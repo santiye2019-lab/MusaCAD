@@ -20,6 +20,11 @@ public class CadView extends View {
     private double unitsPerImagePixel = 1d;
     private String unitName = "piksel";
     private boolean multiTouch;
+    private float[] snapPoints=new float[0];
+    private boolean snapEnabled=true,lastSnapped;
+    public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
+    public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
+
     private boolean selecting, draggingSelection, exporting;
     private float selectionX, selectionY, selectionEndX, selectionEndY;
     public boolean beginSelection(){
@@ -41,16 +46,16 @@ public class CadView extends View {
         });
     }
     public void setListener(Listener l){listener=l;}
-    public void setMode(Mode m){selecting=false;draggingSelection=false;mode=m; points.clear(); notifyValue(); invalidate();}
-    public void setDrawing(Bitmap b){selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
-    public void undo(){if(selecting){cancelSelection();return;}if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
-    public void clearMeasurement(){if(selecting){cancelSelection();return;}points.clear();notifyValue();invalidate();}
+    public void setMode(Mode m){lastSnapped=false;selecting=false;draggingSelection=false;mode=m; points.clear(); notifyValue(); invalidate();}
+    public void setDrawing(Bitmap b){snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
+    public void undo(){lastSnapped=false;if(selecting){cancelSelection();return;}if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
+    public void clearMeasurement(){lastSnapped=false;if(selecting){cancelSelection();return;}points.clear();notifyValue();invalidate();}
     public void setCalibration(double realDistance, String unit){
         if(!Double.isFinite(realDistance)||realDistance<=0||points.size()!=2)throw new IllegalArgumentException();
         double px=distance(points.get(0),points.get(1));
         if(px<=0)throw new IllegalArgumentException();
         unitsPerImagePixel=realDistance/px;
-        unitName=unit; points.clear(); mode=Mode.DISTANCE; notifyValue(); invalidate();
+        unitName=unit; lastSnapped=false; points.clear(); mode=Mode.DISTANCE; notifyValue(); invalidate();
     }
     private void fit(){
         if(drawing==null||getWidth()==0||getHeight()==0)return;
@@ -66,6 +71,12 @@ public class CadView extends View {
         for(PointF point:points){float[] xy={point.x,point.y};imageMatrix.mapPoints(xy);screen.add(new PointF(xy[0],xy[1]));}
         if(screen.size()>1){Path p=new Path();p.moveTo(screen.get(0).x,screen.get(0).y);for(int i=1;i<screen.size();i++)p.lineTo(screen.get(i).x,screen.get(i).y);if(mode==Mode.AREA&&screen.size()>2)p.close();c.drawPath(p,paint);}
         paint.setStyle(Paint.Style.FILL); for(PointF p:screen)c.drawCircle(p.x,p.y,8,paint);
+        if(lastSnapped&&!screen.isEmpty()&&!exporting){
+            PointF point=screen.get(screen.size()-1);paint.setStyle(Paint.Style.STROKE);
+            paint.setColor(Color.WHITE);paint.setStrokeWidth(2);
+            c.drawRect(point.x-12,point.y-12,point.x+12,point.y+12,paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
         if(selecting&&draggingSelection&&!exporting){
             paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.YELLOW);paint.setStrokeWidth(3);
             c.drawRect(Math.min(selectionX,selectionEndX),Math.min(selectionY,selectionEndY),
@@ -89,6 +100,10 @@ public class CadView extends View {
         if(e.getAction()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();
             float[] xy={e.getX(),e.getY()};if(!imageMatrix.invert(inverse))return true;inverse.mapPoints(xy);
             if(xy[0]<0||xy[1]<0||xy[0]>drawing.getWidth()||xy[1]>drawing.getHeight())return true;
+            int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,
+                18*getResources().getDisplayMetrics().density):-1;
+            lastSnapped=snapped>=0;
+            if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
             points.add(new PointF(xy[0],xy[1]));if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));notifyValue();invalidate();return true;}
         return true;
     }

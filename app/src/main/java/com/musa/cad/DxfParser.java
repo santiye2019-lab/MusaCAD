@@ -23,8 +23,9 @@ public final class DxfParser {
     }
     public static final class Result {
         public final Bitmap bitmap;
+        public final float[] snapPoints;
         public final int entityCount, layerCount, skippedCount;
-        Result(Bitmap b,int e,int l,int skipped){bitmap=b;entityCount=e;layerCount=l;skippedCount=skipped;}
+        Result(Bitmap b,int e,int l,int skipped,float[] points){bitmap=b;entityCount=e;layerCount=l;skippedCount=skipped;snapPoints=points;}
     }
     // Display colors distinguish layers; these are not the source file's ACI colors.
     private static final class LayerEntity implements Entity {
@@ -60,7 +61,20 @@ public final class DxfParser {
     public static Result render(File file)throws IOException{
         List<String> lines=readLines(file);if(lines.size()<4)return null;ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();int skipped=0;boolean section=false;
         for(int i=0;i+1<lines.size();){int code=intOf(lines.get(i));String value=lines.get(i+1).trim();i+=2;if(code==0&&"SECTION".equals(value)&&i+1<lines.size()&&"2".equals(lines.get(i).trim())&&"ENTITIES".equals(lines.get(i+1).trim())){section=true;i+=2;continue;}if(code==0&&"ENDSEC".equals(value)){section=false;continue;}if(!section||code!=0)continue;int end=i;while(end+1<lines.size()&&intOf(lines.get(end))!=0)end+=2;Entity e=parse(value,lines,i,end);if(e!=null){String layer=str(lines,i,end,8,"0");layers.add(layer);entities.add(new LayerEntity(e,layer));}else skipped++;i=end;}
-        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities)e.bounds(b);if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);Bitmap out=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(out);c.drawColor(Color.rgb(18,24,30));Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.rgb(225,235,241));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2f);for(Entity e:entities)e.draw(c,p,m);return new Result(out,entities.size(),layers.size(),skipped);
+        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities)e.bounds(b);if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);Bitmap out=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(out);c.drawColor(Color.rgb(18,24,30));Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.rgb(225,235,241));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2f);for(Entity e:entities)e.draw(c,p,m);return new Result(out,entities.size(),layers.size(),skipped,snapPoints(entities,m));
+    }
+    private static float[] snapPoints(List<Entity> entities,Matrix matrix){
+        ArrayList<PointF> points=new ArrayList<>();
+        for(Entity wrapped:entities){
+            Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;
+            if(entity instanceof Line){
+                Line line=(Line)entity;
+                points.add(new PointF(line.x1,line.y1));points.add(new PointF(line.x2,line.y2));
+            }else if(entity instanceof Poly){points.addAll(((Poly)entity).pts);}
+        }
+        float[] result=new float[points.size()*2];
+        for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}
+        matrix.mapPoints(result);return result;
     }
     private static Entity parse(String type,List<String>a,int from,int to){
         if("TEXT".equals(type)||"MTEXT".equals(type)){

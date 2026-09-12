@@ -29,8 +29,7 @@ Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje J
 - Yeni çizimde kalibrasyon sıfırlanır; kalibrasyonsuz ölçüler piksel olarak belirtilir.
 
 Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
-özgün yazı tipi/hizalama/satır kaydırma, bloklar, katman görünürlüğü ve nesne yakalama
-henüz yoktur. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
+özgün yazı tipi/hizalama/satır kaydırma, bloklar ve katman görünürlüğü henüz yoktur. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
 
 
 ## Seçili alan paylaşımı
@@ -41,3 +40,15 @@ seçimi tekrarlayabilir, seçim sırasında GERİ ile iptal edebilirsiniz.
 Çizim ve mevcut ölçüm işaretleri çıktıya alınır; sarı seçim çerçevesi alınmaz.
 Çıktı ekran çözünürlüğündedir; PDF, görüntü tabanlıdır ve ölçekli pafta değildir.
 Her paylaşım ayrı bir geçici dosya üretir.
+
+
+## DXF uç noktası yakalama
+
+NOKTA YAKALA seçeneği, desteklenen DXF çizgilerinin uçlarına ve LWPOLYLINE
+köşelerine dokunmayı kolaylaştırır. Mesafe, alan ve kalibrasyonda en yakın aday
+18 dp ekran mesafesi içinde seçilir; yakalanan son nokta beyaz kareyle gösterilir.
+İstenirse kapatılabilir. DWG önizlemesinde ve aday bulunmayan dosyada devre dışıdır.
+Yakınlaştırmada dokunma toleransı ekran üzerinde sabit kalır.
+
+Bu aşama kesişim, orta nokta, daire merkezi veya blok içindeki nesneleri yakalamaz.
+Ölçü birimini otomatik belirlemez; gerçek uzunluk için kalibrasyon gerekir.
