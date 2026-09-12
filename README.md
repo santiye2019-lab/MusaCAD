@@ -4,8 +4,9 @@
 
 - Android dosya seçiciden DWG/DXF seçme
 - DWG içine gömülü önizlemeyi açma
+- ASCII DXF içindeki LINE, LWPOLYLINE, CIRCLE ve ARC geometrilerini çizme
 - Yakınlaştırma ve kaydırma
-- Nokta seçerek mesafe ve alan işaretleme
+- Kalibrasyonla gerçek birimde mesafe ve alan ölçme
 - Geri alma ve ölçümü temizleme
 - Orijinal dosyayı paylaşma
 - Görünümü PNG olarak paylaşma
@@ -13,7 +14,7 @@
 
 ## Önemli teknik not
 
-DWG kapalı ve karmaşık bir formattır. Bu prototip DWG dosyasındaki gömülü önizlemeyi gösterir. Gerçek çizim koordinatları, katmanlar, nesne yakalama ve ölçekli ölçüm için `CadDocumentProvider` benzeri bir soyutlama arkasına ODA Drawings SDK, AutoCAD Platform Services veya Android için derlenmiş LibreDWG tabanlı bir motor bağlanmalıdır. Ekran önizlemesi üzerinden gösterilen ilk ölçümler bu nedenle resmi metraj kabul edilmemelidir.
+DWG kapalı ve karmaşık bir formattır. Bu prototip DWG dosyasındaki gömülü önizlemeyi gösterir; ASCII DXF dosyalarında ise temel 2B geometrileri doğrudan okur. Katmanlar, bloklar, yazılar ve hassas nesne yakalama için daha kapsamlı bir CAD motoru bağlanmalıdır. Ekran üzerinden yapılan ölçümler kontrol amaçlıdır; resmi metraj öncesinde doğrulanmalıdır.
 
 ## Derleme
 
