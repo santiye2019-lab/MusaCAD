@@ -30,5 +30,14 @@ Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje J
 
 Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
 özgün yazı tipi/hizalama/satır kaydırma, bloklar, katman görünürlüğü ve nesne yakalama
-henüz yoktur. DWG desteği gömülü önizlemeyle sınırlıdır. Seçili alanı kırparak paylaşma
-henüz eklenmemiştir. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
+henüz yoktur. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
+
+
+## Seçili alan paylaşımı
+
+Paylaş → Alan seçerek paylaş yolunu açın. Görünümü tek parmakla sürükleyerek
+dikdörtgen seçin; önizlemeden PNG veya PDF paylaşımını seçin. Yeniden Seç ile
+seçimi tekrarlayabilir, seçim sırasında GERİ ile iptal edebilirsiniz.
+Çizim ve mevcut ölçüm işaretleri çıktıya alınır; sarı seçim çerçevesi alınmaz.
+Çıktı ekran çözünürlüğündedir; PDF, görüntü tabanlıdır ve ölçekli pafta değildir.
+Her paylaşım ayrı bir geçici dosya üretir.

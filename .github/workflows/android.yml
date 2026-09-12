@@ -18,6 +18,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfText.java tests/DxfTextTest.java
           java -cp /tmp/musacad-tests DxfTextTest
+      - name: Test selection bounds
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SelectionBounds.java tests/SelectionBoundsTest.java
+          java -cp /tmp/musacad-tests SelectionBoundsTest
       - name: Build debug APK
         run: |
           chmod +x gradlew
