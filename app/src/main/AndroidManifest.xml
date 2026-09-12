@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.musa.cad">
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <application android:theme="@style/Theme.MusaCAD" android:label="Musa CAD" android:icon="@drawable/ic_launcher">
         <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
