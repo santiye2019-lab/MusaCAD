@@ -14,6 +14,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Test DXF text decoding
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfText.java tests/DxfTextTest.java
+          java -cp /tmp/musacad-tests DxfTextTest
       - name: Build debug APK
         run: |
           chmod +x gradlew

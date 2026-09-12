@@ -19,3 +19,16 @@ DWG kapalı ve karmaşık bir formattır. Bu prototip DWG dosyasındaki gömül�
 ## Derleme
 
 Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje Java 8, minSdk 24 ve targetSdk 35 kullanır.
+
+## Bu geliştirme
+
+- TEXT ve MTEXT için düz yazı gösterimi; parçalı MTEXT içeriği, satır sonları ve Unicode kaçışları okunur.
+- Katman adına göre ayırt edici renkler atanır. Bunlar dosyanın özgün renkleri değildir.
+- Açılan nesne ve katman sayısı, atlanan nesne sayısıyla birlikte gösterilir.
+- Ölçüm noktaları görüntü koordinatlarında tutulur; zoom ölçeği ölçüm sonucuna katılmaz.
+- Yeni çizimde kalibrasyon sıfırlanır; kalibrasyonsuz ölçüler piksel olarak belirtilir.
+
+Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
+özgün yazı tipi/hizalama/satır kaydırma, bloklar, katman görünürlüğü ve nesne yakalama
+henüz yoktur. DWG desteği gömülü önizlemeyle sınırlıdır. Seçili alanı kırparak paylaşma
+henüz eklenmemiştir. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
