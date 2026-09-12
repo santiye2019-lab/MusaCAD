@@ -68,3 +68,18 @@ sayısına eklenir. En fazla 32 iç içe blok ve 100.000 genişletme adımı iş
 Açılan nesne sayısı, blokların içinden çıkan desteklenen öğeleri de içerir.
 
 Teknik başvuru: https://ezdxf.readthedocs.io/en/stable/blocks/insert.html
+
+
+## Arka planda dosya açma
+
+Dosya kopyalama ve çizim hazırlama tek arka plan iş parçacığında yürür.
+Açılış penceresi okunan MB değerini, ardından hazırlama aşamasını gösterir.
+İptal edilen veya eski kalan sonuç ekrana uygulanmaz. Dosya başarıyla açılana
+kadar mevcut çizim, kalibrasyon, ölçümler ve orijinal paylaşım dosyası korunur.
+Boş/okunamayan dosyada kısmi geçici kopya silinir.
+
+Bu sürümde dosya sınırı 32 MB, DXF metin sınırı 600.000 satırdır.
+DWG önizlemesi en fazla 2400 piksel kenara örneklenir.
+İptal arayüzü hemen kapanır; bulut sağlayıcısının engellenen okuması dönene kadar
+arka plan işinin sona ermesi gecikebilir. PDF/PNG dışa aktarımı henüz arka plana
+taşınmamıştır. Telefon üzerinde bellek ve yaşam döngüsü testi yapılmalıdır.

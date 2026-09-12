@@ -12,9 +12,19 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import java.io.*;
+import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20;
+    private final ExecutorService loader=Executors.newSingleThreadExecutor();
+    private LoadTask activeLoad;
+    private static final class LoadTask {
+        Future<?> future;AlertDialog dialog;TextView progress;
+    }
+    private static final class Loaded {
+        File file;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        void dispose(){if(bitmap!=null)bitmap.recycle();if(file!=null)file.delete();}
+    }
     private CheckBox snapToggle;
     private CadView cad; private TextView fileName,result; private File currentFile;
     protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
@@ -30,7 +40,66 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.shareButton).setOnClickListener(v->showShare());
     }
     private void open(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});startActivityForResult(i,OPEN);}
-    protected void onActivityResult(int r,int c,Intent data){super.onActivityResult(r,c,data);if(r!=OPEN||c!=RESULT_OK||data==null)return;Uri u=data.getData();snapToggle.setEnabled(false);try{String n=nameOf(u);currentFile=new File(getCacheDir(),"opened_"+new File(n).getName());try(InputStream in=getContentResolver().openInputStream(u);OutputStream out=new FileOutputStream(currentFile)){byte[] buf=new byte[65536];int k;while((k=in.read(buf))>0)out.write(buf,0,k);}boolean dxf=n.toLowerCase(java.util.Locale.ROOT).endsWith(".dxf");DxfParser.Result parsed=dxf?DxfParser.render(currentFile):null;Bitmap p=dxf?(parsed==null?null:parsed.bitmap):DwgPreview.read(currentFile);if(p!=null){cad.setDrawing(p);if(parsed!=null){cad.setSnapPoints(parsed.snapPoints);snapToggle.setEnabled(parsed.snapPoints.length>0);}fileName.setText(n+(dxf?" — DXF geometri":" — DWG önizleme"));result.setText(dxf?(parsed.entityCount+" nesne, "+parsed.layerCount+" katman; "+parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."):"DWG önizlemesi açıldı. Ölçek belirleyerek ölçebilirsiniz.");}else{cad.setDrawing(null);fileName.setText(n);result.setText(dxf?"Desteklenen DXF geometrisi bulunamadı.":"Dosyada görüntülenebilir DWG önizlemesi bulunamadı.");}}catch(Exception e){cad.setDrawing(null);currentFile=null;fileName.setText("Dosya açılamadı");Toast.makeText(this,"Dosya açılamadı: "+e.getMessage(),Toast.LENGTH_LONG).show();}}
+    protected void onActivityResult(int r,int c,Intent data){
+        super.onActivityResult(r,c,data);
+        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null)startLoad(data.getData());
+    }
+    private void cancelLoad(){
+        LoadTask task=activeLoad;activeLoad=null;
+        if(task!=null){if(task.future!=null)task.future.cancel(true);task.dialog.dismiss();}
+    }
+    private void startLoad(Uri uri){
+        cancelLoad();
+        LoadTask task=new LoadTask();activeLoad=task;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+        int pad=(int)(20*getResources().getDisplayMetrics().density);box.setPadding(pad,pad,pad,pad);
+        box.addView(new ProgressBar(this));
+        task.progress=new TextView(this);task.progress.setText("Dosya okunuyor…");box.addView(task.progress);
+        task.dialog=new AlertDialog.Builder(this).setTitle("Çizim açılıyor").setView(box)
+            .setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        task.future=loader.submit(()->{
+            Loaded loaded=new Loaded();
+            try{
+                FileTransfer.checkCancelled();
+                loaded.name=nameOf(uri);
+                loaded.dxf=loaded.name.toLowerCase(java.util.Locale.ROOT).endsWith(".dxf");
+                loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
+                try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){
+                    FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{
+                        if(activeLoad==task)task.progress.setText(String.format(java.util.Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));
+                    }));
+                }
+                runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Çizim hazırlanıyor…");});
+                FileTransfer.checkCancelled();
+                loaded.parsed=loaded.dxf?DxfParser.render(loaded.file):null;
+                loaded.bitmap=loaded.dxf?(loaded.parsed==null?null:loaded.parsed.bitmap):DwgPreview.read(loaded.file);
+                FileTransfer.checkCancelled();
+                if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
+                    activeLoad=null;task.dialog.dismiss();
+                    currentFile=loaded.file;
+                    cad.setDrawing(loaded.bitmap);
+                    snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
+                    if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
+                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":" — DWG önizleme"));
+                    result.setText(loaded.dxf?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
+                        " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."):
+                        "DWG önizlemesi açıldı. Ölçek belirleyerek ölçebilirsiniz.");
+                });
+            }catch(Exception | OutOfMemoryError e){
+                loaded.dispose();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));
+                });
+            }
+        });
+    }
+    @Override protected void onDestroy(){
+        cancelLoad();loader.shutdownNow();super.onDestroy();
+    }
     private String nameOf(Uri u){try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);}}return "cizim.dwg";}
     private void showShare(){
         new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{

@@ -69,6 +69,7 @@ public final class DxfBlocks {
         return result;
     }
     private static void expand(Record r,Transform parent,String parentLayer,Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
+        if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
         if(++result.visits>100000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;

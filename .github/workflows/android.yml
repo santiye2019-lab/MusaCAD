@@ -30,6 +30,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
+      - name: Test cancellable file transfer
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
+          java -cp /tmp/musacad-tests FileTransferTest
       - name: Build debug APK
         run: |
           chmod +x gradlew
