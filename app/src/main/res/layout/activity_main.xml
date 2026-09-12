@@ -10,6 +10,7 @@
     <HorizontalScrollView android:layout_width="match_parent" android:layout_height="64dp" android:fillViewport="true" android:background="#0B3B60">
         <LinearLayout android:layout_width="wrap_content" android:layout_height="match_parent" android:gravity="center">
             <Button android:id="@+id/panButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="GEZİN" />
+            <Button android:id="@+id/calibrateButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="ÖLÇEK" />
             <Button android:id="@+id/distanceButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="MESAFE" />
             <Button android:id="@+id/areaButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="ALAN" />
             <Button android:id="@+id/undoButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="GERİ" />

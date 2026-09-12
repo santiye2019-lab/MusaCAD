@@ -7,8 +7,8 @@ import android.view.*;
 import java.util.*;
 
 public class CadView extends View {
-    public enum Mode { PAN, DISTANCE, AREA }
-    public interface Listener { void onMeasurement(String value); }
+    public enum Mode { PAN, CALIBRATE, DISTANCE, AREA }
+    public interface Listener { void onMeasurement(String value); void onCalibrationRequested(double pixelDistance); }
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ArrayList<PointF> points = new ArrayList<>();
     private final Matrix imageMatrix = new Matrix();
@@ -17,6 +17,8 @@ public class CadView extends View {
     private Mode mode = Mode.PAN;
     private Listener listener;
     private float lastX, lastY, scale = 1f;
+    private double unitsPerImagePixel = 1d;
+    private String unitName = "birim";
     private final ScaleGestureDetector scaleDetector;
 
     public CadView(Context c, AttributeSet a) {
@@ -33,6 +35,10 @@ public class CadView extends View {
     public void setDrawing(Bitmap b){drawing=b; points.clear(); imageMatrix.reset(); fit(); invalidate();}
     public void undo(){if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
     public void clearMeasurement(){points.clear();notifyValue();invalidate();}
+    public void setCalibration(double realDistance, String unit){
+        if(points.size()==2){double px=distance(points.get(0),points.get(1))/scale;if(px>0)unitsPerImagePixel=realDistance/px;}
+        unitName=unit; points.clear(); mode=Mode.DISTANCE; notifyValue(); invalidate();
+    }
     private void fit(){
         if(drawing==null||getWidth()==0||getHeight()==0)return;
         float s=Math.min((float)getWidth()/drawing.getWidth(),(float)getHeight()/drawing.getHeight());
@@ -54,13 +60,14 @@ public class CadView extends View {
         scaleDetector.onTouchEvent(e); if(scaleDetector.isInProgress())return true;
         if(e.getAction()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
         if(e.getAction()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;}
-        if(e.getAction()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){points.add(new PointF(e.getX(),e.getY()));notifyValue();invalidate();return true;}
+        if(e.getAction()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){points.add(new PointF(e.getX(),e.getY()));if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1))/scale);notifyValue();invalidate();return true;}
         return true;
     }
     private void notifyValue(){
         if(listener==null)return;
-        if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Ekran mesafesi: %.1f birim",sum/scale));}
-        else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2/(scale*scale);}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Ekran alanı: %.1f birim²",a));}
+        if(mode==Mode.CALIBRATE) listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
+        else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Mesafe: %.3f %s",sum/scale*unitsPerImagePixel,unitName));}
+        else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2/(scale*scale)*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));}
         else listener.onMeasurement("Yakınlaştırmak için iki parmak kullanın");
     }
     private double distance(PointF a,PointF b){return Math.hypot(a.x-b.x,a.y-b.y);}

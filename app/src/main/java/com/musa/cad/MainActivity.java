@@ -17,9 +17,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20;
     private CadView cad; private TextView fileName,result; private File currentFile;
     protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
-        cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(v->result.setText(v));
+        cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}});
         findViewById(R.id.openButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->cad.setMode(CadView.Mode.PAN));
+        findViewById(R.id.calibrateButton).setOnClickListener(v->cad.setMode(CadView.Mode.CALIBRATE));
         findViewById(R.id.distanceButton).setOnClickListener(v->cad.setMode(CadView.Mode.DISTANCE));
         findViewById(R.id.areaButton).setOnClickListener(v->cad.setMode(CadView.Mode.AREA));
         findViewById(R.id.undoButton).setOnClickListener(v->cad.undo());
@@ -30,6 +31,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int r,int c,Intent data){super.onActivityResult(r,c,data);if(r!=OPEN||c!=RESULT_OK||data==null)return;Uri u=data.getData();try{String n=nameOf(u);currentFile=new File(getCacheDir(),"opened_"+n);try(InputStream in=getContentResolver().openInputStream(u);OutputStream out=new FileOutputStream(currentFile)){byte[] buf=new byte[65536];int k;while((k=in.read(buf))>0)out.write(buf,0,k);}Bitmap p=DwgPreview.read(currentFile);if(p!=null){cad.setDrawing(p);fileName.setText(n+" — DWG önizleme");result.setText("Önizleme açıldı. Ölçüm motoru sonraki aşamada bağlanacak.");}else{fileName.setText(n);result.setText("Dosyada görüntülenebilir DWG önizlemesi bulunamadı.");}}catch(Exception e){Toast.makeText(this,"Dosya açılamadı: "+e.getMessage(),Toast.LENGTH_LONG).show();}}
     private String nameOf(Uri u){try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);}}return "cizim.dwg";}
     private void showShare(){new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{"Orijinal dosyayı paylaş","PDF olarak paylaş","Görünümü resim olarak paylaş"},(d,w)->{if(w==0)shareFile(currentFile,"application/octet-stream");else if(w==1)exportPdf();else exportImage();}).show();}
+    private void showCalibration(){
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=(int)(16*getResources().getDisplayMetrics().density);box.setPadding(p,0,p,0);
+        EditText value=new EditText(this);value.setHint("Gerçek uzunluk (ör. 2.50)");value.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(value);
+        Spinner units=new Spinner(this);units.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"m","cm","mm"}));box.addView(units);
+        new AlertDialog.Builder(this).setTitle("Ölçeği ayarla").setView(box).setPositiveButton("UYGULA",(d,w)->{try{double n=Double.parseDouble(value.getText().toString().replace(',','.'));cad.setCalibration(n,units.getSelectedItem().toString());}catch(Exception e){Toast.makeText(this,"Geçerli bir uzunluk girin",Toast.LENGTH_LONG).show();}}).setNegativeButton("İPTAL",null).show();
+    }
     private File exportDir(){File d=new File(getCacheDir(),"exports");d.mkdirs();return d;}
     private void exportImage(){try{File f=new File(exportDir(),"MusaCAD_gorunum.png");try(OutputStream o=new FileOutputStream(f)){cad.snapshot().compress(Bitmap.CompressFormat.PNG,100,o);}shareFile(f,"image/png");}catch(Exception e){error(e);}}
     private void exportPdf(){try{Bitmap b=cad.snapshot();PdfDocument p=new PdfDocument();PdfDocument.PageInfo info=new PdfDocument.PageInfo.Builder(b.getWidth(),b.getHeight(),1).create();PdfDocument.Page page=p.startPage(info);page.getCanvas().drawBitmap(b,0,0,null);p.finishPage(page);File f=new File(exportDir(),"MusaCAD_cizim.pdf");try(OutputStream o=new FileOutputStream(f)){p.writeTo(o);}p.close();shareFile(f,"application/pdf");}catch(Exception e){error(e);}}
