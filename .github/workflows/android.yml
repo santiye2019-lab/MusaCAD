@@ -26,6 +26,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
           java -cp /tmp/musacad-tests SnapPointsTest
+      - name: Test DXF block expansion
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-tests DxfBlocksTest
       - name: Build debug APK
         run: |
           chmod +x gradlew

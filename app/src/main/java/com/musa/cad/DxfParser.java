@@ -19,7 +19,25 @@ public final class DxfParser {
     }
     private static final class Circle implements Entity{
         final float x,y,r,start,sweep;Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
-        public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}public void draw(Canvas c,Paint p,Matrix m){float[]o={x,y},e={x+r,y};m.mapPoints(o);m.mapPoints(e);float rr=Math.abs(e[0]-o[0]);c.drawArc(new RectF(o[0]-rr,o[1]-rr,o[0]+rr,o[1]+rr),-start,-sweep,false,p);}
+        public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}public void draw(Canvas c,Paint p,Matrix m){Path path=new Path();path.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);path.transform(m);c.drawPath(path,p);}
+    }
+    private static final class Transformed implements Entity {
+        final Entity entity;final Matrix matrix;
+        Transformed(Entity entity,DxfBlocks.Transform t)throws IOException {
+            this.entity=entity;
+            float[] v={(float)t.a,(float)t.c,(float)t.x,(float)t.b,(float)t.d,(float)t.y,0,0,1};
+            for(float n:v)if(!Float.isFinite(n))throw new IOException("DXF blok dönüşümü sınır dışında");
+            matrix=new Matrix();matrix.setValues(v);
+        }
+        public void bounds(RectF b){
+            RectF local=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+            entity.bounds(local);
+            if(local.left>local.right||local.top>local.bottom)return;
+            matrix.mapRect(local);add(b,local.left,local.top);add(b,local.right,local.bottom);
+        }
+        public void draw(Canvas c,Paint p,Matrix view){
+            Matrix combined=new Matrix();combined.setConcat(view,matrix);entity.draw(c,p,combined);
+        }
     }
     public static final class Result {
         public final Bitmap bitmap;
@@ -59,18 +77,31 @@ public final class DxfParser {
         return fallback;
     }
     public static Result render(File file)throws IOException{
-        List<String> lines=readLines(file);if(lines.size()<4)return null;ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();int skipped=0;boolean section=false;
-        for(int i=0;i+1<lines.size();){int code=intOf(lines.get(i));String value=lines.get(i+1).trim();i+=2;if(code==0&&"SECTION".equals(value)&&i+1<lines.size()&&"2".equals(lines.get(i).trim())&&"ENTITIES".equals(lines.get(i+1).trim())){section=true;i+=2;continue;}if(code==0&&"ENDSEC".equals(value)){section=false;continue;}if(!section||code!=0)continue;int end=i;while(end+1<lines.size()&&intOf(lines.get(end))!=0)end+=2;Entity e=parse(value,lines,i,end);if(e!=null){String layer=str(lines,i,end,8,"0");layers.add(layer);entities.add(new LayerEntity(e,layer));}else skipped++;i=end;}
+        List<String> lines=readLines(file);
+        DxfBlocks.Result expanded=DxfBlocks.expand(lines);
+        ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
+        int skipped=expanded.skipped;
+        for(DxfBlocks.Placement item:expanded.placements){
+            Entity entity=parse(item.record.type,lines,item.record.from,item.record.to);
+            if(entity==null){skipped++;continue;}
+            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
+        }
         if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities)e.bounds(b);if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);Bitmap out=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(out);c.drawColor(Color.rgb(18,24,30));Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.rgb(225,235,241));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2f);for(Entity e:entities)e.draw(c,p,m);return new Result(out,entities.size(),layers.size(),skipped,snapPoints(entities,m));
     }
     private static float[] snapPoints(List<Entity> entities,Matrix matrix){
         ArrayList<PointF> points=new ArrayList<>();
         for(Entity wrapped:entities){
             Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;
+            Matrix transform=new Matrix();
+            if(entity instanceof Transformed){transform=((Transformed)entity).matrix;entity=((Transformed)entity).entity;}
+            ArrayList<PointF> local=new ArrayList<>();
             if(entity instanceof Line){
                 Line line=(Line)entity;
-                points.add(new PointF(line.x1,line.y1));points.add(new PointF(line.x2,line.y2));
-            }else if(entity instanceof Poly){points.addAll(((Poly)entity).pts);}
+                local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));
+            }else if(entity instanceof Poly){local.addAll(((Poly)entity).pts);}
+            for(PointF point:local){
+                float[] xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));
+            }
         }
         float[] result=new float[points.size()*2];
         for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}
