@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.MusaCAD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/cad_blue</item><item name="colorPrimaryVariant">#072840</item>
+        <item name="colorSecondary">@color/cad_accent</item><item name="android:fontFamily">sans</item>
+    </style>
+</resources>
