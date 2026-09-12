@@ -76,13 +76,14 @@ public class MainActivity extends AppCompatActivity {
         try{
             File file=File.createTempFile("MusaCAD_"+suffix+"_",pdf?".pdf":".png",exportDir());
             if(pdf){
-                try(PdfDocument document=new PdfDocument()){
+                PdfDocument document=new PdfDocument();
+                try{
                     PdfDocument.Page page=document.startPage(new PdfDocument.PageInfo.Builder(
                         bitmap.getWidth(),bitmap.getHeight(),1).create());
                     page.getCanvas().drawBitmap(bitmap,0,0,null);
                     document.finishPage(page);
                     try(OutputStream out=new FileOutputStream(file)){document.writeTo(out);}
-                }
+                }finally{document.close();}
             }else{
                 try(OutputStream out=new FileOutputStream(file)){
                     if(!bitmap.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("Resim oluşturulamadı");
