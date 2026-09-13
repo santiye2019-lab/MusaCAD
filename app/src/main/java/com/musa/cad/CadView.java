@@ -45,6 +45,12 @@ public class CadView extends View {
             }
         });
     }
+    public void replaceVisibleDrawing(Bitmap bitmap,float[] candidates){
+        if(drawing==null||bitmap.getWidth()!=drawing.getWidth()||bitmap.getHeight()!=drawing.getHeight())
+            throw new IllegalArgumentException("Çizim boyutu değişti");
+        drawing=bitmap;selecting=false;draggingSelection=false;points.clear();
+        setSnapPoints(candidates);notifyValue();invalidate();
+    }
     public void setListener(Listener l){listener=l;}
     public void setMode(Mode m){lastSnapped=false;selecting=false;draggingSelection=false;mode=m; points.clear(); notifyValue(); invalidate();}
     public void setDrawing(Bitmap b){snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}

@@ -43,7 +43,19 @@ public final class DxfParser {
         public final Bitmap bitmap;
         public final float[] snapPoints;
         public final int entityCount, layerCount, skippedCount;
-        Result(Bitmap b,int e,int l,int skipped,float[] points){bitmap=b;entityCount=e;layerCount=l;skippedCount=skipped;snapPoints=points;}
+        public final Set<String> layerNames,visibleLayers;
+        private final List<Entity> document;
+        private final Matrix view;
+        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible){
+            bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
+            this.document=document;this.view=new Matrix(view);
+            layerNames=Collections.unmodifiableSet(new TreeSet<>(all));
+            visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
+        }
+        public Result withVisibleLayers(Set<String> selected)throws IOException{
+            Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
+            return renderLayers(document,view,layerNames,visible,skippedCount);
+        }
     }
     // Display colors distinguish layers; these are not the source file's ACI colors.
     private static final class LayerEntity implements Entity {
@@ -87,8 +99,24 @@ public final class DxfParser {
             if(entity==null){skipped++;continue;}
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
         }
-        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);Bitmap out=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(out);c.drawColor(Color.rgb(18,24,30));Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.rgb(225,235,241));p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2f);for(Entity e:entities){FileTransfer.checkCancelled();e.draw(c,p,m);}return new Result(out,entities.size(),layers.size(),skipped,snapPoints(entities,m));
+        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);return renderLayers(entities,m,layers,layers,skipped);
     }
+    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped)throws IOException{
+        List<Entity> shown=new ArrayList<>();
+        for(Entity entity:document){
+            FileTransfer.checkCancelled();
+            if(visible.contains(((LayerEntity)entity).layer))shown.add(entity);
+        }
+        Bitmap bitmap=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);
+        try{
+            Canvas canvas=new Canvas(bitmap);canvas.drawColor(Color.rgb(18,24,30));
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2f);
+            for(Entity entity:shown){FileTransfer.checkCancelled();entity.draw(canvas,paint,view);}
+            FileTransfer.checkCancelled();
+            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible);
+        }catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
+    }
+
     private static float[] snapPoints(List<Entity> entities,Matrix matrix){
         ArrayList<PointF> points=new ArrayList<>();
         for(Entity wrapped:entities){

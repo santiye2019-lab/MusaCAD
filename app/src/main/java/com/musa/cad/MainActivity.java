@@ -26,10 +26,12 @@ public class MainActivity extends AppCompatActivity {
         void dispose(){if(bitmap!=null)bitmap.recycle();if(file!=null)file.delete();}
     }
     private CheckBox snapToggle;
+    private DxfParser.Result activeDxf;
     private CadView cad; private TextView fileName,result; private File currentFile;
     protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
+        findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->cad.setMode(CadView.Mode.PAN));
         findViewById(R.id.calibrateButton).setOnClickListener(v->cad.setMode(CadView.Mode.CALIBRATE));
@@ -79,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    currentFile=loaded.file;
+                    currentFile=loaded.file;activeDxf=loaded.parsed;findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
                     cad.setDrawing(loaded.bitmap);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
@@ -99,6 +101,45 @@ public class MainActivity extends AppCompatActivity {
     }
     @Override protected void onDestroy(){
         cancelLoad();loader.shutdownNow();super.onDestroy();
+    }
+    private void showLayers(){
+        if(activeDxf==null||activeLoad!=null)return;
+        String[] names=activeDxf.layerNames.toArray(new String[0]);
+        java.util.Set<String> selected=new java.util.HashSet<>(activeDxf.visibleLayers);
+        boolean[] checked=new boolean[names.length];
+        for(int i=0;i<names.length;i++)checked[i]=selected.contains(names[i]);
+        new AlertDialog.Builder(this).setTitle("Görünecek katmanlar")
+            .setMultiChoiceItems(names,checked,(dialog,index,enabled)->{
+                if(enabled)selected.add(names[index]);else selected.remove(names[index]);
+            }).setPositiveButton("UYGULA",(d,w)->applyLayers(selected))
+            .setNeutralButton("TÜMÜNÜ GÖSTER",(d,w)->applyLayers(new java.util.HashSet<>(activeDxf.layerNames)))
+            .setNegativeButton("İPTAL",null).show();
+    }
+    private void applyLayers(java.util.Set<String> selected){
+        if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;
+        DxfParser.Result source=activeDxf;
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("Katmanlar hazırlanıyor")
+            .setMessage("Görünüm güncelleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        task.future=loader.submit(()->{
+            try{
+                DxfParser.Result updated=source.withVisibleLayers(selected);
+                runOnUiThread(()->{
+                    if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){updated.bitmap.recycle();return;}
+                    activeLoad=null;task.dialog.dismiss();
+                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapPoints);activeDxf=updated;
+                    snapToggle.setEnabled(updated.snapPoints.length>0);
+                    result.setText(updated.entityCount+" nesne, "+updated.visibleLayers.size()+"/"+updated.layerCount+
+                        " katman görünür; "+updated.skippedCount+" desteklenmeyen nesne.");
+                });
+            }catch(Exception|OutOfMemoryError e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));
+                });
+            }
+        });
     }
     private String nameOf(Uri u){try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);}}return "cizim.dwg";}
     private void showShare(){

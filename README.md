@@ -29,7 +29,7 @@ Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje J
 - Yeni çizimde kalibrasyon sıfırlanır; kalibrasyonsuz ölçüler piksel olarak belirtilir.
 
 Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
-özgün yazı tipi/hizalama/satır kaydırma ve katman görünürlüğü henüz yoktur; blok desteğinin sınırları aşağıdadır. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
+özgün yazı tipi/hizalama/satır kaydırma henüz yoktur; katman görünürlüğü uygulama içinden değiştirilebilir; blok desteğinin sınırları aşağıdadır. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
 
 
 ## Seçili alan paylaşımı
@@ -83,3 +83,15 @@ DWG önizlemesi en fazla 2400 piksel kenara örneklenir.
 İptal arayüzü hemen kapanır; bulut sağlayıcısının engellenen okuması dönene kadar
 arka plan işinin sona ermesi gecikebilir. PDF/PNG dışa aktarımı henüz arka plana
 taşınmamıştır. Telefon üzerinde bellek ve yaşam döngüsü testi yapılmalıdır.
+
+
+## Katman görünürlüğü
+
+DXF açıldıktan sonra KATMANLAR düğmesiyle görünür katmanları seçin.
+UYGULA değişikliği işler; İPTAL önceki durumu korur; TÜMÜNÜ GÖSTER tümünü açar.
+Gizlenen katmanlar çizimden ve uç noktası yakalama adaylarından birlikte çıkar.
+PNG/PDF görünüm paylaşımı bu seçimi yansıtır; orijinal dosya değiştirilmez.
+Yeniden çizim arka plandadır; iptal ve hata halinde önceki görünüm korunur.
+Görünüm dönüşümü ve kalibrasyon sabittir; mevcut ölçüm işaretleri temizlenir.
+Liste yalnızca desteklenen nesnelerin katmanlarını içerir. Dosyanın kaynak
+katman açık/kapalı bayrakları ve renkleri henüz birebir uygulanmaz.
