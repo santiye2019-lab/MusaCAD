@@ -117,9 +117,10 @@ public class VerificationRunner extends Instrumentation {
             pinchEvent(v,pinch,0,MotionEvent.ACTION_DOWN,200,400,1);
             pinchEvent(v,pinch,20,MotionEvent.ACTION_POINTER_DOWN|(1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),200,400,2);
             pinchEvent(v,pinch,40,MotionEvent.ACTION_MOVE,150,450,2);
-            pinchEvent(v,pinch,60,MotionEvent.ACTION_MOVE,100,500,2);
-            pinchEvent(v,pinch,80,MotionEvent.ACTION_POINTER_UP|(1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),100,500,2);
-            pinchEvent(v,pinch,100,MotionEvent.ACTION_UP,100,500,1);
+            // Android establishes the scale baseline on the 300px activation span.
+            pinchEvent(v,pinch,60,MotionEvent.ACTION_MOVE,0,600,2);
+            pinchEvent(v,pinch,80,MotionEvent.ACTION_POINTER_UP|(1<<MotionEvent.ACTION_POINTER_INDEX_SHIFT),0,600,2);
+            pinchEvent(v,pinch,100,MotionEvent.ACTION_UP,0,600,1);
             v.setMode(CadView.Mode.DISTANCE);tap(v,200,200);tap(v,500,600);
             require(reading[0].equals("Mesafe: 5.000 m"),"Pinch changed measurement: "+reading[0]);
             passed("Two-finger 2x zoom preserves calibrated distance");
