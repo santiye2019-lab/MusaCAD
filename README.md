@@ -95,3 +95,13 @@ Yeniden çizim arka plandadır; iptal ve hata halinde önceki görünüm korunur
 Görünüm dönüşümü ve kalibrasyon sabittir; mevcut ölçüm işaretleri temizlenir.
 Liste yalnızca desteklenen nesnelerin katmanlarını içerir. Dosyanın kaynak
 katman açık/kapalı bayrakları ve renkleri henüz birebir uygulanmaz.
+
+
+## Deneysel gerçek DWG okuma
+
+LibreDWG tabanlı çevrimdışı DWG→DXF köprüsü eklenmiştir. Geometri okunursa
+katmanlar, desteklenen bloklar ve nokta yakalama kullanılabilir. Başarısızlıkta
+varsa gömülü önizleme açılır ve bu durum başlıkta belirtilir.
+Önceki yalnız önizleme notları bu yeni yol için geçerli değildir; tüm nesneler
+ve DWG sürümleri için eksiksiz destek iddiası yoktur. Kalibrasyon hâlâ gereklidir.
+Lisans, kaynak paketleme ve yeniden derleme için NATIVE_BUILD.md belgesine bakın.

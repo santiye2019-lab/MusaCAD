@@ -10,6 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Build and smoke-test native converter
+        run: |
+          cmake -S app/src/main/cpp -B /tmp/musa-native -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/musa-native --parallel 2
+          /tmp/musa-native/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musa-smoke.dxf
+          test -s /tmp/musa-smoke.dxf
+          mkdir -p app/src/main/assets
+          cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -44,3 +58,13 @@ jobs:
           name: MusaCAD-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Package corresponding source
+        run: |
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
+      - name: Upload native converter and corresponding source
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-native-and-source
+          path: |
+            /tmp/musa-native/musacad_dwg_convert
+            /tmp/MusaCAD-source.tar.gz

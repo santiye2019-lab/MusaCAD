@@ -43,6 +43,7 @@ public final class DxfParser {
         public final Bitmap bitmap;
         public final float[] snapPoints;
         public final int entityCount, layerCount, skippedCount;
+        public int conversionWarnings;
         public final Set<String> layerNames,visibleLayers;
         private final List<Entity> document;
         private final Matrix view;
@@ -54,7 +55,7 @@ public final class DxfParser {
         }
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            return renderLayers(document,view,layerNames,visible,skippedCount);
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount);result.conversionWarnings=conversionWarnings;return result;
         }
     }
     // Display colors distinguish layers; these are not the source file's ACI colors.

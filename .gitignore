@@ -3,3 +3,7 @@ local.properties
 **/build/
 *.jks
 *.keystore
+
+third_party/libredwg/
+app/src/main/assets/COPYING-LibreDWG.txt
+.cxx/

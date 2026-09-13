@@ -31,6 +31,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
+        findViewById(R.id.appTitle).setOnClickListener(v->{
+            String license;
+            try(InputStream in=getAssets().open("COPYING-LibreDWG.txt")){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1)out.write(bytes,0,n);license=out.toString("UTF-8");}
+            catch(IOException e){license="GPL-3.0-or-later";}
+            TextView text=new TextView(this);text.setPadding(24,16,24,16);
+            text.setText("MusaCAD — LibreDWG ile çevrimdışı DWG okuma\nKaynak kod: https://github.com/santiye2019-lab/MusaCAD\n\n"+license);
+            android.text.util.Linkify.addLinks(text,android.text.util.Linkify.WEB_URLS);text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+            ScrollView scroll=new ScrollView(this);scroll.addView(text);
+            new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
+        });
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->cad.setMode(CadView.Mode.PAN));
@@ -74,8 +84,17 @@ public class MainActivity extends AppCompatActivity {
                 }
                 runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Çizim hazırlanıyor…");});
                 FileTransfer.checkCancelled();
-                loaded.parsed=loaded.dxf?DxfParser.render(loaded.file):null;
-                loaded.bitmap=loaded.dxf?(loaded.parsed==null?null:loaded.parsed.bitmap):DwgPreview.read(loaded.file);
+                if(loaded.dxf){loaded.parsed=DxfParser.render(loaded.file);}
+                else{
+                    try{loaded.parsed=NativeDwg.read(loaded.file,getCacheDir());}
+                    catch(InterruptedIOException cancelled){throw cancelled;}
+                    catch(IOException|UnsatisfiedLinkError conversionError){
+                        FileTransfer.checkCancelled();
+                        loaded.bitmap=DwgPreview.read(loaded.file);
+                        if(loaded.bitmap==null)throw new IOException("DWG geometri veya önizleme açılamadı",conversionError);
+                    }
+                }
+                if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;
                 FileTransfer.checkCancelled();
                 if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
                 runOnUiThread(()->{
@@ -85,9 +104,9 @@ public class MainActivity extends AppCompatActivity {
                     cad.setDrawing(loaded.bitmap);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":" — DWG önizleme"));
-                    result.setText(loaded.dxf?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
-                        " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."):
+                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":" — DWG önizleme (geometri okunamadı)"));
+                    result.setText(loaded.parsed!=null?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
+                        " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."+ (loaded.parsed.conversionWarnings!=0?" DWG dönüşüm uyarısı var.":"")):
                         "DWG önizlemesi açıldı. Ölçek belirleyerek ölçebilirsiniz.");
                 });
             }catch(Exception | OutOfMemoryError e){
