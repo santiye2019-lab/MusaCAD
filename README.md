@@ -3,7 +3,7 @@
 İlk prototip özellikleri:
 
 - Android dosya seçiciden DWG/DXF seçme
-- DWG içine gömülü önizlemeyi açma
+- LibreDWG ile deneysel çevrimdışı DWG geometrisi okuma; başarısızlıkta gömülü önizlemeyi açma
 - ASCII DXF içindeki LINE, LWPOLYLINE, CIRCLE ve ARC geometrilerini çizme
 - Yakınlaştırma ve kaydırma
 - Kalibrasyonla gerçek birimde mesafe ve alan ölçme
@@ -14,11 +14,11 @@
 
 ## Önemli teknik not
 
-DWG kapalı ve karmaşık bir formattır. Bu prototip DWG dosyasındaki gömülü önizlemeyi gösterir; ASCII DXF dosyalarında ise temel 2B geometrileri doğrudan okur. Tam DWG geometrisi için ayrıca bir CAD motoru gerekir. DXF yazı, blok ve nokta yakalama desteği aşağıdaki kapsamla sınırlıdır. Ekran üzerinden yapılan ölçümler kontrol amaçlıdır; resmi metraj öncesinde doğrulanmalıdır.
+DWG, LibreDWG motoruyla önce geçici DXF'ye dönüştürülür; desteklenen temel 2B geometriler çizilir. Dönüşüm başarısızsa varsa gömülü önizleme gösterilir. Bu durumda başlıkta görüntünün piksel boyutu ve geometri okunamadığı belirtilir. Küçük önizlemeler çizimin ayrıntılarını taşımaz; kalibrasyon eksik ayrıntıyı veya hassasiyeti geri getirmez. DXF yazı, blok ve nokta yakalama desteği aşağıdaki kapsamla sınırlıdır. Ekran üzerinden yapılan ölçümler kontrol amaçlıdır; resmi metraj öncesinde doğrulanmalıdır.
 
 ## Derleme
 
-Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje Java 8, minSdk 24 ve targetSdk 35 kullanır.
+Önce NATIVE_BUILD.md içindeki sabit sürümlü LibreDWG kaynak hazırlığını yapın; ardından Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje Java 8, minSdk 24 ve targetSdk 35 kullanır.
 
 ## Bu geliştirme
 
@@ -29,7 +29,7 @@ Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje J
 - Yeni çizimde kalibrasyon sıfırlanır; kalibrasyonsuz ölçüler piksel olarak belirtilir.
 
 Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
-özgün yazı tipi/hizalama/satır kaydırma henüz yoktur; katman görünürlüğü uygulama içinden değiştirilebilir; blok desteğinin sınırları aşağıdadır. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği gömülü önizlemeyle sınırlıdır. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
+özgün yazı tipi/hizalama/satır kaydırma henüz yoktur; katman görünürlüğü uygulama içinden değiştirilebilir; blok desteğinin sınırları aşağıdadır. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği deneyseldir; bazı dosyalarda yalnız önizleme açılabilir. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
 
 
 ## Seçili alan paylaşımı
@@ -102,6 +102,7 @@ katman açık/kapalı bayrakları ve renkleri henüz birebir uygulanmaz.
 LibreDWG tabanlı çevrimdışı DWG→DXF köprüsü eklenmiştir. Geometri okunursa
 katmanlar, desteklenen bloklar ve nokta yakalama kullanılabilir. Başarısızlıkta
 varsa gömülü önizleme açılır ve bu durum başlıkta belirtilir.
-Önceki yalnız önizleme notları bu yeni yol için geçerli değildir; tüm nesneler
-ve DWG sürümleri için eksiksiz destek iddiası yoktur. Kalibrasyon hâlâ gereklidir.
+Tüm nesneler ve DWG sürümleri için eksiksiz destek iddiası yoktur.
+Kalibrasyon hâlâ gereklidir. Geometriye ait bölüm haritası okunamayan dosyalar
+önizleme yoluna düşebilir; bu durum tek başına dosyanın bozuk olduğunu kanıtlamaz.
 Lisans, kaynak paketleme ve yeniden derleme için NATIVE_BUILD.md belgesine bakın.

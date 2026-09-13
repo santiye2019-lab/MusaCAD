@@ -104,10 +104,11 @@ public class MainActivity extends AppCompatActivity {
                     cad.setDrawing(loaded.bitmap);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":" — DWG önizleme (geometri okunamadı)"));
+                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":
+                        " — Yalnız önizleme: "+loaded.bitmap.getWidth()+" × "+loaded.bitmap.getHeight()+" px (geometri okunamadı)"));
                     result.setText(loaded.parsed!=null?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
                         " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."+ (loaded.parsed.conversionWarnings!=0?" DWG dönüşüm uyarısı var.":"")):
-                        "DWG önizlemesi açıldı. Ölçek belirleyerek ölçebilirsiniz.");
+                        "Yalnız gömülü küçük resim açıldı. Ayrıntılar ve katmanlar okunamadı. Kalibrasyon görüntü hassasiyetini artırmaz; ölçüler yaklaşık olur.");
                 });
             }catch(Exception | OutOfMemoryError e){
                 loaded.dispose();
