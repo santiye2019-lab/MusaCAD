@@ -61,6 +61,34 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
+      - name: Build Android verification APK
+        run: |
+          mkdir -p app/src/androidTest/assets
+          cp third_party/libredwg/test/test-data/example_2013.dwg app/src/androidTest/assets/reference.dwg
+          ./gradlew --no-daemon assembleDebugAndroidTest
+      - name: Verify on Android emulator
+        timeout-minutes: 12
+        run: |
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n musa-verify -k "system-images;android-35;google_apis;x86_64" --force
+          "$ANDROID_HOME/emulator/emulator" -avd musa-verify -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/musa-emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 180 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == "1" ]]; do sleep 2; done'
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          mkdir -p verification
+          adb shell am instrument -w com.musa.cad.test/com.musa.cad.VerificationRunner | tee verification/instrumentation.txt
+          grep -q MUSACAD_VERIFIED verification/instrumentation.txt
+          adb exec-out run-as com.musa.cad tar -C files -cf - verification > verification/evidence.tar
+      - name: Upload Android verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Android-verification
+          path: |
+            verification/
+            /tmp/musa-emulator.log
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
