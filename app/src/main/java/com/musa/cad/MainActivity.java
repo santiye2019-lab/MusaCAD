@@ -103,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
                     currentFile=loaded.file;activeDxf=loaded.parsed;findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
                     cad.setDrawing(loaded.bitmap);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
-                    if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
+                    if(loaded.parsed!=null)cad.setSnapIndex(loaded.parsed.snapIndex);
                     fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":
                         " — Yalnız önizleme: "+loaded.bitmap.getWidth()+" × "+loaded.bitmap.getHeight()+" px (geometri okunamadı)"));
                     result.setText(loaded.parsed!=null?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
@@ -148,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){updated.bitmap.recycle();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapPoints);activeDxf=updated;
+                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapIndex);activeDxf=updated;
                     snapToggle.setEnabled(updated.snapPoints.length>0);
                     result.setText(updated.entityCount+" nesne, "+updated.visibleLayers.size()+"/"+updated.layerCount+
                         " katman görünür; "+updated.skippedCount+" desteklenmeyen nesne.");

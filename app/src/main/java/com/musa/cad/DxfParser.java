@@ -42,12 +42,14 @@ public final class DxfParser {
     public static final class Result {
         public final Bitmap bitmap;
         public final float[] snapPoints;
+        public final SnapPoints.Index snapIndex;
         public final int entityCount, layerCount, skippedCount;
         public int conversionWarnings;
         public final Set<String> layerNames,visibleLayers;
         private final List<Entity> document;
         private final Matrix view;
-        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible){
+        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible)throws IOException{
+            snapIndex=new SnapPoints.Index(points);
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
             this.document=document;this.view=new Matrix(view);
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));

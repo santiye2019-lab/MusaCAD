@@ -115,3 +115,21 @@ Tüm nesneler ve DWG sürümleri için eksiksiz destek iddiası yoktur.
 Kalibrasyon hâlâ gereklidir. Geometriye ait bölüm haritası okunamayan dosyalar
 önizleme yoluna düşebilir; bu durum tek başına dosyanın bozuk olduğunu kanıtlamaz.
 Lisans, kaynak paketleme ve yeniden derleme için NATIVE_BUILD.md belgesine bakın.
+
+
+## Büyük çizimde nokta yakalama ve alan hesabı
+
+Yakalama noktaları yükleme iş parçacığında 64×64 hücreli değiştirilemez bir
+indekse alınır. Dokunmada yalnız arama yarıçapıyla kesişen hücreler taranır.
+Yakınlık, yakınlaştırmaya göre ekran pikseli cinsinden korunur; eşit uzaklıkta
+önceki sürümle aynı nokta seçilir. Çok uzak yakınlaştırmada tüm hücrelerin
+taranması gerekebilir. Katman değişiminde indeks görünür noktalarla yenilenir.
+
+Alan hesabı yerel başlangıç noktasına göre double ara işlemler ve telafili
+toplam kullanır. Bu, float çarpımlarından doğan küçük alan hatasını azaltır;
+görünüm çözünürlüğünü veya kullanıcı kalibrasyonunun doğruluğunu değiştirmez.
+Kendini kesmeyen bir sınır boyunca sırayla köşe seçilmelidir.
+
+Doğrulama: 500.000 noktalı veri dahil 900 sorguda indeks ve doğrusal tarama
+aynı noktayı buldu. Küçük, ters yönlü ve içbükey alanlar ile mesafe hesabı
+test edildi. Android cihaz performansı ve görsel doğrulama ayrıca gereklidir.

@@ -39,8 +39,11 @@ jobs:
           java -cp /tmp/musacad-tests SelectionBoundsTest
       - name: Test endpoint snapping
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java tests/SnapIndexTest.java
           java -cp /tmp/musacad-tests SnapPointsTest
+          java -cp /tmp/musacad-tests SnapIndexTest
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MeasurementMath.java tests/MeasurementMathTest.java
+          java -cp /tmp/musacad-tests MeasurementMathTest
       - name: Test DXF block expansion
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfStream.java tests/DxfBlocksTest.java tests/DxfStreamTest.java
