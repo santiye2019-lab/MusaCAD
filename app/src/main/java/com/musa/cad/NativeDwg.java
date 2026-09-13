@@ -13,7 +13,7 @@ public final class NativeDwg {
             int status=convertNative(dwg.getAbsolutePath(),converted.getAbsolutePath());
             FileTransfer.checkCancelled();
             if(status<0)throw new IOException("DWG dönüşümü başarısız ("+status+")");
-            if(converted.length()>32L*1024*1024)throw new IOException("Dönüştürülen çizim 32 MB sınırını aşıyor");
+            if(converted.length()>DxfStream.MAX_BYTES)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
             DxfParser.Result result=DxfParser.render(converted);
             if(result==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
             result.conversionWarnings=status;return result;

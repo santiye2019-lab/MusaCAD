@@ -78,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
                 loaded.dxf=loaded.name.toLowerCase(java.util.Locale.ROOT).endsWith(".dxf");
                 loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){
-                    FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{
+                    FileTransfer.copy(in,out,loaded.dxf?DxfStream.MAX_BYTES:32L*1024*1024,bytes->runOnUiThread(()->{
                         if(activeLoad==task)task.progress.setText(String.format(java.util.Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));
                     }));
                 }

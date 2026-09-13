@@ -64,7 +64,7 @@ Daire/yaylar dönüşümlü yollarla çizilir; farklı X/Y ölçeğinde eliptik 
 
 Sınırlar: MINSERT dizileri, harici referanslar, 3B yerleşimler, dinamik blok
 davranışı ve öznitelikler desteklenmez. Eksik veya döngüsel blok referansı atlanan
-sayısına eklenir. En fazla 32 iç içe blok ve 100.000 genişletme adımı işlenir.
+sayısına eklenir. En fazla 32 iç içe blok ve 1.000.000 genişletme adımı işlenir.
 Açılan nesne sayısı, blokların içinden çıkan desteklenen öğeleri de içerir.
 
 Teknik başvuru: https://ezdxf.readthedocs.io/en/stable/blocks/insert.html
@@ -78,7 +78,16 @@ Açılış penceresi okunan MB değerini, ardından hazırlama aşamasını gös
 kadar mevcut çizim, kalibrasyon, ölçümler ve orijinal paylaşım dosyası korunur.
 Boş/okunamayan dosyada kısmi geçici kopya silinir.
 
-Bu sürümde dosya sınırı 32 MB, DXF metin sınırı 600.000 satırdır.
+DWG girdi sınırı 32 MB; doğrudan açılan veya DWG'den dönüştürülen DXF sınırı
+512 MB'dır. DXF metni bütünüyle belleğe alınmaz: ilk geçiş blok konumlarını
+indeksler, ikinci geçiş nesneleri işler; blok üyeleri gerektiğinde dosyadan okunur.
+Desteklenen geometri ve görünüm bellekte tutulmaya devam eder. Yakalama noktaları
+ara PointF listeleri olmadan doğrudan float dizisine yazılır.
+Tek satır 65.536 bayt, bir nesnenin saklanan etiketleri 100.000 çift, blok indeksi
+100.000 tanım ve yakalama noktaları 8.000.000 ile sınırlıdır.
+Büyük dosya okuyucusu 64 MB Java heap altında sentetik ve yerel dosyayla test
+edildi. Bu sonuç Android çizim belleğini, DWG motorunun yerel belleğini veya
+ölçüm doğruluğunu doğrulamaz.
 DWG önizlemesi en fazla 2400 piksel kenara örneklenir.
 İptal arayüzü hemen kapanır; bulut sağlayıcısının engellenen okuması dönene kadar
 arka plan işinin sona ermesi gecikebilir. PDF/PNG dışa aktarımı henüz arka plana

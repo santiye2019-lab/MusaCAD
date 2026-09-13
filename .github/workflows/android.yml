@@ -3,6 +3,7 @@ name: Android APK
 on:
   push:
     branches: [ main ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -42,8 +43,9 @@ jobs:
           java -cp /tmp/musacad-tests SnapPointsTest
       - name: Test DXF block expansion
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfStream.java tests/DxfBlocksTest.java tests/DxfStreamTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
+          java -Xmx64m -cp /tmp/musacad-tests DxfStreamTest
       - name: Test cancellable file transfer
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
