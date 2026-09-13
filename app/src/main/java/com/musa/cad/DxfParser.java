@@ -14,8 +14,32 @@ public final class DxfParser {
         public void bounds(RectF b){add(b,x1,y1);add(b,x2,y2);}public void draw(Canvas c,Paint p,Matrix m){float[]v={x1,y1,x2,y2};m.mapPoints(v);c.drawLine(v[0],v[1],v[2],v[3],p);}
     }
     private static final class Poly implements Entity{
-        final ArrayList<PointF> pts;final boolean closed;Poly(ArrayList<PointF>p,boolean c){pts=p;closed=c;}
-        public void bounds(RectF b){for(PointF p:pts)add(b,p.x,p.y);}public void draw(Canvas c,Paint p,Matrix m){if(pts.size()<2)return;Path q=new Path();float[]v={pts.get(0).x,pts.get(0).y};m.mapPoints(v);q.moveTo(v[0],v[1]);for(int i=1;i<pts.size();i++){v[0]=pts.get(i).x;v[1]=pts.get(i).y;m.mapPoints(v);q.lineTo(v[0],v[1]);}if(closed)q.close();c.drawPath(q,p);}
+        final ArrayList<PointF> pts=new ArrayList<>();final boolean closed;
+        final Map<Integer,List<float[]>> curves=new HashMap<>();
+        Poly(DxfPolyline poly){
+            closed=poly.closed;
+            for(DxfPolyline.Vertex v:poly.vertices)pts.add(new PointF(v.x,v.y));
+            for(int i=0;i<poly.segmentCount();i++){
+                if(poly.vertices.get(i).bulge==0)continue;
+                List<float[]> curve=poly.curve(i);if(!curve.isEmpty())curves.put(i,curve);
+            }
+        }
+        public void bounds(RectF b){
+            for(PointF p:pts)add(b,p.x,p.y);
+            // A cubic lies inside its control-point hull, also after affine block transforms.
+            for(List<float[]> curve:curves.values())for(float[] piece:curve)for(int i=0;i<6;i+=2)add(b,piece[i],piece[i+1]);
+        }
+        public void draw(Canvas c,Paint p,Matrix m){
+            if(pts.size()<2)return;
+            Path path=new Path();path.moveTo(pts.get(0).x,pts.get(0).y);
+            int count=pts.size()-(closed?0:1);
+            for(int i=0;i<count;i++){
+                List<float[]> curve=curves.get(i);
+                if(curve==null){PointF end=pts.get((i+1)%pts.size());path.lineTo(end.x,end.y);}
+                else for(float[] piece:curve)path.cubicTo(piece[0],piece[1],piece[2],piece[3],piece[4],piece[5]);
+            }
+            if(closed)path.close();path.transform(m);c.drawPath(path,p);
+        }
     }
     private static final class Circle implements Entity{
         final float x,y,r,start,sweep;Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
@@ -159,7 +183,11 @@ public final class DxfParser {
             }
             return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,f(a,from,to,40)),angle,plain);
         }
-if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),0,360);if("ARC".equals(type)){float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),start,sweep);}if("LWPOLYLINE".equals(type)){ArrayList<PointF>p=new ArrayList<>();Float x=null;for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==10)x=floatOf(a.get(i+1));else if(code==20&&x!=null){p.add(new PointF(x,floatOf(a.get(i+1))));x=null;}}return new Poly(p,(((int)f(a,from,to,70))&1)!=0);}return null;}
+if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),0,360);if("ARC".equals(type)){float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),start,sweep);}if("LWPOLYLINE".equals(type)){
+            // Non-default OCS planes need a separate coordinate transform.
+            if(f(a,from,to,210)!=0||f(a,from,to,220)!=0||floatOf(str(a,from,to,230,"1"))!=1)return null;
+            try{return new Poly(DxfPolyline.parse(a,from,to));}catch(IllegalArgumentException invalid){return null;}
+        }return null;}
     private static int intOf(String s){try{return Integer.parseInt(s.trim());}catch(Exception e){return-1;}}private static float floatOf(String s){try{return Float.parseFloat(s.trim());}catch(Exception e){return 0;}}private static float f(List<String>a,int from,int to,int wanted){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return floatOf(a.get(i+1));return 0;}private static void add(RectF b,float x,float y){b.left=Math.min(b.left,x);b.top=Math.min(b.top,y);b.right=Math.max(b.right,x);b.bottom=Math.max(b.bottom,y);}private static java.nio.charset.Charset charset(File file)throws IOException {
         String header;
         try(InputStream in=new FileInputStream(file)){byte[] bytes=new byte[65536];int n=in.read(bytes);header=new String(bytes,0,Math.max(0,n),StandardCharsets.ISO_8859_1);}

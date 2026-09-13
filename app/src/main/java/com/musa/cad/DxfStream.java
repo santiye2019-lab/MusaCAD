@@ -68,7 +68,7 @@ public final class DxfStream implements Closeable {
             case "BLOCK":case "INSERT":return code==1||code==2||code==10||code==20||code==30||code==41||code==42||code==50||code==70||code==71||code==210||code==220||code==230;
             case "LINE":return code==10||code==20||code==11||code==21;
             case "CIRCLE":case "ARC":return code==10||code==20||code==40||code==50||code==51;
-            case "LWPOLYLINE":return code==10||code==20||code==70;
+            case "LWPOLYLINE":return code==10||code==20||code==42||code==70||code==210||code==220||code==230;
             case "TEXT":case "MTEXT":return code==1||code==3||code==10||code==20||code==11||code==21||code==40||code==50;
             default:return false;
         }

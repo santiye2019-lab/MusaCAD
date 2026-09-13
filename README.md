@@ -133,3 +133,18 @@ Kendini kesmeyen bir sınır boyunca sırayla köşe seçilmelidir.
 Doğrulama: 500.000 noktalı veri dahil 900 sorguda indeks ve doğrusal tarama
 aynı noktayı buldu. Küçük, ters yönlü ve içbükey alanlar ile mesafe hesabı
 test edildi. Android cihaz performansı ve görsel doğrulama ayrıca gereklidir.
+
+
+## Çoklu çizgi yayları
+
+LWPOLYLINE kod 42 (bulge) artık çizimde korunur. Pozitif/negatif yaylar ve
+kapalı çizginin son köşesindeki yay işlenir. Yaylar en fazla 45 derecelik
+kübik Bézier parçalarıyla yaklaşık çizilir; blok ölçekleme ve aynalaması
+çizim yoluna uygulanır. Kontrol noktaları görünüm sınırına dahil edilir.
+Yakalama adayları özgün köşelerdir; Bézier kontrol noktaları yakalanmaz.
+Ölçüm aracı seçilen noktalar arasında düz mesafe hesaplamaya devam eder,
+yay uzunluğunu veya eğrisel sınırın alanını otomatik hesaplamaz.
+Standart XY dışındaki LWPOLYLINE düzlemleri desteklenmeyen nesne olarak sayılır.
+Değişken çizgi genişliği henüz uygulanmaz.
+
+Başvuru: https://ezdxf.readthedocs.io/en/stable/dxfentities/lwpolyline.html
