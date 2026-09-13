@@ -69,8 +69,9 @@ jobs:
       - name: Verify on Android emulator
         timeout-minutes: 12
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           sudo chmod 666 /dev/kvm
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "system-images;android-35;google_apis;x86_64"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n musa-verify -k "system-images;android-35;google_apis;x86_64" --force
           "$ANDROID_HOME/emulator/emulator" -avd musa-verify -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /tmp/musa-emulator.log 2>&1 &
           adb wait-for-device
