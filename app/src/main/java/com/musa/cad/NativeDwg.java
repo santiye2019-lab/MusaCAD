@@ -14,7 +14,8 @@ public final class NativeDwg {
             int status=convertNative(dwg.getAbsolutePath(),converted.getAbsolutePath());
             FileTransfer.checkCancelled();
             if(status<0)throw new IOException("DWG dönüşümü başarısız ("+status+")");
-            if(converted.length()>256L*1024*1024)throw new IOException("Dönüştürülen çizim 256 MB sınırını aşıyor");
+            // Büyük DWG dosyaları dönüşüm sırasında çok daha büyük ASCII DXF üretebilir.
+            // Sabit MB sınırı uygulamıyoruz; DxfParser büyük dosyalarda streaming moda geçer.
             flattened=DxfDimensionFlattener.flatten(converted,cache);
             DxfParser.Result result=DxfParser.render(flattened);
             if(result==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
