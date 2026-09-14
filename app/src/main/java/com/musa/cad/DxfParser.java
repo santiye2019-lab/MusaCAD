@@ -201,13 +201,14 @@ public final class DxfParser {
             DxfBlocks.Placement item=placements.get(index);
             Entity entity;
             if("POLYLINE".equals(item.record.type)){
-                ArrayList<PointF> points=new ArrayList<>();int j=index+1;
+                ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();int j=index+1;
                 while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){
                     DxfBlocks.Record vertex=placements.get(j).record;
-                    points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));j++;
+                    points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));
+                    bulges.add(vertex.number(42,0));j++;
                 }
                 if(points.size()<2){skipped++;continue;}
-                entity=new Poly(points,(((int)item.record.number(70,0))&1)!=0);index=j-1;
+                entity=bulgedPoly(points,bulges,(((int)item.record.number(70,0))&1)!=0);index=j-1;
             }else if("VERTEX".equals(item.record.type)){
                 skipped++;continue;
             }else{
@@ -280,7 +281,7 @@ public final class DxfParser {
     }
     private static final class PendingPoly {
         final ArrayList<StreamNode> target;final String layer;final boolean closed;final int aci,trueColor;
-        final ArrayList<PointF> points=new ArrayList<>();
+        final ArrayList<PointF> points=new ArrayList<>();final ArrayList<Double> bulges=new ArrayList<>();
         PendingPoly(ArrayList<StreamNode> target,String layer,boolean closed,int aci,int trueColor){
             this.target=target;this.layer=layer;this.closed=closed;this.aci=aci;this.trueColor=trueColor;
         }
@@ -349,7 +350,10 @@ public final class DxfParser {
         }
         ArrayList<StreamNode> target=streamTarget(c);if(target==null)return;
         if(c.pending!=null){
-            if("VERTEX".equals(type)){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));return;}
+            if("VERTEX".equals(type)){
+                c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));
+                c.pending.bulges.add(r.number(42,0));return;
+            }
             if("SEQEND".equals(type)){finishPending(c);return;}
             finishPending(c);
         }
@@ -367,7 +371,7 @@ public final class DxfParser {
 
     private static void finishPending(StreamContext c){
         PendingPoly p=c.pending;if(p==null)return;c.pending=null;
-        if(p.points.size()<2)c.skipped++;else p.target.add(new StreamShape(new Poly(p.points,p.closed),p.layer,p.aci,p.trueColor));
+        if(p.points.size()<2)c.skipped++;else p.target.add(new StreamShape(bulgedPoly(p.points,p.bulges,p.closed),p.layer,p.aci,p.trueColor));
     }
 
     private static void expandStream(List<StreamNode> nodes,DxfBlocks.Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
@@ -500,14 +504,8 @@ public final class DxfParser {
             return new EllipseCurve(f(a,from,to,10),f(a,from,to,20),mx,my,fv(a,from,to,40,1f),
                 fv(a,from,to,41,0f),fv(a,from,to,42,(float)(Math.PI*2)));
         }
-        if("LWPOLYLINE".equals(type)){
-            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);
-            return p.size()<2?null:new Poly(p,(((int)f(a,from,to,70))&1)!=0);
-        }
-        if("SPLINE".equals(type)){
-            ArrayList<PointF>p=repeatedPoints(a,from,to,11,21);if(p.size()<2)p=repeatedPoints(a,from,to,10,20);
-            return p.size()<2?null:new Poly(p,false);
-        }
+        if("LWPOLYLINE".equals(type))return lwPolyline(a,from,to);
+        if("SPLINE".equals(type))return splineEntity(a,from,to);
         if("LEADER".equals(type)){
             ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);
         }
@@ -524,8 +522,8 @@ public final class DxfParser {
      * HATCH has an elevation point (10/20) before its boundary paths. Treating every
      * 10/20 pair as one polygon connects that elevation origin to unrelated loops and
      * creates the long "spider web" lines seen in some DWGs. Parse each boundary path
-     * independently instead. Bulged polyline vertices are currently shown as straight
-     * boundary chords; importantly, separate loops are never joined together.
+     * independently instead. Bulged polyline boundaries are sampled as their true arc geometry, while separate loops
+     * are never joined together.
      */
     private static Entity parseHatch(List<String>a,int from,int to){
         int pathCount=(int)fv(a,from,to,91,0f);if(pathCount<=0)return null;
@@ -542,7 +540,7 @@ public final class DxfParser {
                     if(code==93){vertexCount=(int)floatOf(a.get(i+1));i+=2;break;}
                     if(code==92)break;i+=2;
                 }
-                ArrayList<PointF> points=new ArrayList<>();
+                ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();
                 for(int v=0;v<vertexCount&&i+1<to;v++){
                     while(i+1<to&&intOf(a.get(i))!=10){
                         int code=intOf(a.get(i));if(code==92||code==97)break;i+=2;
@@ -553,11 +551,11 @@ public final class DxfParser {
                         int code=intOf(a.get(i));if(code==92||code==97||code==10)break;i+=2;
                     }
                     if(i+1>=to||intOf(a.get(i))!=20)break;
-                    float y=floatOf(a.get(i+1));i+=2;
-                    if(Float.isFinite(x)&&Float.isFinite(y))points.add(new PointF(x,y));
-                    if(i+1<to&&intOf(a.get(i))==42)i+=2;
+                    float y=floatOf(a.get(i+1));i+=2;double bulge=0d;
+                    if(i+1<to&&intOf(a.get(i))==42){bulge=floatOf(a.get(i+1));i+=2;}
+                    if(Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);}
                 }
-                if(points.size()>=2)paths.add(new Poly(points,closed));
+                if(points.size()>=2)paths.add(bulgedPoly(points,bulges,closed));
             }else{
                 int edgeCount=-1;
                 while(i+1<to){
@@ -594,6 +592,63 @@ public final class DxfParser {
         }
         if(paths.isEmpty())return null;
         return paths.size()==1?paths.get(0):new Composite(paths);
+    }
+
+    private static Entity lwPolyline(List<String>a,int from,int to){
+        ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();
+        for(int i=from;i+1<to;i+=2){
+            if(intOf(a.get(i))!=10)continue;
+            float x=floatOf(a.get(i+1));Float y=null;double bulge=0d;int j=i+2;
+            while(j+1<to&&intOf(a.get(j))!=10){
+                int code=intOf(a.get(j));
+                if(code==20)y=floatOf(a.get(j+1));else if(code==42)bulge=floatOf(a.get(j+1));
+                j+=2;
+            }
+            if(y!=null&&Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);}
+            i=j-2;
+        }
+        if(points.size()<2)return null;
+        return bulgedPoly(points,bulges,(((int)fv(a,from,to,70,0f))&1)!=0);
+    }
+
+    private static Entity splineEntity(List<String>a,int from,int to){
+        boolean closed=(((int)fv(a,from,to,70,0f))&1)!=0;
+        int degree=(int)fv(a,from,to,71,3f);
+        ArrayList<PointF> controls=repeatedPoints(a,from,to,10,20);
+        if(controls.size()>=2){
+            double[] xs=new double[controls.size()],ys=new double[controls.size()];
+            for(int i=0;i<controls.size();i++){xs[i]=controls.get(i).x;ys[i]=controls.get(i).y;}
+            double[] knots=repeatedValues(a,from,to,40),weights=repeatedValues(a,from,to,41);
+            if(weights.length!=controls.size())weights=null;
+            ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleNurbs(degree,knots,weights,xs,ys));
+            if(sampled.size()>=2)return new Poly(sampled,closed);
+        }
+        ArrayList<PointF> fit=repeatedPoints(a,from,to,11,21);
+        if(fit.size()>=2)return new Poly(fit,closed);
+        return controls.size()>=2?new Poly(controls,closed):null;
+    }
+
+    private static Entity bulgedPoly(ArrayList<PointF> points,List<Double> bulges,boolean closed){
+        int n=points.size();if(n<2)return null;
+        double[] xs=new double[n],ys=new double[n],bs=new double[n];
+        for(int i=0;i<n;i++){xs[i]=points.get(i).x;ys[i]=points.get(i).y;bs[i]=bulges!=null&&i<bulges.size()?bulges.get(i):0d;}
+        ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleBulgePolyline(xs,ys,bs,closed));
+        return new Poly(sampled.size()>=2?sampled:points,closed);
+    }
+
+    private static ArrayList<PointF> packedPoints(double[] packed){
+        ArrayList<PointF> points=new ArrayList<>();
+        if(packed==null)return points;
+        for(int i=0;i+1<packed.length;i+=2){
+            if(Double.isFinite(packed[i])&&Double.isFinite(packed[i+1]))points.add(new PointF((float)packed[i],(float)packed[i+1]));
+        }
+        return points;
+    }
+
+    private static double[] repeatedValues(List<String>a,int from,int to,int wanted){
+        ArrayList<Double> values=new ArrayList<>();
+        for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted){try{values.add(Double.parseDouble(a.get(i+1).trim()));}catch(Exception ignored){}}
+        double[] result=new double[values.size()];for(int i=0;i<result.length;i++)result[i]=values.get(i);return result;
     }
 
     private static ArrayList<PointF> repeatedPoints(List<String>a,int from,int to,int xCode,int yCode){
