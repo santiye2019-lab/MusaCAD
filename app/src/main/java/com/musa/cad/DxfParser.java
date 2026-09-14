@@ -846,10 +846,17 @@ public final class DxfParser {
         ArrayList<PointF> points=new ArrayList<>();
         for(Entity wrapped:entities){
             Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;
-            Matrix transform=new Matrix();
-            while(entity instanceof Transformed){
-                Transformed wrappedTransform=(Transformed)entity;Matrix combined=new Matrix();
-                combined.setConcat(transform,wrappedTransform.matrix);transform=combined;entity=wrappedTransform.entity;
+            Matrix transform=new Matrix();ArrayList<DxfViewport.Spec> clips=new ArrayList<>();
+            while(true){
+                if(entity instanceof Transformed){
+                    Transformed wrappedTransform=(Transformed)entity;Matrix combined=new Matrix();
+                    combined.setConcat(transform,wrappedTransform.matrix);transform=combined;entity=wrappedTransform.entity;continue;
+                }
+                if(entity instanceof ViewportClip){
+                    ViewportClip viewport=(ViewportClip)entity;Matrix combined=new Matrix();
+                    combined.setConcat(transform,viewport.modelToPaper);transform=combined;clips.add(viewport.spec);entity=viewport.entity;continue;
+                }
+                break;
             }
             ArrayList<PointF> local=new ArrayList<>();
             if(entity instanceof Line){
@@ -857,7 +864,9 @@ public final class DxfParser {
                 local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));
             }else if(entity instanceof Poly){local.addAll(((Poly)entity).pts);}
             for(PointF point:local){
-                float[] xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));
+                float[] xy={point.x,point.y};transform.mapPoints(xy);boolean inside=true;
+                for(DxfViewport.Spec clip:clips)if(!DxfViewport.contains(clip,xy[0],xy[1],1e-6)){inside=false;break;}
+                if(inside)points.add(new PointF(xy[0],xy[1]));
             }
         }
         float[] result=new float[points.size()*2];
