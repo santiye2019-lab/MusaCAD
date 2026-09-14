@@ -33,7 +33,7 @@ public final class DxfParser {
 
     private static final class Circle implements Entity{
         final float x,y,r,start,sweep;
-        Circle(float a,float b,float c,float d,float e){x=a;y1=b;r=c;start=d;sweep=e;}
+        Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
         public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}
         public void draw(Canvas c,Paint p,Matrix m){
             Path path=new Path();path.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);path.transform(m);c.drawPath(path,p);
