@@ -9,6 +9,7 @@ public final class DxfLayerTable {
         public final Map<String,Integer> colors=new HashMap<>();
         public final Map<String,String> lineTypes=new HashMap<>();
         public final Map<String,Integer> lineWeights=new HashMap<>();
+        public final Map<String,Integer> opacities=new HashMap<>();
         public final Set<String> names=new LinkedHashSet<>();
         public final Set<String> visible=new LinkedHashSet<>();
         public final Set<String> off=new LinkedHashSet<>();
@@ -19,10 +20,14 @@ public final class DxfLayerTable {
         public boolean contains(String name){return namesByKey.containsKey(DxfColor.key(name));}
 
         public void add(String rawName,int aci,int flags,int trueColor){
-            add(rawName,aci,flags,trueColor,DxfStyle.CONTINUOUS,DxfStyle.LW_DEFAULT);
+            add(rawName,aci,flags,trueColor,DxfStyle.CONTINUOUS,DxfStyle.LW_DEFAULT,DxfTransparency.UNSET);
         }
 
         public void add(String rawName,int aci,int flags,int trueColor,String lineType,int lineWeight){
+            add(rawName,aci,flags,trueColor,lineType,lineWeight,DxfTransparency.UNSET);
+        }
+
+        public void add(String rawName,int aci,int flags,int trueColor,String lineType,int lineWeight,long transparency){
             String name=(rawName==null||rawName.trim().isEmpty())?"0":rawName.trim();
             String key=DxfColor.key(name);
             String canonical=namesByKey.get(key);
@@ -30,6 +35,7 @@ public final class DxfLayerTable {
             colors.put(key,DxfColor.layerArgb(aci,trueColor));
             lineTypes.put(key,DxfStyle.normalizeLineType(lineType));
             lineWeights.put(key,lineWeight);
+            opacities.put(key,DxfTransparency.layerOpacity(transparency));
             visible.remove(canonical);off.remove(canonical);frozen.remove(canonical);locked.remove(canonical);
             boolean isOff=aci<0;
             boolean isFrozen=(flags&1)!=0;
@@ -65,7 +71,8 @@ public final class DxfLayerTable {
                 if(!raw.isEmpty())trueColor=DxfColor.trueColor(Long.parseLong(raw));
                 String lineType=text(tags,from,i,6,DxfStyle.CONTINUOUS);
                 int lineWeight=integer(tags,from,i,370,DxfStyle.LW_DEFAULT);
-                table.add(name,aci,flags,trueColor,lineType,lineWeight);
+                long transparency=longInteger(tags,from,i,440,DxfTransparency.UNSET);
+                table.add(name,aci,flags,trueColor,lineType,lineWeight,transparency);
             }
         }catch(NumberFormatException e){throw new IOException("Geçersiz DXF LAYER tablosu",e);}
         table.ensureDefaultLayer();return table;
@@ -78,6 +85,10 @@ public final class DxfLayerTable {
     private static int integer(List<String> tags,int from,int to,int wanted,int fallback){
         String value=text(tags,from,to,wanted,Integer.toString(fallback)).trim();
         return Integer.parseInt(value);
+    }
+    private static long longInteger(List<String> tags,int from,int to,int wanted,long fallback){
+        String value=text(tags,from,to,wanted,Long.toString(fallback)).trim();
+        return Long.parseLong(value);
     }
     private DxfLayerTable(){}
 }

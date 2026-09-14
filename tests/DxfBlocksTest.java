@@ -1,4 +1,5 @@
 import com.musa.cad.DxfBlocks;
+import com.musa.cad.DxfTransparency;
 import java.util.*;
 
 public class DxfBlocksTest {
@@ -30,6 +31,9 @@ public class DxfBlocksTest {
         point(read(nested,insert("B",10,10,20,20)),16,26);
         DxfBlocks.Result layer=read(b,insert("A",8,"BORU"));
         if(!layer.placements.get(0).layer.equals("BORU"))throw new AssertionError("Layer inheritance");
+        String transparentBlock=block("T",tags(0,"LINE",440,16777216,10,3,20,4,11,5,21,4));
+        DxfBlocks.Result transparency=read(transparentBlock,insert("T",440,33554560));
+        if(DxfTransparency.opacity(transparency.placements.get(0).transparency,Collections.emptyMap())!=128)throw new AssertionError("Transparency inheritance");
         skipped(read(b,insert("MISSING")));
         skipped(read(block("A",insert("A")),insert("A")));
 

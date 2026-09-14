@@ -32,6 +32,18 @@ public final class DxfParser {
         }
     }
 
+    private static final class FilledPoly implements Entity{
+        final ArrayList<PointF> pts;
+        FilledPoly(ArrayList<PointF> pts){this.pts=pts;}
+        public void bounds(RectF b){for(PointF q:pts)add(b,q.x,q.y);}
+        public void draw(Canvas c,Paint p,Matrix m){
+            if(pts.size()<3)return;Path path=new Path();float[] v={pts.get(0).x,pts.get(0).y};m.mapPoints(v);path.moveTo(v[0],v[1]);
+            for(int i=1;i<pts.size();i++){v[0]=pts.get(i).x;v[1]=pts.get(i).y;m.mapPoints(v);path.lineTo(v[0],v[1]);}path.close();
+            Paint.Style old=p.getStyle();PathEffect effect=p.getPathEffect();p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);
+            p.setStyle(old);p.setPathEffect(effect);
+        }
+    }
+
     private static final class Wipeout implements Entity{
         final ArrayList<PointF> pts;
         Wipeout(ArrayList<PointF> pts){this.pts=pts;}
@@ -380,7 +392,7 @@ public final class DxfParser {
                 if(entity==null){skipped++;continue;}
             }
             entity=projectOcs(item.record.type,entity,lines,item.record.from,item.record.to);
-            int color=DxfColor.argb(item.color,layerColors);
+            int color=DxfTransparency.apply(DxfColor.argb(item.color,layerColors),DxfTransparency.opacity(item.transparency,layerTable.opacities));
             String effectiveType=DxfStyle.effectiveLineType(item.lineType,item.layer,layerTable.lineTypes);
             int effectiveWeight=DxfStyle.effectiveLineWeight(item.lineWeight,item.layer,layerTable.lineWeights);
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,color,effectiveWeight,
@@ -392,19 +404,19 @@ public final class DxfParser {
 
     private interface StreamNode {}
     private static final class StreamShape implements StreamNode {
-        final Entity entity;final String layer;final int aci,trueColor,lineWeight;final String lineType;final double lineTypeScale;
-        StreamShape(Entity entity,String layer,int aci,int trueColor,String lineType,int lineWeight,double lineTypeScale){
-            this.entity=entity;this.layer=layer;this.aci=aci;this.trueColor=trueColor;
+        final Entity entity;final String layer,handle;final int aci,trueColor,lineWeight;final String lineType;final double lineTypeScale;final long transparencyRaw;
+        StreamShape(Entity entity,String layer,String handle,int aci,int trueColor,long transparencyRaw,String lineType,int lineWeight,double lineTypeScale){
+            this.entity=entity;this.layer=layer;this.handle=handle;this.aci=aci;this.trueColor=trueColor;this.transparencyRaw=transparencyRaw;
             this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;
         }
     }
     private static final class StreamInsert implements StreamNode {
-        final String name,layer,lineType;final int aci,trueColor,lineWeight;
+        final String name,layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;
         final double x,y,z,sx,sy,sz,rotation,ex,ey,ez,lineTypeScale,columnSpacing,rowSpacing;
         final int columns,rows;
         StreamInsert(StreamRecord r)throws IOException{
-            name=key(r.text(2,""));layer=r.text(8,"0");
-            aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
+            name=key(r.text(2,""));layer=r.text(8,"0");handle=r.text(5,"");
+            aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();transparencyRaw=r.longInteger(440,DxfTransparency.UNSET);
             lineType=r.text(6,DxfStyle.BYLAYER);lineWeight=r.integer(370,DxfStyle.LW_BYLAYER);lineTypeScale=DxfStyle.saneScale(r.number(48,1));
             x=r.number(10,0);y=r.number(20,0);z=r.number(30,0);
             sx=r.number(41,1);sy=r.number(42,1);sz=r.number(43,1);rotation=r.number(50,0);
@@ -414,10 +426,10 @@ public final class DxfParser {
         }
     }
     private static final class StreamDimension implements StreamNode {
-        final String name,layer,lineType;final int aci,trueColor,lineWeight;
+        final String name,layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;
         StreamDimension(StreamRecord r)throws IOException{
-            name=key(r.text(2,""));layer=r.text(8,"0");
-            aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
+            name=key(r.text(2,""));layer=r.text(8,"0");handle=r.text(5,"");
+            aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();transparencyRaw=r.longInteger(440,DxfTransparency.UNSET);
             lineType=r.text(6,DxfStyle.BYLAYER);lineWeight=r.integer(370,DxfStyle.LW_BYLAYER);
         }
     }
@@ -440,6 +452,10 @@ public final class DxfParser {
             String value=text(code,Integer.toString(fallback));
             try{return Integer.parseInt(value);}catch(NumberFormatException e){throw new IOException("Geçersiz DXF tamsayı değeri",e);}
         }
+        long longInteger(int code,long fallback)throws IOException{
+            String value=text(code,Long.toString(fallback));
+            try{return Long.parseLong(value);}catch(NumberFormatException e){throw new IOException("Geçersiz DXF tamsayı değeri",e);}
+        }
         int trueColor()throws IOException{
             String value=text(420,"").trim();if(value.isEmpty())return DxfColor.NO_TRUE_COLOR;
             try{return DxfColor.trueColor(Long.parseLong(value));}
@@ -457,11 +473,11 @@ public final class DxfParser {
         }
     }
     private static final class PendingPoly {
-        final ArrayList<StreamNode> target;final String layer,lineType;final boolean closed;final int aci,trueColor,lineWeight;final double lineTypeScale;
+        final ArrayList<StreamNode> target;final String layer,lineType,handle;final boolean closed;final int aci,trueColor,lineWeight;final double lineTypeScale;final long transparencyRaw;
         final double[] ocs;
         final ArrayList<PointF> points=new ArrayList<>();final ArrayList<Double> bulges=new ArrayList<>();
-        PendingPoly(ArrayList<StreamNode> target,String layer,boolean closed,int aci,int trueColor,String lineType,int lineWeight,double lineTypeScale,double[] ocs){
-            this.target=target;this.layer=layer;this.closed=closed;this.aci=aci;this.trueColor=trueColor;
+        PendingPoly(ArrayList<StreamNode> target,String layer,String handle,boolean closed,int aci,int trueColor,long transparencyRaw,String lineType,int lineWeight,double lineTypeScale,double[] ocs){
+            this.target=target;this.layer=layer;this.handle=handle;this.closed=closed;this.aci=aci;this.trueColor=trueColor;this.transparencyRaw=transparencyRaw;
             this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;this.ocs=ocs;
         }
     }
@@ -471,6 +487,7 @@ public final class DxfParser {
         final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
         final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();
+        final Map<String,String> drawOrder=new HashMap<>();
         final ArrayList<StreamNode> roots=new ArrayList<>();
     }
     private static final class StreamCounter {int visits;}
@@ -499,14 +516,15 @@ public final class DxfParser {
         ArrayList<Entity> entities=new ArrayList<>();
         Set<String> layers=new HashSet<>(context.layerTable.names);
         Set<String> visibleLayers=new HashSet<>(context.layerTable.visible);
+        if(!context.drawOrder.isEmpty())context.roots.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
         StreamCounter counter=new StreamCounter();
-        expandStream(context.roots,new DxfBlocks.Transform(),"0",null,null,DxfStyle.LW_BYLAYER,
+        expandStream(context.roots,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
             context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context);
         return finishEntities(entities,layers,visibleLayers,context.skipped);
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==4||code==6||code==7||code==8||code==9||code==62||code==370||code==420||
+        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==331||code==370||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
 
@@ -537,7 +555,8 @@ public final class DxfParser {
         }
         if("TABLES".equals(c.section)&&"LAYER".equals(type)){
             String layerName=r.text(2,"0");
-            c.layerTable.add(layerName,r.integer(62,7),r.integer(70,0),r.trueColor(),r.text(6,DxfStyle.CONTINUOUS),r.integer(370,DxfStyle.LW_DEFAULT));return;
+            c.layerTable.add(layerName,r.integer(62,7),r.integer(70,0),r.trueColor(),r.text(6,DxfStyle.CONTINUOUS),r.integer(370,DxfStyle.LW_DEFAULT),
+                r.longInteger(440,DxfTransparency.UNSET));return;
         }
         if("TABLES".equals(c.section)&&"LTYPE".equals(type)){
             ArrayList<Double> values=new ArrayList<>();
@@ -547,6 +566,9 @@ public final class DxfParser {
         if("TABLES".equals(c.section)&&"STYLE".equals(type)){
             c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),
                 r.integer(70,0),r.integer(71,0));return;
+        }
+        if("OBJECTS".equals(c.section)&&"SORTENTSTABLE".equals(type)){
+            DxfDrawOrder.addRecord(r.tags,0,r.tags.size(),c.drawOrder);return;
         }
         ArrayList<StreamNode> target=streamTarget(c);if(target==null)return;
         if(c.pending!=null){
@@ -558,8 +580,8 @@ public final class DxfParser {
             finishPending(c);
         }
         if("POLYLINE".equals(type)){
-            c.pending=new PendingPoly(target,r.text(8,"0"),(((int)r.number(70,0))&1)!=0,
-                r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),
+            c.pending=new PendingPoly(target,r.text(8,"0"),r.text(5,""),(((int)r.number(70,0))&1)!=0,
+                r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),
                 ocsMatrix("POLYLINE",r.tags,0,r.tags.size()));return;
         }
         if("VERTEX".equals(type)||"SEQEND".equals(type))return;
@@ -568,7 +590,7 @@ public final class DxfParser {
         Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size());
         if(entity==null)c.skipped++;else{
             entity=projectOcs(type,entity,r.tags,0,r.tags.size());
-            target.add(new StreamShape(entity,r.text(8,"0"),r.integer(62,DxfColor.BYLAYER),r.trueColor(),
+            target.add(new StreamShape(entity,r.text(8,"0"),r.text(5,""),r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),
                 r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1))));
         }
     }
@@ -578,11 +600,11 @@ public final class DxfParser {
         if(p.points.size()<2){c.skipped++;return;}
         Entity entity=bulgedPoly(p.points,p.bulges,p.closed);
         if(p.ocs!=null)entity=new Transformed(entity,p.ocs);
-        p.target.add(new StreamShape(entity,p.layer,p.aci,p.trueColor,p.lineType,p.lineWeight,p.lineTypeScale));
+        p.target.add(new StreamShape(entity,p.layer,p.handle,p.aci,p.trueColor,p.transparencyRaw,p.lineType,p.lineWeight,p.lineTypeScale));
     }
 
     private static void expandStream(List<StreamNode> nodes,DxfBlocks.Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
-                                     String byBlockLineType,int byBlockLineWeight,Map<String,StreamBlock> blocks,Set<String> stack,ArrayList<Entity> entities,Set<String> layers,
+                                     DxfTransparency.Ref byBlockTransparency,String byBlockLineType,int byBlockLineWeight,Map<String,StreamBlock> blocks,Set<String> stack,ArrayList<Entity> entities,Set<String> layers,
                                      Set<String> visibleLayers,StreamCounter counter,StreamContext context)throws IOException{
         for(StreamNode node:nodes){
             FileTransfer.checkCancelled();
@@ -590,7 +612,8 @@ public final class DxfParser {
             if(node instanceof StreamShape){
                 StreamShape shape=(StreamShape)node;String layer="0".equals(shape.layer)?parentLayer:shape.layer;
                 DxfColor.Ref ref=DxfColor.resolve(shape.aci,shape.trueColor,layer,byBlockColor);
-                int color=DxfColor.argb(ref,context.layerTable.colors);
+                DxfTransparency.Ref transparency=DxfTransparency.resolve(shape.transparencyRaw,layer,byBlockTransparency);
+                int color=DxfTransparency.apply(DxfColor.argb(ref,context.layerTable.colors),DxfTransparency.opacity(transparency,context.layerTable.opacities));
                 String semanticType=DxfStyle.resolveLineType(shape.lineType,byBlockLineType);
                 int semanticWeight=DxfStyle.resolveLineWeight(shape.lineWeight,byBlockLineWeight);
                 String effectiveType=DxfStyle.effectiveLineType(semanticType,layer,context.layerTable.lineTypes);
@@ -607,10 +630,11 @@ public final class DxfParser {
                     context.skipped++;continue;
                 }
                 DxfColor.Ref dimColor=DxfColor.resolve(dimension.aci,dimension.trueColor,layer,byBlockColor);
+                DxfTransparency.Ref dimTransparency=DxfTransparency.resolve(dimension.transparencyRaw,layer,byBlockTransparency);
                 String dimType=DxfStyle.resolveLineType(dimension.lineType,byBlockLineType);
                 int dimWeight=DxfStyle.resolveLineWeight(dimension.lineWeight,byBlockLineWeight);
                 stack.add(dimension.name);
-                expandStream(block.members,parent,layer,dimColor,dimType,dimWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
+                expandStream(block.members,parent,layer,dimColor,dimTransparency,dimType,dimWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
                 stack.remove(dimension.name);continue;
             }
             StreamInsert insert=(StreamInsert)node;String layer="0".equals(insert.layer)?parentLayer:insert.layer;
@@ -621,6 +645,7 @@ public final class DxfParser {
                 context.skipped++;continue;
             }
             DxfColor.Ref insertColor=DxfColor.resolve(insert.aci,insert.trueColor,layer,byBlockColor);
+            DxfTransparency.Ref insertTransparency=DxfTransparency.resolve(insert.transparencyRaw,layer,byBlockTransparency);
             String insertType=DxfStyle.resolveLineType(insert.lineType,byBlockLineType);
             int insertWeight=DxfStyle.resolveLineWeight(insert.lineWeight,byBlockLineWeight);
             stack.add(insert.name);
@@ -632,10 +657,17 @@ public final class DxfParser {
                             insert.x,insert.y,insert.z,insert.ex,insert.ey,insert.ez,column*insert.columnSpacing,row*insert.rowSpacing);
                     }catch(IllegalArgumentException invalid){context.skipped++;continue;}
                     DxfBlocks.Transform transform=parent.thenLocal(local);
-                    expandStream(block.members,transform,layer,insertColor,insertType,insertWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
+                    expandStream(block.members,transform,layer,insertColor,insertTransparency,insertType,insertWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
                 }
             }finally{stack.remove(insert.name);}
         }
+    }
+
+    private static String streamHandle(StreamNode node){
+        if(node instanceof StreamShape)return ((StreamShape)node).handle;
+        if(node instanceof StreamInsert)return ((StreamInsert)node).handle;
+        if(node instanceof StreamDimension)return ((StreamDimension)node).handle;
+        return "";
     }
 
     private static String key(String value){return value.toUpperCase(Locale.ROOT);}
@@ -795,7 +827,10 @@ public final class DxfParser {
         }
         if("HATCH".equals(type))return parseHatch(a,from,to);
         if("WIPEOUT".equals(type))return parseWipeout(a,from,to);
-        if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){
+        if("SOLID".equals(type)||"TRACE".equals(type)){
+            ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<3?null:new FilledPoly(p);
+        }
+        if("3DFACE".equals(type)){
             ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);
         }
         // DIMENSION graphics are expanded from their anonymous *D blocks before parse().

@@ -38,13 +38,18 @@ public final class DxfBlocks {
             try{double v=Double.parseDouble(text(code,Double.toString(fallback)));if(!Double.isFinite(v))throw new NumberFormatException();return v;}
             catch(NumberFormatException e){throw new IOException("Geçersiz DXF blok koordinatı",e);}
         }
+        long longInteger(int code,long fallback)throws IOException{
+            try{return Long.parseLong(text(code,Long.toString(fallback)));}
+            catch(NumberFormatException e){throw new IOException("Geçersiz DXF tamsayı değeri",e);}
+        }
     }
 
     public static final class Placement {
         public final Record record;public final Transform transform;public final String layer;public final DxfColor.Ref color;
+        public final DxfTransparency.Ref transparency;
         public final String lineType;public final int lineWeight;public final double lineTypeScale;
-        Placement(Record record,Transform transform,String layer,DxfColor.Ref color,String lineType,int lineWeight,double lineTypeScale){
-            this.record=record;this.transform=transform;this.layer=layer;this.color=color;
+        Placement(Record record,Transform transform,String layer,DxfColor.Ref color,DxfTransparency.Ref transparency,String lineType,int lineWeight,double lineTypeScale){
+            this.record=record;this.transform=transform;this.layer=layer;this.color=color;this.transparency=transparency;
             this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;
         }
     }
@@ -83,19 +88,22 @@ public final class DxfBlocks {
                 else if(active!=null)active.members.add(record);
             }else if(section.equals("ENTITIES"))roots.add(record);
         }
+        Map<String,String> drawOrder=DxfDrawOrder.parse(tags);
+        if(!drawOrder.isEmpty())roots.sort((a,b)->DxfDrawOrder.compare(a.text(5,""),b.text(5,""),drawOrder));
         Result result=new Result();
-        for(Record root:roots)expand(root,new Transform(),"0",null,null,DxfStyle.LW_BYLAYER,blocks,new HashSet<>(),result);
+        for(Record root:roots)expand(root,new Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,blocks,new HashSet<>(),result);
         return result;
     }
 
     private static void expand(Record r,Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
-                               String byBlockLineType,int byBlockLineWeight,
+                               DxfTransparency.Ref byBlockTransparency,String byBlockLineType,int byBlockLineWeight,
                                Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
         if(++result.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;
         DxfColor.Ref color=DxfColor.resolve((int)r.number(62,DxfColor.BYLAYER),r.trueColor(),layer,byBlockColor);
+        DxfTransparency.Ref transparency=DxfTransparency.resolve(r.longInteger(440,DxfTransparency.UNSET),layer,byBlockTransparency);
         String lineType=DxfStyle.resolveLineType(r.text(6,DxfStyle.BYLAYER),byBlockLineType);
         int lineWeight=DxfStyle.resolveLineWeight((int)r.number(370,DxfStyle.LW_BYLAYER),byBlockLineWeight);
         double lineTypeScale=DxfStyle.saneScale(r.number(48,1d));
@@ -107,13 +115,13 @@ public final class DxfBlocks {
                 result.skipped++;return;
             }
             stack.add(name);
-            for(Record member:block.members)expand(member,parent,layer,color,lineType,lineWeight,blocks,stack,result);
+            for(Record member:block.members)expand(member,parent,layer,color,transparency,lineType,lineWeight,blocks,stack,result);
             stack.remove(name);
             return;
         }
 
         if(!r.type.equals("INSERT")){
-            result.placements.add(new Placement(r,parent,layer,color,lineType,lineWeight,lineTypeScale));return;
+            result.placements.add(new Placement(r,parent,layer,color,transparency,lineType,lineWeight,lineTypeScale));return;
         }
         String name=key(r.text(2,""));Block block=blocks.get(name);
         if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
@@ -137,7 +145,7 @@ public final class DxfBlocks {
                         column*columnSpacing,row*rowSpacing);
                 }catch(IllegalArgumentException invalid){result.skipped++;continue;}
                 Transform transform=parent.thenLocal(local);
-                for(Record member:block.members)expand(member,transform,layer,color,lineType,lineWeight,blocks,stack,result);
+                for(Record member:block.members)expand(member,transform,layer,color,transparency,lineType,lineWeight,blocks,stack,result);
             }
         }finally{stack.remove(name);}
     }
