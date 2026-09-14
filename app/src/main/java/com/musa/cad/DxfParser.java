@@ -226,20 +226,24 @@ public final class DxfParser {
         public final float[] snapPoints;
         public final int entityCount, layerCount, skippedCount;
         public int conversionWarnings;
-        public final Set<String> layerNames,visibleLayers;
+        public final Set<String> layerNames,visibleLayers,layoutNames;
+        public final String activeLayout;
         private final List<Entity> document;
         private final Matrix view;
 
-        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible){
+        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible,
+               Set<String> layouts,String activeLayout){
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
             this.document=document;this.view=new Matrix(view);
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));
             visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
+            LinkedHashSet<String> names=new LinkedHashSet<>();if(layouts!=null)names.addAll(layouts);if(names.isEmpty())names.add(DxfSpace.MODEL);
+            layoutNames=Collections.unmodifiableSet(names);this.activeLayout=DxfSpace.normalizeName(activeLayout);
         }
 
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            Result result=renderLayers(document,view,layerNames,visible,skippedCount);
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount,layoutNames,activeLayout);
             result.conversionWarnings=conversionWarnings;
             return result;
         }
@@ -399,7 +403,7 @@ public final class DxfParser {
                 lineTypes.get(effectiveType),item.lineTypeScale*lineTypes.globalScale));
             if(layers.add(item.layer)&&!layerTable.contains(item.layer))visibleLayers.add(item.layer);
         }
-        return finishEntities(entities,layers,visibleLayers,skipped);
+        return finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout);
     }
 
     private interface StreamNode {}
@@ -482,13 +486,14 @@ public final class DxfParser {
         }
     }
     private static final class StreamContext {
-        String section="";StreamBlock activeBlock;PendingPoly pending;int skipped;
+        String section="",rootSequenceLayout;StreamBlock activeBlock;PendingPoly pending;int skipped;
         final HashMap<String,StreamBlock> blocks=new HashMap<>();
         final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
         final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();
         final Map<String,String> drawOrder=new HashMap<>();
-        final ArrayList<StreamNode> roots=new ArrayList<>();
+        final LinkedHashSet<String> layouts=new LinkedHashSet<>();
+        final LinkedHashMap<String,ArrayList<StreamNode>> rootsByLayout=new LinkedHashMap<>();
     }
     private static final class StreamCounter {int visits;}
 
@@ -516,22 +521,36 @@ public final class DxfParser {
         ArrayList<Entity> entities=new ArrayList<>();
         Set<String> layers=new HashSet<>(context.layerTable.names);
         Set<String> visibleLayers=new HashSet<>(context.layerTable.visible);
-        if(!context.drawOrder.isEmpty())context.roots.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
+        if(context.layouts.isEmpty())context.layouts.add(DxfSpace.MODEL);
+        String activeLayout=DxfSpace.chooseActive(context.rootsByLayout);
+        ArrayList<StreamNode> roots=context.rootsByLayout.get(activeLayout);if(roots==null)roots=new ArrayList<>();
+        if(!context.drawOrder.isEmpty())roots.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
         StreamCounter counter=new StreamCounter();
-        expandStream(context.roots,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
+        expandStream(roots,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
             context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context);
-        return finishEntities(entities,layers,visibleLayers,context.skipped);
+        return finishEntities(entities,layers,visibleLayers,context.skipped,context.layouts,activeLayout);
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==331||code==370||code==420||code==440||
+        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==66||code==67||
+            code==331||code==370||code==410||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
 
-    private static ArrayList<StreamNode> streamTarget(StreamContext c){
-        if("ENTITIES".equals(c.section))return c.roots;
+    private static boolean streamSequenceMember(String type){
+        return "VERTEX".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)||"SEQEND".equals(type);
+    }
+
+    private static ArrayList<StreamNode> streamTarget(StreamContext c,String type,StreamRecord r)throws IOException{
         if("BLOCKS".equals(c.section)&&c.activeBlock!=null)return c.activeBlock.members;
-        return null;
+        if(!"ENTITIES".equals(c.section))return null;
+        boolean member=streamSequenceMember(type);
+        if(c.rootSequenceLayout!=null&&!member)c.rootSequenceLayout=null;
+        String layout=c.rootSequenceLayout!=null?c.rootSequenceLayout:DxfSpace.layout(r.integer(67,0),r.text(410,""));
+        c.layouts.add(layout);
+        ArrayList<StreamNode> target=c.rootsByLayout.computeIfAbsent(layout,k->new ArrayList<>());
+        if("POLYLINE".equals(type)||("INSERT".equals(type)&&r.integer(66,0)!=0))c.rootSequenceLayout=layout;
+        return target;
     }
 
     private static void processStreamRecord(String type,StreamRecord r,StreamContext c)throws IOException{
@@ -567,16 +586,19 @@ public final class DxfParser {
             c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),
                 r.integer(70,0),r.integer(71,0));return;
         }
+        if("OBJECTS".equals(c.section)&&"LAYOUT".equals(type)){
+            String name=r.text(1,"").trim();if(!name.isEmpty())c.layouts.add(DxfSpace.normalizeName(name));return;
+        }
         if("OBJECTS".equals(c.section)&&"SORTENTSTABLE".equals(type)){
             DxfDrawOrder.addRecord(r.tags,0,r.tags.size(),c.drawOrder);return;
         }
-        ArrayList<StreamNode> target=streamTarget(c);if(target==null)return;
+        ArrayList<StreamNode> target=streamTarget(c,type,r);if(target==null)return;
         if(c.pending!=null){
             if("VERTEX".equals(type)){
                 c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));
                 c.pending.bulges.add(r.number(42,0));return;
             }
-            if("SEQEND".equals(type)){finishPending(c);return;}
+            if("SEQEND".equals(type)){finishPending(c);c.rootSequenceLayout=null;return;}
             finishPending(c);
         }
         if("POLYLINE".equals(type)){
@@ -584,7 +606,8 @@ public final class DxfParser {
                 r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),
                 ocsMatrix("POLYLINE",r.tags,0,r.tags.size()));return;
         }
-        if("VERTEX".equals(type)||"SEQEND".equals(type))return;
+        if("VERTEX".equals(type))return;
+        if("SEQEND".equals(type)){c.rootSequenceLayout=null;return;}
         if("INSERT".equals(type)){target.add(new StreamInsert(r));return;}
         if("DIMENSION".equals(type)){target.add(new StreamDimension(r));return;}
         Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size());
@@ -672,7 +695,8 @@ public final class DxfParser {
 
     private static String key(String value){return value.toUpperCase(Locale.ROOT);}
 
-    private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,int skipped)throws IOException{
+    private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,int skipped,
+                                         Set<String> layoutNames,String activeLayout)throws IOException{
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
         for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}
@@ -682,10 +706,11 @@ public final class DxfParser {
         float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());
         Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);
         m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);
-        return renderLayers(entities,m,layers,visibleLayers,skipped);
+        return renderLayers(entities,m,layers,visibleLayers,skipped,layoutNames,activeLayout);
     }
 
-    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped)throws IOException{
+    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped,
+                                       Set<String> layoutNames,String activeLayout)throws IOException{
         List<Entity> shown=new ArrayList<>();
         for(Entity entity:document){
             FileTransfer.checkCancelled();
@@ -697,7 +722,7 @@ public final class DxfParser {
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2f);
             for(Entity entity:shown){FileTransfer.checkCancelled();entity.draw(canvas,paint,view);}
             FileTransfer.checkCancelled();
-            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible);
+            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,layoutNames,activeLayout);
         }catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
     }
 
