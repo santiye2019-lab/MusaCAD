@@ -17,6 +17,9 @@ public final class DxfColor {
         }
     }
 
+    /** LibreDWG/AutoCAD may expose color-method bits above the 24-bit RGB payload. */
+    public static int trueColor(long raw){return (int)(raw&0x00ffffffL);}
+
     /** Resolve a raw entity color. BYBLOCK inherits the parent INSERT/DIMENSION color. */
     public static Ref resolve(int aci,int trueColor,String layer,Ref byBlock){
         if(trueColor>=0)return new Ref(BYLAYER,trueColor&0x00ffffff,layer);
@@ -26,11 +29,13 @@ public final class DxfColor {
             return new Ref(BYLAYER,NO_TRUE_COLOR,layer);
         }
         if(value<0)value=Math.abs(value);
-        if(value<1||value>255){if(value!=BYLAYER)value=BYLAYER;}
+        if(value<1||value>255){
+            if(value!=BYLAYER)value=BYLAYER;
+        }
         return new Ref(value,NO_TRUE_COLOR,layer);
     }
 
-    /** Resolve a semantic color reference to an Android ARGB value. */
+    /** Resolve a semantic color reference to Android ARGB. */
     public static int argb(Ref ref,Map<String,Integer> layerColors){
         if(ref==null)return aciArgb(7);
         if(ref.trueColor>=0)return 0xff000000|(ref.trueColor&0x00ffffff);
@@ -41,14 +46,15 @@ public final class DxfColor {
         return aciArgb(ref.aci);
     }
 
-    /** Layer table colors: TrueColor wins, otherwise ACI. Negative ACI means off but keeps the same color. */
+    /** Layer table colors: TrueColor wins; negative ACI is an off-layer but retains its color. */
     public static int layerArgb(int aci,int trueColor){
         if(trueColor>=0)return 0xff000000|(trueColor&0x00ffffff);
-        int value=Math.abs(aci);if(value<1||value>255)value=7;
+        int value=Math.abs(aci);
+        if(value<1||value>255)value=7;
         return aciArgb(value);
     }
 
-    /** Standard AutoCAD ACI palette for dark model space (ACI 7 = white). */
+    /** Standard AutoCAD ACI palette, with ACI 7 shown white on the dark model-space background. */
     public static int aciArgb(int index){
         int i=Math.abs(index);
         switch(i){
@@ -64,11 +70,13 @@ public final class DxfColor {
             default:break;
         }
         if(i>=10&&i<=249){
-            int group=(i-10)/10, shade=(i-10)%10;
+            int group=(i-10)/10;
+            int shade=(i-10)%10;
             float hue=group*15f;
-            int[] values={255,255,165,165,127,127,76,76,38,38};
-            float saturation=(shade&1)==0?1f:.5f;
-            return hsv(hue,saturation,values[shade]);
+            // AutoCAD's odd entries are pastel variants of the even hue at ~1/3 saturation.
+            float saturation=(shade%2==0)?1f:(1f/3f);
+            int[] values={255,255,189,189,129,129,104,104,79,79};
+            return hsv(hue,saturation,values[shade]/255f);
         }
         switch(i){
             case 250:return 0xff333333;
@@ -81,20 +89,20 @@ public final class DxfColor {
         }
     }
 
-    private static int hsv(float hue,float saturation,int value){
-        float h=((hue%360f)+360f)%360f/60f;
-        int sector=(int)Math.floor(h);float f=h-sector;
-        float p=value*(1f-saturation),q=value*(1f-saturation*f),t=value*(1f-saturation*(1f-f));
-        int r=0,g=0,b=0;
+    private static int hsv(float h,float s,float v){
+        float hh=((h%360f)+360f)%360f/60f;
+        int sector=(int)Math.floor(hh);float f=hh-sector;
+        float p=v*(1f-s),q=v*(1f-s*f),t=v*(1f-s*(1f-f));
+        float r=0,g=0,b=0;
         switch(sector){
-            case 0:r=value;g=(int)t;b=(int)p;break;
-            case 1:r=(int)q;g=value;b=(int)p;break;
-            case 2:r=(int)p;g=value;b=(int)t;break;
-            case 3:r=(int)p;g=(int)q;b=value;break;
-            case 4:r=(int)t;g=(int)p;b=value;break;
-            default:r=value;g=(int)p;b=(int)q;break;
+            case 0:r=v;g=t;b=p;break;
+            case 1:r=q;g=v;b=p;break;
+            case 2:r=p;g=v;b=t;break;
+            case 3:r=p;g=q;b=v;break;
+            case 4:r=t;g=p;b=v;break;
+            default:r=v;g=p;b=q;break;
         }
-        return 0xff000000|(r<<16)|(g<<8)|b;
+        return 0xff000000|(Math.round(r*255f)<<16)|(Math.round(g*255f)<<8)|Math.round(b*255f);
     }
 
     public static String key(String layer){return (layer==null?"0":layer).toUpperCase(Locale.ROOT);}
