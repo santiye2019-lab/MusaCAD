@@ -17,7 +17,7 @@ jobs:
       - name: Apply one-line source correction
         run: |
           if grep -q 'y1=b' app/src/main/java/com/musa/cad/DxfParser.java; then
-            sed -i 's/this.x=x;y1=b;r=c/this.x=x;this.y=b;r=c/' app/src/main/java/com/musa/cad/DxfParser.java
+            sed -i 's/x=a;y1=b;r=c/x=a;y=b;r=c/' app/src/main/java/com/musa/cad/DxfParser.java
           fi
       - name: Commit correction if needed
         run: |
