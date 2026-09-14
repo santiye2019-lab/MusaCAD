@@ -188,9 +188,12 @@ public final class DxfParser {
 
     private static Result renderBuffered(File file)throws IOException{
         List<String> lines=readLines(file);
-        Map<String,Integer> layerColors=readLayerColors(lines);
+        DxfLayerTable.Table layerTable=DxfLayerTable.parse(lines);
+        Map<String,Integer> layerColors=layerTable.colors;
         DxfBlocks.Result expanded=DxfBlocks.expand(lines);
-        ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
+        ArrayList<Entity> entities=new ArrayList<>();
+        Set<String> layers=new HashSet<>(layerTable.names);
+        Set<String> visibleLayers=new HashSet<>(layerTable.visible);
         int skipped=expanded.skipped;
         List<DxfBlocks.Placement> placements=expanded.placements;
         for(int index=0;index<placements.size();index++){
@@ -212,9 +215,10 @@ public final class DxfParser {
                 if(entity==null){skipped++;continue;}
             }
             int color=DxfColor.argb(item.color,layerColors);
-            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,color));layers.add(item.layer);
+            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,color));
+            if(layers.add(item.layer)&&!layerTable.contains(item.layer))visibleLayers.add(item.layer);
         }
-        return finishEntities(entities,layers,skipped);
+        return finishEntities(entities,layers,visibleLayers,skipped);
     }
 
     private interface StreamNode {}
@@ -284,7 +288,7 @@ public final class DxfParser {
     private static final class StreamContext {
         String section="";StreamBlock activeBlock;PendingPoly pending;int skipped;
         final HashMap<String,StreamBlock> blocks=new HashMap<>();
-        final HashMap<String,Integer> layerColors=new HashMap<>();
+        final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final ArrayList<StreamNode> roots=new ArrayList<>();
     }
     private static final class StreamCounter {int visits;}
@@ -309,10 +313,13 @@ public final class DxfParser {
             if(type!=null)processStreamRecord(type,record,context);
         }
         finishPending(context);
-        ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
+        context.layerTable.ensureDefaultLayer();
+        ArrayList<Entity> entities=new ArrayList<>();
+        Set<String> layers=new HashSet<>(context.layerTable.names);
+        Set<String> visibleLayers=new HashSet<>(context.layerTable.visible);
         StreamCounter counter=new StreamCounter();
-        expandStream(context.roots,new DxfBlocks.Transform(),"0",null,context.blocks,new HashSet<>(),entities,layers,counter,context);
-        return finishEntities(entities,layers,context.skipped);
+        expandStream(context.roots,new DxfBlocks.Transform(),"0",null,context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context);
+        return finishEntities(entities,layers,visibleLayers,context.skipped);
     }
 
     private static boolean keepStreamCode(int code){
@@ -336,9 +343,9 @@ public final class DxfParser {
             }
             if("ENDBLK".equals(type)){finishPending(c);c.activeBlock=null;return;}
         }
-        if("LAYER".equals(type)){
-            String layerName=DxfColor.key(r.text(2,"0"));
-            c.layerColors.put(layerName,DxfColor.layerArgb(r.integer(62,7),r.trueColor()));return;
+        if("TABLES".equals(c.section)&&"LAYER".equals(type)){
+            String layerName=r.text(2,"0");
+            c.layerTable.add(layerName,r.integer(62,7),r.integer(70,0),r.trueColor());return;
         }
         ArrayList<StreamNode> target=streamTarget(c);if(target==null)return;
         if(c.pending!=null){
@@ -365,15 +372,17 @@ public final class DxfParser {
 
     private static void expandStream(List<StreamNode> nodes,DxfBlocks.Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
                                      Map<String,StreamBlock> blocks,Set<String> stack,ArrayList<Entity> entities,Set<String> layers,
-                                     StreamCounter counter,StreamContext context)throws IOException{
+                                     Set<String> visibleLayers,StreamCounter counter,StreamContext context)throws IOException{
         for(StreamNode node:nodes){
             FileTransfer.checkCancelled();
             if(++counter.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
             if(node instanceof StreamShape){
                 StreamShape shape=(StreamShape)node;String layer="0".equals(shape.layer)?parentLayer:shape.layer;
                 DxfColor.Ref ref=DxfColor.resolve(shape.aci,shape.trueColor,layer,byBlockColor);
-                int color=DxfColor.argb(ref,context.layerColors);
-                entities.add(new LayerEntity(new Transformed(shape.entity,parent),layer,color));layers.add(layer);continue;
+                int color=DxfColor.argb(ref,context.layerTable.colors);
+                entities.add(new LayerEntity(new Transformed(shape.entity,parent),layer,color));
+                if(layers.add(layer)&&!context.layerTable.contains(layer))visibleLayers.add(layer);
+                continue;
             }
             if(node instanceof StreamDimension){
                 StreamDimension dimension=(StreamDimension)node;String layer="0".equals(dimension.layer)?parentLayer:dimension.layer;
@@ -383,7 +392,7 @@ public final class DxfParser {
                 }
                 DxfColor.Ref dimColor=DxfColor.resolve(dimension.aci,dimension.trueColor,layer,byBlockColor);
                 stack.add(dimension.name);
-                expandStream(block.members,parent,layer,dimColor,blocks,stack,entities,layers,counter,context);
+                expandStream(block.members,parent,layer,dimColor,blocks,stack,entities,layers,visibleLayers,counter,context);
                 stack.remove(dimension.name);continue;
             }
             StreamInsert insert=(StreamInsert)node;String layer="0".equals(insert.layer)?parentLayer:insert.layer;
@@ -395,14 +404,14 @@ public final class DxfParser {
             DxfColor.Ref insertColor=DxfColor.resolve(insert.aci,insert.trueColor,layer,byBlockColor);
             DxfBlocks.Transform local=DxfBlocks.Transform.insert(block.bx,block.by,insert.sx,insert.sy,insert.rotation,insert.x,insert.y);
             DxfBlocks.Transform transform=parent.thenLocal(local);stack.add(insert.name);
-            expandStream(block.members,transform,layer,insertColor,blocks,stack,entities,layers,counter,context);
+            expandStream(block.members,transform,layer,insertColor,blocks,stack,entities,layers,visibleLayers,counter,context);
             stack.remove(insert.name);
         }
     }
 
     private static String key(String value){return value.toUpperCase(Locale.ROOT);}
 
-    private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,int skipped)throws IOException{
+    private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,int skipped)throws IOException{
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
         for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}
@@ -412,7 +421,7 @@ public final class DxfParser {
         float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());
         Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);
         m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);
-        return renderLayers(entities,m,layers,layers,skipped);
+        return renderLayers(entities,m,layers,visibleLayers,skipped);
     }
 
     private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped)throws IOException{
