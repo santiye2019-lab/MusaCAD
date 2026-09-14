@@ -58,6 +58,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
           java -cp /tmp/musacad-tests DxfCurvesTest
+      - name: Test DXF HATCH pattern geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-tests DxfHatchPatternTest
       - name: Test DXF OCS transforms
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
