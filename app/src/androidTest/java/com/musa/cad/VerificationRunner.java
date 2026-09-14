@@ -18,6 +18,7 @@ public class VerificationRunner extends Instrumentation {
         Bundle result=new Bundle();
         try{
             evidence=new File(getTargetContext().getFilesDir(),"verification");evidence.mkdirs();
+            verifyWindow();
             verifyNative();
             Throwable[] failure={null};
             runOnMainSync(()->{try{verifyGraphics();verifyMeasurements();}catch(Throwable t){failure[0]=t;}});
@@ -29,6 +30,32 @@ public class VerificationRunner extends Instrumentation {
             StringWriter trace=new StringWriter();t.printStackTrace(new PrintWriter(trace));
             result.putString("stream",report+"FAIL\n"+trace);finish(0,result);
         }
+    }
+    private void verifyWindow() throws Exception {
+        MainActivity activity=(MainActivity)startActivitySync(new android.content.Intent(getTargetContext(),MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+        waitForIdleSync();
+        Throwable[] failure={null};
+        runOnMainSync(()->{try{
+            android.view.View root=activity.findViewById(R.id.mainRoot);
+            androidx.core.view.WindowInsetsCompat insets=androidx.core.view.ViewCompat.getRootWindowInsets(root);
+            require(insets!=null,"Window insets absent");
+            androidx.core.graphics.Insets bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()|androidx.core.view.WindowInsetsCompat.Type.displayCutout());
+            require(bars.top>0&&bars.bottom>0,"Emulator system bars absent");
+            int[] top=new int[2],bottom=new int[2],origin=new int[2];
+            root.getLocationOnScreen(origin);
+            android.view.View open=activity.findViewById(R.id.openButton),pan=activity.findViewById(R.id.panButton);
+            open.getLocationOnScreen(top);pan.getLocationOnScreen(bottom);
+            require(top[1]>=origin[1]+bars.top,"Open button behind status bar");
+            require(bottom[1]+pan.getHeight()<=origin[1]+root.getHeight()-bars.bottom,"Toolbar behind navigation bar");
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(root,insets);
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(root,insets);
+            require(root.getPaddingTop()==bars.top&&root.getPaddingBottom()==bars.bottom,"Insets accumulated");
+            passed("Activity buttons clear status/navigation bars; repeated insets stable");
+        }catch(Throwable t){failure[0]=t;}});
+        if(failure[0]!=null)throw new AssertionError("Window verification",failure[0]);
+        png(getUiAutomation().takeScreenshot(),"screen-insets.png");
+        runOnMainSync(activity::finish);
+        waitForIdleSync();
     }
     private void png(Bitmap bitmap,String name)throws IOException {
         try(FileOutputStream out=new FileOutputStream(new File(evidence,name))){require(bitmap.compress(Bitmap.CompressFormat.PNG,100,out),"PNG failed");}

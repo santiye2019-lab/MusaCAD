@@ -11,6 +11,10 @@ import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.graphics.Insets;
 import java.io.*;
 import java.util.concurrent.*;
 
@@ -28,7 +32,18 @@ public class MainActivity extends AppCompatActivity {
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
     private CadView cad; private TextView fileName,result; private File currentFile;
-    protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
+    protected void onCreate(Bundle b){super.onCreate(b);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        setContentView(R.layout.activity_main);
+        View root=findViewById(R.id.mainRoot);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
+            Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+            return insets;
+        });
+        WindowCompat.getInsetsController(getWindow(),root).setAppearanceLightStatusBars(false);
+        WindowCompat.getInsetsController(getWindow(),root).setAppearanceLightNavigationBars(false);
+        ViewCompat.requestApplyInsets(root);
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
         findViewById(R.id.appTitle).setOnClickListener(v->{

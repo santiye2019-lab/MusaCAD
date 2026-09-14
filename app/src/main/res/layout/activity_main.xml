@@ -1,4 +1,4 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#111820">
+<LinearLayout android:id="@+id/mainRoot" xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#111820">
     <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:background="#0B3B60">
         <TextView android:id="@+id/appTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="MUSA CAD" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="20sp" />
         <Button android:id="@+id/openButton" android:layout_width="wrap_content" android:layout_height="44dp" android:text="DOSYA AÇ" />
