@@ -44,6 +44,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test DXF curved geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
+          java -cp /tmp/musacad-tests DxfCurvesTest
       - name: Test DXF block expansion
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
