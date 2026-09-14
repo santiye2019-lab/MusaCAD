@@ -73,6 +73,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfSpace.java tests/DxfSpaceTest.java
           java -cp /tmp/musacad-tests DxfSpaceTest
+      - name: Test DXF paper viewports
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-tests DxfViewportTest
       - name: Test DXF OCS transforms
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
