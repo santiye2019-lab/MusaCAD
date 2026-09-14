@@ -62,9 +62,9 @@ public final class DxfStream implements Closeable {
     }
     // Retain only fields used by geometry parsing and block transforms.
     private static boolean keep(String type,int code){
-        if(code==8)return true;
+        if(code==8||code==67)return true;
         switch(type){
-            case "SECTION":return code==2;
+            case "SECTION":return code==2||code==9||code==70;
             case "BLOCK":case "INSERT":return code==1||code==2||code==10||code==20||code==30||code==41||code==42||code==50||code==70||code==71||code==210||code==220||code==230;
             case "LINE":return code==10||code==20||code==11||code==21;
             case "CIRCLE":case "ARC":return code==10||code==20||code==40||code==50||code==51;

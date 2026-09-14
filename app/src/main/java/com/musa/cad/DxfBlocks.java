@@ -66,7 +66,7 @@ public final class DxfBlocks {
                 if(record.type.equals("BLOCK")){active=new Block(record);blocks.put(key(record.text(2,"")),active);}
                 else if(record.type.equals("ENDBLK"))active=null;
                 else if(active!=null)active.members.add(record);
-            }else if(section.equals("ENTITIES"))roots.add(record);
+            }else if(section.equals("ENTITIES")&&record.number(67,0)==0)roots.add(record);
         }
         Result result=new Result();
         for(Record root:roots)expand(root,new Transform(),"0",blocks,new HashSet<>(),result);
@@ -98,7 +98,10 @@ public final class DxfBlocks {
                 if(r.type.equals("SECTION"))section=r.text(2,"");
                 else if(r.type.equals("ENDSEC"))section="";
                 else if(r.type.equals("EOF"))break;
-                else if(section.equals("ENTITIES"))expand(r,identity,"0",blocks,stack,result);
+                else if(section.equals("ENTITIES")){
+                    if(r.number(67,0)==0)expand(r,identity,"0",blocks,stack,result);
+                    else result.skipped++;
+                }
             }
         }
         result.sink=null;return result;

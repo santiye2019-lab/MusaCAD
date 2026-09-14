@@ -56,6 +56,10 @@ public class CadView extends View {
     public void setDrawing(Bitmap b){snapIndex=null;lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
     public void undo(){lastSnapped=false;if(selecting){cancelSelection();return;}if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
     public void clearMeasurement(){lastSnapped=false;if(selecting){cancelSelection();return;}points.clear();notifyValue();invalidate();}
+    public void setDrawingScale(double metersPerPixel){
+        if(!Double.isFinite(metersPerPixel)||metersPerPixel<=0)throw new IllegalArgumentException("Invalid drawing scale");
+        unitsPerImagePixel=metersPerPixel;unitName="m";notifyValue();invalidate();
+    }
     public void setCalibration(double realDistance, String unit){
         if(!Double.isFinite(realDistance)||realDistance<=0||points.size()!=2)throw new IllegalArgumentException();
         double px=distance(points.get(0),points.get(1));

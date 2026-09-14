@@ -51,7 +51,7 @@ public class VerificationRunner extends Instrumentation {
         return false;
     }
     private void verifyGraphics()throws Exception {
-        String dxf="0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nFRAME\n70\n1\n10\n0\n20\n0\n10\n10\n20\n0\n10\n10\n20\n10\n10\n0\n20\n10\n"+
+        String dxf="0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nFRAME\n70\n1\n10\n0\n20\n0\n10\n10\n20\n0\n10\n10\n20\n10\n10\n0\n20\n10\n"+
             "0\nLWPOLYLINE\n8\nARC\n70\n0\n10\n0\n20\n0\n42\n-1\n10\n10\n20\n0\n0\nENDSEC\n0\nEOF\n";
         File f=new File(getTargetContext().getCacheDir(),"geometry.dxf");
         try(FileOutputStream out=new FileOutputStream(f)){out.write(dxf.getBytes("UTF-8"));}
@@ -68,7 +68,31 @@ public class VerificationRunner extends Instrumentation {
         require(arc.snapIndex.nearest(81,2319,1,8)>=0,"Endpoint snap missing");
         png(arc.bitmap,"arc-only.png");
         passed("Android Canvas: square edges, semicircle direction, layer hiding, endpoint-only snapping");
+        verifyAutomaticScale(all,arc);
         all.bitmap.recycle();arc.bitmap.recycle();f.delete();
+    }
+    private void verifyAutomaticScale(DxfParser.Result all,DxfParser.Result arc)throws Exception {
+        Locale old=Locale.getDefault();Locale.setDefault(Locale.US);
+        try{
+            require(all.unitCode==6&&Math.abs(all.metersPerPixel-1d/224)<1e-10,"File units/scale");
+            require(arc.unitCode==all.unitCode&&arc.metersPerPixel==all.metersPerPixel,"Layer scale changed");
+            CadView v=new CadView(getTargetContext(),null);v.layout(0,0,2400,2400);
+            String[] reading={""};v.setListener(new CadView.Listener(){
+                public void onMeasurement(String text){reading[0]=text;}
+                public void onCalibrationRequested(double pixels){}
+                public void onSelectionReady(){}
+            });
+            v.setDrawing(all.bitmap);v.setSnapIndex(all.snapIndex);v.setDrawingScale(all.metersPerPixel);
+            v.setMode(CadView.Mode.DISTANCE);tap(v,80,2320);tap(v,2320,2320);
+            require(reading[0].equals("Mesafe: 10.000 m"),"Automatic distance: "+reading[0]);
+            v.setMode(CadView.Mode.AREA);tap(v,80,2320);tap(v,2320,2320);tap(v,2320,80);tap(v,80,80);
+            require(reading[0].equals("Alan: 100.000 m²"),"Automatic area: "+reading[0]);
+            png(v.snapshot(),"automatic-units-100m2.png");
+            v.setMode(CadView.Mode.CALIBRATE);tap(v,80,2320);tap(v,2320,2320);v.setCalibration(20,"m");
+            v.replaceVisibleDrawing(arc.bitmap,arc.snapIndex);v.setMode(CadView.Mode.DISTANCE);tap(v,80,2320);tap(v,2320,2320);
+            require(reading[0].equals("Mesafe: 20.000 m"),"Manual override lost on layer change: "+reading[0]);
+            passed("File-defined meters: automatic 10m/100m2; manual override survives layer changes");
+        }finally{Locale.setDefault(old);}
     }
     private static void tap(CadView view,float x,float y){
         long now=SystemClock.uptimeMillis();

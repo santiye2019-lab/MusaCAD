@@ -69,11 +69,15 @@ public final class DxfParser {
         public final SnapPoints.Index snapIndex;
         public final int entityCount, layerCount, skippedCount;
         public int conversionWarnings;
+        public final int unitCode;
+        public final double metersPerPixel;
         public final Set<String> layerNames,visibleLayers;
         private final List<Entity> document;
         private final Matrix view;
-        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible)throws IOException{
+        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int unitCode)throws IOException{
             snapIndex=new SnapPoints.Index(points);
+            this.unitCode=unitCode;float[] coefficients=new float[9];view.getValues(coefficients);
+            metersPerPixel=DxfUnits.metersPerPixel(unitCode,Math.hypot(coefficients[Matrix.MSCALE_X],coefficients[Matrix.MSKEW_Y]));
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
             this.document=document;this.view=new Matrix(view);
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));
@@ -81,7 +85,7 @@ public final class DxfParser {
         }
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            Result result=renderLayers(document,view,layerNames,visible,skippedCount);result.conversionWarnings=conversionWarnings;return result;
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount,unitCode);result.conversionWarnings=conversionWarnings;return result;
         }
     }
     // Display colors distinguish layers; these are not the source file's ACI colors.
@@ -116,6 +120,7 @@ public final class DxfParser {
         return fallback;
     }
     public static Result render(File file)throws IOException{
+        int unitCode=DxfUnits.read(file,charset(file));
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
         final int[] unsupported={0};
         DxfBlocks.Result expanded=DxfBlocks.expand(file,charset(file),item->{
@@ -125,9 +130,9 @@ public final class DxfParser {
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
         });
         int skipped=expanded.skipped+unsupported[0];
-        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);return renderLayers(entities,m,layers,layers,skipped);
+        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);return renderLayers(entities,m,layers,layers,skipped,unitCode);
     }
-    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped)throws IOException{
+    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped,int unitCode)throws IOException{
         List<Entity> shown=new ArrayList<>();
         for(Entity entity:document){
             FileTransfer.checkCancelled();
@@ -139,7 +144,7 @@ public final class DxfParser {
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2f);
             for(Entity entity:shown){FileTransfer.checkCancelled();entity.draw(canvas,paint,view);}
             FileTransfer.checkCancelled();
-            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible);
+            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,unitCode);
         }catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
     }
 

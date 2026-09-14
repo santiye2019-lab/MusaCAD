@@ -148,3 +148,21 @@ Standart XY dışındaki LWPOLYLINE düzlemleri desteklenmeyen nesne olarak say�
 Değişken çizgi genişliği henüz uygulanmaz.
 
 Başvuru: https://ezdxf.readthedocs.io/en/stable/dxfentities/lwpolyline.html
+
+
+## Otomatik çizim birimi — 0.4
+
+Model alanındaki geometri için HEADER/$INSUNITS okunur. mm, cm, dm, m, km,
+inç, feet, mil ve yard tanımları metreye çevrilir; sonuçlar m/m² gösterilir.
+Pafta alanındaki nesneler (kod 67) model ölçümüne karıştırılmaz ve gösterilmeyen
+nesne sayısına dahil edilir. Birim belirsiz veya desteklenmiyorsa ölçüm piksel
+olarak kalır ve kalibrasyon istenir. LUNITS/MEASUREMENT üzerinden tahmin yapılmaz.
+ÖLÇEK ile kullanıcı tanımlı kalibrasyon yapılabilir; katman değişimi bunu korur.
+Dosyadaki birim tanımının doğru olması gerekir. Görünüm ve nokta koordinatları
+hâlâ sınırlı hassasiyettedir; bu sürüm metrologik doğruluk sertifikası değildir.
+
+Android 35 emülatör doğrulaması gerçek Canvas/Matrix, JNI DWG dönüşümü,
+dokunmayla kalibrasyon, mesafe, alan, geri alma, kaydırma ve iki parmakla
+yakınlaştırma yollarını çalıştırır. Bilinen test geometrilerinin PNG çıktıları
+MusaCAD-Android-verification derleme çıktısında bulunur. Bu testler özel kullanıcı
+çiziminin eksiksiz temsil edildiğini veya fiziksel telefondaki performansı kanıtlamaz.

@@ -49,6 +49,10 @@ jobs:
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfStream.java tests/DxfBlocksTest.java tests/DxfStreamTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
           java -Xmx64m -cp /tmp/musacad-tests DxfStreamTest
+      - name: Test drawing units
+        run: |
+          javac -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfUnits.java tests/DxfUnitsTest.java
+          java -cp /tmp/musacad-tests DxfUnitsTest
       - name: Test polyline arcs
         run: |
           javac -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfPolyline.java tests/DxfPolylineTest.java
