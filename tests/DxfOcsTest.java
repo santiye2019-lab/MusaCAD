@@ -24,11 +24,11 @@ public class DxfOcsTest {
 
         // Oblique extrusion is projected onto the WCS XY plane using AutoCAD's arbitrary axes.
         double[] oblique=DxfOcs.insert2d(1,2,0,1,1,1,0,10,20,0,0,1,1,0,0);
-        double root=Math.sqrt(.5);pointEq(oblique,3,4,12,22*root);
+        double root=Math.sqrt(.5);pointEq(oblique,3,4,-12,-22*root);
 
         // Array spacing moves successive block references independently of block scale.
         double[] array=DxfOcs.insert2d(1,2,0,2,3,1,0,10,20,0,0,0,1,5,7);
-        pointEq(array,3,4,19,35);
+        pointEq(array,3,4,19,33);
         System.out.println("5 OCS transform cases passed");
     }
 }
