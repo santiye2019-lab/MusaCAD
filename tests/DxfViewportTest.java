@@ -1,5 +1,4 @@
 import com.musa.cad.DxfViewport;
-import java.util.Arrays;
 
 public class DxfViewportTest {
     private static void close(double a,double b){if(Math.abs(a-b)>1e-6)throw new AssertionError(a+" != "+b);}
@@ -9,6 +8,9 @@ public class DxfViewportTest {
         double[] p=DxfViewport.point(v,10,20);close(p[0],100);close(p[1],50);
         p=DxfViewport.point(v,30,20);close(p[0],140);close(p[1],50);
         close(v.left(),60);close(v.right(),140);close(v.bottom(),30);close(v.top(),70);
+        if(!DxfViewport.contains(v,60,30,0)||!DxfViewport.contains(v,140,70,0))throw new AssertionError("viewport edges");
+        if(DxfViewport.contains(v,140.1,50,0))throw new AssertionError("outside viewport");
+        if(!DxfViewport.contains(v,140.1,50,.2))throw new AssertionError("viewport tolerance");
 
         DxfViewport.Spec rotated=DxfViewport.of(0,0,100,100,0,0,100,Math.PI/2,3,1,0,0,1);
         p=DxfViewport.point(rotated,10,0);close(p[0],0);close(p[1],-10);
@@ -16,6 +18,6 @@ public class DxfViewportTest {
         if(DxfViewport.of(0,0,10,10,0,0,10,0,1,1,0,0,1).supported())throw new AssertionError("overall paper viewport");
         if(DxfViewport.of(0,0,10,10,0,0,10,0,2,0,0,0,1).supported())throw new AssertionError("off viewport");
         if(DxfViewport.of(0,0,10,10,0,0,10,0,2,1,1,0,1).supported())throw new AssertionError("3D view not yet 2D-safe");
-        System.out.println("10 DXF viewport geometry cases passed");
+        System.out.println("14 DXF viewport geometry and clipping cases passed");
     }
 }
