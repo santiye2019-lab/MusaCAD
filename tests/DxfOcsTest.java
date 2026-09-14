@@ -29,6 +29,21 @@ public class DxfOcsTest {
         // Array spacing moves successive block references independently of block scale.
         double[] array=DxfOcs.insert2d(1,2,0,2,3,1,0,10,20,0,0,0,1,5,7);
         pointEq(array,3,4,19,33);
-        System.out.println("5 OCS transform cases passed");
+
+        // Ordinary OCS entities use the same arbitrary-axis basis.
+        double[] entityNormal=DxfOcs.plane2d(0,0,1,123);
+        eq(entityNormal,1,0,0,1,0,0);pointEq(entityNormal,3,4,3,4);
+
+        double[] entityReverse=DxfOcs.plane2d(0,0,-1,0);
+        eq(entityReverse,-1,0,0,1,0,0);pointEq(entityReverse,3,4,-3,4);
+
+        double[] entityOblique=DxfOcs.plane2d(0,1,1,2);
+        pointEq(entityOblique,3,4,-3,-Math.sqrt(8)+Math.sqrt(2));
+
+        boolean rejected=false;
+        try{DxfOcs.plane2d(0,0,0,0);}catch(IllegalArgumentException expected){rejected=true;}
+        if(!rejected)throw new AssertionError("Zero extrusion must be rejected");
+
+        System.out.println("9 OCS transform cases passed");
     }
 }
