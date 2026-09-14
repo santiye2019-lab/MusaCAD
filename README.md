@@ -64,7 +64,7 @@ Daire/yaylar dönüşümlü yollarla çizilir; farklı X/Y ölçeğinde eliptik 
 
 Sınırlar: MINSERT dizileri, harici referanslar, 3B yerleşimler, dinamik blok
 davranışı ve öznitelikler desteklenmez. Eksik veya döngüsel blok referansı atlanan
-sayısına eklenir. En fazla 32 iç içe blok ve 100.000 genişletme adımı işlenir.
+sayısına eklenir. En fazla 32 iç içe blok ve 1.000.000 genişletme adımı işlenir.
 Açılan nesne sayısı, blokların içinden çıkan desteklenen öğeleri de içerir.
 
 Teknik başvuru: https://ezdxf.readthedocs.io/en/stable/blocks/insert.html
@@ -78,7 +78,16 @@ Açılış penceresi okunan MB değerini, ardından hazırlama aşamasını gös
 kadar mevcut çizim, kalibrasyon, ölçümler ve orijinal paylaşım dosyası korunur.
 Boş/okunamayan dosyada kısmi geçici kopya silinir.
 
-Bu sürümde dosya sınırı 32 MB, DXF metin sınırı 600.000 satırdır.
+DWG girdi sınırı 32 MB; doğrudan açılan veya DWG'den dönüştürülen DXF sınırı
+512 MB'dır. DXF metni bütünüyle belleğe alınmaz: ilk geçiş blok konumlarını
+indeksler, ikinci geçiş nesneleri işler; blok üyeleri gerektiğinde dosyadan okunur.
+Desteklenen geometri ve görünüm bellekte tutulmaya devam eder. Yakalama noktaları
+ara PointF listeleri olmadan doğrudan float dizisine yazılır.
+Tek satır 65.536 bayt, bir nesnenin saklanan etiketleri 100.000 çift, blok indeksi
+100.000 tanım ve yakalama noktaları 8.000.000 ile sınırlıdır.
+Büyük dosya okuyucusu 64 MB Java heap altında sentetik ve yerel dosyayla test
+edildi. Bu sonuç Android çizim belleğini, DWG motorunun yerel belleğini veya
+ölçüm doğruluğunu doğrulamaz.
 DWG önizlemesi en fazla 2400 piksel kenara örneklenir.
 İptal arayüzü hemen kapanır; bulut sağlayıcısının engellenen okuması dönene kadar
 arka plan işinin sona ermesi gecikebilir. PDF/PNG dışa aktarımı henüz arka plana
@@ -106,3 +115,54 @@ Tüm nesneler ve DWG sürümleri için eksiksiz destek iddiası yoktur.
 Kalibrasyon hâlâ gereklidir. Geometriye ait bölüm haritası okunamayan dosyalar
 önizleme yoluna düşebilir; bu durum tek başına dosyanın bozuk olduğunu kanıtlamaz.
 Lisans, kaynak paketleme ve yeniden derleme için NATIVE_BUILD.md belgesine bakın.
+
+
+## Büyük çizimde nokta yakalama ve alan hesabı
+
+Yakalama noktaları yükleme iş parçacığında 64×64 hücreli değiştirilemez bir
+indekse alınır. Dokunmada yalnız arama yarıçapıyla kesişen hücreler taranır.
+Yakınlık, yakınlaştırmaya göre ekran pikseli cinsinden korunur; eşit uzaklıkta
+önceki sürümle aynı nokta seçilir. Çok uzak yakınlaştırmada tüm hücrelerin
+taranması gerekebilir. Katman değişiminde indeks görünür noktalarla yenilenir.
+
+Alan hesabı yerel başlangıç noktasına göre double ara işlemler ve telafili
+toplam kullanır. Bu, float çarpımlarından doğan küçük alan hatasını azaltır;
+görünüm çözünürlüğünü veya kullanıcı kalibrasyonunun doğruluğunu değiştirmez.
+Kendini kesmeyen bir sınır boyunca sırayla köşe seçilmelidir.
+
+Doğrulama: 500.000 noktalı veri dahil 900 sorguda indeks ve doğrusal tarama
+aynı noktayı buldu. Küçük, ters yönlü ve içbükey alanlar ile mesafe hesabı
+test edildi. Android cihaz performansı ve görsel doğrulama ayrıca gereklidir.
+
+
+## Çoklu çizgi yayları
+
+LWPOLYLINE kod 42 (bulge) artık çizimde korunur. Pozitif/negatif yaylar ve
+kapalı çizginin son köşesindeki yay işlenir. Yaylar en fazla 45 derecelik
+kübik Bézier parçalarıyla yaklaşık çizilir; blok ölçekleme ve aynalaması
+çizim yoluna uygulanır. Kontrol noktaları görünüm sınırına dahil edilir.
+Yakalama adayları özgün köşelerdir; Bézier kontrol noktaları yakalanmaz.
+Ölçüm aracı seçilen noktalar arasında düz mesafe hesaplamaya devam eder,
+yay uzunluğunu veya eğrisel sınırın alanını otomatik hesaplamaz.
+Standart XY dışındaki LWPOLYLINE düzlemleri desteklenmeyen nesne olarak sayılır.
+Değişken çizgi genişliği henüz uygulanmaz.
+
+Başvuru: https://ezdxf.readthedocs.io/en/stable/dxfentities/lwpolyline.html
+
+
+## Otomatik çizim birimi — 0.4
+
+Model alanındaki geometri için HEADER/$INSUNITS okunur. mm, cm, dm, m, km,
+inç, feet, mil ve yard tanımları metreye çevrilir; sonuçlar m/m² gösterilir.
+Pafta alanındaki nesneler (kod 67) model ölçümüne karıştırılmaz ve gösterilmeyen
+nesne sayısına dahil edilir. Birim belirsiz veya desteklenmiyorsa ölçüm piksel
+olarak kalır ve kalibrasyon istenir. LUNITS/MEASUREMENT üzerinden tahmin yapılmaz.
+ÖLÇEK ile kullanıcı tanımlı kalibrasyon yapılabilir; katman değişimi bunu korur.
+Dosyadaki birim tanımının doğru olması gerekir. Görünüm ve nokta koordinatları
+hâlâ sınırlı hassasiyettedir; bu sürüm metrologik doğruluk sertifikası değildir.
+
+Android 35 emülatör doğrulaması gerçek Canvas/Matrix, JNI DWG dönüşümü,
+dokunmayla kalibrasyon, mesafe, alan, geri alma, kaydırma ve iki parmakla
+yakınlaştırma yollarını çalıştırır. Bilinen test geometrilerinin PNG çıktıları
+MusaCAD-Android-verification derleme çıktısında bulunur. Bu testler özel kullanıcı
+çiziminin eksiksiz temsil edildiğini veya fiziksel telefondaki performansı kanıtlamaz.

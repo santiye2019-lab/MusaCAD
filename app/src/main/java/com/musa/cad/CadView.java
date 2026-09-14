@@ -14,15 +14,20 @@ public class CadView extends View {
     private final Matrix imageMatrix = new Matrix();
     private final Matrix inverse = new Matrix();
     private Bitmap drawing;
+    private DxfParser.Result vectorDrawing;
+    public void setVectorDrawing(DxfParser.Result value){vectorDrawing=value;invalidate();}
+    public void fitDrawing(){fit();invalidate();}
+    public Mode getMode(){return mode;}
+    public boolean hasDrawingScale(){return !"piksel".equals(unitName);}
     private Mode mode = Mode.PAN;
     private Listener listener;
     private float lastX, lastY, scale = 1f;
     private double unitsPerImagePixel = 1d;
     private String unitName = "piksel";
     private boolean multiTouch;
-    private float[] snapPoints=new float[0];
+    private SnapPoints.Index snapIndex;
     private boolean snapEnabled=true,lastSnapped;
-    public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
+    public void setSnapIndex(SnapPoints.Index index){snapIndex=index;lastSnapped=false;}
     public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
 
     private boolean selecting, draggingSelection, exporting;
@@ -45,17 +50,21 @@ public class CadView extends View {
             }
         });
     }
-    public void replaceVisibleDrawing(Bitmap bitmap,float[] candidates){
+    public void replaceVisibleDrawing(Bitmap bitmap,SnapPoints.Index candidates){
         if(drawing==null||bitmap.getWidth()!=drawing.getWidth()||bitmap.getHeight()!=drawing.getHeight())
             throw new IllegalArgumentException("Çizim boyutu değişti");
-        drawing=bitmap;selecting=false;draggingSelection=false;points.clear();
-        setSnapPoints(candidates);notifyValue();invalidate();
+        vectorDrawing=null;drawing=bitmap;selecting=false;draggingSelection=false;points.clear();
+        setSnapIndex(candidates);notifyValue();invalidate();
     }
     public void setListener(Listener l){listener=l;}
     public void setMode(Mode m){lastSnapped=false;selecting=false;draggingSelection=false;mode=m; points.clear(); notifyValue(); invalidate();}
-    public void setDrawing(Bitmap b){snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
+    public void setDrawing(Bitmap b){vectorDrawing=null;snapIndex=null;lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
     public void undo(){lastSnapped=false;if(selecting){cancelSelection();return;}if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
     public void clearMeasurement(){lastSnapped=false;if(selecting){cancelSelection();return;}points.clear();notifyValue();invalidate();}
+    public void setDrawingScale(double metersPerPixel){
+        if(!Double.isFinite(metersPerPixel)||metersPerPixel<=0)throw new IllegalArgumentException("Invalid drawing scale");
+        unitsPerImagePixel=metersPerPixel;unitName="m";notifyValue();invalidate();
+    }
     public void setCalibration(double realDistance, String unit){
         if(!Double.isFinite(realDistance)||realDistance<=0||points.size()!=2)throw new IllegalArgumentException();
         double px=distance(points.get(0),points.get(1));
@@ -71,7 +80,10 @@ public class CadView extends View {
     protected void onSizeChanged(int w,int h,int ow,int oh){if(selecting)cancelSelection();if(ow==0)fit();}
     protected void onDraw(Canvas c){
         super.onDraw(c);
-        if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint); else drawWelcome(c);
+        if(drawing!=null){
+            if(vectorDrawing!=null&&scale>1f)vectorDrawing.drawVector(c,imageMatrix);
+            else {paint.setFilterBitmap(true);c.drawBitmap(drawing,imageMatrix,paint);}
+        } else drawWelcome(c);
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.rgb(25,181,165));
         ArrayList<PointF> screen=new ArrayList<>();
         for(PointF point:points){float[] xy={point.x,point.y};imageMatrix.mapPoints(xy);screen.add(new PointF(xy[0],xy[1]));}
@@ -92,8 +104,8 @@ public class CadView extends View {
 
     }
     private void drawWelcome(Canvas c){
-        paint.setTextAlign(Paint.Align.CENTER);paint.setColor(Color.LTGRAY);paint.setTextSize(38);c.drawText("DWG / DXF görüntüleyici",getWidth()/2f,getHeight()/2f-20,paint);
-        paint.setTextSize(25);c.drawText("Dosya Aç düğmesine dokunun",getWidth()/2f,getHeight()/2f+28,paint);
+        paint.setTextAlign(Paint.Align.CENTER);paint.setColor(Color.LTGRAY);paint.setTextSize(Math.min(20*getResources().getDisplayMetrics().scaledDensity,getWidth()/14f));c.drawText("DWG / DXF görüntüleyici",getWidth()/2f,getHeight()/2f-20,paint);
+        paint.setTextSize(Math.min(14*getResources().getDisplayMetrics().scaledDensity,getWidth()/19f));c.drawText("Dosya Aç düğmesine dokunun",getWidth()/2f,getHeight()/2f+28,paint);
     }
     public boolean onTouchEvent(android.view.MotionEvent e){
         if(drawing==null)return true;
@@ -106,10 +118,10 @@ public class CadView extends View {
         if(e.getAction()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();
             float[] xy={e.getX(),e.getY()};if(!imageMatrix.invert(inverse))return true;inverse.mapPoints(xy);
             if(xy[0]<0||xy[1]<0||xy[0]>drawing.getWidth()||xy[1]>drawing.getHeight())return true;
-            int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,
+            int snapped=snapEnabled&&snapIndex!=null?snapIndex.nearest(xy[0],xy[1],scale,
                 18*getResources().getDisplayMetrics().density):-1;
             lastSnapped=snapped>=0;
-            if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
+            if(lastSnapped){xy[0]=snapIndex.coordinate(snapped);xy[1]=snapIndex.coordinate(snapped+1);}
             points.add(new PointF(xy[0],xy[1]));if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));notifyValue();invalidate();return true;}
         return true;
     }
@@ -118,7 +130,12 @@ public class CadView extends View {
         if(selecting){listener.onMeasurement("Alanı sürükleyerek seçin • İptal: GERİ");return;}
         if(mode==Mode.CALIBRATE) listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
         else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Mesafe: %.3f %s",sum*unitsPerImagePixel,unitName));}
-        else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));}
+        else if(mode==Mode.AREA){
+            float[] xy=new float[points.size()*2];
+            for(int i=0;i<points.size();i++){xy[i*2]=points.get(i).x;xy[i*2+1]=points.get(i).y;}
+            double a=MeasurementMath.area(xy)*unitsPerImagePixel*unitsPerImagePixel;
+            listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));
+        }
         else listener.onMeasurement("Yakınlaştırmak için iki parmak kullanın");
     }
     private boolean selectionTouch(MotionEvent e){
@@ -157,6 +174,6 @@ public class CadView extends View {
         try{draw(canvas);}finally{exporting=false;}
         return b;
     }
-    private double distance(PointF a,PointF b){return Math.hypot(a.x-b.x,a.y-b.y);}
+    private double distance(PointF a,PointF b){return MeasurementMath.distance(a.x,a.y,b.x,b.y);}
     public Bitmap snapshot(){if(drawing==null)throw new IllegalStateException("Önce çizim açın");Bitmap b=Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);draw(new Canvas(b));return b;}
 }

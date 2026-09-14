@@ -11,6 +11,10 @@ import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.graphics.Insets;
 import java.io.*;
 import java.util.concurrent.*;
 
@@ -28,8 +32,19 @@ public class MainActivity extends AppCompatActivity {
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
     private CadView cad; private TextView fileName,result; private File currentFile;
-    protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
-        cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
+    protected void onCreate(Bundle b){super.onCreate(b);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        setContentView(R.layout.activity_main);
+        View root=findViewById(R.id.mainRoot);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
+            Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+            return insets;
+        });
+        WindowCompat.getInsetsController(getWindow(),root).setAppearanceLightStatusBars(false);
+        WindowCompat.getInsetsController(getWindow(),root).setAppearanceLightNavigationBars(false);
+        ViewCompat.requestApplyInsets(root);
+        cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);updateModeButtons();}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
         findViewById(R.id.appTitle).setOnClickListener(v->{
             String license;
@@ -41,6 +56,11 @@ public class MainActivity extends AppCompatActivity {
             ScrollView scroll=new ScrollView(this);scroll.addView(text);
             new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
         });
+        findViewById(R.id.homeButton).setOnClickListener(v->{startActivity(new Intent(this,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));finish();});
+        findViewById(R.id.infoButton).setOnClickListener(this::showDrawingMenu);
+        findViewById(R.id.fileName).setOnClickListener(v->showDrawingInfo());
+        findViewById(R.id.fitButton).setOnClickListener(v->cad.fitDrawing());
+        updateModeButtons();
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->cad.setMode(CadView.Mode.PAN));
@@ -50,11 +70,51 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.undoButton).setOnClickListener(v->cad.undo());
         findViewById(R.id.clearButton).setOnClickListener(v->cad.clearMeasurement());
         findViewById(R.id.shareButton).setOnClickListener(v->showShare());
+        if(getIntent().getData()!=null)startLoad(getIntent().getData());
+    }
+    private void showDrawingMenu(View anchor){
+        PopupMenu menu=new PopupMenu(this,anchor);
+        String[] names={"Çizim bilgisi","Katmanlar","Ekrana sığdır","Dışa aktar / paylaş","Ölçümü temizle","Yardım"};
+        for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);
+        menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
+            case 0:showDrawingInfo();break;case 1:showLayers();break;case 2:cad.fitDrawing();break;
+            case 3:showShare();break;case 4:cad.clearMeasurement();break;
+            case 5:new AlertDialog.Builder(this).setTitle("Çizim araçları").setMessage("İki parmakla yakınlaştırın. Gezin aracıyla çizimi kaydırın. Mesafe veya Alan seçip noktaları işaretleyin. Yakalama açıkken çizgi uçlarına tutunur. Dosya birimi bilinmiyorsa Ölçek ile bilinen uzunluğu girin. Ekrana sığdır görünümü sıfırlar.").setPositiveButton("Kapat",null).show();break;
+        }return true;});menu.show();
+    }
+    private void updateModeButtons(){
+        int[] ids={R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton};
+        CadView.Mode[] modes={CadView.Mode.PAN,CadView.Mode.CALIBRATE,CadView.Mode.DISTANCE,CadView.Mode.AREA};
+        for(int i=0;i<ids.length;i++)findViewById(ids[i]).setSelected(cad.getMode()==modes[i]);
+    }
+    private String drawingSummary(){
+        if(activeDxf==null)return "Yalnız önizleme • Ayrıntılar için ⓘ";
+        String status=activeDxf.skippedCount>0?activeDxf.skippedCount+" nesne gösterilemedi • ":"Çizim hazır • ";
+        return status+(cad.hasDrawingScale()?"Ölçüm hazır":"Ölçek gerekli")+" • ⓘ";
+    }
+    private void showDrawingInfo(){
+        StringBuilder text=new StringBuilder();
+        if(currentFile==null){text.append("Aç düğmesinden DWG veya DXF seçin.\n\nİki parmakla yakınlaştırın. Mesafe ve Alan araçlarıyla nokta seçin. Ölçek aracıyla bilinen bir uzunluğu tanımlayın.");}
+        else if(activeDxf==null){text.append("Yalnız dosyaya gömülü önizleme okunabildi. Bu görüntüde vektör ayrıntıları ve katmanlar bulunmaz; ölçüler yaklaşık olur.");}
+        else{
+            text.append(activeDxf.entityCount).append(" görüntülenen nesne\n").append(activeDxf.visibleLayers.size()).append(" / ").append(activeDxf.layerCount).append(" görünür katman\n\n");
+            text.append("Yakın planda vektör çizimi kullanılır. Yazı yerleşimleri ve bazı CAD öğeleri özgün programdaki görünümden farklı olabilir.\n\n");
+            if(Double.isFinite(activeDxf.metersPerPixel))text.append("Dosya birimi: ").append(DxfUnits.label(activeDxf.unitCode)).append(". Ölçümler metre ve m² olarak gösterilir.");
+            else text.append("Dosyanın fiziksel birimi tanımlı değil. Metre cinsinden ölçmek için Ölçek düğmesiyle bilinen uzunluğu girin.");
+            if(cad.hasDrawingScale())text.append("\nGörünümde ölçüm ölçeği etkin.");
+            if(activeDxf.skippedCount>0){text.append("\n\nGösterilemeyen / atlanan nesneler: ").append(activeDxf.skippedCount);
+                for(java.util.Map.Entry<String,Integer> e:activeDxf.skippedTypes.entrySet())text.append("\n• ").append(e.getKey()).append(": ").append(e.getValue());
+            }
+            if(activeDxf.conversionWarnings!=0)text.append("\n\nDWG dönüştürücüsü uyarı bildirdi. Kritik ölçüleri bilinen bir ölçüyle karşılaştırın.");
+        }
+        TextView body=new TextView(this);body.setText(text);body.setTextSize(15);int pad=(int)(20*getResources().getDisplayMetrics().density);body.setPadding(pad,pad,pad,pad);body.setTextIsSelectable(true);
+        ScrollView scroll=new ScrollView(this);scroll.addView(body);
+        new AlertDialog.Builder(this).setTitle("Çizim bilgisi").setView(scroll).setPositiveButton("Kapat",null).show();
     }
     private void open(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});startActivityForResult(i,OPEN);}
     protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
-        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null)startLoad(data.getData());
+        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null){try{getContentResolver().takePersistableUriPermission(data.getData(),Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}startLoad(data.getData());}
     }
     private void cancelLoad(){
         LoadTask task=activeLoad;activeLoad=null;
@@ -78,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
                 loaded.dxf=loaded.name.toLowerCase(java.util.Locale.ROOT).endsWith(".dxf");
                 loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){
-                    FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{
+                    FileTransfer.copy(in,out,loaded.dxf?DxfStream.MAX_BYTES:32L*1024*1024,bytes->runOnUiThread(()->{
                         if(activeLoad==task)task.progress.setText(String.format(java.util.Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));
                     }));
                 }
@@ -101,14 +161,13 @@ public class MainActivity extends AppCompatActivity {
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
                     currentFile=loaded.file;activeDxf=loaded.parsed;findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
-                    cad.setDrawing(loaded.bitmap);
+                    cad.setDrawing(loaded.bitmap);cad.setVectorDrawing(loaded.parsed);updateModeButtons();
+                    if(loaded.parsed!=null&&Double.isFinite(loaded.parsed.metersPerPixel))cad.setDrawingScale(loaded.parsed.metersPerPixel);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
-                    if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":
-                        " — Yalnız önizleme: "+loaded.bitmap.getWidth()+" × "+loaded.bitmap.getHeight()+" px (geometri okunamadı)"));
-                    result.setText(loaded.parsed!=null?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
-                        " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."+ (loaded.parsed.conversionWarnings!=0?" DWG dönüşüm uyarısı var.":"")):
-                        "Yalnız gömülü küçük resim açıldı. Ayrıntılar ve katmanlar okunamadı. Kalibrasyon görüntü hassasiyetini artırmaz; ölçüler yaklaşık olur.");
+                    if(loaded.parsed!=null)cad.setSnapIndex(loaded.parsed.snapIndex);
+                    RecentDrawings.remember(this,uri,loaded.name,loaded.bitmap);
+                    fileName.setText(loaded.name);
+                    result.setText(drawingSummary());
                 });
             }catch(Exception | OutOfMemoryError e){
                 loaded.dispose();
@@ -148,10 +207,9 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){updated.bitmap.recycle();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapPoints);activeDxf=updated;
+                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapIndex);activeDxf=updated;cad.setVectorDrawing(updated);
                     snapToggle.setEnabled(updated.snapPoints.length>0);
-                    result.setText(updated.entityCount+" nesne, "+updated.visibleLayers.size()+"/"+updated.layerCount+
-                        " katman görünür; "+updated.skippedCount+" desteklenmeyen nesne.");
+                    result.setText(drawingSummary());
                 });
             }catch(Exception|OutOfMemoryError e){
                 runOnUiThread(()->{

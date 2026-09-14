@@ -7,3 +7,5 @@ local.properties
 third_party/libredwg/
 app/src/main/assets/COPYING-LibreDWG.txt
 .cxx/
+
+app/src/androidTest/assets/reference.dwg

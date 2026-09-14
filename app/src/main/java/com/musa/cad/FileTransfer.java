@@ -13,7 +13,7 @@ public final class FileTransfer {
         while(true){
             checkCancelled();int count=in.read(buffer);checkCancelled();
             if(count<0)break;if(count==0)continue;
-            if(count>limit-total)throw new IOException("Dosya çok büyük; en fazla 32 MB açılabilir");
+            if(count>limit-total)throw new IOException("Dosya çok büyük; en fazla "+(limit/1048576)+" MB açılabilir");
             out.write(buffer,0,count);total+=count;
             if(total>=nextProgress){progress.copied(total);nextProgress=total+1048576;}
         }
