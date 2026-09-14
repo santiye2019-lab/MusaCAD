@@ -8,7 +8,7 @@ public class DxfColorTest {
         if(DxfColor.aciArgb(3)!=0xFF00FF00)throw new AssertionError("ACI green");
         if(DxfColor.aciArgb(5)!=0xFF0000FF)throw new AssertionError("ACI blue");
         if(DxfColor.aciArgb(7)!=0xFFFFFFFF)throw new AssertionError("ACI 7 white");
-        if(DxfColor.aciArgb(253)!=0xFF999999)throw new AssertionError("ACI 253 exact gray");
+        if(DxfColor.aciArgb(253)!=0xFF828282)throw new AssertionError("ACI 253 standard gray");
         Map<String,Integer> layers=new HashMap<>();layers.put("BORU",0xFF123456);
         if(DxfColor.argb(DxfColor.resolve(256,-1,"boru",null),layers)!=0xFF123456)throw new AssertionError("BYLAYER");
         DxfColor.Ref parent=DxfColor.resolve(1,-1,"0",null);
