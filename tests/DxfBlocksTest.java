@@ -47,7 +47,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result grid=read(b,insert("A",10,10,20,20,70,2,71,2,44,5,45,7));
         if(grid.placements.size()!=4||grid.skipped!=0)throw new AssertionError("2x2 array");
 
-        // Non-default OCS normals are no longer discarded.
         point(read(b,insert("A",10,10,20,20,210,0,220,0,230,-1)),-12,22);
         DxfBlocks.Result oblique=read(b,insert("A",10,10,20,20,210,0,220,1,230,1));
         if(oblique.placements.size()!=1||oblique.skipped!=0)throw new AssertionError("Oblique extrusion");
@@ -61,12 +60,10 @@ public class DxfBlocksTest {
         DxfBlocks.Result dim=read(dimBlock,dimension("*D1",8,"DIM",10,10000,20,10000,13,-5000,23,9000,14,7000,24,-9000));
         point(dim,3,4);
         if(!dim.placements.get(0).layer.equals("DIM"))throw new AssertionError("Dimension layer inheritance");
-
         String nestedDim=dimBlock+block("C",dimension("*D1",8,"0"));
         point(read(nestedDim,insert("C",10,10,20,20)),12,22);
         skipped(read("",dimension("*MISSING")));
 
-        // Model-space and paper-space roots must never be mixed into one drawing.
         String paperLine=tags(0,"LINE",67,1,410,"Layout1",10,100,20,100,11,110,21,100);
         DxfBlocks.Result mixed=read("",LINE+paperLine);
         if(mixed.placements.size()!=1||!DxfSpace.MODEL.equals(mixed.activeLayout))throw new AssertionError("Model-space preference");
@@ -83,6 +80,11 @@ public class DxfBlocksTest {
         DxfBlocks.Result blockSpace=read(flaggedMember,insert("SPACEBLOCK",410,"Model"));
         if(blockSpace.placements.size()!=1||!DxfSpace.MODEL.equals(blockSpace.activeLayout))throw new AssertionError("Block member space must follow root INSERT");
 
-        System.out.println("21 block expansion and space cases passed");
+        String ownerDxf=tags(0,"SECTION",2,"ENTITIES",0,"LINE",67,1,330,"7",10,3,20,4,11,5,21,4,0,"ENDSEC")+
+            tags(0,"SECTION",2,"OBJECTS",0,"LAYOUT",100,"AcDbPlotSettings",1,"",330,"ROOT",100,"AcDbLayout",1,"A4",330,"7",0,"ENDSEC",0,"EOF");
+        DxfBlocks.Result owned=DxfBlocks.expand(Arrays.asList(ownerDxf.split("\n")),"A4");
+        if(owned.placements.size()!=1||!"A4".equals(owned.activeLayout)||!owned.layouts.contains("A4"))throw new AssertionError("Layout owner resolution");
+
+        System.out.println("22 block expansion and space/layout cases passed");
     }
 }
