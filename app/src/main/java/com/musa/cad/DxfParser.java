@@ -467,6 +467,18 @@ public final class DxfParser {
             this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;
         }
     }
+    private static final class StreamViewport implements StreamNode {
+        final DxfViewport.Spec spec;final String layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;final double lineTypeScale;
+        StreamViewport(StreamRecord r)throws IOException{
+            spec=DxfViewport.of(r.number(10,0),r.number(20,0),r.number(40,0),r.number(41,0),
+                r.number(12,0),r.number(22,0),r.number(45,0),r.number(51,0),r.integer(69,0),r.integer(68,1),
+                r.number(16,0),r.number(26,0),r.number(36,1));
+            layer=r.text(8,"0");handle=r.text(5,"");aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
+            transparencyRaw=r.longInteger(440,DxfTransparency.UNSET);lineType=r.text(6,DxfStyle.BYLAYER);
+            lineWeight=r.integer(370,DxfStyle.LW_BYLAYER);lineTypeScale=DxfStyle.saneScale(r.number(48,1));
+        }
+    }
+
     private static final class StreamInsert implements StreamNode {
         final String name,layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;
         final double x,y,z,sx,sy,sz,rotation,ex,ey,ez,lineTypeScale,columnSpacing,rowSpacing;
@@ -576,16 +588,29 @@ public final class DxfParser {
         Set<String> visibleLayers=new HashSet<>(context.layerTable.visible);
         if(context.layouts.isEmpty())context.layouts.add(DxfSpace.MODEL);
         String activeLayout=DxfSpace.chooseActive(context.rootsByLayout,preferredLayout);
+        List<LayerEntity> viewportModel=null;
+        if(!DxfSpace.isModel(activeLayout)){
+            ArrayList<StreamNode> modelRoots=context.rootsByLayout.get(DxfSpace.MODEL);
+            if(modelRoots!=null&&!modelRoots.isEmpty()){
+                ArrayList<StreamNode> orderedModel=new ArrayList<>(modelRoots);
+                if(!context.drawOrder.isEmpty())orderedModel.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
+                ArrayList<Entity> modelRaw=new ArrayList<>();int previousSkipped=context.skipped;StreamCounter modelCounter=new StreamCounter();
+                expandStream(orderedModel,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
+                    context.blocks,new HashSet<>(),modelRaw,layers,visibleLayers,modelCounter,context,null);
+                context.skipped=previousSkipped;viewportModel=new ArrayList<>();
+                for(Entity e:modelRaw)if(e instanceof LayerEntity)viewportModel.add((LayerEntity)e);
+            }
+        }
         ArrayList<StreamNode> roots=context.rootsByLayout.get(activeLayout);if(roots==null)roots=new ArrayList<>();
         if(!context.drawOrder.isEmpty())roots.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
         StreamCounter counter=new StreamCounter();
         expandStream(roots,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
-            context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context);
+            context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context,viewportModel);
         return finishEntities(entities,layers,visibleLayers,context.skipped,context.layouts,activeLayout);
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==66||code==67||
+        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==66||code==67||code==68||code==69||
             code==331||code==370||code==410||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
@@ -661,6 +686,7 @@ public final class DxfParser {
         }
         if("VERTEX".equals(type))return;
         if("SEQEND".equals(type)){c.rootSequenceLayout=null;return;}
+        if("VIEWPORT".equals(type)){target.add(new StreamViewport(r));return;}
         if("INSERT".equals(type)){target.add(new StreamInsert(r));return;}
         if("DIMENSION".equals(type)){target.add(new StreamDimension(r));return;}
         Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size());
@@ -681,7 +707,7 @@ public final class DxfParser {
 
     private static void expandStream(List<StreamNode> nodes,DxfBlocks.Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
                                      DxfTransparency.Ref byBlockTransparency,String byBlockLineType,int byBlockLineWeight,Map<String,StreamBlock> blocks,Set<String> stack,ArrayList<Entity> entities,Set<String> layers,
-                                     Set<String> visibleLayers,StreamCounter counter,StreamContext context)throws IOException{
+                                     Set<String> visibleLayers,StreamCounter counter,StreamContext context,List<LayerEntity> viewportModel)throws IOException{
         for(StreamNode node:nodes){
             FileTransfer.checkCancelled();
             if(++counter.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
@@ -699,6 +725,22 @@ public final class DxfParser {
                 if(layers.add(layer)&&!context.layerTable.contains(layer))visibleLayers.add(layer);
                 continue;
             }
+            if(node instanceof StreamViewport){
+                StreamViewport viewport=(StreamViewport)node;String layer="0".equals(viewport.layer)?parentLayer:viewport.layer;
+                if(viewportModel==null||!viewport.spec.supported()){context.skipped++;continue;}
+                appendViewportEntities(entities,viewportModel,viewport.spec);
+                DxfColor.Ref ref=DxfColor.resolve(viewport.aci,viewport.trueColor,layer,byBlockColor);
+                DxfTransparency.Ref transparency=DxfTransparency.resolve(viewport.transparencyRaw,layer,byBlockTransparency);
+                int color=DxfTransparency.apply(DxfColor.argb(ref,context.layerTable.colors),DxfTransparency.opacity(transparency,context.layerTable.opacities));
+                String semanticType=DxfStyle.resolveLineType(viewport.lineType,byBlockLineType);
+                int semanticWeight=DxfStyle.resolveLineWeight(viewport.lineWeight,byBlockLineWeight);
+                String effectiveType=DxfStyle.effectiveLineType(semanticType,layer,context.layerTable.lineTypes);
+                int effectiveWeight=DxfStyle.effectiveLineWeight(semanticWeight,layer,context.layerTable.lineWeights);
+                entities.add(new LayerEntity(new Transformed(viewportFrame(viewport.spec),parent),layer,color,effectiveWeight,
+                    context.lineTypes.get(effectiveType),viewport.lineTypeScale*context.lineTypes.globalScale));
+                if(layers.add(layer)&&!context.layerTable.contains(layer))visibleLayers.add(layer);
+                continue;
+            }
             if(node instanceof StreamDimension){
                 StreamDimension dimension=(StreamDimension)node;String layer="0".equals(dimension.layer)?parentLayer:dimension.layer;
                 StreamBlock block=blocks.get(dimension.name);
@@ -710,7 +752,7 @@ public final class DxfParser {
                 String dimType=DxfStyle.resolveLineType(dimension.lineType,byBlockLineType);
                 int dimWeight=DxfStyle.resolveLineWeight(dimension.lineWeight,byBlockLineWeight);
                 stack.add(dimension.name);
-                expandStream(block.members,parent,layer,dimColor,dimTransparency,dimType,dimWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
+                expandStream(block.members,parent,layer,dimColor,dimTransparency,dimType,dimWeight,blocks,stack,entities,layers,visibleLayers,counter,context,viewportModel);
                 stack.remove(dimension.name);continue;
             }
             StreamInsert insert=(StreamInsert)node;String layer="0".equals(insert.layer)?parentLayer:insert.layer;
@@ -733,7 +775,7 @@ public final class DxfParser {
                             insert.x,insert.y,insert.z,insert.ex,insert.ey,insert.ez,column*insert.columnSpacing,row*insert.rowSpacing);
                     }catch(IllegalArgumentException invalid){context.skipped++;continue;}
                     DxfBlocks.Transform transform=parent.thenLocal(local);
-                    expandStream(block.members,transform,layer,insertColor,insertTransparency,insertType,insertWeight,blocks,stack,entities,layers,visibleLayers,counter,context);
+                    expandStream(block.members,transform,layer,insertColor,insertTransparency,insertType,insertWeight,blocks,stack,entities,layers,visibleLayers,counter,context,viewportModel);
                 }
             }finally{stack.remove(insert.name);}
         }
@@ -741,6 +783,7 @@ public final class DxfParser {
 
     private static String streamHandle(StreamNode node){
         if(node instanceof StreamShape)return ((StreamShape)node).handle;
+        if(node instanceof StreamViewport)return ((StreamViewport)node).handle;
         if(node instanceof StreamInsert)return ((StreamInsert)node).handle;
         if(node instanceof StreamDimension)return ((StreamDimension)node).handle;
         return "";
