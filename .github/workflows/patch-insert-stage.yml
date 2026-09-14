@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'Add one-shot INSERT OCS patch workflow'
+    if: github.event.head_commit.message == 'Retry one-shot INSERT OCS patch workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Patch streaming INSERT handling and CI
+      - name: Patch streaming INSERT handling
         run: python3 .github/scripts/patch_insert_stage.py
       - name: Test OCS transforms and block expansion
         run: |
@@ -32,6 +32,6 @@ jobs:
         run: |
           git config user.name 'MusaCAD CI'
           git config user.email 'actions@users.noreply.github.com'
-          git add app/src/main/java/com/musa/cad/DxfParser.java .github/workflows/android.yml
+          git add app/src/main/java/com/musa/cad/DxfParser.java
           git commit -m 'Render INSERT arrays and OCS extrusion projection'
           git push origin HEAD:fix-1b-hatch-geometry
