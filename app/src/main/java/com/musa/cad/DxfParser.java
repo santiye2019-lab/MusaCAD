@@ -40,6 +40,39 @@ public final class DxfParser {
         }
     }
 
+    private static final class Marker implements Entity{
+        final float x,y,size;
+        Marker(float x,float y,float size){this.x=x;this.y=y;this.size=size;}
+        public void bounds(RectF b){add(b,x-size,y-size);add(b,x+size,y+size);}
+        public void draw(Canvas c,Paint p,Matrix m){
+            float[] v={x-size,y,x+size,y,x,y-size,x,y+size};m.mapPoints(v);
+            c.drawLine(v[0],v[1],v[2],v[3],p);c.drawLine(v[4],v[5],v[6],v[7],p);
+        }
+    }
+
+    private static final class EllipseCurve implements Entity{
+        final float cx,cy,mx,my,ratio,start,end;
+        EllipseCurve(float cx,float cy,float mx,float my,float ratio,float start,float end){
+            this.cx=cx;this.cy=cy;this.mx=mx;this.my=my;this.ratio=Math.abs(ratio);this.start=start;this.end=end;
+        }
+        private PointF at(double t){
+            double co=Math.cos(t),si=Math.sin(t);
+            return new PointF((float)(cx+mx*co-my*ratio*si),(float)(cy+my*co+mx*ratio*si));
+        }
+        private double sweep(){double s=end-start;while(s<=0)s+=Math.PI*2;return Math.min(s,Math.PI*2);}
+        public void bounds(RectF b){
+            double sw=sweep();for(int i=0;i<=96;i++){PointF q=at(start+sw*i/96d);add(b,q.x,q.y);}
+        }
+        public void draw(Canvas c,Paint p,Matrix m){
+            double sw=sweep();Path path=new Path();
+            for(int i=0;i<=96;i++){
+                PointF q=at(start+sw*i/96d);float[]v={q.x,q.y};m.mapPoints(v);
+                if(i==0)path.moveTo(v[0],v[1]);else path.lineTo(v[0],v[1]);
+            }
+            c.drawPath(path,p);
+        }
+    }
+
     private static final class Transformed implements Entity {
         final Entity entity;final Matrix matrix;
         Transformed(Entity entity,DxfBlocks.Transform t)throws IOException {
@@ -140,10 +173,25 @@ public final class DxfParser {
         DxfBlocks.Result expanded=DxfBlocks.expand(lines);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
         int skipped=expanded.skipped;
-        for(DxfBlocks.Placement item:expanded.placements){
+        List<DxfBlocks.Placement> placements=expanded.placements;
+        for(int index=0;index<placements.size();index++){
             FileTransfer.checkCancelled();
-            Entity entity=parse(item.record.type,lines,item.record.from,item.record.to);
-            if(entity==null){skipped++;continue;}
+            DxfBlocks.Placement item=placements.get(index);
+            Entity entity;
+            if("POLYLINE".equals(item.record.type)){
+                ArrayList<PointF> points=new ArrayList<>();int j=index+1;
+                while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){
+                    DxfBlocks.Record vertex=placements.get(j).record;
+                    points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));j++;
+                }
+                if(points.size()<2){skipped++;continue;}
+                entity=new Poly(points,(((int)item.record.number(70,0))&1)!=0);index=j-1;
+            }else if("VERTEX".equals(item.record.type)){
+                skipped++;continue;
+            }else{
+                entity=parse(item.record.type,lines,item.record.from,item.record.to);
+                if(entity==null){skipped++;continue;}
+            }
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
         }
         if(entities.isEmpty())return null;
@@ -195,7 +243,7 @@ public final class DxfParser {
     }
 
     private static Entity parse(String type,List<String>a,int from,int to){
-        if("TEXT".equals(type)||"MTEXT".equals(type)){
+        if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
             StringBuilder text=new StringBuilder();
             for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}
             String plain=DxfText.plain(text.toString());
@@ -205,20 +253,61 @@ public final class DxfParser {
                 angle=(float)Math.toDegrees(angle);
                 if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));
             }
-            return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,f(a,from,to,40)),angle,plain);
+            return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,fv(a,from,to,40,1f)),angle,plain);
         }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));
-        if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),0,360);
+        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),Math.max(.1f,fv(a,from,to,40,.5f)));
+        if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);
         if("ARC".equals(type)){
             float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;
-            return new Circle(f(a,from,to,10),f(a,from,to,20),f(a,from,to,40),start,sweep);
+            return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),start,sweep);
+        }
+        if("ELLIPSE".equals(type)){
+            float mx=f(a,from,to,11),my=f(a,from,to,21);if(Math.hypot(mx,my)<1e-6)return null;
+            return new EllipseCurve(f(a,from,to,10),f(a,from,to,20),mx,my,fv(a,from,to,40,1f),
+                fv(a,from,to,41,0f),fv(a,from,to,42,(float)(Math.PI*2)));
         }
         if("LWPOLYLINE".equals(type)){
-            ArrayList<PointF>p=new ArrayList<>();Float x=null;
-            for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==10)x=floatOf(a.get(i+1));else if(code==20&&x!=null){p.add(new PointF(x,floatOf(a.get(i+1))));x=null;}}
-            return new Poly(p,(((int)f(a,from,to,70))&1)!=0);
+            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);
+            return p.size()<2?null:new Poly(p,(((int)f(a,from,to,70))&1)!=0);
+        }
+        if("SPLINE".equals(type)){
+            ArrayList<PointF>p=repeatedPoints(a,from,to,11,21);if(p.size()<2)p=repeatedPoints(a,from,to,10,20);
+            return p.size()<2?null:new Poly(p,false);
+        }
+        if("LEADER".equals(type)){
+            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);
+        }
+        if("HATCH".equals(type)){
+            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,true);
+        }
+        if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){
+            ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);
+        }
+        if("DIMENSION".equals(type)){
+            ArrayList<PointF>p=new ArrayList<>();
+            addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);
+            return p.size()<2?null:new Poly(p,false);
         }
         return null;
+    }
+
+    private static ArrayList<PointF> repeatedPoints(List<String>a,int from,int to,int xCode,int yCode){
+        ArrayList<PointF>p=new ArrayList<>();Float x=null;
+        for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==xCode)x=floatOf(a.get(i+1));else if(code==yCode&&x!=null){p.add(new PointF(x,floatOf(a.get(i+1))));x=null;}}
+        return p;
+    }
+
+    private static ArrayList<PointF> numberedPoints(List<String>a,int from,int to,int xBase,int yBase,int count){
+        ArrayList<PointF>p=new ArrayList<>();for(int i=0;i<count;i++)addPointIfPresent(p,a,from,to,xBase+i,yBase+i);return p;
+    }
+
+    private static void addPointIfPresent(ArrayList<PointF> p,List<String>a,int from,int to,int xCode,int yCode){
+        if(has(a,from,to,xCode)&&has(a,from,to,yCode))p.add(new PointF(f(a,from,to,xCode),f(a,from,to,yCode)));
+    }
+
+    private static boolean has(List<String>a,int from,int to,int wanted){
+        for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return true;return false;
     }
 
     private static List<String>readLines(File f)throws IOException{
@@ -231,6 +320,7 @@ public final class DxfParser {
     private static int intOf(String s){try{return Integer.parseInt(s.trim());}catch(Exception e){return-1;}}
     private static float floatOf(String s){try{return Float.parseFloat(s.trim());}catch(Exception e){return 0;}}
     private static float f(List<String>a,int from,int to,int wanted){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return floatOf(a.get(i+1));return 0;}
+    private static float fv(List<String>a,int from,int to,int wanted,float fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return floatOf(a.get(i+1));return fallback;}
     private static void add(RectF b,float x,float y){b.left=Math.min(b.left,x);b.top=Math.min(b.top,y);b.right=Math.max(b.right,x);b.bottom=Math.max(b.bottom,y);}
 
     private static java.nio.charset.Charset charset(File file)throws IOException {
