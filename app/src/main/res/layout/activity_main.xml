@@ -1,4 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -6,149 +7,261 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="54dp"
+        android:layout_height="66dp"
         android:gravity="center_vertical"
         android:paddingStart="14dp"
-        android:paddingEnd="6dp"
-        android:background="#082B45">
+        android:paddingEnd="10dp"
+        android:background="#0C324D">
 
-        <TextView
-            android:id="@+id/appTitle"
+        <FrameLayout
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/top_action_bg">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_musacad_mark"
+                android:contentDescription="MusaCAD" />
+        </FrameLayout>
+
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:orientation="vertical"
             android:gravity="center_vertical"
-            android:text="MusaCAD"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="20sp" />
+            android:paddingStart="10dp">
+            <TextView
+                android:id="@+id/appTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MusaCAD"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:fontFamily="sans-serif-medium" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mobil DWG / DXF çalışma alanı"
+                android:textColor="#AFC6D3"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <ImageButton
             android:id="@+id/openButton"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="6dp"
             android:src="@drawable/ic_open_file"
             android:contentDescription="Dosya aç"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="11dp" />
+            android:background="@drawable/top_action_bg"
+            android:padding="10dp" />
 
         <ImageButton
             android:id="@+id/shareButton"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
-            android:src="@android:drawable/ic_menu_share"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="#FFFFFF"
-            android:padding="11dp" />
+            android:background="@drawable/top_action_bg"
+            android:padding="10dp"
+            android:enabled="false"
+            android:alpha="0.45" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/fileName"
         android:layout_width="match_parent"
-        android:layout_height="34dp"
+        android:layout_height="36dp"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:singleLine="true"
         android:ellipsize="middle"
-        android:text="Bir DWG veya DXF dosyası açın"
-        android:textColor="#C7D7E1"
+        android:text="Henüz proje açılmadı"
+        android:textColor="#C9D9E2"
         android:textSize="12sp"
-        android:background="#12222D" />
+        android:background="#11242F" />
 
-    <com.musa.cad.CadView
-        android:id="@+id/cadView"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <com.musa.cad.CadView
+            android:id="@+id/cadView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ScrollView
+            android:id="@+id/welcomePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:background="#0B131A"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:paddingTop="28dp"
+                android:paddingBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:padding="22dp"
+                    android:background="@drawable/main_panel_bg"
+                    android:elevation="5dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Projelerinizi cebinizde görüntüleyin"
+                        android:textColor="#FFFFFF"
+                        android:textSize="23sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="DWG ve DXF dosyalarını açın, yakınlaştırın, katmanları yönetin ve ölçüm alın."
+                        android:textColor="#BFD1DA"
+                        android:textSize="13sp"
+                        android:gravity="center"
+                        android:lineSpacingExtra="2dp" />
+
+                    <Button
+                        android:id="@+id/quickOpenButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="54dp"
+                        android:layout_marginTop="24dp"
+                        android:text="DWG / DXF DOSYASI AÇ"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="13sp"
+                        android:drawableStart="@drawable/ic_open_file"
+                        android:drawablePadding="10dp"
+                        android:background="@drawable/primary_action_bg"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:stateListAnimator="@null" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="Paylaşım: Orijinal DWG/DXF • PDF • PNG • Seçili alan"
+                        android:textColor="#8FB7C5"
+                        android:textSize="11sp"
+                        android:gravity="center" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp"
+                    android:weightSum="3">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="5dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="@drawable/feature_chip_bg">
+                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_distance" android:contentDescription="Mesafe" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Mesafe" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:layout_marginEnd="5dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="@drawable/feature_chip_bg">
+                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_area" android:contentDescription="Alan" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Alan" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="@drawable/feature_chip_bg">
+                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_layers" android:contentDescription="Katman" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Katman" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="İpucu: Çizim açıkken iki parmakla yakınlaştırın. Çift dokunarak ekrana sığdırın."
+                    android:textColor="#6F8D9C"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
 
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
         android:layout_height="42dp"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:maxLines="2"
         android:ellipsize="end"
         android:text="Hazır"
-        android:textColor="#EAF2F7"
+        android:textColor="#DDEAF0"
         android:textSize="12sp"
-        android:background="#12222D" />
+        android:background="#102631" />
 
     <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="76dp"
+        android:layout_height="82dp"
         android:fillViewport="false"
         android:scrollbars="none"
-        android:background="#0D1B24">
+        android:background="#0C1D27">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
 
-            <Button
-                android:id="@+id/layersButton"
-                style="@style/ToolButton"
-                android:text="Katmanlar"
-                android:drawableTop="@drawable/ic_layers"
-                android:enabled="false" />
-
-            <CheckBox
-                android:id="@+id/snapToggle"
-                style="@style/ToolButton"
-                android:button="@null"
-                android:text="Nokta Yakala"
-                android:drawableTop="@drawable/ic_snap"
-                android:checked="true"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/panButton"
-                style="@style/ToolButton"
-                android:text="Gezin"
-                android:drawableTop="@drawable/ic_pan" />
-
-            <Button
-                android:id="@+id/calibrateButton"
-                style="@style/ToolButton"
-                android:text="Ölçek"
-                android:drawableTop="@drawable/ic_scale" />
-
-            <Button
-                android:id="@+id/distanceButton"
-                style="@style/ToolButton"
-                android:text="Mesafe"
-                android:drawableTop="@drawable/ic_distance" />
-
-            <Button
-                android:id="@+id/areaButton"
-                style="@style/ToolButton"
-                android:text="Alan"
-                android:drawableTop="@drawable/ic_area" />
-
-            <Button
-                android:id="@+id/fitButton"
-                style="@style/ToolButton"
-                android:text="Sığdır"
-                android:drawableTop="@drawable/ic_fit" />
-
-            <Button
-                android:id="@+id/undoButton"
-                style="@style/ToolButton"
-                android:text="Geri"
-                android:drawableTop="@drawable/ic_undo" />
-
-            <Button
-                android:id="@+id/clearButton"
-                style="@style/ToolButton"
-                android:text="Temizle"
-                android:drawableTop="@drawable/ic_clear" />
+            <Button android:id="@+id/layersButton" style="@style/ToolButton" android:text="Katmanlar" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
+            <CheckBox android:id="@+id/snapToggle" style="@style/ToolButton" android:button="@null" android:text="Nokta Yakala" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
+            <Button android:id="@+id/panButton" style="@style/ToolButton" android:text="Gezin" android:drawableTop="@drawable/ic_pan" />
+            <Button android:id="@+id/calibrateButton" style="@style/ToolButton" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
+            <Button android:id="@+id/distanceButton" style="@style/ToolButton" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
+            <Button android:id="@+id/areaButton" style="@style/ToolButton" android:text="Alan" android:drawableTop="@drawable/ic_area" />
+            <Button android:id="@+id/fitButton" style="@style/ToolButton" android:text="Sığdır" android:drawableTop="@drawable/ic_fit" />
+            <Button android:id="@+id/undoButton" style="@style/ToolButton" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
+            <Button android:id="@+id/clearButton" style="@style/ToolButton" android:text="Temizle" android:drawableTop="@drawable/ic_clear" />
         </LinearLayout>
     </HorizontalScrollView>
 </LinearLayout>
