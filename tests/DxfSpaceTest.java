@@ -11,8 +11,8 @@ public class DxfSpaceTest {
         eq("Paper",DxfSpace.layout(1,"Model"));
 
         LinkedHashMap<String,List<Integer>> spaces=new LinkedHashMap<>();
-        spaces.put("Layout1",Arrays.asList(1));
-        spaces.put("Model",Arrays.asList(2));
+        spaces.put("Layout1",new ArrayList<>(Arrays.asList(1)));
+        spaces.put("Model",new ArrayList<>(Arrays.asList(2)));
         eq("Model",DxfSpace.chooseActive(spaces));
         spaces.get("Model").clear();
         eq("Layout1",DxfSpace.chooseActive(spaces));
