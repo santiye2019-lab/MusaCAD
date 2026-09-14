@@ -33,7 +33,7 @@ public final class DxfParser {
 
     private static final class Circle implements Entity{
         final float x,y,r,start,sweep;
-        Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
+        Circle(float a,float b,float c,float d,float e){x=a;y1=b;r=c;start=d;sweep=e;}
         public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}
         public void draw(Canvas c,Paint p,Matrix m){
             Path path=new Path();path.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);path.transform(m);c.drawPath(path,p);
@@ -71,6 +71,13 @@ public final class DxfParser {
             }
             c.drawPath(path,p);
         }
+    }
+
+    private static final class Composite implements Entity {
+        final ArrayList<Entity> items;
+        Composite(ArrayList<Entity> items){this.items=items;}
+        public void bounds(RectF b){for(Entity item:items)item.bounds(b);}
+        public void draw(Canvas c,Paint p,Matrix m){for(Entity item:items)item.draw(c,p,m);}
     }
 
     private static final class Transformed implements Entity {
@@ -284,7 +291,7 @@ public final class DxfParser {
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==8||(code>=10&&code<=59)||(code>=70&&code<=79)||code==210||code==220||code==230;
+        return code==1||code==2||code==3||code==8||(code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
 
     private static ArrayList<StreamNode> streamTarget(StreamContext c){
@@ -433,9 +440,7 @@ public final class DxfParser {
         if("LEADER".equals(type)){
             ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);
         }
-        if("HATCH".equals(type)){
-            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,true);
-        }
+        if("HATCH".equals(type))return parseHatch(a,from,to);
         if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){
             ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);
         }
@@ -445,6 +450,82 @@ public final class DxfParser {
             return p.size()<2?null:new Poly(p,false);
         }
         return null;
+    }
+
+    /**
+     * HATCH has an elevation point (10/20) before its boundary paths. Treating every
+     * 10/20 pair as one polygon connects that elevation origin to unrelated loops and
+     * creates the long "spider web" lines seen in some DWGs. Parse each boundary path
+     * independently instead. Bulged polyline vertices are currently shown as straight
+     * boundary chords; importantly, separate loops are never joined together.
+     */
+    private static Entity parseHatch(List<String>a,int from,int to){
+        int pathCount=(int)fv(a,from,to,91,0f);if(pathCount<=0)return null;
+        int i=from;ArrayList<Entity> paths=new ArrayList<>();
+        for(int pathIndex=0;pathIndex<pathCount;pathIndex++){
+            while(i+1<to&&intOf(a.get(i))!=92)i+=2;
+            if(i+1>=to)break;
+            int flags=(int)floatOf(a.get(i+1));i+=2;
+            if((flags&2)!=0){
+                boolean closed=true;int vertexCount=-1;
+                while(i+1<to){
+                    int code=intOf(a.get(i));
+                    if(code==73)closed=((int)floatOf(a.get(i+1)))!=0;
+                    if(code==93){vertexCount=(int)floatOf(a.get(i+1));i+=2;break;}
+                    if(code==92)break;i+=2;
+                }
+                ArrayList<PointF> points=new ArrayList<>();
+                for(int v=0;v<vertexCount&&i+1<to;v++){
+                    while(i+1<to&&intOf(a.get(i))!=10){
+                        int code=intOf(a.get(i));if(code==92||code==97)break;i+=2;
+                    }
+                    if(i+1>=to||intOf(a.get(i))!=10)break;
+                    float x=floatOf(a.get(i+1));i+=2;
+                    while(i+1<to&&intOf(a.get(i))!=20){
+                        int code=intOf(a.get(i));if(code==92||code==97||code==10)break;i+=2;
+                    }
+                    if(i+1>=to||intOf(a.get(i))!=20)break;
+                    float y=floatOf(a.get(i+1));i+=2;
+                    if(Float.isFinite(x)&&Float.isFinite(y))points.add(new PointF(x,y));
+                    if(i+1<to&&intOf(a.get(i))==42)i+=2;
+                }
+                if(points.size()>=2)paths.add(new Poly(points,closed));
+            }else{
+                int edgeCount=-1;
+                while(i+1<to){
+                    int code=intOf(a.get(i));
+                    if(code==93){edgeCount=(int)floatOf(a.get(i+1));i+=2;break;}
+                    if(code==92)break;i+=2;
+                }
+                for(int edge=0;edge<edgeCount&&i+1<to;edge++){
+                    while(i+1<to&&intOf(a.get(i))!=72){
+                        int code=intOf(a.get(i));if(code==92||code==97)break;i+=2;
+                    }
+                    if(i+1>=to||intOf(a.get(i))!=72)break;
+                    int edgeType=(int)floatOf(a.get(i+1));int edgeFrom=i+2;i=edgeFrom;
+                    while(i+1<to){
+                        int code=intOf(a.get(i));
+                        if(code==72||code==92||code==97)break;i+=2;
+                    }
+                    int edgeTo=i;Entity edgeEntity=null;
+                    if(edgeType==1&&has(a,edgeFrom,edgeTo,10)&&has(a,edgeFrom,edgeTo,20)&&has(a,edgeFrom,edgeTo,11)&&has(a,edgeFrom,edgeTo,21)){
+                        edgeEntity=new Line(f(a,edgeFrom,edgeTo,10),f(a,edgeFrom,edgeTo,20),f(a,edgeFrom,edgeTo,11),f(a,edgeFrom,edgeTo,21));
+                    }else if(edgeType==2&&has(a,edgeFrom,edgeTo,10)&&has(a,edgeFrom,edgeTo,20)&&has(a,edgeFrom,edgeTo,40)){
+                        float start=f(a,edgeFrom,edgeTo,50),end=f(a,edgeFrom,edgeTo,51);boolean ccw=((int)fv(a,edgeFrom,edgeTo,73,1f))!=0;
+                        float sweep=end-start;while(sweep<0)sweep+=360f;if(!ccw){float oldStart=start;start=end;sweep=oldStart-end;while(sweep<0)sweep+=360f;}
+                        edgeEntity=new Circle(f(a,edgeFrom,edgeTo,10),f(a,edgeFrom,edgeTo,20),Math.abs(f(a,edgeFrom,edgeTo,40)),start,sweep);
+                    }else if(edgeType==3&&has(a,edgeFrom,edgeTo,10)&&has(a,edgeFrom,edgeTo,20)&&has(a,edgeFrom,edgeTo,11)&&has(a,edgeFrom,edgeTo,21)){
+                        float start=(float)Math.toRadians(f(a,edgeFrom,edgeTo,50)),end=(float)Math.toRadians(f(a,edgeFrom,edgeTo,51));
+                        edgeEntity=new EllipseCurve(f(a,edgeFrom,edgeTo,10),f(a,edgeFrom,edgeTo,20),f(a,edgeFrom,edgeTo,11),f(a,edgeFrom,edgeTo,21),fv(a,edgeFrom,edgeTo,40,1f),start,end);
+                    }else if(edgeType==4){
+                        ArrayList<PointF> points=repeatedPoints(a,edgeFrom,edgeTo,10,20);if(points.size()>=2)edgeEntity=new Poly(points,false);
+                    }
+                    if(edgeEntity!=null)paths.add(edgeEntity);
+                }
+            }
+        }
+        if(paths.isEmpty())return null;
+        return paths.size()==1?paths.get(0):new Composite(paths);
     }
 
     private static ArrayList<PointF> repeatedPoints(List<String>a,int from,int to,int xCode,int yCode){
