@@ -73,23 +73,3 @@ rep('''            StreamInsert insert=(StreamInsert)node;String layer="0".equal
             }finally{stack.remove(insert.name);}''')
 
 p.write_text(s)
-
-# Keep CI's pure-Java regression suite aligned with the new INSERT transform dependency.
-w=Path('.github/workflows/android.yml')
-t=w.read_text()
-old='''      - name: Test DXF block expansion
-        run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
-          java -cp /tmp/musacad-tests DxfBlocksTest
-'''
-new='''      - name: Test DXF OCS transforms
-        run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
-          java -cp /tmp/musacad-tests DxfOcsTest
-      - name: Test DXF block expansion
-        run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
-          java -cp /tmp/musacad-tests DxfBlocksTest
-'''
-if t.count(old)!=1: raise SystemExit('android.yml block-test anchor mismatch')
-w.write_text(t.replace(old,new,1))
