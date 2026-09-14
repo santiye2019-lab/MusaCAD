@@ -3,7 +3,7 @@ package com.musa.cad;
 import java.io.IOException;
 import java.util.*;
 
-/** Expands ordinary 2D INSERTs; unsupported references are counted explicitly. */
+/** Expands ordinary 2D INSERTs and DIMENSION graphics blocks. */
 public final class DxfBlocks {
     public static final class Transform {
         public final double a,b,c,d,x,y;
@@ -17,30 +17,40 @@ public final class DxfBlocks {
             return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);
         }
     }
+
     public static final class Record {
         public final String type;
         public final int from,to;
         private final List<String> tags;
         Record(String type,List<String> tags,int from,int to){this.type=type;this.tags=tags;this.from=from;this.to=to;}
         String text(int code,String fallback){for(int i=from;i+1<to;i+=2)if(Integer.parseInt(tags.get(i).trim())==code)return tags.get(i+1).trim();return fallback;}
+        int trueColor()throws IOException{
+            String raw=text(420,"").trim();if(raw.isEmpty())return DxfColor.NO_TRUE_COLOR;
+            try{return DxfColor.trueColor(Long.parseLong(raw));}
+            catch(NumberFormatException e){throw new IOException("Geçersiz DXF TrueColor değeri",e);}
+        }
         double number(int code,double fallback)throws IOException{
             try{double v=Double.parseDouble(text(code,Double.toString(fallback)));if(!Double.isFinite(v))throw new NumberFormatException();return v;}
             catch(NumberFormatException e){throw new IOException("Geçersiz DXF blok koordinatı",e);}
         }
     }
+
     public static final class Placement {
         public final Record record;public final Transform transform;public final String layer;public final DxfColor.Ref color;
         Placement(Record record,Transform transform,String layer,DxfColor.Ref color){this.record=record;this.transform=transform;this.layer=layer;this.color=color;}
     }
+
     private static final class Block {
         final Record header;final List<Record> members=new ArrayList<>();
         Block(Record header){this.header=header;}
     }
+
     public static final class Result {
         public final List<Placement> placements=new ArrayList<>();
         public int skipped;
         private int visits;
     }
+
     public static Result expand(List<String> tags)throws IOException{
         List<Record> records=new ArrayList<>();
         try{
@@ -68,26 +78,29 @@ public final class DxfBlocks {
         for(Record root:roots)expand(root,new Transform(),"0",null,blocks,new HashSet<>(),result);
         return result;
     }
-    private static void expand(Record r,Transform parent,String parentLayer,DxfColor.Ref byBlockColor,Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
+
+    private static void expand(Record r,Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
+                               Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
-        if(++result.visits>100000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
+        if(++result.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;
-        DxfColor.Ref color=DxfColor.resolve((int)r.number(62,DxfColor.BYLAYER),(int)r.number(420,DxfColor.NO_TRUE_COLOR),layer,byBlockColor);
+        DxfColor.Ref color=DxfColor.resolve((int)r.number(62,DxfColor.BYLAYER),r.trueColor(),layer,byBlockColor);
+
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
             if(block==null||stack.contains(name)||stack.size()>=32||block.header.number(30,0)!=0||
                 (((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
                 result.skipped++;return;
             }
-            // AutoCAD DIMENSION graphics are already stored in the anonymous *D... block
-            // in the dimension's current coordinate system. Reuse the parent's transform
-            // instead of connecting definition points (10/13/14), which creates spider lines.
+            // Real DIMENSION graphics live in the anonymous *D block. Do not connect
+            // definition points 10/13/14; that was the source of the long spider lines.
             stack.add(name);
             for(Record member:block.members)expand(member,parent,layer,color,blocks,stack,result);
             stack.remove(name);
             return;
         }
+
         if(!r.type.equals("INSERT")){result.placements.add(new Placement(r,parent,layer,color));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);
         if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
@@ -102,6 +115,7 @@ public final class DxfBlocks {
         for(Record member:block.members)expand(member,transform,layer,color,blocks,stack,result);
         stack.remove(name);
     }
+
     private static String key(String s){return s.toUpperCase(Locale.ROOT);}
     private DxfBlocks(){}
 }
