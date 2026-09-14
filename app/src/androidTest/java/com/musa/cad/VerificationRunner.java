@@ -19,9 +19,10 @@ public class VerificationRunner extends Instrumentation {
         try{
             evidence=new File(getTargetContext().getFilesDir(),"verification");evidence.mkdirs();
             verifyWindow();
+            verifyHome();
             verifyNative();
             Throwable[] failure={null};
-            runOnMainSync(()->{try{verifyGraphics();verifyMeasurements();}catch(Throwable t){failure[0]=t;}});
+            runOnMainSync(()->{try{verifyGraphics();verifyTextZoom();verifyMeasurements();}catch(Throwable t){failure[0]=t;}});
             if(failure[0]!=null)throw failure[0];
             report.append("MUSACAD_VERIFIED\n");
             try(FileOutputStream out=new FileOutputStream(new File(evidence,"results.txt"))){out.write(report.toString().getBytes("UTF-8"));}
@@ -30,6 +31,23 @@ public class VerificationRunner extends Instrumentation {
             StringWriter trace=new StringWriter();t.printStackTrace(new PrintWriter(trace));
             result.putString("stream",report+"FAIL\n"+trace);finish(0,result);
         }
+    }
+    private void verifyHome()throws Exception {
+        Bitmap thumb=Bitmap.createBitmap(160,160,Bitmap.Config.ARGB_8888);thumb.eraseColor(Color.rgb(18,24,30));
+        RecentDrawings.remember(getTargetContext(),android.net.Uri.parse("content://com.musa.cad.test/synthetic"),"Örnek mekanik çizim.dxf",thumb);thumb.recycle();
+        RecentDrawings.toggleFavorite(getTargetContext(),"content://com.musa.cad.test/synthetic");
+        require(RecentDrawings.read(getTargetContext()).get(0).favorite,"Favorite was not persisted");
+        HomeActivity home=(HomeActivity)startActivitySync(new android.content.Intent(getTargetContext(),HomeActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        Throwable[] failure={null};
+        runOnMainSync(()->{try{
+            android.widget.LinearLayout cards=home.findViewById(R.id.recentCards);require(cards.getChildCount()==1,"Recent card missing");
+            home.findViewById(R.id.favoriteTab).performClick();require(cards.getChildAt(0) instanceof android.widget.LinearLayout,"Favorite card missing");
+            ((android.widget.EditText)home.findViewById(R.id.searchDrawings)).setText("bulunmayan");require(cards.getChildAt(0) instanceof android.widget.TextView,"Search did not filter");
+            ((android.widget.EditText)home.findViewById(R.id.searchDrawings)).setText("");
+            passed("Home: persisted recent/favorite card and filename search");
+        }catch(Throwable t){failure[0]=t;}});
+        if(failure[0]!=null)throw new AssertionError("Home verification",failure[0]);
+        waitForIdleSync();png(getUiAutomation().takeScreenshot(),"home-favorites.png");runOnMainSync(home::finish);waitForIdleSync();
     }
     private void verifyWindow() throws Exception {
         MainActivity activity=(MainActivity)startActivitySync(new android.content.Intent(getTargetContext(),MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
@@ -75,6 +93,17 @@ public class VerificationRunner extends Instrumentation {
         png(parsed.bitmap,"native-reference.png");
         passed("Native DWG conversion/render: "+parsed.entityCount+" entities, warnings="+parsed.conversionWarnings);
         parsed.bitmap.recycle();input.delete();
+    }
+    private void verifyTextZoom()throws Exception {
+        String dxf="0\nSECTION\n2\nENTITIES\n0\nLINE\n10\n0\n20\n0\n11\n100\n21\n100\n0\nTEXT\n10\n40\n20\n50\n40\n0.8\n1\nBORU 50\n0\nENDSEC\n0\nEOF\n";
+        File file=new File(getTargetContext().getCacheDir(),"text-zoom.dxf");try(FileOutputStream out=new FileOutputStream(file)){out.write(dxf.getBytes("UTF-8"));}
+        DxfParser.Result scene=DxfParser.render(file);Matrix zoom=new Matrix();zoom.setScale(4,4);zoom.postTranslate(40-976*4,180-1200*4);
+        Bitmap first=Bitmap.createBitmap(512,256,Bitmap.Config.ARGB_8888);first.eraseColor(Color.rgb(18,24,30));scene.drawVector(new Canvas(first),zoom);
+        Bitmap second=Bitmap.createBitmap(512,256,Bitmap.Config.ARGB_8888);second.eraseColor(Color.rgb(18,24,30));scene.drawVector(new Canvas(second),zoom);
+        int[] a=new int[512*256],b=new int[a.length];first.getPixels(a,0,512,0,0,512,256);second.getPixels(b,0,512,0,0,512,256);
+        int ink=0;for(int pixel:a)if(pixel!=Color.rgb(18,24,30))ink++;
+        require(ink>400&&Arrays.equals(a,b),"Small text vanished or changed on repeated vector draw");
+        png(first,"small-text-4x.png");passed("Small CAD text remains visible and stable in repeated 4x vector draws");first.recycle();second.recycle();scene.bitmap.recycle();file.delete();
     }
     private void verifyVectorZoom(DxfParser.Result scene)throws Exception {
         DxfParser.Result frame=scene.withVisibleLayers(Collections.singleton("FRAME"));

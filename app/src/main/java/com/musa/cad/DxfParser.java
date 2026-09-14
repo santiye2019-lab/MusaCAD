@@ -122,20 +122,21 @@ public final class DxfParser {
         }
     }
     private static final class Label implements Entity {
-        final float x,y,height,angle; final String[] rows;
+        final float x,y,height,angle; final String[] rows;private Path cachedShape;
         Label(float x,float y,float h,float angle,String text){
             this.x=x;this.y=y;this.height=h;this.angle=angle;rows=text.split("\n",-1);
         }
         private Path shape(){
-            Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(height);
+            if(cachedShape!=null)return cachedShape;
+            Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(1024);
             Path shape=new Path();
-            for(int i=0;i<rows.length;i++){Path line=new Path();p.getTextPath(rows[i],0,rows[i].length(),0,i*height*1.3f,line);shape.addPath(line);}
-            Matrix placement=new Matrix();placement.setScale(1,-1);placement.postRotate(angle);placement.postTranslate(x,y);
-            shape.transform(placement);return shape;
+            for(int i=0;i<rows.length;i++){Path line=new Path();p.getTextPath(rows[i],0,rows[i].length(),0,i*1024*1.3f,line);shape.addPath(line);}
+            Matrix placement=new Matrix();placement.setScale(height/1024,-height/1024);placement.postRotate(angle);placement.postTranslate(x,y);
+            shape.transform(placement);cachedShape=shape;return shape;
         }
         public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}
         public void draw(Canvas c,Paint p,Matrix m){
-            Path path=shape();path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);
+            Path path=new Path(shape());path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);
         }
     }
     private static String str(List<String>a,int from,int to,int code,String fallback){

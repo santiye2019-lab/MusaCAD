@@ -56,7 +56,8 @@ public class MainActivity extends AppCompatActivity {
             ScrollView scroll=new ScrollView(this);scroll.addView(text);
             new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
         });
-        findViewById(R.id.infoButton).setOnClickListener(v->showDrawingInfo());
+        findViewById(R.id.homeButton).setOnClickListener(v->{startActivity(new Intent(this,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));finish();});
+        findViewById(R.id.infoButton).setOnClickListener(this::showDrawingMenu);
         findViewById(R.id.fileName).setOnClickListener(v->showDrawingInfo());
         findViewById(R.id.fitButton).setOnClickListener(v->cad.fitDrawing());
         updateModeButtons();
@@ -69,6 +70,17 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.undoButton).setOnClickListener(v->cad.undo());
         findViewById(R.id.clearButton).setOnClickListener(v->cad.clearMeasurement());
         findViewById(R.id.shareButton).setOnClickListener(v->showShare());
+        if(getIntent().getData()!=null)startLoad(getIntent().getData());
+    }
+    private void showDrawingMenu(View anchor){
+        PopupMenu menu=new PopupMenu(this,anchor);
+        String[] names={"Çizim bilgisi","Katmanlar","Ekrana sığdır","Dışa aktar / paylaş","Ölçümü temizle","Yardım"};
+        for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);
+        menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
+            case 0:showDrawingInfo();break;case 1:showLayers();break;case 2:cad.fitDrawing();break;
+            case 3:showShare();break;case 4:cad.clearMeasurement();break;
+            case 5:new AlertDialog.Builder(this).setTitle("Çizim araçları").setMessage("İki parmakla yakınlaştırın. Gezin aracıyla çizimi kaydırın. Mesafe veya Alan seçip noktaları işaretleyin. Yakalama açıkken çizgi uçlarına tutunur. Dosya birimi bilinmiyorsa Ölçek ile bilinen uzunluğu girin. Ekrana sığdır görünümü sıfırlar.").setPositiveButton("Kapat",null).show();break;
+        }return true;});menu.show();
     }
     private void updateModeButtons(){
         int[] ids={R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton};
@@ -102,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
     private void open(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});startActivityForResult(i,OPEN);}
     protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
-        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null)startLoad(data.getData());
+        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null){try{getContentResolver().takePersistableUriPermission(data.getData(),Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}startLoad(data.getData());}
     }
     private void cancelLoad(){
         LoadTask task=activeLoad;activeLoad=null;
@@ -153,6 +165,7 @@ public class MainActivity extends AppCompatActivity {
                     if(loaded.parsed!=null&&Double.isFinite(loaded.parsed.metersPerPixel))cad.setDrawingScale(loaded.parsed.metersPerPixel);
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapIndex(loaded.parsed.snapIndex);
+                    RecentDrawings.remember(this,uri,loaded.name,loaded.bitmap);
                     fileName.setText(loaded.name);
                     result.setText(drawingSummary());
                 });
