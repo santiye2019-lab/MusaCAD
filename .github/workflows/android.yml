@@ -28,10 +28,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Test DXF text decoding
+      - name: Test DXF text decoding, styles and alignment
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfText.java tests/DxfTextTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
           java -cp /tmp/musacad-tests DxfTextTest
+          java -cp /tmp/musacad-tests DxfTextStylesTest
+          java -cp /tmp/musacad-tests DxfTextLayoutTest
       - name: Test selection bounds
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SelectionBounds.java tests/SelectionBoundsTest.java
