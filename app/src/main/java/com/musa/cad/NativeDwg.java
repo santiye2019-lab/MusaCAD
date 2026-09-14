@@ -9,15 +9,20 @@ public final class NativeDwg {
     public static DxfParser.Result read(File dwg,File cache)throws IOException {
         FileTransfer.checkCancelled();
         File converted=File.createTempFile("MusaCAD_donusen_",".dxf",cache);
+        File flattened=null;
         try{
             int status=convertNative(dwg.getAbsolutePath(),converted.getAbsolutePath());
             FileTransfer.checkCancelled();
             if(status<0)throw new IOException("DWG dönüşümü başarısız ("+status+")");
             if(converted.length()>256L*1024*1024)throw new IOException("Dönüştürülen çizim 256 MB sınırını aşıyor");
-            DxfParser.Result result=DxfParser.render(converted);
+            flattened=DxfDimensionFlattener.flatten(converted,cache);
+            DxfParser.Result result=DxfParser.render(flattened);
             if(result==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
             result.conversionWarnings=status;return result;
-        }finally{converted.delete();}
+        }finally{
+            if(flattened!=null&&flattened!=converted)flattened.delete();
+            converted.delete();
+        }
     }
     private NativeDwg(){}
 }
