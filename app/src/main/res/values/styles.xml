@@ -1,6 +1,29 @@
 <resources>
     <style name="Theme.MusaCAD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/cad_blue</item><item name="colorPrimaryVariant">#072840</item>
-        <item name="colorSecondary">@color/cad_accent</item><item name="android:fontFamily">sans</item>
+        <item name="colorPrimary">@color/cad_blue</item>
+        <item name="colorPrimaryVariant">#072840</item>
+        <item name="colorSecondary">@color/cad_accent</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#0B131A</item>
+        <item name="android:statusBarColor">#082B45</item>
+    </style>
+
+    <style name="ToolButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">74dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_marginStart">3dp</item>
+        <item name="android:layout_marginEnd">3dp</item>
+        <item name="android:background">@drawable/tool_tile_bg</item>
+        <item name="android:textColor">@color/tool_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">2dp</item>
+        <item name="android:padding">5dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
     </style>
 </resources>
