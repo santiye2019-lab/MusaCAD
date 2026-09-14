@@ -11,6 +11,10 @@ import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import java.io.*;
 import java.util.concurrent.*;
 
@@ -37,12 +41,25 @@ public class MainActivity extends AppCompatActivity {
     private TextView fileName,result;
     private File currentFile;
     private View[] modeButtons;
+    private View welcomePanel,shareButton;
 
     @Override protected void onCreate(Bundle b){
-        super.onCreate(b);setContentView(R.layout.activity_main);
+        super.onCreate(b);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        setContentView(R.layout.activity_main);
+
+        View root=findViewById(R.id.mainRoot);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{
+            Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0,bars.top,0,bars.bottom);
+            return insets;
+        });
+
         cad=findViewById(R.id.cadView);
         fileName=findViewById(R.id.fileName);
         result=findViewById(R.id.resultText);
+        welcomePanel=findViewById(R.id.welcomePanel);
+        shareButton=findViewById(R.id.shareButton);
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
             public void onCalibrationRequested(double px){showCalibration();}
@@ -58,23 +75,53 @@ public class MainActivity extends AppCompatActivity {
         };
         markModeSelected(R.id.panButton);
 
+        int[] interactive={R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.snapToggle,
+            R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.fitButton,R.id.undoButton,R.id.clearButton};
+        for(int id:interactive)installInteractiveFeedback(findViewById(id));
+
         findViewById(R.id.appTitle).setOnClickListener(v->showLicense());
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
+        findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.calibrateButton).setOnClickListener(v->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE));
         findViewById(R.id.distanceButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
         findViewById(R.id.areaButton).setOnClickListener(v->selectMode(R.id.areaButton,CadView.Mode.AREA));
-        findViewById(R.id.fitButton).setOnClickListener(v->cad.fitToScreen());
-        findViewById(R.id.undoButton).setOnClickListener(v->cad.undo());
-        findViewById(R.id.clearButton).setOnClickListener(v->cad.clearMeasurement());
-        findViewById(R.id.shareButton).setOnClickListener(v->showShare());
+        findViewById(R.id.fitButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.fitToScreen();});
+        findViewById(R.id.undoButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.undo();});
+        findViewById(R.id.clearButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.clearMeasurement();});
+        shareButton.setOnClickListener(v->showShare());
     }
 
-    private void selectMode(int id,CadView.Mode mode){cad.setMode(mode);markModeSelected(id);}
+    private void installInteractiveFeedback(View view){
+        if(view==null)return;
+        view.setHapticFeedbackEnabled(true);
+        view.setOnTouchListener((v,e)->{
+            int action=e.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN){
+                v.animate().scaleX(.94f).scaleY(.94f).setDuration(70).start();
+            }else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
+                v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
+            }
+            return false;
+        });
+    }
+
+    private void selectMode(int id,CadView.Mode mode){
+        View button=findViewById(id);
+        if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        cad.setMode(mode);markModeSelected(id);
+    }
     private void markModeSelected(int id){
         if(modeButtons==null)return;
         for(View button:modeButtons)button.setSelected(button.getId()==id);
+    }
+
+    private void hideWelcomePanel(){
+        if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;
+        welcomePanel.animate().alpha(0f).setDuration(180).withEndAction(()->{
+            welcomePanel.setVisibility(View.GONE);welcomePanel.setAlpha(1f);
+        }).start();
     }
 
     private void showLicense(){
@@ -152,6 +199,8 @@ public class MainActivity extends AppCompatActivity {
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
                     currentFile=loaded.file;activeDxf=loaded.parsed;
+                    hideWelcomePanel();
+                    shareButton.setEnabled(true);shareButton.setAlpha(1f);
                     findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
 
                     if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);
@@ -237,6 +286,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showShare(){
+        if(currentFile==null||!currentFile.exists()){
+            Toast.makeText(this,"Paylaşmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;
+        }
         new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{
             "Orijinal dosyayı paylaş","Görünümü PDF olarak paylaş","Görünümü resim olarak paylaş","Alan seçerek paylaş"
         },(d,w)->{
