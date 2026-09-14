@@ -3,7 +3,7 @@ package com.musa.cad;
 import java.io.IOException;
 import java.util.*;
 
-/** Expands ordinary 2D INSERTs and DIMENSION graphics blocks. */
+/** Expands 2D INSERTs, MINSERT arrays, nested blocks and DIMENSION graphics blocks. */
 public final class DxfBlocks {
     public static final class Transform {
         public final double a,b,c,d,x,y;
@@ -12,9 +12,14 @@ public final class DxfBlocks {
         public double[] point(double px,double py){return new double[]{a*px+c*py+x,b*px+d*py+y};}
         public Transform thenLocal(Transform t){return new Transform(a*t.a+c*t.b,b*t.a+d*t.b,a*t.c+c*t.d,b*t.c+d*t.d,a*t.x+c*t.y+x,b*t.x+d*t.y+y);}
         static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){
-            double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);
-            double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;
-            return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);
+            return insert(bx,by,0,sx,sy,1,degrees,x,y,0,0,0,1,0,0);
+        }
+        static Transform insert(double bx,double by,double bz,double sx,double sy,double sz,double degrees,
+                                double x,double y,double z,double ex,double ey,double ez,double arrayX,double arrayY){
+            final double[] m;
+            try{m=DxfOcs.insert2d(bx,by,bz,sx,sy,sz,degrees,x,y,z,ex,ey,ez,arrayX,arrayY);}
+            catch(IllegalArgumentException e){throw e;}
+            return new Transform(m[0],m[1],m[2],m[3],m[4],m[5]);
         }
     }
 
@@ -97,7 +102,7 @@ public final class DxfBlocks {
 
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
-            if(block==null||stack.contains(name)||stack.size()>=32||block.header.number(30,0)!=0||
+            if(block==null||stack.contains(name)||stack.size()>=32||
                 (((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
                 result.skipped++;return;
             }
@@ -112,16 +117,29 @@ public final class DxfBlocks {
         }
         String name=key(r.text(2,""));Block block=blocks.get(name);
         if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
-        if(r.number(70,1)!=1||r.number(71,1)!=1||r.number(210,0)!=0||r.number(220,0)!=0||r.number(230,1)!=1||r.number(30,0)!=0||
-            block.header.number(30,0)!=0||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
+        if((((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
             result.skipped++;return;
         }
-        double sx=r.number(41,1),sy=r.number(42,1);
-        if(sx==0||sy==0){result.skipped++;return;}
-        Transform local=Transform.insert(block.header.number(10,0),block.header.number(20,0),sx,sy,r.number(50,0),r.number(10,0),r.number(20,0));
-        Transform transform=parent.thenLocal(local);stack.add(name);
-        for(Record member:block.members)expand(member,transform,layer,color,lineType,lineWeight,blocks,stack,result);
-        stack.remove(name);
+        double sx=r.number(41,1),sy=r.number(42,1),sz=r.number(43,1);
+        if(sx==0||sy==0||sz==0){result.skipped++;return;}
+        int columns=(int)r.number(70,1),rows=(int)r.number(71,1);
+        if(columns<1||rows<1||columns>1000||rows>1000||(long)columns*rows>10000L){result.skipped++;return;}
+        double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0);
+        double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
+        double x=r.number(10,0),y=r.number(20,0),z=r.number(30,0),rotation=r.number(50,0);
+        double ex=r.number(210,0),ey=r.number(220,0),ez=r.number(230,1);
+        stack.add(name);
+        try{
+            for(int row=0;row<rows;row++)for(int column=0;column<columns;column++){
+                final Transform local;
+                try{
+                    local=Transform.insert(bx,by,bz,sx,sy,sz,rotation,x,y,z,ex,ey,ez,
+                        column*columnSpacing,row*rowSpacing);
+                }catch(IllegalArgumentException invalid){result.skipped++;continue;}
+                Transform transform=parent.thenLocal(local);
+                for(Record member:block.members)expand(member,transform,layer,color,lineType,lineWeight,blocks,stack,result);
+            }
+        }finally{stack.remove(name);}
     }
 
     private static String key(String s){return s.toUpperCase(Locale.ROOT);}
