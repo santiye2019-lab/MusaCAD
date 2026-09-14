@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'Add one-shot compositing workflow'
+    if: github.event.head_commit.message == 'Retry one-shot compositing workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +53,6 @@ jobs:
         run: |
           git config user.name 'MusaCAD CI'
           git config user.email 'actions@users.noreply.github.com'
-          git add app/src/main/java/com/musa/cad/DxfParser.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfLayerTable.java tests/DxfLayerTableTest.java tests/DxfBlocksTest.java .github/workflows/android.yml
+          git add app/src/main/java/com/musa/cad/DxfParser.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfLayerTable.java tests/DxfLayerTableTest.java tests/DxfBlocksTest.java
           git commit -m 'Render transparency fills and DXF draw order'
           git push origin HEAD:fix-1b-hatch-geometry
