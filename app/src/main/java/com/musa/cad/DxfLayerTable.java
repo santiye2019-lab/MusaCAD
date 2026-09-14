@@ -3,10 +3,12 @@ package com.musa.cad;
 import java.io.IOException;
 import java.util.*;
 
-/** Reads the authoritative DXF LAYER table, including visibility state and color. */
+/** Reads the authoritative DXF LAYER table, including visibility, color and display style. */
 public final class DxfLayerTable {
     public static final class Table {
         public final Map<String,Integer> colors=new HashMap<>();
+        public final Map<String,String> lineTypes=new HashMap<>();
+        public final Map<String,Integer> lineWeights=new HashMap<>();
         public final Set<String> names=new LinkedHashSet<>();
         public final Set<String> visible=new LinkedHashSet<>();
         public final Set<String> off=new LinkedHashSet<>();
@@ -17,11 +19,17 @@ public final class DxfLayerTable {
         public boolean contains(String name){return namesByKey.containsKey(DxfColor.key(name));}
 
         public void add(String rawName,int aci,int flags,int trueColor){
+            add(rawName,aci,flags,trueColor,DxfStyle.CONTINUOUS,DxfStyle.LW_DEFAULT);
+        }
+
+        public void add(String rawName,int aci,int flags,int trueColor,String lineType,int lineWeight){
             String name=(rawName==null||rawName.trim().isEmpty())?"0":rawName.trim();
             String key=DxfColor.key(name);
             String canonical=namesByKey.get(key);
             if(canonical==null){canonical=name;namesByKey.put(key,canonical);names.add(canonical);}
             colors.put(key,DxfColor.layerArgb(aci,trueColor));
+            lineTypes.put(key,DxfStyle.normalizeLineType(lineType));
+            lineWeights.put(key,lineWeight);
             visible.remove(canonical);off.remove(canonical);frozen.remove(canonical);locked.remove(canonical);
             boolean isOff=aci<0;
             boolean isFrozen=(flags&1)!=0;
@@ -33,7 +41,7 @@ public final class DxfLayerTable {
         }
 
         public void ensureDefaultLayer(){
-            if(names.isEmpty())add("0",7,0,DxfColor.NO_TRUE_COLOR);
+            if(names.isEmpty())add("0",7,0,DxfColor.NO_TRUE_COLOR,DxfStyle.CONTINUOUS,DxfStyle.LW_DEFAULT);
         }
     }
 
@@ -55,7 +63,9 @@ public final class DxfLayerTable {
                 int trueColor=DxfColor.NO_TRUE_COLOR;
                 String raw=text(tags,from,i,420,"").trim();
                 if(!raw.isEmpty())trueColor=DxfColor.trueColor(Long.parseLong(raw));
-                table.add(name,aci,flags,trueColor);
+                String lineType=text(tags,from,i,6,DxfStyle.CONTINUOUS);
+                int lineWeight=integer(tags,from,i,370,DxfStyle.LW_DEFAULT);
+                table.add(name,aci,flags,trueColor,lineType,lineWeight);
             }
         }catch(NumberFormatException e){throw new IOException("Geçersiz DXF LAYER tablosu",e);}
         table.ensureDefaultLayer();return table;
