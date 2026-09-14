@@ -20,6 +20,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
@@ -41,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView fileName,result;
     private File currentFile;
     private View[] modeButtons;
-    private View welcomePanel,shareButton;
+    private View welcomePanel,shareButton,shareToolButton;
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);
@@ -51,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
         View root=findViewById(R.id.mainRoot);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{
             Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(0,bars.top,0,bars.bottom);
+            v.setPadding(0,bars.top,0,bars.bottom+dp(6));
             return insets;
         });
 
@@ -60,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         result=findViewById(R.id.resultText);
         welcomePanel=findViewById(R.id.welcomePanel);
         shareButton=findViewById(R.id.shareButton);
+        shareToolButton=findViewById(R.id.shareToolButton);
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
             public void onCalibrationRequested(double px){showCalibration();}
@@ -75,11 +77,13 @@ public class MainActivity extends AppCompatActivity {
         };
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.snapToggle,
-            R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.fitButton,R.id.undoButton,R.id.clearButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.snapToggle,
+            R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.zoomInButton,R.id.zoomOutButton,
+            R.id.fitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
-        findViewById(R.id.appTitle).setOnClickListener(v->showLicense());
+        findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);
+        findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
         findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
@@ -87,11 +91,17 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.calibrateButton).setOnClickListener(v->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE));
         findViewById(R.id.distanceButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
         findViewById(R.id.areaButton).setOnClickListener(v->selectMode(R.id.areaButton,CadView.Mode.AREA));
+        findViewById(R.id.zoomInButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.zoomBy(1.35f);});
+        findViewById(R.id.zoomOutButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.zoomBy(1f/1.35f);});
         findViewById(R.id.fitButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.fitToScreen();});
         findViewById(R.id.undoButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.undo();});
         findViewById(R.id.clearButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.clearMeasurement();});
         shareButton.setOnClickListener(v->showShare());
+        shareToolButton.setOnClickListener(v->showShare());
+        updateShareEnabled(false);
     }
+
+    private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
 
     private void installInteractiveFeedback(View view){
         if(view==null)return;
@@ -105,6 +115,45 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+    }
+
+    private void showMainMenu(View anchor){
+        anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        PopupMenu popup=new PopupMenu(this,anchor);
+        Menu menu=popup.getMenu();
+        menu.add(0,MENU_OPEN,0,"Dosya aç");
+        menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);
+        menu.add(0,MENU_FIT,2,"Ekrana sığdır").setEnabled(currentFile!=null);
+        menu.add(0,MENU_SHARE,3,"Paylaş").setEnabled(currentFile!=null);
+        menu.add(0,MENU_INFO,4,"Çizim bilgileri").setEnabled(activeDxf!=null);
+        menu.add(0,MENU_ABOUT,5,"MusaCAD hakkında");
+        popup.setOnMenuItemClickListener(item->{
+            switch(item.getItemId()){
+                case MENU_OPEN:open();return true;
+                case MENU_LAYERS:showLayers();return true;
+                case MENU_FIT:cad.fitToScreen();return true;
+                case MENU_SHARE:showShare();return true;
+                case MENU_INFO:showDrawingInfo();return true;
+                case MENU_ABOUT:showLicense();return true;
+                default:return false;
+            }
+        });
+        popup.show();
+    }
+
+    private void showDrawingInfo(){
+        if(activeDxf==null)return;
+        String text="Dosya başarıyla açıldı.\n\n"+
+            "Nesne: "+activeDxf.entityCount+"\n"+
+            "Katman: "+activeDxf.layerCount+"\n"+
+            "Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+
+            "Görüntüleme: vektörel / net yakınlaştırma";
+        new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
+    }
+
+    private void updateShareEnabled(boolean enabled){
+        shareButton.setEnabled(enabled);shareButton.setAlpha(enabled?1f:.45f);
+        shareToolButton.setEnabled(enabled);shareToolButton.setAlpha(enabled?1f:.55f);
     }
 
     private void selectMode(int id,CadView.Mode mode){
@@ -158,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
         cancelLoad();
         LoadTask task=new LoadTask();activeLoad=task;
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
-        int pad=(int)(20*getResources().getDisplayMetrics().density);box.setPadding(pad,pad,pad,pad);
+        int pad=dp(20);box.setPadding(pad,pad,pad,pad);
         box.addView(new ProgressBar(this));
         task.progress=new TextView(this);task.progress.setText("Dosya okunuyor…");box.addView(task.progress);
         task.dialog=new AlertDialog.Builder(this).setTitle("Çizim açılıyor").setView(box)
@@ -200,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
                     activeLoad=null;task.dialog.dismiss();
                     currentFile=loaded.file;activeDxf=loaded.parsed;
                     hideWelcomePanel();
-                    shareButton.setEnabled(true);shareButton.setAlpha(1f);
+                    updateShareEnabled(true);
                     findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
 
                     if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);
@@ -212,12 +261,9 @@ public class MainActivity extends AppCompatActivity {
 
                     fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme"));
                     if(loaded.parsed!=null){
-                        String status="Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman";
-                        if(loaded.parsed.skippedCount>0)status+="  •  "+loaded.parsed.skippedCount+" atlandı";
-                        if(loaded.parsed.conversionWarnings!=0)status+="  •  dönüşüm uyarısı";
-                        result.setText(status);
+                        result.setText("Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman");
                     }else{
-                        result.setText("Önizleme modu  •  geometri okunamadığı için ayrıntı ve ölçüm hassasiyeti sınırlı");
+                        result.setText("Hazır  •  DWG önizleme modu");
                     }
                 });
             }catch(Exception | OutOfMemoryError e){
@@ -234,7 +280,10 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onDestroy(){cancelLoad();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
-        if(activeDxf==null||activeLoad!=null)return;
+        if(activeDxf==null||activeLoad!=null){
+            if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();
+            return;
+        }
         String[] names=activeDxf.layerNames.toArray(new String[0]);
         java.util.Set<String> selected=new java.util.HashSet<>(activeDxf.visibleLayers);
         boolean[] checked=new boolean[names.length];
@@ -264,7 +313,7 @@ public class MainActivity extends AppCompatActivity {
                     activeLoad=null;task.dialog.dismiss();
                     cad.replaceVisibleDrawing(updated);activeDxf=updated;
                     snapToggle.setEnabled(updated.snapPoints.length>0);
-                    result.setText("Hazır  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman görünür");
+                    result.setText("Hazır  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");
                 });
             }catch(Exception|OutOfMemoryError e){
                 runOnUiThread(()->{
@@ -303,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
         try{bitmap=cad.selectionSnapshot();}catch(Exception e){error(e);return;}
         ImageView preview=new ImageView(this);preview.setImageBitmap(bitmap);
         preview.setAdjustViewBounds(true);preview.setMaxHeight((int)(getResources().getDisplayMetrics().heightPixels*.55f));preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int pad=(int)(12*getResources().getDisplayMetrics().density);preview.setPadding(pad,pad,pad,pad);
+        int pad=dp(12);preview.setPadding(pad,pad,pad,pad);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Seçili alan önizlemesi")
             .setView(preview).setPositiveButton("PNG PAYLAŞ",(d,w)->exportBitmap(bitmap,false,"alan"))
             .setNeutralButton("PDF PAYLAŞ",(d,w)->exportBitmap(bitmap,true,"alan"))
@@ -315,7 +364,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showCalibration(){
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
-        int p=(int)(16*getResources().getDisplayMetrics().density);box.setPadding(p,0,p,0);
+        int p=dp(16);box.setPadding(p,0,p,0);
         EditText value=new EditText(this);value.setHint("Gerçek uzunluk (ör. 2.50)");
         value.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(value);
         Spinner units=new Spinner(this);units.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"m","cm","mm"}));box.addView(units);
