@@ -398,9 +398,25 @@ public final class DxfParser {
         p.add(new PointF((float)spec.left(),(float)spec.top()));return new Poly(p,true);
     }
 
-    private static void appendViewportEntities(ArrayList<Entity> target,List<LayerEntity> model,DxfViewport.Spec spec)throws IOException{
+    private static Set<String> viewportFrozenLayers(List<String>a,int from,int to,DxfLayerTable.Table layerTable){
+        HashSet<String> result=new HashSet<>();
+        for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==331){
+            String name=layerTable.nameForHandle(a.get(i+1));if(name!=null)result.add(DxfColor.key(name));
+        }
+        return result;
+    }
+
+    private static Set<String> viewportFrozenLayers(Collection<String> handles,DxfLayerTable.Table layerTable){
+        HashSet<String> result=new HashSet<>();if(handles==null)return result;
+        for(String handle:handles){String name=layerTable.nameForHandle(handle);if(name!=null)result.add(DxfColor.key(name));}
+        return result;
+    }
+
+    private static void appendViewportEntities(ArrayList<Entity> target,List<LayerEntity> model,DxfViewport.Spec spec,Set<String> frozenLayers)throws IOException{
         if((long)target.size()+model.size()>500000L)throw new IOException("VIEWPORT açıldığında nesne sınırı aşıldı");
-        for(LayerEntity item:model){FileTransfer.checkCancelled();target.add(item.inViewport(spec));}
+        for(LayerEntity item:model){
+            FileTransfer.checkCancelled();if(frozenLayers!=null&&frozenLayers.contains(DxfColor.key(item.layer)))continue;target.add(item.inViewport(spec));
+        }
     }
 
     private static int appendBufferedPlacements(List<String> lines,List<DxfBlocks.Placement> placements,
@@ -413,7 +429,8 @@ public final class DxfParser {
             if("VIEWPORT".equals(item.record.type)){
                 DxfViewport.Spec spec=viewportSpec(lines,item.record.from,item.record.to);
                 if(viewportModel==null||!spec.supported()){skipped++;continue;}
-                appendViewportEntities(entities,viewportModel,spec);entity=viewportFrame(spec);
+                Set<String> frozen=viewportFrozenLayers(lines,item.record.from,item.record.to,layerTable);
+                appendViewportEntities(entities,viewportModel,spec,frozen);entity=viewportFrame(spec);
             }else if("POLYLINE".equals(item.record.type)){
                 ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();int j=index+1;
                 while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){
@@ -469,6 +486,7 @@ public final class DxfParser {
     }
     private static final class StreamViewport implements StreamNode {
         final DxfViewport.Spec spec;final String layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;final double lineTypeScale;
+        final Set<String> frozenHandles=new LinkedHashSet<>();
         StreamViewport(StreamRecord r)throws IOException{
             spec=DxfViewport.of(r.number(10,0),r.number(20,0),r.number(40,0),r.number(41,0),
                 r.number(12,0),r.number(22,0),r.number(45,0),r.number(51,0),r.integer(69,0),r.integer(68,1),
@@ -476,6 +494,7 @@ public final class DxfParser {
             layer=r.text(8,"0");handle=r.text(5,"");aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
             transparencyRaw=r.longInteger(440,DxfTransparency.UNSET);lineType=r.text(6,DxfStyle.BYLAYER);
             lineWeight=r.integer(370,DxfStyle.LW_BYLAYER);lineTypeScale=DxfStyle.saneScale(r.number(48,1));
+            for(int i=0;i+1<r.tags.size();i+=2)if(intOf(r.tags.get(i))==331)frozenHandles.add(r.tags.get(i+1).trim());
         }
     }
 
@@ -653,7 +672,7 @@ public final class DxfParser {
         if("TABLES".equals(c.section)&&"LAYER".equals(type)){
             String layerName=r.text(2,"0");
             c.layerTable.add(layerName,r.integer(62,7),r.integer(70,0),r.trueColor(),r.text(6,DxfStyle.CONTINUOUS),r.integer(370,DxfStyle.LW_DEFAULT),
-                r.longInteger(440,DxfTransparency.UNSET));return;
+                r.longInteger(440,DxfTransparency.UNSET),r.text(5,""));return;
         }
         if("TABLES".equals(c.section)&&"LTYPE".equals(type)){
             ArrayList<Double> values=new ArrayList<>();
@@ -728,7 +747,8 @@ public final class DxfParser {
             if(node instanceof StreamViewport){
                 StreamViewport viewport=(StreamViewport)node;String layer="0".equals(viewport.layer)?parentLayer:viewport.layer;
                 if(viewportModel==null||!viewport.spec.supported()){context.skipped++;continue;}
-                appendViewportEntities(entities,viewportModel,viewport.spec);
+                Set<String> frozen=viewportFrozenLayers(viewport.frozenHandles,context.layerTable);
+                appendViewportEntities(entities,viewportModel,viewport.spec,frozen);
                 DxfColor.Ref ref=DxfColor.resolve(viewport.aci,viewport.trueColor,layer,byBlockColor);
                 DxfTransparency.Ref transparency=DxfTransparency.resolve(viewport.transparencyRaw,layer,byBlockTransparency);
                 int color=DxfTransparency.apply(DxfColor.argb(ref,context.layerTable.colors),DxfTransparency.opacity(transparency,context.layerTable.opacities));
