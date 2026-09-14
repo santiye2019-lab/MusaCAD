@@ -1,6 +1,43 @@
 <resources>
     <style name="Theme.MusaCAD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/cad_blue</item><item name="colorPrimaryVariant">#072840</item>
-        <item name="colorSecondary">@color/cad_accent</item><item name="android:fontFamily">sans</item>
+        <item name="colorPrimary">@color/cad_blue</item>
+        <item name="colorPrimaryVariant">#072840</item>
+        <item name="colorSecondary">@color/cad_accent</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#0B131A</item>
+        <item name="android:statusBarColor">#082B45</item>
+    </style>
+
+    <style name="ToolTile">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_marginHorizontal">3dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:padding">4dp</item>
+        <item name="android:background">@drawable/tool_tile_bg</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="ToolIconText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#F4FAFE</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="ToolLabelText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#D9E7EF</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:includeFontPadding">false</item>
     </style>
 </resources>
