@@ -10,8 +10,8 @@ android {
         minSdkVersion 24
         targetSdkVersion 35
         ndk { abiFilters "arm64-v8a", "x86_64" }
-        versionCode 5
-        versionName '0.5-interactive-tools'
+        versionCode 6
+        versionName '0.5.1-dwg-open-fix'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
