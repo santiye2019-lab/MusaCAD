@@ -43,5 +43,10 @@ public final class DxfViewport {
         double[] m=spec.matrix();return new double[]{m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]};
     }
 
+    public static boolean contains(Spec spec,double paperX,double paperY,double tolerance){
+        double t=Math.max(0,tolerance);
+        return paperX>=spec.left()-t&&paperX<=spec.right()+t&&paperY>=spec.bottom()-t&&paperY<=spec.top()+t;
+    }
+
     private DxfViewport(){}
 }
