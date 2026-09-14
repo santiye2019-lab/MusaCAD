@@ -43,14 +43,18 @@ public class VerificationRunner extends Instrumentation {
             require(bars.top>0&&bars.bottom>0,"Emulator system bars absent");
             int[] top=new int[2],bottom=new int[2],origin=new int[2];
             root.getLocationOnScreen(origin);
-            android.view.View open=activity.findViewById(R.id.openButton),pan=activity.findViewById(R.id.panButton);
+            android.view.View open=activity.findViewById(R.id.openButton),pan=activity.findViewById(R.id.fitButton);
             open.getLocationOnScreen(top);pan.getLocationOnScreen(bottom);
             require(top[1]>=origin[1]+bars.top,"Open button behind status bar");
             require(bottom[1]+pan.getHeight()<=origin[1]+root.getHeight()-bars.bottom,"Toolbar behind navigation bar");
             androidx.core.view.ViewCompat.dispatchApplyWindowInsets(root,insets);
             androidx.core.view.ViewCompat.dispatchApplyWindowInsets(root,insets);
             require(root.getPaddingTop()==bars.top&&root.getPaddingBottom()==bars.bottom,"Insets accumulated");
-            passed("Activity buttons clear status/navigation bars; repeated insets stable");
+            require(activity.findViewById(R.id.panButton).isSelected(),"Initial tool highlight missing");
+            activity.findViewById(R.id.areaButton).performClick();
+            require(activity.findViewById(R.id.areaButton).isSelected()&&!activity.findViewById(R.id.panButton).isSelected(),"Active tool highlight did not change");
+            activity.findViewById(R.id.panButton).performClick();
+            passed("Activity buttons clear system bars; repeated insets stable; selected tool highlight works");
         }catch(Throwable t){failure[0]=t;}});
         if(failure[0]!=null)throw new AssertionError("Window verification",failure[0]);
         png(getUiAutomation().takeScreenshot(),"screen-insets.png");
@@ -72,6 +76,23 @@ public class VerificationRunner extends Instrumentation {
         passed("Native DWG conversion/render: "+parsed.entityCount+" entities, warnings="+parsed.conversionWarnings);
         parsed.bitmap.recycle();input.delete();
     }
+    private void verifyVectorZoom(DxfParser.Result scene)throws Exception {
+        DxfParser.Result frame=scene.withVisibleLayers(Collections.singleton("FRAME"));
+        CadView view=new CadView(getTargetContext(),null);view.layout(0,0,512,512);view.setDrawing(frame.bitmap);
+        java.lang.reflect.Field matrixField=CadView.class.getDeclaredField("imageMatrix");matrixField.setAccessible(true);
+        Matrix zoom=(Matrix)matrixField.get(view);zoom.setScale(8,8);zoom.postTranslate(256-1200*8,256-2320*8);
+        java.lang.reflect.Field scaleField=CadView.class.getDeclaredField("scale");scaleField.setAccessible(true);scaleField.setFloat(view,8f);
+        Bitmap raster=view.snapshot();view.setVectorDrawing(frame);Bitmap vector=view.snapshot();
+        int thick=0,thin=0,bg=Color.rgb(18,24,30);
+        for(int y=230;y<282;y++){if(raster.getPixel(256,y)!=bg)thick++;if(vector.getPixel(256,y)!=bg)thin++;}
+        require(thick>=12&&thin>0&&thin<=3,"8x vector line is not sharp: raster="+thick+", vector="+thin);
+        DxfParser.Result hidden=scene.withVisibleLayers(Collections.emptySet());
+        view.replaceVisibleDrawing(hidden.bitmap,hidden.snapIndex);view.setVectorDrawing(hidden);
+        Bitmap empty=view.snapshot();require(empty.getPixel(256,256)==bg,"Hidden layer visible in vector zoom");
+        png(vector,"vector-8x.png");png(raster,"raster-8x.png");
+        passed("Actual CadView at 8x: raster line "+thick+" px, vector "+thin+" px; hidden layers stay hidden");
+        raster.recycle();vector.recycle();empty.recycle();frame.bitmap.recycle();hidden.bitmap.recycle();
+    }
     private static boolean ink(Bitmap b,int x,int y){
         int background=Color.rgb(18,24,30);
         for(int dy=-3;dy<=3;dy++)for(int dx=-3;dx<=3;dx++)if(b.getPixel(x+dx,y+dy)!=background)return true;
@@ -84,6 +105,7 @@ public class VerificationRunner extends Instrumentation {
         try(FileOutputStream out=new FileOutputStream(f)){out.write(dxf.getBytes("UTF-8"));}
         DxfParser.Result all=DxfParser.render(f);
         require(all.entityCount==2&&all.layerCount==2,"Scene count");
+        verifyVectorZoom(all);
         require(ink(all.bitmap,80,1200)&&ink(all.bitmap,1200,80),"Square edges missing");
         png(all.bitmap,"square-and-arc.png");
         DxfParser.Result arc=all.withVisibleLayers(Collections.singleton("ARC"));

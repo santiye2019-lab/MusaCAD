@@ -74,6 +74,22 @@ public final class DxfParser {
         public final Set<String> layerNames,visibleLayers;
         private final List<Entity> document;
         private final Matrix view;
+        private final List<Entity> visibleDocument=new ArrayList<>();
+        private final List<RectF> imageBounds=new ArrayList<>();
+        public Map<String,Integer> skippedTypes=Collections.emptyMap();
+        /** Draw original geometry at the current zoom; stroke width is in screen pixels. */
+        public void drawVector(Canvas canvas,Matrix imageToScreen){
+            Matrix screenToImage=new Matrix();if(!imageToScreen.invert(screenToImage))return;
+            Rect clip=canvas.getClipBounds();RectF visible=new RectF(clip);visible.inset(-3,-3);screenToImage.mapRect(visible);
+            Matrix combined=new Matrix();combined.setConcat(imageToScreen,view);
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.25f);
+            for(int i=0;i<visibleDocument.size();i++){
+                RectF b=imageBounds.get(i);
+                // Inclusive comparisons retain zero-width/height line bounds.
+                if(b.right<visible.left||b.left>visible.right||b.bottom<visible.top||b.top>visible.bottom)continue;
+                visibleDocument.get(i).draw(canvas,paint,combined);
+            }
+        }
         Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int unitCode)throws IOException{
             snapIndex=new SnapPoints.Index(points);
             this.unitCode=unitCode;float[] coefficients=new float[9];view.getValues(coefficients);
@@ -82,10 +98,17 @@ public final class DxfParser {
             this.document=document;this.view=new Matrix(view);
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));
             visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
+            for(Entity entity:document){
+                FileTransfer.checkCancelled();
+                if(!visible.contains(((LayerEntity)entity).layer))continue;
+                RectF bounds=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+                entity.bounds(bounds);view.mapRect(bounds);
+                visibleDocument.add(entity);imageBounds.add(bounds);
+            }
         }
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            Result result=renderLayers(document,view,layerNames,visible,skippedCount,unitCode);result.conversionWarnings=conversionWarnings;return result;
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount,unitCode);result.conversionWarnings=conversionWarnings;result.skippedTypes=skippedTypes;return result;
         }
     }
     // Display colors distinguish layers; these are not the source file's ACI colors.
@@ -122,15 +145,15 @@ public final class DxfParser {
     public static Result render(File file)throws IOException{
         int unitCode=DxfUnits.read(file,charset(file));
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
-        final int[] unsupported={0};
+        final int[] unsupported={0};Map<String,Integer> skippedTypes=new TreeMap<>();
         DxfBlocks.Result expanded=DxfBlocks.expand(file,charset(file),item->{
             FileTransfer.checkCancelled();
             Entity entity=parse(item.record.type,item.record.tags,item.record.from,item.record.to);
-            if(entity==null){unsupported[0]++;return;}
+            if(entity==null){unsupported[0]++;skippedTypes.merge(item.record.type,1,Integer::sum);return;}
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
         });
         int skipped=expanded.skipped+unsupported[0];
-        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);return renderLayers(entities,m,layers,layers,skipped,unitCode);
+        if(entities.isEmpty())return null;RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);Result result=renderLayers(entities,m,layers,layers,skipped,unitCode);if(expanded.skipped>0)skippedTypes.put("Blok / yerleşim",expanded.skipped);result.skippedTypes=Collections.unmodifiableMap(skippedTypes);return result;
     }
     private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped,int unitCode)throws IOException{
         List<Entity> shown=new ArrayList<>();

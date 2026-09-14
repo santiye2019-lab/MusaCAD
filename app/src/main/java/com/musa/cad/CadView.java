@@ -14,6 +14,11 @@ public class CadView extends View {
     private final Matrix imageMatrix = new Matrix();
     private final Matrix inverse = new Matrix();
     private Bitmap drawing;
+    private DxfParser.Result vectorDrawing;
+    public void setVectorDrawing(DxfParser.Result value){vectorDrawing=value;invalidate();}
+    public void fitDrawing(){fit();invalidate();}
+    public Mode getMode(){return mode;}
+    public boolean hasDrawingScale(){return !"piksel".equals(unitName);}
     private Mode mode = Mode.PAN;
     private Listener listener;
     private float lastX, lastY, scale = 1f;
@@ -48,12 +53,12 @@ public class CadView extends View {
     public void replaceVisibleDrawing(Bitmap bitmap,SnapPoints.Index candidates){
         if(drawing==null||bitmap.getWidth()!=drawing.getWidth()||bitmap.getHeight()!=drawing.getHeight())
             throw new IllegalArgumentException("Çizim boyutu değişti");
-        drawing=bitmap;selecting=false;draggingSelection=false;points.clear();
+        vectorDrawing=null;drawing=bitmap;selecting=false;draggingSelection=false;points.clear();
         setSnapIndex(candidates);notifyValue();invalidate();
     }
     public void setListener(Listener l){listener=l;}
     public void setMode(Mode m){lastSnapped=false;selecting=false;draggingSelection=false;mode=m; points.clear(); notifyValue(); invalidate();}
-    public void setDrawing(Bitmap b){snapIndex=null;lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
+    public void setDrawing(Bitmap b){vectorDrawing=null;snapIndex=null;lastSnapped=false;selecting=false;draggingSelection=false;drawing=b; unitsPerImagePixel=1; unitName="piksel"; mode=Mode.PAN; points.clear(); imageMatrix.reset(); fit(); invalidate();}
     public void undo(){lastSnapped=false;if(selecting){cancelSelection();return;}if(!points.isEmpty())points.remove(points.size()-1);notifyValue();invalidate();}
     public void clearMeasurement(){lastSnapped=false;if(selecting){cancelSelection();return;}points.clear();notifyValue();invalidate();}
     public void setDrawingScale(double metersPerPixel){
@@ -75,7 +80,10 @@ public class CadView extends View {
     protected void onSizeChanged(int w,int h,int ow,int oh){if(selecting)cancelSelection();if(ow==0)fit();}
     protected void onDraw(Canvas c){
         super.onDraw(c);
-        if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint); else drawWelcome(c);
+        if(drawing!=null){
+            if(vectorDrawing!=null&&scale>1f)vectorDrawing.drawVector(c,imageMatrix);
+            else {paint.setFilterBitmap(true);c.drawBitmap(drawing,imageMatrix,paint);}
+        } else drawWelcome(c);
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.rgb(25,181,165));
         ArrayList<PointF> screen=new ArrayList<>();
         for(PointF point:points){float[] xy={point.x,point.y};imageMatrix.mapPoints(xy);screen.add(new PointF(xy[0],xy[1]));}
@@ -96,8 +104,8 @@ public class CadView extends View {
 
     }
     private void drawWelcome(Canvas c){
-        paint.setTextAlign(Paint.Align.CENTER);paint.setColor(Color.LTGRAY);paint.setTextSize(38);c.drawText("DWG / DXF görüntüleyici",getWidth()/2f,getHeight()/2f-20,paint);
-        paint.setTextSize(25);c.drawText("Dosya Aç düğmesine dokunun",getWidth()/2f,getHeight()/2f+28,paint);
+        paint.setTextAlign(Paint.Align.CENTER);paint.setColor(Color.LTGRAY);paint.setTextSize(Math.min(20*getResources().getDisplayMetrics().scaledDensity,getWidth()/14f));c.drawText("DWG / DXF görüntüleyici",getWidth()/2f,getHeight()/2f-20,paint);
+        paint.setTextSize(Math.min(14*getResources().getDisplayMetrics().scaledDensity,getWidth()/19f));c.drawText("Dosya Aç düğmesine dokunun",getWidth()/2f,getHeight()/2f+28,paint);
     }
     public boolean onTouchEvent(android.view.MotionEvent e){
         if(drawing==null)return true;
