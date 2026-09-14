@@ -44,13 +44,23 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test DXF layer table
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfLayerTable.java tests/DxfLayerTableTest.java
+          java -cp /tmp/musacad-tests DxfLayerTableTest
+      - name: Test DXF display styles
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfLineTypes.java app/src/main/java/com/musa/cad/DxfWipeout.java tests/DxfStyleTest.java tests/DxfLineTypesTest.java tests/DxfWipeoutTest.java
+          java -cp /tmp/musacad-tests DxfStyleTest
+          java -cp /tmp/musacad-tests DxfLineTypesTest
+          java -cp /tmp/musacad-tests DxfWipeoutTest
       - name: Test DXF curved geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
           java -cp /tmp/musacad-tests DxfCurvesTest
       - name: Test DXF block expansion
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
       - name: Test cancellable file transfer
         run: |
