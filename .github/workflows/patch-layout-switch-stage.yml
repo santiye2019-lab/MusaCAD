@@ -1,0 +1,54 @@
+name: One-shot layout switch patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-layout-switch-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot layout switch workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch layout selection
+        run: python3 .github/scripts/patch_layout_switch_stage.py
+      - name: Test layout and prior renderer regressions
+        run: |
+          rm -rf /tmp/musacad-layout-test && mkdir -p /tmp/musacad-layout-test
+          javac -d /tmp/musacad-layout-test app/src/main/java/com/musa/cad/DxfSpace.java tests/DxfSpaceTest.java
+          java -cp /tmp/musacad-layout-test DxfSpaceTest
+          javac -d /tmp/musacad-layout-test app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-layout-test DxfBlocksTest
+          javac -d /tmp/musacad-layout-test app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-layout-test DxfHatchPatternTest
+          javac -d /tmp/musacad-layout-test app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-layout-test DxfTextTest
+          java -cp /tmp/musacad-layout-test DxfTextStylesTest
+          java -cp /tmp/musacad-layout-test DxfTextLayoutTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit layout switch support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfParser.java app/src/main/java/com/musa/cad/NativeDwg.java app/src/main/java/com/musa/cad/MainActivity.java
+          git commit -m 'Switch between DXF model and paper layouts'
+          git push origin HEAD:fix-1b-hatch-geometry
