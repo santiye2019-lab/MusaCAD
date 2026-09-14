@@ -31,6 +31,22 @@ public final class DxfSpace {
 
     public static boolean isModel(String layout){return MODEL.equals(normalizeName(layout));}
 
+    /** Prefer an explicitly requested populated layout, otherwise use the normal fallback rule. */
+    public static String chooseActive(Map<String,? extends Collection<?>> rootsByLayout,String preferred){
+        if(preferred!=null&&!preferred.trim().isEmpty()){
+            String wanted=normalizeName(preferred);
+            Collection<?> direct=rootsByLayout.get(wanted);
+            if(direct!=null&&!direct.isEmpty())return wanted;
+            for(Map.Entry<String,? extends Collection<?>> entry:rootsByLayout.entrySet()){
+                if(normalizeName(entry.getKey()).equalsIgnoreCase(wanted)){
+                    Collection<?> values=entry.getValue();
+                    if(values!=null&&!values.isEmpty())return normalizeName(entry.getKey());
+                }
+            }
+        }
+        return chooseActive(rootsByLayout);
+    }
+
     /** Prefer real model-space geometry; for paper-only files fall back to the first populated layout. */
     public static String chooseActive(Map<String,? extends Collection<?>> rootsByLayout){
         Collection<?> model=rootsByLayout.get(MODEL);
