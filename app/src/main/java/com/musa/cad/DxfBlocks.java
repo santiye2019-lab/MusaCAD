@@ -73,6 +73,20 @@ public final class DxfBlocks {
         if(++result.visits>100000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;
+        if(r.type.equals("DIMENSION")){
+            String name=key(r.text(2,""));Block block=blocks.get(name);
+            if(block==null||stack.contains(name)||stack.size()>=32||block.header.number(30,0)!=0||
+                (((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
+                result.skipped++;return;
+            }
+            // AutoCAD DIMENSION graphics are already stored in the anonymous *D... block
+            // in the dimension's current coordinate system. Reuse the parent's transform
+            // instead of connecting definition points (10/13/14), which creates spider lines.
+            stack.add(name);
+            for(Record member:block.members)expand(member,parent,layer,blocks,stack,result);
+            stack.remove(name);
+            return;
+        }
         if(!r.type.equals("INSERT")){result.placements.add(new Placement(r,parent,layer));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);
         if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
