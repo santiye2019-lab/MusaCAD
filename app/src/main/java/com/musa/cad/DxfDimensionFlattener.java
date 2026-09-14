@@ -19,16 +19,36 @@ final class DxfDimensionFlattener {
             }
             return fallback;
         }
-        Record withInheritedLayer(String inherited){
-            if(inherited==null||inherited.isEmpty()||"0".equals(inherited))return this;
-            Record copy=null;
+        private Record copy(){Record c=new Record();c.type=type;c.lines.addAll(lines);return c;}
+        private int indexOf(int wanted){
             for(int i=0;i+1<lines.size();i+=2){
-                int code;try{code=Integer.parseInt(lines.get(i).trim());}catch(NumberFormatException e){continue;}
-                if(code==8&&"0".equals(lines.get(i+1).trim())){
-                    copy=new Record();copy.type=type;copy.lines.addAll(lines);copy.lines.set(i+1,inherited);break;
+                try{if(Integer.parseInt(lines.get(i).trim())==wanted)return i;}catch(NumberFormatException ignored){}
+            }
+            return -1;
+        }
+        private void setTag(int code,String value){
+            int i=indexOf(code);
+            if(i>=0)lines.set(i+1,value);
+            else{lines.add(Integer.toString(code));lines.add(value);}
+        }
+        Record withInheritedStyle(Record parent){
+            String inherited=parent.text(8,"0").trim();Record result=this;boolean copied=false;
+            int layerIndex=indexOf(8);
+            if(!inherited.isEmpty()&&!"0".equals(inherited)&&(layerIndex<0||"0".equals(lines.get(layerIndex+1).trim()))){
+                result=copy();copied=true;result.setTag(8,inherited);
+            }
+            int trueIndex=result.indexOf(420),aciIndex=result.indexOf(62);
+            if(trueIndex<0&&aciIndex>=0&&"0".equals(result.lines.get(aciIndex+1).trim())){
+                if(!copied){result=result.copy();copied=true;}
+                String parentTrue=parent.text(420,"").trim();
+                if(!parentTrue.isEmpty()){result.setTag(420,parentTrue);result.setTag(62,"256");}
+                else{
+                    String parentAci=parent.text(62,"256").trim();
+                    if("0".equals(parentAci)||parentAci.isEmpty())parentAci="256";
+                    result.setTag(62,parentAci);
                 }
             }
-            return copy==null?this:copy;
+            return result;
         }
     }
 
@@ -97,10 +117,9 @@ final class DxfDimensionFlattener {
         if(depth>=32)return;
         String name=key(dimension.text(2,"").trim());List<Record> members=blocks.get(name);
         if(members==null||members.isEmpty()||!stack.add(name))return;
-        String inherited=dimension.text(8,"0").trim();
         try{
             for(Record raw:members){
-                FileTransfer.checkCancelled();Record member=raw.withInheritedLayer(inherited);
+                FileTransfer.checkCancelled();Record member=raw.withInheritedStyle(dimension);
                 if("DIMENSION".equals(member.type))writeDimension(member,writer,blocks,stack,depth+1);else write(member,writer);
             }
         }finally{stack.remove(name);}
