@@ -29,8 +29,8 @@ public final class DxfBlocks {
         }
     }
     public static final class Placement {
-        public final Record record;public final Transform transform;public final String layer;
-        Placement(Record record,Transform transform,String layer){this.record=record;this.transform=transform;this.layer=layer;}
+        public final Record record;public final Transform transform;public final String layer;public final DxfColor.Ref color;
+        Placement(Record record,Transform transform,String layer,DxfColor.Ref color){this.record=record;this.transform=transform;this.layer=layer;this.color=color;}
     }
     private static final class Block {
         final Record header;final List<Record> members=new ArrayList<>();
@@ -65,14 +65,15 @@ public final class DxfBlocks {
             }else if(section.equals("ENTITIES"))roots.add(record);
         }
         Result result=new Result();
-        for(Record root:roots)expand(root,new Transform(),"0",blocks,new HashSet<>(),result);
+        for(Record root:roots)expand(root,new Transform(),"0",null,blocks,new HashSet<>(),result);
         return result;
     }
-    private static void expand(Record r,Transform parent,String parentLayer,Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
+    private static void expand(Record r,Transform parent,String parentLayer,DxfColor.Ref byBlockColor,Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
         if(++result.visits>100000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;
+        DxfColor.Ref color=DxfColor.resolve((int)r.number(62,DxfColor.BYLAYER),(int)r.number(420,DxfColor.NO_TRUE_COLOR),layer,byBlockColor);
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
             if(block==null||stack.contains(name)||stack.size()>=32||block.header.number(30,0)!=0||
@@ -83,11 +84,11 @@ public final class DxfBlocks {
             // in the dimension's current coordinate system. Reuse the parent's transform
             // instead of connecting definition points (10/13/14), which creates spider lines.
             stack.add(name);
-            for(Record member:block.members)expand(member,parent,layer,blocks,stack,result);
+            for(Record member:block.members)expand(member,parent,layer,color,blocks,stack,result);
             stack.remove(name);
             return;
         }
-        if(!r.type.equals("INSERT")){result.placements.add(new Placement(r,parent,layer));return;}
+        if(!r.type.equals("INSERT")){result.placements.add(new Placement(r,parent,layer,color));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);
         if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
         if(r.number(70,1)!=1||r.number(71,1)!=1||r.number(210,0)!=0||r.number(220,0)!=0||r.number(230,1)!=1||r.number(30,0)!=0||
@@ -98,7 +99,7 @@ public final class DxfBlocks {
         if(sx==0||sy==0){result.skipped++;return;}
         Transform local=Transform.insert(block.header.number(10,0),block.header.number(20,0),sx,sy,r.number(50,0),r.number(10,0),r.number(20,0));
         Transform transform=parent.thenLocal(local);stack.add(name);
-        for(Record member:block.members)expand(member,transform,layer,blocks,stack,result);
+        for(Record member:block.members)expand(member,transform,layer,color,blocks,stack,result);
         stack.remove(name);
     }
     private static String key(String s){return s.toUpperCase(Locale.ROOT);}
