@@ -169,6 +169,17 @@ public final class DxfParser {
     }
 
     public static Result render(File file)throws IOException{
+        // LibreDWG can expand a modest DWG into a very large ASCII DXF.
+        // Avoid retaining millions of DXF text lines on mobile devices.
+        if(file.length()>8L*1024*1024)return renderStreaming(file);
+        try{return renderBuffered(file);}
+        catch(IOException e){
+            if(e.getMessage()!=null&&e.getMessage().contains("etiket sınırı"))return renderStreaming(file);
+            throw e;
+        }
+    }
+
+    private static Result renderBuffered(File file)throws IOException{
         List<String> lines=readLines(file);
         DxfBlocks.Result expanded=DxfBlocks.expand(lines);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
@@ -194,6 +205,150 @@ public final class DxfParser {
             }
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
         }
+        return finishEntities(entities,layers,skipped);
+    }
+
+    private interface StreamNode {}
+    private static final class StreamShape implements StreamNode {
+        final Entity entity;final String layer;
+        StreamShape(Entity entity,String layer){this.entity=entity;this.layer=layer;}
+    }
+    private static final class StreamInsert implements StreamNode {
+        final String name,layer;
+        final double x,y,z,sx,sy,rotation,ex,ey,ez;
+        final int columns,rows;
+        StreamInsert(StreamRecord r)throws IOException{
+            name=key(r.text(2,""));layer=r.text(8,"0");
+            x=r.number(10,0);y=r.number(20,0);z=r.number(30,0);
+            sx=r.number(41,1);sy=r.number(42,1);rotation=r.number(50,0);
+            columns=(int)r.number(70,1);rows=(int)r.number(71,1);
+            ex=r.number(210,0);ey=r.number(220,0);ez=r.number(230,1);
+        }
+    }
+    private static final class StreamBlock {
+        final String name;final double bx,by,bz;final int flags;final String xref;
+        final ArrayList<StreamNode> members=new ArrayList<>();
+        StreamBlock(StreamRecord r)throws IOException{
+            name=key(r.text(2,""));bx=r.number(10,0);by=r.number(20,0);bz=r.number(30,0);
+            flags=(int)r.number(70,0);xref=r.text(1,"");
+        }
+    }
+    private static final class StreamRecord {
+        final ArrayList<String> tags=new ArrayList<>();
+        void add(int code,String value){tags.add(Integer.toString(code));tags.add(value);}
+        String text(int code,String fallback){
+            for(int i=0;i+1<tags.size();i+=2)if(intOf(tags.get(i))==code)return tags.get(i+1).trim();
+            return fallback;
+        }
+        double number(int code,double fallback)throws IOException{
+            String value=text(code,Double.toString(fallback));
+            try{double n=Double.parseDouble(value);if(!Double.isFinite(n))throw new NumberFormatException();return n;}
+            catch(NumberFormatException e){throw new IOException("Geçersiz DXF sayısal değeri",e);}
+        }
+    }
+    private static final class PendingPoly {
+        final ArrayList<StreamNode> target;final String layer;final boolean closed;final ArrayList<PointF> points=new ArrayList<>();
+        PendingPoly(ArrayList<StreamNode> target,String layer,boolean closed){this.target=target;this.layer=layer;this.closed=closed;}
+    }
+    private static final class StreamContext {
+        String section="";StreamBlock activeBlock;PendingPoly pending;int skipped;
+        final HashMap<String,StreamBlock> blocks=new HashMap<>();
+        final ArrayList<StreamNode> roots=new ArrayList<>();
+    }
+    private static final class StreamCounter {int visits;}
+
+    /** Memory-bounded parser used for large ASCII DXF files produced by DWG conversion. */
+    private static Result renderStreaming(File file)throws IOException{
+        StreamContext context=new StreamContext();
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(file),charset(file)),128*1024)){
+            String type=null;StreamRecord record=null;
+            while(true){
+                FileTransfer.checkCancelled();
+                String codeLine=reader.readLine();if(codeLine==null)break;
+                String value=reader.readLine();if(value==null)throw new IOException("Eksik DXF etiketi");
+                final int code;try{code=Integer.parseInt(codeLine.trim());}catch(NumberFormatException e){throw new IOException("Geçersiz ASCII DXF etiketi",e);}
+                if(code==0){
+                    if(type!=null)processStreamRecord(type,record,context);
+                    type=value.trim();record=new StreamRecord();
+                }else if(record!=null&&keepStreamCode(code)){
+                    record.add(code,value);
+                }
+            }
+            if(type!=null)processStreamRecord(type,record,context);
+        }
+        finishPending(context);
+        ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
+        StreamCounter counter=new StreamCounter();
+        expandStream(context.roots,new DxfBlocks.Transform(),"0",context.blocks,new HashSet<>(),entities,layers,counter,context);
+        return finishEntities(entities,layers,context.skipped);
+    }
+
+    private static boolean keepStreamCode(int code){
+        return code==1||code==2||code==3||code==8||(code>=10&&code<=59)||(code>=70&&code<=79)||code==210||code==220||code==230;
+    }
+
+    private static ArrayList<StreamNode> streamTarget(StreamContext c){
+        if("ENTITIES".equals(c.section))return c.roots;
+        if("BLOCKS".equals(c.section)&&c.activeBlock!=null)return c.activeBlock.members;
+        return null;
+    }
+
+    private static void processStreamRecord(String type,StreamRecord r,StreamContext c)throws IOException{
+        if("SECTION".equals(type)){finishPending(c);c.section=r.text(2,"");c.activeBlock=null;return;}
+        if("ENDSEC".equals(type)){finishPending(c);c.section="";c.activeBlock=null;return;}
+        if("EOF".equals(type)){finishPending(c);return;}
+        if("BLOCKS".equals(c.section)){
+            if("BLOCK".equals(type)){
+                finishPending(c);StreamBlock block=new StreamBlock(r);c.activeBlock=block;
+                if(!block.name.isEmpty())c.blocks.put(block.name,block);return;
+            }
+            if("ENDBLK".equals(type)){finishPending(c);c.activeBlock=null;return;}
+        }
+        ArrayList<StreamNode> target=streamTarget(c);if(target==null)return;
+        if(c.pending!=null){
+            if("VERTEX".equals(type)){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));return;}
+            if("SEQEND".equals(type)){finishPending(c);return;}
+            finishPending(c);
+        }
+        if("POLYLINE".equals(type)){
+            c.pending=new PendingPoly(target,r.text(8,"0"),(((int)r.number(70,0))&1)!=0);return;
+        }
+        if("VERTEX".equals(type)||"SEQEND".equals(type))return;
+        if("INSERT".equals(type)){target.add(new StreamInsert(r));return;}
+        Entity entity=parse(type,r.tags,0,r.tags.size());
+        if(entity==null)c.skipped++;else target.add(new StreamShape(entity,r.text(8,"0")));
+    }
+
+    private static void finishPending(StreamContext c){
+        PendingPoly p=c.pending;if(p==null)return;c.pending=null;
+        if(p.points.size()<2)c.skipped++;else p.target.add(new StreamShape(new Poly(p.points,p.closed),p.layer));
+    }
+
+    private static void expandStream(List<StreamNode> nodes,DxfBlocks.Transform parent,String parentLayer,Map<String,StreamBlock> blocks,Set<String> stack,
+                                     ArrayList<Entity> entities,Set<String> layers,StreamCounter counter,StreamContext context)throws IOException{
+        for(StreamNode node:nodes){
+            FileTransfer.checkCancelled();
+            if(++counter.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
+            if(node instanceof StreamShape){
+                StreamShape shape=(StreamShape)node;String layer="0".equals(shape.layer)?parentLayer:shape.layer;
+                entities.add(new LayerEntity(new Transformed(shape.entity,parent),layer));layers.add(layer);continue;
+            }
+            StreamInsert insert=(StreamInsert)node;String layer="0".equals(insert.layer)?parentLayer:insert.layer;
+            StreamBlock block=blocks.get(insert.name);
+            if(block==null||stack.contains(insert.name)||stack.size()>=32||insert.columns!=1||insert.rows!=1||insert.z!=0||
+                insert.ex!=0||insert.ey!=0||insert.ez!=1||block.bz!=0||(block.flags&12)!=0||!block.xref.isEmpty()||insert.sx==0||insert.sy==0){
+                context.skipped++;continue;
+            }
+            DxfBlocks.Transform local=DxfBlocks.Transform.insert(block.bx,block.by,insert.sx,insert.sy,insert.rotation,insert.x,insert.y);
+            DxfBlocks.Transform transform=parent.thenLocal(local);stack.add(insert.name);
+            expandStream(block.members,transform,layer,blocks,stack,entities,layers,counter,context);
+            stack.remove(insert.name);
+        }
+    }
+
+    private static String key(String value){return value.toUpperCase(Locale.ROOT);}
+
+    private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,int skipped)throws IOException{
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
         for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}
