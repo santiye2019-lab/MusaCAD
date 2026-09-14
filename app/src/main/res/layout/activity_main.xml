@@ -1,22 +1,154 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#111820">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:background="#0B3B60">
-        <TextView android:id="@+id/appTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="MUSA CAD" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="20sp" />
-        <Button android:id="@+id/openButton" android:layout_width="wrap_content" android:layout_height="44dp" android:text="DOSYA AÇ" />
-        <ImageButton android:id="@+id/shareButton" android:layout_width="48dp" android:layout_height="48dp" android:src="@android:drawable/ic_menu_share" android:contentDescription="Paylaş" android:background="?attr/selectableItemBackgroundBorderless" android:tint="#FFFFFF" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0B131A">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="6dp"
+        android:background="#082B45">
+
+        <TextView
+            android:id="@+id/appTitle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:text="MusaCAD"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="20sp" />
+
+        <ImageButton
+            android:id="@+id/openButton"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:src="@drawable/ic_open_file"
+            android:contentDescription="Dosya aç"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="11dp" />
+
+        <ImageButton
+            android:id="@+id/shareButton"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:src="@android:drawable/ic_menu_share"
+            android:contentDescription="Paylaş"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#FFFFFF"
+            android:padding="11dp" />
     </LinearLayout>
-    <TextView android:id="@+id/fileName" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="8dp" android:text="Bir DWG veya DXF dosyası açın" android:textColor="#DDE8F0" android:background="#182531" />
-    <com.musa.cad.CadView android:id="@+id/cadView" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
-    <TextView android:id="@+id/resultText" android:layout_width="match_parent" android:layout_height="40dp" android:gravity="center_vertical" android:paddingHorizontal="12dp" android:text="Hazır" android:textColor="#FFFFFF" android:background="#182531" />
-    <HorizontalScrollView android:layout_width="match_parent" android:layout_height="64dp" android:fillViewport="true" android:background="#0B3B60">
-        <LinearLayout android:layout_width="wrap_content" android:layout_height="match_parent" android:gravity="center">
-            <Button android:id="@+id/layersButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="KATMANLAR" android:enabled="false" />
-            <CheckBox android:id="@+id/snapToggle" android:layout_width="wrap_content" android:layout_height="48dp" android:text="NOKTA YAKALA" android:textColor="#FFFFFF" android:checked="true" android:enabled="false" />
-            <Button android:id="@+id/panButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="GEZİN" />
-            <Button android:id="@+id/calibrateButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="ÖLÇEK" />
-            <Button android:id="@+id/distanceButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="MESAFE" />
-            <Button android:id="@+id/areaButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="ALAN" />
-            <Button android:id="@+id/undoButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="GERİ" />
-            <Button android:id="@+id/clearButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="TEMİZLE" />
+
+    <TextView
+        android:id="@+id/fileName"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:singleLine="true"
+        android:ellipsize="middle"
+        android:text="Bir DWG veya DXF dosyası açın"
+        android:textColor="#C7D7E1"
+        android:textSize="12sp"
+        android:background="#12222D" />
+
+    <com.musa.cad.CadView
+        android:id="@+id/cadView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/resultText"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="Hazır"
+        android:textColor="#EAF2F7"
+        android:textSize="12sp"
+        android:background="#12222D" />
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="76dp"
+        android:fillViewport="false"
+        android:scrollbars="none"
+        android:background="#0D1B24">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <Button
+                android:id="@+id/layersButton"
+                style="@style/ToolButton"
+                android:text="Katmanlar"
+                android:drawableTop="@drawable/ic_layers"
+                android:enabled="false" />
+
+            <CheckBox
+                android:id="@+id/snapToggle"
+                style="@style/ToolButton"
+                android:button="@null"
+                android:text="Nokta Yakala"
+                android:drawableTop="@drawable/ic_snap"
+                android:checked="true"
+                android:enabled="false" />
+
+            <Button
+                android:id="@+id/panButton"
+                style="@style/ToolButton"
+                android:text="Gezin"
+                android:drawableTop="@drawable/ic_pan" />
+
+            <Button
+                android:id="@+id/calibrateButton"
+                style="@style/ToolButton"
+                android:text="Ölçek"
+                android:drawableTop="@drawable/ic_scale" />
+
+            <Button
+                android:id="@+id/distanceButton"
+                style="@style/ToolButton"
+                android:text="Mesafe"
+                android:drawableTop="@drawable/ic_distance" />
+
+            <Button
+                android:id="@+id/areaButton"
+                style="@style/ToolButton"
+                android:text="Alan"
+                android:drawableTop="@drawable/ic_area" />
+
+            <Button
+                android:id="@+id/fitButton"
+                style="@style/ToolButton"
+                android:text="Sığdır"
+                android:drawableTop="@drawable/ic_fit" />
+
+            <Button
+                android:id="@+id/undoButton"
+                style="@style/ToolButton"
+                android:text="Geri"
+                android:drawableTop="@drawable/ic_undo" />
+
+            <Button
+                android:id="@+id/clearButton"
+                style="@style/ToolButton"
+                android:text="Temizle"
+                android:drawableTop="@drawable/ic_clear" />
         </LinearLayout>
     </HorizontalScrollView>
 </LinearLayout>
