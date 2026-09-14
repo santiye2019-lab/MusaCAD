@@ -13,6 +13,11 @@ public class DxfTextTest {
         check("Metin", "\\LMetin\\l");
         check("\\Hbroken", "\\Hbroken");
         check("Türkçe ğış", "Türkçe ğış");
-        System.out.println("7 DXF text cases passed");
+        check("A\nB", "A\\XB");
+        check("12/34", "\\S12^34;");
+        check("90° ± Ø", "90%%D %%P %%C");
+        check("AB", "A%%uB%%u");
+        check("Geniş", "\\W0.8;Geniş");
+        System.out.println("12 DXF text cases passed");
     }
 }
