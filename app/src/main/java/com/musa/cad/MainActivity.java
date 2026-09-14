@@ -18,48 +18,95 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
+
     private static final class LoadTask {
         Future<?> future;AlertDialog dialog;TextView progress;
     }
+
     private static final class Loaded {
         File file;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
-        void dispose(){if(bitmap!=null)bitmap.recycle();if(file!=null)file.delete();}
+        void dispose(){
+            if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();
+            if(file!=null)file.delete();
+        }
     }
+
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
-    private CadView cad; private TextView fileName,result; private File currentFile;
-    protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main);
-        cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);cad.setListener(new CadView.Listener(){public void onMeasurement(String v){result.setText(v);}public void onCalibrationRequested(double px){showCalibration();}public void onSelectionReady(){previewSelection();}});
-        snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
-        findViewById(R.id.appTitle).setOnClickListener(v->{
-            String license;
-            try(InputStream in=getAssets().open("COPYING-LibreDWG.txt")){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1)out.write(bytes,0,n);license=out.toString("UTF-8");}
-            catch(IOException e){license="GPL-3.0-or-later";}
-            TextView text=new TextView(this);text.setPadding(24,16,24,16);
-            text.setText("MusaCAD — LibreDWG ile çevrimdışı DWG okuma\nKaynak kod: https://github.com/santiye2019-lab/MusaCAD\n\n"+license);
-            android.text.util.Linkify.addLinks(text,android.text.util.Linkify.WEB_URLS);text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
-            ScrollView scroll=new ScrollView(this);scroll.addView(text);
-            new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
+    private CadView cad;
+    private TextView fileName,result;
+    private File currentFile;
+    private View[] modeButtons;
+
+    @Override protected void onCreate(Bundle b){
+        super.onCreate(b);setContentView(R.layout.activity_main);
+        cad=findViewById(R.id.cadView);
+        fileName=findViewById(R.id.fileName);
+        result=findViewById(R.id.resultText);
+        cad.setListener(new CadView.Listener(){
+            public void onMeasurement(String v){result.setText(v);}
+            public void onCalibrationRequested(double px){showCalibration();}
+            public void onSelectionReady(){previewSelection();}
         });
+
+        snapToggle=findViewById(R.id.snapToggle);
+        snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
+
+        modeButtons=new View[]{
+            findViewById(R.id.panButton),findViewById(R.id.calibrateButton),
+            findViewById(R.id.distanceButton),findViewById(R.id.areaButton)
+        };
+        markModeSelected(R.id.panButton);
+
+        findViewById(R.id.appTitle).setOnClickListener(v->showLicense());
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.openButton).setOnClickListener(v->open());
-        findViewById(R.id.panButton).setOnClickListener(v->cad.setMode(CadView.Mode.PAN));
-        findViewById(R.id.calibrateButton).setOnClickListener(v->cad.setMode(CadView.Mode.CALIBRATE));
-        findViewById(R.id.distanceButton).setOnClickListener(v->cad.setMode(CadView.Mode.DISTANCE));
-        findViewById(R.id.areaButton).setOnClickListener(v->cad.setMode(CadView.Mode.AREA));
+        findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
+        findViewById(R.id.calibrateButton).setOnClickListener(v->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE));
+        findViewById(R.id.distanceButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
+        findViewById(R.id.areaButton).setOnClickListener(v->selectMode(R.id.areaButton,CadView.Mode.AREA));
+        findViewById(R.id.fitButton).setOnClickListener(v->cad.fitToScreen());
         findViewById(R.id.undoButton).setOnClickListener(v->cad.undo());
         findViewById(R.id.clearButton).setOnClickListener(v->cad.clearMeasurement());
         findViewById(R.id.shareButton).setOnClickListener(v->showShare());
     }
-    private void open(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});startActivityForResult(i,OPEN);}
-    protected void onActivityResult(int r,int c,Intent data){
+
+    private void selectMode(int id,CadView.Mode mode){cad.setMode(mode);markModeSelected(id);}
+    private void markModeSelected(int id){
+        if(modeButtons==null)return;
+        for(View button:modeButtons)button.setSelected(button.getId()==id);
+    }
+
+    private void showLicense(){
+        String license;
+        try(InputStream in=getAssets().open("COPYING-LibreDWG.txt")){
+            ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;
+            while((n=in.read(bytes))!=-1)out.write(bytes,0,n);license=out.toString("UTF-8");
+        }catch(IOException e){license="GPL-3.0-or-later";}
+        TextView text=new TextView(this);text.setPadding(24,16,24,16);
+        text.setText("MusaCAD — LibreDWG ile çevrimdışı DWG okuma\nKaynak kod: https://github.com/santiye2019-lab/MusaCAD\n\n"+license);
+        android.text.util.Linkify.addLinks(text,android.text.util.Linkify.WEB_URLS);
+        text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        ScrollView scroll=new ScrollView(this);scroll.addView(text);
+        new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
+    }
+
+    private void open(){
+        Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});
+        startActivityForResult(i,OPEN);
+    }
+
+    @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null)startLoad(data.getData());
     }
+
     private void cancelLoad(){
         LoadTask task=activeLoad;activeLoad=null;
         if(task!=null){if(task.future!=null)task.future.cancel(true);task.dialog.dismiss();}
     }
+
     private void startLoad(Uri uri){
         cancelLoad();
         LoadTask task=new LoadTask();activeLoad=task;
@@ -70,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
         task.dialog=new AlertDialog.Builder(this).setTitle("Çizim açılıyor").setView(box)
             .setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
         task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+
         task.future=loader.submit(()->{
             Loaded loaded=new Loaded();
             try{
@@ -84,8 +132,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Çizim hazırlanıyor…");});
                 FileTransfer.checkCancelled();
-                if(loaded.dxf){loaded.parsed=DxfParser.render(loaded.file);}
-                else{
+
+                if(loaded.dxf){
+                    loaded.parsed=DxfParser.render(loaded.file);
+                }else{
                     try{loaded.parsed=NativeDwg.read(loaded.file,getCacheDir());}
                     catch(InterruptedIOException cancelled){throw cancelled;}
                     catch(IOException|UnsatisfiedLinkError conversionError){
@@ -97,31 +147,43 @@ public class MainActivity extends AppCompatActivity {
                 if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;
                 FileTransfer.checkCancelled();
                 if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
+
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    currentFile=loaded.file;activeDxf=loaded.parsed;findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
-                    cad.setDrawing(loaded.bitmap);
+                    currentFile=loaded.file;activeDxf=loaded.parsed;
+                    findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
+
+                    if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);
+                    else cad.setDrawing(loaded.bitmap);
+                    markModeSelected(R.id.panButton);
+
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    fileName.setText(loaded.name+(loaded.dxf?" — DXF geometri":loaded.parsed!=null?" — DWG geometri":
-                        " — Yalnız önizleme: "+loaded.bitmap.getWidth()+" × "+loaded.bitmap.getHeight()+" px (geometri okunamadı)"));
-                    result.setText(loaded.parsed!=null?(loaded.parsed.entityCount+" nesne, "+loaded.parsed.layerCount+
-                        " katman; "+loaded.parsed.skippedCount+" desteklenmeyen nesne. Yaklaşık görünüm."+ (loaded.parsed.conversionWarnings!=0?" DWG dönüşüm uyarısı var.":"")):
-                        "Yalnız gömülü küçük resim açıldı. Ayrıntılar ve katmanlar okunamadı. Kalibrasyon görüntü hassasiyetini artırmaz; ölçüler yaklaşık olur.");
+
+                    fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme"));
+                    if(loaded.parsed!=null){
+                        String status="Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman";
+                        if(loaded.parsed.skippedCount>0)status+="  •  "+loaded.parsed.skippedCount+" atlandı";
+                        if(loaded.parsed.conversionWarnings!=0)status+="  •  dönüşüm uyarısı";
+                        result.setText(status);
+                    }else{
+                        result.setText("Önizleme modu  •  geometri okunamadığı için ayrıntı ve ölçüm hassasiyeti sınırlı");
+                    }
                 });
             }catch(Exception | OutOfMemoryError e){
                 loaded.dispose();
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed())return;
-                    activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));
+                    activeLoad=null;task.dialog.dismiss();
+                    error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));
                 });
             }
         });
     }
-    @Override protected void onDestroy(){
-        cancelLoad();loader.shutdownNow();super.onDestroy();
-    }
+
+    @Override protected void onDestroy(){cancelLoad();loader.shutdownNow();super.onDestroy();}
+
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null)return;
         String[] names=activeDxf.layerNames.toArray(new String[0]);
@@ -135,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
             .setNeutralButton("TÜMÜNÜ GÖSTER",(d,w)->applyLayers(new java.util.HashSet<>(activeDxf.layerNames)))
             .setNegativeButton("İPTAL",null).show();
     }
+
     private void applyLayers(java.util.Set<String> selected){
         if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;
         DxfParser.Result source=activeDxf;
@@ -146,32 +209,43 @@ public class MainActivity extends AppCompatActivity {
             try{
                 DxfParser.Result updated=source.withVisibleLayers(selected);
                 runOnUiThread(()->{
-                    if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){updated.bitmap.recycle();return;}
+                    if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){
+                        if(updated.bitmap!=null&&!updated.bitmap.isRecycled())updated.bitmap.recycle();return;
+                    }
                     activeLoad=null;task.dialog.dismiss();
-                    cad.replaceVisibleDrawing(updated.bitmap,updated.snapPoints);activeDxf=updated;
+                    cad.replaceVisibleDrawing(updated);activeDxf=updated;
                     snapToggle.setEnabled(updated.snapPoints.length>0);
-                    result.setText(updated.entityCount+" nesne, "+updated.visibleLayers.size()+"/"+updated.layerCount+
-                        " katman görünür; "+updated.skippedCount+" desteklenmeyen nesne.");
+                    result.setText("Hazır  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman görünür");
                 });
             }catch(Exception|OutOfMemoryError e){
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed())return;
-                    activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));
+                    activeLoad=null;task.dialog.dismiss();
+                    error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));
                 });
             }
         });
     }
-    private String nameOf(Uri u){try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);}}return "cizim.dwg";}
+
+    private String nameOf(Uri u){
+        try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){
+            if(c!=null&&c.moveToFirst()){
+                int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);
+            }
+        }
+        return "cizim.dwg";
+    }
+
     private void showShare(){
         new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{
-            "Orijinal dosyayı paylaş","Görünümü PDF olarak paylaş","Görünümü resim olarak paylaş",
-            "Alan seçerek paylaş"
+            "Orijinal dosyayı paylaş","Görünümü PDF olarak paylaş","Görünümü resim olarak paylaş","Alan seçerek paylaş"
         },(d,w)->{
             if(w==0)shareFile(currentFile,"application/octet-stream");
             else if(w==3){if(!cad.beginSelection())Toast.makeText(this,"Önce çizim açın",Toast.LENGTH_SHORT).show();}
             else {cad.cancelSelection();exportView(w==1);}
         }).show();
     }
+
     private void previewSelection(){
         final Bitmap bitmap;
         try{bitmap=cad.selectionSnapshot();}catch(Exception e){error(e);return;}
@@ -186,34 +260,42 @@ public class MainActivity extends AppCompatActivity {
         dialog.setOnDismissListener(d->{preview.setImageDrawable(null);bitmap.recycle();});
         dialog.show();
     }
+
     private void showCalibration(){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=(int)(16*getResources().getDisplayMetrics().density);box.setPadding(p,0,p,0);
-        EditText value=new EditText(this);value.setHint("Gerçek uzunluk (ör. 2.50)");value.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(value);
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+        int p=(int)(16*getResources().getDisplayMetrics().density);box.setPadding(p,0,p,0);
+        EditText value=new EditText(this);value.setHint("Gerçek uzunluk (ör. 2.50)");
+        value.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(value);
         Spinner units=new Spinner(this);units.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"m","cm","mm"}));box.addView(units);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Ölçeği ayarla").setView(box).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",(d,w)->cad.clearMeasurement()).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Ölçeği ayarla").setView(box)
+            .setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",(d,w)->cad.clearMeasurement()).create();
         dialog.setOnCancelListener(d->cad.clearMeasurement());
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{
-            double n=Double.parseDouble(value.getText().toString().replace(',','.'));cad.setCalibration(n,units.getSelectedItem().toString());dialog.dismiss();
-        }catch(Exception e){value.setError("Sıfırdan büyük bir uzunluk girin; iki farklı nokta seçin.");}}));
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                double n=Double.parseDouble(value.getText().toString().replace(',','.'));
+                cad.setCalibration(n,units.getSelectedItem().toString());markModeSelected(R.id.distanceButton);dialog.dismiss();
+            }catch(Exception e){value.setError("Sıfırdan büyük bir uzunluk girin; iki farklı nokta seçin.");}
+        }));
         dialog.show();
     }
+
     private File exportDir(){File d=new File(getCacheDir(),"exports");d.mkdirs();return d;}
+
     private void exportView(boolean pdf){
         Bitmap bitmap=null;
         try{bitmap=cad.snapshot();exportBitmap(bitmap,pdf,"gorunum");}
         catch(Exception e){error(e);}
         finally{if(bitmap!=null)bitmap.recycle();}
     }
+
     private void exportBitmap(Bitmap bitmap,boolean pdf,String suffix){
         try{
             File file=File.createTempFile("MusaCAD_"+suffix+"_",pdf?".pdf":".png",exportDir());
             if(pdf){
                 PdfDocument document=new PdfDocument();
                 try{
-                    PdfDocument.Page page=document.startPage(new PdfDocument.PageInfo.Builder(
-                        bitmap.getWidth(),bitmap.getHeight(),1).create());
-                    page.getCanvas().drawBitmap(bitmap,0,0,null);
-                    document.finishPage(page);
+                    PdfDocument.Page page=document.startPage(new PdfDocument.PageInfo.Builder(bitmap.getWidth(),bitmap.getHeight(),1).create());
+                    page.getCanvas().drawBitmap(bitmap,0,0,null);document.finishPage(page);
                     try(OutputStream out=new FileOutputStream(file)){document.writeTo(out);}
                 }finally{document.close();}
             }else{
@@ -221,10 +303,17 @@ public class MainActivity extends AppCompatActivity {
                     if(!bitmap.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("Resim oluşturulamadı");
                 }
             }
-            cad.cancelSelection();
-            shareFile(file,pdf?"application/pdf":"image/png");
+            cad.cancelSelection();shareFile(file,pdf?"application/pdf":"image/png");
         }catch(Exception e){error(e);}
     }
-    private void shareFile(File f,String mime){if(f==null||!f.exists()){Toast.makeText(this,"Önce dosya açın",Toast.LENGTH_SHORT).show();return;}Uri u=FileProvider.getUriForFile(this,getPackageName()+".files",f);Intent s=new Intent(Intent.ACTION_SEND);s.setType(mime);s.putExtra(Intent.EXTRA_STREAM,u);s.setClipData(ClipData.newRawUri("MusaCAD",u));s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(s,"Paylaş"));}
+
+    private void shareFile(File f,String mime){
+        if(f==null||!f.exists()){Toast.makeText(this,"Önce dosya açın",Toast.LENGTH_SHORT).show();return;}
+        Uri u=FileProvider.getUriForFile(this,getPackageName()+".files",f);
+        Intent s=new Intent(Intent.ACTION_SEND);s.setType(mime);s.putExtra(Intent.EXTRA_STREAM,u);
+        s.setClipData(ClipData.newRawUri("MusaCAD",u));s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(s,"Paylaş"));
+    }
+
     private void error(Exception e){Toast.makeText(this,"İşlem başarısız: "+e.getMessage(),Toast.LENGTH_LONG).show();}
 }
