@@ -1,0 +1,76 @@
+name: One-shot curved geometry patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-curves-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot curved geometry renderer patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch bulge and spline rendering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/musa/cad/DxfParser.java')
+          s=p.read_text()
+          reps=[]
+          reps.append((
+          '''                ArrayList<PointF> points=new ArrayList<>();int j=index+1;\n                while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){\n                    DxfBlocks.Record vertex=placements.get(j).record;\n                    points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));j++;\n                }\n                if(points.size()<2){skipped++;continue;}\n                entity=new Poly(points,(((int)item.record.number(70,0))&1)!=0);index=j-1;''',
+          '''                ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();int j=index+1;\n                while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){\n                    DxfBlocks.Record vertex=placements.get(j).record;\n                    points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));\n                    bulges.add(vertex.number(42,0));j++;\n                }\n                if(points.size()<2){skipped++;continue;}\n                entity=bulgedPoly(points,bulges,(((int)item.record.number(70,0))&1)!=0);index=j-1;'''))
+          reps.append((
+          '''        final ArrayList<PointF> points=new ArrayList<>();\n        PendingPoly(ArrayList<StreamNode> target,String layer,boolean closed,int aci,int trueColor){''',
+          '''        final ArrayList<PointF> points=new ArrayList<>();final ArrayList<Double> bulges=new ArrayList<>();\n        PendingPoly(ArrayList<StreamNode> target,String layer,boolean closed,int aci,int trueColor){'''))
+          reps.append((
+          '''            if("VERTEX".equals(type)){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));return;}''',
+          '''            if("VERTEX".equals(type)){\n                c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));\n                c.pending.bulges.add(r.number(42,0));return;\n            }'''))
+          reps.append((
+          '''        if(p.points.size()<2)c.skipped++;else p.target.add(new StreamShape(new Poly(p.points,p.closed),p.layer,p.aci,p.trueColor));''',
+          '''        if(p.points.size()<2)c.skipped++;else p.target.add(new StreamShape(bulgedPoly(p.points,p.bulges,p.closed),p.layer,p.aci,p.trueColor));'''))
+          reps.append((
+          '''        if("LWPOLYLINE".equals(type)){\n            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);\n            return p.size()<2?null:new Poly(p,(((int)f(a,from,to,70))&1)!=0);\n        }\n        if("SPLINE".equals(type)){\n            ArrayList<PointF>p=repeatedPoints(a,from,to,11,21);if(p.size()<2)p=repeatedPoints(a,from,to,10,20);\n            return p.size()<2?null:new Poly(p,false);\n        }''',
+          '''        if("LWPOLYLINE".equals(type))return lwPolyline(a,from,to);\n        if("SPLINE".equals(type))return splineEntity(a,from,to);'''))
+          reps.append((
+          '''                ArrayList<PointF> points=new ArrayList<>();\n                for(int v=0;v<vertexCount&&i+1<to;v++){''',
+          '''                ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();\n                for(int v=0;v<vertexCount&&i+1<to;v++){'''))
+          reps.append((
+          '''                    float y=floatOf(a.get(i+1));i+=2;\n                    if(Float.isFinite(x)&&Float.isFinite(y))points.add(new PointF(x,y));\n                    if(i+1<to&&intOf(a.get(i))==42)i+=2;\n                }\n                if(points.size()>=2)paths.add(new Poly(points,closed));''',
+          '''                    float y=floatOf(a.get(i+1));i+=2;double bulge=0d;\n                    if(i+1<to&&intOf(a.get(i))==42){bulge=floatOf(a.get(i+1));i+=2;}\n                    if(Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);}\n                }\n                if(points.size()>=2)paths.add(bulgedPoly(points,bulges,closed));'''))
+          for old,new in reps:
+              count=s.count(old)
+              if count!=1:
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:100]!r}')
+              s=s.replace(old,new,1)
+
+          anchor='''    private static ArrayList<PointF> repeatedPoints(List<String>a,int from,int to,int xCode,int yCode){'''
+          helpers='''    private static Entity lwPolyline(List<String>a,int from,int to){\n        ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();\n        for(int i=from;i+1<to;i+=2){\n            if(intOf(a.get(i))!=10)continue;\n            float x=floatOf(a.get(i+1));Float y=null;double bulge=0d;int j=i+2;\n            while(j+1<to&&intOf(a.get(j))!=10){\n                int code=intOf(a.get(j));\n                if(code==20)y=floatOf(a.get(j+1));else if(code==42)bulge=floatOf(a.get(j+1));\n                j+=2;\n            }\n            if(y!=null&&Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);}\n            i=j-2;\n        }\n        if(points.size()<2)return null;\n        return bulgedPoly(points,bulges,(((int)fv(a,from,to,70,0f))&1)!=0);\n    }\n\n    private static Entity splineEntity(List<String>a,int from,int to){\n        boolean closed=(((int)fv(a,from,to,70,0f))&1)!=0;\n        int degree=(int)fv(a,from,to,71,3f);\n        ArrayList<PointF> controls=repeatedPoints(a,from,to,10,20);\n        if(controls.size()>=2){\n            double[] xs=new double[controls.size()],ys=new double[controls.size()];\n            for(int i=0;i<controls.size();i++){xs[i]=controls.get(i).x;ys[i]=controls.get(i).y;}\n            double[] knots=repeatedValues(a,from,to,40),weights=repeatedValues(a,from,to,41);\n            if(weights.length!=controls.size())weights=null;\n            ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleNurbs(degree,knots,weights,xs,ys));\n            if(sampled.size()>=2)return new Poly(sampled,closed);\n        }\n        ArrayList<PointF> fit=repeatedPoints(a,from,to,11,21);\n        if(fit.size()>=2)return new Poly(fit,closed);\n        return controls.size()>=2?new Poly(controls,closed):null;\n    }\n\n    private static Entity bulgedPoly(ArrayList<PointF> points,List<Double> bulges,boolean closed){\n        int n=points.size();if(n<2)return null;\n        double[] xs=new double[n],ys=new double[n],bs=new double[n];\n        for(int i=0;i<n;i++){xs[i]=points.get(i).x;ys[i]=points.get(i).y;bs[i]=bulges!=null&&i<bulges.size()?bulges.get(i):0d;}\n        ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleBulgePolyline(xs,ys,bs,closed));\n        return new Poly(sampled.size()>=2?sampled:points,closed);\n    }\n\n    private static ArrayList<PointF> packedPoints(double[] packed){\n        ArrayList<PointF> points=new ArrayList<>();\n        if(packed==null)return points;\n        for(int i=0;i+1<packed.length;i+=2){\n            if(Double.isFinite(packed[i])&&Double.isFinite(packed[i+1]))points.add(new PointF((float)packed[i],(float)packed[i+1]));\n        }\n        return points;\n    }\n\n    private static double[] repeatedValues(List<String>a,int from,int to,int wanted){\n        ArrayList<Double> values=new ArrayList<>();\n        for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted){try{values.add(Double.parseDouble(a.get(i+1).trim()));}catch(Exception ignored){}}\n        double[] result=new double[values.size()];for(int i=0;i<result.length;i++)result[i]=values.get(i);return result;\n    }\n\n'''
+          if s.count(anchor)!=1: raise SystemExit('repeatedPoints anchor not unique')
+          s=s.replace(anchor,helpers+anchor,1)
+          s=s.replace('Bulged polyline vertices are currently shown as straight\n     * boundary chords; importantly, separate loops are never joined together.',
+                      'Bulged polyline boundaries are sampled as their true arc geometry, while separate loops\n     * are never joined together.')
+          p.write_text(s)
+          PY
+      - name: Test curved geometry sampler
+        run: |
+          rm -rf /tmp/musacad-curve-test && mkdir -p /tmp/musacad-curve-test
+          javac -d /tmp/musacad-curve-test app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
+          java -cp /tmp/musacad-curve-test DxfCurvesTest
+      - name: Commit renderer patch
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Render bulge arcs and NURBS splines accurately'
+          git push origin HEAD:fix-1b-hatch-geometry
