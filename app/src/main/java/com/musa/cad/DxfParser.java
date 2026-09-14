@@ -576,6 +576,7 @@ public final class DxfParser {
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
         final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();
         final Map<String,String> drawOrder=new HashMap<>();
+        final Map<String,String> layoutByOwner=new HashMap<>();
         final LinkedHashSet<String> layouts=new LinkedHashSet<>();
         final LinkedHashMap<String,ArrayList<StreamNode>> rootsByLayout=new LinkedHashMap<>();
     }
@@ -600,7 +601,7 @@ public final class DxfParser {
             }
             if(type!=null)processStreamRecord(type,record,context);
         }
-        finishPending(context);
+        finishPending(context);resolveStreamLayouts(context);
         context.layerTable.ensureDefaultLayer();
         ArrayList<Entity> entities=new ArrayList<>();
         Set<String> layers=new HashSet<>(context.layerTable.names);
@@ -630,7 +631,7 @@ public final class DxfParser {
 
     private static boolean keepStreamCode(int code){
         return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==66||code==67||code==68||code==69||
-            code==331||code==370||code==410||code==420||code==440||
+            code==330||code==331||code==370||code==410||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
 
@@ -643,8 +644,10 @@ public final class DxfParser {
         if(!"ENTITIES".equals(c.section))return null;
         boolean member=streamSequenceMember(type);
         if(c.rootSequenceLayout!=null&&!member)c.rootSequenceLayout=null;
-        String layout=c.rootSequenceLayout!=null?c.rootSequenceLayout:DxfSpace.layout(r.integer(67,0),r.text(410,""));
-        c.layouts.add(layout);
+        int paper=r.integer(67,0);String rawLayout=r.text(410,"");
+        String layout=c.rootSequenceLayout!=null?c.rootSequenceLayout:
+            (paper==1&&rawLayout.trim().isEmpty()?DxfSpace.unresolvedPaper(r.text(330,"")):DxfSpace.layout(paper,rawLayout));
+        if(!DxfSpace.isUnresolvedPaper(layout))c.layouts.add(layout);
         ArrayList<StreamNode> target=c.rootsByLayout.computeIfAbsent(layout,k->new ArrayList<>());
         if("POLYLINE".equals(type)||("INSERT".equals(type)&&r.integer(66,0)!=0))c.rootSequenceLayout=layout;
         return target;
@@ -684,7 +687,8 @@ public final class DxfParser {
                 r.integer(70,0),r.integer(71,0));return;
         }
         if("OBJECTS".equals(c.section)&&"LAYOUT".equals(type)){
-            String name=r.text(1,"").trim();if(!name.isEmpty())c.layouts.add(DxfSpace.normalizeName(name));return;
+            String name=DxfSpace.layoutObjectName(r.tags,0,r.tags.size());String owner=DxfSpace.layoutObjectOwner(r.tags,0,r.tags.size());
+            c.layouts.add(name);if(!owner.isEmpty())c.layoutByOwner.put(owner,name);return;
         }
         if("OBJECTS".equals(c.section)&&"SORTENTSTABLE".equals(type)){
             DxfDrawOrder.addRecord(r.tags,0,r.tags.size(),c.drawOrder);return;
@@ -714,6 +718,15 @@ public final class DxfParser {
             target.add(new StreamShape(entity,r.text(8,"0"),r.text(5,""),r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),
                 r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1))));
         }
+    }
+
+    private static void resolveStreamLayouts(StreamContext c){
+        LinkedHashMap<String,ArrayList<StreamNode>> resolved=new LinkedHashMap<>();
+        for(Map.Entry<String,ArrayList<StreamNode>> entry:c.rootsByLayout.entrySet()){
+            String layout=DxfSpace.resolveUnresolved(entry.getKey(),c.layoutByOwner);c.layouts.add(layout);
+            resolved.computeIfAbsent(layout,k->new ArrayList<>()).addAll(entry.getValue());
+        }
+        c.rootsByLayout.clear();c.rootsByLayout.putAll(resolved);c.layouts.addAll(c.layoutByOwner.values());
     }
 
     private static void finishPending(StreamContext c)throws IOException{

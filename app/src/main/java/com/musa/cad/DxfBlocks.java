@@ -82,7 +82,7 @@ public final class DxfBlocks {
             }
         }catch(NumberFormatException e){throw new IOException("Geçersiz ASCII DXF etiketleri",e);}
         Map<String,Block> blocks=new HashMap<>();List<Record> roots=new ArrayList<>();
-        LinkedHashSet<String> layoutNames=new LinkedHashSet<>();
+        LinkedHashSet<String> layoutNames=new LinkedHashSet<>();Map<String,String> layoutByOwner=new HashMap<>();
         String section="";Block active=null;
         for(Record record:records){
             if(record.type.equals("SECTION")){section=record.text(2,"");active=null;continue;}
@@ -93,7 +93,8 @@ public final class DxfBlocks {
                 else if(active!=null)active.members.add(record);
             }else if(section.equals("ENTITIES"))roots.add(record);
             else if(section.equals("OBJECTS")&&record.type.equals("LAYOUT")){
-                String name=record.text(1,"").trim();if(!name.isEmpty())layoutNames.add(DxfSpace.normalizeName(name));
+                String name=DxfSpace.layoutObjectName(tags,record.from,record.to);String owner=DxfSpace.layoutObjectOwner(tags,record.from,record.to);
+                layoutNames.add(name);if(!owner.isEmpty())layoutByOwner.put(owner,name);
             }
         }
 
@@ -103,7 +104,7 @@ public final class DxfBlocks {
             boolean member=isSequenceMember(root.type);
             if(sequenceLayout!=null&&!member)sequenceLayout=null;
             String layout=sequenceLayout!=null?sequenceLayout:
-                DxfSpace.layout((int)root.number(67,0),root.text(410,""));
+                DxfSpace.layout((int)root.number(67,0),root.text(410,""),root.text(330,""),layoutByOwner);
             layoutNames.add(layout);
             rootsByLayout.computeIfAbsent(layout,k->new ArrayList<>()).add(root);
             if(startsSequence(root))sequenceLayout=layout;
