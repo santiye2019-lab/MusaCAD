@@ -67,7 +67,9 @@ public final class DxfBlocks {
         private int visits;
     }
 
-    public static Result expand(List<String> tags)throws IOException{
+    public static Result expand(List<String> tags)throws IOException{return expand(tags,null);}
+
+    public static Result expand(List<String> tags,String preferredLayout)throws IOException{
         List<Record> records=new ArrayList<>();
         try{
             if(tags.size()%2!=0)throw new NumberFormatException();
@@ -110,7 +112,7 @@ public final class DxfBlocks {
 
         Result result=new Result();
         result.layouts.addAll(layoutNames);if(result.layouts.isEmpty())result.layouts.add(DxfSpace.MODEL);
-        result.activeLayout=DxfSpace.chooseActive(rootsByLayout);
+        result.activeLayout=DxfSpace.chooseActive(rootsByLayout,preferredLayout);
         List<Record> selected=rootsByLayout.get(result.activeLayout);
         if(selected==null)selected=Collections.emptyList();
         Map<String,String> drawOrder=DxfDrawOrder.parse(tags);

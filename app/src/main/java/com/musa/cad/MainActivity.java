@@ -20,7 +20,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20;
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_LAYOUT=7;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
@@ -41,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
     private CadView cad;
     private TextView fileName,result;
     private File currentFile;
+    private boolean currentIsDxf;
     private View[] modeButtons;
     private View welcomePanel,shareButton,shareToolButton;
 
@@ -123,14 +124,16 @@ public class MainActivity extends AppCompatActivity {
         Menu menu=popup.getMenu();
         menu.add(0,MENU_OPEN,0,"Dosya aç");
         menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);
-        menu.add(0,MENU_FIT,2,"Ekrana sığdır").setEnabled(currentFile!=null);
-        menu.add(0,MENU_SHARE,3,"Paylaş").setEnabled(currentFile!=null);
-        menu.add(0,MENU_INFO,4,"Çizim bilgileri").setEnabled(activeDxf!=null);
-        menu.add(0,MENU_ABOUT,5,"MusaCAD hakkında");
+        menu.add(0,MENU_LAYOUT,2,"Model / Pafta").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);
+        menu.add(0,MENU_FIT,3,"Ekrana sığdır").setEnabled(currentFile!=null);
+        menu.add(0,MENU_SHARE,4,"Paylaş").setEnabled(currentFile!=null);
+        menu.add(0,MENU_INFO,5,"Çizim bilgileri").setEnabled(activeDxf!=null);
+        menu.add(0,MENU_ABOUT,6,"MusaCAD hakkında");
         popup.setOnMenuItemClickListener(item->{
             switch(item.getItemId()){
                 case MENU_OPEN:open();return true;
                 case MENU_LAYERS:showLayers();return true;
+                case MENU_LAYOUT:showLayouts();return true;
                 case MENU_FIT:cad.fitToScreen();return true;
                 case MENU_SHARE:showShare();return true;
                 case MENU_INFO:showDrawingInfo();return true;
@@ -249,7 +252,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    currentFile=loaded.file;activeDxf=loaded.parsed;
+                    currentFile=loaded.file;currentIsDxf=loaded.dxf;activeDxf=loaded.parsed;
                     hideWelcomePanel();
                     updateShareEnabled(true);
                     findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
@@ -263,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
 
                     fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme"));
                     if(loaded.parsed!=null){
-                        result.setText("Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman");
+                        result.setText("Hazır  •  "+loaded.parsed.activeLayout+"  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman");
                     }else{
                         result.setText("Hazır  •  DWG önizleme modu");
                     }
@@ -280,6 +283,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy(){cancelLoad();loader.shutdownNow();super.onDestroy();}
+
+    private void showLayouts(){
+        if(activeDxf==null||activeLoad!=null)return;
+        String[] names=activeDxf.layoutNames.toArray(new String[0]);
+        if(names.length<2){Toast.makeText(this,"Bu çizimde tek görünüm var",Toast.LENGTH_SHORT).show();return;}
+        int checked=0;for(int i=0;i<names.length;i++)if(names[i].equals(activeDxf.activeLayout)){checked=i;break;}
+        new AlertDialog.Builder(this).setTitle("Model / Pafta seç")
+            .setSingleChoiceItems(names,checked,(dialog,index)->{dialog.dismiss();applyLayout(names[index]);})
+            .setNegativeButton("İPTAL",null).show();
+    }
+
+    private void applyLayout(String layout){
+        if(activeDxf==null||currentFile==null||activeLoad!=null||activeDxf.activeLayout.equals(layout))return;
+        DxfParser.Result source=activeDxf;File file=currentFile;boolean isDxf=currentIsDxf;
+        java.util.Set<String> wantedLayers=new java.util.HashSet<>(source.visibleLayers);
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("Pafta hazırlanıyor")
+            .setMessage(layout+" yükleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        task.future=loader.submit(()->{
+            DxfParser.Result updated=null;
+            try{
+                updated=isDxf?DxfParser.render(file,layout):NativeDwg.read(file,getCacheDir(),layout);
+                if(updated==null)throw new IOException("Seçilen paftada desteklenen çizim bulunamadı");
+                java.util.Set<String> selected=new java.util.HashSet<>(wantedLayers);selected.retainAll(updated.layerNames);
+                if(!selected.equals(updated.visibleLayers))updated=updated.withVisibleLayers(selected);
+                DxfParser.Result ready=updated;
+                runOnUiThread(()->{
+                    if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){if(ready.bitmap!=null&&!ready.bitmap.isRecycled())ready.bitmap.recycle();return;}
+                    activeLoad=null;task.dialog.dismiss();activeDxf=ready;
+                    cad.setVectorDrawing(ready);cad.setSnapPoints(ready.snapPoints);cad.fitToScreen();
+                    snapToggle.setEnabled(ready.snapPoints.length>0);
+                    result.setText("Hazır  •  "+ready.activeLayout+"  •  "+ready.entityCount+" nesne  •  "+ready.visibleLayers.size()+"/"+ready.layerCount+" katman");
+                });
+            }catch(Exception|OutOfMemoryError e){
+                if(updated!=null&&updated.bitmap!=null&&!updated.bitmap.isRecycled())updated.bitmap.recycle();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));
+                });
+            }
+        });
+    }
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){
@@ -315,7 +361,7 @@ public class MainActivity extends AppCompatActivity {
                     activeLoad=null;task.dialog.dismiss();
                     cad.replaceVisibleDrawing(updated);activeDxf=updated;
                     snapToggle.setEnabled(updated.snapPoints.length>0);
-                    result.setText("Hazır  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");
+                    result.setText("Hazır  •  "+updated.activeLayout+"  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");
                 });
             }catch(Exception|OutOfMemoryError e){
                 runOnUiThread(()->{

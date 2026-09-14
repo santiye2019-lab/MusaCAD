@@ -6,7 +6,9 @@ import java.io.*;
 public final class NativeDwg {
     static {System.loadLibrary("musacad_dwg");}
     private static native int convertNative(String input,String output);
-    public static DxfParser.Result read(File dwg,File cache)throws IOException {
+    public static DxfParser.Result read(File dwg,File cache)throws IOException {return read(dwg,cache,null);}
+
+    public static DxfParser.Result read(File dwg,File cache,String preferredLayout)throws IOException {
         FileTransfer.checkCancelled();
         File converted=File.createTempFile("MusaCAD_donusen_",".dxf",cache);
         File flattened=null;
@@ -17,7 +19,7 @@ public final class NativeDwg {
             // Büyük DWG dosyaları dönüşüm sırasında çok daha büyük ASCII DXF üretebilir.
             // Sabit MB sınırı uygulamıyoruz; DxfParser büyük dosyalarda streaming moda geçer.
             flattened=DxfDimensionFlattener.flatten(converted,cache);
-            DxfParser.Result result=DxfParser.render(flattened);
+            DxfParser.Result result=DxfParser.render(flattened,preferredLayout);
             if(result==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
             result.conversionWarnings=status;return result;
         }finally{

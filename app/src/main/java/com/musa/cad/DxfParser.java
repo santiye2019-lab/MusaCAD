@@ -352,24 +352,26 @@ public final class DxfParser {
         return fallback;
     }
 
-    public static Result render(File file)throws IOException{
+    public static Result render(File file)throws IOException{return render(file,null);}
+
+    public static Result render(File file,String preferredLayout)throws IOException{
         // LibreDWG can expand a modest DWG into a very large ASCII DXF.
         // Avoid retaining millions of DXF text lines on mobile devices.
-        if(file.length()>8L*1024*1024)return renderStreaming(file);
-        try{return renderBuffered(file);}
+        if(file.length()>8L*1024*1024)return renderStreaming(file,preferredLayout);
+        try{return renderBuffered(file,preferredLayout);}
         catch(IOException e){
-            if(e.getMessage()!=null&&e.getMessage().contains("etiket sınırı"))return renderStreaming(file);
+            if(e.getMessage()!=null&&e.getMessage().contains("etiket sınırı"))return renderStreaming(file,preferredLayout);
             throw e;
         }
     }
 
-    private static Result renderBuffered(File file)throws IOException{
+    private static Result renderBuffered(File file,String preferredLayout)throws IOException{
         List<String> lines=readLines(file);
         DxfLayerTable.Table layerTable=DxfLayerTable.parse(lines);
         DxfLineTypes.Table lineTypes=DxfLineTypes.parse(lines);
         DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);
         Map<String,Integer> layerColors=layerTable.colors;
-        DxfBlocks.Result expanded=DxfBlocks.expand(lines);
+        DxfBlocks.Result expanded=DxfBlocks.expand(lines,preferredLayout);
         ArrayList<Entity> entities=new ArrayList<>();
         Set<String> layers=new HashSet<>(layerTable.names);
         Set<String> visibleLayers=new HashSet<>(layerTable.visible);
@@ -498,7 +500,7 @@ public final class DxfParser {
     private static final class StreamCounter {int visits;}
 
     /** Memory-bounded parser used for large ASCII DXF files produced by DWG conversion. */
-    private static Result renderStreaming(File file)throws IOException{
+    private static Result renderStreaming(File file,String preferredLayout)throws IOException{
         StreamContext context=new StreamContext();
         try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(file),charset(file)),128*1024)){
             String type=null;StreamRecord record=null;
@@ -522,7 +524,7 @@ public final class DxfParser {
         Set<String> layers=new HashSet<>(context.layerTable.names);
         Set<String> visibleLayers=new HashSet<>(context.layerTable.visible);
         if(context.layouts.isEmpty())context.layouts.add(DxfSpace.MODEL);
-        String activeLayout=DxfSpace.chooseActive(context.rootsByLayout);
+        String activeLayout=DxfSpace.chooseActive(context.rootsByLayout,preferredLayout);
         ArrayList<StreamNode> roots=context.rootsByLayout.get(activeLayout);if(roots==null)roots=new ArrayList<>();
         if(!context.drawOrder.isEmpty())roots.sort((a,b)->DxfDrawOrder.compare(streamHandle(a),streamHandle(b),context.drawOrder));
         StreamCounter counter=new StreamCounter();
