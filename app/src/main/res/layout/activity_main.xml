@@ -7,23 +7,20 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="66dp"
+        android:layout_height="64dp"
         android:gravity="center_vertical"
-        android:paddingStart="14dp"
+        android:paddingStart="10dp"
         android:paddingEnd="10dp"
         android:background="#0C324D">
 
-        <FrameLayout
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@drawable/top_action_bg">
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_musacad_mark"
-                android:contentDescription="MusaCAD" />
-        </FrameLayout>
+        <ImageButton
+            android:id="@+id/menuButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/ic_menu"
+            android:contentDescription="Ana menü"
+            android:background="@drawable/top_action_bg"
+            android:padding="10dp" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -39,14 +36,16 @@
                 android:text="MusaCAD"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="20sp"
+                android:textSize="19sp"
                 android:fontFamily="sans-serif-medium" />
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mobil DWG / DXF çalışma alanı"
+                android:text="DWG / DXF çalışma alanı"
                 android:textColor="#AFC6D3"
-                android:textSize="10sp" />
+                android:textSize="9sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <ImageButton
@@ -74,7 +73,7 @@
     <TextView
         android:id="@+id/fileName"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="34dp"
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
@@ -82,7 +81,7 @@
         android:ellipsize="middle"
         android:text="Henüz proje açılmadı"
         android:textColor="#C9D9E2"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:background="#11242F" />
 
     <FrameLayout
@@ -101,23 +100,23 @@
             android:layout_height="match_parent"
             android:fillViewport="true"
             android:background="#0B131A"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp">
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:paddingTop="28dp"
-                android:paddingBottom="24dp">
+                android:paddingTop="20dp"
+                android:paddingBottom="18dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:gravity="center_horizontal"
-                    android:padding="22dp"
+                    android:padding="20dp"
                     android:background="@drawable/main_panel_bg"
                     android:elevation="5dp">
 
@@ -126,7 +125,7 @@
                         android:layout_height="wrap_content"
                         android:text="Projelerinizi cebinizde görüntüleyin"
                         android:textColor="#FFFFFF"
-                        android:textSize="23sp"
+                        android:textSize="21sp"
                         android:textStyle="bold"
                         android:gravity="center"
                         android:fontFamily="sans-serif-medium" />
@@ -134,24 +133,24 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="8dp"
                         android:text="DWG ve DXF dosyalarını açın, yakınlaştırın, katmanları yönetin ve ölçüm alın."
                         android:textColor="#BFD1DA"
-                        android:textSize="13sp"
+                        android:textSize="12sp"
                         android:gravity="center"
                         android:lineSpacingExtra="2dp" />
 
                     <Button
                         android:id="@+id/quickOpenButton"
                         android:layout_width="match_parent"
-                        android:layout_height="54dp"
-                        android:layout_marginTop="24dp"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="20dp"
                         android:text="DWG / DXF DOSYASI AÇ"
                         android:textColor="#FFFFFF"
                         android:textStyle="bold"
-                        android:textSize="13sp"
+                        android:textSize="12sp"
                         android:drawableStart="@drawable/ic_open_file"
-                        android:drawablePadding="10dp"
+                        android:drawablePadding="8dp"
                         android:background="@drawable/primary_action_bg"
                         android:minHeight="0dp"
                         android:minWidth="0dp"
@@ -160,10 +159,10 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="Paylaşım: Orijinal DWG/DXF • PDF • PNG • Seçili alan"
+                        android:layout_marginTop="13dp"
+                        android:text="Orijinal DWG/DXF • PDF • PNG • Seçili alan paylaşımı"
                         android:textColor="#8FB7C5"
-                        android:textSize="11sp"
+                        android:textSize="10sp"
                         android:gravity="center" />
                 </LinearLayout>
 
@@ -171,54 +170,54 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="14dp"
                     android:weightSum="3">
 
                     <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="78dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="5dp"
+                        android:layout_marginEnd="4dp"
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/feature_chip_bg">
-                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_distance" android:contentDescription="Mesafe" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Mesafe" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                        <ImageView android:layout_width="25dp" android:layout_height="25dp" android:src="@drawable/ic_distance" android:contentDescription="Mesafe" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Mesafe" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="10sp" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="78dp"
                         android:layout_weight="1"
-                        android:layout_marginStart="5dp"
-                        android:layout_marginEnd="5dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/feature_chip_bg">
-                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_area" android:contentDescription="Alan" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Alan" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                        <ImageView android:layout_width="25dp" android:layout_height="25dp" android:src="@drawable/ic_area" android:contentDescription="Alan" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Alan" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="10sp" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="88dp"
+                        android:layout_height="78dp"
                         android:layout_weight="1"
-                        android:layout_marginStart="5dp"
+                        android:layout_marginStart="4dp"
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/feature_chip_bg">
-                        <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_layers" android:contentDescription="Katman" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Katman" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="11sp" />
+                        <ImageView android:layout_width="25dp" android:layout_height="25dp" android:src="@drawable/ic_layers" android:contentDescription="Katman" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Katman" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="10sp" />
                     </LinearLayout>
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="İpucu: Çizim açıkken iki parmakla yakınlaştırın. Çift dokunarak ekrana sığdırın."
+                    android:layout_marginTop="13dp"
+                    android:text="İpucu: İki parmakla yakınlaştırın • Çift dokunarak ekrana sığdırın"
                     android:textColor="#6F8D9C"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:gravity="center" />
             </LinearLayout>
         </ScrollView>
@@ -227,41 +226,48 @@
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="34dp"
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:maxLines="2"
+        android:singleLine="true"
         android:ellipsize="end"
         android:text="Hazır"
         android:textColor="#DDEAF0"
-        android:textSize="12sp"
+        android:textSize="10sp"
         android:background="#102631" />
 
     <HorizontalScrollView
+        android:id="@+id/toolStrip"
         android:layout_width="match_parent"
-        android:layout_height="82dp"
+        android:layout_height="96dp"
         android:fillViewport="false"
         android:scrollbars="none"
+        android:clipToPadding="false"
+        android:paddingTop="5dp"
+        android:paddingBottom="10dp"
         android:background="#0C1D27">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp">
+            android:gravity="top"
+            android:paddingStart="7dp"
+            android:paddingEnd="10dp">
 
-            <Button android:id="@+id/layersButton" style="@style/ToolButton" android:text="Katmanlar" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
-            <CheckBox android:id="@+id/snapToggle" style="@style/ToolButton" android:button="@null" android:text="Nokta Yakala" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
-            <Button android:id="@+id/panButton" style="@style/ToolButton" android:text="Gezin" android:drawableTop="@drawable/ic_pan" />
-            <Button android:id="@+id/calibrateButton" style="@style/ToolButton" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
-            <Button android:id="@+id/distanceButton" style="@style/ToolButton" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
-            <Button android:id="@+id/areaButton" style="@style/ToolButton" android:text="Alan" android:drawableTop="@drawable/ic_area" />
-            <Button android:id="@+id/fitButton" style="@style/ToolButton" android:text="Sığdır" android:drawableTop="@drawable/ic_fit" />
-            <Button android:id="@+id/undoButton" style="@style/ToolButton" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
-            <Button android:id="@+id/clearButton" style="@style/ToolButton" android:text="Temizle" android:drawableTop="@drawable/ic_clear" />
+            <Button android:id="@+id/layersButton" style="@style/ToolButtonPurple" android:text="Katman" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
+            <CheckBox android:id="@+id/snapToggle" style="@style/ToolButtonTeal" android:button="@null" android:text="Nokta" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
+            <Button android:id="@+id/panButton" style="@style/ToolButtonBlue" android:text="Gezin" android:drawableTop="@drawable/ic_pan" />
+            <Button android:id="@+id/calibrateButton" style="@style/ToolButtonTeal" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
+            <Button android:id="@+id/distanceButton" style="@style/ToolButtonTeal" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
+            <Button android:id="@+id/areaButton" style="@style/ToolButtonTeal" android:text="Alan" android:drawableTop="@drawable/ic_area" />
+            <Button android:id="@+id/zoomInButton" style="@style/ToolButtonBlue" android:text="Yakın +" android:drawableTop="@drawable/ic_zoom_in" />
+            <Button android:id="@+id/zoomOutButton" style="@style/ToolButtonBlue" android:text="Yakın -" android:drawableTop="@drawable/ic_zoom_out" />
+            <Button android:id="@+id/fitButton" style="@style/ToolButtonBlue" android:text="Sığdır" android:drawableTop="@drawable/ic_fit" />
+            <Button android:id="@+id/undoButton" style="@style/ToolButtonOrange" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
+            <Button android:id="@+id/clearButton" style="@style/ToolButtonOrange" android:text="Temizle" android:drawableTop="@drawable/ic_clear" />
+            <Button android:id="@+id/shareToolButton" style="@style/ToolButtonOrange" android:text="Paylaş" android:drawableTop="@drawable/ic_share_pro" android:enabled="false" />
         </LinearLayout>
     </HorizontalScrollView>
 </LinearLayout>

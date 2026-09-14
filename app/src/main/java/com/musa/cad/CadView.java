@@ -94,6 +94,14 @@ public class CadView extends View {
 
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
 
+    public void zoomBy(float factor){
+        if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;
+        float next=Math.max(.001f,Math.min(200f,scale*factor));
+        float applied=next/scale;scale=next;
+        imageMatrix.postScale(applied,applied,getWidth()/2f,getHeight()/2f);
+        invalidate();notifyValue();
+    }
+
     public void undo(){
         lastSnapped=false;
         if(selecting){cancelSelection();return;}

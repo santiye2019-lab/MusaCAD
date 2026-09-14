@@ -10,8 +10,8 @@ android {
         minSdkVersion 24
         targetSdkVersion 35
         ndk { abiFilters "arm64-v8a", "x86_64" }
-        versionCode 4
-        versionName '0.4-pro-home'
+        versionCode 5
+        versionName '0.5-interactive-tools'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
