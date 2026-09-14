@@ -61,6 +61,8 @@ public final class DxfBlocks {
 
     public static final class Result {
         public final List<Placement> placements=new ArrayList<>();
+        public final Set<String> layouts=new LinkedHashSet<>();
+        public String activeLayout=DxfSpace.MODEL;
         public int skipped;
         private int visits;
     }
@@ -78,6 +80,7 @@ public final class DxfBlocks {
             }
         }catch(NumberFormatException e){throw new IOException("Geçersiz ASCII DXF etiketleri",e);}
         Map<String,Block> blocks=new HashMap<>();List<Record> roots=new ArrayList<>();
+        LinkedHashSet<String> layoutNames=new LinkedHashSet<>();
         String section="";Block active=null;
         for(Record record:records){
             if(record.type.equals("SECTION")){section=record.text(2,"");active=null;continue;}
@@ -87,12 +90,42 @@ public final class DxfBlocks {
                 else if(record.type.equals("ENDBLK"))active=null;
                 else if(active!=null)active.members.add(record);
             }else if(section.equals("ENTITIES"))roots.add(record);
+            else if(section.equals("OBJECTS")&&record.type.equals("LAYOUT")){
+                String name=record.text(1,"").trim();if(!name.isEmpty())layoutNames.add(DxfSpace.normalizeName(name));
+            }
         }
-        Map<String,String> drawOrder=DxfDrawOrder.parse(tags);
-        if(!drawOrder.isEmpty())roots.sort((a,b)->DxfDrawOrder.compare(a.text(5,""),b.text(5,""),drawOrder));
+
+        LinkedHashMap<String,List<Record>> rootsByLayout=new LinkedHashMap<>();
+        String sequenceLayout=null;
+        for(Record root:roots){
+            boolean member=isSequenceMember(root.type);
+            if(sequenceLayout!=null&&!member)sequenceLayout=null;
+            String layout=sequenceLayout!=null?sequenceLayout:
+                DxfSpace.layout((int)root.number(67,0),root.text(410,""));
+            layoutNames.add(layout);
+            rootsByLayout.computeIfAbsent(layout,k->new ArrayList<>()).add(root);
+            if(startsSequence(root))sequenceLayout=layout;
+            if("SEQEND".equals(root.type))sequenceLayout=null;
+        }
+
         Result result=new Result();
-        for(Record root:roots)expand(root,new Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,blocks,new HashSet<>(),result);
+        result.layouts.addAll(layoutNames);if(result.layouts.isEmpty())result.layouts.add(DxfSpace.MODEL);
+        result.activeLayout=DxfSpace.chooseActive(rootsByLayout);
+        List<Record> selected=rootsByLayout.get(result.activeLayout);
+        if(selected==null)selected=Collections.emptyList();
+        Map<String,String> drawOrder=DxfDrawOrder.parse(tags);
+        if(!drawOrder.isEmpty()&&selected.size()>1)selected.sort((a,b)->DxfDrawOrder.compare(a.text(5,""),b.text(5,""),drawOrder));
+        for(Record root:selected)expand(root,new Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,blocks,new HashSet<>(),result);
         return result;
+    }
+
+    private static boolean isSequenceMember(String type){
+        return "VERTEX".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)||"SEQEND".equals(type);
+    }
+
+    private static boolean startsSequence(Record record)throws IOException{
+        if("POLYLINE".equals(record.type))return true;
+        return "INSERT".equals(record.type)&&((int)record.number(66,0))!=0;
     }
 
     private static void expand(Record r,Transform parent,String parentLayer,DxfColor.Ref byBlockColor,
