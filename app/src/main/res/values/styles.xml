@@ -39,4 +39,7 @@
     <style name="ToolButtonTeal" parent="ToolButton"><item name="android:background">@drawable/tool_tile_teal</item></style>
     <style name="ToolButtonPurple" parent="ToolButton"><item name="android:background">@drawable/tool_tile_purple</item></style>
     <style name="ToolButtonOrange" parent="ToolButton"><item name="android:background">@drawable/tool_tile_orange</item></style>
+    <style name="ToolButtonGreen" parent="ToolButton"><item name="android:background">@drawable/tool_tile_green</item></style>
+    <style name="ToolButtonMagenta" parent="ToolButton"><item name="android:background">@drawable/tool_tile_magenta</item></style>
+    <style name="ToolButtonYellow" parent="ToolButton"><item name="android:background">@drawable/tool_tile_yellow</item></style>
 </resources>
