@@ -6,10 +6,10 @@ public class DxfLayerTableTest {
         List<String> tags=Arrays.asList(
             "0","SECTION","2","TABLES",
             "0","TABLE","2","LAYER",
-            "0","LAYER","2","Visible","70","0","62","3","440","33554560",
-            "0","LAYER","2","OffLayer","70","0","62","-1",
-            "0","LAYER","2","FrozenLayer","70","1","62","5",
-            "0","LAYER","2","LockedLayer","70","4","62","2",
+            "0","LAYER","5","A1","2","Visible","70","0","62","3","440","33554560",
+            "0","LAYER","5","A2","2","OffLayer","70","0","62","-1",
+            "0","LAYER","5","A3","2","FrozenLayer","70","1","62","5",
+            "0","LAYER","5","A4","2","LockedLayer","70","4","62","2",
             "0","ENDTAB","0","ENDSEC","0","EOF"
         );
         DxfLayerTable.Table t=DxfLayerTable.parse(tags);
@@ -20,6 +20,8 @@ public class DxfLayerTableTest {
         if(!t.locked.contains("LockedLayer"))throw new AssertionError("locked layer");
         if(t.colors.get("VISIBLE")!=0xFF00FF00)throw new AssertionError("layer color");
         if(t.opacities.get("VISIBLE")!=128)throw new AssertionError("layer transparency");
-        System.out.println("DXF layer table states passed");
+        if(!"Visible".equals(t.nameForHandle("a1")))throw new AssertionError("layer handle lookup");
+        if(!"FrozenLayer".equals(t.nameForHandle("A3")))throw new AssertionError("frozen handle lookup");
+        System.out.println("DXF layer table states and handles passed");
     }
 }
