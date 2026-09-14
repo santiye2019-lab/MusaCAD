@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [ main, fix-1a-dwg-open-reliability ]
+    branches: [ main, fix-1a-dwg-open-reliability, fix-1b-hatch-geometry ]
   workflow_dispatch:
 
 jobs:
