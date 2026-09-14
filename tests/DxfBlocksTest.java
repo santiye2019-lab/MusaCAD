@@ -1,4 +1,5 @@
 import com.musa.cad.DxfBlocks;
+import com.musa.cad.DxfSpace;
 import com.musa.cad.DxfTransparency;
 import java.util.*;
 
@@ -64,6 +65,24 @@ public class DxfBlocksTest {
         String nestedDim=dimBlock+block("C",dimension("*D1",8,"0"));
         point(read(nestedDim,insert("C",10,10,20,20)),12,22);
         skipped(read("",dimension("*MISSING")));
-        System.out.println("17 block expansion cases passed");
+
+        // Model-space and paper-space roots must never be mixed into one drawing.
+        String paperLine=tags(0,"LINE",67,1,410,"Layout1",10,100,20,100,11,110,21,100);
+        DxfBlocks.Result mixed=read("",LINE+paperLine);
+        if(mixed.placements.size()!=1||!DxfSpace.MODEL.equals(mixed.activeLayout))throw new AssertionError("Model-space preference");
+        if(!mixed.layouts.contains("Model")||!mixed.layouts.contains("Layout1"))throw new AssertionError("Layout discovery");
+        DxfBlocks.Result paperOnly=read("",paperLine);
+        if(paperOnly.placements.size()!=1||!"Layout1".equals(paperOnly.activeLayout))throw new AssertionError("Paper-only fallback");
+
+        String paperPoly=tags(0,"POLYLINE",67,1,410,"Sheet A",70,0)+
+            tags(0,"VERTEX",10,10,20,10)+tags(0,"VERTEX",10,20,20,20)+tags(0,"SEQEND");
+        DxfBlocks.Result sequence=read("",LINE+paperPoly);
+        if(sequence.placements.size()!=1||!DxfSpace.MODEL.equals(sequence.activeLayout))throw new AssertionError("Paper polyline sequence leaked into model");
+
+        String flaggedMember=block("SPACEBLOCK",tags(0,"LINE",67,1,410,"Layout1",10,3,20,4,11,5,21,4));
+        DxfBlocks.Result blockSpace=read(flaggedMember,insert("SPACEBLOCK",410,"Model"));
+        if(blockSpace.placements.size()!=1||!DxfSpace.MODEL.equals(blockSpace.activeLayout))throw new AssertionError("Block member space must follow root INSERT");
+
+        System.out.println("21 block expansion and space cases passed");
     }
 }
