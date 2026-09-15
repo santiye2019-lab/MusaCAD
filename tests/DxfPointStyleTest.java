@@ -11,6 +11,7 @@ public class DxfPointStyleTest {
         close(DxfPointStyle.deviceHalfSize(new DxfPointStyle.Style(2,2.5),4,1000),5);
         close(DxfPointStyle.deviceHalfSize(new DxfPointStyle.Style(0,0),4,1000),25);
         DxfPointStyle.Style hidden=new DxfPointStyle.Style(1,0);if(!hidden.hidden())throw new AssertionError("hidden");
+        DxfPointStyle.Style circleOnly=new DxfPointStyle.Style(33,0);if(circleOnly.hidden()||!circleOnly.circle()||circleOnly.base()!=1)throw new AssertionError("circle-only");
         DxfPointStyle.Style combined=new DxfPointStyle.Style(96,0);if(!combined.circle()||!combined.square()||combined.base()!=0)throw new AssertionError("circle+square");
         System.out.println("DXF PDMODE/PDSIZE cases passed");
     }
