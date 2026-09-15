@@ -1,6 +1,6 @@
 package com.musa.cad;
 
-/** Pure geometry helpers for classic DXF LEADER paths and arrowheads. */
+/** Pure geometry helpers for classic DXF LEADER paths, arrowheads and hook lines. */
 public final class DxfLeader {
     /** Returns tip,leftBase,rightBase packed as x/y pairs, or an empty array when geometry is degenerate. */
     public static double[] arrow(double tipX,double tipY,double nextX,double nextY,double requestedSize){
@@ -33,11 +33,23 @@ public final class DxfLeader {
         double[] packed=new double[xs.length*2];for(int i=0;i<xs.length;i++){packed[i*2]=xs[i];packed[i*2+1]=ys[i];}return packed;
     }
 
-    /** Uses DIMSTYLE size when available; otherwise a conservative fraction of the first leader segment. */
+    /**
+     * Returns the classic horizontal hook/landing segment as start/end x/y pairs.
+     * Group 74 selects whether the hook follows or opposes the stored horizontal vector.
+     */
+    public static double[] hook(double x,double y,double horizontalX,double horizontalY,boolean sameDirection,double size){
+        double len=Math.hypot(horizontalX,horizontalY);
+        if(!finite(x,y,horizontalX,horizontalY,size)||len<1e-12||size<=1e-12)return new double[0];
+        double sign=sameDirection?1d:-1d,ux=horizontalX/len*sign,uy=horizontalY/len*sign;
+        return new double[]{x,y,x+ux*size,y+uy*size};
+    }
+
+    /** Uses DIMSTYLE size when available; otherwise a conservative fraction of the adjacent leader segment. */
     public static double saneSize(double styleSize,double firstSegmentLength){
         if(!Double.isFinite(firstSegmentLength)||firstSegmentLength<=1e-12)return 0d;
         double size=Double.isFinite(styleSize)&&styleSize>1e-12?styleSize:firstSegmentLength*.08;
         return Math.max(firstSegmentLength*.01,Math.min(firstSegmentLength*.30,size));
     }
+    private static boolean finite(double... values){for(double v:values)if(!Double.isFinite(v))return false;return true;}
     private DxfLeader(){}
 }
