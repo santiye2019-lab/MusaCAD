@@ -58,6 +58,50 @@ public final class DxfCurves {
         return packed(out);
     }
 
+    /**
+     * Smooth fallback for SPLINE entities that provide fit points but no usable control
+     * point/knot representation. It interpolates every fit point with a cubic Hermite
+     * curve instead of joining them with visible straight chords. Optional DXF start/end
+     * tangent directions are honored when present. NaN tangents mean automatic tangents.
+     */
+    public static double[] sampleFitSpline(double[] xs,double[] ys,boolean closed,
+                                           double startTx,double startTy,double endTx,double endTy){
+        if(xs==null||ys==null||xs.length!=ys.length||xs.length<2)return new double[0];
+        int n=xs.length;for(int i=0;i<n;i++)if(!finite(xs[i],ys[i]))return new double[0];
+        if(n==2&&!closed)return new double[]{xs[0],ys[0],xs[1],ys[1]};
+        double[] tx=new double[n],ty=new double[n];
+        for(int i=0;i<n;i++){
+            if(closed){int prev=(i+n-1)%n,next=(i+1)%n;tx[i]=(xs[next]-xs[prev])*.5;ty[i]=(ys[next]-ys[prev])*.5;}
+            else if(i==0){tx[i]=xs[1]-xs[0];ty[i]=ys[1]-ys[0];}
+            else if(i==n-1){tx[i]=xs[n-1]-xs[n-2];ty[i]=ys[n-1]-ys[n-2];}
+            else{tx[i]=(xs[i+1]-xs[i-1])*.5;ty[i]=(ys[i+1]-ys[i-1])*.5;}
+        }
+        if(!closed){
+            double firstChord=Math.hypot(xs[1]-xs[0],ys[1]-ys[0]);double lastChord=Math.hypot(xs[n-1]-xs[n-2],ys[n-1]-ys[n-2]);
+            double[] first=scaledDirection(startTx,startTy,firstChord);if(first!=null){tx[0]=first[0];ty[0]=first[1];}
+            double[] last=scaledDirection(endTx,endTy,lastChord);if(last!=null){tx[n-1]=last[0];ty[n-1]=last[1];}
+        }
+        int segments=closed?n:n-1,steps=Math.max(8,Math.min(48,12));ArrayList<Double> out=new ArrayList<>((segments*steps+1)*2);add(out,xs[0],ys[0]);
+        for(int i=0;i<segments;i++){
+            int j=(i+1)%n;
+            for(int k=1;k<=steps;k++){
+                if(k==steps){add(out,xs[j],ys[j]);continue;}
+                double u=k/(double)steps,u2=u*u,u3=u2*u;
+                double h00=2*u3-3*u2+1,h10=u3-2*u2+u,h01=-2*u3+3*u2,h11=u3-u2;
+                add(out,h00*xs[i]+h10*tx[i]+h01*xs[j]+h11*tx[j],h00*ys[i]+h10*ty[i]+h01*ys[j]+h11*ty[j]);
+            }
+        }
+        return packed(out);
+    }
+
+    public static double[] sampleFitSpline(double[] xs,double[] ys,boolean closed){
+        return sampleFitSpline(xs,ys,closed,Double.NaN,Double.NaN,Double.NaN,Double.NaN);
+    }
+
+    private static double[] scaledDirection(double x,double y,double length){
+        if(!finite(x,y,length)||length<=1e-12)return null;double norm=Math.hypot(x,y);if(norm<=1e-12)return null;return new double[]{x/norm*length,y/norm*length};
+    }
+
     private static double[] deBoor(double u,int p,double[] knots,double[] weights,double[] xs,double[] ys,int n){
         int k=findSpan(u,p,knots,n);
         double[][] d=new double[p+1][3];
