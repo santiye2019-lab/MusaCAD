@@ -77,6 +77,23 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
           java -cp /tmp/musacad-tests DxfCurvesTest
+      - name: Test DXF geometric and variable polyline widths
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-tests DxfPolylineWidthTest
+      - name: Test classic LEADER geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          java -cp /tmp/musacad-tests DxfDimStylesTest
+          java -cp /tmp/musacad-tests DxfLeaderTest
+      - name: Test DXF RAY and XLINE clipping
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfInfiniteLine.java tests/DxfInfiniteLineTest.java
+          java -cp /tmp/musacad-tests DxfInfiniteLineTest
+      - name: Test DXF MULTILEADER context parsing
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-tests DxfMLeaderTest
       - name: Test DXF HATCH pattern geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
@@ -98,10 +115,11 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
           java -cp /tmp/musacad-tests DxfOcsTest
-      - name: Test DXF block expansion
+      - name: Test DXF block expansion and real-drawing ceiling
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
+          java -cp /tmp/musacad-tests DxfExpansionLimitTest
       - name: Test cancellable file transfer
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
