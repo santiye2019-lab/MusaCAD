@@ -51,9 +51,9 @@ public final class DxfLineTypes {
 
         public void add(String name,List<Double> values){
             ArrayList<Element> sequence=new ArrayList<>();if(values!=null)for(Double value:values)sequence.add(new Element(value==null?0:value,0,0,"","",1,0,0,0));
-            add(name,sequence);
+            addSequence(name,sequence);
         }
-        private void add(String name,List<Element> sequence){
+        private void addSequence(String name,List<Element> sequence){
             String key=DxfStyle.normalizeLineType(name);patterns.put(key,new Pattern(key,sequence.toArray(new Element[0])));
         }
         public Pattern get(String name){return patterns.get(DxfStyle.normalizeLineType(name));}
@@ -79,7 +79,7 @@ public final class DxfLineTypes {
                     }
                 }
             }catch(NumberFormatException e){throw new IOException("Geçersiz DXF LTYPE elemanı",e);}
-            if(current!=null)sequence.add(current.build());add(name,sequence);
+            if(current!=null)sequence.add(current.build());addSequence(name,sequence);
         }
     }
 
