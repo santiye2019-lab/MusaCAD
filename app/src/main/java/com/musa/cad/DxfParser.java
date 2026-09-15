@@ -74,12 +74,22 @@ public final class DxfParser {
     }
 
     private static final class Marker implements Entity{
-        final float x,y,size;
-        Marker(float x,float y,float size){this.x=x;this.y=y;this.size=size;}
-        public void bounds(RectF b){add(b,x-size,y-size);add(b,x+size,y+size);}
+        final float x,y;final DxfPointStyle.Style style;
+        Marker(float x,float y,DxfPointStyle.Style style){this.x=x;this.y=y;this.style=style==null?new DxfPointStyle.Style(0,0):style;}
+        public void bounds(RectF b){add(b,x,y);}
         public void draw(Canvas c,Paint p,Matrix m){
-            float[] v={x-size,y,x+size,y,x,y-size,x,y+size};m.mapPoints(v);
-            c.drawLine(v[0],v[1],v[2],v[3],p);c.drawLine(v[4],v[5],v[6],v[7],p);
+            if(style.hidden())return;float[] center={x,y};m.mapPoints(center);
+            float[] vectors={1,0,0,1};m.mapVectors(vectors);double deviceScale=(Math.hypot(vectors[0],vectors[1])+Math.hypot(vectors[2],vectors[3]))*.5;
+            float h=(float)DxfPointStyle.deviceHalfSize(style,deviceScale,Math.min(c.getWidth(),c.getHeight()));float cx=center[0],cy=center[1];
+            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();p.setPathEffect(null);int base=style.base();
+            if(base==0){p.setStyle(Paint.Style.FILL);c.drawCircle(cx,cy,Math.max(1f,p.getStrokeWidth()*.75f),p);p.setStyle(Paint.Style.STROKE);}
+            else{p.setStyle(Paint.Style.STROKE);if(base==2){c.drawLine(cx-h,cy,cx+h,cy,p);c.drawLine(cx,cy-h,cx,cy+h,p);}
+                else if(base==3){c.drawLine(cx-h,cy-h,cx+h,cy+h,p);c.drawLine(cx-h,cy+h,cx+h,cy-h,p);}
+                else if(base==4)c.drawLine(cx,cy-h,cx,cy+h,p);
+                else if(base!=1){p.setStyle(Paint.Style.FILL);c.drawCircle(cx,cy,Math.max(1f,p.getStrokeWidth()*.75f),p);p.setStyle(Paint.Style.STROKE);}}
+            if(style.circle()){p.setStyle(Paint.Style.STROKE);c.drawCircle(cx,cy,h,p);}
+            if(style.square()){p.setStyle(Paint.Style.STROKE);c.drawRect(cx-h,cy-h,cx+h,cy+h,p);}
+            p.setStyle(oldStyle);p.setPathEffect(oldEffect);
         }
     }
 
@@ -474,7 +484,7 @@ public final class DxfParser {
     }
 
     private static int appendBufferedPlacements(List<String> lines,List<DxfBlocks.Placement> placements,
-                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,
+                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,
                                                  ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,
                                                  List<LayerEntity> viewportModel)throws IOException{
         int skipped=0;Map<String,Integer> layerColors=layerTable.colors;
@@ -494,7 +504,7 @@ public final class DxfParser {
                 skipped++;continue;
             }else{
                 entity=isTextType(item.record.type)?parseTextEntity(item.record.type,lines,item.record.from,item.record.to,textStyles):
-                    parse(item.record.type,lines,item.record.from,item.record.to);
+                    parse(item.record.type,lines,item.record.from,item.record.to,pointStyle);
                 if(entity==null){skipped++;continue;}
             }
             entity=projectOcs(item.record.type,entity,lines,item.record.from,item.record.to);
@@ -513,16 +523,17 @@ public final class DxfParser {
         DxfLayerTable.Table layerTable=DxfLayerTable.parse(lines);
         DxfLineTypes.Table lineTypes=DxfLineTypes.parse(lines);
         DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);
+        DxfPointStyle.Style pointStyle=DxfPointStyle.parse(lines);
         int insUnits=DxfUnits.parse(lines);
         DxfBlocks.Result expanded=DxfBlocks.expand(lines,preferredLayout);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>(layerTable.names);
         Set<String> visibleLayers=new HashSet<>(layerTable.visible);List<LayerEntity> viewportModel=null;
         if(!DxfSpace.isModel(expanded.activeLayout)){
             DxfBlocks.Result modelExpanded=DxfBlocks.expand(lines,DxfSpace.MODEL);ArrayList<Entity> modelRaw=new ArrayList<>();
-            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,modelRaw,layers,visibleLayers,null);
+            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,modelRaw,layers,visibleLayers,null);
             viewportModel=new ArrayList<>();for(Entity e:modelRaw)if(e instanceof LayerEntity)viewportModel.add((LayerEntity)e);
         }
-        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,
+        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,
             entities,layers,visibleLayers,viewportModel);
         return applyUnits(finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout),insUnits);
     }
@@ -626,6 +637,7 @@ public final class DxfParser {
         final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
         final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();
+        DxfPointStyle.Style pointStyle=new DxfPointStyle.Style(0,0);
         final Map<String,String> drawOrder=new HashMap<>();
         final Map<String,String> layoutByOwner=new HashMap<>();
         final LinkedHashSet<String> layouts=new LinkedHashSet<>();
@@ -708,7 +720,7 @@ public final class DxfParser {
         if("SECTION".equals(type)){
             finishPending(c);c.section=r.text(2,"");c.activeBlock=null;
             if("HEADER".equals(c.section)){
-                c.insUnits=DxfUnits.parseHeaderRecord(r.tags);
+                c.insUnits=DxfUnits.parseHeaderRecord(r.tags);c.pointStyle=DxfPointStyle.parseHeaderRecord(r.tags);
                 for(int i=0;i+1<r.tags.size();i+=2)if(intOf(r.tags.get(i))==9&&"$LTSCALE".equalsIgnoreCase(r.tags.get(i+1).trim())){
                     for(int j=i+2;j+1<r.tags.size();j+=2){int code=intOf(r.tags.get(j));if(code==9)break;if(code==40){double v=r.numberAt(j,1);if(v>0)c.lineTypes.globalScale=v;break;}}
                 }
@@ -769,7 +781,7 @@ public final class DxfParser {
         if("VIEWPORT".equals(type)){target.add(new StreamViewport(r));return;}
         if("INSERT".equals(type)){target.add(new StreamInsert(r));return;}
         if("DIMENSION".equals(type)){target.add(new StreamDimension(r));return;}
-        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size());
+        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size(),c.pointStyle);
         if(entity==null)c.skipped++;else{
             entity=projectOcs(type,entity,r.tags,0,r.tags.size());
             target.add(new StreamShape(entity,r.text(8,"0"),r.text(5,""),r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),
@@ -1052,6 +1064,11 @@ public final class DxfParser {
         catch(IllegalArgumentException invalid){return null;}
     }
 
+    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle){
+        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),pointStyle);
+        return parse(type,a,from,to);
+    }
+
     private static Entity parse(String type,List<String>a,int from,int to){
         if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
             StringBuilder text=new StringBuilder();
@@ -1066,7 +1083,7 @@ public final class DxfParser {
             return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,fv(a,from,to,40,1f)),angle,plain);
         }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));
-        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),Math.max(.1f,fv(a,from,to,40,.5f)));
+        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),new DxfPointStyle.Style(0,0));
         if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);
         if("ARC".equals(type)){
             float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;
