@@ -85,6 +85,19 @@ public final class DxfParser {
         }
     }
 
+    private static final class InfiniteEntity implements Entity{
+        final float x,y,dx,dy;final boolean ray;
+        InfiniteEntity(float x,float y,float dx,float dy,boolean ray){this.x=x;this.y=y;this.dx=dx;this.dy=dy;this.ray=ray;}
+        public void bounds(RectF b){
+            double len=Math.hypot(dx,dy);if(len<1e-12){add(b,x,y);return;}float ux=(float)(dx/len),uy=(float)(dy/len);
+            add(b,x,y);add(b,x+ux,y+uy);if(!ray)add(b,x-ux,y-uy);
+        }
+        public void draw(Canvas c,Paint p,Matrix m){
+            float[] v={x,y,x+dx,y+dy};m.mapPoints(v);double[] q=DxfInfiniteLine.clip(v[0],v[1],v[2]-v[0],v[3]-v[1],ray,0,0,c.getWidth(),c.getHeight());
+            if(q.length==4)c.drawLine((float)q[0],(float)q[1],(float)q[2],(float)q[3],p);
+        }
+    }
+
     private static final class SegmentSet implements Entity{
         final float[] xy;
         SegmentSet(double[] packed){xy=new float[packed==null?0:packed.length];for(int i=0;i<xy.length;i++)xy[i]=(float)packed[i];}
@@ -1024,6 +1037,8 @@ public final class DxfParser {
             double[] candidates=null;
             if(entity instanceof Line){
                 Line line=(Line)entity;candidates=DxfSnapGeometry.line(line.x1,line.y1,line.x2,line.y2);
+            }else if(entity instanceof InfiniteEntity){
+                InfiniteEntity infinite=(InfiniteEntity)entity;candidates=new double[]{infinite.x,infinite.y};
             }else if(entity instanceof LeaderEntity){
                 Poly poly=((LeaderEntity)entity).line;double[] xy=new double[poly.pts.size()*2];
                 for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}
@@ -1164,6 +1179,10 @@ public final class DxfParser {
             return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,fv(a,from,to,40,1f)),angle,plain);
         }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));
+        if("RAY".equals(type)||"XLINE".equals(type)){
+            float dx=f(a,from,to,11),dy=f(a,from,to,21);if(Math.hypot(dx,dy)<1e-12)return null;
+            return new InfiniteEntity(f(a,from,to,10),f(a,from,to,20),dx,dy,"RAY".equals(type));
+        }
         if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),new DxfPointStyle.Style(0,0));
         if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);
         if("ARC".equals(type)){
