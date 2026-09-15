@@ -766,7 +766,8 @@ public final class DxfParser {
     private static boolean keepStreamCode(int code){
         return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
             code==330||code==331||code==340||code==370||code==410||code==420||code==440||
-            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
+            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||
+            (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
     }
 
     private static boolean streamSequenceMember(String type){
@@ -1155,7 +1156,9 @@ public final class DxfParser {
     private static Entity leaderEntity(List<String>a,int from,int to,DxfDimStyles.Table dimStyles){
         ArrayList<PointF> raw=repeatedPoints(a,from,to,10,20);if(raw.size()<2)return null;int n=raw.size();double[] xs=new double[n],ys=new double[n];
         for(int i=0;i<n;i++){xs[i]=raw.get(i).x;ys[i]=raw.get(i).y;}
-        boolean spline=((int)fv(a,from,to,72,0f))==1;ArrayList<PointF> points=packedPoints(DxfLeader.path(xs,ys,spline));if(points.size()<2)points=raw;
+        boolean spline=((int)fv(a,from,to,72,0f))==1;double endTx=Double.NaN,endTy=Double.NaN;
+        if(spline&&has(a,from,to,211)&&has(a,from,to,221)){endTx=f(a,from,to,211);endTy=f(a,from,to,221);if(((int)fv(a,from,to,74,0f))==0){endTx=-endTx;endTy=-endTy;}}
+        ArrayList<PointF> points=packedPoints(DxfLeader.path(xs,ys,spline,endTx,endTy));if(points.size()<2)points=raw;
         ArrayList<PointF> arrow=new ArrayList<>();
         if(((int)fv(a,from,to,71,0f))!=0){
             PointF tip=raw.get(0),rawNext=raw.get(1),direction=points.size()>1?points.get(1):rawNext;double segment=Math.hypot(rawNext.x-tip.x,rawNext.y-tip.y);
