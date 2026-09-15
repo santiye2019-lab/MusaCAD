@@ -1138,13 +1138,14 @@ public final class DxfParser {
     }
 
     private static Entity leaderEntity(List<String>a,int from,int to,DxfDimStyles.Table dimStyles){
-        ArrayList<PointF> points=repeatedPoints(a,from,to,10,20);if(points.size()<2)return null;
+        ArrayList<PointF> raw=repeatedPoints(a,from,to,10,20);if(raw.size()<2)return null;int n=raw.size();double[] xs=new double[n],ys=new double[n];
+        for(int i=0;i<n;i++){xs[i]=raw.get(i).x;ys[i]=raw.get(i).y;}
+        boolean spline=((int)fv(a,from,to,72,0f))==1;ArrayList<PointF> points=packedPoints(DxfLeader.path(xs,ys,spline));if(points.size()<2)points=raw;
         ArrayList<PointF> arrow=new ArrayList<>();
         if(((int)fv(a,from,to,71,0f))!=0){
-            PointF tip=points.get(0),next=points.get(1);double segment=Math.hypot(next.x-tip.x,next.y-tip.y);
-            double styleSize=dimStyles==null?0d:dimStyles.arrowSize(str(a,from,to,3,""));
-            double[] packed=DxfLeader.arrow(tip.x,tip.y,next.x,next.y,DxfLeader.saneSize(styleSize,segment));
-            arrow=packedPoints(packed);
+            PointF tip=raw.get(0),rawNext=raw.get(1),direction=points.size()>1?points.get(1):rawNext;double segment=Math.hypot(rawNext.x-tip.x,rawNext.y-tip.y);
+            double styleSize=dimStyles==null?0d:dimStyles.arrowSize(str(a,from,to,3,""));double size=DxfLeader.saneSize(styleSize,segment);
+            arrow=packedPoints(DxfLeader.arrowSized(tip.x,tip.y,direction.x,direction.y,size));
         }
         return new LeaderEntity(points,arrow);
     }
