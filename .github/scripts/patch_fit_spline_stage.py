@@ -1,0 +1,6 @@
+from pathlib import Path
+p=Path('app/src/main/java/com/musa/cad/DxfParser.java');s=p.read_text()
+old='''        ArrayList<PointF> fit=repeatedPoints(a,from,to,11,21);\n        if(fit.size()>=2)return new Poly(fit,closed);\n        return controls.size()>=2?new Poly(controls,closed):null;\n'''
+new='''        ArrayList<PointF> fit=repeatedPoints(a,from,to,11,21);\n        if(fit.size()>=2){\n            double[] xs=new double[fit.size()],ys=new double[fit.size()];for(int i=0;i<fit.size();i++){xs[i]=fit.get(i).x;ys[i]=fit.get(i).y;}\n            double startTx=has(a,from,to,12)&&has(a,from,to,22)?f(a,from,to,12):Double.NaN;\n            double startTy=has(a,from,to,12)&&has(a,from,to,22)?f(a,from,to,22):Double.NaN;\n            double endTx=has(a,from,to,13)&&has(a,from,to,23)?f(a,from,to,13):Double.NaN;\n            double endTy=has(a,from,to,13)&&has(a,from,to,23)?f(a,from,to,23):Double.NaN;\n            ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleFitSpline(xs,ys,closed,startTx,startTy,endTx,endTy));\n            if(sampled.size()>=2)return new Poly(sampled,closed);\n            return new Poly(fit,closed);\n        }\n        return controls.size()>=2?new Poly(controls,closed):null;\n'''
+if s.count(old)!=1: raise SystemExit(f'expected spline fallback once, got {s.count(old)}')
+s=s.replace(old,new,1);p.write_text(s)
