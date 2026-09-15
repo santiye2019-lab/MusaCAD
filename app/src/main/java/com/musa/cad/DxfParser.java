@@ -310,6 +310,49 @@ public final class DxfParser {
             float[] dash=DxfLineTypes.dashIntervals(lineType,lineTypeScale,deviceScale);
             p.setPathEffect(dash==null?null:new DashPathEffect(dash,0));
             entity.draw(c,p,m);p.setPathEffect(null);
+            if(lineType!=null&&lineType.complex())drawComplex(c,p,entity,m,new int[]{4096});
+        }
+        private void drawComplex(Canvas c,Paint p,Entity e,Matrix m,int[] budget){
+            if(e==null||budget[0]<=0)return;
+            if(e instanceof Transformed){Transformed t=(Transformed)e;Matrix q=new Matrix();q.setConcat(m,t.matrix);drawComplex(c,p,t.entity,q,budget);return;}
+            if(e instanceof ViewportClip){
+                ViewportClip v=(ViewportClip)e;float[] xy={(float)v.spec.left(),(float)v.spec.bottom(),(float)v.spec.right(),(float)v.spec.bottom(),
+                    (float)v.spec.right(),(float)v.spec.top(),(float)v.spec.left(),(float)v.spec.top()};m.mapPoints(xy);
+                Path clip=new Path();clip.moveTo(xy[0],xy[1]);clip.lineTo(xy[2],xy[3]);clip.lineTo(xy[4],xy[5]);clip.lineTo(xy[6],xy[7]);clip.close();
+                int save=c.save();c.clipPath(clip);Matrix q=new Matrix();q.setConcat(m,v.modelToPaper);drawComplex(c,p,v.entity,q,budget);c.restoreToCount(save);return;
+            }
+            if(e instanceof Composite){for(Entity item:((Composite)e).items)drawComplex(c,p,item,m,budget);return;}
+            if(e instanceof Line){Line q=(Line)e;segment(c,p,m,q.x1,q.y1,q.x2,q.y2,budget);return;}
+            if(e instanceof Poly){
+                Poly q=(Poly)e;for(int i=1;i<q.pts.size()&&budget[0]>0;i++){PointF a=q.pts.get(i-1),b=q.pts.get(i);segment(c,p,m,a.x,a.y,b.x,b.y,budget);}
+                if(q.closed&&q.pts.size()>2&&budget[0]>0){PointF a=q.pts.get(q.pts.size()-1),b=q.pts.get(0);segment(c,p,m,a.x,a.y,b.x,b.y,budget);}return;
+            }
+            if(e instanceof SegmentSet){SegmentSet q=(SegmentSet)e;for(int i=0;i+3<q.xy.length&&budget[0]>0;i+=4)segment(c,p,m,q.xy[i],q.xy[i+1],q.xy[i+2],q.xy[i+3],budget);return;}
+            if(e instanceof Circle){
+                Circle q=(Circle)e;int n=Math.max(12,Math.min(96,(int)Math.ceil(Math.abs(q.sweep)/6d)));double prev=Math.toRadians(q.start);
+                float ax=(float)(q.x+q.r*Math.cos(prev)),ay=(float)(q.y+q.r*Math.sin(prev));
+                for(int i=1;i<=n&&budget[0]>0;i++){double t=Math.toRadians(q.start+q.sweep*i/n);float bx=(float)(q.x+q.r*Math.cos(t)),by=(float)(q.y+q.r*Math.sin(t));segment(c,p,m,ax,ay,bx,by,budget);ax=bx;ay=by;}return;
+            }
+            if(e instanceof EllipseCurve){
+                EllipseCurve q=(EllipseCurve)e;double sw=q.sweep();PointF a=q.at(q.start);
+                for(int i=1;i<=72&&budget[0]>0;i++){PointF b=q.at(q.start+sw*i/72d);segment(c,p,m,a.x,a.y,b.x,b.y,budget);a=b;}
+            }
+        }
+        private void segment(Canvas c,Paint p,Matrix m,float x1,float y1,float x2,float y2,int[] budget){
+            float[] v={x1,y1,x2,y2};m.mapPoints(v);double dx=v[2]-v[0],dy=v[3]-v[1],len=Math.hypot(dx,dy);if(len<1e-5)return;
+            float[] basis={1,0,0,1};m.mapVectors(basis);double deviceScale=(Math.hypot(basis[0],basis[1])+Math.hypot(basis[2],basis[3]))*.5;
+            List<DxfLineTypes.Placement> placements=DxfLineTypes.decorations(lineType,lineTypeScale,deviceScale,len);if(placements.isEmpty())return;
+            double ux=dx/len,uy=dy/len,nx=-uy,ny=ux,tangent=Math.toDegrees(Math.atan2(dy,dx));
+            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();Typeface oldTypeface=p.getTypeface();float oldText=p.getTextSize();Paint.Align oldAlign=p.getTextAlign();
+            p.setStyle(Paint.Style.FILL);p.setPathEffect(null);p.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));p.setTextAlign(Paint.Align.CENTER);
+            for(DxfLineTypes.Placement q:placements){
+                if(budget[0]<=0)break;if(q.kind!=DxfLineTypes.KIND_TEXT||q.text.isEmpty())continue;
+                double along=q.distance+q.xOffsetPixels,px=v[0]+ux*along+nx*q.yOffsetPixels,py=v[1]+uy*along+ny*q.yOffsetPixels;
+                if(!Double.isFinite(px)||!Double.isFinite(py))continue;float size=(float)Math.max(5,Math.min(180,q.scalePixels));p.setTextSize(size);
+                double angle=((q.flags&4)!=0?0:tangent)+q.rotation;if((q.flags&8)!=0){angle%=360;if(angle<0)angle+=360;if(angle>90&&angle<270)angle+=180;}
+                int save=c.save();c.rotate((float)angle,(float)px,(float)py);c.drawText(q.text,(float)px,(float)(py-size*.18),p);c.restoreToCount(save);budget[0]--;
+            }
+            p.setStyle(oldStyle);p.setPathEffect(oldEffect);p.setTypeface(oldTypeface);p.setTextSize(oldText);p.setTextAlign(oldAlign);
         }
     }
 
@@ -639,7 +682,7 @@ public final class DxfParser {
 
     private static boolean keepStreamCode(int code){
         return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
-            code==330||code==331||code==370||code==410||code==420||code==440||
+            code==330||code==331||code==340||code==370||code==410||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
 
@@ -686,11 +729,7 @@ public final class DxfParser {
             c.layerTable.add(layerName,r.integer(62,7),r.integer(70,0),r.trueColor(),r.text(6,DxfStyle.CONTINUOUS),r.integer(370,DxfStyle.LW_DEFAULT),
                 r.longInteger(440,DxfTransparency.UNSET),r.text(5,""));return;
         }
-        if("TABLES".equals(c.section)&&"LTYPE".equals(type)){
-            ArrayList<Double> values=new ArrayList<>();
-            for(int i=0;i+1<r.tags.size();i+=2)if(intOf(r.tags.get(i))==49)values.add(r.numberAt(i,0));
-            c.lineTypes.add(r.text(2,DxfStyle.CONTINUOUS),values);return;
-        }
+        if("TABLES".equals(c.section)&&"LTYPE".equals(type)){c.lineTypes.addRecord(r.tags);return;}
         if("TABLES".equals(c.section)&&"STYLE".equals(type)){
             c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),
                 r.integer(70,0),r.integer(71,0));return;
