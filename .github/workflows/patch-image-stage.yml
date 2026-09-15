@@ -1,0 +1,58 @@
+name: One-shot raster IMAGE fallback patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-image-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot raster IMAGE workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch raster IMAGE fallback
+        run: python3 .github/scripts/patch_image_stage.py
+      - name: Test raster geometry and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-image && mkdir -p /tmp/musacad-image
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfWipeout.java tests/DxfWipeoutTest.java
+          java -cp /tmp/musacad-image DxfWipeoutTest
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-image DxfMLeaderTest
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-image DxfViewportTest
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-image DxfPolylineWidthTest
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          java -cp /tmp/musacad-image DxfDimStylesTest
+          java -cp /tmp/musacad-image DxfLeaderTest
+          javac -d /tmp/musacad-image app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
+          java -cp /tmp/musacad-image DxfBlocksTest
+          java -cp /tmp/musacad-image DxfExpansionLimitTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit raster IMAGE fallback
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Render external raster IMAGE footprints'
+          git push origin HEAD:fix-1b-hatch-geometry
