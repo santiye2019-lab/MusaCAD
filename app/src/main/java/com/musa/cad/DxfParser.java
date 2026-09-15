@@ -702,13 +702,13 @@ public final class DxfParser {
         ArrayList<StreamNode> target=streamTarget(c,type,r);if(target==null)return;
         if(c.pending!=null){
             if("VERTEX".equals(type)){
-                if(r.integer(60,0)==0){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));c.pending.bulges.add(r.number(42,0));}
+                if(!DxfVisibility.invisible(type,r.integer(60,0),r.integer(70,0))){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));c.pending.bulges.add(r.number(42,0));}
                 return;
             }
             if("SEQEND".equals(type)){finishPending(c);c.rootSequenceLayout=null;return;}
             finishPending(c);
         }
-        if(r.integer(60,0)!=0)return; // Honor the common DXF entity invisibility flag in streaming mode too.
+        if(DxfVisibility.invisible(type,r.integer(60,0),r.integer(70,0)))return;
         if("POLYLINE".equals(type)){
             c.pending=new PendingPoly(target,r.text(8,"0"),r.text(5,""),(((int)r.number(70,0))&1)!=0,
                 r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),

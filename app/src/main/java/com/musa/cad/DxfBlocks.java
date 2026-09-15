@@ -137,7 +137,7 @@ public final class DxfBlocks {
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
         if(++result.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
-        if((int)r.number(60,0)!=0)return; // Common entity visibility: 1 means invisible.
+        if(DxfVisibility.invisible(r.type,(int)r.number(60,0),(int)r.number(70,0)))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;
         DxfColor.Ref color=DxfColor.resolve((int)r.number(62,DxfColor.BYLAYER),r.trueColor(),layer,byBlockColor);
         DxfTransparency.Ref transparency=DxfTransparency.resolve(r.longInteger(440,DxfTransparency.UNSET),layer,byBlockTransparency);

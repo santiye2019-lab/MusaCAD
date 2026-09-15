@@ -63,6 +63,13 @@ public class DxfBlocksTest {
         String hiddenMember=block("H",tags(0,"LINE",60,1,10,3,20,4,11,5,21,4)+LINE);
         DxfBlocks.Result hiddenInside=read(hiddenMember,insert("H"));
         if(hiddenInside.placements.size()!=1||hiddenInside.skipped!=0)throw new AssertionError("Invisible block member");
+        DxfBlocks.Result hiddenAttrib=read("",tags(0,"ATTRIB",70,1,1,"SECRET",10,3,20,4,40,1));
+        if(!hiddenAttrib.placements.isEmpty()||hiddenAttrib.skipped!=0)throw new AssertionError("Invisible ATTRIB flag");
+        DxfBlocks.Result visibleAttrib=read("",tags(0,"ATTRIB",70,2,1,"VISIBLE",10,3,20,4,40,1));
+        if(visibleAttrib.placements.size()!=1||visibleAttrib.skipped!=0)throw new AssertionError("Visible ATTRIB flags");
+        String hiddenAttdefBlock=block("AH",tags(0,"ATTDEF",70,1,1,"SECRET",10,3,20,4,40,1)+LINE);
+        DxfBlocks.Result hiddenAttdef=read(hiddenAttdefBlock,insert("AH"));
+        if(hiddenAttdef.placements.size()!=1||hiddenAttdef.skipped!=0)throw new AssertionError("Invisible ATTDEF in block");
 
         String dimBlock=block("*D1",LINE);
         DxfBlocks.Result dim=read(dimBlock,dimension("*D1",8,"DIM",10,10000,20,10000,13,-5000,23,9000,14,7000,24,-9000));
@@ -93,6 +100,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result owned=DxfBlocks.expand(Arrays.asList(ownerDxf.split("\n")),"A4");
         if(owned.placements.size()!=1||!"A4".equals(owned.activeLayout)||!owned.layouts.contains("A4"))throw new AssertionError("Layout owner resolution");
 
-        System.out.println("25 block expansion, visibility and space/layout cases passed");
+        System.out.println("28 block expansion, visibility and space/layout cases passed");
     }
 }
