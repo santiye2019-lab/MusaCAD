@@ -630,7 +630,7 @@ public final class DxfParser {
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==62||code==66||code==67||code==68||code==69||
+        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
             code==330||code==331||code==370||code==410||code==420||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
     }
@@ -696,12 +696,13 @@ public final class DxfParser {
         ArrayList<StreamNode> target=streamTarget(c,type,r);if(target==null)return;
         if(c.pending!=null){
             if("VERTEX".equals(type)){
-                c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));
-                c.pending.bulges.add(r.number(42,0));return;
+                if(r.integer(60,0)==0){c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));c.pending.bulges.add(r.number(42,0));}
+                return;
             }
             if("SEQEND".equals(type)){finishPending(c);c.rootSequenceLayout=null;return;}
             finishPending(c);
         }
+        if(r.integer(60,0)!=0)return; // Honor the common DXF entity invisibility flag in streaming mode too.
         if("POLYLINE".equals(type)){
             c.pending=new PendingPoly(target,r.text(8,"0"),r.text(5,""),(((int)r.number(70,0))&1)!=0,
                 r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),

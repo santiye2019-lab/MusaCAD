@@ -56,6 +56,14 @@ public class DxfBlocksTest {
         if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");
         skipped(read(b,insert("A",70,1001)));
 
+        DxfBlocks.Result hiddenRoot=read("",tags(0,"LINE",60,1,10,3,20,4,11,5,21,4));
+        if(!hiddenRoot.placements.isEmpty()||hiddenRoot.skipped!=0)throw new AssertionError("Invisible root entity");
+        DxfBlocks.Result hiddenInsert=read(b,insert("A",60,1));
+        if(!hiddenInsert.placements.isEmpty()||hiddenInsert.skipped!=0)throw new AssertionError("Invisible INSERT");
+        String hiddenMember=block("H",tags(0,"LINE",60,1,10,3,20,4,11,5,21,4)+LINE);
+        DxfBlocks.Result hiddenInside=read(hiddenMember,insert("H"));
+        if(hiddenInside.placements.size()!=1||hiddenInside.skipped!=0)throw new AssertionError("Invisible block member");
+
         String dimBlock=block("*D1",LINE);
         DxfBlocks.Result dim=read(dimBlock,dimension("*D1",8,"DIM",10,10000,20,10000,13,-5000,23,9000,14,7000,24,-9000));
         point(dim,3,4);
@@ -85,6 +93,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result owned=DxfBlocks.expand(Arrays.asList(ownerDxf.split("\n")),"A4");
         if(owned.placements.size()!=1||!"A4".equals(owned.activeLayout)||!owned.layouts.contains("A4"))throw new AssertionError("Layout owner resolution");
 
-        System.out.println("22 block expansion and space/layout cases passed");
+        System.out.println("25 block expansion, visibility and space/layout cases passed");
     }
 }
