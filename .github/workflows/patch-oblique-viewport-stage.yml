@@ -31,7 +31,7 @@ jobs:
           java -cp /tmp/musacad-oblique DxfOcsTest
           javac -d /tmp/musacad-oblique app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
           java -cp /tmp/musacad-oblique DxfPolylineWidthTest
-          javac -d /tmp/musacad-oblique app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          javac -d /tmp/musacad-oblique app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
           java -cp /tmp/musacad-oblique DxfDimStylesTest
           java -cp /tmp/musacad-oblique DxfLeaderTest
           javac -d /tmp/musacad-oblique app/src/main/java/com/musa/cad/DxfInfiniteLine.java tests/DxfInfiniteLineTest.java
@@ -62,4 +62,4 @@ jobs:
           git commit -m 'Project oblique paper viewports with view targets'
           git push origin HEAD:fix-1b-hatch-geometry
 
-# rerun after correcting the oblique-target regression expectation
+# rerun with complete LEADER test dependencies
