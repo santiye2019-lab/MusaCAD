@@ -30,6 +30,14 @@ public class DxfLeaderTest {
         if(Math.abs(tangent[last+1]-tangent[prev+1])>.8)throw new AssertionError("stored horizontal end tangent should control spline landing direction");
         if(!(tangent[last]-tangent[prev]>0))throw new AssertionError("stored positive horizontal tangent should approach leader end from the left");
 
+        double[] hook=DxfLeader.hook(10,5,1,0,true,2.5);
+        if(hook.length!=4)throw new AssertionError("hook");close(hook[0],10);close(hook[1],5);close(hook[2],12.5);close(hook[3],5);
+        double[] opposite=DxfLeader.hook(10,5,1,0,false,2.5);
+        close(opposite[2],7.5);close(opposite[3],5);
+        double[] angled=DxfLeader.hook(2,3,3,4,true,5);
+        close(angled[2],5);close(angled[3],7);
+        if(DxfLeader.hook(0,0,0,0,true,2).length!=0)throw new AssertionError("degenerate hook");
+
         if(DxfLeader.path(new double[]{0},new double[]{0},true).length!=0)throw new AssertionError("bad leader path");
         System.out.println("DXF LEADER cases passed");
     }
