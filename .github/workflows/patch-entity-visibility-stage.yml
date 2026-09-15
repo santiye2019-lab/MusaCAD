@@ -1,0 +1,54 @@
+name: One-shot entity visibility patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-entity-visibility-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot entity visibility workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch common DXF entity visibility
+        run: python3 .github/scripts/patch_entity_visibility_stage.py
+      - name: Test visibility and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-visibility && mkdir -p /tmp/musacad-visibility
+          javac -d /tmp/musacad-visibility app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-visibility DxfBlocksTest
+          javac -d /tmp/musacad-visibility app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-visibility DxfViewportTest
+          javac -d /tmp/musacad-visibility app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-visibility DxfHatchPatternTest
+          javac -d /tmp/musacad-visibility app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-visibility DxfTextTest
+          java -cp /tmp/musacad-visibility DxfTextStylesTest
+          java -cp /tmp/musacad-visibility DxfTextLayoutTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit entity visibility support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/DxfParser.java tests/DxfBlocksTest.java
+          git commit -m 'Honor invisible DXF entities'
+          git push origin HEAD:fix-1b-hatch-geometry
