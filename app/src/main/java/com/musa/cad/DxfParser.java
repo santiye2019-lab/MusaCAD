@@ -1088,7 +1088,9 @@ public final class DxfParser {
             ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<3?null:new FilledPoly(p);
         }
         if("3DFACE".equals(type)){
-            ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);
+            ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);
+            if(p.size()<3)return null;
+            return segmentSet(DxfFace.visibleEdges(pointArray(p),(int)fv(a,from,to,70,0f)));
         }
         // DIMENSION graphics are expanded from their anonymous *D blocks before parse().
         if("DIMENSION".equals(type))return null;
