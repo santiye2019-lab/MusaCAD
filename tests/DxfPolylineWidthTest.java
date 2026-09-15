@@ -5,6 +5,9 @@ public class DxfPolylineWidthTest {
     public static void main(String[] args){
         close(DxfPolylineWidth.constant(-20),20);
         close(DxfPolylineWidth.constant(Double.NaN),0);
+        close(DxfPolylineWidth.uniform(5,5.0000001),5.00000005);
+        close(DxfPolylineWidth.uniform(5,7),0);
+        close(DxfPolylineWidth.uniform(5,0),0);
         close(DxfPolylineWidth.device(3,2,2),6);
         close(DxfPolylineWidth.device(20,1.5,.5),20);
         close(DxfPolylineWidth.device(0,2,2),0);
