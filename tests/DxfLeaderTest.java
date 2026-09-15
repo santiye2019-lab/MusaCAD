@@ -23,6 +23,13 @@ public class DxfLeaderTest {
         if(spline.length<=6)throw new AssertionError("spline leader should be smoothly sampled");
         close(spline[0],0);close(spline[1],0);close(spline[spline.length-2],10);close(spline[spline.length-1],0);
         if(Math.abs(spline[3]-spline[1])<1e-9)throw new AssertionError("spline leader must curve between vertices");
+
+        double[] tangent=DxfLeader.path(new double[]{0,5,10},new double[]{0,10,0},true,1,0);
+        if(tangent.length<=6)throw new AssertionError("tangent spline leader should be sampled");
+        int last=tangent.length-2,prev=last-2;
+        if(Math.abs(tangent[last+1]-tangent[prev+1])>.8)throw new AssertionError("stored horizontal end tangent should control spline landing direction");
+        if(!(tangent[last]-tangent[prev]>0))throw new AssertionError("stored positive horizontal tangent should approach leader end from the left");
+
         if(DxfLeader.path(new double[]{0},new double[]{0},true).length!=0)throw new AssertionError("bad leader path");
         System.out.println("DXF LEADER cases passed");
     }
