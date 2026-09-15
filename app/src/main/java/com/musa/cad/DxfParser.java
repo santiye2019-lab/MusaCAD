@@ -1224,6 +1224,7 @@ public final class DxfParser {
         if("SPLINE".equals(type))return splineEntity(a,from,to);
         if("HATCH".equals(type))return parseHatch(a,from,to);
         if("WIPEOUT".equals(type))return parseWipeout(a,from,to);
+        if("IMAGE".equals(type))return parseImageFrame(a,from,to);
         if("SOLID".equals(type)||"TRACE".equals(type)){
             ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<3?null:new FilledPoly(p);
         }
@@ -1334,6 +1335,16 @@ public final class DxfParser {
                 lines.add(new DxfHatchPattern.Line(angle,bx,by,ox,oy,raw));
         }
         return lines;
+    }
+
+    /** External raster bytes are normally not embedded in DWG/DXF; keep the IMAGE footprint visible as a safe fallback. */
+    private static Entity parseImageFrame(List<String>a,int from,int to){
+        int display=(int)fv(a,from,to,70,1f);if((display&1)==0)return null;
+        ArrayList<double[]> raw=new ArrayList<>();
+        if((display&4)!=0){ArrayList<PointF> clip=repeatedPoints(a,from,to,14,24);for(PointF q:clip)raw.add(new double[]{q.x,q.y});}
+        double[] packed=DxfWipeout.boundary(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21),
+            f(a,from,to,12),f(a,from,to,22),fv(a,from,to,13,1f),fv(a,from,to,23,1f),raw);
+        ArrayList<PointF> points=packedPoints(packed);return points.size()<3?null:new Poly(points,true);
     }
 
     private static Entity parseWipeout(List<String>a,int from,int to){
