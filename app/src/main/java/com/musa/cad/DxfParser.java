@@ -846,7 +846,15 @@ public final class DxfParser {
                                          Set<String> layoutNames,String activeLayout)throws IOException{
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
-        for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}
+        boolean hasVisibleBounds=false;
+        for(Entity e:entities){
+            FileTransfer.checkCancelled();LayerEntity layer=(LayerEntity)e;if(!visibleLayers.contains(layer.layer))continue;
+            layer.bounds(b);hasVisibleBounds=true;
+        }
+        if(!hasVisibleBounds||!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top){
+            b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+            for(Entity e:entities){FileTransfer.checkCancelled();e.bounds(b);}
+        }
         if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)return null;
         if(b.width()==0){b.left-=.5f;b.right+=.5f;}
         if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}
