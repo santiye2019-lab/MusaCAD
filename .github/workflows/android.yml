@@ -46,6 +46,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfSnapGeometry.java tests/DxfSnapGeometryTest.java
           java -cp /tmp/musacad-tests DxfSnapGeometryTest
+      - name: Test DXF drawing units
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfUnits.java tests/DxfUnitsTest.java
+          java -cp /tmp/musacad-tests DxfUnitsTest
       - name: Test DXF colors
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
