@@ -872,16 +872,31 @@ public final class DxfParser {
                 }
                 break;
             }
-            ArrayList<PointF> local=new ArrayList<>();
+            double[] candidates=null;
             if(entity instanceof Line){
-                Line line=(Line)entity;
-                local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));
-            }else if(entity instanceof Poly){local.addAll(((Poly)entity).pts);}
-            for(PointF point:local){
-                float[] xy={point.x,point.y};transform.mapPoints(xy);boolean inside=true;
+                Line line=(Line)entity;candidates=DxfSnapGeometry.line(line.x1,line.y1,line.x2,line.y2);
+            }else if(entity instanceof Poly){
+                Poly poly=(Poly)entity;double[] xy=new double[poly.pts.size()*2];
+                for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}
+                candidates=DxfSnapGeometry.poly(xy,poly.closed);
+            }else if(entity instanceof Circle){
+                Circle circle=(Circle)entity;candidates=DxfSnapGeometry.circle(circle.x,circle.y,circle.r,circle.start,circle.sweep);
+            }else if(entity instanceof EllipseCurve){
+                EllipseCurve ellipse=(EllipseCurve)entity;candidates=DxfSnapGeometry.ellipse(ellipse.cx,ellipse.cy,ellipse.mx,ellipse.my,ellipse.ratio,ellipse.start,ellipse.end);
+            }else if(entity instanceof Marker){
+                Marker marker=(Marker)entity;candidates=new double[]{marker.x,marker.y};
+            }else if(entity instanceof FilledPoly){
+                FilledPoly poly=(FilledPoly)entity;double[] xy=new double[poly.pts.size()*2];
+                for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}
+                candidates=DxfSnapGeometry.poly(xy,true);
+            }
+            if(candidates!=null)for(int i=0;i+1<candidates.length;i+=2){
+                float[] xy={(float)candidates[i],(float)candidates[i+1]};transform.mapPoints(xy);boolean inside=true;
                 for(DxfViewport.Spec clip:clips)if(!DxfViewport.contains(clip,xy[0],xy[1],1e-6)){inside=false;break;}
                 if(inside)points.add(new PointF(xy[0],xy[1]));
+                if(points.size()>=250000)break;
             }
+            if(points.size()>=250000)break;
         }
         float[] result=new float[points.size()*2];
         for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}
