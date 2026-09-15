@@ -5,6 +5,8 @@ import java.util.*;
 
 /** Expands 2D INSERTs, MINSERT arrays, nested blocks and DIMENSION graphics blocks. */
 public final class DxfBlocks {
+    /** Safety ceiling sized to accept the largest current real-world MusaCAD regression drawings. */
+    public static final int MAX_EXPANSION_VISITS=750000;
     public static final class Transform {
         public final double a,b,c,d,x,y;
         public Transform(){this(1,0,0,1,0,0);}
@@ -135,7 +137,7 @@ public final class DxfBlocks {
                                DxfTransparency.Ref byBlockTransparency,String byBlockLineType,int byBlockLineWeight,
                                Map<String,Block> blocks,Set<String> stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");
-        if(++result.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
+        if(++result.visits>MAX_EXPANSION_VISITS)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
         if(r.type.equals("SEQEND"))return;
         if(DxfVisibility.invisible(r.type,(int)r.number(60,0),(int)r.number(70,0)))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;

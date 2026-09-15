@@ -886,7 +886,7 @@ public final class DxfParser {
                                      Set<String> visibleLayers,StreamCounter counter,StreamContext context,List<LayerEntity> viewportModel)throws IOException{
         for(StreamNode node:nodes){
             FileTransfer.checkCancelled();
-            if(++counter.visits>500000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
+            if(++counter.visits>DxfBlocks.MAX_EXPANSION_VISITS)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");
             if(node instanceof StreamShape){
                 StreamShape shape=(StreamShape)node;String layer="0".equals(shape.layer)?parentLayer:shape.layer;
                 DxfColor.Ref ref=DxfColor.resolve(shape.aci,shape.trueColor,layer,byBlockColor);
