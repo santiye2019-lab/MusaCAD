@@ -1156,14 +1156,20 @@ public final class DxfParser {
     private static Entity leaderEntity(List<String>a,int from,int to,DxfDimStyles.Table dimStyles){
         ArrayList<PointF> raw=repeatedPoints(a,from,to,10,20);if(raw.size()<2)return null;int n=raw.size();double[] xs=new double[n],ys=new double[n];
         for(int i=0;i<n;i++){xs[i]=raw.get(i).x;ys[i]=raw.get(i).y;}
-        boolean spline=((int)fv(a,from,to,72,0f))==1;double endTx=Double.NaN,endTy=Double.NaN;
-        if(spline&&has(a,from,to,211)&&has(a,from,to,221)){endTx=f(a,from,to,211);endTy=f(a,from,to,221);if(((int)fv(a,from,to,74,0f))==0){endTx=-endTx;endTy=-endTy;}}
-        ArrayList<PointF> points=packedPoints(DxfLeader.path(xs,ys,spline,endTx,endTy));if(points.size()<2)points=raw;
+        boolean spline=((int)fv(a,from,to,72,0f))==1;double endTx=Double.NaN,endTy=Double.NaN;int hookDirection=(int)fv(a,from,to,74,0f);
+        if(spline&&has(a,from,to,211)&&has(a,from,to,221)){endTx=f(a,from,to,211);endTy=f(a,from,to,221);if(hookDirection==0){endTx=-endTx;endTy=-endTy;}}
+        ArrayList<PointF> points=packedPoints(DxfLeader.path(xs,ys,spline,endTx,endTy));if(points.size()<2)points=new ArrayList<>(raw);
+        String dimStyle=str(a,from,to,3,"");double styleSize=dimStyles==null?0d:dimStyles.arrowSize(dimStyle);
         ArrayList<PointF> arrow=new ArrayList<>();
         if(((int)fv(a,from,to,71,0f))!=0){
             PointF tip=raw.get(0),rawNext=raw.get(1),direction=points.size()>1?points.get(1):rawNext;double segment=Math.hypot(rawNext.x-tip.x,rawNext.y-tip.y);
-            double styleSize=dimStyles==null?0d:dimStyles.arrowSize(str(a,from,to,3,""));double size=DxfLeader.saneSize(styleSize,segment);
-            arrow=packedPoints(DxfLeader.arrowSized(tip.x,tip.y,direction.x,direction.y,size));
+            double size=DxfLeader.saneSize(styleSize,segment);arrow=packedPoints(DxfLeader.arrowSized(tip.x,tip.y,direction.x,direction.y,size));
+        }
+        int annotationType=(int)fv(a,from,to,73,3f);boolean hasHook=((int)fv(a,from,to,75,0f))!=0&&annotationType!=3;
+        if(hasHook&&has(a,from,to,211)&&has(a,from,to,221)){
+            PointF end=raw.get(n-1),before=raw.get(n-2);double adjacent=Math.hypot(end.x-before.x,end.y-before.y);double size=DxfLeader.saneSize(styleSize,adjacent);
+            double[] hook=DxfLeader.hook(end.x,end.y,f(a,from,to,211),f(a,from,to,221),hookDirection!=0,size);
+            if(hook.length==4)points.add(new PointF((float)hook[2],(float)hook[3]));
         }
         return new LeaderEntity(points,arrow);
     }
