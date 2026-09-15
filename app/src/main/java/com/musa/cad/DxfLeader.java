@@ -19,9 +19,17 @@ public final class DxfLeader {
 
     /** Returns either the original straight LEADER vertices or a smooth spline path through them. */
     public static double[] path(double[] xs,double[] ys,boolean spline){
+        return path(xs,ys,spline,Double.NaN,Double.NaN);
+    }
+
+    /**
+     * Spline LEADER variant honoring AutoCAD's stored end-tangent direction (group 211/221).
+     * NaN tangent values keep the automatic tangent used by the generic fit-point sampler.
+     */
+    public static double[] path(double[] xs,double[] ys,boolean spline,double endTx,double endTy){
         if(xs==null||ys==null||xs.length!=ys.length||xs.length<2)return new double[0];
         for(int i=0;i<xs.length;i++)if(!Double.isFinite(xs[i])||!Double.isFinite(ys[i]))return new double[0];
-        if(spline){double[] sampled=DxfCurves.sampleFitSpline(xs,ys,false);if(sampled.length>=4)return sampled;}
+        if(spline){double[] sampled=DxfCurves.sampleFitSpline(xs,ys,false,Double.NaN,Double.NaN,endTx,endTy);if(sampled.length>=4)return sampled;}
         double[] packed=new double[xs.length*2];for(int i=0;i<xs.length;i++){packed[i*2]=xs[i];packed[i*2+1]=ys[i];}return packed;
     }
 
