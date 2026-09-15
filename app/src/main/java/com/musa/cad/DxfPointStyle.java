@@ -10,7 +10,8 @@ public final class DxfPointStyle {
         public int base(){return mode&15;}
         public boolean circle(){return (mode&32)!=0;}
         public boolean square(){return (mode&64)!=0;}
-        public boolean hidden(){return base()==1;}
+        /** PDMODE=1 alone suppresses the point. Modifier combinations such as 33 still draw their surround. */
+        public boolean hidden(){return mode==1;}
     }
 
     public static Style parse(List<String> tags){return parseRange(tags,0,tags==null?0:tags.size());}
