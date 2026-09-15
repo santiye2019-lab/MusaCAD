@@ -61,3 +61,5 @@ jobs:
           git add app/src/main/java/com/musa/cad/DxfParser.java
           git commit -m 'Project oblique paper viewports with view targets'
           git push origin HEAD:fix-1b-hatch-geometry
+
+# rerun after correcting the oblique-target regression expectation
