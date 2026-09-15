@@ -150,6 +150,7 @@ public class MainActivity extends AppCompatActivity {
             "Nesne: "+activeDxf.entityCount+"\n"+
             "Katman: "+activeDxf.layerCount+"\n"+
             "Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+
+            "Ölçü birimi: "+(activeDxf.automaticUnits?DxfUnits.name(activeDxf.insUnits)+" (otomatik)":"kalibrasyon gerekli")+"\n"+
             "Görüntüleme: vektörel / net yakınlaştırma";
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }

@@ -88,7 +88,9 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;
-        drawing=null;vectorDrawing=result;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();
+        drawing=null;vectorDrawing=result;
+        unitsPerImagePixel=result.automaticUnits?result.unitsPerImagePixel:1d;unitName=result.automaticUnits?result.unitName:"piksel";
+        mode=Mode.PAN;points.clear();
         imageMatrix.reset();fit();invalidate();
     }
 

@@ -242,7 +242,10 @@ public final class DxfParser {
         public final Bitmap bitmap;
         public final float[] snapPoints;
         public final int entityCount, layerCount, skippedCount;
-        public int conversionWarnings;
+        public int conversionWarnings,insUnits;
+        public boolean automaticUnits;
+        public double unitsPerImagePixel=1d;
+        public String unitName="piksel";
         public final Set<String> layerNames,visibleLayers,layoutNames;
         public final String activeLayout;
         private final List<Entity> document;
@@ -261,7 +264,8 @@ public final class DxfParser {
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
             Result result=renderLayers(document,view,layerNames,visible,skippedCount,layoutNames,activeLayout);
-            result.conversionWarnings=conversionWarnings;
+            result.conversionWarnings=conversionWarnings;result.insUnits=insUnits;result.automaticUnits=automaticUnits;
+            result.unitsPerImagePixel=unitsPerImagePixel;result.unitName=unitName;
             return result;
         }
 
@@ -463,6 +467,7 @@ public final class DxfParser {
         DxfLayerTable.Table layerTable=DxfLayerTable.parse(lines);
         DxfLineTypes.Table lineTypes=DxfLineTypes.parse(lines);
         DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);
+        int insUnits=DxfUnits.parse(lines);
         DxfBlocks.Result expanded=DxfBlocks.expand(lines,preferredLayout);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>(layerTable.names);
         Set<String> visibleLayers=new HashSet<>(layerTable.visible);List<LayerEntity> viewportModel=null;
@@ -473,7 +478,7 @@ public final class DxfParser {
         }
         int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,
             entities,layers,visibleLayers,viewportModel);
-        return finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout);
+        return applyUnits(finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout),insUnits);
     }
 
     private interface StreamNode {}
@@ -570,7 +575,7 @@ public final class DxfParser {
         }
     }
     private static final class StreamContext {
-        String section="",rootSequenceLayout;StreamBlock activeBlock;PendingPoly pending;int skipped;
+        String section="",rootSequenceLayout;StreamBlock activeBlock;PendingPoly pending;int skipped,insUnits;
         final HashMap<String,StreamBlock> blocks=new HashMap<>();
         final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
@@ -626,7 +631,7 @@ public final class DxfParser {
         StreamCounter counter=new StreamCounter();
         expandStream(roots,new DxfBlocks.Transform(),"0",null,null,null,DxfStyle.LW_BYLAYER,
             context.blocks,new HashSet<>(),entities,layers,visibleLayers,counter,context,viewportModel);
-        return finishEntities(entities,layers,visibleLayers,context.skipped,context.layouts,activeLayout);
+        return applyUnits(finishEntities(entities,layers,visibleLayers,context.skipped,context.layouts,activeLayout),context.insUnits);
     }
 
     private static boolean keepStreamCode(int code){
@@ -657,6 +662,7 @@ public final class DxfParser {
         if("SECTION".equals(type)){
             finishPending(c);c.section=r.text(2,"");c.activeBlock=null;
             if("HEADER".equals(c.section)){
+                c.insUnits=DxfUnits.parseHeaderRecord(r.tags);
                 for(int i=0;i+1<r.tags.size();i+=2)if(intOf(r.tags.get(i))==9&&"$LTSCALE".equalsIgnoreCase(r.tags.get(i+1).trim())){
                     for(int j=i+2;j+1<r.tags.size();j+=2){int code=intOf(r.tags.get(j));if(code==9)break;if(code==40){double v=r.numberAt(j,1);if(v>0)c.lineTypes.globalScale=v;break;}}
                 }
@@ -824,6 +830,17 @@ public final class DxfParser {
     }
 
     private static String key(String value){return value.toUpperCase(Locale.ROOT);}
+
+    private static Result applyUnits(Result result,int insUnits){
+        if(result==null)return null;result.insUnits=insUnits;
+        if(!DxfSpace.isModel(result.activeLayout)||!DxfUnits.known(insUnits))return result;
+        float[] vectors={1,0,0,1};result.view.mapVectors(vectors);
+        double scale=(Math.hypot(vectors[0],vectors[1])+Math.hypot(vectors[2],vectors[3]))*.5;
+        if(Double.isFinite(scale)&&scale>1e-12){
+            result.unitsPerImagePixel=1d/scale;result.unitName=DxfUnits.symbol(insUnits);result.automaticUnits=true;
+        }
+        return result;
+    }
 
     private static Result finishEntities(ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,int skipped,
                                          Set<String> layoutNames,String activeLayout)throws IOException{
