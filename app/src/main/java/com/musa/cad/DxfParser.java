@@ -1330,7 +1330,16 @@ public final class DxfParser {
             if(sampled.size()>=2)return new Poly(sampled,closed);
         }
         ArrayList<PointF> fit=repeatedPoints(a,from,to,11,21);
-        if(fit.size()>=2)return new Poly(fit,closed);
+        if(fit.size()>=2){
+            double[] xs=new double[fit.size()],ys=new double[fit.size()];for(int i=0;i<fit.size();i++){xs[i]=fit.get(i).x;ys[i]=fit.get(i).y;}
+            double startTx=has(a,from,to,12)&&has(a,from,to,22)?f(a,from,to,12):Double.NaN;
+            double startTy=has(a,from,to,12)&&has(a,from,to,22)?f(a,from,to,22):Double.NaN;
+            double endTx=has(a,from,to,13)&&has(a,from,to,23)?f(a,from,to,13):Double.NaN;
+            double endTy=has(a,from,to,13)&&has(a,from,to,23)?f(a,from,to,23):Double.NaN;
+            ArrayList<PointF> sampled=packedPoints(DxfCurves.sampleFitSpline(xs,ys,closed,startTx,startTy,endTx,endTy));
+            if(sampled.size()>=2)return new Poly(sampled,closed);
+            return new Poly(fit,closed);
+        }
         return controls.size()>=2?new Poly(controls,closed):null;
     }
 
