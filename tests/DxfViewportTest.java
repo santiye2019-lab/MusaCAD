@@ -25,9 +25,8 @@ public class DxfViewportTest {
         p=DxfViewport.point(oblique,0,1);close(p[0],1/Math.sqrt(2));close(p[1],-1/Math.sqrt(6));
 
         DxfViewport.Spec obliqueTarget=DxfViewport.of(10,20,100,100,0,0,50,0,6,1,1,1,1,3,4,5);
-        double rx=-1/Math.sqrt(2),ry=1/Math.sqrt(2),ux=-1/Math.sqrt(6),uy=-1/Math.sqrt(6),uz=2/Math.sqrt(6);
-        double u=3*rx+4*ry, vv=3*ux+4*uy+5*uz;
-        p=DxfViewport.point(obliqueTarget,3,4);close(p[0],10-2*u);close(p[1],20-2*vv);
+        double uz=2/Math.sqrt(6);
+        p=DxfViewport.point(obliqueTarget,3,4);close(p[0],10);close(p[1],20-2*5*uz);
 
         if(DxfViewport.of(0,0,10,10,0,0,10,0,1,1,0,0,1).supported())throw new AssertionError("overall paper viewport");
         if(DxfViewport.of(0,0,10,10,0,0,10,0,2,0,0,0,1).supported())throw new AssertionError("off viewport");
