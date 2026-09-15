@@ -1,0 +1,64 @@
+name: One-shot complex linetype patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-complex-linetype-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot complex linetype workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch complex linetype rendering
+        run: python3 .github/scripts/patch_complex_linetype_stage.py
+      - name: Test complex linetypes and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-ltype && mkdir -p /tmp/musacad-ltype
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfLineTypes.java tests/DxfLineTypesTest.java
+          java -cp /tmp/musacad-ltype DxfLineTypesTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfPolyMesh.java tests/DxfPolyMeshTest.java
+          java -cp /tmp/musacad-ltype DxfPolyMeshTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfVisibility.java tests/DxfVisibilityTest.java
+          java -cp /tmp/musacad-ltype DxfVisibilityTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfUnits.java tests/DxfUnitsTest.java
+          java -cp /tmp/musacad-ltype DxfUnitsTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfSnapGeometry.java tests/DxfSnapGeometryTest.java
+          java -cp /tmp/musacad-ltype DxfSnapGeometryTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-ltype DxfBlocksTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-ltype DxfViewportTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-ltype DxfHatchPatternTest
+          javac -d /tmp/musacad-ltype app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-ltype DxfTextTest
+          java -cp /tmp/musacad-ltype DxfTextStylesTest
+          java -cp /tmp/musacad-ltype DxfTextLayoutTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit complex linetype support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Render embedded text in complex linetypes'
+          git push origin HEAD:fix-1b-hatch-geometry
