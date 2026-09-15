@@ -50,6 +50,28 @@ public final class DxfParser {
         }
     }
 
+    /** Filled geometry for DXF per-segment start/end polyline widths. */
+    private static final class VariableWidth implements Entity{
+        final Entity centerline;final ArrayList<ArrayList<PointF>> outlines=new ArrayList<>();
+        VariableWidth(Entity centerline,double[][] packed){
+            this.centerline=centerline;
+            if(packed!=null)for(double[] polygon:packed){ArrayList<PointF> pts=packedPoints(polygon);if(pts.size()>=3)outlines.add(pts);}
+        }
+        public void bounds(RectF b){
+            if(outlines.isEmpty()){centerline.bounds(b);return;}
+            for(ArrayList<PointF> polygon:outlines)for(PointF q:polygon)add(b,q.x,q.y);
+        }
+        public void draw(Canvas c,Paint p,Matrix m){
+            if(outlines.isEmpty()){centerline.draw(c,p,m);return;}
+            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();p.setPathEffect(null);p.setStyle(Paint.Style.FILL);
+            for(ArrayList<PointF> polygon:outlines){
+                Path path=new Path();float[] v={polygon.get(0).x,polygon.get(0).y};m.mapPoints(v);path.moveTo(v[0],v[1]);
+                for(int i=1;i<polygon.size();i++){v[0]=polygon.get(i).x;v[1]=polygon.get(i).y;m.mapPoints(v);path.lineTo(v[0],v[1]);}path.close();c.drawPath(path,p);
+            }
+            p.setStyle(oldStyle);p.setPathEffect(oldEffect);
+        }
+    }
+
     private static final class LeaderEntity implements Entity{
         final Poly line;final ArrayList<PointF> arrow;
         LeaderEntity(ArrayList<PointF> points,ArrayList<PointF> arrow){this.line=new Poly(points,false);this.arrow=arrow==null?new ArrayList<>():arrow;}
@@ -356,6 +378,7 @@ public final class DxfParser {
         private void drawComplex(Canvas c,Paint p,Entity e,Matrix m,int[] budget){
             if(e==null||budget[0]<=0)return;
             if(e instanceof GeometricWidth){drawComplex(c,p,((GeometricWidth)e).entity,m,budget);return;}
+            if(e instanceof VariableWidth){drawComplex(c,p,((VariableWidth)e).centerline,m,budget);return;}
             if(e instanceof LeaderEntity){drawComplex(c,p,((LeaderEntity)e).line,m,budget);return;}
             if(e instanceof Transformed){Transformed t=(Transformed)e;Matrix q=new Matrix();q.setConcat(m,t.matrix);drawComplex(c,p,t.entity,q,budget);return;}
             if(e instanceof ViewportClip){
@@ -657,12 +680,12 @@ public final class DxfParser {
         }
     }
     private static final class PendingPoly {
-        final ArrayList<StreamNode> target;final String layer,lineType,handle;final boolean closed;final int flags,mCount,nCount,aci,trueColor,lineWeight;final double lineTypeScale,geometricWidth;final long transparencyRaw;
+        final ArrayList<StreamNode> target;final String layer,lineType,handle;final boolean closed;final int flags,mCount,nCount,aci,trueColor,lineWeight;final double lineTypeScale,geometricWidth,defaultStartWidth,defaultEndWidth;final long transparencyRaw;
         final double[] ocs;boolean variableWidth;
-        final ArrayList<PointF> points=new ArrayList<>();final ArrayList<Double> bulges=new ArrayList<>();final ArrayList<int[]> faces=new ArrayList<>();
-        PendingPoly(ArrayList<StreamNode> target,String layer,String handle,int flags,int mCount,int nCount,int aci,int trueColor,long transparencyRaw,String lineType,int lineWeight,double lineTypeScale,double geometricWidth,double[] ocs){
+        final ArrayList<PointF> points=new ArrayList<>();final ArrayList<Double> bulges=new ArrayList<>(),startWidths=new ArrayList<>(),endWidths=new ArrayList<>();final ArrayList<int[]> faces=new ArrayList<>();
+        PendingPoly(ArrayList<StreamNode> target,String layer,String handle,int flags,int mCount,int nCount,int aci,int trueColor,long transparencyRaw,String lineType,int lineWeight,double lineTypeScale,double defaultStartWidth,double defaultEndWidth,double[] ocs){
             this.target=target;this.layer=layer;this.handle=handle;this.flags=flags;this.mCount=mCount;this.nCount=nCount;this.closed=(flags&1)!=0;this.aci=aci;this.trueColor=trueColor;this.transparencyRaw=transparencyRaw;
-            this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;this.geometricWidth=geometricWidth;this.ocs=ocs;
+            this.lineType=lineType;this.lineWeight=lineWeight;this.lineTypeScale=lineTypeScale;this.defaultStartWidth=defaultStartWidth;this.defaultEndWidth=defaultEndWidth;this.geometricWidth=DxfPolylineWidth.uniform(defaultStartWidth,defaultEndWidth);this.ocs=ocs;
         }
     }
     private static final class StreamContext {
@@ -797,8 +820,9 @@ public final class DxfParser {
                     if((c.pending.flags&64)!=0&&(vertexFlags&128)!=0&&(vertexFlags&64)==0){
                         c.pending.faces.add(new int[]{r.integer(71,0),r.integer(72,0),r.integer(73,0),r.integer(74,0)});
                     }else{
-                        if(has(r.tags,0,r.tags.size(),40)||has(r.tags,0,r.tags.size(),41))c.pending.variableWidth=true;
+                        boolean hasStart=has(r.tags,0,r.tags.size(),40),hasEnd=has(r.tags,0,r.tags.size(),41);if(hasStart||hasEnd)c.pending.variableWidth=true;
                         c.pending.points.add(new PointF((float)r.number(10,0),(float)r.number(20,0)));c.pending.bulges.add(r.number(42,0));
+                        c.pending.startWidths.add(r.number(40,c.pending.defaultStartWidth));c.pending.endWidths.add(r.number(41,c.pending.defaultEndWidth));
                     }
                 }
                 return;
@@ -811,7 +835,7 @@ public final class DxfParser {
             int flags=r.integer(70,0);
             c.pending=new PendingPoly(target,r.text(8,"0"),r.text(5,""),flags,r.integer(71,0),r.integer(72,0),
                 r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),r.text(6,DxfStyle.BYLAYER),r.integer(370,DxfStyle.LW_BYLAYER),DxfStyle.saneScale(r.number(48,1)),
-                DxfPolylineWidth.uniform(r.number(40,0),r.number(41,0)),ocsMatrix("POLYLINE",r.tags,0,r.tags.size()));return;
+                r.number(40,0),r.number(41,0),ocsMatrix("POLYLINE",r.tags,0,r.tags.size()));return;
         }
         if("VERTEX".equals(type))return;
         if("SEQEND".equals(type)){c.rootSequenceLayout=null;return;}
@@ -986,6 +1010,7 @@ public final class DxfParser {
             Matrix transform=new Matrix();ArrayList<DxfViewport.Spec> clips=new ArrayList<>();
             while(true){
                 if(entity instanceof GeometricWidth){entity=((GeometricWidth)entity).entity;continue;}
+                if(entity instanceof VariableWidth){entity=((VariableWidth)entity).centerline;continue;}
                 if(entity instanceof Transformed){
                     Transformed wrappedTransform=(Transformed)entity;Matrix combined=new Matrix();
                     combined.setConcat(transform,wrappedTransform.matrix);transform=combined;entity=wrappedTransform.entity;continue;
@@ -1274,22 +1299,22 @@ public final class DxfParser {
     }
 
     private static Entity lwPolyline(List<String>a,int from,int to){
-        ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();
+        ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>(),startWidths=new ArrayList<>(),endWidths=new ArrayList<>();boolean perVertexWidth=false;
         for(int i=from;i+1<to;i+=2){
             if(intOf(a.get(i))!=10)continue;
-            float x=floatOf(a.get(i+1));Float y=null;double bulge=0d;int j=i+2;
+            float x=floatOf(a.get(i+1));Float y=null;double bulge=0d,startWidth=0d,endWidth=0d;int j=i+2;
             while(j+1<to&&intOf(a.get(j))!=10){
                 int code=intOf(a.get(j));
                 if(code==20)y=floatOf(a.get(j+1));else if(code==42)bulge=floatOf(a.get(j+1));
+                else if(code==40){startWidth=floatOf(a.get(j+1));perVertexWidth=true;}else if(code==41){endWidth=floatOf(a.get(j+1));perVertexWidth=true;}
                 j+=2;
             }
-            if(y!=null&&Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);}
+            if(y!=null&&Float.isFinite(x)&&Float.isFinite(y)){points.add(new PointF(x,y));bulges.add(bulge);startWidths.add(startWidth);endWidths.add(endWidth);}
             i=j-2;
         }
-        if(points.size()<2)return null;
-        Entity result=bulgedPoly(points,bulges,(((int)fv(a,from,to,70,0f))&1)!=0);
-        double width=(has(a,from,to,40)||has(a,from,to,41))?0d:DxfPolylineWidth.constant(fv(a,from,to,43,0f));
-        return geometricWidth(result,width);
+        if(points.size()<2)return null;boolean closed=(((int)fv(a,from,to,70,0f))&1)!=0;Entity result=bulgedPoly(points,bulges,closed);
+        if(perVertexWidth)return variableGeometricWidth(result,points,bulges,startWidths,endWidths,closed);
+        return geometricWidth(result,DxfPolylineWidth.constant(fv(a,from,to,43,0f)));
     }
 
     private static Entity splineEntity(List<String>a,int from,int to){
@@ -1310,25 +1335,35 @@ public final class DxfParser {
     }
 
     private static Entity classicPolyline(DxfBlocks.Record header,List<DxfBlocks.Record> records,List<String> tags)throws IOException{
-        int flags=(int)header.number(70,0);ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>();ArrayList<int[]> faces=new ArrayList<>();boolean variableWidth=false;
+        int flags=(int)header.number(70,0);ArrayList<PointF> points=new ArrayList<>();ArrayList<Double> bulges=new ArrayList<>(),startWidths=new ArrayList<>(),endWidths=new ArrayList<>();ArrayList<int[]> faces=new ArrayList<>();
+        double defaultStart=header.number(40,0),defaultEnd=header.number(41,0);boolean vertexWidthOverride=false;
         for(DxfBlocks.Record vertex:records){
             int vf=(int)vertex.number(70,0);
             if((flags&64)!=0&&(vf&128)!=0&&(vf&64)==0){faces.add(new int[]{(int)vertex.number(71,0),(int)vertex.number(72,0),(int)vertex.number(73,0),(int)vertex.number(74,0)});continue;}
             if(!has(tags,vertex.from,vertex.to,10)||!has(tags,vertex.from,vertex.to,20))continue;
-            if(has(tags,vertex.from,vertex.to,40)||has(tags,vertex.from,vertex.to,41))variableWidth=true;
+            boolean hasStart=has(tags,vertex.from,vertex.to,40),hasEnd=has(tags,vertex.from,vertex.to,41);if(hasStart||hasEnd)vertexWidthOverride=true;
             points.add(new PointF(f(tags,vertex.from,vertex.to,10),f(tags,vertex.from,vertex.to,20)));bulges.add(vertex.number(42,0));
+            startWidths.add(hasStart?vertex.number(40,defaultStart):defaultStart);endWidths.add(hasEnd?vertex.number(41,defaultEnd):defaultEnd);
         }
         if((flags&64)!=0)return segmentSet(DxfPolyMesh.polyface(pointArray(points),faces));
         if((flags&16)!=0)return segmentSet(DxfPolyMesh.polygonMesh(pointArray(points),(int)header.number(71,0),(int)header.number(72,0),(flags&1)!=0,(flags&32)!=0));
-        Entity result=points.size()<2?null:bulgedPoly(points,bulges,(flags&1)!=0);
-        return variableWidth?result:geometricWidth(result,DxfPolylineWidth.uniform(header.number(40,0),header.number(41,0)));
+        boolean closed=(flags&1)!=0;Entity result=points.size()<2?null:bulgedPoly(points,bulges,closed);double uniform=DxfPolylineWidth.uniform(defaultStart,defaultEnd);
+        if(!vertexWidthOverride&&uniform>1e-12)return geometricWidth(result,uniform);
+        return variableGeometricWidth(result,points,bulges,startWidths,endWidths,closed);
     }
 
     private static Entity streamPolyline(PendingPoly p){
         if((p.flags&64)!=0)return segmentSet(DxfPolyMesh.polyface(pointArray(p.points),p.faces));
         if((p.flags&16)!=0)return segmentSet(DxfPolyMesh.polygonMesh(pointArray(p.points),p.mCount,p.nCount,(p.flags&1)!=0,(p.flags&32)!=0));
         Entity result=p.points.size()<2?null:bulgedPoly(p.points,p.bulges,p.closed);
-        return p.variableWidth?result:geometricWidth(result,p.geometricWidth);
+        if(!p.variableWidth&&p.geometricWidth>1e-12)return geometricWidth(result,p.geometricWidth);
+        return variableGeometricWidth(result,p.points,p.bulges,p.startWidths,p.endWidths,p.closed);
+    }
+
+    private static Entity variableGeometricWidth(Entity entity,List<PointF> points,List<Double> bulges,List<Double> startWidths,List<Double> endWidths,boolean closed){
+        if(entity==null||points==null||points.size()<2)return entity;int n=points.size();double[] xs=new double[n],ys=new double[n],bs=new double[n],sw=new double[n],ew=new double[n];
+        for(int i=0;i<n;i++){PointF q=points.get(i);xs[i]=q.x;ys[i]=q.y;bs[i]=bulges!=null&&i<bulges.size()?bulges.get(i):0d;sw[i]=startWidths!=null&&i<startWidths.size()?startWidths.get(i):0d;ew[i]=endWidths!=null&&i<endWidths.size()?endWidths.get(i):0d;}
+        double[][] outlines=DxfPolylineWidth.variable(xs,ys,bs,sw,ew,closed);return outlines.length==0?entity:new VariableWidth(entity,outlines);
     }
 
     private static Entity geometricWidth(Entity entity,double width){return entity!=null&&DxfPolylineWidth.constant(width)>1e-12?new GeometricWidth(entity,width):entity;}
