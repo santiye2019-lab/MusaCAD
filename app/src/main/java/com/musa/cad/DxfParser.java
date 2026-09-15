@@ -50,6 +50,19 @@ public final class DxfParser {
         }
     }
 
+    private static final class LeaderEntity implements Entity{
+        final Poly line;final ArrayList<PointF> arrow;
+        LeaderEntity(ArrayList<PointF> points,ArrayList<PointF> arrow){this.line=new Poly(points,false);this.arrow=arrow==null?new ArrayList<>():arrow;}
+        public void bounds(RectF b){line.bounds(b);for(PointF q:arrow)add(b,q.x,q.y);}
+        public void draw(Canvas c,Paint p,Matrix m){
+            line.draw(c,p,m);if(arrow.size()<3)return;
+            Path path=new Path();float[] v={arrow.get(0).x,arrow.get(0).y};m.mapPoints(v);path.moveTo(v[0],v[1]);
+            for(int i=1;i<arrow.size();i++){v[0]=arrow.get(i).x;v[1]=arrow.get(i).y;m.mapPoints(v);path.lineTo(v[0],v[1]);}path.close();
+            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);
+            p.setStyle(oldStyle);p.setPathEffect(oldEffect);
+        }
+    }
+
     private static final class SegmentSet implements Entity{
         final float[] xy;
         SegmentSet(double[] packed){xy=new float[packed==null?0:packed.length];for(int i=0;i<xy.length;i++)xy[i]=(float)packed[i];}
@@ -343,6 +356,7 @@ public final class DxfParser {
         private void drawComplex(Canvas c,Paint p,Entity e,Matrix m,int[] budget){
             if(e==null||budget[0]<=0)return;
             if(e instanceof GeometricWidth){drawComplex(c,p,((GeometricWidth)e).entity,m,budget);return;}
+            if(e instanceof LeaderEntity){drawComplex(c,p,((LeaderEntity)e).line,m,budget);return;}
             if(e instanceof Transformed){Transformed t=(Transformed)e;Matrix q=new Matrix();q.setConcat(m,t.matrix);drawComplex(c,p,t.entity,q,budget);return;}
             if(e instanceof ViewportClip){
                 ViewportClip v=(ViewportClip)e;float[] xy={(float)v.spec.left(),(float)v.spec.bottom(),(float)v.spec.right(),(float)v.spec.bottom(),
@@ -503,7 +517,7 @@ public final class DxfParser {
     }
 
     private static int appendBufferedPlacements(List<String> lines,List<DxfBlocks.Placement> placements,
-                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,
+                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles,
                                                  ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,
                                                  List<LayerEntity> viewportModel)throws IOException{
         int skipped=0;Map<String,Integer> layerColors=layerTable.colors;
@@ -523,7 +537,7 @@ public final class DxfParser {
                 skipped++;continue;
             }else{
                 entity=isTextType(item.record.type)?parseTextEntity(item.record.type,lines,item.record.from,item.record.to,textStyles):
-                    parse(item.record.type,lines,item.record.from,item.record.to,pointStyle);
+                    parse(item.record.type,lines,item.record.from,item.record.to,pointStyle,dimStyles);
                 if(entity==null){skipped++;continue;}
             }
             entity=projectOcs(item.record.type,entity,lines,item.record.from,item.record.to);
@@ -543,16 +557,17 @@ public final class DxfParser {
         DxfLineTypes.Table lineTypes=DxfLineTypes.parse(lines);
         DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);
         DxfPointStyle.Style pointStyle=DxfPointStyle.parse(lines);
+        DxfDimStyles.Table dimStyles=DxfDimStyles.parse(lines);
         int insUnits=DxfUnits.parse(lines);
         DxfBlocks.Result expanded=DxfBlocks.expand(lines,preferredLayout);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>(layerTable.names);
         Set<String> visibleLayers=new HashSet<>(layerTable.visible);List<LayerEntity> viewportModel=null;
         if(!DxfSpace.isModel(expanded.activeLayout)){
             DxfBlocks.Result modelExpanded=DxfBlocks.expand(lines,DxfSpace.MODEL);ArrayList<Entity> modelRaw=new ArrayList<>();
-            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,modelRaw,layers,visibleLayers,null);
+            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,modelRaw,layers,visibleLayers,null);
             viewportModel=new ArrayList<>();for(Entity e:modelRaw)if(e instanceof LayerEntity)viewportModel.add((LayerEntity)e);
         }
-        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,
+        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,
             entities,layers,visibleLayers,viewportModel);
         return applyUnits(finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout),insUnits);
     }
@@ -656,6 +671,7 @@ public final class DxfParser {
         final DxfLayerTable.Table layerTable=new DxfLayerTable.Table();
         final DxfLineTypes.Table lineTypes=new DxfLineTypes.Table();
         final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();
+        final DxfDimStyles.Table dimStyles=new DxfDimStyles.Table();
         DxfPointStyle.Style pointStyle=new DxfPointStyle.Style(0,0);
         final Map<String,String> drawOrder=new HashMap<>();
         final Map<String,String> layoutByOwner=new HashMap<>();
@@ -765,6 +781,7 @@ public final class DxfParser {
             c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),
                 r.integer(70,0),r.integer(71,0));return;
         }
+        if("TABLES".equals(c.section)&&"DIMSTYLE".equals(type)){c.dimStyles.addRecord(r.tags);return;}
         if("OBJECTS".equals(c.section)&&"LAYOUT".equals(type)){
             String name=DxfSpace.layoutObjectName(r.tags,0,r.tags.size());String owner=DxfSpace.layoutObjectOwner(r.tags,0,r.tags.size());
             c.layouts.add(name);if(!owner.isEmpty())c.layoutByOwner.put(owner,name);return;
@@ -801,7 +818,7 @@ public final class DxfParser {
         if("VIEWPORT".equals(type)){target.add(new StreamViewport(r));return;}
         if("INSERT".equals(type)){target.add(new StreamInsert(r));return;}
         if("DIMENSION".equals(type)){target.add(new StreamDimension(r));return;}
-        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size(),c.pointStyle);
+        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size(),c.pointStyle,c.dimStyles);
         if(entity==null)c.skipped++;else{
             entity=projectOcs(type,entity,r.tags,0,r.tags.size());
             target.add(new StreamShape(entity,r.text(8,"0"),r.text(5,""),r.integer(62,DxfColor.BYLAYER),r.trueColor(),r.longInteger(440,DxfTransparency.UNSET),
@@ -982,6 +999,10 @@ public final class DxfParser {
             double[] candidates=null;
             if(entity instanceof Line){
                 Line line=(Line)entity;candidates=DxfSnapGeometry.line(line.x1,line.y1,line.x2,line.y2);
+            }else if(entity instanceof LeaderEntity){
+                Poly poly=((LeaderEntity)entity).line;double[] xy=new double[poly.pts.size()*2];
+                for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}
+                candidates=DxfSnapGeometry.poly(xy,false);
             }else if(entity instanceof Poly){
                 Poly poly=(Poly)entity;double[] xy=new double[poly.pts.size()*2];
                 for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}
@@ -1085,9 +1106,22 @@ public final class DxfParser {
         catch(IllegalArgumentException invalid){return null;}
     }
 
-    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle){
+    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles){
         if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),pointStyle);
+        if("LEADER".equals(type))return leaderEntity(a,from,to,dimStyles);
         return parse(type,a,from,to);
+    }
+
+    private static Entity leaderEntity(List<String>a,int from,int to,DxfDimStyles.Table dimStyles){
+        ArrayList<PointF> points=repeatedPoints(a,from,to,10,20);if(points.size()<2)return null;
+        ArrayList<PointF> arrow=new ArrayList<>();
+        if(((int)fv(a,from,to,71,0f))!=0){
+            PointF tip=points.get(0),next=points.get(1);double segment=Math.hypot(next.x-tip.x,next.y-tip.y);
+            double styleSize=dimStyles==null?0d:dimStyles.arrowSize(str(a,from,to,3,""));
+            double[] packed=DxfLeader.arrow(tip.x,tip.y,next.x,next.y,DxfLeader.saneSize(styleSize,segment));
+            arrow=packedPoints(packed);
+        }
+        return new LeaderEntity(points,arrow);
     }
 
     private static Entity parse(String type,List<String>a,int from,int to){
@@ -1117,9 +1151,6 @@ public final class DxfParser {
         }
         if("LWPOLYLINE".equals(type))return lwPolyline(a,from,to);
         if("SPLINE".equals(type))return splineEntity(a,from,to);
-        if("LEADER".equals(type)){
-            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);
-        }
         if("HATCH".equals(type))return parseHatch(a,from,to);
         if("WIPEOUT".equals(type))return parseWipeout(a,from,to);
         if("SOLID".equals(type)||"TRACE".equals(type)){
