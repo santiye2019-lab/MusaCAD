@@ -1,0 +1,35 @@
+from pathlib import Path
+p=Path('app/src/main/java/com/musa/cad/DxfParser.java');s=p.read_text()
+
+def repl(old,new,count=1):
+    global s
+    n=s.count(old)
+    if n!=count: raise SystemExit(f'expected {count}, got {n}: {old[:220]!r}')
+    s=s.replace(old,new,count)
+
+marker='''    private static final class SegmentSet implements Entity{\n'''
+leader='''    private static final class LeaderEntity implements Entity{\n        final Poly line;final ArrayList<PointF> arrow;\n        LeaderEntity(ArrayList<PointF> points,ArrayList<PointF> arrow){this.line=new Poly(points,false);this.arrow=arrow==null?new ArrayList<>():arrow;}\n        public void bounds(RectF b){line.bounds(b);for(PointF q:arrow)add(b,q.x,q.y);}\n        public void draw(Canvas c,Paint p,Matrix m){\n            line.draw(c,p,m);if(arrow.size()<3)return;\n            Path path=new Path();float[] v={arrow.get(0).x,arrow.get(0).y};m.mapPoints(v);path.moveTo(v[0],v[1]);\n            for(int i=1;i<arrow.size();i++){v[0]=arrow.get(i).x;v[1]=arrow.get(i).y;m.mapPoints(v);path.lineTo(v[0],v[1]);}path.close();\n            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);\n            p.setStyle(oldStyle);p.setPathEffect(oldEffect);\n        }\n    }\n\n'''+marker
+repl(marker,leader)
+
+repl('''            if(e instanceof GeometricWidth){drawComplex(c,p,((GeometricWidth)e).entity,m,budget);return;}\n            if(e instanceof Transformed){''','''            if(e instanceof GeometricWidth){drawComplex(c,p,((GeometricWidth)e).entity,m,budget);return;}\n            if(e instanceof LeaderEntity){drawComplex(c,p,((LeaderEntity)e).line,m,budget);return;}\n            if(e instanceof Transformed){''')
+
+repl('''            }else if(entity instanceof Poly){\n                Poly poly=(Poly)entity;double[] xy=new double[poly.pts.size()*2];\n''','''            }else if(entity instanceof LeaderEntity){\n                Poly poly=((LeaderEntity)entity).line;double[] xy=new double[poly.pts.size()*2];\n                for(int i=0;i<poly.pts.size();i++){xy[i*2]=poly.pts.get(i).x;xy[i*2+1]=poly.pts.get(i).y;}\n                candidates=DxfSnapGeometry.poly(xy,false);\n            }else if(entity instanceof Poly){\n                Poly poly=(Poly)entity;double[] xy=new double[poly.pts.size()*2];\n''')
+
+repl('''                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,\n''','''                                                 DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles,\n''')
+repl('''                    parse(item.record.type,lines,item.record.from,item.record.to,pointStyle);\n''','''                    parse(item.record.type,lines,item.record.from,item.record.to,pointStyle,dimStyles);\n''')
+repl('''        DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);\n        DxfPointStyle.Style pointStyle=DxfPointStyle.parse(lines);\n''','''        DxfTextStyles.Table textStyles=DxfTextStyles.parse(lines);\n        DxfPointStyle.Style pointStyle=DxfPointStyle.parse(lines);\n        DxfDimStyles.Table dimStyles=DxfDimStyles.parse(lines);\n''')
+repl('''            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,modelRaw,layers,visibleLayers,null);\n''','''            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,modelRaw,layers,visibleLayers,null);\n''')
+repl('''        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,\n            entities,layers,visibleLayers,viewportModel);\n''','''        int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,\n            entities,layers,visibleLayers,viewportModel);\n''')
+
+repl('''        final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();\n        DxfPointStyle.Style pointStyle=new DxfPointStyle.Style(0,0);\n''','''        final DxfTextStyles.Table textStyles=new DxfTextStyles.Table();\n        final DxfDimStyles.Table dimStyles=new DxfDimStyles.Table();\n        DxfPointStyle.Style pointStyle=new DxfPointStyle.Style(0,0);\n''')
+repl('''        if("TABLES".equals(c.section)&&"STYLE".equals(type)){\n            c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),\n                r.integer(70,0),r.integer(71,0));return;\n        }\n''','''        if("TABLES".equals(c.section)&&"STYLE".equals(type)){\n            c.textStyles.add(r.text(2,DxfTextStyles.STANDARD),r.text(3,""),r.text(4,""),r.number(40,0),r.number(41,1),r.number(50,0),\n                r.integer(70,0),r.integer(71,0));return;\n        }\n        if("TABLES".equals(c.section)&&"DIMSTYLE".equals(type)){c.dimStyles.addRecord(r.tags);return;}\n''')
+repl('''        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size(),c.pointStyle);\n''','''        Entity entity=isTextType(type)?parseTextEntity(type,r.tags,0,r.tags.size(),c.textStyles):parse(type,r.tags,0,r.tags.size(),c.pointStyle,c.dimStyles);\n''')
+
+old='''    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle){\n        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),pointStyle);\n        return parse(type,a,from,to);\n    }\n'''
+new='''    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles){\n        if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),pointStyle);\n        if("LEADER".equals(type))return leaderEntity(a,from,to,dimStyles);\n        return parse(type,a,from,to);\n    }\n\n    private static Entity leaderEntity(List<String>a,int from,int to,DxfDimStyles.Table dimStyles){\n        ArrayList<PointF> points=repeatedPoints(a,from,to,10,20);if(points.size()<2)return null;\n        ArrayList<PointF> arrow=new ArrayList<>();\n        if(((int)fv(a,from,to,71,0f))!=0){\n            PointF tip=points.get(0),next=points.get(1);double segment=Math.hypot(next.x-tip.x,next.y-tip.y);\n            double styleSize=dimStyles==null?0d:dimStyles.arrowSize(str(a,from,to,3,""));\n            double[] packed=DxfLeader.arrow(tip.x,tip.y,next.x,next.y,DxfLeader.saneSize(styleSize,segment));\n            arrow=packedPoints(packed);\n        }\n        return new LeaderEntity(points,arrow);\n    }\n'''
+repl(old,new)
+
+# LEADER is now handled by the style-aware overload; remove the old plain-poly fallback.
+repl('''        if("LEADER".equals(type)){\n            ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);\n        }\n''','')
+
+p.write_text(s)
