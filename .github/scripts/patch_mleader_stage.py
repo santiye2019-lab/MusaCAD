@@ -9,9 +9,11 @@ def repl(old,new,count=1):
 
 # Large-file streaming must retain the nested MULTILEADER structural markers.
 repl('''            code==330||code==331||code==340||code==370||code==410||code==420||code==440||
-            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||code==210||code==220||code==230;
+            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||
+            (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
 ''','''            code==330||code==331||code==340||code==370||code==410||code==420||code==440||
-            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||code==210||code==220||code==230;
+            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||
+            (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
 ''')
 
 repl('''    private static Entity parse(String type,List<String>a,int from,int to,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles){
