@@ -436,21 +436,27 @@ public final class DxfParser {
     }
 
     private static final class Label implements Entity {
-        final float x,y,height,angle,widthFactor,oblique,boxWidth,targetWidth;
-        final String text,fontFamily;final int hAlign,vAlign,attachment;
-        final boolean mtext,backwards,upsideDown,aligned;
-        private Path cached;
+        final float x,y,height,angle,widthFactor,oblique,boxWidth,targetWidth,backgroundScale;
+        final String text,fontFamily;final int hAlign,vAlign,attachment,backgroundColor;
+        final boolean mtext,backwards,upsideDown,aligned,backgroundEnabled;
+        private Path cached,cachedBackground;
         Label(float x,float y,float h,float angle,String text){
-            this(x,y,h,angle,text,1,0,"sans-serif",0,0,false,1,0,false,false,0,false);
+            this(x,y,h,angle,text,1,0,"sans-serif",0,0,false,1,0,false,false,0,false,false,BACKGROUND,1.5f);
         }
         Label(float x,float y,float h,float angle,String text,float widthFactor,float oblique,String fontFamily,
               int hAlign,int vAlign,boolean mtext,int attachment,float boxWidth,boolean backwards,boolean upsideDown,
               float targetWidth,boolean aligned){
+            this(x,y,h,angle,text,widthFactor,oblique,fontFamily,hAlign,vAlign,mtext,attachment,boxWidth,backwards,upsideDown,targetWidth,aligned,false,BACKGROUND,1.5f);
+        }
+        Label(float x,float y,float h,float angle,String text,float widthFactor,float oblique,String fontFamily,
+              int hAlign,int vAlign,boolean mtext,int attachment,float boxWidth,boolean backwards,boolean upsideDown,
+              float targetWidth,boolean aligned,boolean backgroundEnabled,int backgroundColor,float backgroundScale){
             this.x=x;this.y=y;this.height=Math.max(.01f,h);this.angle=angle;this.text=text==null?"":text;
             this.widthFactor=Math.max(.01f,Math.abs(widthFactor));this.oblique=Float.isFinite(oblique)?oblique:0;
             this.fontFamily=fontFamily==null||fontFamily.isEmpty()?"sans-serif":fontFamily;this.hAlign=hAlign;this.vAlign=vAlign;
             this.mtext=mtext;this.attachment=attachment;this.boxWidth=Math.max(0,boxWidth);this.backwards=backwards;this.upsideDown=upsideDown;
-            this.targetWidth=Math.max(0,targetWidth);this.aligned=aligned;
+            this.targetWidth=Math.max(0,targetWidth);this.aligned=aligned;this.backgroundEnabled=backgroundEnabled;this.backgroundColor=backgroundColor;
+            this.backgroundScale=(float)DxfMTextBackground.boxScale(backgroundScale);
         }
         private ArrayList<String> rows(Paint paint){
             ArrayList<String> result=new ArrayList<>();String[] explicit=text.split("\n",-1);
@@ -489,14 +495,23 @@ public final class DxfParser {
                 double hx=DxfTextLayout.textHorizontal(hAlign);int vy=DxfTextLayout.textVertical(vAlign);
                 dx=(float)-(r.left+hx*r.width());dy=vy==0?0:vy==1?-r.top:vy==2?-r.centerY():-r.bottom;
             }
-            Matrix placement=new Matrix();placement.setTranslate(dx,dy);placement.postRotate(angle);placement.postTranslate(x,y);shape.transform(placement);
-            return shape;
+            Matrix placement=new Matrix();placement.setTranslate(dx,dy);placement.postRotate(angle);placement.postTranslate(x,y);
+            if(backgroundEnabled){
+                RectF box=new RectF(r);float pad=(float)DxfMTextBackground.padding(height,backgroundScale);box.inset(-pad,-pad);
+                Path background=new Path();background.addRect(box,Path.Direction.CW);background.transform(placement);cachedBackground=background;
+            }
+            shape.transform(placement);return shape;
         }
         private Path shape(){if(cached==null)cached=buildShape();return new Path(cached);}
-        public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);if(!r.isEmpty()){add(b,r.left,r.top);add(b,r.right,r.bottom);}}
+        private Path background(){shape();return cachedBackground==null?null:new Path(cachedBackground);}
+        public void bounds(RectF b){
+            RectF r=new RectF();shape().computeBounds(r,true);if(!r.isEmpty()){add(b,r.left,r.top);add(b,r.right,r.bottom);}
+            Path bg=background();if(bg!=null){r.setEmpty();bg.computeBounds(r,true);if(!r.isEmpty()){add(b,r.left,r.top);add(b,r.right,r.bottom);}}
+        }
         public void draw(Canvas c,Paint p,Matrix m){
-            Path path=shape();path.transform(m);Paint.Style old=p.getStyle();PathEffect effect=p.getPathEffect();
-            p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(old);p.setPathEffect(effect);
+            Path path=shape();path.transform(m);Paint.Style old=p.getStyle();PathEffect effect=p.getPathEffect();int oldColor=p.getColor();
+            p.setPathEffect(null);p.setStyle(Paint.Style.FILL);Path bg=background();if(bg!=null){bg.transform(m);p.setColor(backgroundColor);c.drawPath(bg,p);p.setColor(oldColor);}
+            c.drawPath(path,p);p.setColor(oldColor);p.setStyle(old);p.setPathEffect(effect);
         }
     }
 
@@ -766,7 +781,7 @@ public final class DxfParser {
 
     private static boolean keepStreamCode(int code){
         return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
-            code==330||code==331||code==340||code==370||code==410||code==420||code==440||
+            code==330||code==331||code==340||code==370||code==410||code==420||code==421||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||
             (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
     }
@@ -1104,8 +1119,16 @@ public final class DxfParser {
         float oblique=has(a,from,to,51)?f(a,from,to,51):(float)style.oblique;
         boolean backwards=false,upsideDown=false;int hAlign=0,vAlign=0,attachment=1;float boxWidth=0,targetWidth=0;
         float x=f(a,from,to,10),y=f(a,from,to,20),angle=0;boolean aligned=false;
+        boolean backgroundEnabled=false;int backgroundColor=BACKGROUND;float backgroundScale=1.5f;
         if(mtext){
             attachment=(int)fv(a,from,to,71,1f);boxWidth=Math.max(0,fv(a,from,to,41,0f));
+            int backgroundFlags=(int)fv(a,from,to,90,0f);backgroundEnabled=DxfMTextBackground.enabled(backgroundFlags);
+            if(backgroundEnabled){
+                long backgroundTrueColor=-1;String rawColor=str(a,from,to,421,"").trim();
+                if(!rawColor.isEmpty())try{backgroundTrueColor=Long.parseLong(rawColor);}catch(NumberFormatException ignored){}
+                backgroundColor=DxfMTextBackground.color(backgroundFlags,(int)fv(a,from,to,63,0f),backgroundTrueColor,BACKGROUND);
+                backgroundScale=(float)DxfMTextBackground.boxScale(fv(a,from,to,45,1.5f));
+            }
             if(has(a,from,to,11)&&has(a,from,to,21))angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));
             else if(has(a,from,to,50))angle=(float)Math.toDegrees(f(a,from,to,50));
         }else{
@@ -1120,7 +1143,7 @@ public final class DxfParser {
             }
         }
         return new Label(x,y,height,angle,plain,width,oblique,style.familyHint(),hAlign,vAlign,mtext,attachment,boxWidth,
-            backwards,upsideDown,targetWidth,aligned);
+            backwards,upsideDown,targetWidth,aligned,backgroundEnabled,backgroundColor,backgroundScale);
     }
 
     private static Entity projectOcs(String type,Entity entity,List<String>a,int from,int to)throws IOException{
