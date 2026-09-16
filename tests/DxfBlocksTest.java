@@ -70,6 +70,12 @@ public class DxfBlocksTest {
         String hiddenAttdefBlock=block("AH",tags(0,"ATTDEF",70,1,1,"SECRET",10,3,20,4,40,1)+LINE);
         DxfBlocks.Result hiddenAttdef=read(hiddenAttdefBlock,insert("AH"));
         if(hiddenAttdef.placements.size()!=1||hiddenAttdef.skipped!=0)throw new AssertionError("Invisible ATTDEF in block");
+        String variableAttdefBlock=block("AV",tags(0,"ATTDEF",70,0,1,"DEFAULT",2,"TAG",10,3,20,4,40,1)+LINE);
+        DxfBlocks.Result variableAttdef=read(variableAttdefBlock,insert("AV"));
+        if(variableAttdef.placements.size()!=1||!"LINE".equals(variableAttdef.placements.get(0).record.type))throw new AssertionError("Variable ATTDEF template duplicated in block");
+        String constantAttdefBlock=block("AC",tags(0,"ATTDEF",70,2,1,"CONSTANT",2,"TAG",10,3,20,4,40,1)+LINE);
+        DxfBlocks.Result constantAttdef=read(constantAttdefBlock,insert("AC"));
+        if(constantAttdef.placements.size()!=2||!"ATTDEF".equals(constantAttdef.placements.get(0).record.type))throw new AssertionError("Constant ATTDEF must remain visible");
 
         String dimBlock=block("*D1",LINE);
         DxfBlocks.Result dim=read(dimBlock,dimension("*D1",8,"DIM",10,10000,20,10000,13,-5000,23,9000,14,7000,24,-9000));
@@ -100,6 +106,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result owned=DxfBlocks.expand(Arrays.asList(ownerDxf.split("\n")),"A4");
         if(owned.placements.size()!=1||!"A4".equals(owned.activeLayout)||!owned.layouts.contains("A4"))throw new AssertionError("Layout owner resolution");
 
-        System.out.println("28 block expansion, visibility and space/layout cases passed");
+        System.out.println("30 block expansion, visibility and space/layout cases passed");
     }
 }
