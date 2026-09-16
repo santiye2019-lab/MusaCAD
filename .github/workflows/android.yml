@@ -102,6 +102,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
           java -cp /tmp/musacad-tests DxfHatchPatternTest
+      - name: Test DXF HATCH gradients
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatchGradient.java tests/DxfHatchGradientTest.java
+          java -cp /tmp/musacad-tests DxfHatchGradientTest
       - name: Test DXF transparency and draw order
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java tests/DxfTransparencyTest.java tests/DxfDrawOrderTest.java
@@ -111,10 +115,11 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfSpace.java tests/DxfSpaceTest.java
           java -cp /tmp/musacad-tests DxfSpaceTest
-      - name: Test DXF paper viewports
+      - name: Test DXF paper viewports and nonrectangular clipping
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java app/src/main/java/com/musa/cad/DxfViewportClip.java tests/DxfViewportTest.java tests/DxfViewportClipTest.java
           java -cp /tmp/musacad-tests DxfViewportTest
+          java -cp /tmp/musacad-tests DxfViewportClipTest
       - name: Test DXF OCS transforms
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
