@@ -10,6 +10,9 @@ public class DxfMTextBackgroundTest {
         yes(DxfMTextBackground.enabled(1),"explicit fill");
         yes(DxfMTextBackground.enabled(2),"drawing background fill");
         no(DxfMTextBackground.enabled(16),"frame bit alone is not fill");
+        no(DxfMTextBackground.frame(1),"fill alone is not frame");
+        yes(DxfMTextBackground.frame(16),"text frame");
+        yes(DxfMTextBackground.frame(17),"fill plus frame");
         eq(DxfMTextBackground.color(2,1,0x123456,0xff12181e),0xff12181e,"drawing background wins");
         eq(DxfMTextBackground.color(1,1,0x123456,0xff12181e),0xff123456,"true color wins");
         eq(DxfMTextBackground.color(1,3,-1,0xff12181e),0xff00ff00,"ACI fill");
@@ -18,6 +21,6 @@ public class DxfMTextBackgroundTest {
         close(DxfMTextBackground.boxScale(.5),1.5,"too-small scale");
         close(DxfMTextBackground.boxScale(20),10,"scale cap");
         close(DxfMTextBackground.padding(4,1.5),1,"padding");
-        System.out.println("12 MTEXT background mask cases passed");
+        System.out.println("15 MTEXT background mask/frame cases passed");
     }
 }
