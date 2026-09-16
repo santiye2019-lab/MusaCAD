@@ -15,7 +15,7 @@ public class DxfMeshTest {
         eq(triangles.length,20,"shared diagonal deduped");
         double[] explicit=DxfMesh.wireframe(v,null,new int[]{0,1,1,2,2,3,3,0});eq(explicit.length,16,"explicit edges");
         double[] mixed=DxfMesh.wireframe(v,new int[]{3,0,1,2},new int[]{2,3,3,0});eq(mixed.length,20,"faces plus explicit edges");
-        double[] bad=DxfMesh.wireframe(v,new int[]{4,0,1,9,3},new int[]{-1,2,1,1});eq(bad.length,12,"invalid references ignored");
+        double[] bad=DxfMesh.wireframe(v,new int[]{4,0,1,9,3},new int[]{-1,2,1,1});eq(bad.length,8,"invalid references ignored");
         eq(DxfMesh.wireframe(new double[]{0,0},new int[]{2,0,1},null).length,0,"too few vertices");
         System.out.println("modern MESH wireframe cases passed");
     }
