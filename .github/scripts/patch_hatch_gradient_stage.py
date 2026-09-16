@@ -1,0 +1,18 @@
+from pathlib import Path
+p=Path('app/src/main/java/com/musa/cad/DxfParser.java');s=p.read_text()
+
+def repl(old,new,count=1):
+    global s
+    n=s.count(old)
+    if n!=count: raise SystemExit(f'expected {count}, got {n}: {old[:220]!r}')
+    s=s.replace(old,new,count)
+
+repl('''        final ArrayList<HatchLoop> loops;final boolean solid;final int style;\n        final ArrayList<DxfHatchPattern.Line> pattern;\n        Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern){\n            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;\n        }\n''','''        final ArrayList<HatchLoop> loops;final boolean solid;final int style;\n        final ArrayList<DxfHatchPattern.Line> pattern;final DxfHatchGradient.Data gradient;\n        Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern,DxfHatchGradient.Data gradient){\n            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;this.gradient=gradient==null?DxfHatchGradient.none():gradient;\n        }\n''')
+
+repl('''            if(loops.isEmpty())return;Path clip=boundary(m);\n            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();\n            if(solid){\n''','''            if(loops.isEmpty())return;Path clip=boundary(m);\n            Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();\n            if(gradient.enabled){\n                RectF box=localBounds();if(box.left<=box.right&&box.top<=box.bottom){\n                    int oldColor=p.getColor(),alpha=Color.alpha(oldColor);Shader oldShader=p.getShader();\n                    int c1=(alpha<<24)|(gradient.color1&0x00ffffff),c2=(alpha<<24)|(gradient.color2&0x00ffffff);\n                    p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setShader(null);p.setColor(c1);\n                    if(gradient.linear()){\n                        double[] axis=DxfHatchGradient.axis(box.left,box.top,box.right,box.bottom,gradient.rotation);\n                        if(axis.length==4){float[] q={(float)axis[0],(float)axis[1],(float)axis[2],(float)axis[3]};m.mapPoints(q);\n                            if(Math.hypot(q[2]-q[0],q[3]-q[1])>1e-4)p.setShader(new LinearGradient(q[0],q[1],q[2],q[3],c1,c2,Shader.TileMode.CLAMP));}\n                    }\n                    c.drawPath(clip,p);p.setShader(oldShader);p.setColor(oldColor);p.setStyle(oldStyle);p.setPathEffect(oldEffect);return;\n                }\n            }\n            if(solid){\n''')
+
+repl('''        boolean solid=((int)fv(a,from,to,70,0f))!=0;int style=(int)fv(a,from,to,75,0f);\n        ArrayList<DxfHatchPattern.Line> pattern=solid?new ArrayList<>():parseHatchPatternLines(a,i,to);\n        return new Hatch(loops,solid,style,pattern);\n''','''        boolean solid=((int)fv(a,from,to,70,0f))!=0;int style=(int)fv(a,from,to,75,0f);\n        DxfHatchGradient.Data gradient=DxfHatchGradient.parse(a,from,to);\n        ArrayList<DxfHatchPattern.Line> pattern=(solid||gradient.enabled)?new ArrayList<>():parseHatchPatternLines(a,i,to);\n        return new Hatch(loops,solid,style,pattern,gradient);\n''')
+
+repl('''            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||\n            (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);\n''','''            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||(code>=450&&code<=470)||\n            (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);\n''')
+
+p.write_text(s)
