@@ -44,8 +44,8 @@ public final class DxfColor {
                 int b=base[2]*level/255;
                 if((shade&1)!=0){
                     // LibreDWG's odd ACI entries are a 2/3 blend toward the
-                    // current brightness level, e.g. 10 red -> 11 pastel red.
-                    r=(r+2*level)/3;g=(g+2*level)/3;b=(b+2*level)/3;
+                    // current brightness level, rounded to the nearest byte.
+                    r=(r+2*level+1)/3;g=(g+2*level+1)/3;b=(b+2*level+1)/3;
                 }
                 return (r<<16)|(g<<8)|b;
         }
