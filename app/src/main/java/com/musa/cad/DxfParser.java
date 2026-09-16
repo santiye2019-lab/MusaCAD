@@ -132,13 +132,13 @@ public final class DxfParser {
         public int contentHeight(){return SIZE;}
     }
 
-    // Display colors distinguish layers; these are not the source file's ACI colors.
+    /** Retains the source DXF color already resolved from ACI/TrueColor/BYLAYER/BYBLOCK. */
     private static final class LayerEntity implements Entity {
-        final Entity entity; final String layer;
-        LayerEntity(Entity e,String l){entity=e;layer=l;}
+        final Entity entity; final String layer; final int color;
+        LayerEntity(Entity e,String l,int color){entity=e;layer=l;this.color=color;}
         public void bounds(RectF b){entity.bounds(b);}
         public void draw(Canvas c,Paint p,Matrix m){
-            p.setColor(Color.HSVToColor(new float[]{Math.floorMod(layer.hashCode(),360),.45f,.95f}));
+            p.setColor(color);
             entity.draw(c,p,m);
         }
     }
@@ -192,7 +192,7 @@ public final class DxfParser {
                 entity=parse(item.record.type,lines,item.record.from,item.record.to);
                 if(entity==null){skipped++;continue;}
             }
-            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
+            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,item.color));layers.add(item.layer);
         }
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
