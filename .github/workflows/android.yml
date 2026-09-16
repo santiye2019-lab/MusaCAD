@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, gandalf/step27-editor-integration ]
   workflow_dispatch:
 
 jobs:
