@@ -1,108 +1,78 @@
-# Musa CAD (Android)
+# MusaCAD Android
 
-İlk prototip özellikleri:
+MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düzenlemeler eklemek ve çıktı paylaşmak için geliştirilen Android CAD uygulamasıdır.
 
-- Android dosya seçiciden DWG/DXF seçme
-- LibreDWG ile deneysel çevrimdışı DWG geometrisi okuma; başarısızlıkta gömülü önizlemeyi açma
-- ASCII DXF içindeki LINE, LWPOLYLINE, CIRCLE ve ARC geometrilerini çizme
-- Yakınlaştırma ve kaydırma
-- Kalibrasyonla gerçek birimde mesafe ve alan ölçme
-- Geri alma ve ölçümü temizleme
-- Orijinal dosyayı paylaşma
+## Mevcut özellikler
+
+- Android dosya seçicisinden DWG ve DXF açma
+- Dosya yöneticisinden desteklenen DWG/DXF dosyalarını doğrudan MusaCAD ile açma
+- LibreDWG tabanlı çevrimdışı DWG → DXF dönüştürme
+- Dönüşüm başarısızsa DWG içindeki gömülü önizlemeyi kullanma
+- Vektörel DXF görüntüleme ve yakınlaştırmada yeniden çizim
+- İki parmakla zoom, tek parmakla gezinme, çift dokunmayla ekrana sığdırma
+- Katman açma/kapatma
+- Uç nokta/köşe yakalama
+- Kalibrasyonla metre, santimetre veya milimetre cinsinden mesafe ve alan ölçümü
+- Çizgi, çoklu çizgi, dikdörtgen, daire ve yazı ekleme
+- Düzenlemeleri geri alma
+- Düzenlenmiş çizimi DXF olarak kaydetme
+- Orijinal DWG/DXF dosyasını paylaşma
 - Görünümü PNG olarak paylaşma
-- Görünümü PDF olarak oluşturup paylaşma
+- Tam görünümü doğrudan PDF çizim yüzeyine aktararak paylaşma
+- Ekranda alan seçip seçili alanı PNG veya PDF olarak paylaşma
+- Büyük dosya açma yolu için 256 MB üst sınır
+- Arka planda dosya okuma/dönüştürme ve iptal desteği
 
-## Önemli teknik not
+## Desteklenen 2B geometri
 
-DWG, LibreDWG motoruyla önce geçici DXF'ye dönüştürülür; desteklenen temel 2B geometriler çizilir. Dönüşüm başarısızsa varsa gömülü önizleme gösterilir. Bu durumda başlıkta görüntünün piksel boyutu ve geometri okunamadığı belirtilir. Küçük önizlemeler çizimin ayrıntılarını taşımaz; kalibrasyon eksik ayrıntıyı veya hassasiyeti geri getirmez. DXF yazı, blok ve nokta yakalama desteği aşağıdaki kapsamla sınırlıdır. Ekran üzerinden yapılan ölçümler kontrol amaçlıdır; resmi metraj öncesinde doğrulanmalıdır.
+DXF tarafında temel olarak LINE, LWPOLYLINE, POLYLINE/VERTEX, CIRCLE, ARC, ELLIPSE, TEXT, MTEXT, ATTRIB/ATTDEF, SPLINE, LEADER, HATCH, SOLID, TRACE, 3DFACE ve sınırlı DIMENSION gösterimi işlenir. BLOCK/INSERT yerleşimlerinde taşıma, döndürme, ölçek, aynalama ve iç içe blokların önemli bir bölümü desteklenir.
+
+Her DWG/DXF nesnesinin birebir desteklendiği iddia edilmez. Dinamik bloklar, harici referanslar, bazı 3B nesneler, MINSERT dizileri ve özel/proxy nesneler sınırlı veya desteklenmeyen alanlardır.
+
+## Netlik
+
+Vektörel olarak çözülebilen DWG/DXF geometri ekranda bitmap büyütmek yerine yeniden çizilir. Bu nedenle zoom sırasında çizgiler ve desteklenen yazılar mümkün olduğunca net kalır. DWG dönüştürülemez ve yalnız gömülü önizleme bulunursa görüntü raster önizleme olduğu için ayrıntı seviyesi kaynak DWG önizlemesiyle sınırlıdır.
+
+## Ölçüm
+
+Ölçüm modu önce bir kalibrasyon ister. Çizimde uzunluğu bilinen iki nokta seçilir ve gerçek değer m, cm veya mm olarak girilir. Ardından mesafe ve alan hesapları bu ölçeği kullanır. Nokta yakalama açık olduğunda desteklenen çizgi uçları ve çoklu çizgi köşeleri seçim kolaylığı sağlar.
+
+MusaCAD ölçümleri saha ve kontrol amaçlı yardımcı ölçümlerdir; resmi metraj veya imalat kararı öncesinde kaynak proje/ölçek ayrıca doğrulanmalıdır.
+
+## Düzenleme ve DXF kaydetme
+
+Vektörel olarak açılan DWG önce geçici DXF çalışma kopyasına dönüştürülür. Çizgi, çoklu çizgi, dikdörtgen, daire ve yazı düzenlemeleri ekranda tutulur ve `DXF Kaydet` ile kaynak/çalışma DXF'inin ENTITIES bölümüne eklenerek yeni bir dosyaya yazılır. Orijinal dosya değiştirilmez.
+
+## Paylaşım ve çıktı
+
+Paylaş menüsünde:
+
+1. Orijinal dosyayı paylaş
+2. Görünümü PDF olarak paylaş
+3. Görünümü PNG olarak paylaş
+4. Alan seçerek paylaş
+
+seçenekleri bulunur. Tam görünüm PDF'i doğrudan CAD görünümünden PDF canvas'ına çizilir. Seçili alan paylaşımı ekran üzerinde dikdörtgen seçimle çalışır ve PNG/PDF önizlemesi verir.
+
+## Büyük dosyalar
+
+Eski 32 MB açma sınırı kaldırılmış, mevcut büyük çizim yolu 256 MB üst sınıra yükseltilmiştir. DXF ayrıştırıcısında ayrıca bellek tüketimini sınırlamak için etiket/satır sınırı bulunur. Çok büyük veya çok karmaşık dosyalarda telefonun RAM miktarı yine pratik sınır oluşturabilir.
+
+## Lisans
+
+DWG dönüştürme motoru LibreDWG kullanır. Uygulama içinde LibreDWG lisans metni gösterilir ve karşılık gelen kaynak paketinin CI çıktısına dahil edilmesi sağlanır. Ayrıntılar `NATIVE_BUILD.md`, `LICENSE` ve uygulamadaki `MusaCAD hakkında` ekranındadır.
 
 ## Derleme
 
-Önce NATIVE_BUILD.md içindeki sabit sürümlü LibreDWG kaynak hazırlığını yapın; ardından Android Studio'da klasörü açın ve `app` modülünü çalıştırın. Proje Java 8, minSdk 24 ve targetSdk 35 kullanır.
+- compileSdk: 35
+- targetSdk: 35
+- minSdk: 24
+- Java: 17
+- Android Gradle Plugin: 8.6.1
+- Native DWG köprüsü: sabit commit'e pinlenmiş LibreDWG
 
-## Bu geliştirme
+GitHub Actions kalite kapısı native dönüştürücü smoke testini, Java yardımcı sınıf testlerini, Android lint ve unit testlerini, debug ve release varyantlarının derlenmesini çalıştırır.
 
-- TEXT ve MTEXT için düz yazı gösterimi; parçalı MTEXT içeriği, satır sonları ve Unicode kaçışları okunur.
-- Katman adına göre ayırt edici renkler atanır. Bunlar dosyanın özgün renkleri değildir.
-- Açılan nesne ve katman sayısı, atlanan nesne sayısıyla birlikte gösterilir.
-- Ölçüm noktaları görüntü koordinatlarında tutulur; zoom ölçeği ölçüm sonucuna katılmaz.
-- Yeni çizimde kalibrasyon sıfırlanır; kalibrasyonsuz ölçüler piksel olarak belirtilir.
+## Kurulum güvenlik notu
 
-Sınırlar: DXF hâlen 2400×2400 bitmap olarak görüntülenir; vektör yakınlaştırma,
-özgün yazı tipi/hizalama/satır kaydırma henüz yoktur; katman görünürlüğü uygulama içinden değiştirilebilir; blok desteğinin sınırları aşağıdadır. Nokta yakalama aşağıdaki nesnelerle sınırlıdır. DWG desteği deneyseldir; bazı dosyalarda yalnız önizleme açılabilir. APK derlenmesi, cihaz üzerinde doğruluk testi anlamına gelmez.
-
-
-## Seçili alan paylaşımı
-
-Paylaş → Alan seçerek paylaş yolunu açın. Görünümü tek parmakla sürükleyerek
-dikdörtgen seçin; önizlemeden PNG veya PDF paylaşımını seçin. Yeniden Seç ile
-seçimi tekrarlayabilir, seçim sırasında GERİ ile iptal edebilirsiniz.
-Çizim ve mevcut ölçüm işaretleri çıktıya alınır; sarı seçim çerçevesi alınmaz.
-Çıktı ekran çözünürlüğündedir; PDF, görüntü tabanlıdır ve ölçekli pafta değildir.
-Her paylaşım ayrı bir geçici dosya üretir.
-
-
-## DXF uç noktası yakalama
-
-NOKTA YAKALA seçeneği, desteklenen DXF çizgilerinin uçlarına ve LWPOLYLINE
-köşelerine dokunmayı kolaylaştırır. Mesafe, alan ve kalibrasyonda en yakın aday
-18 dp ekran mesafesi içinde seçilir; yakalanan son nokta beyaz kareyle gösterilir.
-İstenirse kapatılabilir. DWG önizlemesinde ve aday bulunmayan dosyada devre dışıdır.
-Yakınlaştırmada dokunma toleransı ekran üzerinde sabit kalır.
-
-Bu aşama kesişim, orta nokta, daire merkezi yakalamaz. Desteklenen bloklardaki çizgi uçları ve çoklu çizgi köşeleri yakalanır.
-Ölçü birimini otomatik belirlemez; gerçek uzunluk için kalibrasyon gerekir.
-
-
-## Temel 2B blok desteği
-
-BLOCKS bölümündeki tanımlar, ENTITIES içindeki INSERT yerleşimleriyle açılır.
-Taban noktası, taşıma, döndürme, farklı X/Y ölçekleri, aynalama ve iç içe bloklar
-hesaba katılır. Blok içindeki 0 katmanı yerleşimin katmanını devralır.
-Çizgi uçları ve çoklu çizgi köşeleri dönüşümden sonra nokta yakalamaya katılır.
-Daire/yaylar dönüşümlü yollarla çizilir; farklı X/Y ölçeğinde eliptik görünür.
-
-Sınırlar: MINSERT dizileri, harici referanslar, 3B yerleşimler, dinamik blok
-davranışı ve öznitelikler desteklenmez. Eksik veya döngüsel blok referansı atlanan
-sayısına eklenir. En fazla 32 iç içe blok ve 100.000 genişletme adımı işlenir.
-Açılan nesne sayısı, blokların içinden çıkan desteklenen öğeleri de içerir.
-
-Teknik başvuru: https://ezdxf.readthedocs.io/en/stable/blocks/insert.html
-
-
-## Arka planda dosya açma
-
-Dosya kopyalama ve çizim hazırlama tek arka plan iş parçacığında yürür.
-Açılış penceresi okunan MB değerini, ardından hazırlama aşamasını gösterir.
-İptal edilen veya eski kalan sonuç ekrana uygulanmaz. Dosya başarıyla açılana
-kadar mevcut çizim, kalibrasyon, ölçümler ve orijinal paylaşım dosyası korunur.
-Boş/okunamayan dosyada kısmi geçici kopya silinir.
-
-Bu sürümde dosya sınırı 32 MB, DXF metin sınırı 600.000 satırdır.
-DWG önizlemesi en fazla 2400 piksel kenara örneklenir.
-İptal arayüzü hemen kapanır; bulut sağlayıcısının engellenen okuması dönene kadar
-arka plan işinin sona ermesi gecikebilir. PDF/PNG dışa aktarımı henüz arka plana
-taşınmamıştır. Telefon üzerinde bellek ve yaşam döngüsü testi yapılmalıdır.
-
-
-## Katman görünürlüğü
-
-DXF açıldıktan sonra KATMANLAR düğmesiyle görünür katmanları seçin.
-UYGULA değişikliği işler; İPTAL önceki durumu korur; TÜMÜNÜ GÖSTER tümünü açar.
-Gizlenen katmanlar çizimden ve uç noktası yakalama adaylarından birlikte çıkar.
-PNG/PDF görünüm paylaşımı bu seçimi yansıtır; orijinal dosya değiştirilmez.
-Yeniden çizim arka plandadır; iptal ve hata halinde önceki görünüm korunur.
-Görünüm dönüşümü ve kalibrasyon sabittir; mevcut ölçüm işaretleri temizlenir.
-Liste yalnızca desteklenen nesnelerin katmanlarını içerir. Dosyanın kaynak
-katman açık/kapalı bayrakları ve renkleri henüz birebir uygulanmaz.
-
-
-## Deneysel gerçek DWG okuma
-
-LibreDWG tabanlı çevrimdışı DWG→DXF köprüsü eklenmiştir. Geometri okunursa
-katmanlar, desteklenen bloklar ve nokta yakalama kullanılabilir. Başarısızlıkta
-varsa gömülü önizleme açılır ve bu durum başlıkta belirtilir.
-Tüm nesneler ve DWG sürümleri için eksiksiz destek iddiası yoktur.
-Kalibrasyon hâlâ gereklidir. Geometriye ait bölüm haritası okunamayan dosyalar
-önizleme yoluna düşebilir; bu durum tek başına dosyanın bozuk olduğunu kanıtlamaz.
-Lisans, kaynak paketleme ve yeniden derleme için NATIVE_BUILD.md belgesine bakın.
+Android, Play Store dışından elle yüklenen uygulamalarda kaynağa/cihaz politikasına bağlı olarak “bilinmeyen uygulama”, Play Protect veya benzeri bir yükleme uyarısı gösterebilir. Bu uyarı uygulama içi kodla güvenli biçimde kaldırılamaz. Kalıcı olarak uyarısız dağıtım için uygulamanın sabit bir release anahtarıyla imzalanması ve tercihen Google Play gibi güvenilen bir dağıtım kanalından yayınlanması gerekir.
