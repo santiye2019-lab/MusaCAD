@@ -1,0 +1,69 @@
+name: One-shot HATCH gradient patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-hatch-gradient-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot HATCH gradient workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch HATCH gradient rendering
+        run: python3 .github/scripts/patch_hatch_gradient_stage.py
+      - name: Test HATCH gradients and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-gradient && mkdir -p /tmp/musacad-gradient
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfHatchGradient.java tests/DxfHatchGradientTest.java
+          java -cp /tmp/musacad-gradient DxfHatchGradientTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-gradient DxfHatchPatternTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfViewport.java app/src/main/java/com/musa/cad/DxfViewportClip.java tests/DxfViewportTest.java tests/DxfViewportClipTest.java
+          java -cp /tmp/musacad-gradient DxfViewportTest
+          java -cp /tmp/musacad-gradient DxfViewportClipTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
+          java -cp /tmp/musacad-gradient DxfCurvesTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-gradient DxfTextTest
+          java -cp /tmp/musacad-gradient DxfTextStylesTest
+          java -cp /tmp/musacad-gradient DxfTextLayoutTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfMTextBackground.java tests/DxfMTextBackgroundTest.java
+          java -cp /tmp/musacad-gradient DxfMTextBackgroundTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-gradient DxfPolylineWidthTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          java -cp /tmp/musacad-gradient DxfDimStylesTest
+          java -cp /tmp/musacad-gradient DxfLeaderTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-gradient DxfMLeaderTest
+          javac -d /tmp/musacad-gradient app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
+          java -cp /tmp/musacad-gradient DxfBlocksTest
+          java -cp /tmp/musacad-gradient DxfExpansionLimitTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit HATCH gradient support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Render linear HATCH gradients'
+          git push origin HEAD:fix-1b-hatch-geometry
