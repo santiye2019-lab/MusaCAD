@@ -189,10 +189,13 @@ public final class DxfParser {
 
     /** Filled/patterned HATCH clipped to its independent boundary loops. */
     private static final class Hatch implements Entity {
-        final ArrayList<HatchLoop> loops;final boolean solid;final int style;
+        final ArrayList<HatchLoop> loops;final boolean solid;final int style,solidFillAci;
         final ArrayList<DxfHatchPattern.Line> pattern;final DxfHatchGradient.Data gradient;
         Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern,DxfHatchGradient.Data gradient){
-            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;this.gradient=gradient==null?DxfHatchGradient.none():gradient;
+            this(loops,solid,style,pattern,gradient,-1);
+        }
+        Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern,DxfHatchGradient.Data gradient,int solidFillAci){
+            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;this.gradient=gradient==null?DxfHatchGradient.none():gradient;this.solidFillAci=solidFillAci;
         }
         private boolean preferred(HatchLoop loop){
             if(style==2)return (loop.flags&1)!=0;              // IGNORE: external boundary only.
@@ -232,7 +235,8 @@ public final class DxfParser {
                 }
             }
             if(solid){
-                p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(clip,p);
+                int oldColor=p.getColor();p.setPathEffect(null);p.setStyle(Paint.Style.FILL);
+                if(solidFillAci>=0)p.setColor(DxfMPolygon.solidFillArgb(solidFillAci,oldColor));c.drawPath(clip,p);p.setColor(oldColor);
                 p.setStyle(oldStyle);p.setPathEffect(oldEffect);return;
             }
             if(pattern.isEmpty()){
@@ -848,7 +852,7 @@ public final class DxfParser {
     }
 
     private static boolean keepStreamCode(int code){
-        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
+        return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==63||code==66||code==67||code==68||code==69||
             code==330||code==331||code==340||code==370||code==410||code==420||code==421||code==440||
             (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||(code>=450&&code<=470)||
             (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
@@ -1236,7 +1240,7 @@ public final class DxfParser {
     private static double[] ocsMatrix(String type,List<String>a,int from,int to){
         boolean supported="TEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)||
             "CIRCLE".equals(type)||"ARC".equals(type)||"LWPOLYLINE".equals(type)||"POLYLINE".equals(type)||
-            "HATCH".equals(type)||"SOLID".equals(type)||"TRACE".equals(type);
+            "HATCH".equals(type)||"MPOLYGON".equals(type)||"SOLID".equals(type)||"TRACE".equals(type);
         if(!supported)return null;
         if("POLYLINE".equals(type)){
             int flags=(int)fv(a,from,to,70,0f);
@@ -1324,6 +1328,7 @@ public final class DxfParser {
         if("LWPOLYLINE".equals(type))return lwPolyline(a,from,to);
         if("SPLINE".equals(type))return splineEntity(a,from,to);
         if("HATCH".equals(type))return parseHatch(a,from,to);
+        if("MPOLYGON".equals(type))return parseMPolygon(a,from,to);
         if("WIPEOUT".equals(type))return parseWipeout(a,from,to);
         if("IMAGE".equals(type))return parseImageFrame(a,from,to);
         if("SOLID".equals(type)||"TRACE".equals(type)){
@@ -1347,7 +1352,10 @@ public final class DxfParser {
      * are never joined together.
      */
     /** Parse independent HATCH loops, then render SOLID fill or explicit DXF pattern definitions. */
-    private static Entity parseHatch(List<String>a,int from,int to){
+    private static Entity parseHatch(List<String>a,int from,int to){return parseHatchLike(a,from,to,false);}
+    private static Entity parseMPolygon(List<String>a,int from,int to){return parseHatchLike(a,from,to,true);}
+
+    private static Entity parseHatchLike(List<String>a,int from,int to,boolean mpolygon){
         int pathCount=(int)fv(a,from,to,91,0f);if(pathCount<=0)return null;
         int i=from;ArrayList<HatchLoop> loops=new ArrayList<>();
         for(int pathIndex=0;pathIndex<pathCount;pathIndex++){
@@ -1382,10 +1390,19 @@ public final class DxfParser {
             }
         }
         if(loops.isEmpty())return null;
-        boolean solid=((int)fv(a,from,to,70,0f))!=0;int style=(int)fv(a,from,to,75,0f);
-        DxfHatchGradient.Data gradient=DxfHatchGradient.parse(a,from,to);
+        if(mpolygon){
+            double ox=fv(a,i,to,11,0f),oy=fv(a,i,to,21,0f);
+            if(Double.isFinite(ox)&&Double.isFinite(oy)&&(Math.abs(ox)>1e-12||Math.abs(oy)>1e-12))
+                for(HatchLoop loop:loops)for(PointF q:loop.points){q.x+=ox;q.y+=oy;}
+        }
+        boolean solid=mpolygon?DxfMPolygon.solid((int)fv(a,from,to,71,0f)):((int)fv(a,from,to,70,0f))!=0;
+        int style=mpolygon?0:(int)fv(a,from,to,75,0f);DxfHatchGradient.Data gradient=DxfHatchGradient.parse(a,from,to);
         ArrayList<DxfHatchPattern.Line> pattern=(solid||gradient.enabled)?new ArrayList<>():parseHatchPatternLines(a,i,to);
-        return new Hatch(loops,solid,style,pattern,gradient);
+        int fillAci=mpolygon?(int)fv(a,i,to,63,256f):-1;Hatch fill=new Hatch(loops,solid,style,pattern,gradient,fillAci);
+        if(!mpolygon)return fill;
+        ArrayList<Entity> items=new ArrayList<>();if(solid||gradient.enabled||!pattern.isEmpty())items.add(fill);
+        for(HatchLoop loop:loops)if(loop.points.size()>=2)items.add(new Poly(new ArrayList<>(loop.points),true));
+        if(items.isEmpty())return null;return items.size()==1?items.get(0):new Composite(items);
     }
 
     private static void appendHatchEdge(ArrayList<PointF> loop,ArrayList<PointF> edge){
