@@ -1,21 +1,25 @@
 package com.musa.cad;
 
+import android.graphics.Matrix;
 import android.graphics.PointF;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Writes MusaCAD overlay edits into a copy of the full source/converted DXF. */
 public final class DxfWriter {
     public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits)throws IOException{
         if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
-        Charset cs=DxfParser.charset(baseDxf);boolean inserted=false;String section="";boolean sectionPending=false;
+        Matrix contentToWorld=contentToWorldMatrix(drawing);
+        Charset cs=charset(baseDxf);boolean inserted=false;String section="";boolean sectionPending=false;
         try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(baseDxf),cs),128*1024);
             BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,cs),128*1024)){
             while(true){
                 FileTransfer.checkCancelled();String codeLine=in.readLine();if(codeLine==null)break;String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");
                 int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}String value=valueLine.trim();
-                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){writeEdits(out,drawing,edits);inserted=true;}
+                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){writeEdits(out,contentToWorld,edits);inserted=true;}
                 out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();
                 if(code==0&&"SECTION".equals(value)){sectionPending=true;continue;}
                 if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;continue;}
@@ -25,18 +29,44 @@ public final class DxfWriter {
         }
     }
 
-    private static void writeEdits(BufferedWriter out,DxfParser.Result drawing,List<CadEdit> edits)throws IOException{
+    private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits)throws IOException{
+        if(edits==null)return;
         for(CadEdit edit:edits){
+            FileTransfer.checkCancelled();
             switch(edit.type){
-                case LINE:{PointF a=w(drawing,edit.xy[0],edit.xy[1]),b=w(drawing,edit.xy[2],edit.xy[3]);entity(out,"LINE");layer(out);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
-                case RECTANGLE:{PointF a=w(drawing,edit.xy[0],edit.xy[1]),b=w(drawing,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");layer(out);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
-                case CIRCLE:{PointF c=w(drawing,edit.xy[0],edit.xy[1]),p=w(drawing,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");layer(out);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
-                case POLYLINE:{entity(out,"LWPOLYLINE");layer(out);int count=edit.xy.length/2;i(out,90,count);i(out,70,0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(drawing,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
-                case TEXT:{PointF p=w(drawing,edit.xy[0],edit.xy[1]);entity(out,"TEXT");layer(out);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,drawing.worldTextHeight(30));tag(out,1,safe(edit.text));break;}
+                case LINE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LINE");layer(out);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
+                case RECTANGLE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");layer(out);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
+                case CIRCLE:{PointF c=w(contentToWorld,edit.xy[0],edit.xy[1]),p=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");layer(out);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
+                case POLYLINE:{entity(out,"LWPOLYLINE");layer(out);int count=edit.xy.length/2;i(out,90,count);i(out,70,0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
+                case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");layer(out);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,worldTextHeight(contentToWorld,30));tag(out,1,safe(edit.text));break;}
             }
         }
     }
-    private static PointF w(DxfParser.Result r,float x,float y){return r.contentToWorld(x,y);}
+
+    /** Result keeps the world-to-content transform private; keep persistence isolated here rather than exposing parser internals. */
+    private static Matrix contentToWorldMatrix(DxfParser.Result drawing)throws IOException{
+        try{
+            Field field=DxfParser.Result.class.getDeclaredField("view");field.setAccessible(true);
+            Matrix worldToContent=(Matrix)field.get(drawing);Matrix inverse=new Matrix();
+            if(worldToContent==null||!worldToContent.invert(inverse))throw new IOException("DXF koordinat dönüşümü oluşturulamadı");
+            return inverse;
+        }catch(ReflectiveOperationException|SecurityException e){throw new IOException("DXF koordinat dönüşümüne erişilemedi",e);}
+    }
+
+    private static Charset charset(File file)throws IOException{
+        String header;
+        try(InputStream in=new FileInputStream(file)){byte[] bytes=new byte[65536];int count=in.read(bytes);header=new String(bytes,0,Math.max(0,count),StandardCharsets.ISO_8859_1);}
+        java.util.regex.Matcher version=java.util.regex.Pattern.compile("AC10([0-9]{2})").matcher(header);
+        if(version.find()&&Integer.parseInt(version.group(1))>=21)return StandardCharsets.UTF_8;
+        java.util.regex.Matcher cp=java.util.regex.Pattern.compile("ANSI_([0-9]+)").matcher(header);
+        try{if(cp.find())return Charset.forName("windows-"+cp.group(1));}catch(Exception ignored){}
+        return Charset.forName("windows-1252");
+    }
+
+    private static double worldTextHeight(Matrix contentToWorld,float contentPixels){
+        float[] vector={0,contentPixels};contentToWorld.mapVectors(vector);return Math.max(.001,Math.hypot(vector[0],vector[1]));
+    }
+    private static PointF w(Matrix m,float x,float y){float[] xy={x,y};m.mapPoints(xy);return new PointF(xy[0],xy[1]);}
     private static void entity(BufferedWriter o,String type)throws IOException{tag(o,0,type);}
     private static void layer(BufferedWriter o)throws IOException{tag(o,8,"0");}
     private static void point(BufferedWriter o,double x,double y)throws IOException{n(o,10,x);n(o,20,y);}
