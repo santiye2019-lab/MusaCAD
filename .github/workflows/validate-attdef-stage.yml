@@ -1,0 +1,56 @@
+name: One-shot ATTDEF regression validation
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/validate-attdef-stage.yml' ]
+
+jobs:
+  validate:
+    if: github.event.head_commit.message == 'Add one-shot ATTDEF validation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test ATTDEF semantics and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-attdef && mkdir -p /tmp/musacad-attdef
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfVisibility.java tests/DxfVisibilityTest.java
+          java -cp /tmp/musacad-attdef DxfVisibilityTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
+          java -cp /tmp/musacad-attdef DxfBlocksTest
+          java -cp /tmp/musacad-attdef DxfExpansionLimitTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
+          java -cp /tmp/musacad-attdef DxfCurvesTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-attdef DxfHatchPatternTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-attdef DxfTextTest
+          java -cp /tmp/musacad-attdef DxfTextStylesTest
+          java -cp /tmp/musacad-attdef DxfTextLayoutTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-attdef DxfPolylineWidthTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          java -cp /tmp/musacad-attdef DxfDimStylesTest
+          java -cp /tmp/musacad-attdef DxfLeaderTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-attdef DxfMLeaderTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-attdef DxfViewportTest
+          javac -d /tmp/musacad-attdef app/src/main/java/com/musa/cad/DxfInfiniteLine.java tests/DxfInfiniteLineTest.java
+          java -cp /tmp/musacad-attdef DxfInfiniteLineTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
