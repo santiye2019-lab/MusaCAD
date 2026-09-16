@@ -190,9 +190,9 @@ public final class DxfParser {
     /** Filled/patterned HATCH clipped to its independent boundary loops. */
     private static final class Hatch implements Entity {
         final ArrayList<HatchLoop> loops;final boolean solid;final int style;
-        final ArrayList<DxfHatchPattern.Line> pattern;
-        Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern){
-            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;
+        final ArrayList<DxfHatchPattern.Line> pattern;final DxfHatchGradient.Data gradient;
+        Hatch(ArrayList<HatchLoop> loops,boolean solid,int style,ArrayList<DxfHatchPattern.Line> pattern,DxfHatchGradient.Data gradient){
+            this.loops=loops;this.solid=solid;this.style=style;this.pattern=pattern;this.gradient=gradient==null?DxfHatchGradient.none():gradient;
         }
         private boolean preferred(HatchLoop loop){
             if(style==2)return (loop.flags&1)!=0;              // IGNORE: external boundary only.
@@ -218,6 +218,19 @@ public final class DxfParser {
         public void draw(Canvas c,Paint p,Matrix m){
             if(loops.isEmpty())return;Path clip=boundary(m);
             Paint.Style oldStyle=p.getStyle();PathEffect oldEffect=p.getPathEffect();
+            if(gradient.enabled){
+                RectF box=localBounds();if(box.left<=box.right&&box.top<=box.bottom){
+                    int oldColor=p.getColor(),alpha=Color.alpha(oldColor);Shader oldShader=p.getShader();
+                    int c1=(alpha<<24)|(gradient.color1&0x00ffffff),c2=(alpha<<24)|(gradient.color2&0x00ffffff);
+                    p.setPathEffect(null);p.setStyle(Paint.Style.FILL);p.setShader(null);p.setColor(c1);
+                    if(gradient.linear()){
+                        double[] axis=DxfHatchGradient.axis(box.left,box.top,box.right,box.bottom,gradient.rotation);
+                        if(axis.length==4){float[] q={(float)axis[0],(float)axis[1],(float)axis[2],(float)axis[3]};m.mapPoints(q);
+                            if(Math.hypot(q[2]-q[0],q[3]-q[1])>1e-4)p.setShader(new LinearGradient(q[0],q[1],q[2],q[3],c1,c2,Shader.TileMode.CLAMP));}
+                    }
+                    c.drawPath(clip,p);p.setShader(oldShader);p.setColor(oldColor);p.setStyle(oldStyle);p.setPathEffect(oldEffect);return;
+                }
+            }
             if(solid){
                 p.setPathEffect(null);p.setStyle(Paint.Style.FILL);c.drawPath(clip,p);
                 p.setStyle(oldStyle);p.setPathEffect(oldEffect);return;
@@ -837,7 +850,7 @@ public final class DxfParser {
     private static boolean keepStreamCode(int code){
         return code==1||code==2||code==3||code==4||code==5||code==6||code==7||code==8||code==9||code==60||code==62||code==66||code==67||code==68||code==69||
             code==330||code==331||code==340||code==370||code==410||code==420||code==421||code==440||
-            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||
+            (code>=10&&code<=59)||(code>=70&&code<=79)||(code>=90&&code<=99)||(code>=300&&code<=305)||(code>=450&&code<=470)||
             (code>=210&&code<=213)||(code>=220&&code<=223)||(code>=230&&code<=233);
     }
 
@@ -1370,8 +1383,9 @@ public final class DxfParser {
         }
         if(loops.isEmpty())return null;
         boolean solid=((int)fv(a,from,to,70,0f))!=0;int style=(int)fv(a,from,to,75,0f);
-        ArrayList<DxfHatchPattern.Line> pattern=solid?new ArrayList<>():parseHatchPatternLines(a,i,to);
-        return new Hatch(loops,solid,style,pattern);
+        DxfHatchGradient.Data gradient=DxfHatchGradient.parse(a,from,to);
+        ArrayList<DxfHatchPattern.Line> pattern=(solid||gradient.enabled)?new ArrayList<>():parseHatchPatternLines(a,i,to);
+        return new Hatch(loops,solid,style,pattern,gradient);
     }
 
     private static void appendHatchEdge(ArrayList<PointF> loop,ArrayList<PointF> edge){
