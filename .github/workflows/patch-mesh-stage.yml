@@ -65,3 +65,5 @@ jobs:
           git add app/src/main/java/com/musa/cad/DxfParser.java
           git commit -m 'Render modern MESH wireframes'
           git push origin HEAD:fix-1b-hatch-geometry
+
+# retry after correcting the invalid-reference regression expectation
