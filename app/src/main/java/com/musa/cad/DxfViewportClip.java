@@ -27,9 +27,12 @@ public final class DxfViewportClip {
         double[] result=new double[out.size()];for(int i=0;i<result.length;i++)result[i]=out.get(i);return result;
     }
 
-    /** Point-in-polygon with edge tolerance in paper-space drawing units. */
-    public static boolean contains(double[] raw,double x,double y,double tolerance){
-        double[] p=polygon(raw);if(p.length<6||!Double.isFinite(x)||!Double.isFinite(y))return false;
+    /** Point-in-polygon with edge tolerance; raw input is sanitized first. */
+    public static boolean contains(double[] raw,double x,double y,double tolerance){return containsPrepared(polygon(raw),x,y,tolerance);}
+
+    /** Fast point-in-polygon for a polygon already returned by {@link #polygon(double[])}. */
+    public static boolean containsPrepared(double[] p,double x,double y,double tolerance){
+        if(p==null||p.length<6||!Double.isFinite(x)||!Double.isFinite(y))return false;
         double tol=Math.max(0,Double.isFinite(tolerance)?tolerance:0);int n=p.length/2;
         for(int i=0;i<n;i++){int j=(i+1)%n;if(distanceToSegment(x,y,p[i*2],p[i*2+1],p[j*2],p[j*2+1])<=tol)return true;}
         boolean inside=false;
@@ -42,8 +45,11 @@ public final class DxfViewportClip {
     }
 
     /** Returns [left,bottom,right,top], or an empty array for invalid polygons. */
-    public static double[] bounds(double[] raw){
-        double[] p=polygon(raw);if(p.length<6)return new double[0];
+    public static double[] bounds(double[] raw){return boundsPrepared(polygon(raw));}
+
+    /** Fast bounds for a polygon already returned by {@link #polygon(double[])}. */
+    public static double[] boundsPrepared(double[] p){
+        if(p==null||p.length<6)return new double[0];
         double l=Double.POSITIVE_INFINITY,b=Double.POSITIVE_INFINITY,r=Double.NEGATIVE_INFINITY,t=Double.NEGATIVE_INFINITY;
         for(int i=0;i<p.length;i+=2){l=Math.min(l,p[i]);r=Math.max(r,p[i]);b=Math.min(b,p[i+1]);t=Math.max(t,p[i+1]);}
         return new double[]{l,b,r,t};
