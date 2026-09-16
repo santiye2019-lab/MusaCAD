@@ -1331,6 +1331,7 @@ public final class DxfParser {
         if("MPOLYGON".equals(type))return parseMPolygon(a,from,to);
         if("WIPEOUT".equals(type))return parseWipeout(a,from,to);
         if("IMAGE".equals(type))return parseImageFrame(a,from,to);
+        if("MESH".equals(type))return parseMesh(a,from,to);
         if("SOLID".equals(type)||"TRACE".equals(type)){
             ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<3?null:new FilledPoly(p);
         }
@@ -1454,6 +1455,31 @@ public final class DxfParser {
                 lines.add(new DxfHatchPattern.Line(angle,bx,by,ox,oy,raw));
         }
         return lines;
+    }
+
+    /** Modern AcDbSubDMesh rendered as a 2D WCS wireframe; subdivision surfaces are not synthesized. */
+    private static Entity parseMesh(List<String>a,int from,int to){
+        int vertexTag=-1,vertexCount=-1,faceTag=-1,faceItems=0;
+        for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));
+            if(code==92&&faceTag<0){vertexTag=i;vertexCount=(int)floatOf(a.get(i+1));}
+            else if(code==93){faceTag=i;faceItems=(int)floatOf(a.get(i+1));break;}
+        }
+        if(vertexTag<0||faceTag<0||vertexCount<2||faceItems<0)return null;
+        ArrayList<PointF> vertices=new ArrayList<>();Float vx=null;
+        for(int i=vertexTag+2;i+1<faceTag&&vertices.size()<vertexCount;i+=2){int code=intOf(a.get(i));
+            if(code==10)vx=floatOf(a.get(i+1));else if(code==20&&vx!=null){float vy=floatOf(a.get(i+1));if(Float.isFinite(vx)&&Float.isFinite(vy))vertices.add(new PointF(vx,vy));vx=null;}
+        }
+        if(vertices.size()<2)return null;double[] xy=pointArray(vertices);ArrayList<Integer> faces=new ArrayList<>();int edgeTag=-1,edgeCount=0;
+        for(int i=faceTag+2;i+1<to;i+=2){int code=intOf(a.get(i));
+            if(code==94){edgeTag=i;edgeCount=(int)floatOf(a.get(i+1));break;}
+            if(code==90&&faces.size()<faceItems)faces.add((int)floatOf(a.get(i+1)));
+        }
+        int[] faceData=new int[faces.size()];for(int i=0;i<faceData.length;i++)faceData[i]=faces.get(i);
+        ArrayList<Integer> edges=new ArrayList<>();if(edgeTag>=0&&edgeCount>0){
+            int wanted=Math.min(200000,edgeCount*2);for(int i=edgeTag+2;i+1<to&&edges.size()<wanted;i+=2){int code=intOf(a.get(i));if(code==95)break;if(code==90)edges.add((int)floatOf(a.get(i+1)));}
+        }
+        int[] edgeData=new int[edges.size()];for(int i=0;i<edgeData.length;i++)edgeData[i]=edges.get(i);
+        return segmentSet(DxfMesh.wireframe(xy,faceData,edgeData));
     }
 
     /** External raster bytes are normally not embedded in DWG/DXF; keep the IMAGE footprint visible as a safe fallback. */
