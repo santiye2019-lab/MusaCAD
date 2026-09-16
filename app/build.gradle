@@ -10,8 +10,8 @@ android {
         minSdkVersion 24
         targetSdkVersion 35
         ndk { abiFilters "arm64-v8a", "x86_64" }
-        versionCode 6
-        versionName '0.6-editor-large-dwg'
+        versionCode 7
+        versionName '0.7-editor-tools'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
