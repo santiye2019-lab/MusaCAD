@@ -1,8 +1,9 @@
 package com.musa.cad;
 
-/** Pure MTEXT background-mask semantics shared by buffered and streaming DXF rendering. */
+/** Pure MTEXT background-mask and text-frame semantics shared by buffered and streaming DXF rendering. */
 public final class DxfMTextBackground {
     public static boolean enabled(int flags){return (flags&3)!=0;}
+    public static boolean frame(int flags){return (flags&16)!=0;}
     public static boolean useDrawingBackground(int flags){return (flags&2)!=0;}
 
     /** AutoCAD normally writes 1.5; reject corrupt/extreme values without hiding the text. */
