@@ -2,7 +2,7 @@ name: Android quality gate
 
 on:
   push:
-    branches: [ main, gandalf/step27-editor-integration ]
+    branches: [ main, gandalf/step27-editor-integration, gandalf/commercial-readiness ]
   workflow_dispatch:
 
 jobs:
@@ -40,9 +40,13 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
           java -cp /tmp/musacad-tests SnapPointsTest
-      - name: Test DXF block expansion
+      - name: Test DXF color palette
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
+          java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test DXF block expansion and color inheritance
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
       - name: Test cancellable file transfer
         run: |
