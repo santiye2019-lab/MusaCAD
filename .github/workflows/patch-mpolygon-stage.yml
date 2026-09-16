@@ -1,0 +1,69 @@
+name: One-shot MPOLYGON patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-mpolygon-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot MPOLYGON workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch MPOLYGON rendering
+        run: python3 .github/scripts/patch_mpolygon_stage.py
+      - name: Test MPOLYGON and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-mpolygon && mkdir -p /tmp/musacad-mpolygon
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfMPolygon.java tests/DxfMPolygonTest.java
+          java -cp /tmp/musacad-mpolygon DxfMPolygonTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfHatchGradient.java tests/DxfHatchGradientTest.java
+          java -cp /tmp/musacad-mpolygon DxfHatchGradientTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-mpolygon DxfHatchPatternTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfViewport.java app/src/main/java/com/musa/cad/DxfViewportClip.java tests/DxfViewportTest.java tests/DxfViewportClipTest.java
+          java -cp /tmp/musacad-mpolygon DxfViewportTest
+          java -cp /tmp/musacad-mpolygon DxfViewportClipTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfCurves.java tests/DxfCurvesTest.java
+          java -cp /tmp/musacad-mpolygon DxfCurvesTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-mpolygon DxfPolylineWidthTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-mpolygon DxfTextTest
+          java -cp /tmp/musacad-mpolygon DxfTextStylesTest
+          java -cp /tmp/musacad-mpolygon DxfTextLayoutTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfCurves.java app/src/main/java/com/musa/cad/DxfDimStyles.java app/src/main/java/com/musa/cad/DxfLeader.java tests/DxfDimStylesTest.java tests/DxfLeaderTest.java
+          java -cp /tmp/musacad-mpolygon DxfDimStylesTest
+          java -cp /tmp/musacad-mpolygon DxfLeaderTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-mpolygon DxfMLeaderTest
+          javac -d /tmp/musacad-mpolygon app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
+          java -cp /tmp/musacad-mpolygon DxfBlocksTest
+          java -cp /tmp/musacad-mpolygon DxfExpansionLimitTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit MPOLYGON support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Render MPOLYGON fills and boundaries'
+          git push origin HEAD:fix-1b-hatch-geometry
