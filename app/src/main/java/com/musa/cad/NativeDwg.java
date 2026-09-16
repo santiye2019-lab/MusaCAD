@@ -2,7 +2,7 @@ package com.musa.cad;
 
 import java.io.*;
 
-/** Offline conversion; caller retains the original DWG and a temporary DXF working copy. */
+/** Offline DWG conversion. Viewing can use read(); editor flows can retain the converted DXF via readWithWorkingCopy(). */
 public final class NativeDwg {
     static {System.loadLibrary("musacad_dwg");}
     private static native int convertNative(String input,String output);
@@ -14,7 +14,15 @@ public final class NativeDwg {
         Conversion(DxfParser.Result result,File dxf,int warnings){this.result=result;this.dxf=dxf;this.warnings=warnings;}
     }
 
-    public static Conversion read(File dwg,File cache)throws IOException {
+    /** Backward-compatible viewing path used by the current MainActivity. */
+    public static DxfParser.Result read(File dwg,File cache)throws IOException {
+        Conversion conversion=readWithWorkingCopy(dwg,cache);
+        try{return conversion.result;}
+        finally{if(conversion.dxf!=null)conversion.dxf.delete();}
+    }
+
+    /** Editor path: caller owns and must eventually delete the returned temporary DXF. */
+    public static Conversion readWithWorkingCopy(File dwg,File cache)throws IOException {
         FileTransfer.checkCancelled();
         File converted=File.createTempFile("MusaCAD_donusen_",".dxf",cache);
         boolean keep=false;
