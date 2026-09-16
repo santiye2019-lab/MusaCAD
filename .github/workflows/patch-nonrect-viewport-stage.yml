@@ -1,0 +1,65 @@
+name: One-shot nonrectangular VIEWPORT patch
+
+on:
+  push:
+    branches: [ fix-1b-hatch-geometry ]
+    paths: [ '.github/workflows/patch-nonrect-viewport-stage.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot nonrectangular viewport workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-1b-hatch-geometry
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Patch nonrectangular VIEWPORT clipping
+        run: python3 .github/scripts/patch_nonrect_viewport_stage.py
+      - name: Test viewport clipping and cumulative renderer regressions
+        run: |
+          rm -rf /tmp/musacad-vpclip && mkdir -p /tmp/musacad-vpclip
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfViewportClip.java tests/DxfViewportClipTest.java
+          java -cp /tmp/musacad-vpclip DxfViewportClipTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
+          java -cp /tmp/musacad-vpclip DxfViewportTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfVisibility.java tests/DxfVisibilityTest.java
+          java -cp /tmp/musacad-vpclip DxfVisibilityTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfStyle.java app/src/main/java/com/musa/cad/DxfTransparency.java app/src/main/java/com/musa/cad/DxfDrawOrder.java app/src/main/java/com/musa/cad/DxfOcs.java app/src/main/java/com/musa/cad/DxfSpace.java app/src/main/java/com/musa/cad/DxfVisibility.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java tests/DxfExpansionLimitTest.java
+          java -cp /tmp/musacad-vpclip DxfBlocksTest
+          java -cp /tmp/musacad-vpclip DxfExpansionLimitTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfOcs.java tests/DxfOcsTest.java
+          java -cp /tmp/musacad-vpclip DxfOcsTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfHatchPattern.java tests/DxfHatchPatternTest.java
+          java -cp /tmp/musacad-vpclip DxfHatchPatternTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfText.java app/src/main/java/com/musa/cad/DxfTextStyles.java app/src/main/java/com/musa/cad/DxfTextLayout.java tests/DxfTextTest.java tests/DxfTextStylesTest.java tests/DxfTextLayoutTest.java
+          java -cp /tmp/musacad-vpclip DxfTextTest
+          java -cp /tmp/musacad-vpclip DxfTextStylesTest
+          java -cp /tmp/musacad-vpclip DxfTextLayoutTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfMTextBackground.java tests/DxfMTextBackgroundTest.java
+          java -cp /tmp/musacad-vpclip DxfMTextBackgroundTest
+          javac -d /tmp/musacad-vpclip app/src/main/java/com/musa/cad/DxfPolylineWidth.java tests/DxfPolylineWidthTest.java
+          java -cp /tmp/musacad-vpclip DxfPolylineWidthTest
+      - name: Fetch pinned LibreDWG for Android compile
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile Android Java sources
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+      - name: Commit nonrectangular viewport support
+        run: |
+          git config user.name 'MusaCAD CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/musa/cad/DxfParser.java
+          git commit -m 'Clip paper viewports to nonrectangular boundaries'
+          git push origin HEAD:fix-1b-hatch-geometry
