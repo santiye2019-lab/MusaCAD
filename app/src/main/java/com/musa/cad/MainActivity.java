@@ -16,11 +16,12 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import java.io.*;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20;
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6;
+    private static final int OPEN=20,SAVE_DXF=21;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
@@ -29,9 +30,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static final class Loaded {
-        File file;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
         void dispose(){
             if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();
+            if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();
             if(file!=null)file.delete();
         }
     }
@@ -40,7 +42,8 @@ public class MainActivity extends AppCompatActivity {
     private DxfParser.Result activeDxf;
     private CadView cad;
     private TextView fileName,result;
-    private File currentFile;
+    private File currentFile,editingBaseDxf;
+    private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
     private View welcomePanel,shareButton,shareToolButton;
 
@@ -66,20 +69,22 @@ public class MainActivity extends AppCompatActivity {
             public void onMeasurement(String v){result.setText(v);}
             public void onCalibrationRequested(double px){showCalibration();}
             public void onSelectionReady(){previewSelection();}
+            public void onTextRequested(float x,float y){showTextEditor(x,y);}
         });
 
         snapToggle=findViewById(R.id.snapToggle);
         snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
 
         modeButtons=new View[]{
-            findViewById(R.id.panButton),findViewById(R.id.calibrateButton),
-            findViewById(R.id.distanceButton),findViewById(R.id.areaButton)
+            findViewById(R.id.panButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),
+            findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)
         };
         markModeSelected(R.id.panButton);
 
         int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.snapToggle,
-            R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.zoomInButton,R.id.zoomOutButton,
-            R.id.fitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton};
+            R.id.panButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,
+            R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,
+            R.id.zoomInButton,R.id.zoomOutButton,R.id.fitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);
@@ -91,6 +96,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.calibrateButton).setOnClickListener(v->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE));
         findViewById(R.id.distanceButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
         findViewById(R.id.areaButton).setOnClickListener(v->selectMode(R.id.areaButton,CadView.Mode.AREA));
+        findViewById(R.id.lineButton).setOnClickListener(v->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE));
+        findViewById(R.id.polylineButton).setOnClickListener(v->selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE));
+        findViewById(R.id.rectangleButton).setOnClickListener(v->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE));
+        findViewById(R.id.circleButton).setOnClickListener(v->selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE));
+        findViewById(R.id.textButton).setOnClickListener(v->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT));
+        findViewById(R.id.finishEditButton).setOnClickListener(v->{
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            if(!cad.finishEdit())Toast.makeText(this,"Bitirmek için Çoklu çizgi modunda en az 2 nokta seçin",Toast.LENGTH_SHORT).show();
+        });
+        findViewById(R.id.saveDxfButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);requestEditedDxfSave();});
         findViewById(R.id.zoomInButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.zoomBy(1.35f);});
         findViewById(R.id.zoomOutButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.zoomBy(1f/1.35f);});
         findViewById(R.id.fitButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.fitToScreen();});
@@ -98,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.clearButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.clearMeasurement();});
         shareButton.setOnClickListener(v->showShare());
         shareToolButton.setOnClickListener(v->showShare());
-        updateShareEnabled(false);
+        updateShareEnabled(false);updateEditorEnabled(false);
     }
 
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -117,6 +132,8 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private boolean canEdit(){return activeDxf!=null&&editingBaseDxf!=null&&editingBaseDxf.exists();}
+
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         PopupMenu popup=new PopupMenu(this,anchor);
@@ -124,14 +141,16 @@ public class MainActivity extends AppCompatActivity {
         menu.add(0,MENU_OPEN,0,"Dosya aç");
         menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);
         menu.add(0,MENU_FIT,2,"Ekrana sığdır").setEnabled(currentFile!=null);
-        menu.add(0,MENU_SHARE,3,"Paylaş").setEnabled(currentFile!=null);
-        menu.add(0,MENU_INFO,4,"Çizim bilgileri").setEnabled(activeDxf!=null);
-        menu.add(0,MENU_ABOUT,5,"MusaCAD hakkında");
+        menu.add(0,MENU_SAVE_DXF,3,"Düzenlenmiş DXF kaydet").setEnabled(canEdit());
+        menu.add(0,MENU_SHARE,4,"Paylaş").setEnabled(currentFile!=null);
+        menu.add(0,MENU_INFO,5,"Çizim bilgileri").setEnabled(activeDxf!=null);
+        menu.add(0,MENU_ABOUT,6,"MusaCAD hakkında");
         popup.setOnMenuItemClickListener(item->{
             switch(item.getItemId()){
                 case MENU_OPEN:open();return true;
                 case MENU_LAYERS:showLayers();return true;
                 case MENU_FIT:cad.fitToScreen();return true;
+                case MENU_SAVE_DXF:requestEditedDxfSave();return true;
                 case MENU_SHARE:showShare();return true;
                 case MENU_INFO:showDrawingInfo();return true;
                 case MENU_ABOUT:showLicense();return true;
@@ -147,6 +166,8 @@ public class MainActivity extends AppCompatActivity {
             "Nesne: "+activeDxf.entityCount+"\n"+
             "Katman: "+activeDxf.layerCount+"\n"+
             "Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+
+            "Eklenen düzenleme: "+cad.editCount()+"\n"+
+            "Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+
             "Görüntüleme: vektörel / net yakınlaştırma";
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }
@@ -156,11 +177,24 @@ public class MainActivity extends AppCompatActivity {
         shareToolButton.setEnabled(enabled);shareToolButton.setAlpha(enabled?1f:.55f);
     }
 
+    private void updateEditorEnabled(boolean enabled){
+        int[] ids={R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
+        for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}
+    }
+
     private void selectMode(int id,CadView.Mode mode){
         View button=findViewById(id);
         if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         cad.setMode(mode);markModeSelected(id);
     }
+
+    private void selectEditMode(int id,CadView.Mode mode){
+        if(!canEdit()){
+            Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();return;
+        }
+        selectMode(id,mode);
+    }
+
     private void markModeSelected(int id){
         if(modeButtons==null)return;
         for(View button:modeButtons)button.setSelected(button.getId()==id);
@@ -188,6 +222,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void open(){
+        if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden yeni dosya açılamaz",Toast.LENGTH_SHORT).show();return;}
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);
         i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/octet-stream"});
         startActivityForResult(i,OPEN);
@@ -195,12 +230,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
-        if(r==OPEN&&c==RESULT_OK&&data!=null&&data.getData()!=null)startLoad(data.getData());
+        if(c!=RESULT_OK||data==null||data.getData()==null)return;
+        if(r==OPEN)startLoad(data.getData());
+        else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
 
     private void cancelLoad(){
         LoadTask task=activeLoad;activeLoad=null;
-        if(task!=null){if(task.future!=null)task.future.cancel(true);task.dialog.dismiss();}
+        if(task!=null){if(task.future!=null)task.future.cancel(true);if(task.dialog!=null)task.dialog.dismiss();}
     }
 
     private void startLoad(Uri uri){
@@ -219,21 +256,23 @@ public class MainActivity extends AppCompatActivity {
             try{
                 FileTransfer.checkCancelled();
                 loaded.name=nameOf(uri);
-                loaded.dxf=loaded.name.toLowerCase(java.util.Locale.ROOT).endsWith(".dxf");
+                loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");
                 loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){
                     FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{
-                        if(activeLoad==task)task.progress.setText(String.format(java.util.Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));
+                        if(activeLoad==task)task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));
                     }));
                 }
                 runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Çizim hazırlanıyor…");});
                 FileTransfer.checkCancelled();
 
                 if(loaded.dxf){
-                    loaded.parsed=DxfParser.render(loaded.file);
+                    loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;
                 }else{
-                    try{loaded.parsed=NativeDwg.read(loaded.file,getCacheDir());}
-                    catch(InterruptedIOException cancelled){throw cancelled;}
+                    try{
+                        NativeDwg.Conversion conversion=NativeDwg.readWithWorkingCopy(loaded.file,getCacheDir());
+                        loaded.parsed=conversion.result;loaded.workingDxf=conversion.dxf;
+                    }catch(InterruptedIOException cancelled){throw cancelled;}
                     catch(IOException|UnsatisfiedLinkError conversionError){
                         FileTransfer.checkCancelled();
                         loaded.bitmap=DwgPreview.read(loaded.file);
@@ -247,9 +286,10 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
                     activeLoad=null;task.dialog.dismiss();
-                    currentFile=loaded.file;activeDxf=loaded.parsed;
+                    releaseCurrentFiles();
+                    currentFile=loaded.file;editingBaseDxf=loaded.workingDxf;currentDisplayName=loaded.name;activeDxf=loaded.parsed;
                     hideWelcomePanel();
-                    updateShareEnabled(true);
+                    updateShareEnabled(true);updateEditorEnabled(canEdit());
                     findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
 
                     if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);
@@ -259,9 +299,10 @@ public class MainActivity extends AppCompatActivity {
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
 
-                    fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme"));
+                    String editable=canEdit()?"  •  düzenlenebilir":"";
+                    fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme")+editable);
                     if(loaded.parsed!=null){
-                        result.setText("Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman");
+                        result.setText("Hazır  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman"+(canEdit()?"  •  düzenleme açık":""));
                     }else{
                         result.setText("Hazır  •  DWG önizleme modu");
                     }
@@ -277,7 +318,14 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    @Override protected void onDestroy(){cancelLoad();loader.shutdownNow();super.onDestroy();}
+    private void releaseCurrentFiles(){
+        if(activeDxf!=null&&activeDxf.bitmap!=null&&!activeDxf.bitmap.isRecycled())activeDxf.bitmap.recycle();
+        if(editingBaseDxf!=null&&editingBaseDxf!=currentFile)editingBaseDxf.delete();
+        if(currentFile!=null)currentFile.delete();
+        activeDxf=null;editingBaseDxf=null;currentFile=null;
+    }
+
+    @Override protected void onDestroy(){cancelLoad();releaseCurrentFiles();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){
@@ -285,18 +333,18 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         String[] names=activeDxf.layerNames.toArray(new String[0]);
-        java.util.Set<String> selected=new java.util.HashSet<>(activeDxf.visibleLayers);
+        Set<String> selected=new HashSet<>(activeDxf.visibleLayers);
         boolean[] checked=new boolean[names.length];
         for(int i=0;i<names.length;i++)checked[i]=selected.contains(names[i]);
         new AlertDialog.Builder(this).setTitle("Görünecek katmanlar")
             .setMultiChoiceItems(names,checked,(dialog,index,enabled)->{
                 if(enabled)selected.add(names[index]);else selected.remove(names[index]);
             }).setPositiveButton("UYGULA",(d,w)->applyLayers(selected))
-            .setNeutralButton("TÜMÜNÜ GÖSTER",(d,w)->applyLayers(new java.util.HashSet<>(activeDxf.layerNames)))
+            .setNeutralButton("TÜMÜNÜ GÖSTER",(d,w)->applyLayers(new HashSet<>(activeDxf.layerNames)))
             .setNegativeButton("İPTAL",null).show();
     }
 
-    private void applyLayers(java.util.Set<String> selected){
+    private void applyLayers(Set<String> selected){
         if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;
         DxfParser.Result source=activeDxf;
         LoadTask task=new LoadTask();activeLoad=task;
@@ -312,6 +360,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                     activeLoad=null;task.dialog.dismiss();
                     cad.replaceVisibleDrawing(updated);activeDxf=updated;
+                    if(source.bitmap!=null&&!source.bitmap.isRecycled())source.bitmap.recycle();
                     snapToggle.setEnabled(updated.snapPoints.length>0);
                     result.setText("Hazır  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");
                 });
@@ -332,6 +381,54 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return "cizim.dwg";
+    }
+
+    private void showTextEditor(float x,float y){
+        EditText input=new EditText(this);input.setHint("Çizime eklenecek yazı");input.setSingleLine(false);input.setMaxLines(3);
+        int p=dp(16);input.setPadding(p,p/2,p,p/2);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Yazı ekle").setView(input)
+            .setPositiveButton("EKLE",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String text=input.getText().toString().trim();
+            if(text.isEmpty()){input.setError("Bir yazı girin");return;}
+            cad.addTextEdit(x,y,text);dialog.dismiss();
+        }));
+        dialog.show();
+    }
+
+    private void requestEditedDxfSave(){
+        if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden kaydedilemez",Toast.LENGTH_SHORT).show();return;}
+        if(!canEdit()){Toast.makeText(this,"Bu çizim DXF olarak düzenlenebilir durumda değil",Toast.LENGTH_SHORT).show();return;}
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");
+        String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");
+        intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");startActivityForResult(intent,SAVE_DXF);
+    }
+
+    private void saveEditedDxf(Uri uri){
+        if(!canEdit()||activeLoad!=null)return;
+        final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> edits=cad.getEdits();
+        LoadTask task=new LoadTask();activeLoad=task;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);
+        box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);
+        task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box)
+            .setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        task.future=loader.submit(()->{
+            try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+                if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");
+                DxfWriter.write(base,out,drawing,edits);FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();
+                    Toast.makeText(this,"DXF kaydedildi • "+edits.size()+" düzenleme",Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();error(e);
+                });
+            }
+        });
     }
 
     private void showShare(){
