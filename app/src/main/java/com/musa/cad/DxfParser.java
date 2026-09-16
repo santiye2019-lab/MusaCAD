@@ -305,19 +305,34 @@ public final class DxfParser {
     }
 
     private static final class ViewportClip implements Entity {
-        final Entity entity;final Matrix modelToPaper;final DxfViewport.Spec spec;
-        ViewportClip(Entity entity,DxfViewport.Spec spec)throws IOException{
-            this.entity=entity;this.spec=spec;double[] t=spec.matrix();
+        final Entity entity;final Matrix modelToPaper;final DxfViewport.Spec spec;final double[] polygon;
+        ViewportClip(Entity entity,DxfViewport.Spec spec)throws IOException{this(entity,spec,null);}
+        ViewportClip(Entity entity,DxfViewport.Spec spec,double[] polygon)throws IOException{
+            this.entity=entity;this.spec=spec;this.polygon=DxfViewportClip.polygon(polygon);double[] t=spec.matrix();
             float[] v={(float)t[0],(float)t[2],(float)t[4],(float)t[1],(float)t[3],(float)t[5],0,0,1};
             for(float n:v)if(!Float.isFinite(n))throw new IOException("VIEWPORT dönüşümü sınır dışında");
             modelToPaper=new Matrix();modelToPaper.setValues(v);
         }
-        public void bounds(RectF b){add(b,(float)spec.left(),(float)spec.bottom());add(b,(float)spec.right(),(float)spec.top());}
-        public void draw(Canvas c,Paint p,Matrix view){
+        boolean nonRectangular(){return polygon.length>=6;}
+        boolean containsPaper(double x,double y,double tolerance){
+            return nonRectangular()?DxfViewportClip.containsPrepared(polygon,x,y,tolerance):DxfViewport.contains(spec,x,y,tolerance);
+        }
+        Path clipPath(Matrix view){
+            Path clip=new Path();
+            if(nonRectangular()){
+                float[] xy=new float[polygon.length];for(int i=0;i<polygon.length;i++)xy[i]=(float)polygon[i];view.mapPoints(xy);
+                clip.moveTo(xy[0],xy[1]);for(int i=2;i+1<xy.length;i+=2)clip.lineTo(xy[i],xy[i+1]);clip.close();return clip;
+            }
             float[] xy={(float)spec.left(),(float)spec.bottom(),(float)spec.right(),(float)spec.bottom(),
                 (float)spec.right(),(float)spec.top(),(float)spec.left(),(float)spec.top()};view.mapPoints(xy);
-            Path clip=new Path();clip.moveTo(xy[0],xy[1]);clip.lineTo(xy[2],xy[3]);clip.lineTo(xy[4],xy[5]);clip.lineTo(xy[6],xy[7]);clip.close();
-            int save=c.save();c.clipPath(clip);Matrix combined=new Matrix();combined.setConcat(view,modelToPaper);entity.draw(c,p,combined);c.restoreToCount(save);
+            clip.moveTo(xy[0],xy[1]);clip.lineTo(xy[2],xy[3]);clip.lineTo(xy[4],xy[5]);clip.lineTo(xy[6],xy[7]);clip.close();return clip;
+        }
+        public void bounds(RectF b){
+            if(nonRectangular()){double[] q=DxfViewportClip.boundsPrepared(polygon);add(b,(float)q[0],(float)q[1]);add(b,(float)q[2],(float)q[3]);}
+            else{add(b,(float)spec.left(),(float)spec.bottom());add(b,(float)spec.right(),(float)spec.top());}
+        }
+        public void draw(Canvas c,Paint p,Matrix view){
+            int save=c.save();c.clipPath(clipPath(view));Matrix combined=new Matrix();combined.setConcat(view,modelToPaper);entity.draw(c,p,combined);c.restoreToCount(save);
         }
     }
 
@@ -376,8 +391,8 @@ public final class DxfParser {
             entity=e;layer=l;this.color=color;this.lineWeight=lineWeight;this.lineType=lineType;this.lineTypeScale=lineTypeScale;
         }
         public void bounds(RectF b){entity.bounds(b);}
-        LayerEntity inViewport(DxfViewport.Spec spec)throws IOException{
-            return new LayerEntity(new ViewportClip(entity,spec),layer,color,lineWeight,lineType,lineTypeScale);
+        LayerEntity inViewport(DxfViewport.Spec spec,double[] polygon)throws IOException{
+            return new LayerEntity(new ViewportClip(entity,spec,polygon),layer,color,lineWeight,lineType,lineTypeScale);
         }
         public void draw(Canvas c,Paint p,Matrix m){
             p.setColor(color);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(DxfStyle.strokeWidthPx(lineWeight));
@@ -395,10 +410,8 @@ public final class DxfParser {
             if(e instanceof LeaderEntity){drawComplex(c,p,((LeaderEntity)e).line,m,budget);return;}
             if(e instanceof Transformed){Transformed t=(Transformed)e;Matrix q=new Matrix();q.setConcat(m,t.matrix);drawComplex(c,p,t.entity,q,budget);return;}
             if(e instanceof ViewportClip){
-                ViewportClip v=(ViewportClip)e;float[] xy={(float)v.spec.left(),(float)v.spec.bottom(),(float)v.spec.right(),(float)v.spec.bottom(),
-                    (float)v.spec.right(),(float)v.spec.top(),(float)v.spec.left(),(float)v.spec.top()};m.mapPoints(xy);
-                Path clip=new Path();clip.moveTo(xy[0],xy[1]);clip.lineTo(xy[2],xy[3]);clip.lineTo(xy[4],xy[5]);clip.lineTo(xy[6],xy[7]);clip.close();
-                int save=c.save();c.clipPath(clip);Matrix q=new Matrix();q.setConcat(m,v.modelToPaper);drawComplex(c,p,v.entity,q,budget);c.restoreToCount(save);return;
+                ViewportClip v=(ViewportClip)e;int save=c.save();c.clipPath(v.clipPath(m));Matrix q=new Matrix();q.setConcat(m,v.modelToPaper);
+                drawComplex(c,p,v.entity,q,budget);c.restoreToCount(save);return;
             }
             if(e instanceof Composite){for(Entity item:((Composite)e).items)drawComplex(c,p,item,m,budget);return;}
             if(e instanceof Line){Line q=(Line)e;segment(c,p,m,q.x1,q.y1,q.x2,q.y2,budget);return;}
@@ -543,10 +556,47 @@ public final class DxfParser {
             fv(a,from,to,17,0f),fv(a,from,to,27,0f),fv(a,from,to,37,0f));
     }
 
-    private static Entity viewportFrame(DxfViewport.Spec spec){
-        ArrayList<PointF> p=new ArrayList<>();p.add(new PointF((float)spec.left(),(float)spec.bottom()));
-        p.add(new PointF((float)spec.right(),(float)spec.bottom()));p.add(new PointF((float)spec.right(),(float)spec.top()));
-        p.add(new PointF((float)spec.left(),(float)spec.top()));return new Poly(p,true);
+    private static Entity viewportFrame(DxfViewport.Spec spec){return viewportFrame(spec,null);}
+
+    private static Entity viewportFrame(DxfViewport.Spec spec,double[] polygon){
+        double[] clip=DxfViewportClip.polygon(polygon);ArrayList<PointF> p=new ArrayList<>();
+        if(clip.length>=6){for(int i=0;i+1<clip.length;i+=2)p.add(new PointF((float)clip[i],(float)clip[i+1]));return new Poly(p,true);}
+        p.add(new PointF((float)spec.left(),(float)spec.bottom()));p.add(new PointF((float)spec.right(),(float)spec.bottom()));
+        p.add(new PointF((float)spec.right(),(float)spec.top()));p.add(new PointF((float)spec.left(),(float)spec.top()));return new Poly(p,true);
+    }
+
+    private static double[] viewportClipPolygon(Entity entity){
+        ArrayList<PointF> points=new ArrayList<>();if(!appendViewportClipPolygon(entity,new Matrix(),points))return new double[0];
+        double[] packed=new double[points.size()*2];for(int i=0;i<points.size();i++){packed[i*2]=points.get(i).x;packed[i*2+1]=points.get(i).y;}
+        return DxfViewportClip.polygon(packed);
+    }
+
+    private static boolean appendViewportClipPolygon(Entity entity,Matrix transform,ArrayList<PointF> out){
+        if(entity==null)return false;
+        if(entity instanceof GeometricWidth)return appendViewportClipPolygon(((GeometricWidth)entity).entity,transform,out);
+        if(entity instanceof VariableWidth)return appendViewportClipPolygon(((VariableWidth)entity).centerline,transform,out);
+        if(entity instanceof Transformed){Transformed t=(Transformed)entity;Matrix q=new Matrix();q.setConcat(transform,t.matrix);return appendViewportClipPolygon(t.entity,q,out);}
+        if(entity instanceof Poly){Poly p=(Poly)entity;if(!p.closed||p.pts.size()<3)return false;for(PointF v:p.pts)addMapped(out,transform,v.x,v.y);return true;}
+        if(entity instanceof FilledPoly){FilledPoly p=(FilledPoly)entity;if(p.pts.size()<3)return false;for(PointF v:p.pts)addMapped(out,transform,v.x,v.y);return true;}
+        if(entity instanceof Circle){Circle q=(Circle)entity;if(Math.abs(q.sweep)<359.99||q.r<=0)return false;for(int i=0;i<96;i++){double a=Math.toRadians(q.start+q.sweep*i/96d);addMapped(out,transform,q.x+q.r*Math.cos(a),q.y+q.r*Math.sin(a));}return true;}
+        if(entity instanceof EllipseCurve){EllipseCurve q=(EllipseCurve)entity;double sw=q.sweep();if(sw<Math.PI*2-1e-4)return false;for(int i=0;i<96;i++){PointF v=q.at(q.start+sw*i/96d);addMapped(out,transform,v.x,v.y);}return true;}
+        return false;
+    }
+
+    private static void addMapped(ArrayList<PointF> out,Matrix transform,double x,double y){float[] q={(float)x,(float)y};transform.mapPoints(q);if(Float.isFinite(q[0])&&Float.isFinite(q[1]))out.add(new PointF(q[0],q[1]));}
+
+    private static Map<String,double[]> bufferedViewportClipPolygons(List<String> lines,List<DxfBlocks.Placement> placements,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles)throws IOException{
+        HashSet<String> wanted=new HashSet<>();for(DxfBlocks.Placement p:placements)if("VIEWPORT".equals(p.record.type)){String h=p.record.text(340,"");if(!h.isEmpty())wanted.add(DxfColor.key(h));}
+        HashMap<String,double[]> result=new HashMap<>();if(wanted.isEmpty())return result;
+        for(int index=0;index<placements.size();index++){
+            DxfBlocks.Placement item=placements.get(index);String handle=item.record.text(5,"");if(handle.isEmpty()||!wanted.contains(DxfColor.key(handle)))continue;Entity entity=null;
+            if("POLYLINE".equals(item.record.type)){ArrayList<DxfBlocks.Record> vertices=new ArrayList<>();int j=index+1;while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){vertices.add(placements.get(j).record);j++;}entity=classicPolyline(item.record,vertices,lines);}
+            else if("LWPOLYLINE".equals(item.record.type)||"CIRCLE".equals(item.record.type)||"ELLIPSE".equals(item.record.type)||"SPLINE".equals(item.record.type)||"SOLID".equals(item.record.type))
+                entity=parse(item.record.type,lines,item.record.from,item.record.to,pointStyle,dimStyles);
+            if(entity==null)continue;entity=projectOcs(item.record.type,entity,lines,item.record.from,item.record.to);entity=new Transformed(entity,item.transform);
+            double[] polygon=viewportClipPolygon(entity);if(polygon.length>=6)result.put(DxfColor.key(handle),polygon);
+        }
+        return result;
     }
 
     private static Set<String> viewportFrozenLayers(List<String>a,int from,int to,DxfLayerTable.Table layerTable){
@@ -563,25 +613,26 @@ public final class DxfParser {
         return result;
     }
 
-    private static void appendViewportEntities(ArrayList<Entity> target,List<LayerEntity> model,DxfViewport.Spec spec,Set<String> frozenLayers)throws IOException{
+    private static void appendViewportEntities(ArrayList<Entity> target,List<LayerEntity> model,DxfViewport.Spec spec,Set<String> frozenLayers,double[] polygon)throws IOException{
         if((long)target.size()+model.size()>500000L)throw new IOException("VIEWPORT açıldığında nesne sınırı aşıldı");
         for(LayerEntity item:model){
-            FileTransfer.checkCancelled();if(frozenLayers!=null&&frozenLayers.contains(DxfColor.key(item.layer)))continue;target.add(item.inViewport(spec));
+            FileTransfer.checkCancelled();if(frozenLayers!=null&&frozenLayers.contains(DxfColor.key(item.layer)))continue;target.add(item.inViewport(spec,polygon));
         }
     }
 
     private static int appendBufferedPlacements(List<String> lines,List<DxfBlocks.Placement> placements,
                                                  DxfLayerTable.Table layerTable,DxfLineTypes.Table lineTypes,DxfTextStyles.Table textStyles,DxfPointStyle.Style pointStyle,DxfDimStyles.Table dimStyles,
                                                  ArrayList<Entity> entities,Set<String> layers,Set<String> visibleLayers,
-                                                 List<LayerEntity> viewportModel)throws IOException{
+                                                 List<LayerEntity> viewportModel,Map<String,double[]> viewportClips)throws IOException{
         int skipped=0;Map<String,Integer> layerColors=layerTable.colors;
         for(int index=0;index<placements.size();index++){
             FileTransfer.checkCancelled();DxfBlocks.Placement item=placements.get(index);Entity entity;
             if("VIEWPORT".equals(item.record.type)){
                 DxfViewport.Spec spec=viewportSpec(lines,item.record.from,item.record.to);
                 if(viewportModel==null||!spec.supported()){skipped++;continue;}
-                Set<String> frozen=viewportFrozenLayers(lines,item.record.from,item.record.to,layerTable);
-                appendViewportEntities(entities,viewportModel,spec,frozen);entity=viewportFrame(spec);
+                Set<String> frozen=viewportFrozenLayers(lines,item.record.from,item.record.to,layerTable);String clipHandle=item.record.text(340,"");
+                double[] clip=viewportClips==null?null:viewportClips.get(DxfColor.key(clipHandle));
+                appendViewportEntities(entities,viewportModel,spec,frozen,clip);entity=viewportFrame(spec,clip);
             }else if("POLYLINE".equals(item.record.type)){
                 ArrayList<DxfBlocks.Record> vertices=new ArrayList<>();int j=index+1;
                 while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){vertices.add(placements.get(j).record);j++;}
@@ -618,11 +669,12 @@ public final class DxfParser {
         Set<String> visibleLayers=new HashSet<>(layerTable.visible);List<LayerEntity> viewportModel=null;
         if(!DxfSpace.isModel(expanded.activeLayout)){
             DxfBlocks.Result modelExpanded=DxfBlocks.expand(lines,DxfSpace.MODEL);ArrayList<Entity> modelRaw=new ArrayList<>();
-            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,modelRaw,layers,visibleLayers,null);
+            appendBufferedPlacements(lines,modelExpanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,modelRaw,layers,visibleLayers,null,null);
             viewportModel=new ArrayList<>();for(Entity e:modelRaw)if(e instanceof LayerEntity)viewportModel.add((LayerEntity)e);
         }
+        Map<String,double[]> viewportClips=viewportModel==null?Collections.emptyMap():bufferedViewportClipPolygons(lines,expanded.placements,pointStyle,dimStyles);
         int skipped=expanded.skipped+appendBufferedPlacements(lines,expanded.placements,layerTable,lineTypes,textStyles,pointStyle,dimStyles,
-            entities,layers,visibleLayers,viewportModel);
+            entities,layers,visibleLayers,viewportModel,viewportClips);
         return applyUnits(finishEntities(entities,layers,visibleLayers,skipped,expanded.layouts,expanded.activeLayout),insUnits);
     }
 
@@ -635,13 +687,13 @@ public final class DxfParser {
         }
     }
     private static final class StreamViewport implements StreamNode {
-        final DxfViewport.Spec spec;final String layer,lineType,handle;final int aci,trueColor,lineWeight;final long transparencyRaw;final double lineTypeScale;
+        final DxfViewport.Spec spec;final String layer,lineType,handle,clipHandle;final int aci,trueColor,lineWeight;final long transparencyRaw;final double lineTypeScale;
         final Set<String> frozenHandles=new LinkedHashSet<>();
         StreamViewport(StreamRecord r)throws IOException{
             spec=DxfViewport.of(r.number(10,0),r.number(20,0),r.number(40,0),r.number(41,0),
                 r.number(12,0),r.number(22,0),r.number(45,0),r.number(51,0),r.integer(69,0),r.integer(68,1),
                 r.number(16,0),r.number(26,0),r.number(36,1),r.number(17,0),r.number(27,0),r.number(37,0));
-            layer=r.text(8,"0");handle=r.text(5,"");aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
+            layer=r.text(8,"0");handle=r.text(5,"");clipHandle=r.text(340,"");aci=r.integer(62,DxfColor.BYLAYER);trueColor=r.trueColor();
             transparencyRaw=r.longInteger(440,DxfTransparency.UNSET);lineType=r.text(6,DxfStyle.BYLAYER);
             lineWeight=r.integer(370,DxfStyle.LW_BYLAYER);lineTypeScale=DxfStyle.saneScale(r.number(48,1));
             for(int i=0;i+1<r.tags.size();i+=2)if(intOf(r.tags.get(i))==331)frozenHandles.add(r.tags.get(i+1).trim());
@@ -729,6 +781,7 @@ public final class DxfParser {
         DxfPointStyle.Style pointStyle=new DxfPointStyle.Style(0,0);
         final Map<String,String> drawOrder=new HashMap<>();
         final Map<String,String> layoutByOwner=new HashMap<>();
+        final Map<String,double[]> viewportClips=new HashMap<>();
         final LinkedHashSet<String> layouts=new LinkedHashSet<>();
         final LinkedHashMap<String,ArrayList<StreamNode>> rootsByLayout=new LinkedHashMap<>();
     }
@@ -753,7 +806,7 @@ public final class DxfParser {
             }
             if(type!=null)processStreamRecord(type,record,context);
         }
-        finishPending(context);resolveStreamLayouts(context);
+        finishPending(context);resolveStreamLayouts(context);buildStreamViewportClips(context);
         context.layerTable.ensureDefaultLayer();
         ArrayList<Entity> entities=new ArrayList<>();
         Set<String> layers=new HashSet<>(context.layerTable.names);
@@ -891,6 +944,16 @@ public final class DxfParser {
         c.rootsByLayout.clear();c.rootsByLayout.putAll(resolved);c.layouts.addAll(c.layoutByOwner.values());
     }
 
+    private static void buildStreamViewportClips(StreamContext c){
+        HashSet<String> wanted=new HashSet<>();for(ArrayList<StreamNode> nodes:c.rootsByLayout.values())for(StreamNode node:nodes)if(node instanceof StreamViewport){
+            String h=((StreamViewport)node).clipHandle;if(h!=null&&!h.isEmpty())wanted.add(DxfColor.key(h));}
+        if(wanted.isEmpty())return;
+        for(ArrayList<StreamNode> nodes:c.rootsByLayout.values())for(StreamNode node:nodes)if(node instanceof StreamShape){
+            StreamShape shape=(StreamShape)node;if(shape.handle==null||shape.handle.isEmpty()||!wanted.contains(DxfColor.key(shape.handle)))continue;
+            double[] polygon=viewportClipPolygon(shape.entity);if(polygon.length>=6)c.viewportClips.put(DxfColor.key(shape.handle),polygon);
+        }
+    }
+
     private static void finishPending(StreamContext c)throws IOException{
         PendingPoly p=c.pending;if(p==null)return;c.pending=null;
         Entity entity=streamPolyline(p);if(entity==null){c.skipped++;return;}
@@ -921,8 +984,8 @@ public final class DxfParser {
             if(node instanceof StreamViewport){
                 StreamViewport viewport=(StreamViewport)node;String layer="0".equals(viewport.layer)?parentLayer:viewport.layer;
                 if(viewportModel==null||!viewport.spec.supported()){context.skipped++;continue;}
-                Set<String> frozen=viewportFrozenLayers(viewport.frozenHandles,context.layerTable);
-                appendViewportEntities(entities,viewportModel,viewport.spec,frozen);
+                Set<String> frozen=viewportFrozenLayers(viewport.frozenHandles,context.layerTable);double[] clip=context.viewportClips.get(DxfColor.key(viewport.clipHandle));
+                appendViewportEntities(entities,viewportModel,viewport.spec,frozen,clip);
                 DxfColor.Ref ref=DxfColor.resolve(viewport.aci,viewport.trueColor,layer,byBlockColor);
                 DxfTransparency.Ref transparency=DxfTransparency.resolve(viewport.transparencyRaw,layer,byBlockTransparency);
                 int color=DxfTransparency.apply(DxfColor.argb(ref,context.layerTable.colors),DxfTransparency.opacity(transparency,context.layerTable.opacities));
@@ -930,7 +993,7 @@ public final class DxfParser {
                 int semanticWeight=DxfStyle.resolveLineWeight(viewport.lineWeight,byBlockLineWeight);
                 String effectiveType=DxfStyle.effectiveLineType(semanticType,layer,context.layerTable.lineTypes);
                 int effectiveWeight=DxfStyle.effectiveLineWeight(semanticWeight,layer,context.layerTable.lineWeights);
-                entities.add(new LayerEntity(new Transformed(viewportFrame(viewport.spec),parent),layer,color,effectiveWeight,
+                entities.add(new LayerEntity(new Transformed(viewportFrame(viewport.spec,clip),parent),layer,color,effectiveWeight,
                     context.lineTypes.get(effectiveType),viewport.lineTypeScale*context.lineTypes.globalScale));
                 if(layers.add(layer)&&!context.layerTable.contains(layer))visibleLayers.add(layer);
                 continue;
@@ -1039,7 +1102,7 @@ public final class DxfParser {
         ArrayList<PointF> points=new ArrayList<>();
         for(Entity wrapped:entities){
             Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;
-            Matrix transform=new Matrix();ArrayList<DxfViewport.Spec> clips=new ArrayList<>();
+            Matrix transform=new Matrix();ArrayList<ViewportClip> clips=new ArrayList<>();
             while(true){
                 if(entity instanceof GeometricWidth){entity=((GeometricWidth)entity).entity;continue;}
                 if(entity instanceof VariableWidth){entity=((VariableWidth)entity).centerline;continue;}
@@ -1049,7 +1112,7 @@ public final class DxfParser {
                 }
                 if(entity instanceof ViewportClip){
                     ViewportClip viewport=(ViewportClip)entity;Matrix combined=new Matrix();
-                    combined.setConcat(transform,viewport.modelToPaper);transform=combined;clips.add(viewport.spec);entity=viewport.entity;continue;
+                    combined.setConcat(transform,viewport.modelToPaper);transform=combined;clips.add(viewport);entity=viewport.entity;continue;
                 }
                 break;
             }
@@ -1083,7 +1146,7 @@ public final class DxfParser {
             }
             if(candidates!=null)for(int i=0;i+1<candidates.length;i+=2){
                 float[] xy={(float)candidates[i],(float)candidates[i+1]};transform.mapPoints(xy);boolean inside=true;
-                for(DxfViewport.Spec clip:clips)if(!DxfViewport.contains(clip,xy[0],xy[1],1e-6)){inside=false;break;}
+                for(ViewportClip clip:clips)if(!clip.containsPaper(xy[0],xy[1],1e-6)){inside=false;break;}
                 if(inside)points.add(new PointF(xy[0],xy[1]));
                 if(points.size()>=250000)break;
             }
