@@ -34,6 +34,10 @@ jobs:
           java -cp /tmp/musacad-tests DxfTextTest
           java -cp /tmp/musacad-tests DxfTextStylesTest
           java -cp /tmp/musacad-tests DxfTextLayoutTest
+      - name: Test DXF MTEXT background masks and frames
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfMTextBackground.java tests/DxfMTextBackgroundTest.java
+          java -cp /tmp/musacad-tests DxfMTextBackgroundTest
       - name: Test selection bounds
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SelectionBounds.java tests/SelectionBoundsTest.java
