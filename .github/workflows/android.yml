@@ -44,6 +44,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test CAD print scale math
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrintMath.java tests/CadPrintMathTest.java
+          java -cp /tmp/musacad-tests CadPrintMathTest
       - name: Test DXF block expansion and color inheritance
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
