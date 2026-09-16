@@ -114,6 +114,24 @@ public class MainActivity extends AppCompatActivity {
         shareButton.setOnClickListener(v->showShare());
         shareToolButton.setOnClickListener(v->showShare());
         updateShareEnabled(false);updateEditorEnabled(false);
+        handleIncomingIntent(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent intent){
+        super.onNewIntent(intent);setIntent(intent);handleIncomingIntent(intent);
+    }
+
+    private void handleIncomingIntent(Intent intent){
+        if(intent==null)return;
+        Uri uri=null;
+        if(Intent.ACTION_VIEW.equals(intent.getAction()))uri=intent.getData();
+        else if(Intent.ACTION_SEND.equals(intent.getAction())){
+            if(android.os.Build.VERSION.SDK_INT>=33)uri=intent.getParcelableExtra(Intent.EXTRA_STREAM,Uri.class);
+            else {
+                @SuppressWarnings("deprecation") Uri legacy=intent.getParcelableExtra(Intent.EXTRA_STREAM);uri=legacy;
+            }
+        }
+        if(uri!=null)startLoad(uri);
     }
 
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -297,6 +315,7 @@ public class MainActivity extends AppCompatActivity {
                     markModeSelected(R.id.panButton);
 
                     snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);
+                    snapToggle.setChecked(true);
                     if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
 
                     String editable=canEdit()?"  •  düzenlenebilir":"";
@@ -380,7 +399,8 @@ public class MainActivity extends AppCompatActivity {
                 int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);
             }
         }
-        return "cizim.dwg";
+        String last=u.getLastPathSegment();
+        return last==null||last.trim().isEmpty()?"cizim.dwg":last;
     }
 
     private void showTextEditor(float x,float y){
@@ -480,10 +500,26 @@ public class MainActivity extends AppCompatActivity {
     private File exportDir(){File d=new File(getCacheDir(),"exports");d.mkdirs();return d;}
 
     private void exportView(boolean pdf){
+        if(pdf){exportViewPdf();return;}
         Bitmap bitmap=null;
-        try{bitmap=cad.snapshot();exportBitmap(bitmap,pdf,"gorunum");}
+        try{bitmap=cad.snapshot();exportBitmap(bitmap,false,"gorunum");}
         catch(Exception e){error(e);}
         finally{if(bitmap!=null)bitmap.recycle();}
+    }
+
+    private void exportViewPdf(){
+        if(cad.getWidth()<=0||cad.getHeight()<=0){error(new IOException("PDF görünümü hazırlanamadı"));return;}
+        File file=null;PdfDocument document=new PdfDocument();
+        try{
+            file=File.createTempFile("MusaCAD_gorunum_",".pdf",exportDir());
+            PdfDocument.PageInfo info=new PdfDocument.PageInfo.Builder(cad.getWidth(),cad.getHeight(),1).create();
+            PdfDocument.Page page=document.startPage(info);
+            cad.draw(page.getCanvas());
+            document.finishPage(page);
+            try(OutputStream out=new FileOutputStream(file)){document.writeTo(out);}
+            shareFile(file,"application/pdf");
+        }catch(Exception e){if(file!=null)file.delete();error(e);}
+        finally{document.close();}
     }
 
     private void exportBitmap(Bitmap bitmap,boolean pdf,String suffix){
