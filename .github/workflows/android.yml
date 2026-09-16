@@ -1,4 +1,4 @@
-name: Android APK
+name: Android quality gate
 
 on:
   push:
@@ -48,14 +48,17 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
           java -cp /tmp/musacad-tests FileTransferTest
-      - name: Build debug APK
+      - name: Android lint and unit tests
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
-      - name: Upload APK
+          ./gradlew --no-daemon lintDebug testDebugUnitTest
+      - name: Build debug and release variants
+        run: |
+          ./gradlew --no-daemon assembleDebug assembleRelease
+      - name: Upload internal debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: MusaCAD-debug-apk
+          name: MusaCAD-internal-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Package corresponding source
