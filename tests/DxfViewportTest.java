@@ -11,7 +11,7 @@ public class DxfViewportTest {
         List<String>paperTags=tags(40,10,41,10,68,1,69,1,45,10,36,1);DxfViewport.View paper=DxfViewport.parse(paperTags,0,paperTags.size());if(paper.active2d())throw new AssertionError("paper viewport id 1 must not show model");
         List<String>offTags=tags(40,10,41,10,68,1,69,2,45,10,36,1,90,DxfViewport.FLAG_OFF);DxfViewport.View off=DxfViewport.parse(offTags,0,offTags.size());if(off.active2d())throw new AssertionError("off viewport");
         List<String>perspectiveTags=tags(40,10,41,10,68,1,69,2,45,10,36,1,90,DxfViewport.FLAG_PERSPECTIVE);DxfViewport.View perspective=DxfViewport.parse(perspectiveTags,0,perspectiveTags.size());if(perspective.active2d())throw new AssertionError("perspective viewport");
-        List<String>clippedTags=tags(40,10,41,10,68,1,69,2,45,10,36,1,90,DxfViewport.FLAG_NON_RECTANGULAR);DxfViewport.View clipped=DxfViewport.parse(clippedTags,0,clippedTags.size());if(!clipped.active2d()||clipped.rectangular())throw new AssertionError("nonrect flag");
+        List<String>clippedTags=tags(40,10,41,10,68,1,69,2,45,10,36,1,90,DxfViewport.FLAG_NON_RECTANGULAR,340,"ABCD");DxfViewport.View clipped=DxfViewport.parse(clippedTags,0,clippedTags.size());if(clipped.active2d()||clipped.rectangular()||!clipped.hasExternalClipBoundary()||!"ABCD".equals(clipped.clipBoundaryHandle))throw new AssertionError("nonrect fallback");
         System.out.println("DXF viewport geometry cases passed");
     }
 }
