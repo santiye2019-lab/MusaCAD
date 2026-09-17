@@ -4,7 +4,8 @@
 - [x] Android dosya seçicisinden DWG açma
 - [x] Android dosya seçicisinden DXF açma
 - [x] Desteklenen DWG/DXF dosyalarını dış uygulama/dosya yöneticisinden MusaCAD ile açma
-- [x] Büyük çizim yolunda eski 32 MB sınırını aşma (256 MB üst sınır)
+- [x] Büyük çizim yolunda eski 32 MB sınırını aşma (256 MB içe aktarma üst sınırı)
+- [x] DXF parser'da eski 600.000 satır sınırını kaldırma ve tüm dosyalarda streaming okuma
 - [x] Açma işlemini iptal edebilme
 
 ## Görüntüleme
@@ -57,6 +58,7 @@
 - [x] Selection bounds test
 - [x] Endpoint snapping test
 - [x] DXF block expansion test
+- [x] Birebir LibreDWG 256 renk ACI paleti regresyonu
 - [x] File transfer / cancellation / large drawing regression test
 - [ ] Android lintDebug
 - [ ] Gradle unit tests
