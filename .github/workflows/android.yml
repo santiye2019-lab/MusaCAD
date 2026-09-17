@@ -72,6 +72,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBulge.java tests/DxfBulgeTest.java
           java -cp /tmp/musacad-tests DxfBulgeTest
+      - name: Test DXF NURBS spline geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfSpline.java tests/DxfSplineTest.java
+          java -cp /tmp/musacad-tests DxfSplineTest
       - name: Test DXF linetype and lineweight
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java tests/DxfLineStyleTest.java
