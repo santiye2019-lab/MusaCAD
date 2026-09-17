@@ -50,6 +50,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".RecentFilesActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
             android:exported="false" />
