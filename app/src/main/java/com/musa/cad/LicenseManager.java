@@ -16,7 +16,6 @@ public final class LicenseManager {
     private static final String K_TRIAL_TOKEN="trial_token_v2";
     private static final String K_SERVER_TRIAL_USED="server_trial_used_v2";
     private static final String K_SIGNED_TRIAL_LAST_SEEN="signed_trial_last_seen_v2";
-    private static final long SERVER_CLOCK_TOLERANCE_MS=5L*60L*1000L;
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -32,9 +31,9 @@ public final class LicenseManager {
         String signedTrial=p.getString(K_TRIAL_TOKEN,null);
         if(signedTrial!=null){
             long now=System.currentTimeMillis(),last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);
-            if(last>0&&now+TrialPolicy.CLOCK_ROLLBACK_TOLERANCE_MS<last)return State.CLOCK_ERROR;
+            if(!SignedTrialPolicy.clockOk(last,now))return State.CLOCK_ERROR;
             LicenseToken.Result r=verifyToken(c,signedTrial,now);
-            if(validTrialWindow(r,now)){
+            if(r!=null&&SignedTrialPolicy.validWindow(r.valid,r.expiresAtMs,now)){
                 if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();
                 return State.TRIAL_ACTIVE;
             }
@@ -75,9 +74,8 @@ public final class LicenseManager {
     /** Accepts only a finite signed token whose expiry is approximately one day from activation. */
     public static boolean activateTrialToken(Context c,String token){
         if(token==null||token.trim().isEmpty())return false;
-        long now=System.currentTimeMillis();
-        LicenseToken.Result r=verifyToken(c,token,now);
-        if(!validTrialWindow(r,now))return false;
+        long now=System.currentTimeMillis();LicenseToken.Result r=verifyToken(c,token,now);
+        if(r==null||!SignedTrialPolicy.validWindow(r.valid,r.expiresAtMs,now))return false;
         prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putLong(K_SIGNED_TRIAL_LAST_SEEN,now).putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_START).remove(K_LAST_SEEN).commit();
         return true;
     }
@@ -86,7 +84,7 @@ public final class LicenseManager {
 
     public static long remainingMs(Context c){
         SharedPreferences p=prefs(c);String signedTrial=p.getString(K_TRIAL_TOKEN,null);long now=System.currentTimeMillis();
-        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);if(last>0&&now+TrialPolicy.CLOCK_ROLLBACK_TOLERANCE_MS<last)return 0L;LicenseToken.Result r=verifyToken(c,signedTrial,now);return validTrialWindow(r,now)?Math.max(0L,r.expiresAtMs-now):0L;}
+        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);LicenseToken.Result r=verifyToken(c,signedTrial,now);return r==null?0L:SignedTrialPolicy.remainingMs(r.valid,r.expiresAtMs,last,now);}
         return TrialPolicy.remainingMs(p.getLong(K_TRIAL_START,0L),p.getLong(K_LAST_SEEN,0L),now);
     }
 
@@ -101,21 +99,11 @@ public final class LicenseManager {
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
-        try{
-            LicenseToken.Result r=verifyToken(c,code,System.currentTimeMillis());
-            if(!r.valid)return ActivationResult.INVALID_CODE;
-            prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();
-            return ActivationResult.ACTIVATED;
-        }catch(Exception e){return ActivationResult.INVALID_CODE;}
+        try{LicenseToken.Result r=verifyToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();return ActivationResult.ACTIVATED;}
+        catch(Exception e){return ActivationResult.INVALID_CODE;}
     }
 
-    private static boolean verifyStoredPaidToken(Context c,String token){
-        LicenseToken.Result r=verifyToken(c,token,System.currentTimeMillis());
-        if(r.valid)return true;
-        prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;
-    }
-
-    private static boolean validTrialWindow(LicenseToken.Result r,long now){return r!=null&&r.valid&&r.expiresAtMs>now&&r.expiresAtMs<=now+TrialPolicy.TRIAL_DURATION_MS+SERVER_CLOCK_TOLERANCE_MS;}
+    private static boolean verifyStoredPaidToken(Context c,String token){LicenseToken.Result r=verifyToken(c,token,System.currentTimeMillis());if(r!=null&&r.valid)return true;prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;}
 
     private static LicenseToken.Result verifyToken(Context c,String token,long now){
         try{return LicenseToken.verify(token,installationId(c),now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));}
