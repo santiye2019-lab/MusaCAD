@@ -116,7 +116,7 @@ public class RecentFilesActivity extends AppCompatActivity {
             return;
         }
         Intent share=new Intent(Intent.ACTION_SEND);
-        share.setType(mimeFor(entry));
+        share.setType("application/octet-stream");
         share.putExtra(Intent.EXTRA_STREAM,uri);
         share.setClipData(ClipData.newRawUri(entry.name,uri));
         share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -127,10 +127,6 @@ public class RecentFilesActivity extends AppCompatActivity {
         }
     }
 
-    private String mimeFor(RecentFileStore.Entry entry){
-        if(entry==null)return "application/octet-stream";
-        return entry.isDxf()?"application/dxf":"application/dwg";
-    }
 
     private void openRecent(RecentFileStore.Entry entry){
         Uri uri=Uri.parse(entry.uri);
