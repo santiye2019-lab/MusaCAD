@@ -11,5 +11,5 @@ binding = "DB"
 database_name = "musacad-trials"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
-# Never put MUSACAD_LICENSE_PRIVATE_KEY_PEM in this file or Git.
+# Never put MUSACAD_TRIAL_PRIVATE_KEY_PEM in this file or Git.
 # Add it as an encrypted Worker secret instead.
