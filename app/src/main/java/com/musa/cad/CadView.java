@@ -72,7 +72,7 @@ public class CadView extends View {
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
         vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
-        if(source==null||!result.visibleLayers.contains(source.layer))sourceEdits.clearSelection();
+        if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
     }
 
@@ -117,7 +117,7 @@ public class CadView extends View {
         ArrayList<CadEdit> out=new ArrayList<>();for(CadEdit e:edits)out.add(e.copy());
         if(vectorDrawing==null){out.addAll(sourceEdits.replacements());return out;}
         for(Map.Entry<Integer,CadEdit> e:sourceEdits.replacementMap().entrySet()){
-            DxfParser.SourceEntity source=vectorDrawing.sourceById(e.getKey());if(source!=null&&vectorDrawing.visibleLayers.contains(source.layer))out.add(e.getValue().copy());
+            if(vectorDrawing.isSourceVisible(e.getKey()))out.add(e.getValue().copy());
         }
         return out;
     }
@@ -195,7 +195,7 @@ public class CadView extends View {
     private void drawEdits(Canvas c){
         for(CadEdit edit:edits)drawEdit(c,edit,Color.rgb(255,193,7));
         if(vectorDrawing!=null){for(SourceReplacement replacement:sourceEdits.replacementRecords())vectorDrawing.drawSourceReplacement(c,imageMatrix,replacement,false,false);}
-        paint.setPathEffect(null);paint.setStrokeWidth(3f);
+        resetTextPaint();paint.setPathEffect(null);paint.setStrokeWidth(3f);
     }
 
     private void drawEdit(Canvas c,CadEdit edit,int color){
@@ -205,9 +205,19 @@ public class CadView extends View {
             case RECTANGLE:{float[] v=map(edit.xy);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;}
             case CIRCLE:{float[] v=map(edit.xy);float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);c.drawCircle(v[0],v[1],r,paint);break;}
             case POLYLINE:{float[] v=map(edit.xy);if(v.length>=4){Path p=new Path();p.moveTo(v[0],v[1]);for(int i=2;i+1<v.length;i+=2)p.lineTo(v[i],v[i+1]);if(edit.closed)p.close();c.drawPath(p,paint);}break;}
-            case TEXT:{float[] v=map(edit.xy);paint.setStyle(Paint.Style.FILL);paint.setTextSize(Math.max(14f*getResources().getDisplayMetrics().scaledDensity,30f*scale));int save=c.save();c.rotate(edit.rotationDegrees,v[0],v[1]);c.drawText(edit.text==null?"":edit.text,v[0],v[1],paint);c.restoreToCount(save);paint.setStyle(Paint.Style.STROKE);break;}
+            case TEXT:{
+                float[] v=map(edit.xy);paint.setStyle(Paint.Style.FILL);int save=c.save();c.rotate(edit.rotationDegrees,v[0],v[1]);
+                if(edit.hasTextStyle()){
+                    paint.setTypeface(edit.textShx?Typeface.MONOSPACE:Typeface.create(edit.textFamilyHint,Typeface.NORMAL));
+                    paint.setTextSize(Math.max(1f,edit.textHeight*scale));paint.setTextScaleX(edit.textWidthFactor);paint.setTextSkewX((float)-Math.tan(Math.toRadians(edit.textOblique)));
+                    c.scale((edit.textGenerationFlags&2)!=0?-1f:1f,(edit.textGenerationFlags&4)!=0?-1f:1f,v[0],v[1]);
+                }else paint.setTextSize(Math.max(14f*getResources().getDisplayMetrics().scaledDensity,30f*scale));
+                c.drawText(edit.text==null?"":edit.text,v[0],v[1],paint);c.restoreToCount(save);resetTextPaint();paint.setStyle(Paint.Style.STROKE);break;
+            }
         }
     }
+
+    private void resetTextPaint(){paint.setTypeface(null);paint.setTextScaleX(1f);paint.setTextSkewX(0f);}
 
     private void drawSelectedSource(Canvas c){
         CadEdit edit=sourceEdits.currentSelected();if(edit==null)return;float[] v=map(edit.xy);float left=Float.POSITIVE_INFINITY,top=Float.POSITIVE_INFINITY,right=Float.NEGATIVE_INFINITY,bottom=Float.NEGATIVE_INFINITY;
@@ -260,7 +270,7 @@ public class CadView extends View {
     private void selectSourceAt(float x,float y){
         float tolerance=20f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);DxfParser.SourceEntity source=null;
         int replacementId=sourceEdits.findReplacement(x,y,tolerance);
-        if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.visibleLayers.contains(candidate.layer))source=candidate;}
+        if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.isSourceVisible(replacementId))source=candidate;}
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();return;}
         sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
