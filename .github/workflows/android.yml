@@ -104,10 +104,16 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/TrialPolicy.java tests/TrialPolicyTest.java
           java -cp /tmp/musacad-tests TrialPolicyTest
+      - name: Test stable hashed license identity
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DeviceIdentityHash.java tests/DeviceIdentityHashTest.java
+          java -cp /tmp/musacad-tests DeviceIdentityHashTest
       - name: Test signed license tokens
         run: |
           javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/LicenseToken.java tests/LicenseTokenTest.java
           java -cp /tmp/musacad-license-tests LicenseTokenTest
+      - name: Check trial service source
+        run: node --check server/trial-worker/src/index.js
       - name: Compile offline license generator
         run: |
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
@@ -136,7 +142,7 @@ jobs:
           if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:
