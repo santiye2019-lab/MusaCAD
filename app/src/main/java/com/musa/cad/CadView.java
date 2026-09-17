@@ -194,17 +194,12 @@ public class CadView extends View {
 
     private void drawEdits(Canvas c){
         for(CadEdit edit:edits)drawEdit(c,edit,Color.rgb(255,193,7));
-        if(vectorDrawing!=null){
-            for(Map.Entry<Integer,CadEdit> entry:sourceEdits.replacementMap().entrySet()){
-                DxfParser.SourceEntity source=vectorDrawing.sourceById(entry.getKey());
-                if(source!=null&&vectorDrawing.visibleLayers.contains(source.layer))drawEdit(c,entry.getValue(),source.color);
-            }
-        }
-        paint.setStrokeWidth(3f);
+        if(vectorDrawing!=null){for(SourceReplacement replacement:sourceEdits.replacementRecords())vectorDrawing.drawSourceReplacement(c,imageMatrix,replacement,false,false);}
+        paint.setPathEffect(null);paint.setStrokeWidth(3f);
     }
 
     private void drawEdit(Canvas c,CadEdit edit,int color){
-        paint.setColor(color);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(edit.strokeWidth);
+        paint.setPathEffect(null);paint.setColor(color);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(edit.strokeWidth);
         switch(edit.type){
             case LINE:{float[] v=map(edit.xy);c.drawLine(v[0],v[1],v[2],v[3],paint);break;}
             case RECTANGLE:{float[] v=map(edit.xy);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;}
@@ -218,16 +213,16 @@ public class CadView extends View {
         CadEdit edit=sourceEdits.currentSelected();if(edit==null)return;float[] v=map(edit.xy);float left=Float.POSITIVE_INFINITY,top=Float.POSITIVE_INFINITY,right=Float.NEGATIVE_INFINITY,bottom=Float.NEGATIVE_INFINITY;
         if(edit.type==CadEdit.Type.CIRCLE&&v.length>=4){float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;}
         else {for(int i=0;i+1<v.length;i+=2){left=Math.min(left,v[i]);right=Math.max(right,v[i]);top=Math.min(top,v[i+1]);bottom=Math.max(bottom,v[i+1]);}}
-        if(!Float.isFinite(left)){return;}float pad=Math.max(10f,8f*getResources().getDisplayMetrics().density);if(right-left<pad){left-=pad;right+=pad;}else{left-=pad;right+=pad;}if(bottom-top<pad){top-=pad;bottom+=pad;}else{top-=pad;bottom+=pad;}
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f);paint.setColor(moveSelectedArmed?Color.CYAN:Color.YELLOW);c.drawRect(left,top,right,bottom,paint);paint.setStyle(Paint.Style.FILL);
+        if(!Float.isFinite(left)){return;}float pad=Math.max(10f,8f*getResources().getDisplayMetrics().density);left-=pad;right+=pad;top-=pad;bottom+=pad;
+        paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f);paint.setColor(moveSelectedArmed?Color.CYAN:Color.YELLOW);c.drawRect(left,top,right,bottom,paint);paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawLiveFreehand(Canvas c){
         if(freehandPoints.size()<2)return;float[] xy=new float[freehandPoints.size()*2];for(int i=0;i<freehandPoints.size();i++){xy[i*2]=freehandPoints.get(i).x;xy[i*2+1]=freehandPoints.get(i).y;}imageMatrix.mapPoints(xy);
-        Path p=new Path();p.moveTo(xy[0],xy[1]);for(int i=2;i+1<xy.length;i+=2)p.lineTo(xy[i],xy[i+1]);paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setColor(Color.rgb(255,193,7));paint.setStrokeWidth(pressureWidth(stylusPressure));c.drawPath(p,paint);paint.setStrokeCap(Paint.Cap.BUTT);paint.setStrokeJoin(Paint.Join.MITER);
+        Path p=new Path();p.moveTo(xy[0],xy[1]);for(int i=2;i+1<xy.length;i+=2)p.lineTo(xy[i],xy[i+1]);paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setColor(Color.rgb(255,193,7));paint.setStrokeWidth(pressureWidth(stylusPressure));c.drawPath(p,paint);paint.setStrokeCap(Paint.Cap.BUTT);paint.setStrokeJoin(Paint.Join.MITER);
     }
 
-    private void drawStylusCursor(Canvas c){float r=9f*getResources().getDisplayMetrics().density;paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.5f);paint.setColor(Color.WHITE);c.drawCircle(hoverX,hoverY,r,paint);c.drawLine(hoverX-r*1.5f,hoverY,hoverX+r*1.5f,hoverY,paint);c.drawLine(hoverX,hoverY-r*1.5f,hoverX,hoverY+r*1.5f,paint);paint.setStyle(Paint.Style.FILL);}
+    private void drawStylusCursor(Canvas c){float r=9f*getResources().getDisplayMetrics().density;paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.5f);paint.setColor(Color.WHITE);c.drawCircle(hoverX,hoverY,r,paint);c.drawLine(hoverX-r*1.5f,hoverY,hoverX+r*1.5f,hoverY,paint);c.drawLine(hoverX,hoverY-r*1.5f,hoverX,hoverY+r*1.5f,paint);paint.setStyle(Paint.Style.FILL);}
     private float pressureWidth(float pressure){float p=Math.max(0f,Math.min(1f,pressure));return 2f+5f*p;}
     private float[] map(float[] source){float[] target=source.clone();imageMatrix.mapPoints(target);return target;}
 
@@ -268,7 +263,8 @@ public class CadView extends View {
         if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.visibleLayers.contains(candidate.layer))source=candidate;}
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();return;}
-        sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color);moveSelectedArmed=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
+        sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
+        moveSelectedArmed=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
     }
 
     private boolean fingerNavigationTouch(MotionEvent e){
