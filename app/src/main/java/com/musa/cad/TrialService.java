@@ -17,7 +17,8 @@ public final class TrialService {
     public static Result start(Context context){
         if(context==null)return new Result(Status.INVALID_RESPONSE,"context");
         String endpoint=BuildConfig.TRIAL_API_URL==null?"":BuildConfig.TRIAL_API_URL.trim();
-        if(endpoint.isEmpty())return new Result(Status.NOT_CONFIGURED,"Trial sunucusu yapılandırılmadı");
+        String trialKey=BuildConfig.TRIAL_PUBLIC_KEY_PEM==null?"":BuildConfig.TRIAL_PUBLIC_KEY_PEM.trim();
+        if(endpoint.isEmpty()||trialKey.isEmpty())return new Result(Status.NOT_CONFIGURED,"Trial sunucusu veya doğrulama anahtarı yapılandırılmadı");
         if(!endpoint.startsWith("https://"))return new Result(Status.NOT_CONFIGURED,"Trial adresi HTTPS olmalıdır");
         HttpsURLConnection connection=null;
         try{
