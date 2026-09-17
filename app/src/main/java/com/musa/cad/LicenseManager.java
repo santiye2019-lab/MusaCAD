@@ -32,7 +32,7 @@ public final class LicenseManager {
         if(signedTrial!=null){
             long now=System.currentTimeMillis(),last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);
             if(!SignedTrialPolicy.clockOk(last,now))return State.CLOCK_ERROR;
-            LicenseToken.Result r=verifyToken(c,signedTrial,now);
+            TrialToken.Result r=verifyTrialToken(c,signedTrial,now);
             if(r!=null&&SignedTrialPolicy.validWindow(r.valid,r.expiresAtMs,now)){
                 if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();
                 return State.TRIAL_ACTIVE;
@@ -74,7 +74,7 @@ public final class LicenseManager {
     /** Accepts only a finite signed token whose expiry is approximately one day from activation. */
     public static boolean activateTrialToken(Context c,String token){
         if(token==null||token.trim().isEmpty())return false;
-        long now=System.currentTimeMillis();LicenseToken.Result r=verifyToken(c,token,now);
+        long now=System.currentTimeMillis();TrialToken.Result r=verifyTrialToken(c,token,now);
         if(r==null||!SignedTrialPolicy.validWindow(r.valid,r.expiresAtMs,now))return false;
         prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putLong(K_SIGNED_TRIAL_LAST_SEEN,now).putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_START).remove(K_LAST_SEEN).commit();
         return true;
@@ -84,7 +84,7 @@ public final class LicenseManager {
 
     public static long remainingMs(Context c){
         SharedPreferences p=prefs(c);String signedTrial=p.getString(K_TRIAL_TOKEN,null);long now=System.currentTimeMillis();
-        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);LicenseToken.Result r=verifyToken(c,signedTrial,now);return r==null?0L:SignedTrialPolicy.remainingMs(r.valid,r.expiresAtMs,last,now);}
+        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);TrialToken.Result r=verifyTrialToken(c,signedTrial,now);return r==null?0L:SignedTrialPolicy.remainingMs(r.valid,r.expiresAtMs,last,now);}
         return TrialPolicy.remainingMs(p.getLong(K_TRIAL_START,0L),p.getLong(K_LAST_SEEN,0L),now);
     }
 
@@ -99,15 +99,23 @@ public final class LicenseManager {
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
-        try{LicenseToken.Result r=verifyToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();return ActivationResult.ACTIVATED;}
+        try{LicenseToken.Result r=verifyPaidToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();return ActivationResult.ACTIVATED;}
         catch(Exception e){return ActivationResult.INVALID_CODE;}
     }
 
-    private static boolean verifyStoredPaidToken(Context c,String token){LicenseToken.Result r=verifyToken(c,token,System.currentTimeMillis());if(r!=null&&r.valid)return true;prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;}
+    private static boolean verifyStoredPaidToken(Context c,String token){LicenseToken.Result r=verifyPaidToken(c,token,System.currentTimeMillis());if(r!=null&&r.valid)return true;prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;}
 
-    private static LicenseToken.Result verifyToken(Context c,String token,long now){
+    private static LicenseToken.Result verifyPaidToken(Context c,String token,long now){
         try{return LicenseToken.verify(token,installationId(c),now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));}
         catch(Exception e){return null;}
+    }
+
+    private static TrialToken.Result verifyTrialToken(Context c,String token,long now){
+        try{
+            String publicKey=BuildConfig.TRIAL_PUBLIC_KEY_PEM==null?"":BuildConfig.TRIAL_PUBLIC_KEY_PEM.trim();
+            if(publicKey.isEmpty())return null;
+            return TrialToken.verify(token,installationId(c),now,publicKey);
+        }catch(Exception e){return null;}
     }
 
     private static String readAsset(Context c,String name)throws Exception{
