@@ -26,6 +26,7 @@ public final class DxfMText {
         }
 
         public boolean hasAbsoluteHeight(){return Double.isFinite(absoluteHeight)&&absoluteHeight>0d;}
+        public boolean usesShxFont(){return font!=null&&font.trim().toLowerCase(Locale.ROOT).endsWith(".shx");}
     }
 
     public static final class Result {
