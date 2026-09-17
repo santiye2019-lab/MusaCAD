@@ -106,7 +106,7 @@ public final class DxfBlocks {
                     layerColorLookup.put(lookup,color);layerLineTypeLookup.put(lookup,lineType);layerLineWeightLookup.put(lookup,lineWeight);result.layerColors.put(name,color);result.layerLineTypes.put(name,lineType);result.layerLineWeights.put(name,lineWeight);
                 }else if("TABLES".equals(section)&&"STYLE".equals(r.type)){
                     ArrayList<String> one=new ArrayList<>(r.tags.size()+2);one.add("0");one.add("STYLE");one.addAll(r.tags);
-                    result.textStyles.putAll(DxfTextStyle.parse(one));
+                    String styleName=DxfTextStyle.normalize(r.text(2,DxfTextStyle.STANDARD));DxfTextStyle.Style style=DxfTextStyle.parse(one).get(styleName);if(style!=null)result.textStyles.put(styleName,style);
                 }else if("BLOCKS".equals(section)&&"BLOCK".equals(r.type)){
                     if(blocks.size()>=100000)throw new IOException("DXF blok sayısı sınırı aşıldı");
                     Block block=new Block(r);block.file=file;block.charset=charset;block.offset=input.nextRecordOffset;block.offsetLine=input.nextRecordLine;blocks.put(key(r.text(2,"")),block);
