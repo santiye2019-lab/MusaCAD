@@ -2,7 +2,7 @@ name: Trial hardening gate
 
 on:
   push:
-    branches: [ main, 'gandalf/trial-hardening' ]
+    branches: [ main, 'gandalf/**' ]
     paths:
       - 'app/src/main/java/com/musa/cad/DeviceIdentityHash.java'
       - 'app/src/main/java/com/musa/cad/DeviceIdentity.java'
