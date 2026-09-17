@@ -30,8 +30,8 @@ public final class DxfWriter {
                 FileTransfer.checkCancelled();String codeLine=in.readLine();if(codeLine==null)break;String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");
                 int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}String value=valueLine.trim();
                 if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){
-                    writeEdits(out,contentToWorld,additions,"0",null,null,null,null);
-                    writeReplacements(out,contentToWorld,replacements);inserted=true;
+                    writeEdits(out,contentToWorld,additions,"0",null,null,null,null,drawing.activeLayout);
+                    writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;
                 }
 
                 boolean removed=isRemoved(lineIndex,removals);
@@ -50,27 +50,26 @@ public final class DxfWriter {
 
     private static boolean isRemoved(int lineIndex,List<SourceRange> removals){for(SourceRange range:removals)if(range!=null&&range.containsLine(lineIndex))return true;return false;}
 
-    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements)throws IOException{
+    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements,DxfParser.Result drawing)throws IOException{
         if(replacements==null)return;
         for(SourceReplacement replacement:replacements){
-            if(replacement==null)continue;
-            writeEdit(out,contentToWorld,replacement.edit,replacement.layer,replacement.color&0x00FFFFFF,
-                replacement.lineType,replacement.lineTypeScale,replacement.lineWeight);
+            if(replacement==null)continue;DxfParser.SourceEntity source=drawing.sourceById(replacement.sourceId);String layout=source==null?drawing.activeLayout:source.layout;
+            writeEdit(out,contentToWorld,replacement.edit,replacement.layer,replacement.color&0x00FFFFFF,replacement.lineType,replacement.lineTypeScale,replacement.lineWeight,layout);
         }
     }
 
-    private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits,String layer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight)throws IOException{
-        if(edits==null)return;for(CadEdit edit:edits)writeEdit(out,contentToWorld,edit,layer,trueColor,lineType,lineTypeScale,lineWeight);
+    private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits,String layer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight,String layout)throws IOException{
+        if(edits==null)return;for(CadEdit edit:edits)writeEdit(out,contentToWorld,edit,layer,trueColor,lineType,lineTypeScale,lineWeight,layout);
     }
 
-    private static void writeEdit(BufferedWriter out,Matrix contentToWorld,CadEdit edit,String sourceLayer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight)throws IOException{
+    private static void writeEdit(BufferedWriter out,Matrix contentToWorld,CadEdit edit,String sourceLayer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight,String layout)throws IOException{
         if(edit==null)return;FileTransfer.checkCancelled();String layerName=sourceLayer==null||sourceLayer.trim().isEmpty()?"0":sourceLayer;
         switch(edit.type){
-            case LINE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
-            case RECTANGLE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
-            case CIRCLE:{PointF c=w(contentToWorld,edit.xy[0],edit.xy[1]),p=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
-            case POLYLINE:{entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight);int count=edit.xy.length/2;i(out,90,count);i(out,70,edit.closed?1:0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
-            case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,worldTextHeight(contentToWorld,30));n(out,50,-edit.rotationDegrees);tag(out,1,safe(edit.text));break;}
+            case LINE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
+            case RECTANGLE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
+            case CIRCLE:{PointF c=w(contentToWorld,edit.xy[0],edit.xy[1]),p=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
+            case POLYLINE:{entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);int count=edit.xy.length/2;i(out,90,count);i(out,70,edit.closed?1:0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
+            case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,worldTextHeight(contentToWorld,30));n(out,50,-edit.rotationDegrees);tag(out,1,safe(edit.text));break;}
         }
     }
 
@@ -91,8 +90,9 @@ public final class DxfWriter {
     private static double worldTextHeight(Matrix contentToWorld,float contentPixels){float[] vector={0,contentPixels};contentToWorld.mapVectors(vector);return Math.max(.001,Math.hypot(vector[0],vector[1]));}
     private static PointF w(Matrix m,float x,float y){float[] xy={x,y};m.mapPoints(xy);return new PointF(xy[0],xy[1]);}
     private static void entity(BufferedWriter o,String type)throws IOException{tag(o,0,type);}
-    private static void common(BufferedWriter o,String layer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight)throws IOException{
-        tag(o,8,layer);if(trueColor!=null)tag(o,420,Integer.toString(trueColor));
+    private static void common(BufferedWriter o,String layer,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight,String layout)throws IOException{
+        tag(o,8,layer);if(layout!=null&&!layout.trim().isEmpty()&&!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layout.trim())){i(o,67,1);tag(o,410,layout.trim());}
+        if(trueColor!=null)tag(o,420,Integer.toString(trueColor));
         if(lineType!=null&&!lineType.trim().isEmpty())tag(o,6,DxfLineStyle.normalizeName(lineType));
         if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d&&Math.abs(lineTypeScale-1d)>1e-9)n(o,48,lineTypeScale);
         if(lineWeight!=null)i(o,370,DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT));
