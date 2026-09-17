@@ -1,0 +1,34 @@
+MUSACAD SON KULLANICI LİSANS VE DENEME KOŞULLARI
+Sürüm 1 — 17 Eylül 2026
+
+1. KAPSAM
+Bu koşullar MusaCAD uygulamasının MusaCAD'e ait özgün arayüz, iş akışı ve uygulama bileşenlerinin kullanımını düzenler. Uygulama içinde kullanılan üçüncü taraf ve açık kaynak bileşenler kendi lisanslarına tabidir; bu koşullar o lisansların kullanıcıya tanıdığı hakları daraltmaz.
+
+2. DENEME SÜRÜMÜ
+Kullanıcı, koşulları kabul ettikten sonra aynı kurulum için bir defaya mahsus 24 saatlik ücretsiz deneme başlatabilir. Deneme süresi başlatıldığı anda işlemeye başlar. Uygulamayı kapatmak, internet bağlantısını kesmek veya cihaz saatini değiştirmek deneme süresini yeniden başlatmaz.
+
+3. TİCARİ LİSANS
+Deneme süresi sonunda uygulamanın lisans gerektiren işlevlerine erişim için geçerli bir MusaCAD lisansı gerekir. Lisans türü; süreli, süresiz, cihaz bazlı veya kullanıcı bazlı olarak ayrıca tanımlanabilir. Lisans kodunun doğrulanması için ileride MusaCAD lisans altyapısı kullanılacaktır.
+
+4. LİSANS KODUNUN KORUNMASI
+Lisans kodu yalnız satın alındığı kapsamda kullanılabilir. Lisans kodunun yetkisiz çoğaltılması, paylaşılması, satılması veya lisans denetimini aşmaya yönelik kullanım yasaktır. Açık kaynak lisanslarından doğan tersine mühendislik veya kaynak koda erişim hakları saklıdır.
+
+5. KULLANICI DOSYALARI VE GİZLİLİK
+MusaCAD'in mevcut çalışma yapısında DWG/DXF dosyalarının görüntülenmesi ve dönüştürülmesi cihaz üzerinde gerçekleştirilir. Kullanıcının çizimleri, kullanıcı açıkça paylaşım veya dışa aktarma işlemi başlatmadıkça uygulama tarafından kendiliğinden üçüncü taraflara gönderilmez. Gelecekte çevrimiçi lisans doğrulama veya bulut özellikleri eklenirse gerekli veri işleme bilgileri ayrıca açıklanacaktır.
+
+6. DOSYA UYUMLULUĞU
+DWG ve DXF biçimleri çok sayıda sürüm, nesne tipi ve üretici uzantısı içerir. MusaCAD desteklenen dosyaları mümkün olan en doğru şekilde görüntülemeyi amaçlar; ancak her dosyanın, her özel CAD nesnesinin veya her üçüncü taraf uzantısının eksiksiz açılacağı garanti edilmez. Kritik teknik çıktılar kullanıcı tarafından ayrıca doğrulanmalıdır.
+
+7. ÜÇÜNCÜ TARAF / AÇIK KAYNAK BİLEŞENLER
+MusaCAD, GNU LibreDWG dahil açık kaynak bileşenler içerebilir. Bu bileşenlerin telif hakkı ve lisans bildirimleri uygulama içinde sunulur. GPL kapsamındaki bileşenler bakımından GPL'nin kullanıcıya sağladığı kaynak kodu, değiştirme ve yeniden dağıtım hakları aynen geçerlidir.
+
+8. GÜNCELLEMELER
+Uygulamanın işlevleri, desteklenen dosya türleri, lisans yöntemi ve güvenlik özellikleri yeni sürümlerde değiştirilebilir. Lisansın hangi ana sürümleri kapsadığı satın alma sırasında ayrıca belirtilir.
+
+9. SORUMLULUK
+MusaCAD profesyonel teknik çalışmalara yardımcı bir araçtır. Uygulanabilir hukukun izin verdiği ölçüde; uygulamanın ürettiği ölçüm, çıktı veya dönüştürmelerin proje, imalat, ruhsat, ihale veya saha uygulamasında kullanılmasından önce kullanıcı tarafından kontrol edilmesi gerekir.
+
+10. KABUL
+“Koşulları kabul ediyorum” seçeneğinin işaretlenmesi ve denemenin veya lisanslı kullanımın başlatılması bu metnin kabul edildiği anlamına gelir.
+
+Not: Bu metin ticari yayın öncesi hukuk danışmanı tarafından yürürlükteki tüketici, mesafeli satış, kişisel veri ve yazılım lisans mevzuatına göre son kez gözden geçirilmelidir.
