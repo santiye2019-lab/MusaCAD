@@ -63,8 +63,10 @@ final class CadPrint {
             try{
                 if(attributes==null)throw new IOException("Yazdırma özellikleri hazırlanamadı");document=new PrintedPdfDocument(context,attributes);PdfDocument.Page page=document.startPage(0);Canvas canvas=page.getCanvas();canvas.drawColor(Color.WHITE);Rect content=document.getPageContentRect();RectF target=new RectF(content);int save=canvas.save();canvas.clipRect(target);
                 boolean mono=forceMonochrome||attributes.getColorMode()==PrintAttributes.COLOR_MODE_MONOCHROME;
-                if(drawing!=null){Matrix matrix=drawing.printMatrix(target,denominator);drawing.drawVectorForPrint(canvas,matrix,mono,hidden);drawEdits(canvas,additions,matrix,mono,null);for(SourceReplacement replacement:replacements)if(drawing.visibleLayers.contains(replacement.layer))drawEdits(canvas,Collections.singletonList(replacement.edit),matrix,mono,replacement.color);}
-                else renderBitmap(canvas,bitmap,target,mono);
+                if(drawing!=null){
+                    Matrix matrix=drawing.printMatrix(target,denominator);drawing.drawVectorForPrint(canvas,matrix,mono,hidden);drawEdits(canvas,additions,matrix,mono);
+                    for(SourceReplacement replacement:replacements)drawing.drawSourceReplacement(canvas,matrix,replacement,true,mono);
+                }else renderBitmap(canvas,bitmap,target,mono);
                 canvas.restoreToCount(save);document.finishPage(page);if(signal.isCanceled()){callback.onWriteCancelled();return;}try(FileOutputStream out=new FileOutputStream(destination.getFileDescriptor())){document.writeTo(out);out.flush();}callback.onWriteFinished(new PageRange[]{PageRange.ALL_PAGES});
             }catch(Exception e){callback.onWriteFailed(e.getMessage()==null?"Yazdırma belgesi oluşturulamadı":e.getMessage());}finally{if(document!=null)document.close();}
         }
@@ -74,8 +76,8 @@ final class CadPrint {
     private static boolean containsPage(PageRange[] ranges,int page){if(ranges==null)return false;for(PageRange range:ranges)if(page>=range.getStart()&&page<=range.getEnd())return true;return false;}
     private static void renderBitmap(Canvas canvas,Bitmap bitmap,RectF target,boolean monochrome){if(bitmap==null||bitmap.isRecycled())return;float scale=Math.min(target.width()/bitmap.getWidth(),target.height()/bitmap.getHeight());float w=bitmap.getWidth()*scale,h=bitmap.getHeight()*scale;RectF dst=new RectF(target.centerX()-w/2f,target.centerY()-h/2f,target.centerX()+w/2f,target.centerY()+h/2f);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);if(monochrome){ColorMatrix cm=new ColorMatrix();cm.setSaturation(0f);paint.setColorFilter(new ColorMatrixColorFilter(cm));}canvas.drawBitmap(bitmap,null,dst,paint);}
 
-    private static void drawEdits(Canvas canvas,List<CadEdit> edits,Matrix matrix,boolean monochrome,Integer sourceColor){
-        if(edits==null||edits.isEmpty())return;int color=monochrome?Color.BLACK:(sourceColor==null?Color.rgb(230,126,34):paperColor(sourceColor));Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setColor(color);paint.setStrokeWidth(.9f);paint.setStyle(Paint.Style.STROKE);
+    private static void drawEdits(Canvas canvas,List<CadEdit> edits,Matrix matrix,boolean monochrome){
+        if(edits==null||edits.isEmpty())return;int color=monochrome?Color.BLACK:Color.rgb(230,126,34);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setColor(color);paint.setStrokeWidth(.9f);paint.setStyle(Paint.Style.STROKE);
         for(CadEdit edit:edits){float[] v=edit.xy.clone();matrix.mapPoints(v);switch(edit.type){
             case LINE:canvas.drawLine(v[0],v[1],v[2],v[3],paint);break;
             case RECTANGLE:canvas.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;
@@ -84,6 +86,5 @@ final class CadPrint {
             case TEXT:paint.setStyle(Paint.Style.FILL);paint.setTextSize(9f);int save=canvas.save();canvas.rotate(edit.rotationDegrees,v[0],v[1]);canvas.drawText(edit.text==null?"":edit.text,v[0],v[1],paint);canvas.restoreToCount(save);paint.setStyle(Paint.Style.STROKE);break;
         }}
     }
-    private static int paperColor(int color){int r=Color.red(color),g=Color.green(color),b=Color.blue(color);return r>=245&&g>=245&&b>=245?Color.BLACK:Color.rgb(r,g,b);}
     private CadPrint(){}
 }
