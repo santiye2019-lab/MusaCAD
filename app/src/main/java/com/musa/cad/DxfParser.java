@@ -75,16 +75,12 @@ public final class DxfParser {
                 double bx=(line.baseX*co-line.baseY*si)*scale,by=(line.baseX*si+line.baseY*co)*scale;
                 double ox=(line.offsetX*co-line.offsetY*si)*scale,oy=(line.offsetX*si+line.offsetY*co)*scale;
                 double angle=Math.toRadians(line.angleDegrees+hatch.patternAngleDegrees);
-                float[] base={(float)bx,(float)by};m.mapPoints(base);
-                float[] offset={(float)ox,(float)oy};m.mapVectors(offset);float step=(float)Math.hypot(offset[0],offset[1]);if(step<.5f||!Float.isFinite(step))continue;
-                float[] dir={(float)Math.cos(angle),(float)Math.sin(angle)};m.mapVectors(dir);float length=(float)Math.hypot(dir[0],dir[1]);if(length<1e-6f)continue;dir[0]/=length;dir[1]/=length;
+                float[]base={(float)bx,(float)by};m.mapPoints(base);float[]offset={(float)ox,(float)oy};m.mapVectors(offset);
+                float step=(float)Math.hypot(offset[0],offset[1]);if(step<.5f||!Float.isFinite(step))continue;
+                float[]dir={(float)Math.cos(angle),(float)Math.sin(angle)};m.mapVectors(dir);float length=(float)Math.hypot(dir[0],dir[1]);if(length<1e-6f)continue;dir[0]/=length;dir[1]/=length;
                 DxfLineStyle.Pattern dashPattern=new DxfLineStyle.Pattern("HATCH",line.dashes,false);DxfLineStyle.Dash dash=dashPattern.dash(matrixScale(m),1d,scale,1d);
-                p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));
-                int count=Math.min(1600,(int)Math.ceil(diag/step)+6);
-                for(int n=-count;n<=count;n++){
-                    float ax=base[0]+offset[0]*n,ay=base[1]+offset[1]*n;
-                    c.drawLine(ax-dir[0]*diag*2,ay-dir[1]*diag*2,ax+dir[0]*diag*2,ay+dir[1]*diag*2,p);
-                }
+                p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));int count=Math.min(1600,(int)Math.ceil(diag/step)+6);
+                for(int n=-count;n<=count;n++){float ax=base[0]+offset[0]*n,ay=base[1]+offset[1]*n;c.drawLine(ax-dir[0]*diag*2,ay-dir[1]*diag*2,ax+dir[0]*diag*2,ay+dir[1]*diag*2,p);}
             }
             p.setPathEffect(null);c.restoreToCount(save);p.setStyle(old);
         }
@@ -107,7 +103,7 @@ public final class DxfParser {
 
     public static final class Result{
         public final Bitmap bitmap;public final float[] snapPoints;public final int entityCount,layerCount,skippedCount;public int conversionWarnings;public final Set<String> layerNames,visibleLayers;
-        private final List<Entity> document;private final Matrix view;private final RectF contentBounds;private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern> lineTypes;private final List<SourceEntity> editableSources;private final Map<Integer,SourceEntity> sourceById;
+        private final List<Entity>document;private final Matrix view;private final RectF contentBounds;private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<SourceEntity>editableSources;private final Map<Integer,SourceEntity>sourceById;
         Result(Bitmap b,int e,int skipped,float[]points,List<Entity>document,Matrix view,Set<String>all,Set<String>visible,RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,Map<String,DxfLineStyle.Pattern>lineTypes){
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
             ArrayList<SourceEntity>sourceList=new ArrayList<>();LinkedHashMap<Integer,SourceEntity>sourceMap=new LinkedHashMap<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;CadEdit contentEdit=mapEditToContent(layer.sourceEditWorld,this.view);SourceEntity source=new SourceEntity(layer.sourceId,layer.sourceRange,layer.sourceType,layer.layer,layer.color,layer.lineType,layer.lineTypeScale,layer.lineWeight,contentEdit);sourceList.add(source);sourceMap.put(source.sourceId,source);}editableSources=Collections.unmodifiableList(sourceList);sourceById=Collections.unmodifiableMap(sourceMap);
@@ -133,23 +129,29 @@ public final class DxfParser {
 
     private static int paperColor(int color){int r=Color.red(color),g=Color.green(color),b=Color.blue(color);return r>=245&&g>=245&&b>=245?Color.BLACK:Color.rgb(r,g,b);}
 
+    /** TEXT/MTEXT/ATTRIB renderer preserving DXF STYLE width, oblique and generation flags. */
     private static final class Label implements Entity{
-        final float x,y,height,angle;final String text;final String[]rows;
-        Label(float x,float y,float h,float angle,String text){this.x=x;this.y=y;this.height=h;this.angle=angle;this.text=text;rows=text.split("\n",-1);}
-        private Path shape(){Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(height);Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();p.getTextPath(rows[i],0,rows[i].length(),0,i*height*1.3f,line);shape.addPath(line);}Matrix placement=new Matrix();placement.setScale(1,-1);placement.postRotate(angle);placement.postTranslate(x,y);shape.transform(placement);return shape;}
+        final float x,y,height,angle,widthFactor,oblique;final int generationFlags;final String text;final String[]rows;final DxfTextStyle.Style style;
+        Label(float x,float y,float h,float angle,String text,DxfTextStyle.Style style,float widthFactor,float oblique,int generationFlags){this.x=x;this.y=y;this.height=h;this.angle=angle;this.text=text;this.style=style==null?DxfTextStyle.defaultStyle():style;this.widthFactor=Math.max(.01f,widthFactor);this.oblique=oblique;this.generationFlags=generationFlags;rows=text.split("\n",-1);}
+        private Typeface typeface(){return style.usesShx()?Typeface.MONOSPACE:Typeface.create(style.familyHint(),Typeface.NORMAL);}
+        private Path shape(){
+            Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(typeface());tp.setTextSize(height);tp.setTextScaleX(widthFactor);tp.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));
+            Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();tp.getTextPath(rows[i],0,rows[i].length(),0,i*height*1.3f,line);shape.addPath(line);}
+            float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f;Matrix placement=new Matrix();placement.setScale(sx,sy);placement.postRotate(angle);placement.postTranslate(x,y);shape.transform(placement);return shape;
+        }
         public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);}
     }
 
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
     public static Result render(File file)throws IOException{
-        List<String>lines=readLines(file);int insUnits=headerInt(lines,"$INSUNITS",70,0);double millimetersPerUnit=CadPrintMath.millimetersPerUnit(insUnits);String drawingUnitName=CadPrintMath.unitName(insUnits);int defaultLineweight=headerInt(lines,"$LWDEFAULT",370,DxfLineStyle.DEFAULT_LINEWEIGHT);defaultLineweight=DxfLineStyle.normalizeWeight(defaultLineweight,DxfLineStyle.DEFAULT_LINEWEIGHT);double globalLineTypeScale=safeLineTypeScale(headerDouble(lines,"$LTSCALE",40,1d));
+        List<String>lines=readLines(file);Map<String,DxfTextStyle.Style>textStyles=DxfTextStyle.parse(lines);int insUnits=headerInt(lines,"$INSUNITS",70,0);double millimetersPerUnit=CadPrintMath.millimetersPerUnit(insUnits);String drawingUnitName=CadPrintMath.unitName(insUnits);int defaultLineweight=headerInt(lines,"$LWDEFAULT",370,DxfLineStyle.DEFAULT_LINEWEIGHT);defaultLineweight=DxfLineStyle.normalizeWeight(defaultLineweight,DxfLineStyle.DEFAULT_LINEWEIGHT);double globalLineTypeScale=safeLineTypeScale(headerDouble(lines,"$LTSCALE",40,1d));
         DxfBlocks.Result expanded=DxfBlocks.expand(lines,defaultLineweight);ArrayList<Entity>entities=new ArrayList<>();Set<String>layers=new HashSet<>();int skipped=expanded.skipped;List<DxfBlocks.Placement>placements=expanded.placements;DxfLineStyle.Pattern continuous=expanded.lineTypes.get(DxfLineStyle.CONTINUOUS);
         for(int index=0;index<placements.size();index++){
             FileTransfer.checkCancelled();DxfBlocks.Placement item=placements.get(index);Entity entity;
             if("POLYLINE".equals(item.record.type)){ArrayList<PointF>points=new ArrayList<>();int j=index+1;while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){DxfBlocks.Record vertex=placements.get(j).record;points.add(new PointF(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20)));j++;}if(points.size()<2){skipped++;continue;}entity=new Poly(points,(((int)item.record.number(70,0))&1)!=0);index=j-1;}
             else if("VERTEX".equals(item.record.type)){skipped++;continue;}
-            else{entity=parse(item.record.type,lines,item.record.from,item.record.to);if(entity==null){skipped++;continue;}}
+            else{entity=parse(item.record.type,lines,item.record.from,item.record.to,textStyles);if(entity==null){skipped++;continue;}}
             CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;SourceRange sourceRange=sourceEdit==null?null:new SourceRange(item.record.from,Math.max(0,item.record.from-2),item.record.to);int sourceId=sourceRange==null?-1:sourceRange.sourceId;DxfLineStyle.Pattern pattern=expanded.lineTypes.get(item.lineType);if(pattern==null)pattern=continuous;
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,item.color,item.lineType,pattern,item.lineTypeScale,item.lineWeight,item.blockScale,sourceId,sourceRange,item.record.type,sourceEdit));layers.add(item.layer);
         }
@@ -168,8 +170,14 @@ public final class DxfParser {
 
     private static float[] snapPoints(List<Entity>entities,Matrix matrix){ArrayList<PointF>points=new ArrayList<>();for(Entity wrapped:entities){Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;Matrix transform=new Matrix();if(entity instanceof Transformed){transform=((Transformed)entity).matrix;entity=((Transformed)entity).entity;}ArrayList<PointF>local=new ArrayList<>();if(entity instanceof Line){Line line=(Line)entity;local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));}else if(entity instanceof Poly)local.addAll(((Poly)entity).pts);for(PointF point:local){float[]xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));}}float[]result=new float[points.size()*2];for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}matrix.mapPoints(result);return result;}
 
-    private static Entity parse(String type,List<String>a,int from,int to){
-        if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){StringBuilder text=new StringBuilder();for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}String plain=DxfText.plain(text.toString());if(plain.trim().isEmpty())return null;float angle=f(a,from,to,50);if("MTEXT".equals(type)){angle=(float)Math.toDegrees(angle);if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));}return new Label(f(a,from,to,10),f(a,from,to,20),Math.max(.01f,fv(a,from,to,40,1f)),angle,plain);}
+    private static Entity parse(String type,List<String>a,int from,int to,Map<String,DxfTextStyle.Style>textStyles){
+        if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
+            StringBuilder text=new StringBuilder();for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}
+            String plain=DxfText.plain(text.toString());if(plain.trim().isEmpty())return null;DxfTextStyle.Style style=DxfTextStyle.resolve(textStyles,str(a,from,to,7,DxfTextStyle.STANDARD));
+            float angle=f(a,from,to,50);if("MTEXT".equals(type)){angle=(float)Math.toDegrees(angle);if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));}
+            float rawHeight=Math.max(.01f,fv(a,from,to,40,1f)),height=style.textHeight(rawHeight);float entityWidth="MTEXT".equals(type)?1f:fv(a,from,to,41,1f),width=style.width(entityWidth);float entityOblique="MTEXT".equals(type)?0f:fv(a,from,to,51,0f),oblique=style.oblique(entityOblique);int generation=style.generation("MTEXT".equals(type)?0:(int)fv(a,from,to,71,0f));
+            return new Label(f(a,from,to,10),f(a,from,to,20),height,angle,plain,style,width,oblique,generation);
+        }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));
         if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),Math.max(.1f,fv(a,from,to,40,.5f)));
         if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);
