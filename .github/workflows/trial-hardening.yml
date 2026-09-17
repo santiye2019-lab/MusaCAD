@@ -1,0 +1,38 @@
+name: Trial hardening gate
+
+on:
+  push:
+    branches: [ main, 'gandalf/trial-hardening' ]
+    paths:
+      - 'app/src/main/java/com/musa/cad/DeviceIdentityHash.java'
+      - 'app/src/main/java/com/musa/cad/DeviceIdentity.java'
+      - 'app/src/main/java/com/musa/cad/LicenseManager.java'
+      - 'app/src/main/java/com/musa/cad/TrialPolicy.java'
+      - 'app/src/main/java/com/musa/cad/SignedTrialPolicy.java'
+      - 'app/src/main/java/com/musa/cad/TrialService.java'
+      - 'tests/DeviceIdentityHashTest.java'
+      - 'tests/SignedTrialPolicyTest.java'
+      - 'server/trial-worker/**'
+      - '.github/workflows/trial-hardening.yml'
+  workflow_dispatch:
+
+jobs:
+  trial-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test stable device identity
+        run: |
+          mkdir -p /tmp/musacad-trial-tests
+          javac -d /tmp/musacad-trial-tests app/src/main/java/com/musa/cad/DeviceIdentityHash.java tests/DeviceIdentityHashTest.java
+          java -cp /tmp/musacad-trial-tests DeviceIdentityHashTest
+      - name: Test signed trial time policy
+        run: |
+          javac -d /tmp/musacad-trial-tests app/src/main/java/com/musa/cad/TrialPolicy.java app/src/main/java/com/musa/cad/SignedTrialPolicy.java tests/SignedTrialPolicyTest.java
+          java -cp /tmp/musacad-trial-tests SignedTrialPolicyTest
+      - name: Check trial service source
+        run: node --check server/trial-worker/src/index.js
