@@ -68,6 +68,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
           java -cp /tmp/musacad-tests DxfTextAlignTest
+      - name: Test DXF polyline bulge arcs
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBulge.java tests/DxfBulgeTest.java
+          java -cp /tmp/musacad-tests DxfBulgeTest
       - name: Test DXF linetype and lineweight
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java tests/DxfLineStyleTest.java
