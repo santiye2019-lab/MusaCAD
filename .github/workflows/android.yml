@@ -52,6 +52,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrintMath.java tests/CadPrintMathTest.java
           java -cp /tmp/musacad-tests CadPrintMathTest
+      - name: Test one-day trial policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/TrialPolicy.java tests/TrialPolicyTest.java
+          java -cp /tmp/musacad-tests TrialPolicyTest
       - name: Test DXF block expansion and color inheritance
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
