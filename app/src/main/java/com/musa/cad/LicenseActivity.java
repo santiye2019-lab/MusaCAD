@@ -1,6 +1,6 @@
 package com.musa.cad;
 
-import android.content.Intent;
+import android.content.*;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
@@ -17,7 +17,7 @@ public class LicenseActivity extends AppCompatActivity {
     private CheckBox termsCheck;
     private Button trialButton;
     private EditText licenseCode;
-    private TextView status,message;
+    private TextView status,message,installationId;
     private Intent pendingIntent;
 
     @Override protected void onCreate(Bundle savedInstanceState){
@@ -40,9 +40,12 @@ public class LicenseActivity extends AppCompatActivity {
         licenseCode=findViewById(R.id.licenseCode);
         status=findViewById(R.id.licenseStatus);
         message=findViewById(R.id.licenseMessage);
+        installationId=findViewById(R.id.installationId);
+        installationId.setText(LicenseManager.installationId(this));
         termsCheck.setChecked(LicenseManager.termsAccepted(this));
 
         findViewById(R.id.termsButton).setOnClickListener(v->showTerms());
+        findViewById(R.id.copyInstallationIdButton).setOnClickListener(v->copyInstallationId());
         trialButton.setOnClickListener(v->startTrial());
         findViewById(R.id.activateButton).setOnClickListener(v->activate());
         refresh();
@@ -84,10 +87,16 @@ public class LicenseActivity extends AppCompatActivity {
         }
         String code=licenseCode.getText().toString().trim();
         LicenseManager.ActivationResult r=LicenseManager.activateCode(this,code);
-        if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);enterApp();return;}
-        if(r==LicenseManager.ActivationResult.INVALID_CODE){licenseCode.setError("Geçerli bir lisans kodu girin");return;}
-        message.setText("Lisans kodu ekranı hazır. Güvenli imzalı kod doğrulaması, lisans üretici yazılımıyla birlikte etkinleştirilecek.");
-        Toast.makeText(this,"Lisans doğrulama motoru sonraki lisans adımında etkinleştirilecek",Toast.LENGTH_LONG).show();
+        if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;}
+        licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
+        message.setText("Lisans kodu bu ekrandaki Cihaz/Lisans Kimliği için üretilmelidir.");
+    }
+
+    private void copyInstallationId(){
+        String id=LicenseManager.installationId(this);
+        ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Lisans Kimliği",id));
+        Toast.makeText(this,"Lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
     }
 
     private void enterApp(){
