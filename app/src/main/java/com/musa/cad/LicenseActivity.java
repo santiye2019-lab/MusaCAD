@@ -11,14 +11,18 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import java.io.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class LicenseActivity extends AppCompatActivity {
     public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";
+    private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
     private CheckBox termsCheck;
     private Button trialButton;
     private EditText licenseCode;
     private TextView status,message,installationId;
     private Intent pendingIntent;
+    private volatile boolean trialRequestRunning;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
@@ -56,8 +60,8 @@ public class LicenseActivity extends AppCompatActivity {
         switch(s){
             case TRIAL_AVAILABLE:
                 status.setText("1 gün ücretsiz deneyin");
-                trialButton.setEnabled(true);trialButton.setAlpha(1f);
-                trialButton.setText("1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");break;
+                trialButton.setEnabled(!trialRequestRunning);trialButton.setAlpha(trialRequestRunning?.55f:1f);
+                trialButton.setText(trialRequestRunning?"DENEME DOĞRULANIYOR…":"1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");break;
             case TRIAL_EXPIRED:
                 status.setText("Ücretsiz deneme sona erdi");
                 trialButton.setEnabled(false);trialButton.setAlpha(.45f);
@@ -73,12 +77,26 @@ public class LicenseActivity extends AppCompatActivity {
     }
 
     private void startTrial(){
+        if(trialRequestRunning)return;
         if(!termsCheck.isChecked()){
             Toast.makeText(this,"Önce lisans ve deneme koşullarını kabul edin",Toast.LENGTH_LONG).show();return;
         }
-        LicenseManager.acceptTerms(this);
-        if(LicenseManager.startTrial(this))enterApp();
-        else {refresh();Toast.makeText(this,"Ücretsiz deneme yeniden başlatılamaz",Toast.LENGTH_LONG).show();}
+        LicenseManager.acceptTerms(this);trialRequestRunning=true;message.setText("Ücretsiz deneme cihaz için doğrulanıyor…");refresh();
+        trialExecutor.execute(()->{
+            TrialService.Result r=TrialService.start(getApplicationContext());
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;trialRequestRunning=false;
+                switch(r.status){
+                    case ACTIVATED:Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
+                    case ALREADY_USED:message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");refresh();return;
+                    case NOT_CONFIGURED:message.setText("Ücretsiz deneme sunucusu bu sürümde yapılandırılmamış. Lisans kodu ile devam edebilirsiniz.");break;
+                    case NETWORK_ERROR:message.setText("Ücretsiz denemeyi başlatmak için internet bağlantısını kontrol edin ve yeniden deneyin.");break;
+                    case DENIED:message.setText(r.message==null?"Ücretsiz deneme isteği reddedildi.":r.message);break;
+                    case INVALID_RESPONSE:message.setText("Deneme sunucu yanıtı doğrulanamadı. Lisans kodu ile devam edebilirsiniz.");break;
+                }
+                refresh();
+            });
+        });
     }
 
     private void activate(){
@@ -101,10 +119,8 @@ public class LicenseActivity extends AppCompatActivity {
 
     private void enterApp(){
         Intent next=pendingIntent==null?new Intent(this,MainActivity.class):new Intent(pendingIntent).setClass(this,MainActivity.class);
-        next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(next);
-        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
-        finish();
+        next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);startActivity(next);
+        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);finish();
     }
 
     private void showTerms(){
@@ -121,4 +137,6 @@ public class LicenseActivity extends AppCompatActivity {
             byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString("UTF-8");
         }catch(IOException e){return "Lisans koşulları okunamadı.";}
     }
+
+    @Override protected void onDestroy(){trialExecutor.shutdownNow();super.onDestroy();}
 }
