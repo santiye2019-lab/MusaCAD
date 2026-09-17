@@ -7,3 +7,7 @@ local.properties
 third_party/libredwg/
 app/src/main/assets/COPYING-LibreDWG.txt
 .cxx/
+
+server/trial-worker/wrangler.toml
+server/trial-worker/.dev.vars
+server/trial-worker/.wrangler/
