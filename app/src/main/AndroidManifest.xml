@@ -5,7 +5,10 @@
     <application
         android:theme="@style/Theme.MusaCAD"
         android:label="MusaCAD"
-        android:icon="@drawable/ic_launcher">
+        android:icon="@drawable/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".SplashActivity"
