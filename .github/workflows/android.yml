@@ -131,6 +131,18 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
           java -cp /tmp/musacad-tests FileTransferTest
+      - name: Test large DXF streaming under bounded heap
+        run: |
+          javac -d /tmp/musacad-tests \
+            app/src/main/java/com/musa/cad/FileTransfer.java \
+            app/src/main/java/com/musa/cad/DxfColor.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/DxfLineTypeParser.java \
+            app/src/main/java/com/musa/cad/DxfTextStyle.java \
+            app/src/main/java/com/musa/cad/DxfStream.java \
+            app/src/main/java/com/musa/cad/DxfBlocks.java \
+            tests/DxfStreamingLargeTest.java
+          java -Xmx64m -cp /tmp/musacad-tests DxfStreamingLargeTest
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
