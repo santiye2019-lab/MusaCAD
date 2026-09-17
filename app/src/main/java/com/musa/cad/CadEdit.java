@@ -46,8 +46,14 @@ public final class CadEdit {
         return new CadEdit(type,out,text,strokeWidth,closed,textRotation);
     }
 
-    public float centerX(){return (minX()+maxX())*.5f;}
-    public float centerY(){return (minY()+maxY())*.5f;}
+    public float centerX(){
+        if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[0];
+        return (minX()+maxX())*.5f;
+    }
+    public float centerY(){
+        if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[1];
+        return (minY()+maxY())*.5f;
+    }
     public float minX(){float v=Float.POSITIVE_INFINITY;for(int i=0;i+1<xy.length;i+=2)v=Math.min(v,xy[i]);return Float.isFinite(v)?v:0f;}
     public float maxX(){float v=Float.NEGATIVE_INFINITY;for(int i=0;i+1<xy.length;i+=2)v=Math.max(v,xy[i]);return Float.isFinite(v)?v:0f;}
     public float minY(){float v=Float.POSITIVE_INFINITY;for(int i=1;i<xy.length;i+=2)v=Math.min(v,xy[i]);return Float.isFinite(v)?v:0f;}
