@@ -120,7 +120,7 @@ public final class DxfParser {
 
     private static CadEdit sourceEdit(Entity entity,String type){
         if(entity instanceof Line&&"LINE".equals(type)){Line l=(Line)entity;return CadEdit.line(l.x1,l.y1,l.x2,l.y2);}
-        if(entity instanceof Poly&&"LWPOLYLINE".equals(type)){Poly p=(Poly)entity;float[]xy=new float[p.snapPts.size()*2];for(int i=0;i<p.snapPts.size();i++){xy[i*2]=p.snapPts.get(i).x;xy[i*2+1]=p.snapPts.get(i).y;}return CadEdit.polyline(xy,p.closed);}
+        if(entity instanceof Poly&&"LWPOLYLINE".equals(type)){Poly p=(Poly)entity;if(p.pts.size()>p.snapPts.size()+(p.closed?1:0))return null;float[]xy=new float[p.snapPts.size()*2];for(int i=0;i<p.snapPts.size();i++){xy[i*2]=p.snapPts.get(i).x;xy[i*2+1]=p.snapPts.get(i).y;}return CadEdit.polyline(xy,p.closed);}
         if(entity instanceof Circle&&"CIRCLE".equals(type)){Circle c=(Circle)entity;return CadEdit.circle(c.x,c.y,c.x+c.r,c.y);}
         if(entity instanceof Label&&"TEXT".equals(type)){Label l=(Label)entity;float[]base=l.baseline();return CadEdit.styledText(base[0],base[1],l.text,l.angle,l.style.name,l.style.familyHint(),l.style.usesShx(),l.height,l.widthFactor,l.oblique,l.generationFlags);}
         return null;
