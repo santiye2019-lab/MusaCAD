@@ -64,6 +64,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java tests/DxfLineStyleTest.java
           java -cp /tmp/musacad-tests DxfLineStyleTest
+      - name: Test DXF hatch boundaries and patterns
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatch.java tests/DxfHatchTest.java
+          java -cp /tmp/musacad-tests DxfHatchTest
       - name: Test CAD print scale math
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrintMath.java tests/CadPrintMathTest.java
