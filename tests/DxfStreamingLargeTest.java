@@ -17,6 +17,7 @@ public class DxfStreamingLargeTest {
             tag(w,0,"SECTION");tag(w,2,"TABLES");
             tag(w,0,"LTYPE");tag(w,2,"DASHED");tag(w,49,"5");tag(w,49,"-2");
             tag(w,0,"LAYER");tag(w,2,"PIPE");tag(w,62,"1");tag(w,6,"DASHED");tag(w,370,"50");
+            tag(w,0,"STYLE");tag(w,2,"STANDARD");tag(w,3,"Arial.ttf");tag(w,41,"1.0");
             tag(w,0,"STYLE");tag(w,2,"ROMANS");tag(w,3,"romans.shx");tag(w,41,"0.8");
             tag(w,0,"ENDSEC");
 
@@ -54,6 +55,7 @@ public class DxfStreamingLargeTest {
         if(Math.abs(result.globalLineTypeScale-.5)>1e-9)throw new AssertionError("ltscale");
         if(!result.lineTypes.containsKey("DASHED"))throw new AssertionError("linetype");
         if(!result.textStyles.containsKey("ROMANS"))throw new AssertionError("style");
+        if(!"Arial.ttf".equals(result.textStyles.get("STANDARD").fontFile))throw new AssertionError("STANDARD style overwritten");
         if(!result.layerColors.containsKey("PIPE"))throw new AssertionError("layer");
         if(!result.placements.isEmpty())throw new AssertionError("streaming must not retain placements");
         if(file.length()>DxfStream.MAX_BYTES)throw new AssertionError("fixture unexpectedly too large");
