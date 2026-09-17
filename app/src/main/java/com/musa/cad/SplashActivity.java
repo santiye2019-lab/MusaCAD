@@ -13,9 +13,18 @@ import androidx.core.view.WindowInsetsCompat;
 
 public class SplashActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable launchMain = () -> {
+    private final Runnable launchNext = () -> {
         if (isFinishing() || isDestroyed()) return;
-        startActivity(new Intent(this, MainActivity.class));
+        Intent incoming=new Intent(getIntent());
+        boolean fileEntry=Intent.ACTION_VIEW.equals(incoming.getAction())||Intent.ACTION_SEND.equals(incoming.getAction());
+        Intent next;
+        if(LicenseManager.hasAccess(this)){
+            next=fileEntry?incoming.setClass(this,MainActivity.class):new Intent(this,MainActivity.class);
+        }else{
+            next=new Intent(this,LicenseActivity.class);
+            if(fileEntry)next.putExtra(LicenseActivity.EXTRA_PENDING_INTENT,incoming);
+        }
+        startActivity(next);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         finish();
     };
@@ -38,11 +47,11 @@ public class SplashActivity extends AppCompatActivity {
         content.setScaleY(.94f);
         content.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(480).start();
 
-        handler.postDelayed(launchMain, 1450);
+        handler.postDelayed(launchNext, 1200);
     }
 
     @Override protected void onDestroy() {
-        handler.removeCallbacks(launchMain);
+        handler.removeCallbacks(launchNext);
         super.onDestroy();
     }
 }

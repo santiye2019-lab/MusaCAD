@@ -100,17 +100,23 @@ public final class DxfParser {
         public final Set<String> layerNames,visibleLayers;
         private final List<Entity> document;
         private final Matrix view;
+        private final RectF contentBounds;
+        private final float worldToContentScale;
+        private final double millimetersPerUnit;
+        private final String drawingUnitName;
 
-        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible){
+        Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible,
+               RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName){
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
-            this.document=document;this.view=new Matrix(view);
+            this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);
+            this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));
             visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
         }
 
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            Result result=renderLayers(document,view,layerNames,visible,skippedCount);
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount,contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName);
             result.conversionWarnings=conversionWarnings;
             return result;
         }
@@ -128,19 +134,53 @@ public final class DxfParser {
             }
         }
 
+        /** Draws a paper-friendly vector copy. White CAD geometry becomes black on white paper. */
+        public void drawVectorForPrint(Canvas canvas, Matrix contentToPage, boolean monochrome){
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(.8f);
+            Matrix combined=new Matrix();combined.setConcat(contentToPage,view);
+            for(Entity entity:document){
+                LayerEntity layer=(LayerEntity)entity;
+                if(!visibleLayers.contains(layer.layer))continue;
+                paint.setColor(monochrome?Color.BLACK:paperColor(layer.color));
+                layer.entity.draw(canvas,paint,combined);
+            }
+        }
+
+        /** Content-space to physical print-page matrix. denominator=0 means fit to page. */
+        public Matrix printMatrix(RectF target,int denominator){
+            Matrix matrix=new Matrix();
+            if(target==null||target.width()<=0||target.height()<=0)return matrix;
+            double pointsPerWorld=CadPrintMath.pointsPerDrawingUnit(millimetersPerUnit,denominator);
+            if(denominator>0&&Double.isFinite(pointsPerWorld)&&worldToContentScale>0){
+                float scale=(float)(pointsPerWorld/worldToContentScale);
+                matrix.setScale(scale,scale);
+                RectF mapped=new RectF(contentBounds);matrix.mapRect(mapped);
+                matrix.postTranslate(target.centerX()-mapped.centerX(),target.centerY()-mapped.centerY());
+            }else{
+                matrix.setRectToRect(contentBounds,target,Matrix.ScaleToFit.CENTER);
+            }
+            return matrix;
+        }
+
+        public boolean hasPhysicalUnits(){return Double.isFinite(millimetersPerUnit)&&millimetersPerUnit>0;}
+        public String drawingUnitName(){return drawingUnitName;}
+        public float drawingAspectRatio(){return contentBounds.height()>0?contentBounds.width()/contentBounds.height():1f;}
         public int contentWidth(){return SIZE;}
         public int contentHeight(){return SIZE;}
     }
 
-    // Display colors distinguish layers; these are not the source file's ACI colors.
+    /** Retains the source DXF color already resolved from ACI/TrueColor/BYLAYER/BYBLOCK. */
     private static final class LayerEntity implements Entity {
-        final Entity entity; final String layer;
-        LayerEntity(Entity e,String l){entity=e;layer=l;}
+        final Entity entity; final String layer; final int color;
+        LayerEntity(Entity e,String l,int color){entity=e;layer=l;this.color=color;}
         public void bounds(RectF b){entity.bounds(b);}
-        public void draw(Canvas c,Paint p,Matrix m){
-            p.setColor(Color.HSVToColor(new float[]{Math.floorMod(layer.hashCode(),360),.45f,.95f}));
-            entity.draw(c,p,m);
-        }
+        public void draw(Canvas c,Paint p,Matrix m){p.setColor(color);entity.draw(c,p,m);}
+    }
+
+    private static int paperColor(int color){
+        int r=Color.red(color),g=Color.green(color),b=Color.blue(color);
+        return r>=245&&g>=245&&b>=245?Color.BLACK:Color.rgb(r,g,b);
     }
 
     private static final class Label implements Entity {
@@ -170,6 +210,9 @@ public final class DxfParser {
 
     public static Result render(File file)throws IOException{
         List<String> lines=readLines(file);
+        int insUnits=headerInt(lines,"$INSUNITS",0);
+        double millimetersPerUnit=CadPrintMath.millimetersPerUnit(insUnits);
+        String drawingUnitName=CadPrintMath.unitName(insUnits);
         DxfBlocks.Result expanded=DxfBlocks.expand(lines);
         ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();
         int skipped=expanded.skipped;
@@ -192,7 +235,7 @@ public final class DxfParser {
                 entity=parse(item.record.type,lines,item.record.from,item.record.to);
                 if(entity==null){skipped++;continue;}
             }
-            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer));layers.add(item.layer);
+            entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,item.color));layers.add(item.layer);
         }
         if(entities.isEmpty())return null;
         RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
@@ -203,10 +246,12 @@ public final class DxfParser {
         float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());
         Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);
         m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);
-        return renderLayers(entities,m,layers,layers,skipped);
+        RectF contentBounds=new RectF(b);m.mapRect(contentBounds);
+        return renderLayers(entities,m,layers,layers,skipped,contentBounds,s,millimetersPerUnit,drawingUnitName);
     }
 
-    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped)throws IOException{
+    private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped,
+                                       RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName)throws IOException{
         List<Entity> shown=new ArrayList<>();
         for(Entity entity:document){
             FileTransfer.checkCancelled();
@@ -218,7 +263,8 @@ public final class DxfParser {
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2f);
             for(Entity entity:shown){FileTransfer.checkCancelled();entity.draw(canvas,paint,view);}
             FileTransfer.checkCancelled();
-            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible);
+            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,
+                contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName);
         }catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
     }
 
@@ -308,6 +354,17 @@ public final class DxfParser {
 
     private static boolean has(List<String>a,int from,int to,int wanted){
         for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return true;return false;
+    }
+
+    private static int headerInt(List<String>a,String variable,int fallback){
+        for(int i=0;i+1<a.size();i+=2){
+            if(intOf(a.get(i))!=9||!variable.equals(a.get(i+1).trim()))continue;
+            for(int j=i+2;j+1<a.size();j+=2){
+                int code=intOf(a.get(j));if(code==9||code==0)break;
+                if(code==70)return intOf(a.get(j+1));
+            }
+        }
+        return fallback;
     }
 
     private static List<String>readLines(File f)throws IOException{

@@ -2,8 +2,12 @@ name: Android quality gate
 
 on:
   push:
-    branches: [ main, gandalf/step27-editor-integration ]
+    branches: [ main, gandalf/step27-editor-integration, gandalf/commercial-readiness ]
   workflow_dispatch:
+
+concurrency:
+  group: musacad-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -40,9 +44,34 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
           java -cp /tmp/musacad-tests SnapPointsTest
-      - name: Test DXF block expansion
+      - name: Test stylus freehand persistence
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadEditStylusTest.java
+          java -cp /tmp/musacad-tests CadEditStylusTest
+      - name: Test DXF color palette
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
+          java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test CAD print scale math
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrintMath.java tests/CadPrintMathTest.java
+          java -cp /tmp/musacad-tests CadPrintMathTest
+      - name: Test one-day trial policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/TrialPolicy.java tests/TrialPolicyTest.java
+          java -cp /tmp/musacad-tests TrialPolicyTest
+      - name: Test signed license tokens
+        run: |
+          javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/LicenseToken.java tests/LicenseTokenTest.java
+          java -cp /tmp/musacad-license-tests LicenseTokenTest
+      - name: Compile offline license generator
+        run: |
+          javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
+          java -cp /tmp/musacad-license-tool LicenseGenerator >/tmp/license-generator-usage.txt || test $? -eq 2
+          grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
+      - name: Test DXF block expansion and color inheritance
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
       - name: Test cancellable file transfer
         run: |
@@ -63,7 +92,7 @@ jobs:
           if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:

@@ -3,9 +3,13 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
+        android:name=".MusaCadApp"
         android:theme="@style/Theme.MusaCAD"
-        android:label="Musa CAD"
-        android:icon="@drawable/ic_launcher">
+        android:label="MusaCAD"
+        android:icon="@drawable/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".SplashActivity"
@@ -15,12 +19,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="portrait"
-            android:exported="true">
             <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -46,6 +44,16 @@
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".LicenseActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

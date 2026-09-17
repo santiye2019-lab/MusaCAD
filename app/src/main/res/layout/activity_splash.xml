@@ -14,14 +14,14 @@
         android:paddingEnd="34dp">
 
         <FrameLayout
-            android:layout_width="112dp"
-            android:layout_height="112dp"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
             android:background="@drawable/splash_logo_bg"
-            android:elevation="8dp">
+            android:elevation="10dp">
 
             <ImageView
-                android:layout_width="74dp"
-                android:layout_height="74dp"
+                android:layout_width="82dp"
+                android:layout_height="82dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_musacad_mark"
                 android:contentDescription="MusaCAD logo" />
@@ -33,7 +33,7 @@
             android:layout_marginTop="28dp"
             android:text="MusaCAD"
             android:textColor="#FFFFFF"
-            android:textSize="38sp"
+            android:textSize="40sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium" />
 
@@ -41,19 +41,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="MusaCAD uygulamasına hoş geldiniz"
-            android:textColor="#F5FFFFFF"
-            android:textSize="17sp"
-            android:fontFamily="sans-serif-medium" />
+            android:text="ÇİZ • ÖLÇ • DÜZENLE • HER YERDE"
+            android:textColor="#7FD4FF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:gravity="center"
-            android:text="DWG / DXF görüntüleme • ölçüm • katman • paylaşım"
+            android:text="DWG / DXF • katman • ölçüm • düzenleme • PDF / PNG"
             android:textColor="#D9FFFFFF"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <ProgressBar
             android:layout_width="34dp"
@@ -65,7 +66,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Proje çalışma alanı hazırlanıyor…"
+            android:text="Profesyonel CAD çalışma alanı hazırlanıyor…"
             android:textColor="#CCFFFFFF"
             android:textSize="12sp" />
     </LinearLayout>
@@ -75,7 +76,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="24dp"
-        android:text="MusaCAD • Mobil CAD Görüntüleyici"
+        android:text="MusaCAD • Mobil CAD Çözümü"
         android:textColor="#BFFFFFFF"
         android:textSize="11sp" />
 </FrameLayout>

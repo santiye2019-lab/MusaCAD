@@ -17,6 +17,7 @@ public class CadView extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<PointF> points = new ArrayList<>();
+    private final ArrayList<PointF> freehandPoints = new ArrayList<>();
     private final ArrayList<CadEdit> edits = new ArrayList<>();
     private final Matrix imageMatrix = new Matrix();
     private final Matrix inverse = new Matrix();
@@ -36,9 +37,17 @@ public class CadView extends View {
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
 
+    // Active stylus support. Finger behavior stays unchanged until a stylus is actually detected.
+    private boolean stylusModeDetected,stylusDown;
+    private boolean stylusHover;
+    private float hoverX,hoverY,stylusPressure=.5f;
+    private float freehandPressureSum;
+    private int freehandPressureSamples;
+
     public CadView(Context c, AttributeSet a) {
         super(c, a);
         setBackgroundColor(Color.rgb(18,24,30));
+        setFocusable(true);
         scaleDetector = new ScaleGestureDetector(c, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             public boolean onScale(ScaleGestureDetector d) {
                 float next=Math.max(.001f,Math.min(200f,scale*d.getScaleFactor()));
@@ -63,6 +72,7 @@ public class CadView extends View {
 
     public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
     public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
+    public boolean isStylusModeDetected(){return stylusModeDetected;}
 
     public boolean beginSelection(){
         if(!hasDrawing())return false;
@@ -72,26 +82,26 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();
+        vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
     }
 
     public void setListener(Listener l){listener=l;}
 
     public void setMode(Mode m){
-        lastSnapped=false;selecting=false;draggingSelection=false;mode=m;points.clear();notifyValue();invalidate();
+        lastSnapped=false;selecting=false;draggingSelection=false;mode=m;points.clear();freehandPoints.clear();notifyValue();invalidate();
     }
 
     public void setDrawing(Bitmap b){
         snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;
-        vectorDrawing=null;drawing=b;edits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();
+        vectorDrawing=null;drawing=b;edits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;
-        drawing=null;vectorDrawing=result;edits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();
+        drawing=null;vectorDrawing=result;edits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -124,15 +134,15 @@ public class CadView extends View {
     }
 
     public void undo(){
-        lastSnapped=false;
+        lastSnapped=false;freehandPoints.clear();
         if(selecting){cancelSelection();return;}
         if(!points.isEmpty())points.remove(points.size()-1);
-        else if(editMode()&&!edits.isEmpty())edits.remove(edits.size()-1);
+        else if(!edits.isEmpty())edits.remove(edits.size()-1);
         notifyValue();invalidate();
     }
 
     public void clearMeasurement(){
-        lastSnapped=false;
+        lastSnapped=false;freehandPoints.clear();
         if(selecting){cancelSelection();return;}
         points.clear();notifyValue();invalidate();
     }
@@ -167,6 +177,7 @@ public class CadView extends View {
         else drawWelcome(c);
 
         drawEdits(c);
+        drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);
         paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
@@ -195,12 +206,14 @@ public class CadView extends View {
                 Math.max(selectionX,selectionEndX),Math.max(selectionY,selectionEndY),paint);
             paint.setStyle(Paint.Style.FILL);
         }
+        if(stylusHover&&!exporting)drawStylusCursor(c);
     }
 
     private void drawEdits(Canvas c){
         if(edits.isEmpty())return;
-        paint.setColor(Color.rgb(255,193,7));paint.setStrokeWidth(3f);paint.setStyle(Paint.Style.STROKE);
+        paint.setColor(Color.rgb(255,193,7));paint.setStyle(Paint.Style.STROKE);
         for(CadEdit edit:edits){
+            paint.setStrokeWidth(edit.strokeWidth);
             switch(edit.type){
                 case LINE:{float[] v=map(edit.xy);c.drawLine(v[0],v[1],v[2],v[3],paint);break;}
                 case RECTANGLE:{float[] v=map(edit.xy);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;}
@@ -209,6 +222,30 @@ public class CadView extends View {
                 case TEXT:{float[] v=map(edit.xy);paint.setStyle(Paint.Style.FILL);paint.setTextSize(Math.max(14f*getResources().getDisplayMetrics().scaledDensity,30f*scale));c.drawText(edit.text,v[0],v[1],paint);paint.setStyle(Paint.Style.STROKE);break;}
             }
         }
+        paint.setStrokeWidth(3f);
+    }
+
+    private void drawLiveFreehand(Canvas c){
+        if(freehandPoints.size()<2)return;
+        float[] xy=new float[freehandPoints.size()*2];
+        for(int i=0;i<freehandPoints.size();i++){xy[i*2]=freehandPoints.get(i).x;xy[i*2+1]=freehandPoints.get(i).y;}
+        imageMatrix.mapPoints(xy);
+        Path p=new Path();p.moveTo(xy[0],xy[1]);for(int i=2;i+1<xy.length;i+=2)p.lineTo(xy[i],xy[i+1]);
+        paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(Color.rgb(255,193,7));paint.setStrokeWidth(pressureWidth(stylusPressure));c.drawPath(p,paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);paint.setStrokeJoin(Paint.Join.MITER);
+    }
+
+    private void drawStylusCursor(Canvas c){
+        float r=9f*getResources().getDisplayMetrics().density;
+        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.5f);paint.setColor(Color.WHITE);
+        c.drawCircle(hoverX,hoverY,r,paint);c.drawLine(hoverX-r*1.5f,hoverY,hoverX+r*1.5f,hoverY,paint);c.drawLine(hoverX,hoverY-r*1.5f,hoverX,hoverY+r*1.5f,paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private float pressureWidth(float pressure){
+        float p=Math.max(0f,Math.min(1f,pressure));
+        return 2f+5f*p;
     }
 
     private float[] map(float[] source){float[] target=source.clone();imageMatrix.mapPoints(target);return target;}
@@ -221,50 +258,154 @@ public class CadView extends View {
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
+    @Override public boolean onGenericMotionEvent(MotionEvent e){
+        if(isStylus(e)){
+            stylusModeDetected=true;
+            int action=e.getActionMasked();
+            if(action==MotionEvent.ACTION_HOVER_ENTER||action==MotionEvent.ACTION_HOVER_MOVE){
+                stylusHover=true;hoverX=e.getX();hoverY=e.getY();stylusPressure=e.getPressure();invalidate();return true;
+            }
+            if(action==MotionEvent.ACTION_HOVER_EXIT){stylusHover=false;invalidate();return true;}
+        }
+        return super.onGenericMotionEvent(e);
+    }
+
     @Override public boolean onTouchEvent(MotionEvent e){
         if(!hasDrawing())return true;
+        boolean stylus=isStylus(e);
+        if(stylus){stylusModeDetected=true;stylusPressure=e.getPressure();stylusHover=false;}
         if(selecting)return selectionTouch(e);
+
+        // Palm rejection + finger navigation: once an active stylus is detected, fingers do not add CAD points.
+        if(stylusModeDetected&&!stylus)return fingerNavigationTouch(e);
+
+        if(stylus){
+            if(isStylusErase(e)){
+                if(e.getActionMasked()==MotionEvent.ACTION_DOWN){performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);undo();}
+                return true;
+            }
+            boolean buttonPan=(e.getButtonState()&MotionEvent.BUTTON_STYLUS_PRIMARY)!=0;
+            if(mode==Mode.PAN&&!buttonPan)return stylusFreehandTouch(e);
+            if(buttonPan)return directPanTouch(e);
+        }
+
         if(mode==Mode.PAN)gestureDetector.onTouchEvent(e);
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;
         if(e.getPointerCount()>1)multiTouch=true;
         scaleDetector.onTouchEvent(e);
         if(multiTouch)return true;
 
-        if(e.getAction()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
-        if(e.getAction()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){
+        if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
+        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){
             float dx=e.getX()-lastX,dy=e.getY()-lastY;
             imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;
         }
-        if(e.getAction()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){
-            if(editMode()&&vectorDrawing==null){notifyValue();return true;}
-            if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();
-            float[] xy={e.getX(),e.getY()};
-            if(!imageMatrix.invert(inverse))return true;
-            inverse.mapPoints(xy);
-            if(xy[0]<0||xy[1]<0||xy[0]>contentWidth()||xy[1]>contentHeight())return true;
-            int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,
-                18*getResources().getDisplayMetrics().density):-1;
-            lastSnapped=snapped>=0;
-            if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
-
-            if(mode==Mode.DRAW_TEXT){
-                if(listener!=null)listener.onTextRequested(xy[0],xy[1]);
-                lastSnapped=false;notifyValue();invalidate();return true;
-            }
-
-            points.add(new PointF(xy[0],xy[1]));
-            if(mode==Mode.DRAW_LINE&&points.size()==2){
-                PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.line(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
-            }else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){
-                PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.rectangle(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
-            }else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){
-                PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.circle(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
-            }else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null){
-                listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
-            }
-            notifyValue();invalidate();return true;
+        if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN){
+            return addCadPoint(e.getX(),e.getY());
         }
         return true;
+    }
+
+    private boolean fingerNavigationTouch(MotionEvent e){
+        // Ignore accidental palm/finger contacts while the pen tip is down.
+        if(stylusDown)return true;
+        if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;
+        if(e.getPointerCount()>1)multiTouch=true;
+        scaleDetector.onTouchEvent(e);
+        if(multiTouch)return true;
+        if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
+        if(e.getActionMasked()==MotionEvent.ACTION_MOVE){
+            imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;
+        }
+        return true;
+    }
+
+    private boolean directPanTouch(MotionEvent e){
+        int action=e.getActionMasked();
+        if(action==MotionEvent.ACTION_DOWN){stylusDown=true;lastX=e.getX();lastY=e.getY();return true;}
+        if(action==MotionEvent.ACTION_MOVE){imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}
+        if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){stylusDown=false;return true;}
+        return true;
+    }
+
+    private boolean stylusFreehandTouch(MotionEvent e){
+        int action=e.getActionMasked();
+        if(action==MotionEvent.ACTION_DOWN){
+            stylusDown=true;freehandPoints.clear();freehandPressureSum=0f;freehandPressureSamples=0;
+            addFreehandSample(e.getX(),e.getY(),e.getPressure());invalidate();return true;
+        }
+        if(action==MotionEvent.ACTION_MOVE){
+            int history=e.getHistorySize();
+            for(int i=0;i<history;i++)addFreehandSample(e.getHistoricalX(i),e.getHistoricalY(i),e.getHistoricalPressure(i));
+            addFreehandSample(e.getX(),e.getY(),e.getPressure());invalidate();return true;
+        }
+        if(action==MotionEvent.ACTION_UP){
+            addFreehandSample(e.getX(),e.getY(),e.getPressure());commitFreehand();stylusDown=false;notifyValue();invalidate();return true;
+        }
+        if(action==MotionEvent.ACTION_CANCEL){freehandPoints.clear();stylusDown=false;invalidate();return true;}
+        return true;
+    }
+
+    private void addFreehandSample(float screenX,float screenY,float pressure){
+        PointF p=screenToContent(screenX,screenY);if(p==null)return;
+        if(!freehandPoints.isEmpty()){
+            PointF last=freehandPoints.get(freehandPoints.size()-1);
+            float min=Math.max(.4f,1.5f/Math.max(.01f,scale));
+            if(distance(last,p)<min)return;
+        }
+        freehandPoints.add(p);freehandPressureSum+=Math.max(0f,Math.min(1f,pressure));freehandPressureSamples++;
+        stylusPressure=pressure;
+    }
+
+    private void commitFreehand(){
+        if(freehandPoints.size()<2){freehandPoints.clear();return;}
+        float[] xy=new float[freehandPoints.size()*2];
+        for(int i=0;i<freehandPoints.size();i++){xy[i*2]=freehandPoints.get(i).x;xy[i*2+1]=freehandPoints.get(i).y;}
+        float avg=freehandPressureSamples==0?.5f:freehandPressureSum/freehandPressureSamples;
+        edits.add(CadEdit.freehand(xy,pressureWidth(avg)));freehandPoints.clear();
+    }
+
+    private boolean addCadPoint(float screenX,float screenY){
+        if(editMode()&&vectorDrawing==null){notifyValue();return true;}
+        if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();
+        PointF point=screenToContent(screenX,screenY);if(point==null)return true;
+        float[] xy={point.x,point.y};
+        int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;
+        lastSnapped=snapped>=0;
+        if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
+
+        if(mode==Mode.DRAW_TEXT){
+            if(listener!=null)listener.onTextRequested(xy[0],xy[1]);
+            lastSnapped=false;notifyValue();invalidate();return true;
+        }
+
+        points.add(new PointF(xy[0],xy[1]));
+        if(mode==Mode.DRAW_LINE&&points.size()==2){
+            PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.line(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
+        }else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){
+            PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.rectangle(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
+        }else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){
+            PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.circle(a.x,a.y,b.x,b.y));points.clear();lastSnapped=false;
+        }else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null){
+            listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
+        }
+        notifyValue();invalidate();return true;
+    }
+
+    private PointF screenToContent(float screenX,float screenY){
+        float[] xy={screenX,screenY};if(!imageMatrix.invert(inverse))return null;inverse.mapPoints(xy);
+        if(xy[0]<0||xy[1]<0||xy[0]>contentWidth()||xy[1]>contentHeight())return null;
+        return new PointF(xy[0],xy[1]);
+    }
+
+    private boolean isStylus(MotionEvent e){
+        if(e==null||e.getPointerCount()<1)return false;
+        int type=e.getToolType(0);return type==MotionEvent.TOOL_TYPE_STYLUS||type==MotionEvent.TOOL_TYPE_ERASER;
+    }
+
+    private boolean isStylusErase(MotionEvent e){
+        if(e.getToolType(0)==MotionEvent.TOOL_TYPE_ERASER)return true;
+        return (e.getButtonState()&MotionEvent.BUTTON_STYLUS_SECONDARY)!=0;
     }
 
     private void notifyValue(){
@@ -292,6 +433,8 @@ public class CadView extends View {
             listener.onMeasurement("Daire: merkez ve yarıçap noktası seçin • Eklenen: "+edits.size());
         }else if(mode==Mode.DRAW_TEXT){
             listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
+        }else if(stylusModeDetected){
+            listener.onMeasurement("Kalem: serbest çizim • Kalem tuşu: gezin • Silgi/2. tuş: geri al • Parmak: gezin/zoom");
         }else{
             listener.onMeasurement("Sürükle: gez • İki parmak: yakınlaştır • Çift dokun: sığdır");
         }

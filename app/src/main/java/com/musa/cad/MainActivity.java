@@ -21,7 +21,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21;
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
@@ -160,15 +160,17 @@ public class MainActivity extends AppCompatActivity {
         menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);
         menu.add(0,MENU_FIT,2,"Ekrana sığdır").setEnabled(currentFile!=null);
         menu.add(0,MENU_SAVE_DXF,3,"Düzenlenmiş DXF kaydet").setEnabled(canEdit());
-        menu.add(0,MENU_SHARE,4,"Paylaş").setEnabled(currentFile!=null);
-        menu.add(0,MENU_INFO,5,"Çizim bilgileri").setEnabled(activeDxf!=null);
-        menu.add(0,MENU_ABOUT,6,"MusaCAD hakkında");
+        menu.add(0,MENU_PRINT,4,"Yazdır").setEnabled(currentFile!=null);
+        menu.add(0,MENU_SHARE,5,"Paylaş").setEnabled(currentFile!=null);
+        menu.add(0,MENU_INFO,6,"Çizim bilgileri").setEnabled(activeDxf!=null);
+        menu.add(0,MENU_ABOUT,7,"MusaCAD hakkında");
         popup.setOnMenuItemClickListener(item->{
             switch(item.getItemId()){
                 case MENU_OPEN:open();return true;
                 case MENU_LAYERS:showLayers();return true;
                 case MENU_FIT:cad.fitToScreen();return true;
                 case MENU_SAVE_DXF:requestEditedDxfSave();return true;
+                case MENU_PRINT:printDrawing();return true;
                 case MENU_SHARE:showShare();return true;
                 case MENU_INFO:showDrawingInfo();return true;
                 case MENU_ABOUT:showLicense();return true;
@@ -462,6 +464,17 @@ public class MainActivity extends AppCompatActivity {
             else if(w==3){if(!cad.beginSelection())Toast.makeText(this,"Önce çizim açın",Toast.LENGTH_SHORT).show();}
             else {cad.cancelSelection();exportView(w==1);}
         }).show();
+    }
+
+    private void printDrawing(){
+        if(currentFile==null||!currentFile.exists()){
+            Toast.makeText(this,"Yazdırmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;
+        }
+        Bitmap preview=null;
+        try{
+            if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)throw new IOException("DWG önizlemesi yazdırma için hazırlanamadı");}
+            CadPrint.show(this,activeDxf,cad.getEdits(),preview,currentDisplayName);
+        }catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
     }
 
     private void previewSelection(){
