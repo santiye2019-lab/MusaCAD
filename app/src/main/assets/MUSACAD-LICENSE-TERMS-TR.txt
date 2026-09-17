@@ -5,16 +5,16 @@ Sürüm 1 — 17 Eylül 2026
 Bu koşullar MusaCAD uygulamasının MusaCAD'e ait özgün arayüz, iş akışı ve uygulama bileşenlerinin kullanımını düzenler. Uygulama içinde kullanılan üçüncü taraf ve açık kaynak bileşenler kendi lisanslarına tabidir; bu koşullar o lisansların kullanıcıya tanıdığı hakları daraltmaz.
 
 2. DENEME SÜRÜMÜ
-Kullanıcı, koşulları kabul ettikten sonra aynı kurulum için bir defaya mahsus 24 saatlik ücretsiz deneme başlatabilir. Deneme süresi başlatıldığı anda işlemeye başlar. Uygulamayı kapatmak, internet bağlantısını kesmek veya cihaz saatini değiştirmek deneme süresini yeniden başlatmaz.
+Kullanıcı, koşulları kabul ettikten sonra uygun bir cihaz için bir defaya mahsus 24 saatlik ücretsiz deneme başlatabilir. İlk deneme aktivasyonu internet bağlantısı üzerinden MusaCAD deneme hizmeti tarafından cihaz için doğrulanır; ardından imzalı deneme yetkisi cihazda çevrimdışı doğrulanabilir. Uygulamayı kapatmak, yeniden kurmak, internet bağlantısını kesmek veya cihaz saatini değiştirmek deneme süresini yeniden başlatmaz.
 
 3. TİCARİ LİSANS
-Deneme süresi sonunda uygulamanın lisans gerektiren işlevlerine erişim için geçerli bir MusaCAD lisansı gerekir. Lisans türü; süreli, süresiz, cihaz bazlı veya kullanıcı bazlı olarak ayrıca tanımlanabilir. Lisans kodunun doğrulanması için ileride MusaCAD lisans altyapısı kullanılacaktır.
+Deneme süresi sonunda uygulamanın lisans gerektiren işlevlerine erişim için geçerli bir MusaCAD lisansı gerekir. Lisans türü; süreli, süresiz, cihaz bazlı veya kullanıcı bazlı olarak ayrıca tanımlanabilir. Lisans kodu, bu cihaz için üretilmiş dijital imzalı MusaCAD lisans verisi üzerinden uygulama içinde doğrulanır.
 
 4. LİSANS KODUNUN KORUNMASI
 Lisans kodu yalnız satın alındığı kapsamda kullanılabilir. Lisans kodunun yetkisiz çoğaltılması, paylaşılması, satılması veya lisans denetimini aşmaya yönelik kullanım yasaktır. Açık kaynak lisanslarından doğan tersine mühendislik veya kaynak koda erişim hakları saklıdır.
 
 5. KULLANICI DOSYALARI VE GİZLİLİK
-MusaCAD'in mevcut çalışma yapısında DWG/DXF dosyalarının görüntülenmesi ve dönüştürülmesi cihaz üzerinde gerçekleştirilir. Kullanıcının çizimleri, kullanıcı açıkça paylaşım veya dışa aktarma işlemi başlatmadıkça uygulama tarafından kendiliğinden üçüncü taraflara gönderilmez. Gelecekte çevrimiçi lisans doğrulama veya bulut özellikleri eklenirse gerekli veri işleme bilgileri ayrıca açıklanacaktır.
+MusaCAD'in mevcut çalışma yapısında DWG/DXF dosyalarının görüntülenmesi ve dönüştürülmesi cihaz üzerinde gerçekleştirilir. Kullanıcının çizimleri, kullanıcı açıkça paylaşım veya dışa aktarma işlemi başlatmadıkça uygulama tarafından kendiliğinden üçüncü taraflara gönderilmez. Ücretsiz denemenin ilk aktivasyonunda, ham Android cihaz kimliği yerine uygulamaya özgü olarak türetilmiş MusaCAD Cihaz/Lisans Kimliği ve temel uygulama sürüm bilgileri deneme hizmetine gönderilebilir. Çizim dosyası bu işlem kapsamında gönderilmez.
 
 6. DOSYA UYUMLULUĞU
 DWG ve DXF biçimleri çok sayıda sürüm, nesne tipi ve üretici uzantısı içerir. MusaCAD desteklenen dosyaları mümkün olan en doğru şekilde görüntülemeyi amaçlar; ancak her dosyanın, her özel CAD nesnesinin veya her üçüncü taraf uzantısının eksiksiz açılacağı garanti edilmez. Kritik teknik çıktılar kullanıcı tarafından ayrıca doğrulanmalıdır.
