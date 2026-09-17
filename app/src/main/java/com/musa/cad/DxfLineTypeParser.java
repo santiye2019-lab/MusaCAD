@@ -20,7 +20,7 @@ public final class DxfLineTypeParser {
                     case 75:current.shapeNumber=intOf(value);break;
                     case 9:current.text=value;break;
                     case 46:current.scale=doubleOf(value,1d);break;
-                    case 50:current.rotation=doubleOf(value,0d);break;
+                    case 50:current.rotationDegrees=Math.toDegrees(doubleOf(value,0d));break;
                     case 44:current.xOffset=doubleOf(value,0d);break;
                     case 45:current.yOffset=doubleOf(value,0d);break;
                     default:break;
@@ -34,11 +34,11 @@ public final class DxfLineTypeParser {
 
     private static void finish(Element e,List<DxfLineStyle.ComplexElement> out){
         if(e.flags==0&&e.shapeNumber==0&&(e.text==null||e.text.isEmpty()))return;
-        out.add(new DxfLineStyle.ComplexElement(e.index,e.flags,e.shapeNumber,e.text,e.scale,e.rotation,e.xOffset,e.yOffset));
+        out.add(new DxfLineStyle.ComplexElement(e.index,e.flags,e.shapeNumber,e.text,e.scale,e.rotationDegrees,e.xOffset,e.yOffset));
     }
 
     private static final class Element{
-        final int index;int flags,shapeNumber;String text="";double scale=1d,rotation,xOffset,yOffset;
+        final int index;int flags,shapeNumber;String text="";double scale=1d,rotationDegrees,xOffset,yOffset;
         Element(int index){this.index=index;}
     }
     private static int intOf(String s){try{return Integer.parseInt(s.trim());}catch(Exception e){return 0;}}
