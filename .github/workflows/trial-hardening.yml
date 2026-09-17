@@ -10,8 +10,11 @@ on:
       - 'app/src/main/java/com/musa/cad/TrialPolicy.java'
       - 'app/src/main/java/com/musa/cad/SignedTrialPolicy.java'
       - 'app/src/main/java/com/musa/cad/TrialService.java'
+      - 'app/src/main/java/com/musa/cad/TrialToken.java'
+      - 'app/src/main/java/com/musa/cad/LicenseToken.java'
       - 'tests/DeviceIdentityHashTest.java'
       - 'tests/SignedTrialPolicyTest.java'
+      - 'tests/TrialTokenTest.java'
       - 'server/trial-worker/**'
       - '.github/workflows/trial-hardening.yml'
   workflow_dispatch:
@@ -34,5 +37,9 @@ jobs:
         run: |
           javac -d /tmp/musacad-trial-tests app/src/main/java/com/musa/cad/TrialPolicy.java app/src/main/java/com/musa/cad/SignedTrialPolicy.java tests/SignedTrialPolicyTest.java
           java -cp /tmp/musacad-trial-tests SignedTrialPolicyTest
+      - name: Test separation of trial and paid tokens
+        run: |
+          javac -d /tmp/musacad-trial-tests app/src/main/java/com/musa/cad/LicenseToken.java app/src/main/java/com/musa/cad/TrialToken.java tests/TrialTokenTest.java
+          java -cp /tmp/musacad-trial-tests TrialTokenTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
