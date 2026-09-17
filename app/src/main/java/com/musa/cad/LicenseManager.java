@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-import java.util.UUID;
 
 public final class LicenseManager {
     private static final String PREFS="musacad_license_state";
@@ -14,7 +13,6 @@ public final class LicenseManager {
     private static final String K_LAST_SEEN="last_seen_v1";
     private static final String K_TERMS_VERSION="terms_version";
     private static final String K_LICENSE_TOKEN="license_token_v1";
-    private static final String K_INSTALLATION_ID="installation_id_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -72,14 +70,8 @@ public final class LicenseManager {
         return hours>0?String.format(Locale.getDefault(),"Deneme: %d sa %d dk kaldı",hours,mins):String.format(Locale.getDefault(),"Deneme: %d dk kaldı",mins);
     }
 
-    public static String installationId(Context c){
-        SharedPreferences p=prefs(c);
-        String id=p.getString(K_INSTALLATION_ID,null);
-        if(id!=null&&!id.isEmpty())return id;
-        id=UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
-        p.edit().putString(K_INSTALLATION_ID,id).commit();
-        return id;
-    }
+    /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
+    public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
