@@ -8,8 +8,11 @@ import java.util.List;
 /** Android drawing adapter for complex-linetype embedded text. */
 final class DxfComplexLineAndroid {
     static void drawSegment(Canvas canvas,Paint paint,DxfLineStyle.Pattern pattern,float x1,float y1,float x2,float y2,double pixelsPerPatternUnit){
+        drawSegment(canvas,paint,pattern,x1,y1,x2,y2,pixelsPerPatternUnit,0d);
+    }
+    static void drawSegment(Canvas canvas,Paint paint,DxfLineStyle.Pattern pattern,float x1,float y1,float x2,float y2,double pixelsPerPatternUnit,double pathOffsetPixels){
         if(canvas==null||paint==null||pattern==null||!pattern.hasRenderableComplexText())return;
-        List<DxfComplexLineText.Placement> placements=DxfComplexLineText.placements(pattern,x1,y1,x2,y2,pixelsPerPatternUnit);
+        List<DxfComplexLineText.Placement> placements=DxfComplexLineText.placements(pattern,x1,y1,x2,y2,pixelsPerPatternUnit,pathOffsetPixels);
         if(placements.isEmpty())return;
         Paint.Style oldStyle=paint.getStyle();Paint.Align oldAlign=paint.getTextAlign();Typeface oldTypeface=paint.getTypeface();
         float oldSize=paint.getTextSize();android.graphics.PathEffect oldEffect=paint.getPathEffect();
