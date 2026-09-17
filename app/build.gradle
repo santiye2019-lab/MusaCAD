@@ -5,6 +5,7 @@ def musaStorePassword = System.getenv('MUSACAD_KEYSTORE_PASSWORD')
 def musaKeyAlias = System.getenv('MUSACAD_KEY_ALIAS')
 def musaKeyPassword = System.getenv('MUSACAD_KEY_PASSWORD')
 def musaTrialApiUrl = System.getenv('MUSACAD_TRIAL_API_URL') ?: ''
+def musaTrialPublicKeyPem = System.getenv('MUSACAD_TRIAL_PUBLIC_KEY_PEM') ?: ''
 def hasReleaseSigning = musaKeystore && musaStorePassword && musaKeyAlias && musaKeyPassword
 
 android {
@@ -37,6 +38,7 @@ android {
         versionCode 10
         versionName '1.0'
         buildConfigField "String", "TRIAL_API_URL", groovy.json.JsonOutput.toJson(musaTrialApiUrl)
+        buildConfigField "String", "TRIAL_PUBLIC_KEY_PEM", groovy.json.JsonOutput.toJson(musaTrialPublicKeyPem)
     }
 
     buildTypes {
