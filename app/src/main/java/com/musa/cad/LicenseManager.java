@@ -15,6 +15,7 @@ public final class LicenseManager {
     private static final String K_LICENSE_TOKEN="license_token_v1";
     private static final String K_TRIAL_TOKEN="trial_token_v2";
     private static final String K_SERVER_TRIAL_USED="server_trial_used_v2";
+    private static final String K_SIGNED_TRIAL_LAST_SEEN="signed_trial_last_seen_v2";
     private static final long SERVER_CLOCK_TOLERANCE_MS=5L*60L*1000L;
     public static final int TERMS_VERSION=1;
 
@@ -30,9 +31,14 @@ public final class LicenseManager {
 
         String signedTrial=p.getString(K_TRIAL_TOKEN,null);
         if(signedTrial!=null){
-            LicenseToken.Result r=verifyToken(c,signedTrial,System.currentTimeMillis());
-            if(validTrialWindow(r,System.currentTimeMillis()))return State.TRIAL_ACTIVE;
-            p.edit().remove(K_TRIAL_TOKEN).putBoolean(K_SERVER_TRIAL_USED,true).apply();
+            long now=System.currentTimeMillis(),last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);
+            if(last>0&&now+TrialPolicy.CLOCK_ROLLBACK_TOLERANCE_MS<last)return State.CLOCK_ERROR;
+            LicenseToken.Result r=verifyToken(c,signedTrial,now);
+            if(validTrialWindow(r,now)){
+                if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();
+                return State.TRIAL_ACTIVE;
+            }
+            p.edit().remove(K_TRIAL_TOKEN).remove(K_SIGNED_TRIAL_LAST_SEEN).putBoolean(K_SERVER_TRIAL_USED,true).apply();
             return State.TRIAL_EXPIRED;
         }
         if(p.getBoolean(K_SERVER_TRIAL_USED,false))return State.TRIAL_EXPIRED;
@@ -72,15 +78,15 @@ public final class LicenseManager {
         long now=System.currentTimeMillis();
         LicenseToken.Result r=verifyToken(c,token,now);
         if(!validTrialWindow(r,now))return false;
-        prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_START).remove(K_LAST_SEEN).commit();
+        prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putLong(K_SIGNED_TRIAL_LAST_SEEN,now).putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_START).remove(K_LAST_SEEN).commit();
         return true;
     }
 
-    public static void markServerTrialUsed(Context c){prefs(c).edit().putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_TOKEN).apply();}
+    public static void markServerTrialUsed(Context c){prefs(c).edit().putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_TOKEN).remove(K_SIGNED_TRIAL_LAST_SEEN).apply();}
 
     public static long remainingMs(Context c){
         SharedPreferences p=prefs(c);String signedTrial=p.getString(K_TRIAL_TOKEN,null);long now=System.currentTimeMillis();
-        if(signedTrial!=null){LicenseToken.Result r=verifyToken(c,signedTrial,now);return validTrialWindow(r,now)?Math.max(0L,r.expiresAtMs-now):0L;}
+        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);if(last>0&&now+TrialPolicy.CLOCK_ROLLBACK_TOLERANCE_MS<last)return 0L;LicenseToken.Result r=verifyToken(c,signedTrial,now);return validTrialWindow(r,now)?Math.max(0L,r.expiresAtMs-now):0L;}
         return TrialPolicy.remainingMs(p.getLong(K_TRIAL_START,0L),p.getLong(K_LAST_SEEN,0L),now);
     }
 
@@ -109,9 +115,7 @@ public final class LicenseManager {
         prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;
     }
 
-    private static boolean validTrialWindow(LicenseToken.Result r,long now){
-        return r!=null&&r.valid&&r.expiresAtMs>now&&r.expiresAtMs<=now+TrialPolicy.TRIAL_DURATION_MS+SERVER_CLOCK_TOLERANCE_MS;
-    }
+    private static boolean validTrialWindow(LicenseToken.Result r,long now){return r!=null&&r.valid&&r.expiresAtMs>now&&r.expiresAtMs<=now+TrialPolicy.TRIAL_DURATION_MS+SERVER_CLOCK_TOLERANCE_MS;}
 
     private static LicenseToken.Result verifyToken(Context c,String token,long now){
         try{return LicenseToken.verify(token,installationId(c),now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));}
@@ -125,8 +129,9 @@ public final class LicenseManager {
     }
 
     private static void touch(Context c){
-        long now=System.currentTimeMillis();SharedPreferences p=prefs(c);long last=p.getLong(K_LAST_SEEN,0L);
-        if(now>last)p.edit().putLong(K_LAST_SEEN,now).apply();
+        long now=System.currentTimeMillis();SharedPreferences p=prefs(c);
+        if(p.getString(K_TRIAL_TOKEN,null)!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();return;}
+        long last=p.getLong(K_LAST_SEEN,0L);if(now>last)p.edit().putLong(K_LAST_SEEN,now).apply();
     }
     private LicenseManager(){}
 }
