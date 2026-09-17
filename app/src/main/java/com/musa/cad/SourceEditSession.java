@@ -62,6 +62,10 @@ public final class SourceEditSession {
         ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.add(e.replacement.copy());return out;
     }
 
+    public Map<Integer,CadEdit> replacementMap(){
+        LinkedHashMap<Integer,CadEdit> out=new LinkedHashMap<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.put(e.id,e.replacement.copy());return out;
+    }
+
     public List<SourceRange> removals(){
         ArrayList<SourceRange> out=new ArrayList<>();for(Entry e:entries.values())if(e.deleted||e.replacement!=null)out.add(e.range);return out;
     }
