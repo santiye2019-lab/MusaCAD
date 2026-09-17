@@ -1,6 +1,6 @@
 package com.musa.cad;
 
-/** Resolves DXF TEXT/ATTRIB alignment codes into a concrete insertion transform. */
+/** Resolves DXF TEXT/ATTRIB alignment and MTEXT attachment into concrete transforms. */
 public final class DxfTextAlign {
     public static final class Result {
         public final float x,y,angleDegrees,widthScale,heightScale,localOffsetX,localOffsetY;
@@ -33,6 +33,18 @@ public final class DxfTextAlign {
         if(h==4)oy=-height*.5f;
         else if(v==1)oy=0f;else if(v==2)oy=-height*.5f;else if(v==3)oy=-height;
         return new Result(anchorX,anchorY,rotationDegrees,1f,1f,ox,oy);
+    }
+
+    /**
+     * Returns the local translation needed to place an already world-oriented MTEXT path's
+     * requested attachment point at the insertion origin. Bounds use mathematical/world Y,
+     * so the visual top is maxY (the RectF bottom value after Android path bounds calculation).
+     */
+    public static float[] mtextOffset(int attachment,float left,float top,float right,float bottom){
+        int a=attachment>=1&&attachment<=9?attachment:1;int column=(a-1)%3,row=(a-1)/3;
+        float anchorX=column==0?left:column==1?(left+right)*.5f:right;
+        float anchorY=row==0?bottom:row==1?(top+bottom)*.5f:top;
+        return new float[]{-anchorX,-anchorY};
     }
 
     private static float safeScale(float value){return Float.isFinite(value)&&value>0f?value:1f;}
