@@ -25,9 +25,10 @@ public class RecentFilesActivity extends AppCompatActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         View root=buildUi();
         setContentView(root);
+        final int side=dp(16),vertical=dp(14);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{
             Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(0,bars.top,0,bars.bottom);return insets;
+            v.setPadding(side,bars.top+vertical,side,bars.bottom+vertical);return insets;
         });
         renderRecents();
     }
