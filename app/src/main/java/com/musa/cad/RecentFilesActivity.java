@@ -55,6 +55,7 @@ public class RecentFilesActivity extends AppCompatActivity {
     }
 
     private void renderRecents(){
+        recycleThumbnails(listBox);
         listBox.removeAllViews();
         List<RecentFileStore.Entry> entries=RecentFileStore.list(this);
         if(entries.isEmpty()){
