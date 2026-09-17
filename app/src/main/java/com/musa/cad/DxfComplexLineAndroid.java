@@ -10,6 +10,9 @@ final class DxfComplexLineAndroid {
     static void drawSegment(Canvas canvas,Paint paint,DxfLineStyle.Pattern pattern,float x1,float y1,float x2,float y2,double pixelsPerPatternUnit){
         drawSegment(canvas,paint,pattern,x1,y1,x2,y2,pixelsPerPatternUnit,0d,1d,0d);
     }
+    static void drawSegment(Canvas canvas,Paint paint,DxfLineStyle.Pattern pattern,float x1,float y1,float x2,float y2,double pixelsPerPatternUnit,double pathOffsetPixels){
+        drawSegment(canvas,paint,pattern,x1,y1,x2,y2,pixelsPerPatternUnit,pathOffsetPixels,1d,0d);
+    }
     static void drawSegment(Canvas canvas,Paint paint,DxfLineStyle.Pattern pattern,float x1,float y1,float x2,float y2,double pixelsPerPatternUnit,double pathOffsetPixels,double orientationSign,double absoluteXAxisAngleDegrees){
         if(canvas==null||paint==null||pattern==null||!pattern.hasRenderableComplexText())return;
         List<DxfComplexLineText.Placement> placements=DxfComplexLineText.placements(pattern,x1,y1,x2,y2,pixelsPerPatternUnit,pathOffsetPixels,orientationSign,absoluteXAxisAngleDegrees);
