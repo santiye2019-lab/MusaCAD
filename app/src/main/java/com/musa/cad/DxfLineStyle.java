@@ -13,18 +13,56 @@ public final class DxfLineStyle {
     public static final int LW_DEFAULT=-3;
     public static final int DEFAULT_LINEWEIGHT=25; // 0.25 mm
 
+    /** Metadata attached to a complex LTYPE dash element. External SHX glyph bytes are never embedded here. */
+    public static final class ComplexElement {
+        public final int elementIndex,flags,shapeNumber;
+        public final String text;
+        public final double scale,rotationDegrees,xOffset,yOffset;
+
+        public ComplexElement(int elementIndex,int flags,int shapeNumber,String text,double scale,double rotationDegrees,double xOffset,double yOffset){
+            this.elementIndex=Math.max(0,elementIndex);
+            this.flags=flags;
+            this.shapeNumber=shapeNumber;
+            this.text=text=text==null?"":text;
+            this.scale=safeFinitePositive(scale,1d);
+            this.rotationDegrees=Double.isFinite(rotationDegrees)?rotationDegrees:0d;
+            this.xOffset=Double.isFinite(xOffset)?xOffset:0d;
+            this.yOffset=Double.isFinite(yOffset)?yOffset:0d;
+        }
+
+        public boolean hasText(){return !text.isEmpty();}
+        public boolean hasShape(){return shapeNumber!=0&&!hasText();}
+    }
+
     public static final class Pattern {
         public final String name;
         public final double[] elements;
         public final boolean complex;
+        public final List<ComplexElement> complexElements;
 
-        public Pattern(String name,double[] elements,boolean complex){
+        public Pattern(String name,double[] elements,boolean complex){this(name,elements,complex,Collections.emptyList());}
+        public Pattern(String name,double[] elements,boolean complex,List<ComplexElement> complexElements){
             this.name=normalizeName(name);
             this.elements=elements==null?new double[0]:elements.clone();
-            this.complex=complex;
+            ArrayList<ComplexElement> copy=new ArrayList<>();
+            if(complexElements!=null)for(ComplexElement item:complexElements)if(item!=null&&item.elementIndex<this.elements.length)copy.add(item);
+            this.complexElements=Collections.unmodifiableList(copy);
+            this.complex=complex||!copy.isEmpty();
         }
 
         public boolean continuous(){return elements.length==0||CONTINUOUS.equals(name);}
+        public boolean hasRenderableComplexText(){for(ComplexElement item:complexElements)if(item.hasText())return true;return false;}
+        public boolean requiresExternalShape(){for(ComplexElement item:complexElements)if(item.hasShape())return true;return false;}
+
+        /** Unscaled absolute DXF pattern cycle length. */
+        public double cycleLength(){double total=0d;for(double value:elements)if(Double.isFinite(value))total+=Math.abs(value);return total;}
+
+        /** Distance from the beginning of a pattern cycle to the middle of an element. */
+        public double elementCenterDistance(int index){
+            if(index<0||index>=elements.length)return 0d;
+            double total=0d;for(int i=0;i<index;i++)total+=Math.abs(elements[i]);
+            return total+Math.abs(elements[index])*.5d;
+        }
 
         /**
          * Converts signed DXF dash/gap elements into Android-compatible on/off intervals.
@@ -104,5 +142,6 @@ public final class DxfLineStyle {
 
     private static int validDefault(int value){return value>=0&&value<=211?value:DEFAULT_LINEWEIGHT;}
     private static double safeScale(double value){return Double.isFinite(value)&&value>0d?value:1d;}
+    private static double safeFinitePositive(double value,double fallback){return Double.isFinite(value)&&value>0d?value:fallback;}
     private DxfLineStyle(){}
 }
