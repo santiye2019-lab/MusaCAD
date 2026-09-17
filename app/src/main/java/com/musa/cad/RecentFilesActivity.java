@@ -23,8 +23,9 @@ public class RecentFilesActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
-        setContentView(buildUi());
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content),(v,insets)->{
+        View root=buildUi();
+        setContentView(root);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{
             Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(0,bars.top,0,bars.bottom);return insets;
         });
@@ -32,7 +33,7 @@ public class RecentFilesActivity extends AppCompatActivity {
     }
 
     private View buildUi(){
-        LinearLayout root=new LinearLayout(this);root.setId(android.R.id.content);root.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(7,16,21));root.setPadding(dp(16),dp(14),dp(16),dp(14));
 
         LinearLayout header=new LinearLayout(this);header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);
