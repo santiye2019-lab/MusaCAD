@@ -4,7 +4,7 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import java.security.*;
 import java.security.cert.Certificate;
-import java.util.Base64;
+import android.util.Base64;
 
 final class LicenseKeyStore {
     private static final String STORE="AndroidKeyStore";
@@ -40,7 +40,9 @@ final class LicenseKeyStore {
     }
 
     static String publicKeyPem() throws Exception {
-        String b64=Base64.getMimeEncoder(64,new byte[]{'\n'}).encodeToString(publicKey().getEncoded());
+        String raw=Base64.encodeToString(publicKey().getEncoded(),Base64.NO_WRAP);
+        StringBuilder b64=new StringBuilder();
+        for(int i=0;i<raw.length();i+=64){if(i>0)b64.append('\n');b64.append(raw, i, Math.min(raw.length(),i+64));}
         return "-----BEGIN PUBLIC KEY-----\n"+b64+"\n-----END PUBLIC KEY-----\n";
     }
 
