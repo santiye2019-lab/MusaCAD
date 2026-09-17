@@ -11,6 +11,7 @@ android {
     namespace 'com.musa.cad'
     compileSdkVersion 35
     ndkVersion "27.2.12479018"
+    buildFeatures { buildConfig true }
     externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }
 
     signingConfigs {
