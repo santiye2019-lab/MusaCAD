@@ -21,8 +21,13 @@ public class CadEditTransformTest {
         near(text.rotationDegrees,120,"text rotation");
         if(!"ODA".equals(text.text))throw new AssertionError("text lost");
 
+        CadEdit styled=CadEdit.styledText(4,8,"KESIT",15,"ROMANS","monospace",true,22f,.8f,12f,2).translated(5,-3).rotated(90,9,5);
+        if(!styled.hasTextStyle()||!"ROMANS".equals(styled.textStyleName)||!"monospace".equals(styled.textFamilyHint)||!styled.textShx)throw new AssertionError("text style identity lost");
+        near(styled.textHeight,22f,"text height");near(styled.textWidthFactor,.8f,"text width");near(styled.textOblique,12f,"text oblique");if(styled.textGenerationFlags!=2)throw new AssertionError("text generation flags");near(styled.rotationDegrees,105f,"styled text rotation");
+        CadEdit styledCopy=styled.copy();if(!styledCopy.hasTextStyle()||styledCopy.textGenerationFlags!=styled.textGenerationFlags)throw new AssertionError("styled copy metadata");
+
         CadEdit copy=poly.copy();poly.xy[0]=99;if(copy.xy[0]!=0)throw new AssertionError("copy geometry shared");
-        System.out.println("CAD source edit transform cases passed");
+        System.out.println("CAD source edit transform and text-style cases passed");
     }
 
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
