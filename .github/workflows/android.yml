@@ -116,6 +116,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/LicenseToken.java tests/LicenseTokenTest.java
           java -cp /tmp/musacad-license-tests LicenseTokenTest
+      - name: Test debug-only license tokens
+        run: |
+          javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/DebugLicenseToken.java tests/DebugLicenseTokenTest.java
+          java -cp /tmp/musacad-license-tests DebugLicenseTokenTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
       - name: Compile offline license generator
@@ -149,16 +153,22 @@ jobs:
           ./gradlew --no-daemon lintDebug testDebugUnitTest
       - name: Build debug and release variants
         run: |
-          ./gradlew --no-daemon assembleDebug assembleRelease
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease :licenseadmin:assembleDebug
       - name: Upload internal debug APK
         uses: actions/upload-artifact@v4
         with:
           name: MusaCAD-internal-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Upload license admin test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-license-admin-test-apk
+          path: licenseadmin/build/outputs/apk/debug/licenseadmin-debug.apk
+          if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licenseadmin third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:
