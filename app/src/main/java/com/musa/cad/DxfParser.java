@@ -97,6 +97,46 @@ public final class DxfParser {
         private Path shape(){Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(typeface());tp.setTextSize(height);tp.setTextScaleX(widthFactor);tp.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();tp.getTextPath(rows[i],0,rows[i].length(),offsetX,offsetY+i*height*1.3f,line);shape.addPath(line);}float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f;Matrix mirror=new Matrix();mirror.setScale(sx,sy);shape.transform(mirror);if(mtextAttachment>=1&&mtextAttachment<=9){RectF bounds=new RectF();shape.computeBounds(bounds,true);if(!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(mtextAttachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);shape.transform(anchor);}}Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);shape.transform(placement);return shape;}public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);}
     }
 
+
+    private static final class MTextLabel implements Entity{
+        final float x,y,height,angle,widthFactor,oblique;final int attachment;final DxfTextStyle.Style style;final DxfMText.Result rich;
+        MTextLabel(float x,float y,float h,float angle,DxfMText.Result rich,DxfTextStyle.Style style,float width,float oblique,int attachment){
+            this.x=x;this.y=y;height=Math.max(.01f,h);this.angle=angle;this.rich=rich;this.style=style==null?DxfTextStyle.defaultStyle():style;widthFactor=Math.max(.01f,width);this.oblique=oblique;this.attachment=attachment;
+        }
+        private Typeface face(DxfMText.Run run){
+            String f=run.font==null?"":run.font.trim();
+            if(f.isEmpty())return Label.typeface(style);
+            String lower=f.toLowerCase(Locale.ROOT);if(lower.endsWith(".shx")||(!lower.contains(".")&&!lower.contains(" ")))return Typeface.MONOSPACE;
+            f=f.replace('\\','/');int slash=f.lastIndexOf('/');if(slash>=0)f=f.substring(slash+1);int dot=f.lastIndexOf('.');if(dot>0)f=f.substring(0,dot);f=f.replace('_',' ').replace('-',' ').trim();
+            return Typeface.create(f.isEmpty()?style.familyHint():f,Typeface.NORMAL);
+        }
+        private Path shape(){
+            Path all=new Path();float cursorX=0f,cursorY=0f,lineMax=height;
+            for(DxfMText.Run run:rich.runs){
+                String[]parts=run.text.split("\\n",-1);
+                float runHeight=(float)(run.hasAbsoluteHeight()?run.absoluteHeight:height*run.heightScale);runHeight=Math.max(.01f,runHeight);
+                Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(face(run));tp.setTextSize(runHeight);tp.setTextScaleX((float)Math.max(.01d,widthFactor*run.widthScale));
+                double runOblique=Math.abs(run.obliqueDegrees)>1e-9?run.obliqueDegrees:oblique;tp.setTextSkewX((float)-Math.tan(Math.toRadians(runOblique)));
+                for(int part=0;part<parts.length;part++){
+                    String text=parts[part];float startX=cursorX;
+                    if(!text.isEmpty()){Path glyphs=new Path();tp.getTextPath(text,0,text.length(),cursorX,cursorY,glyphs);all.addPath(glyphs);cursorX+=tp.measureText(text);lineMax=Math.max(lineMax,runHeight);}
+                    if(cursorX>startX){
+                        float thick=Math.max(.01f,runHeight*.045f);
+                        if(run.underline)all.addRect(startX,cursorY+runHeight*.12f,cursorX,cursorY+runHeight*.12f+thick,Path.Direction.CW);
+                        if(run.overline)all.addRect(startX,cursorY-runHeight,cursorX,cursorY-runHeight+thick,Path.Direction.CW);
+                        if(run.strike)all.addRect(startX,cursorY-runHeight*.38f,cursorX,cursorY-runHeight*.38f+thick,Path.Direction.CW);
+                    }
+                    if(part+1<parts.length){cursorX=0f;cursorY+=lineMax*1.3f;lineMax=height;}
+                }
+            }
+            RectF bounds=new RectF();all.computeBounds(bounds,true);
+            if(attachment>=1&&attachment<=9&&!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(attachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);all.transform(anchor);}
+            Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);all.transform(placement);return all;
+        }
+        public void bounds(RectF b){Path p=shape();RectF r=new RectF();p.computeBounds(r,true);if(!r.isEmpty()){add(b,r.left,r.top);add(b,r.right,r.bottom);}}
+        public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);Paint.Style old=p.getStyle();p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(old);}
+    }
+
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
     public static Result render(File file)throws IOException{
@@ -136,7 +176,16 @@ public final class DxfParser {
     private static float[]snapPoints(List<Entity>entities,Matrix matrix){ArrayList<PointF>points=new ArrayList<>();for(Entity wrapped:entities){Entity entity=((LayerEntity)wrapped).entity;Matrix transform=new Matrix();if(entity instanceof Transformed){transform=((Transformed)entity).matrix;entity=((Transformed)entity).entity;}ArrayList<PointF>local=new ArrayList<>();if(entity instanceof Line){Line l=(Line)entity;local.add(new PointF(l.x1,l.y1));local.add(new PointF(l.x2,l.y2));}else if(entity instanceof Poly)local.addAll(((Poly)entity).snapPts);for(PointF point:local){float[]xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));}}float[]result=new float[points.size()*2];for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}matrix.mapPoints(result);return result;}
 
     private static Entity parse(String type,List<String>a,int from,int to,Map<String,DxfTextStyle.Style>styles){
-        if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){StringBuilder text=new StringBuilder();for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}String plain=DxfText.plain(text.toString());if(plain.trim().isEmpty())return null;DxfTextStyle.Style style=DxfTextStyle.resolve(styles,str(a,from,to,7,DxfTextStyle.STANDARD));float angle=f(a,from,to,50);boolean mtext="MTEXT".equals(type);if(mtext){angle=(float)Math.toDegrees(angle);if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));}float raw=Math.max(.01f,fv(a,from,to,40,1f)),height=style.textHeight(raw);float entityWidth=mtext?1f:fv(a,from,to,41,1f),width=style.width(entityWidth);float entityOblique=mtext?0f:fv(a,from,to,51,0f),oblique=style.oblique(entityOblique);int generation=style.generation(mtext?0:(int)fv(a,from,to,71,0f));float x=f(a,from,to,10),y=f(a,from,to,20);boolean alignable=!mtext,hasSecond=alignable&&has(a,from,to,11)&&has(a,from,to,21);float x2=hasSecond?f(a,from,to,11):x,y2=hasSecond?f(a,from,to,21):y;int horizontal=alignable?(int)fv(a,from,to,72,0f):0;int vertical="TEXT".equals(type)?(int)fv(a,from,to,73,0f):("ATTRIB".equals(type)||"ATTDEF".equals(type))?(int)fv(a,from,to,74,0f):0;int attachment=mtext?(int)fv(a,from,to,71,1f):0;return new Label(x,y,height,angle,plain,style,width,oblique,generation,x2,y2,hasSecond,horizontal,vertical,attachment);}
+        if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
+            StringBuilder text=new StringBuilder();for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}
+            boolean mtext="MTEXT".equals(type);DxfMText.Result rich=mtext?DxfMText.parse(text.toString()):null;String plain=mtext?rich.plainText():DxfText.plain(text.toString());if(plain.trim().isEmpty())return null;
+            DxfTextStyle.Style style=DxfTextStyle.resolve(styles,str(a,from,to,7,DxfTextStyle.STANDARD));float angle=f(a,from,to,50);if(mtext){angle=(float)Math.toDegrees(angle);if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));}
+            float raw=Math.max(.01f,fv(a,from,to,40,1f)),height=style.textHeight(raw);float entityWidth=mtext?1f:fv(a,from,to,41,1f),width=style.width(entityWidth);float entityOblique=mtext?0f:fv(a,from,to,51,0f),oblique=style.oblique(entityOblique);
+            int generation=style.generation(mtext?0:(int)fv(a,from,to,71,0f));float x=f(a,from,to,10),y=f(a,from,to,20);int attachment=mtext?(int)fv(a,from,to,71,1f):0;
+            if(mtext)return new MTextLabel(x,y,height,angle,rich,style,width,oblique,attachment);
+            boolean hasSecond=has(a,from,to,11)&&has(a,from,to,21);float x2=hasSecond?f(a,from,to,11):x,y2=hasSecond?f(a,from,to,21):y;int horizontal=(int)fv(a,from,to,72,0f);int vertical="TEXT".equals(type)?(int)fv(a,from,to,73,0f):("ATTRIB".equals(type)||"ATTDEF".equals(type))?(int)fv(a,from,to,74,0f):0;
+            return new Label(x,y,height,angle,plain,style,width,oblique,generation,x2,y2,hasSecond,horizontal,vertical,0);
+        }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),Math.max(.1f,fv(a,from,to,40,.5f)));if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);if("ARC".equals(type)){float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),start,sweep);}if("ELLIPSE".equals(type)){float mx=f(a,from,to,11),my=f(a,from,to,21);if(Math.hypot(mx,my)<1e-6)return null;return new EllipseCurve(f(a,from,to,10),f(a,from,to,20),mx,my,fv(a,from,to,40,1f),fv(a,from,to,41,0f),fv(a,from,to,42,(float)(Math.PI*2)));}if("LWPOLYLINE".equals(type)){boolean closed=(((int)f(a,from,to,70))&1)!=0;return bulgePoly(lwVertices(a,from,to),closed);}if("SPLINE".equals(type)){try{return splinePoly(DxfSpline.parse(a,from,to));}catch(IOException ignored){return null;}}if("LEADER".equals(type)){ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}if("HATCH".equals(type)){try{DxfHatch.Result h=DxfHatch.parse(a,from,to);return h.loops.isEmpty()?null:new HatchEntity(h);}catch(IOException ignored){return null;}}if("VIEWPORT".equals(type)){DxfViewport.View vp=DxfViewport.parse(a,from,to);return vp.id>1&&vp.paperWidth>0&&vp.paperHeight>0?new ViewportEntity(vp):null;}if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);}if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
     }
 
