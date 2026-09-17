@@ -54,12 +54,16 @@ jobs:
           java -cp /tmp/musacad-tests CadEditTransformTest
       - name: Test source entity edit session
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java app/src/main/java/com/musa/cad/SourceReplacement.java app/src/main/java/com/musa/cad/SourceEditSession.java tests/SourceEditSessionTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java app/src/main/java/com/musa/cad/SourceReplacement.java app/src/main/java/com/musa/cad/SourceEditSession.java tests/SourceEditSessionTest.java
           java -cp /tmp/musacad-tests SourceEditSessionTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test DXF linetype and lineweight
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java tests/DxfLineStyleTest.java
+          java -cp /tmp/musacad-tests DxfLineStyleTest
       - name: Test CAD print scale math
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrintMath.java tests/CadPrintMathTest.java
@@ -77,9 +81,9 @@ jobs:
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
           java -cp /tmp/musacad-license-tool LicenseGenerator >/tmp/license-generator-usage.txt || test $? -eq 2
           grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
-      - name: Test DXF block expansion, colors and source origins
+      - name: Test DXF block expansion, colors, styles and source origins
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest
       - name: Test cancellable file transfer
         run: |
