@@ -2,7 +2,7 @@ name: Android quality gate
 
 on:
   push:
-    branches: [ main, gandalf/step27-editor-integration, gandalf/commercial-readiness ]
+    branches: [ main, 'gandalf/**' ]
   workflow_dispatch:
 
 concurrency:
@@ -48,6 +48,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadEditStylusTest.java
           java -cp /tmp/musacad-tests CadEditStylusTest
+      - name: Test source entity edit transforms
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java tests/CadEditTransformTest.java
+          java -cp /tmp/musacad-tests CadEditTransformTest
+      - name: Test source entity edit session
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java app/src/main/java/com/musa/cad/SourceReplacement.java app/src/main/java/com/musa/cad/SourceEditSession.java tests/SourceEditSessionTest.java
+          java -cp /tmp/musacad-tests SourceEditSessionTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
@@ -69,7 +77,7 @@ jobs:
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
           java -cp /tmp/musacad-license-tool LicenseGenerator >/tmp/license-generator-usage.txt || test $? -eq 2
           grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
-      - name: Test DXF block expansion and color inheritance
+      - name: Test DXF block expansion, colors and source origins
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-tests DxfBlocksTest

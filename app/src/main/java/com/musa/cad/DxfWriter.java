@@ -8,38 +8,69 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Writes MusaCAD overlay edits into a copy of the full source/converted DXF. */
+/** Writes MusaCAD overlay/source edits into a copy of the full source/converted DXF. */
 public final class DxfWriter {
     public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits)throws IOException{
+        write(baseDxf,target,drawing,edits,Collections.emptyList(),Collections.emptyList());
+    }
+
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits,List<SourceRange> removedSources)throws IOException{
+        write(baseDxf,target,drawing,edits,Collections.emptyList(),removedSources);
+    }
+
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,
+                             List<SourceReplacement> replacements,List<SourceRange> removedSources)throws IOException{
         if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
         Matrix contentToWorld=contentToWorldMatrix(drawing);
-        Charset cs=charset(baseDxf);boolean inserted=false;String section="";boolean sectionPending=false;
+        Charset cs=charset(baseDxf);boolean inserted=false;String section="";boolean sectionPending=false;int lineIndex=0;
+        List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
         try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(baseDxf),cs),128*1024);
             BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,cs),128*1024)){
             while(true){
                 FileTransfer.checkCancelled();String codeLine=in.readLine();if(codeLine==null)break;String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");
                 int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}String value=valueLine.trim();
-                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){writeEdits(out,contentToWorld,edits);inserted=true;}
-                out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();
-                if(code==0&&"SECTION".equals(value)){sectionPending=true;continue;}
-                if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;continue;}
-                if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;}
+                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){
+                    writeEdits(out,contentToWorld,additions,"0",null);
+                    writeReplacements(out,contentToWorld,replacements);
+                    inserted=true;
+                }
+
+                boolean removed=isRemoved(lineIndex,removals);
+                if(!removed){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
+
+                if(!removed){
+                    if(code==0&&"SECTION".equals(value)){sectionPending=true;lineIndex+=2;continue;}
+                    if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;lineIndex+=2;continue;}
+                    if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;}
+                }
+                lineIndex+=2;
             }
             if(!inserted)throw new IOException("DXF ENTITIES bölümü bulunamadı");out.flush();
         }
     }
 
-    private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits)throws IOException{
-        if(edits==null)return;
-        for(CadEdit edit:edits){
-            FileTransfer.checkCancelled();
-            switch(edit.type){
-                case LINE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LINE");layer(out);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
-                case RECTANGLE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");layer(out);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
-                case CIRCLE:{PointF c=w(contentToWorld,edit.xy[0],edit.xy[1]),p=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");layer(out);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
-                case POLYLINE:{entity(out,"LWPOLYLINE");layer(out);int count=edit.xy.length/2;i(out,90,count);i(out,70,0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
-                case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");layer(out);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,worldTextHeight(contentToWorld,30));tag(out,1,safe(edit.text));break;}
-            }
+    private static boolean isRemoved(int lineIndex,List<SourceRange> removals){for(SourceRange range:removals)if(range!=null&&range.containsLine(lineIndex))return true;return false;}
+
+    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements)throws IOException{
+        if(replacements==null)return;
+        for(SourceReplacement replacement:replacements){
+            if(replacement==null)continue;
+            writeEdit(out,contentToWorld,replacement.edit,replacement.layer,replacement.color&0x00FFFFFF);
+        }
+    }
+
+    private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits,String layer,Integer trueColor)throws IOException{
+        if(edits==null)return;for(CadEdit edit:edits)writeEdit(out,contentToWorld,edit,layer,trueColor);
+    }
+
+    private static void writeEdit(BufferedWriter out,Matrix contentToWorld,CadEdit edit,String sourceLayer,Integer trueColor)throws IOException{
+        if(edit==null)return;FileTransfer.checkCancelled();String layerName=sourceLayer==null||sourceLayer.trim().isEmpty()?"0":sourceLayer;
+        switch(edit.type){
+            case LINE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LINE");common(out,layerName,trueColor);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,b.x);n(out,21,b.y);n(out,31,0);break;}
+            case RECTANGLE:{PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"LWPOLYLINE");common(out,layerName,trueColor);i(out,90,4);i(out,70,1);point(out,a.x,a.y);point(out,b.x,a.y);point(out,b.x,b.y);point(out,a.x,b.y);break;}
+            case CIRCLE:{PointF c=w(contentToWorld,edit.xy[0],edit.xy[1]),p=w(contentToWorld,edit.xy[2],edit.xy[3]);entity(out,"CIRCLE");common(out,layerName,trueColor);n(out,10,c.x);n(out,20,c.y);n(out,30,0);n(out,40,Math.hypot(p.x-c.x,p.y-c.y));break;}
+            case POLYLINE:{entity(out,"LWPOLYLINE");common(out,layerName,trueColor);int count=edit.xy.length/2;i(out,90,count);i(out,70,edit.closed?1:0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
+            case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");common(out,layerName,trueColor);n(out,10,p.x);n(out,20,p.y);n(out,30,0);n(out,40,worldTextHeight(contentToWorld,30));n(out,50,-edit.rotationDegrees);tag(out,1,safe(edit.text));break;}
         }
     }
 
@@ -63,12 +94,10 @@ public final class DxfWriter {
         return Charset.forName("windows-1252");
     }
 
-    private static double worldTextHeight(Matrix contentToWorld,float contentPixels){
-        float[] vector={0,contentPixels};contentToWorld.mapVectors(vector);return Math.max(.001,Math.hypot(vector[0],vector[1]));
-    }
+    private static double worldTextHeight(Matrix contentToWorld,float contentPixels){float[] vector={0,contentPixels};contentToWorld.mapVectors(vector);return Math.max(.001,Math.hypot(vector[0],vector[1]));}
     private static PointF w(Matrix m,float x,float y){float[] xy={x,y};m.mapPoints(xy);return new PointF(xy[0],xy[1]);}
     private static void entity(BufferedWriter o,String type)throws IOException{tag(o,0,type);}
-    private static void layer(BufferedWriter o)throws IOException{tag(o,8,"0");}
+    private static void common(BufferedWriter o,String layer,Integer trueColor)throws IOException{tag(o,8,layer);if(trueColor!=null)tag(o,420,Integer.toString(trueColor));}
     private static void point(BufferedWriter o,double x,double y)throws IOException{n(o,10,x);n(o,20,y);}
     private static void i(BufferedWriter o,int code,int v)throws IOException{tag(o,code,Integer.toString(v));}
     private static void n(BufferedWriter o,int code,double v)throws IOException{tag(o,code,String.format(Locale.US,"%.8f",v));}

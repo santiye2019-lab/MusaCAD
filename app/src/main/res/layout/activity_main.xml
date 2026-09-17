@@ -134,7 +134,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="DWG ve DXF dosyalarını açın, yakınlaştırın, katmanları yönetin, ölçüm alın ve temel çizim ekleyin."
+                        android:text="DWG ve DXF dosyalarını açın, yakınlaştırın, katmanları yönetin, ölçüm alın ve CAD nesnelerini düzenleyin."
                         android:textColor="#BFD1DA"
                         android:textSize="12sp"
                         android:gravity="center"
@@ -206,8 +206,8 @@
                         android:orientation="vertical"
                         android:gravity="center"
                         android:background="@drawable/feature_chip_bg">
-                        <ImageView android:layout_width="25dp" android:layout_height="25dp" android:src="@drawable/ic_line" android:contentDescription="Çizim" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Çizim" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="10sp" />
+                        <ImageView android:layout_width="25dp" android:layout_height="25dp" android:src="@drawable/ic_line" android:contentDescription="Düzenleme" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Düzenle" android:textColor="#EAF5F7" android:textStyle="bold" android:textSize="10sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -262,6 +262,12 @@
             <Button android:id="@+id/calibrateButton" style="@style/ToolButtonTeal" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
             <Button android:id="@+id/distanceButton" style="@style/ToolButtonTeal" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
             <Button android:id="@+id/areaButton" style="@style/ToolButtonTeal" android:text="Alan" android:drawableTop="@drawable/ic_area" />
+
+            <Button android:id="@+id/selectEntityButton" style="@style/ToolButtonYellow" android:text="Seç" android:enabled="false" />
+            <Button android:id="@+id/moveEntityButton" style="@style/ToolButtonBlue" android:text="Taşı" android:enabled="false" />
+            <Button android:id="@+id/rotateEntityButton" style="@style/ToolButtonPurple" android:text="Döndür" android:enabled="false" />
+            <Button android:id="@+id/copyEntityButton" style="@style/ToolButtonGreen" android:text="Kopya" android:enabled="false" />
+            <Button android:id="@+id/deleteEntityButton" style="@style/ToolButtonOrange" android:text="Sil" android:enabled="false" />
 
             <Button android:id="@+id/lineButton" style="@style/ToolButtonGreen" android:text="Çizgi" android:drawableTop="@drawable/ic_line" android:enabled="false" />
             <Button android:id="@+id/polylineButton" style="@style/ToolButtonMagenta" android:text="Çoklu" android:drawableTop="@drawable/ic_polyline" android:enabled="false" />
