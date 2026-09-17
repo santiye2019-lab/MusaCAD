@@ -38,6 +38,8 @@ public class DxfBlocksTest {
         String layers=layer("BORU",62,3)+layer("TRUE",62,2,420,0x123456);
         DxfBlocks.Result direct=read(layers,"",line(8,"BORU"));color(direct,DxfColor.aciArgb(3));if(!direct.placements.get(0).directRoot)throw new AssertionError("Direct ENTITIES record must be editable root");
         color(read(layers,"",line(8,"BORU",62,1)),DxfColor.aciArgb(1));color(read(layers,"",line(8,"TRUE")),DxfColor.trueColorArgb(0x123456));color(read(layers,"",line(8,"BORU",420,0xABCDEF)),DxfColor.trueColorArgb(0xABCDEF));
+        color(read(layer("UNSIGNED",420,3265154816L),"",line(8,"UNSIGNED")),DxfColor.trueColorArgb(0x9E4F00));
+        color(read(layers,"",line(8,"BORU",420,3265154816L)),DxfColor.trueColorArgb(0x9E4F00));
         DxfBlocks.Result insideBlock=read(layers,block("C",line(62,0)),insert("C",62,5));color(insideBlock,DxfColor.aciArgb(5));if(insideBlock.placements.get(0).directRoot)throw new AssertionError("Block-expanded member must not be edited as a root source record");
         color(read(layers,block("C",line(62,0)),insert("C",8,"BORU",62,256)),DxfColor.aciArgb(3));
         String nestedColor=block("INNER",line(62,0))+block("OUTER",insert("INNER",62,0));color(read(layers,nestedColor,insert("OUTER",62,6)),DxfColor.aciArgb(6));
