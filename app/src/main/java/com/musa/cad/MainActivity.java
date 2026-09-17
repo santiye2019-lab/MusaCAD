@@ -210,7 +210,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void showShare(){
         if(currentFile==null||!currentFile.exists()){Toast.makeText(this,"Paylaşmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;}
-        new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{"Orijinal dosyayı paylaş","Görünümü PDF olarak paylaş","Görünümü resim olarak paylaş","Alan seçerek paylaş"},(d,w)->{if(w==0)shareFile(currentFile,"application/octet-stream");else if(w==3){if(!cad.beginSelection())Toast.makeText(this,"Önce çizim açın",Toast.LENGTH_SHORT).show();}else {cad.cancelSelection();exportView(w==1);}}).show();
+        new AlertDialog.Builder(this).setTitle("Paylaş").setItems(new String[]{"Orijinal dosyayı paylaş","Görünümü PDF olarak paylaş","Görünümü resim olarak paylaş","Alan seçerek paylaş"},(d,w)->{if(w==0)shareOriginalFile();else if(w==3){if(!cad.beginSelection())Toast.makeText(this,"Önce çizim açın",Toast.LENGTH_SHORT).show();}else {cad.cancelSelection();exportView(w==1);}}).show();
+    }
+
+    private void shareOriginalFile(){
+        if(currentFile==null||!currentFile.exists()){Toast.makeText(this,"Paylaşmak için önce dosya açın",Toast.LENGTH_SHORT).show();return;}
+        File copy=null;
+        try{
+            String lower=currentDisplayName==null?"":currentDisplayName.toLowerCase(Locale.ROOT);
+            String suffix=lower.endsWith(".dxf")?".dxf":".dwg";
+            copy=File.createTempFile("MusaCAD_orijinal_",suffix,exportDir());
+            try(InputStream in=new FileInputStream(currentFile);OutputStream out=new FileOutputStream(copy)){
+                byte[] buffer=new byte[64*1024];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+            }
+            shareFile(copy,"application/octet-stream");
+        }catch(Exception e){if(copy!=null)copy.delete();error(e);}
     }
 
     private void printDrawing(){
