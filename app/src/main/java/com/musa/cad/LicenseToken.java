@@ -1,15 +1,16 @@
 package com.musa.cad;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 
 /** Pure-Java verifier for offline, installation-bound MusaCAD license tokens. */
 public final class LicenseToken {
     public static final String PREFIX="MC1";
+    private static final char[] URL64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".toCharArray();
 
     public static final class Result {
         public final boolean valid;
@@ -28,9 +29,8 @@ public final class LicenseToken {
             String compact=token.trim().replace("\n","").replace("\r","").replace(" ","");
             String[] parts=compact.split("\\.");
             if(parts.length!=3||!PREFIX.equals(parts[0]))return fail("format");
-            Base64.Decoder dec=Base64.getUrlDecoder();
-            byte[] payloadBytes=dec.decode(parts[1]);
-            byte[] signatureBytes=dec.decode(parts[2]);
+            byte[] payloadBytes=decode64(parts[1],true);
+            byte[] signatureBytes=decode64(parts[2],true);
             String payload=new String(payloadBytes,StandardCharsets.UTF_8);
             String[] fields=payload.split("\\|",-1);
             if(fields.length!=3||!PREFIX.equals(fields[0]))return fail("payload");
@@ -55,16 +55,42 @@ public final class LicenseToken {
     }
 
     public static String encode(String payload,byte[] signature){
-        Base64.Encoder enc=Base64.getUrlEncoder().withoutPadding();
-        return PREFIX+"."+enc.encodeToString(payload.getBytes(StandardCharsets.UTF_8))+"."+enc.encodeToString(signature);
+        return PREFIX+"."+encodeUrl64(payload.getBytes(StandardCharsets.UTF_8))+"."+encodeUrl64(signature);
     }
 
     private static PublicKey parsePublicKey(String pem)throws Exception{
         if(pem==null)throw new IllegalArgumentException("publicKey");
-        String b64=pem.replace("-----BEGIN PUBLIC KEY-----","")
-            .replace("-----END PUBLIC KEY-----","").replaceAll("\\s","");
-        byte[] der=Base64.getDecoder().decode(b64);
+        String b64=pem.replace("-----BEGIN PUBLIC KEY-----","").replace("-----END PUBLIC KEY-----","").replaceAll("\\s","");
+        byte[] der=decode64(b64,false);
         return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
+    }
+
+    private static String encodeUrl64(byte[] data){
+        StringBuilder out=new StringBuilder((data.length*4+2)/3);
+        for(int i=0;i<data.length;i+=3){
+            int b0=data[i]&255,b1=i+1<data.length?data[i+1]&255:0,b2=i+2<data.length?data[i+2]&255:0;
+            out.append(URL64[b0>>>2]);out.append(URL64[((b0&3)<<4)|(b1>>>4)]);
+            if(i+1<data.length)out.append(URL64[((b1&15)<<2)|(b2>>>6)]);
+            if(i+2<data.length)out.append(URL64[b2&63]);
+        }
+        return out.toString();
+    }
+
+    private static byte[] decode64(String s,boolean url)throws Exception{
+        String clean=s.replace("=","").replaceAll("\\s","");
+        ByteArrayOutputStream out=new ByteArrayOutputStream(clean.length()*3/4);
+        int acc=0,bits=0;
+        for(int i=0;i<clean.length();i++){
+            int v=value64(clean.charAt(i),url);if(v<0)throw new IllegalArgumentException("base64");
+            acc=(acc<<6)|v;bits+=6;
+            if(bits>=8){bits-=8;out.write((acc>>>bits)&255);}
+        }
+        return out.toByteArray();
+    }
+
+    private static int value64(char c,boolean url){
+        if(c>='A'&&c<='Z')return c-'A';if(c>='a'&&c<='z')return c-'a'+26;if(c>='0'&&c<='9')return c-'0'+52;
+        if(c=='+'||url&&c=='-')return 62;if(c=='/'||url&&c=='_')return 63;return -1;
     }
 
     private static boolean constantEquals(String a,String b){
