@@ -6,7 +6,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname !== "/v1/trial/start") return json({ status: "not_found" }, 404);
     if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
-    if (!env.DB || !env.MUSACAD_LICENSE_PRIVATE_KEY_PEM) return json({ status: "server_error" }, 503);
+    if (!env.DB || !env.MUSACAD_TRIAL_PRIVATE_KEY_PEM) return json({ status: "server_error" }, 503);
 
     let body;
     try {
@@ -36,7 +36,7 @@ export default {
 
       const expiresAt = Number(row.expires_at_ms);
       if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) return json({ status: "used" }, 409);
-      const token = await signToken(deviceId, expiresAt, env.MUSACAD_LICENSE_PRIVATE_KEY_PEM);
+      const token = await signToken(deviceId, expiresAt, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM);
       return json({ status: "active", token, expiresAtMs: expiresAt }, 200);
     } catch (_) {
       return json({ status: "server_error" }, 503);
@@ -49,7 +49,7 @@ function validDeviceId(value) {
 }
 
 async function signToken(deviceId, expiresAtMs, privateKeyPem) {
-  const payload = `MC1|${deviceId}|${expiresAtMs}`;
+  const payload = `MT1|${deviceId}|${expiresAtMs}`;
   const key = await crypto.subtle.importKey(
     "pkcs8",
     pemBytes(privateKeyPem, "PRIVATE KEY"),
@@ -59,7 +59,7 @@ async function signToken(deviceId, expiresAtMs, privateKeyPem) {
   );
   const payloadBytes = new TextEncoder().encode(payload);
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, payloadBytes);
-  return `MC1.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
+  return `MT1.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
 }
 
 function pemBytes(pem, label) {
