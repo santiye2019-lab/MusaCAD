@@ -14,8 +14,8 @@ public class CadEditTransformTest {
         if(poly.hitDistance(5,5)>5.01f)throw new AssertionError("polyline hit distance invalid");
 
         CadEdit circle=CadEdit.circle(10,10,15,10).translated(-5,2);
-        near(circle.centerX(),7.5f,"circle coordinate bounds center x");
-        if(circle.hitDistance(10,17)>0.01f)throw new AssertionError("circle hit test invalid");
+        near(circle.centerX(),5,"circle center x");near(circle.centerY(),12,"circle center y");
+        if(circle.hitDistance(5,17)>0.01f)throw new AssertionError("circle hit test invalid");
 
         CadEdit text=CadEdit.text(4,8,"ODA",30).rotated(90,4,8);
         near(text.rotationDegrees,120,"text rotation");
