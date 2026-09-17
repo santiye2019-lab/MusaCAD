@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
+        android:name=".MusaCadApp"
         android:theme="@style/Theme.MusaCAD"
         android:label="MusaCAD"
         android:icon="@drawable/ic_launcher"
