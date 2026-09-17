@@ -12,14 +12,19 @@ public final class TrialService {
     private static final int TIMEOUT_MS=10000,MAX_RESPONSE_BYTES=32768;
 
     public enum Status { ACTIVATED, ALREADY_USED, NOT_CONFIGURED, NETWORK_ERROR, INVALID_RESPONSE, DENIED }
+
+    public static boolean isConfigured(){
+        String endpoint=BuildConfig.TRIAL_API_URL==null?"":BuildConfig.TRIAL_API_URL.trim();
+        String trialKey=BuildConfig.TRIAL_PUBLIC_KEY_PEM==null?"":BuildConfig.TRIAL_PUBLIC_KEY_PEM.trim();
+        return !endpoint.isEmpty()&&!trialKey.isEmpty()&&endpoint.startsWith("https://");
+    }
     public static final class Result {public final Status status;public final String message;Result(Status status,String message){this.status=status;this.message=message;}}
 
     public static Result start(Context context){
         if(context==null)return new Result(Status.INVALID_RESPONSE,"context");
         String endpoint=BuildConfig.TRIAL_API_URL==null?"":BuildConfig.TRIAL_API_URL.trim();
         String trialKey=BuildConfig.TRIAL_PUBLIC_KEY_PEM==null?"":BuildConfig.TRIAL_PUBLIC_KEY_PEM.trim();
-        if(endpoint.isEmpty()||trialKey.isEmpty())return new Result(Status.NOT_CONFIGURED,"Trial sunucusu veya doğrulama anahtarı yapılandırılmadı");
-        if(!endpoint.startsWith("https://"))return new Result(Status.NOT_CONFIGURED,"Trial adresi HTTPS olmalıdır");
+        if(!isConfigured())return new Result(Status.NOT_CONFIGURED,"Trial sunucusu veya doğrulama anahtarı yapılandırılmadı");
         HttpsURLConnection connection=null;
         try{
             URL url=new URL(endpoint);connection=(HttpsURLConnection)url.openConnection();
