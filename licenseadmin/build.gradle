@@ -1,0 +1,28 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.musa.cad.licenseadmin'
+    compileSdkVersion 35
+
+    defaultConfig {
+        applicationId 'com.musa.cad.licenseadmin.test'
+        minSdkVersion 24
+        targetSdkVersion 35
+        versionCode 1
+        versionName '0.1-test'
+    }
+
+    buildTypes {
+        debug { debuggable true }
+        release {
+            debuggable false
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
