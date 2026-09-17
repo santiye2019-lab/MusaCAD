@@ -44,6 +44,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
           java -cp /tmp/musacad-tests SnapPointsTest
+      - name: Test stylus freehand persistence
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadEditStylusTest.java
+          java -cp /tmp/musacad-tests CadEditStylusTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
