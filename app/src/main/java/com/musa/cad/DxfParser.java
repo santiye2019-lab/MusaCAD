@@ -139,10 +139,48 @@ public final class DxfParser {
 
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
+    private static final long STREAM_THRESHOLD=2L*1024L*1024L;
+
     public static Result render(File file)throws IOException{
+        if(file!=null&&file.length()>STREAM_THRESHOLD)return renderStreaming(file);
         List<String>lines=readLines(file);Map<String,DxfTextStyle.Style>styles=DxfTextStyle.parse(lines);int units=headerInt(lines,"$INSUNITS",70,0);double mm=CadPrintMath.millimetersPerUnit(units);String unitName=CadPrintMath.unitName(units);int defaultWeight=DxfLineStyle.normalizeWeight(headerInt(lines,"$LWDEFAULT",370,DxfLineStyle.DEFAULT_LINEWEIGHT),DxfLineStyle.DEFAULT_LINEWEIGHT);double globalScale=safeLineTypeScale(headerDouble(lines,"$LTSCALE",40,1d));DxfBlocks.Result expanded=DxfBlocks.expand(lines,defaultWeight);ArrayList<Entity>entities=new ArrayList<>();Set<String>layers=new HashSet<>();LinkedHashSet<String>layouts=new LinkedHashSet<>();int skipped=expanded.skipped;List<DxfBlocks.Placement>placements=expanded.placements;DxfLineStyle.Pattern continuous=expanded.lineTypes.get(DxfLineStyle.CONTINUOUS);
-        for(int index=0;index<placements.size();index++){FileTransfer.checkCancelled();DxfBlocks.Placement item=placements.get(index);Entity entity;if("POLYLINE".equals(item.record.type)){ArrayList<DxfBulge.Vertex>vertices=new ArrayList<>();int j=index+1;while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){DxfBlocks.Record vertex=placements.get(j).record;vertices.add(new DxfBulge.Vertex(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20),fv(lines,vertex.from,vertex.to,42,0f)));j++;}boolean closed=(((int)item.record.number(70,0))&1)!=0;entity=bulgePoly(vertices,closed);if(entity==null){skipped++;continue;}index=j-1;}else if("VERTEX".equals(item.record.type)){skipped++;continue;}else{entity=parse(item.record.type,lines,item.record.from,item.record.to,styles);if(entity==null){skipped++;continue;}}CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;SourceRange range=sourceEdit==null?null:new SourceRange(item.record.from,Math.max(0,item.record.from-2),item.record.to);int sourceId=range==null?-1:range.sourceId;DxfLineStyle.Pattern pattern=expanded.lineTypes.get(item.lineType);if(pattern==null)pattern=continuous;entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,item.layout,item.color,item.lineType,pattern,item.lineTypeScale,item.lineWeight,item.blockScale,sourceId,range,item.record.type,sourceEdit));layers.add(item.layer);layouts.add(item.layout);}
+        for(int index=0;index<placements.size();index++){FileTransfer.checkCancelled();DxfBlocks.Placement item=placements.get(index);Entity entity;if("POLYLINE".equals(item.record.type)){ArrayList<DxfBulge.Vertex>vertices=new ArrayList<>();int j=index+1;while(j<placements.size()&&"VERTEX".equals(placements.get(j).record.type)){DxfBlocks.Record vertex=placements.get(j).record;vertices.add(new DxfBulge.Vertex(f(lines,vertex.from,vertex.to,10),f(lines,vertex.from,vertex.to,20),fv(lines,vertex.from,vertex.to,42,0f)));j++;}boolean closed=(((int)item.record.number(70,0))&1)!=0;entity=bulgePoly(vertices,closed);if(entity==null){skipped++;continue;}index=j-1;}else if("VERTEX".equals(item.record.type)){skipped++;continue;}else{entity=parse(item.record.type,lines,item.record.from,item.record.to,styles);if(entity==null){skipped++;continue;}}CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;SourceRange range=sourceEdit==null?null:new SourceRange(item.record.sourceFrom,item.record.sourceStart,item.record.sourceTo);int sourceId=range==null?-1:range.sourceId;DxfLineStyle.Pattern pattern=expanded.lineTypes.get(item.lineType);if(pattern==null)pattern=continuous;Entity placed=item.transform.isIdentity()?entity:new Transformed(entity,item.transform);entities.add(new LayerEntity(placed,item.layer,item.layout,item.color,item.lineType,pattern,item.lineTypeScale,item.lineWeight,item.blockScale,sourceId,range,item.record.type,sourceEdit));layers.add(item.layer);layouts.add(item.layout);}
         if(entities.isEmpty())return null;String initial=findLayout(layouts,layouts.contains(DxfBlocks.MODEL_LAYOUT)?DxfBlocks.MODEL_LAYOUT:layouts.iterator().next());return renderLayout(entities,layers,layers,layouts,initial,skipped,mm,unitName,globalScale,expanded.lineTypes);
+    }
+
+
+    private static Result renderStreaming(File file)throws IOException{
+        final ArrayList<Entity>entities=new ArrayList<>();final Set<String>layers=new HashSet<>();final LinkedHashSet<String>layouts=new LinkedHashSet<>();
+        final class Collector implements DxfBlocks.Sink{
+            DxfBlocks.Result meta;DxfBlocks.Placement pendingPolyline;ArrayList<DxfBulge.Vertex>vertices;
+            public void begin(DxfBlocks.Result metadata){meta=metadata;}
+            public void accept(DxfBlocks.Placement item)throws IOException{
+                FileTransfer.checkCancelled();
+                if(pendingPolyline!=null){
+                    if("VERTEX".equals(item.record.type)){vertices.add(new DxfBulge.Vertex(f(item.record.tags(),item.record.from,item.record.to,10),f(item.record.tags(),item.record.from,item.record.to,20),fv(item.record.tags(),item.record.from,item.record.to,42,0f)));return;}
+                    flushPolyline();
+                }
+                if("POLYLINE".equals(item.record.type)){pendingPolyline=item;vertices=new ArrayList<>();return;}
+                if("VERTEX".equals(item.record.type)){meta.skipped++;return;}
+                add(item,parse(item.record.type,item.record.tags(),item.record.from,item.record.to,meta.textStyles));
+            }
+            private void flushPolyline()throws IOException{
+                if(pendingPolyline==null)return;boolean closed=(((int)pendingPolyline.record.number(70,0))&1)!=0;Entity entity=bulgePoly(vertices,closed);DxfBlocks.Placement item=pendingPolyline;pendingPolyline=null;vertices=null;if(entity==null){meta.skipped++;return;}add(item,entity);
+            }
+            private void add(DxfBlocks.Placement item,Entity entity)throws IOException{
+                if(entity==null){meta.skipped++;return;}
+                CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;
+                SourceRange range=sourceEdit==null?null:new SourceRange(item.record.sourceFrom,item.record.sourceStart,item.record.sourceTo);int sourceId=range==null?-1:range.sourceId;
+                DxfLineStyle.Pattern pattern=meta.lineTypes.get(item.lineType);if(pattern==null)pattern=meta.lineTypes.get(DxfLineStyle.CONTINUOUS);
+                Entity placed=item.transform.isIdentity()?entity:new Transformed(entity,item.transform);
+                entities.add(new LayerEntity(placed,item.layer,item.layout,item.color,item.lineType,pattern,item.lineTypeScale,item.lineWeight,item.blockScale,sourceId,range,item.record.type,sourceEdit));layers.add(item.layer);layouts.add(item.layout);
+            }
+            public void finish()throws IOException{flushPolyline();}
+        }
+        Collector collector=new Collector();DxfBlocks.Result expanded=DxfBlocks.expand(file,charset(file),collector);
+        if(entities.isEmpty())return null;if(layouts.isEmpty())layouts.addAll(expanded.layoutNames);if(layouts.isEmpty())layouts.add(DxfBlocks.MODEL_LAYOUT);
+        double mm=CadPrintMath.millimetersPerUnit(expanded.units);String unitName=CadPrintMath.unitName(expanded.units);String initial=findLayout(layouts,layouts.contains(DxfBlocks.MODEL_LAYOUT)?DxfBlocks.MODEL_LAYOUT:layouts.iterator().next());
+        return renderLayout(entities,layers,layers,layouts,initial,expanded.skipped,mm,unitName,expanded.globalLineTypeScale,expanded.lineTypes);
     }
 
     private static Result renderLayout(List<Entity>document,Set<String>all,Set<String>visible,Set<String>layouts,String requested,int skipped,double mm,String unitName,double global,Map<String,DxfLineStyle.Pattern>lineTypes)throws IOException{
