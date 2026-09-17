@@ -56,7 +56,7 @@ seçenekleri bulunur. Tam görünüm PDF'i doğrudan CAD görünümünden PDF ca
 
 ## Büyük dosyalar
 
-Eski 32 MB açma sınırı kaldırılmış, mevcut büyük çizim yolu 256 MB üst sınıra yükseltilmiştir. DXF ayrıştırıcısında ayrıca bellek tüketimini sınırlamak için etiket/satır sınırı bulunur. Çok büyük veya çok karmaşık dosyalarda telefonun RAM miktarı yine pratik sınır oluşturabilir.
+Eski 32 MB açma sınırı kaldırılmış, Android dosya içe aktarma yolu 256 MB üst sınıra yükseltilmiştir. DXF ayrıştırıcısı dosyanın tamamını satır listesi olarak RAM'e almadan streaming çalışır; eski 600.000 satır/etiket sınırı kaldırılmıştır. Bozuk veya aşırı karmaşık tek nesnelere karşı kayıt-boyutu ve blok-genişleme güvenlik sınırları korunur. Çok büyük veya çok karmaşık çizimlerde telefonun RAM miktarı, ekranda tutulacak geometri sayısı nedeniyle yine pratik sınır oluşturabilir.
 
 ## Lisans
 
