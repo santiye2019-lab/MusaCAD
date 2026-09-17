@@ -78,6 +78,8 @@ public final class LicenseToken {
 
     private static byte[] decode64(String s,boolean url)throws Exception{
         String clean=s.replace("=","").replaceAll("\\s","");
+        int mod=clean.length()&3;
+        if(mod==1)throw new IllegalArgumentException("base64 length");
         ByteArrayOutputStream out=new ByteArrayOutputStream(clean.length()*3/4);
         int acc=0,bits=0;
         for(int i=0;i<clean.length();i++){
@@ -85,6 +87,9 @@ public final class LicenseToken {
             acc=(acc<<6)|v;bits+=6;
             if(bits>=8){bits-=8;out.write((acc>>>bits)&255);}
         }
+        // Unpadded Base64 has 2 or 4 unused low bits. They must be zero; otherwise
+        // multiple textual license codes could decode to the same signed byte sequence.
+        if(bits>0&&(acc&((1<<bits)-1))!=0)throw new IllegalArgumentException("noncanonical base64");
         return out.toByteArray();
     }
 
