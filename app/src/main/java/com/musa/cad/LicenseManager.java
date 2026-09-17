@@ -2,18 +2,23 @@ package com.musa.cad;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.UUID;
 
 public final class LicenseManager {
     private static final String PREFS="musacad_license_state";
     private static final String K_TRIAL_START="trial_start_v1";
     private static final String K_LAST_SEEN="last_seen_v1";
     private static final String K_TERMS_VERSION="terms_version";
-    private static final String K_LICENSED="licensed_v1";
+    private static final String K_LICENSE_TOKEN="license_token_v1";
+    private static final String K_INSTALLATION_ID="installation_id_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
-    public enum ActivationResult { ACTIVATED, INVALID_CODE, NOT_CONFIGURED }
+    public enum ActivationResult { ACTIVATED, INVALID_CODE }
 
     private static SharedPreferences prefs(Context c){
         return c.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
@@ -21,7 +26,8 @@ public final class LicenseManager {
 
     public static State state(Context c){
         SharedPreferences p=prefs(c);
-        if(p.getBoolean(K_LICENSED,false))return State.LICENSED;
+        String token=p.getString(K_LICENSE_TOKEN,null);
+        if(token!=null&&verifyStoredToken(c,token))return State.LICENSED;
         long start=p.getLong(K_TRIAL_START,0L);
         if(start<=0)return State.TRIAL_AVAILABLE;
         long last=p.getLong(K_LAST_SEEN,0L),now=System.currentTimeMillis();
@@ -66,14 +72,39 @@ public final class LicenseManager {
         return hours>0?String.format(Locale.getDefault(),"Deneme: %d sa %d dk kaldı",hours,mins):String.format(Locale.getDefault(),"Deneme: %d dk kaldı",mins);
     }
 
-    /**
-     * The UI and storage contract are ready, but commercial key verification deliberately has no
-     * hard-coded master key. The separate license-generator step will add public-key verification;
-     * only the public key belongs in the APK, never the private signing key.
-     */
+    public static String installationId(Context c){
+        SharedPreferences p=prefs(c);
+        String id=p.getString(K_INSTALLATION_ID,null);
+        if(id!=null&&!id.isEmpty())return id;
+        id=UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
+        p.edit().putString(K_INSTALLATION_ID,id).commit();
+        return id;
+    }
+
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
-        return ActivationResult.NOT_CONFIGURED;
+        try{
+            LicenseToken.Result r=LicenseToken.verify(code,installationId(c),System.currentTimeMillis(),readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));
+            if(!r.valid)return ActivationResult.INVALID_CODE;
+            prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();
+            return ActivationResult.ACTIVATED;
+        }catch(Exception e){return ActivationResult.INVALID_CODE;}
+    }
+
+    private static boolean verifyStoredToken(Context c,String token){
+        try{
+            LicenseToken.Result r=LicenseToken.verify(token,installationId(c),System.currentTimeMillis(),readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));
+            if(r.valid)return true;
+            prefs(c).edit().remove(K_LICENSE_TOKEN).apply();
+        }catch(Exception ignored){ }
+        return false;
+    }
+
+    private static String readAsset(Context c,String name)throws Exception{
+        try(InputStream in=c.getAssets().open(name);ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);
+            return out.toString(StandardCharsets.UTF_8.name());
+        }
     }
 
     private static void touch(Context c){
