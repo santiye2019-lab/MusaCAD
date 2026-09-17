@@ -19,17 +19,10 @@ public class DxfBlocksTest {
             tags(0,"SECTION",2,"BLOCKS")+blocks+tags(0,"ENDSEC",0,"SECTION",2,"ENTITIES")+roots+tags(0,"ENDSEC",0,"EOF");
         return DxfBlocks.expand(Arrays.asList(text.split("\n")));
     }
-    private static void point(DxfBlocks.Result r,double x,double y){
-        if(r.placements.size()!=1||r.skipped!=0)throw new AssertionError("Unexpected expansion count");
-        double[] actual=r.placements.get(0).transform.point(3,4);if(Math.abs(actual[0]-x)>1e-6||Math.abs(actual[1]-y)>1e-6)throw new AssertionError(Arrays.toString(actual));
-    }
+    private static void point(DxfBlocks.Result r,double x,double y){if(r.placements.size()!=1||r.skipped!=0)throw new AssertionError("Unexpected expansion count");double[] actual=r.placements.get(0).transform.point(3,4);if(Math.abs(actual[0]-x)>1e-6||Math.abs(actual[1]-y)>1e-6)throw new AssertionError(Arrays.toString(actual));}
     private static void color(DxfBlocks.Result r,int expected){if(r.placements.size()!=1||r.placements.get(0).color!=expected)throw new AssertionError("Color expected "+Integer.toHexString(expected)+" got "+(r.placements.isEmpty()?"none":Integer.toHexString(r.placements.get(0).color)));}
-    private static void style(DxfBlocks.Result r,String type,int weight,double scale){
-        if(r.placements.size()!=1)throw new AssertionError("style placement count");DxfBlocks.Placement p=r.placements.get(0);
-        if(!type.equals(p.lineType))throw new AssertionError("linetype "+p.lineType+" != "+type);
-        if(p.lineWeight!=weight)throw new AssertionError("lineweight "+p.lineWeight+" != "+weight);
-        if(Math.abs(p.lineTypeScale-scale)>1e-6)throw new AssertionError("linetype scale "+p.lineTypeScale+" != "+scale);
-    }
+    private static void style(DxfBlocks.Result r,String type,int weight,double scale){if(r.placements.size()!=1)throw new AssertionError("style placement count");DxfBlocks.Placement p=r.placements.get(0);if(!type.equals(p.lineType))throw new AssertionError("linetype "+p.lineType+" != "+type);if(p.lineWeight!=weight)throw new AssertionError("lineweight "+p.lineWeight+" != "+weight);if(Math.abs(p.lineTypeScale-scale)>1e-6)throw new AssertionError("linetype scale "+p.lineTypeScale+" != "+scale);}
+    private static void layout(DxfBlocks.Result r,String expected){if(r.placements.size()!=1||!expected.equals(r.placements.get(0).layout))throw new AssertionError("layout "+(r.placements.isEmpty()?"none":r.placements.get(0).layout)+" != "+expected);if(!r.layoutNames.contains(expected))throw new AssertionError("layout list missing "+expected);}
     private static void skipped(DxfBlocks.Result r){if(r.skipped!=1||!r.placements.isEmpty())throw new AssertionError("Expected skipped reference");}
 
     public static void main(String[] args)throws Exception {
@@ -55,21 +48,21 @@ public class DxfBlocksTest {
         style(read(styles,"",line(8,"STYLE",6,"CONTINUOUS",370,100,48,.5)),"CONTINUOUS",100,.5);
         String styledBlock=block("S",line(6,"BYBLOCK",370,-2));
         style(read(styles,styledBlock,insert("S",6,"DASHED",370,70,48,2)),"DASHED",70,2d);
-        DxfBlocks.Result scaledBlock=read(styles,styledBlock,insert("S",6,"DASHED",370,70,41,2,42,3));
-        if(Math.abs(scaledBlock.placements.get(0).blockScale-2.5d)>1e-6)throw new AssertionError("block scale");
-        if(scaledBlock.layerLineWeights.get("STYLE")!=50||!"DASHED".equals(scaledBlock.layerLineTypes.get("STYLE")))throw new AssertionError("layer style maps");
+        DxfBlocks.Result scaledBlock=read(styles,styledBlock,insert("S",6,"DASHED",370,70,41,2,42,3));if(Math.abs(scaledBlock.placements.get(0).blockScale-2.5d)>1e-6)throw new AssertionError("block scale");if(scaledBlock.layerLineWeights.get("STYLE")!=50||!"DASHED".equals(scaledBlock.layerLineTypes.get("STYLE")))throw new AssertionError("layer style maps");
 
-        // DIMENSION picture block content is already at the dimension location; group 12/22 is an optional clone/move offset.
         String picture=dimBlock("*D1",line(62,0,6,"BYBLOCK",370,-2));
         DxfBlocks.Result dim=read(styles,picture,dimension("*D1",8,"STYLE",62,5,6,"DASHED",370,70));
-        if(dim.placements.size()!=1||dim.placements.get(0).directRoot)throw new AssertionError("dimension picture expansion");
-        double[] dimPoint=dim.placements.get(0).transform.point(3,4);if(Math.abs(dimPoint[0]-3)>1e-6||Math.abs(dimPoint[1]-4)>1e-6)throw new AssertionError("dimension default transform");
-        style(dim,"DASHED",70,1d);color(dim,DxfColor.aciArgb(5));
-        DxfBlocks.Result movedDim=read(styles,picture,dimension("*D1",12,7,22,-2,8,"STYLE",62,5,6,"DASHED",370,70));
-        double[] movedPoint=movedDim.placements.get(0).transform.point(3,4);if(Math.abs(movedPoint[0]-10)>1e-6||Math.abs(movedPoint[1]-2)>1e-6)throw new AssertionError("dimension group12 translation");
+        if(dim.placements.size()!=1||dim.placements.get(0).directRoot)throw new AssertionError("dimension picture expansion");double[] dimPoint=dim.placements.get(0).transform.point(3,4);if(Math.abs(dimPoint[0]-3)>1e-6||Math.abs(dimPoint[1]-4)>1e-6)throw new AssertionError("dimension default transform");style(dim,"DASHED",70,1d);color(dim,DxfColor.aciArgb(5));
+        DxfBlocks.Result movedDim=read(styles,picture,dimension("*D1",12,7,22,-2,8,"STYLE",62,5,6,"DASHED",370,70));double[] movedPoint=movedDim.placements.get(0).transform.point(3,4);if(Math.abs(movedPoint[0]-10)>1e-6||Math.abs(movedPoint[1]-2)>1e-6)throw new AssertionError("dimension group12 translation");
         DxfBlocks.Result missingDim=read("",dimension("*MISSING",13,0,23,0,14,10,24,0));if(missingDim.placements.size()!=1||!"DIMENSION".equals(missingDim.placements.get(0).record.type))throw new AssertionError("dimension fallback");
         DxfBlocks.Result tiltedDim=read(picture,dimension("*D1",210,1,220,0,230,0,13,0,23,0,14,10,24,0));if(tiltedDim.placements.size()!=1||!"DIMENSION".equals(tiltedDim.placements.get(0).record.type))throw new AssertionError("dimension OCS fallback");
 
-        System.out.println("29 block/color/source/style/dimension expansion cases passed");
+        layout(read("",line()),DxfBlocks.MODEL_LAYOUT);
+        layout(read("",line(67,1)),DxfBlocks.PAPER_LAYOUT);
+        layout(read("",line(67,1,410,"Sheet A")),"Sheet A");
+        DxfBlocks.Result paperInsert=read(block("P",line()),insert("P",67,1,410,"Sheet B"));layout(paperInsert,"Sheet B");
+        DxfBlocks.Result mixed=read("",line()+line(67,1,410,"Sheet C"));if(!mixed.layoutNames.contains(DxfBlocks.MODEL_LAYOUT)||!mixed.layoutNames.contains("Sheet C")||mixed.placements.size()!=2)throw new AssertionError("mixed layouts");
+
+        System.out.println("34 block/color/source/style/dimension/layout expansion cases passed");
     }
 }
