@@ -31,8 +31,7 @@ public final class DxfParser {
 
     private static final class Circle implements Entity{
         final float x,y,r,start,sweep;
-        Circle(float a,float b,float c,float d,float e){x=a;y1dummy=0;y=b;r=c;start=d;sweep=e;}
-        private final float y1dummy;
+        Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
         public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}
         public void draw(Canvas c,Paint p,Matrix m){Path path=new Path();path.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);path.transform(m);c.drawPath(path,p);}
     }
@@ -91,19 +90,21 @@ public final class DxfParser {
         private final double millimetersPerUnit;
         private final String drawingUnitName;
         private final double globalLineTypeScale;
+        private final Map<String,DxfLineStyle.Pattern> lineTypes;
         private final List<SourceEntity> editableSources;
         private final Map<Integer,SourceEntity> sourceById;
 
         Result(Bitmap b,int e,int skipped,float[] points,List<Entity> document,Matrix view,Set<String> all,Set<String> visible,
-               RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale){
+               RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,
+               Map<String,DxfLineStyle.Pattern> lineTypes){
             bitmap=b;entityCount=e;skippedCount=skipped;snapPoints=points;
             this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);
             this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);
+            this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));
             layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(visible));layerCount=all.size();
             ArrayList<SourceEntity> sourceList=new ArrayList<>();LinkedHashMap<Integer,SourceEntity> sourceMap=new LinkedHashMap<>();
             for(Entity entity:document){
-                LayerEntity layer=(LayerEntity)entity;
-                if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;
+                LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;
                 CadEdit contentEdit=mapEditToContent(layer.sourceEditWorld,this.view);
                 SourceEntity source=new SourceEntity(layer.sourceId,layer.sourceRange,layer.sourceType,layer.layer,layer.color,layer.lineType,layer.lineTypeScale,layer.lineWeight,contentEdit);
                 sourceList.add(source);sourceMap.put(source.sourceId,source);
@@ -113,7 +114,7 @@ public final class DxfParser {
 
         public Result withVisibleLayers(Set<String> selected)throws IOException{
             Set<String> visible=new HashSet<>(selected);visible.retainAll(layerNames);
-            Result result=renderLayers(document,view,layerNames,visible,skippedCount,contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName,globalLineTypeScale);
+            Result result=renderLayers(document,view,layerNames,visible,skippedCount,contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes);
             result.conversionWarnings=conversionWarnings;return result;
         }
 
@@ -134,20 +135,30 @@ public final class DxfParser {
         /** Draw retained DXF geometry directly to the target canvas so zoom stays sharp. */
         public void drawVector(Canvas canvas, Matrix imageMatrix){drawVector(canvas,imageMatrix,Collections.emptySet());}
         public void drawVector(Canvas canvas, Matrix imageMatrix,Set<Integer> hiddenSourceIds){
-            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);
-            Matrix combined=new Matrix();combined.setConcat(imageMatrix,view);Set<Integer> hidden=hiddenSourceIds==null?Collections.emptySet():hiddenSourceIds;
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(imageMatrix,view);
+            Set<Integer> hidden=hiddenSourceIds==null?Collections.emptySet():hiddenSourceIds;
             for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(visibleLayers.contains(layer.layer)&&!hidden.contains(layer.sourceId))layer.drawStyled(canvas,paint,combined,false,false,globalLineTypeScale);}
         }
 
         /** Draws a paper-friendly vector copy. White CAD geometry becomes black on white paper. */
         public void drawVectorForPrint(Canvas canvas, Matrix contentToPage, boolean monochrome){drawVectorForPrint(canvas,contentToPage,monochrome,Collections.emptySet());}
         public void drawVectorForPrint(Canvas canvas, Matrix contentToPage, boolean monochrome,Set<Integer> hiddenSourceIds){
+            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(contentToPage,view);
+            Set<Integer> hidden=hiddenSourceIds==null?Collections.emptySet():hiddenSourceIds;
+            for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(!visibleLayers.contains(layer.layer)||hidden.contains(layer.sourceId))continue;layer.drawStyled(canvas,paint,combined,true,monochrome,globalLineTypeScale);}
+        }
+
+        /** Draw a moved/rotated source entity with the same DXF style as its original. */
+        public void drawSourceReplacement(Canvas canvas,Matrix contentToTarget,SourceReplacement replacement,boolean print,boolean monochrome){
+            if(canvas==null||contentToTarget==null||replacement==null||!visibleLayers.contains(replacement.layer))return;
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);
-            Matrix combined=new Matrix();combined.setConcat(contentToPage,view);Set<Integer> hidden=hiddenSourceIds==null?Collections.emptySet():hiddenSourceIds;
-            for(Entity entity:document){
-                LayerEntity layer=(LayerEntity)entity;if(!visibleLayers.contains(layer.layer)||hidden.contains(layer.sourceId))continue;
-                layer.drawStyled(canvas,paint,combined,true,monochrome,globalLineTypeScale);
-            }
+            paint.setColor(monochrome?Color.BLACK:(print?paperColor(replacement.color):replacement.color));
+            paint.setStrokeWidth(print?DxfLineStyle.printStrokePoints(replacement.lineWeight):DxfLineStyle.screenStroke(replacement.lineWeight));
+            DxfLineStyle.Pattern pattern=lineTypes.get(DxfLineStyle.normalizeName(replacement.lineType));
+            if(pattern==null)pattern=lineTypes.get(DxfLineStyle.CONTINUOUS);
+            double pixelsPerDrawingUnit=matrixScale(contentToTarget)*worldToContentScale;
+            DxfLineStyle.Dash dash=pattern==null?null:pattern.dash(pixelsPerDrawingUnit,globalLineTypeScale,replacement.lineTypeScale,1d);
+            paint.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));drawContentEdit(canvas,paint,contentToTarget,replacement.edit);paint.setPathEffect(null);
         }
 
         /** Content-space to physical print-page matrix. denominator=0 means fit to page. */
@@ -180,11 +191,9 @@ public final class DxfParser {
         public void bounds(RectF b){entity.bounds(b);}
         public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}
         void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean monochrome,double globalLineTypeScale){
-            p.setColor(monochrome?Color.BLACK:(print?paperColor(color):color));
-            p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));
+            p.setColor(monochrome?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));
             DxfLineStyle.Dash dash=linePattern==null?null:linePattern.dash(matrixScale(m),globalLineTypeScale,lineTypeScale,blockScale);
-            p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));
-            entity.draw(c,p,m);p.setPathEffect(null);
+            p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));entity.draw(c,p,m);p.setPathEffect(null);
         }
     }
 
@@ -205,13 +214,11 @@ public final class DxfParser {
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
     public static Result render(File file)throws IOException{
-        List<String> lines=readLines(file);
-        int insUnits=headerInt(lines,"$INSUNITS",70,0);double millimetersPerUnit=CadPrintMath.millimetersPerUnit(insUnits);String drawingUnitName=CadPrintMath.unitName(insUnits);
+        List<String> lines=readLines(file);int insUnits=headerInt(lines,"$INSUNITS",70,0);double millimetersPerUnit=CadPrintMath.millimetersPerUnit(insUnits);String drawingUnitName=CadPrintMath.unitName(insUnits);
         int defaultLineweight=headerInt(lines,"$LWDEFAULT",370,DxfLineStyle.DEFAULT_LINEWEIGHT);defaultLineweight=DxfLineStyle.normalizeWeight(defaultLineweight,DxfLineStyle.DEFAULT_LINEWEIGHT);
-        double globalLineTypeScale=headerDouble(lines,"$LTSCALE",40,1d);globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);
+        double globalLineTypeScale=safeLineTypeScale(headerDouble(lines,"$LTSCALE",40,1d));
         DxfBlocks.Result expanded=DxfBlocks.expand(lines,defaultLineweight);ArrayList<Entity> entities=new ArrayList<>();Set<String> layers=new HashSet<>();int skipped=expanded.skipped;
-        List<DxfBlocks.Placement> placements=expanded.placements;
-        DxfLineStyle.Pattern continuous=expanded.lineTypes.get(DxfLineStyle.CONTINUOUS);
+        List<DxfBlocks.Placement> placements=expanded.placements;DxfLineStyle.Pattern continuous=expanded.lineTypes.get(DxfLineStyle.CONTINUOUS);
         for(int index=0;index<placements.size();index++){
             FileTransfer.checkCancelled();DxfBlocks.Placement item=placements.get(index);Entity entity;
             if("POLYLINE".equals(item.record.type)){
@@ -221,8 +228,7 @@ public final class DxfParser {
             }else if("VERTEX".equals(item.record.type)){skipped++;continue;}
             else {entity=parse(item.record.type,lines,item.record.from,item.record.to);if(entity==null){skipped++;continue;}}
 
-            CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;
-            SourceRange sourceRange=sourceEdit==null?null:new SourceRange(item.record.from,Math.max(0,item.record.from-2),item.record.to);int sourceId=sourceRange==null?-1:sourceRange.sourceId;
+            CadEdit sourceEdit=item.directRoot?sourceEdit(entity,item.record.type):null;SourceRange sourceRange=sourceEdit==null?null:new SourceRange(item.record.from,Math.max(0,item.record.from-2),item.record.to);int sourceId=sourceRange==null?-1:sourceRange.sourceId;
             DxfLineStyle.Pattern pattern=expanded.lineTypes.get(item.lineType);if(pattern==null)pattern=continuous;
             entities.add(new LayerEntity(new Transformed(entity,item.transform),item.layer,item.color,item.lineType,pattern,item.lineTypeScale,item.lineWeight,item.blockScale,
                 sourceId,sourceRange,item.record.type,sourceEdit));layers.add(item.layer);
@@ -233,18 +239,32 @@ public final class DxfParser {
         if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}
         float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix m=new Matrix();m.postTranslate(-b.left,-b.bottom);m.postScale(s,-s);
         m.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);RectF contentBounds=new RectF(b);m.mapRect(contentBounds);
-        return renderLayers(entities,m,layers,layers,skipped,contentBounds,s,millimetersPerUnit,drawingUnitName,globalLineTypeScale);
+        return renderLayers(entities,m,layers,layers,skipped,contentBounds,s,millimetersPerUnit,drawingUnitName,globalLineTypeScale,expanded.lineTypes);
     }
 
     private static Result renderLayers(List<Entity> document,Matrix view,Set<String> all,Set<String> visible,int skipped,
-                                       RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale)throws IOException{
+                                       RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,
+                                       Map<String,DxfLineStyle.Pattern> lineTypes)throws IOException{
         List<Entity> shown=new ArrayList<>();for(Entity entity:document){FileTransfer.checkCancelled();if(visible.contains(((LayerEntity)entity).layer))shown.add(entity);}
         Bitmap bitmap=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);
         try{
             Canvas canvas=new Canvas(bitmap);canvas.drawColor(Color.rgb(18,24,30));Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);
             for(Entity entity:shown){FileTransfer.checkCancelled();((LayerEntity)entity).drawStyled(canvas,paint,view,false,false,globalLineTypeScale);}FileTransfer.checkCancelled();
-            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName,globalLineTypeScale);
+            return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,contentBounds,worldToContentScale,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes);
         }catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
+    }
+
+    private static void drawContentEdit(Canvas canvas,Paint paint,Matrix matrix,CadEdit edit){
+        if(edit==null)return;float[] v=edit.xy.clone();matrix.mapPoints(v);
+        switch(edit.type){
+            case LINE:canvas.drawLine(v[0],v[1],v[2],v[3],paint);break;
+            case RECTANGLE:canvas.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;
+            case CIRCLE:canvas.drawCircle(v[0],v[1],(float)Math.hypot(v[2]-v[0],v[3]-v[1]),paint);break;
+            case POLYLINE:
+                if(v.length>=4){Path path=new Path();path.moveTo(v[0],v[1]);for(int i=2;i+1<v.length;i+=2)path.lineTo(v[i],v[i+1]);if(edit.closed)path.close();canvas.drawPath(path,paint);}break;
+            case TEXT:
+                paint.setStyle(Paint.Style.FILL);paint.setTextSize(Math.max(8f,30f*matrixScale(matrix)));int save=canvas.save();canvas.rotate(edit.rotationDegrees,v[0],v[1]);canvas.drawText(edit.text==null?"":edit.text,v[0],v[1],paint);canvas.restoreToCount(save);paint.setStyle(Paint.Style.STROKE);break;
+        }
     }
 
     private static CadEdit sourceEdit(Entity entity,String type){
@@ -272,9 +292,7 @@ public final class DxfParser {
         for(Entity wrapped:entities){
             Entity entity=wrapped instanceof LayerEntity?((LayerEntity)wrapped).entity:wrapped;Matrix transform=new Matrix();
             if(entity instanceof Transformed){transform=((Transformed)entity).matrix;entity=((Transformed)entity).entity;}
-            ArrayList<PointF> local=new ArrayList<>();
-            if(entity instanceof Line){Line line=(Line)entity;local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));}
-            else if(entity instanceof Poly)local.addAll(((Poly)entity).pts);
+            ArrayList<PointF> local=new ArrayList<>();if(entity instanceof Line){Line line=(Line)entity;local.add(new PointF(line.x1,line.y1));local.add(new PointF(line.x2,line.y2));}else if(entity instanceof Poly)local.addAll(((Poly)entity).pts);
             for(PointF point:local){float[] xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));}
         }
         float[] result=new float[points.size()*2];for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}matrix.mapPoints(result);return result;
@@ -306,16 +324,10 @@ public final class DxfParser {
     private static void addPointIfPresent(ArrayList<PointF> p,List<String>a,int from,int to,int xCode,int yCode){if(has(a,from,to,xCode)&&has(a,from,to,yCode))p.add(new PointF(f(a,from,to,xCode),f(a,from,to,yCode)));}
     private static boolean has(List<String>a,int from,int to,int wanted){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==wanted)return true;return false;}
 
-    private static int headerInt(List<String>a,String variable,int wantedCode,int fallback){
-        for(int i=0;i+1<a.size();i+=2){if(intOf(a.get(i))!=9||!variable.equals(a.get(i+1).trim()))continue;for(int j=i+2;j+1<a.size();j+=2){int code=intOf(a.get(j));if(code==9||code==0)break;if(code==wantedCode)return intOf(a.get(j+1));}}return fallback;
-    }
-    private static double headerDouble(List<String>a,String variable,int wantedCode,double fallback){
-        for(int i=0;i+1<a.size();i+=2){if(intOf(a.get(i))!=9||!variable.equals(a.get(i+1).trim()))continue;for(int j=i+2;j+1<a.size();j+=2){int code=intOf(a.get(j));if(code==9||code==0)break;if(code==wantedCode){try{double v=Double.parseDouble(a.get(j+1).trim());return Double.isFinite(v)?v:fallback;}catch(Exception ignored){return fallback;}}}}return fallback;
-    }
+    private static int headerInt(List<String>a,String variable,int wantedCode,int fallback){for(int i=0;i+1<a.size();i+=2){if(intOf(a.get(i))!=9||!variable.equals(a.get(i+1).trim()))continue;for(int j=i+2;j+1<a.size();j+=2){int code=intOf(a.get(j));if(code==9||code==0)break;if(code==wantedCode)return intOf(a.get(j+1));}}return fallback;}
+    private static double headerDouble(List<String>a,String variable,int wantedCode,double fallback){for(int i=0;i+1<a.size();i+=2){if(intOf(a.get(i))!=9||!variable.equals(a.get(i+1).trim()))continue;for(int j=i+2;j+1<a.size();j+=2){int code=intOf(a.get(j));if(code==9||code==0)break;if(code==wantedCode){try{double v=Double.parseDouble(a.get(j+1).trim());return Double.isFinite(v)?v:fallback;}catch(Exception ignored){return fallback;}}}}return fallback;}
     private static double safeLineTypeScale(double value){return Double.isFinite(value)&&value>0d?value:1d;}
-    private static float matrixScale(Matrix matrix){
-        float[] v=new float[9];matrix.getValues(v);double sx=Math.hypot(v[Matrix.MSCALE_X],v[Matrix.MSKEW_Y]),sy=Math.hypot(v[Matrix.MSKEW_X],v[Matrix.MSCALE_Y]);double s=(sx+sy)/2d;return Double.isFinite(s)&&s>0d?(float)s:1f;
-    }
+    private static float matrixScale(Matrix matrix){float[] v=new float[9];matrix.getValues(v);double sx=Math.hypot(v[Matrix.MSCALE_X],v[Matrix.MSKEW_Y]),sy=Math.hypot(v[Matrix.MSKEW_X],v[Matrix.MSCALE_Y]);double s=(sx+sy)/2d;return Double.isFinite(s)&&s>0d?(float)s:1f;}
     private static List<String>readLines(File f)throws IOException{ArrayList<String>r=new ArrayList<>();try(BufferedReader b=new BufferedReader(new InputStreamReader(new FileInputStream(f),charset(f)))){String s;while((s=b.readLine())!=null){FileTransfer.checkCancelled();if(r.size()>=600000)throw new IOException("DXF etiket sınırı aşıldı");r.add(s);}}return r;}
     private static int intOf(String s){try{return Integer.parseInt(s.trim());}catch(Exception e){return-1;}}
     private static float floatOf(String s){try{return Float.parseFloat(s.trim());}catch(Exception e){return 0;}}
