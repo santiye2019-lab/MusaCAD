@@ -8,7 +8,9 @@ public class DxfBlocksTest {
     private static final String LINE=tags(0,"LINE",10,3,20,4,11,5,21,4);
     private static String line(Object... extra){return tags(0,"LINE",10,3,20,4,11,5,21,4)+tags(extra);}
     private static String block(String name,String body){return tags(0,"BLOCK",2,name,10,1,20,2)+body+tags(0,"ENDBLK");}
+    private static String dimBlock(String name,String body){return tags(0,"BLOCK",2,name,70,1,10,0,20,0)+body+tags(0,"ENDBLK");}
     private static String insert(String name,Object... extra){return tags(0,"INSERT",2,name)+tags(extra);}
+    private static String dimension(String name,Object... extra){return tags(0,"DIMENSION",2,name,10,100,20,200,70,32)+tags(extra);}
     private static String layer(String name,Object... extra){return tags(0,"LAYER",2,name)+tags(extra);}
     private static String ltype(String name,Object... elements){StringBuilder s=new StringBuilder(tags(0,"LTYPE",2,name,70,0,3,name,72,65,73,elements.length,40,1));for(Object e:elements)s.append(tags(49,e,74,0));return s.toString();}
     private static DxfBlocks.Result read(String blocks,String roots)throws Exception{return read("",blocks,roots);}
@@ -57,6 +59,17 @@ public class DxfBlocksTest {
         if(Math.abs(scaledBlock.placements.get(0).blockScale-2.5d)>1e-6)throw new AssertionError("block scale");
         if(scaledBlock.layerLineWeights.get("STYLE")!=50||!"DASHED".equals(scaledBlock.layerLineTypes.get("STYLE")))throw new AssertionError("layer style maps");
 
-        System.out.println("25 block/color/source/style expansion cases passed");
+        // DIMENSION picture block content is already at the dimension location; group 12/22 is an optional clone/move offset.
+        String picture=dimBlock("*D1",line(62,0,6,"BYBLOCK",370,-2));
+        DxfBlocks.Result dim=read(styles,picture,dimension("*D1",8,"STYLE",62,5,6,"DASHED",370,70));
+        if(dim.placements.size()!=1||dim.placements.get(0).directRoot)throw new AssertionError("dimension picture expansion");
+        double[] dimPoint=dim.placements.get(0).transform.point(3,4);if(Math.abs(dimPoint[0]-3)>1e-6||Math.abs(dimPoint[1]-4)>1e-6)throw new AssertionError("dimension default transform");
+        style(dim,"DASHED",70,1d);color(dim,DxfColor.aciArgb(5));
+        DxfBlocks.Result movedDim=read(styles,picture,dimension("*D1",12,7,22,-2,8,"STYLE",62,5,6,"DASHED",370,70));
+        double[] movedPoint=movedDim.placements.get(0).transform.point(3,4);if(Math.abs(movedPoint[0]-10)>1e-6||Math.abs(movedPoint[1]-2)>1e-6)throw new AssertionError("dimension group12 translation");
+        DxfBlocks.Result missingDim=read("",dimension("*MISSING",13,0,23,0,14,10,24,0));if(missingDim.placements.size()!=1||!"DIMENSION".equals(missingDim.placements.get(0).record.type))throw new AssertionError("dimension fallback");
+        DxfBlocks.Result tiltedDim=read(picture,dimension("*D1",210,1,220,0,230,0,13,0,23,0,14,10,24,0));if(tiltedDim.placements.size()!=1||!"DIMENSION".equals(tiltedDim.placements.get(0).record.type))throw new AssertionError("dimension OCS fallback");
+
+        System.out.println("29 block/color/source/style/dimension expansion cases passed");
     }
 }
