@@ -62,7 +62,7 @@ jobs:
           java -cp /tmp/musacad-license-tests LicenseTokenTest
       - name: Compile offline license generator
         run: |
-          javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java
+          javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
           java -cp /tmp/musacad-license-tool LicenseGenerator >/tmp/license-generator-usage.txt || test $? -eq 2
           grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
       - name: Test DXF block expansion and color inheritance
