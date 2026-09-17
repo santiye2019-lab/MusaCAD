@@ -154,8 +154,8 @@ public class RecentFilesActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
         if(requestCode!=PICK_FILE||resultCode!=RESULT_OK||data==null||data.getData()==null)return;
-        Uri uri=data.getData();int flags=data.getFlags()&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        try{getContentResolver().takePersistableUriPermission(uri,flags&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        Uri uri=data.getData();
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
         Intent result=new Intent();result.setData(uri);result.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);setResult(RESULT_OK,result);finish();
     }
 
