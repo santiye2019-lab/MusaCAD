@@ -88,8 +88,48 @@ public class RecentFilesActivity extends AppCompatActivity {
 
         TextView arrow=text("›",28,Color.rgb(25,181,165),false);arrow.setGravity(Gravity.CENTER);card.addView(arrow,new LinearLayout.LayoutParams(dp(28),ViewGroup.LayoutParams.MATCH_PARENT));
         card.setOnClickListener(v->openRecent(entry));
-        card.setOnLongClickListener(v->{new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Son açılanlardan kaldırılsın mı?").setMessage(entry.name).setPositiveButton("KALDIR",(d,w)->{RecentFileStore.remove(this,entry.uri);renderRecents();}).setNegativeButton("İPTAL",null).show();return true;});
+        card.setOnLongClickListener(v->{showRecentActions(entry);return true;});
         return card;
+    }
+
+    private void showRecentActions(RecentFileStore.Entry entry){
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(entry.name)
+            .setItems(new String[]{"Paylaş","Son açılanlardan kaldır"},(dialog,which)->{
+                if(which==0)shareRecent(entry);
+                else new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Son açılanlardan kaldırılsın mı?")
+                    .setMessage(entry.name)
+                    .setPositiveButton("KALDIR",(d,w)->{RecentFileStore.remove(this,entry.uri);renderRecents();})
+                    .setNegativeButton("İPTAL",null)
+                    .show();
+            })
+            .setNegativeButton("KAPAT",null)
+            .show();
+    }
+
+    private void shareRecent(RecentFileStore.Entry entry){
+        Uri uri=Uri.parse(entry.uri);
+        if(!canRead(uri)){
+            RecentFileStore.remove(this,entry.uri);renderRecents();
+            Toast.makeText(this,"Bu dosyaya erişim artık yok. Cihazdan yeniden seçin.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent share=new Intent(Intent.ACTION_SEND);
+        share.setType(mimeFor(entry));
+        share.putExtra(Intent.EXTRA_STREAM,uri);
+        share.setClipData(ClipData.newRawUri(entry.name,uri));
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try{
+            startActivity(Intent.createChooser(share,"Dosyayı paylaş"));
+        }catch(android.content.ActivityNotFoundException e){
+            Toast.makeText(this,"Bu dosyayı paylaşabilecek bir uygulama bulunamadı.",Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String mimeFor(RecentFileStore.Entry entry){
+        if(entry==null)return "application/octet-stream";
+        return entry.isDxf()?"application/dxf":"application/dwg";
     }
 
     private void openRecent(RecentFileStore.Entry entry){
