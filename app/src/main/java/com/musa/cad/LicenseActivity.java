@@ -60,8 +60,16 @@ public class LicenseActivity extends AppCompatActivity {
         switch(s){
             case TRIAL_AVAILABLE:
                 status.setText("1 gün ücretsiz deneyin");
-                trialButton.setEnabled(!trialRequestRunning);trialButton.setAlpha(trialRequestRunning?.55f:1f);
-                trialButton.setText(trialRequestRunning?"DENEME DOĞRULANIYOR…":"1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");break;
+                boolean configured=TrialService.isConfigured();
+                boolean debugFallback=BuildConfig.DEBUG&&!configured;
+                trialButton.setEnabled(!trialRequestRunning&&(configured||debugFallback));
+                trialButton.setAlpha(trialButton.isEnabled()?1f:.45f);
+                trialButton.setText(trialRequestRunning?"DENEME DOĞRULANIYOR…":"1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");
+                if(!configured){
+                    if(debugFallback)message.setText("İç test sürümü: 1 günlük deneme bu cihazda yerel olarak başlatılır.");
+                    else message.setText("Ücretsiz deneme servisi bu sürümde etkin değil. Lisans kodu ile devam edebilirsiniz.");
+                }
+                break;
             case TRIAL_EXPIRED:
                 status.setText("Ücretsiz deneme sona erdi");
                 trialButton.setEnabled(false);trialButton.setAlpha(.45f);
@@ -81,7 +89,17 @@ public class LicenseActivity extends AppCompatActivity {
         if(!termsCheck.isChecked()){
             Toast.makeText(this,"Önce lisans ve deneme koşullarını kabul edin",Toast.LENGTH_LONG).show();return;
         }
-        LicenseManager.acceptTerms(this);trialRequestRunning=true;message.setText("Ücretsiz deneme cihaz için doğrulanıyor…");refresh();
+        LicenseManager.acceptTerms(this);
+        if(!TrialService.isConfigured()){
+            if(BuildConfig.DEBUG){
+                if(LicenseManager.startTrial(this)){
+                    Toast.makeText(this,"1 günlük iç test denemesi etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
+                }
+                message.setText("İç test denemesi başlatılamadı.");refresh();return;
+            }
+            message.setText("Ücretsiz deneme servisi bu sürümde etkin değil. Lisans kodu ile devam edebilirsiniz.");refresh();return;
+        }
+        trialRequestRunning=true;message.setText("Ücretsiz deneme cihaz için doğrulanıyor…");refresh();
         trialExecutor.execute(()->{
             TrialService.Result r=TrialService.start(getApplicationContext());
             runOnUiThread(()->{
@@ -104,6 +122,12 @@ public class LicenseActivity extends AppCompatActivity {
             Toast.makeText(this,"Önce lisans koşullarını kabul edin",Toast.LENGTH_LONG).show();return;
         }
         String code=licenseCode.getText().toString().trim();
+        if(code.isEmpty()){
+            licenseCode.setError("Lisans kodunu yapıştırın");
+            licenseCode.requestFocus();
+            message.setText("Lisans kodu, bu ekrandaki Cihaz / Lisans Kimliği için üretilmelidir.");
+            return;
+        }
         LicenseManager.ActivationResult r=LicenseManager.activateCode(this,code);
         if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;}
         licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
