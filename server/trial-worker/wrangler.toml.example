@@ -1,0 +1,15 @@
+name = "musacad-trial-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+MUSACAD_PACKAGE_NAME = "com.musa.cad"
+
+# Create a D1 database, then replace these placeholders in a local wrangler.toml.
+[[d1_databases]]
+binding = "DB"
+database_name = "musacad-trials"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Never put MUSACAD_LICENSE_PRIVATE_KEY_PEM in this file or Git.
+# Add it as an encrypted Worker secret instead.
