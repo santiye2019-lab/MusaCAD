@@ -60,6 +60,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test DXF text styles and font metadata
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextStyle.java tests/DxfTextStyleTest.java
+          java -cp /tmp/musacad-tests DxfTextStyleTest
       - name: Test DXF linetype and lineweight
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java tests/DxfLineStyleTest.java
