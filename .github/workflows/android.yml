@@ -84,6 +84,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java tests/DxfComplexLineTypeTest.java
           java -cp /tmp/musacad-tests DxfComplexLineTypeTest
+      - name: Test DXF complex linetype text placement
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfComplexLineText.java tests/DxfComplexLineTextTest.java
+          java -cp /tmp/musacad-tests DxfComplexLineTextTest
       - name: Test DXF hatch boundaries and patterns
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatch.java tests/DxfHatchTest.java
