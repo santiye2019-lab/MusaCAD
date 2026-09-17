@@ -182,9 +182,16 @@ public final class DxfBlocks {
     }
     private static boolean isPaper(String layout){return layout!=null&&!normalizeLayout(layout).equalsIgnoreCase(MODEL_LAYOUT);}
     private static String normalizeLayout(String layout){String value=layout==null?"":layout.trim();return value.isEmpty()?MODEL_LAYOUT:value;}
-    private static int layerColor(Record record)throws IOException{if(record.has(420))return DxfColor.trueColorArgb(record.integer(420,0));int aci=Math.abs(record.integer(62,DxfColor.DEFAULT_ACI));return DxfColor.aciArgb(aci>=1&&aci<=255?aci:DxfColor.DEFAULT_ACI);}
+    private static int trueColor(Record record)throws IOException{
+        try{
+            long raw=Long.parseLong(record.text(420,"0").trim());
+            if(raw<0L||raw>0xFFFFFFFFL)throw new NumberFormatException();
+            return DxfColor.trueColorArgb((int)raw);
+        }catch(NumberFormatException e){throw new IOException("Geçersiz DXF TrueColor değeri",e);}
+    }
+    private static int layerColor(Record record)throws IOException{if(record.has(420))return trueColor(record);int aci=Math.abs(record.integer(62,DxfColor.DEFAULT_ACI));return DxfColor.aciArgb(aci>=1&&aci<=255?aci:DxfColor.DEFAULT_ACI);}
     private static int layerLineweight(Record record,int defaultWeight)throws IOException{return DxfLineStyle.normalizeWeight(record.integer(370,DxfLineStyle.LW_DEFAULT),defaultWeight);}
-    private static int entityColor(Record record,String layer,int inheritedBlockColor,Map<String,Integer>layerColors)throws IOException{if(record.has(420))return DxfColor.trueColorArgb(record.integer(420,0));int aci=record.integer(62,DxfColor.BYLAYER);if(aci==DxfColor.BYBLOCK)return inheritedBlockColor;if(aci==DxfColor.BYLAYER)return layerColors.getOrDefault(key(layer),DxfColor.aciArgb(DxfColor.DEFAULT_ACI));aci=Math.abs(aci);if(aci>=1&&aci<=255)return DxfColor.aciArgb(aci);return layerColors.getOrDefault(key(layer),DxfColor.aciArgb(DxfColor.DEFAULT_ACI));}
+    private static int entityColor(Record record,String layer,int inheritedBlockColor,Map<String,Integer>layerColors)throws IOException{if(record.has(420))return trueColor(record);int aci=record.integer(62,DxfColor.BYLAYER);if(aci==DxfColor.BYBLOCK)return inheritedBlockColor;if(aci==DxfColor.BYLAYER)return layerColors.getOrDefault(key(layer),DxfColor.aciArgb(DxfColor.DEFAULT_ACI));aci=Math.abs(aci);if(aci>=1&&aci<=255)return DxfColor.aciArgb(aci);return layerColors.getOrDefault(key(layer),DxfColor.aciArgb(DxfColor.DEFAULT_ACI));}
     private static String entityLineType(Record record,String layer,String inheritedBlockType,Map<String,String>layerLineTypes){String layerType=layerLineTypes.getOrDefault(key(layer),DxfLineStyle.CONTINUOUS);return DxfLineStyle.resolveLinetype(record.text(6,DxfLineStyle.BYLAYER),layerType,inheritedBlockType);}
     private static int entityLineweight(Record record,String layer,int inheritedBlockWeight,Map<String,Integer>layerLineWeights,int defaultWeight)throws IOException{int layerWeight=layerLineWeights.getOrDefault(key(layer),defaultWeight);return DxfLineStyle.resolveLineweight(record.integer(370,DxfLineStyle.LW_BYLAYER),layerWeight,inheritedBlockWeight,defaultWeight);}
     private static String key(String s){return s.toUpperCase(Locale.ROOT);}
