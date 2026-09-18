@@ -35,10 +35,12 @@ public class MainActivity extends AppCompatActivity {
     private DxfParser.Result activeDxf;
     private CadView cad;
     private TextView fileName,result,editStatusText,tabFileName;
+    private EditText commandInput;
     private File currentFile,editingBaseDxf;
     private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
     private View welcomePanel,shareButton,shareToolButton;
+    private String lastCommandRaw="";
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
@@ -46,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
-        editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);
+        editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);commandInput=findViewById(R.id.commandInput);
         shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
@@ -59,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
@@ -93,7 +95,163 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.undoButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.undo();});
         findViewById(R.id.clearButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.clearMeasurement();});
         shareButton.setOnClickListener(v->showShare());shareToolButton.setOnClickListener(v->showShare());
+        findViewById(R.id.commandSendButton).setOnClickListener(v->executeCommand());
+        commandInput.setOnEditorActionListener((v,action,event)->{
+            if(action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||action==android.view.inputmethod.EditorInfo.IME_ACTION_GO||
+               (event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN)){
+                executeCommand();return true;
+            }
+            return false;
+        });
+        commandInput.setOnKeyListener((v,keyCode,event)->{
+            if(keyCode==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN){executeCommand();return true;}
+            return false;
+        });
         updateShareEnabled(false);updateEditorEnabled(false);handleIncomingIntent(getIntent());
+    }
+
+    private void executeCommand(){
+        if(commandInput==null)return;
+        String raw=commandInput.getText().toString().trim();
+        commandInput.setText("");
+        android.view.inputmethod.InputMethodManager imm=(android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        if(imm!=null)imm.hideSoftInputFromWindow(commandInput.getWindowToken(),0);
+
+        if(raw.isEmpty()){
+            if(cad.confirmCurrentCommand()){
+                result.setText("Komut tamamlandı • Enter ile onaylandı");
+                return;
+            }
+            if(lastCommandRaw.isEmpty()){
+                result.setText("Komut bekleniyor • ? yazarak listeyi görün");
+                return;
+            }
+            raw=lastCommandRaw;
+        }else lastCommandRaw=raw;
+
+        CadCommand.Action action=CadCommand.parse(raw);
+        switch(action){
+            case LINE:
+                selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE);
+                result.setText("LINE • İlk noktayı seçin");
+                break;
+            case POLYLINE:
+                selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE);
+                result.setText("PLINE • Noktaları seçin • Enter/Bitir ile tamamlayın");
+                break;
+            case CIRCLE:
+                selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE);
+                result.setText("CIRCLE • Merkez ve yarıçap noktası seçin");
+                break;
+            case RECTANGLE:
+                selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE);
+                result.setText("RECTANG • İki köşe seçin");
+                break;
+            case TEXT:
+                selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT);
+                result.setText("TEXT/MTEXT • Yazı konumuna dokunun");
+                break;
+            case SELECT:
+                selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+                result.setText("SELECT • Nesne seçin");
+                break;
+            case PAN:
+                selectMode(R.id.panButton,CadView.Mode.PAN);
+                result.setText("PAN • Çizimi sürükleyin");
+                break;
+            case MOVE:
+                if(!cad.armMoveSelected()){
+                    selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+                    result.setText("MOVE • Önce nesne seçin, sonra M yazın");
+                }
+                break;
+            case COPY:
+                if(!cad.copySelectedEntity()){
+                    selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+                    result.setText("COPY • Önce nesne seçin, sonra CO yazın");
+                }
+                break;
+            case ROTATE:
+                if(!cad.rotateSelectedEntity()){
+                    selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+                    result.setText("ROTATE • Önce nesne seçin, sonra RO yazın");
+                }
+                break;
+            case ERASE:
+                if(!cad.deleteSelectedEntity()){
+                    selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+                    result.setText("ERASE • Önce nesne seçin, sonra E yazın");
+                }
+                break;
+            case LAYER:
+                showLayers();
+                break;
+            case PROPERTIES:
+                if(activeDxf!=null)showDrawingInfo();
+                else Toast.makeText(this,"Özellikler için önce bir çizim açın",Toast.LENGTH_SHORT).show();
+                break;
+            case DISTANCE:
+                selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);
+                result.setText("DIST • İki nokta seçin");
+                break;
+            case AREA:
+                selectMode(R.id.areaButton,CadView.Mode.AREA);
+                result.setText("AREA • Sınır noktalarını seçin");
+                break;
+            case ZOOM:
+                result.setText("ZOOM • Extents için Z E veya ZE kullanın");
+                break;
+            case ZOOM_EXTENTS:
+                cad.fitToScreen();
+                result.setText("ZOOM EXTENTS • Çizim ekrana sığdırıldı");
+                break;
+            case UNDO:
+                cad.undo();
+                break;
+            case SAVE:
+                requestEditedDxfSave();
+                break;
+            case HELP:
+                showCommandHelp();
+                break;
+            case UNSUPPORTED:
+                result.setText(CadCommand.canonical(raw)+" • Komut tanındı; MusaCAD motor desteği henüz yok");
+                break;
+            default:
+                result.setText("Bilinmeyen komut: "+raw+" • ? yazarak komutları görün");
+                break;
+        }
+    }
+
+    private void showCommandHelp(){
+        String text=
+            "Çalışan komutlar\n\n"+
+            "L / LINE • Çizgi\n"+
+            "PL / PLINE / POLYLINE • Çoklu çizgi\n"+
+            "C / CIRCLE • Daire\n"+
+            "REC / RECTANG / RECTANGLE • Dikdörtgen\n"+
+            "DT / T / TEXT / MTEXT • Yazı\n"+
+            "SEL / SELECT • Seç\n"+
+            "P / PAN • Gezin\n"+
+            "M / MOVE • Taşı\n"+
+            "CO / CP / COPY • Kopyala\n"+
+            "RO / ROTATE • Döndür\n"+
+            "E / ERASE / DELETE • Sil\n"+
+            "LA / LAYER • Katman\n"+
+            "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
+            "DI / DIST / DISTANCE • Mesafe\n"+
+            "AA / AREA • Alan\n"+
+            "Z E / ZE / ZOOM EXTENTS • Ekrana sığdır\n"+
+            "Z / ZOOM • Zoom komutu\n"+
+            "U / UNDO • Geri al\n"+
+            "QS / QSAVE / SAVE • Kaydet\n\n"+
+            "Tanınıyor, motor desteği henüz yok\n"+
+            "ARC, ARRAY, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, MIRROR, OFFSET, OSNAP, PEDIT, POINT, REGEN, SCALE, STRETCH, TRIM, EXPLODE, XLINE, REDO";
+        new AlertDialog.Builder(this)
+            .setTitle("MusaCAD komutları")
+            .setMessage(text)
+            .setPositiveButton("TAMAM",null)
+            .show();
     }
 
     private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir kaynak nesne seçin",Toast.LENGTH_SHORT).show();}

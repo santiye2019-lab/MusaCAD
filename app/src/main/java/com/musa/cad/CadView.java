@@ -78,6 +78,8 @@ public class CadView extends View {
 
     public void setListener(Listener l){listener=l;}
 
+    public boolean confirmCurrentCommand(){return finishEdit();}
+
     public void setMode(Mode m){
         lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         if(m!=Mode.SELECT_ENTITY)sourceEdits.clearSelection();
