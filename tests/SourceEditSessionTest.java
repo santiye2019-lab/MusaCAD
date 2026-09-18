@@ -26,6 +26,10 @@ public class SourceEditSessionTest {
         if(!switched.hasSelection()||switched.replacementRecords().size()!=1||switched.modifiedCount()!=1)throw new AssertionError("tab snapshot restore");
         SourceReplacement tabRestored=switched.replacementRecords().get(0);
         if(!"BORU".equals(tabRestored.layer)||!"DASHED".equals(tabRestored.lineType)||tabRestored.lineWeight!=50)throw new AssertionError("tab snapshot style");
+        if(!switched.setSelectedProperties("MEKANIK",CadEdit.COLOR_BYLAYER,7,"CENTER",DxfLineStyle.LW_BYLAYER))throw new AssertionError("property override");
+        SourceReplacement overridden=switched.replacementRecords().get(0);
+        if(!"MEKANIK".equals(overridden.layer)||overridden.colorMode!=CadEdit.COLOR_BYLAYER||!"CENTER".equals(overridden.lineType)||overridden.lineWeight!=DxfLineStyle.LW_BYLAYER)
+            throw new AssertionError("selected property override lost");
         System.out.println("Source entity edit session/style cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
