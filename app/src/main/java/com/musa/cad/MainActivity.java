@@ -21,6 +21,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21;
+    private static final int MAX_OPEN_DOCUMENTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
@@ -29,6 +30,15 @@ public class MainActivity extends AppCompatActivity {
     private static final class Loaded {
         File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
+    }
+    private static final class DocumentSession {
+        File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        CadView.SessionState viewState;
+        void dispose(){
+            Bitmap owned=parsed!=null?parsed.bitmap:bitmap;if(owned!=null&&!owned.isRecycled())owned.recycle();
+            if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();
+            file=null;workingDxf=null;bitmap=null;parsed=null;viewState=null;
+        }
     }
 
     private CheckBox snapToggle;
@@ -39,7 +49,12 @@ public class MainActivity extends AppCompatActivity {
     private File currentFile,editingBaseDxf;
     private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
-    private View welcomePanel,shareButton,shareToolButton;
+    private View welcomePanel,shareButton,shareToolButton,documentTabScroll;
+    private LinearLayout documentTabs;
+    private final ArrayList<DocumentSession> documents=new ArrayList<>();
+    private int activeDocumentIndex=-1,backCloseStage=0;
+    private long backCloseStageAt;
+    private String lastCommandRaw="";
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
@@ -47,9 +62,9 @@ public class MainActivity extends AppCompatActivity {
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);commandInput=findViewById(R.id.commandInput);
-        shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);
+        shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);documentTabs=findViewById(R.id.documentTabs);documentTabScroll=findViewById(R.id.documentTabScroll);
         cad.setListener(new CadView.Listener(){
-            public void onMeasurement(String v){result.setText(v);}
+            public void onMeasurement(String v){result.setText(v);refreshDocumentTabs();}
             public void onCalibrationRequested(double px){showCalibration();}
             public void onSelectionReady(){previewSelection();}
             public void onTextRequested(float x,float y){showTextEditor(x,y);}
@@ -87,8 +102,9 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.clearButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.clearMeasurement();});
         shareButton.setOnClickListener(v->showShare());shareToolButton.setOnClickListener(v->showShare());
         findViewById(R.id.commandSendButton).setOnClickListener(v->executeCommand());
-        commandInput.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||(event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN)){executeCommand();return true;}return false;});
-        updateShareEnabled(false);updateEditorEnabled(false);handleIncomingIntent(getIntent());
+        commandInput.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||action==android.view.inputmethod.EditorInfo.IME_ACTION_GO||(event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN)){executeCommand();return true;}return false;});
+        commandInput.setOnKeyListener((v,keyCode,event)->{if(keyCode==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN){executeCommand();return true;}return false;});
+        updateShareEnabled(false);updateEditorEnabled(false);refreshDocumentTabs();handleIncomingIntent(getIntent());
     }
 
     private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir kaynak nesne seçin",Toast.LENGTH_SHORT).show();}
