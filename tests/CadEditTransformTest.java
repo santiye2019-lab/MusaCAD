@@ -25,6 +25,8 @@ public class CadEditTransformTest {
         if(!styled.hasTextStyle()||!"ROMANS".equals(styled.textStyleName)||!"monospace".equals(styled.textFamilyHint)||!styled.textShx)throw new AssertionError("text style identity lost");
         near(styled.textHeight,22f,"text height");near(styled.textWidthFactor,.8f,"text width");near(styled.textOblique,12f,"text oblique");if(styled.textGenerationFlags!=2)throw new AssertionError("text generation flags");near(styled.rotationDegrees,105f,"styled text rotation");
         CadEdit styledCopy=styled.copy();if(!styledCopy.hasTextStyle()||styledCopy.textGenerationFlags!=styled.textGenerationFlags)throw new AssertionError("styled copy metadata");
+        CadEdit props=CadEdit.line(0,0,1,1).withCadProperties("MEKANIK",CadEdit.COLOR_ACI,3).translated(5,5).rotated(90,5,5).copy();
+        if(!"MEKANIK".equals(props.layerName)||props.colorMode!=CadEdit.COLOR_ACI||props.colorValue!=3)throw new AssertionError("CAD layer/color properties lost");
 
         CadEdit copy=poly.copy();poly.xy[0]=99;if(copy.xy[0]!=0)throw new AssertionError("copy geometry shared");
         System.out.println("CAD source edit transform and text-style cases passed");
