@@ -62,8 +62,11 @@ public final class SourceEditSession {
     public void select(int id,SourceRange range,CadEdit prototype){select(id,range,prototype,"0",0xFFFFFFFF,DxfLineStyle.CONTINUOUS,1d,DxfLineStyle.DEFAULT_LINEWEIGHT);}
     public void select(int id,SourceRange range,CadEdit prototype,String layer,int color){select(id,range,prototype,layer,color,DxfLineStyle.CONTINUOUS,1d,DxfLineStyle.DEFAULT_LINEWEIGHT);}
     public void select(int id,SourceRange range,CadEdit prototype,String layer,int color,String lineType,double lineTypeScale,int lineWeight){
+        select(id,range,prototype,layer,CadEdit.COLOR_TRUECOLOR,color&0x00FFFFFF,lineType,lineTypeScale,lineWeight);
+    }
+    public void select(int id,SourceRange range,CadEdit prototype,String layer,int colorMode,int colorValue,String lineType,double lineTypeScale,int lineWeight){
         if(id<0||range==null||prototype==null){selected=-1;return;}
-        Entry e=entries.get(id);if(e==null){e=new Entry(id,range,prototype,layer,color,lineType,lineTypeScale,lineWeight);entries.put(id,e);}selected=e.deleted?-1:id;
+        Entry e=entries.get(id);if(e==null){e=new Entry(id,range,prototype,layer,colorMode,colorValue,lineType,lineTypeScale,lineWeight);entries.put(id,e);}selected=e.deleted?-1:id;
     }
     public void clearSelection(){selected=-1;}
 
