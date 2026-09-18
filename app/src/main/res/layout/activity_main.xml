@@ -8,7 +8,7 @@
     <!-- Üst başlık -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="52dp"
         android:gravity="center_vertical"
         android:paddingStart="9dp"
         android:paddingEnd="9dp"
@@ -17,7 +17,7 @@
         <ImageButton
             android:id="@+id/menuButton"
             android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_height="38dp"
             android:src="@drawable/ic_menu"
             android:contentDescription="Ana menü"
             android:background="@drawable/top_action_bg"
@@ -25,7 +25,7 @@
 
         <ImageView
             android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_height="38dp"
             android:layout_marginStart="8dp"
             android:src="@drawable/ic_musacad_mark"
             android:contentDescription="MusaCAD logo" />
@@ -45,7 +45,7 @@
                 android:text="MusaCAD"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="20sp"
+                android:textSize="18sp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -53,15 +53,15 @@
                 android:layout_height="wrap_content"
                 android:text="DWG / DXF Görüntüleyici &amp; Editör"
                 android:textColor="#9FC4DB"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:singleLine="true"
                 android:ellipsize="end" />
         </LinearLayout>
 
         <ImageButton
             android:id="@+id/openButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:layout_marginEnd="6dp"
             android:src="@drawable/ic_open_file"
             android:contentDescription="Dosya aç"
@@ -70,8 +70,8 @@
 
         <ImageButton
             android:id="@+id/shareButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
             android:background="@drawable/top_action_bg"
@@ -81,8 +81,8 @@
 
         <ImageButton
             android:id="@+id/headerMoreButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:layout_marginStart="6dp"
             android:src="@drawable/ic_more"
             android:contentDescription="Diğer menü"
@@ -93,7 +93,7 @@
     <!-- Dosya ve düzenlenebilirlik -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="40dp"
+        android:layout_height="32dp"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
@@ -102,7 +102,7 @@
         <TextView
             android:id="@+id/fileName"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="30dp"
             android:layout_weight="1"
             android:gravity="center_vertical"
             android:paddingStart="12dp"
@@ -117,8 +117,8 @@
 
         <TextView
             android:id="@+id/editStatusText"
-            android:layout_width="96dp"
-            android:layout_height="34dp"
+            android:layout_width="92dp"
+            android:layout_height="30dp"
             android:layout_marginStart="7dp"
             android:gravity="center"
             android:text="Dosya yok"
@@ -131,7 +131,7 @@
     <!-- Gönderilen örnekteki üst hızlı araç düzeni -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="72dp"
+        android:layout_height="58dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="4dp"
@@ -197,8 +197,8 @@
         android:background="#061623">
 
         <TextView
-            android:layout_width="68dp"
-            android:layout_height="34dp"
+            android:layout_width="60dp"
+            android:layout_height="30dp"
             android:gravity="center"
             android:text="Komut:"
             android:textColor="#35D7FF"
@@ -209,7 +209,7 @@
         <EditText
             android:id="@+id/commandInput"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="30dp"
             android:layout_weight="1"
             android:layout_marginStart="5dp"
             android:singleLine="true"
@@ -225,8 +225,8 @@
 
         <Button
             android:id="@+id/commandSendButton"
-            android:layout_width="42dp"
-            android:layout_height="34dp"
+            android:layout_width="38dp"
+            android:layout_height="30dp"
             android:layout_marginStart="5dp"
             android:text="↵"
             android:textColor="#FFFFFF"
@@ -237,8 +237,8 @@
             android:stateListAnimator="@null" />
 
         <TextView
-            android:layout_width="40dp"
-            android:layout_height="34dp"
+            android:layout_width="34dp"
+            android:layout_height="30dp"
             android:layout_marginStart="5dp"
             android:gravity="center"
             android:text="TR"
@@ -316,7 +316,7 @@
 
         <!-- Sağ dikey hızlı görünüm araçları -->
         <LinearLayout
-            android:layout_width="48dp"
+            android:layout_width="44dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
             android:layout_marginEnd="7dp"
@@ -327,8 +327,8 @@
 
             <ImageButton
                 android:id="@+id/rightFitButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="32dp"
                 android:src="@drawable/ic_fit"
                 android:contentDescription="Ekrana sığdır"
                 android:background="@drawable/top_action_bg"
@@ -336,8 +336,8 @@
 
             <ImageButton
                 android:id="@+id/rightZoomInButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="32dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_in"
                 android:contentDescription="Yakınlaştır"
@@ -346,8 +346,8 @@
 
             <ImageButton
                 android:id="@+id/rightZoomOutButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="32dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_out"
                 android:contentDescription="Uzaklaştır"
@@ -355,8 +355,8 @@
                 android:padding="9dp" />
 
             <TextView
-                android:layout_width="40dp"
-                android:layout_height="42dp"
+                android:layout_width="36dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="5dp"
                 android:gravity="center"
                 android:text="2D"
@@ -366,8 +366,8 @@
                 android:background="@drawable/tool_tile_blue" />
 
             <TextView
-                android:layout_width="40dp"
-                android:layout_height="42dp"
+                android:layout_width="36dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="5dp"
                 android:gravity="center"
                 android:text="3D"
@@ -381,8 +381,8 @@
 
             <ImageButton
                 android:id="@+id/rightLayersButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="32dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_layers"
                 android:contentDescription="Katmanlar"
@@ -396,7 +396,7 @@
     <!-- Alt araç paneli: gönderilen görseldeki gibi iki sıra -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="124dp"
+        android:layout_height="104dp"
         android:orientation="vertical"
         android:paddingStart="2dp"
         android:paddingEnd="2dp"
@@ -406,7 +406,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="50dp"
             android:orientation="horizontal"
             android:weightSum="8">
 
@@ -539,7 +539,7 @@
         <TextView
             android:id="@+id/tabFileName"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:layout_weight="1"
             android:gravity="center_vertical"
             android:paddingStart="11dp"
@@ -555,7 +555,7 @@
         <Button
             android:id="@+id/finishEditButton"
             android:layout_width="46dp"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:layout_marginStart="5dp"
             android:text="Bitir"
             android:textAllCaps="false"
@@ -569,7 +569,7 @@
         <Button
             android:id="@+id/saveDxfButton"
             android:layout_width="48dp"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:layout_marginStart="4dp"
             android:text="Kaydet"
             android:textAllCaps="false"
@@ -583,7 +583,7 @@
         <ImageButton
             android:id="@+id/shareToolButton"
             android:layout_width="38dp"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:layout_marginStart="4dp"
             android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
@@ -595,7 +595,7 @@
         <ImageButton
             android:id="@+id/quickOpenButton"
             android:layout_width="38dp"
-            android:layout_height="36dp"
+            android:layout_height="32dp"
             android:layout_marginStart="4dp"
             android:src="@drawable/ic_open_file"
             android:contentDescription="Yeni çizim aç"
@@ -607,7 +607,7 @@
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
+        android:layout_height="26dp"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"

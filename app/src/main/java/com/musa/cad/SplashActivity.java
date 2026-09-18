@@ -12,11 +12,13 @@ import androidx.core.view.WindowInsetsCompat;
 
 public class SplashActivity extends AppCompatActivity {
     private Intent pendingIntent;
+    private static final String STATE_SPLASH_SHOWN="musacad_splash_shown";
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_splash);
+        if(getApplication() instanceof MusaCadApp)((MusaCadApp)getApplication()).markIntroSeen();
 
         Intent incoming=new Intent(getIntent());
         boolean fileEntry=Intent.ACTION_VIEW.equals(incoming.getAction())||Intent.ACTION_SEND.equals(incoming.getAction());
@@ -35,6 +37,7 @@ public class SplashActivity extends AppCompatActivity {
         content.setTranslationY(24f);
         content.animate().alpha(1f).translationY(0f).setDuration(420).start();
 
+        getSharedPreferences("musacad_intro",MODE_PRIVATE).edit().putBoolean(STATE_SPLASH_SHOWN,true).apply();
         findViewById(R.id.startButton).setOnClickListener(v->openApp());
         findViewById(R.id.licenseInfoButton).setOnClickListener(v->openLicense());
         findViewById(R.id.aboutLinkButton).setOnClickListener(v->startActivity(new Intent(this,AboutActivity.class)));

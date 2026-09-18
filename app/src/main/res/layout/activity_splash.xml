@@ -1,4 +1,5 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/splashRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -93,7 +94,7 @@ Her Zaman Yanınızda"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
                         android:src="@drawable/ic_open_file"
-                        android:tint="#1C8CFF"
+                        app:tint="#1C8CFF"
                         android:contentDescription="@null" />
                     <TextView
                         android:layout_width="match_parent"
@@ -116,7 +117,7 @@ Görüntüleme"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
                         android:src="@drawable/ic_distance"
-                        android:tint="#56E5B1"
+                        app:tint="#56E5B1"
                         android:contentDescription="@null" />
                     <TextView
                         android:layout_width="match_parent"
@@ -139,7 +140,7 @@ Alan Hesabı"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
                         android:src="@drawable/ic_text"
-                        android:tint="#F6A35C"
+                        app:tint="#F6A35C"
                         android:contentDescription="@null" />
                     <TextView
                         android:layout_width="match_parent"
@@ -162,7 +163,7 @@ ve Notasyon"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
                         android:src="@drawable/ic_share_pro"
-                        android:tint="#B85CFF"
+                        app:tint="#B85CFF"
                         android:contentDescription="@null" />
                     <TextView
                         android:layout_width="match_parent"
