@@ -19,6 +19,7 @@ public class CadView extends View {
     private final ArrayList<PointF> points=new ArrayList<>();
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
     private final ArrayList<CadEdit> edits=new ArrayList<>();
+    private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
     private final SourceEditSession sourceEdits=new SourceEditSession();
     private final Matrix imageMatrix=new Matrix();
     private final Matrix inverse=new Matrix();
@@ -33,10 +34,10 @@ public class CadView extends View {
     private float[] snapPoints=new float[0];
     private boolean snapEnabled=true,lastSnapped;
     private boolean moveSelectedArmed,lastActionRegular;
-    private enum PairCommand { NONE, TRIM, EXTEND, FILLET, CHAMFER }
+    private enum PairCommand { NONE, TRIM, EXTEND, FILLET, CHAMFER, MATCHPROP, JOIN }
     private PairCommand pairCommand=PairCommand.NONE;
     private float pairValue;
-    private boolean breakArmed;
+    private boolean breakArmed,lastUndoWasRegular;
     private float selectedPickX,selectedPickY;
 
     private boolean selecting,draggingSelection,exporting;
@@ -93,14 +94,14 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        vectorDrawing=null;drawing=b;edits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
+        vectorDrawing=null;drawing=b;edits.clear();redoEdits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;vectorDrawing=result;edits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
+        drawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -129,6 +130,9 @@ public class CadView extends View {
         return out;
     }
 
+    private void addRegularEdit(CadEdit edit){if(edit==null)return;edits.add(edit);redoEdits.clear();lastUndoWasRegular=false;}
+    private void addRegularEdits(Collection<CadEdit> list){if(list==null||list.isEmpty())return;for(CadEdit edit:list)if(edit!=null)edits.add(edit);redoEdits.clear();lastUndoWasRegular=false;}
+
     public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&sourceEdits.hasSelection();}
 
     public boolean armTrimSelected(){
@@ -151,6 +155,16 @@ public class CadView extends View {
         CadEdit selected=sourceEdits.currentSelected();
         if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE||!Float.isFinite(distance)||distance<=0f)return false;
         pairValue=distance;pairCommand=PairCommand.CHAMFER;breakArmed=false;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+
+    public boolean armMatchProperties(){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        pairCommand=PairCommand.MATCHPROP;breakArmed=false;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+    public boolean armJoinSelected(){
+        CadEdit selected=sourceEdits.currentSelected();
+        if(mode!=Mode.SELECT_ENTITY||selected==null||(selected.type!=CadEdit.Type.LINE&&selected.type!=CadEdit.Type.POLYLINE)||selected.closed)return false;
+        pairCommand=PairCommand.JOIN;breakArmed=false;moveSelectedArmed=false;notifyValue();invalidate();return true;
     }
 
     public boolean armBreakSelected(){
@@ -246,11 +260,18 @@ public class CadView extends View {
     public void undo(){
         lastSnapped=false;freehandPoints.clear();
         if(selecting){cancelSelection();return;}
-        if(!points.isEmpty())points.remove(points.size()-1);
-        else if(mode==Mode.SELECT_ENTITY&&!lastActionRegular&&sourceEdits.undo()){}
-        else if(!edits.isEmpty()){edits.remove(edits.size()-1);lastActionRegular=false;}
-        else if(sourceEdits.undo()){}
+        if(!points.isEmpty()){points.remove(points.size()-1);lastUndoWasRegular=false;}
+        else if(mode==Mode.SELECT_ENTITY&&!lastActionRegular&&sourceEdits.undo()){lastUndoWasRegular=false;}
+        else if(!edits.isEmpty()){CadEdit removed=edits.remove(edits.size()-1);redoEdits.addFirst(removed.copy());lastActionRegular=false;lastUndoWasRegular=true;}
+        else if(sourceEdits.undo()){lastUndoWasRegular=false;}
         moveSelectedArmed=false;notifyValue();invalidate();
+    }
+    public boolean redo(){
+        lastSnapped=false;freehandPoints.clear();boolean changed=false;
+        if(lastUndoWasRegular&&!redoEdits.isEmpty()){CadEdit edit=redoEdits.removeFirst();edits.add(edit.copy());lastActionRegular=true;changed=true;}
+        else if(sourceEdits.redo()){lastActionRegular=false;changed=true;}
+        if(changed){moveSelectedArmed=false;notifyValue();invalidate();}
+        return changed;
     }
 
     public void clearMeasurement(){
@@ -399,9 +420,25 @@ public class CadView extends View {
         CadEdit target=sourceEdits.currentSelected();
         if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){pairCommand=PairCommand.NONE;notifyValue();invalidate();return;}
         PairCommand command=pairCommand;
-        DxfParser.SourceEntity boundary=findBoundaryLineAt(x,y);
-        if(boundary==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İkinci çizgiye dokunun");return;}
-        CadEdit edge=boundary.prototype();
+        DxfParser.SourceEntity boundary=(command==PairCommand.MATCHPROP||command==PairCommand.JOIN)?findEditableSourceAt(x,y):findBoundaryLineAt(x,y);
+        if(boundary==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İkinci nesneye dokunun");return;}
+        CadEdit edge=sourceEdits.currentFor(boundary.sourceId);if(edge==null)edge=boundary.prototype();
+        if(command==PairCommand.MATCHPROP){
+            if(sourceEdits.matchSelectedPropertiesToOther(boundary.sourceId,boundary.range,boundary.prototype(),boundary.layer,boundary.color,boundary.lineType,boundary.lineTypeScale,boundary.lineWeight)){
+                pairCommand=PairCommand.NONE;lastActionRegular=false;lastUndoWasRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+                if(listener!=null)listener.onMeasurement("MATCHPROP • Özellikler hedef nesneye aktarıldı");
+            }
+            return;
+        }
+        if(command==PairCommand.JOIN){
+            CadEdit joined=joinGeometry(target,edge,30f*getResources().getDisplayMetrics().density/Math.max(.001f,scale));
+            if(joined==null){if(listener!=null)listener.onMeasurement("JOIN • Açık LINE/POLYLINE uçları birbirine yeterince yakın olmalı");return;}
+            if(sourceEdits.replaceSelectedAndDeleteOther(boundary.sourceId,boundary.range,boundary.prototype(),boundary.layer,boundary.color,boundary.lineType,boundary.lineTypeScale,boundary.lineWeight,joined)){
+                pairCommand=PairCommand.NONE;lastActionRegular=false;lastUndoWasRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+                if(listener!=null)listener.onMeasurement("JOIN • İki nesne tek polyline olarak birleştirildi");
+            }
+            return;
+        }
         if(edge.type!=CadEdit.Type.LINE||edge.xy.length<4){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İkinci nesne LINE olmalı");return;}
         float[] hit=lineIntersection(target.xy[0],target.xy[1],target.xy[2],target.xy[3],edge.xy[0],edge.xy[1],edge.xy[2],edge.xy[3]);
         if(hit==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgiler paralel veya çakışık");return;}
@@ -470,7 +507,7 @@ public class CadView extends View {
     }
 
     private static String pairCommandName(PairCommand command){
-        switch(command){case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";default:return "KOMUT";}
+        switch(command){case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";default:return "KOMUT";}
     }
 
     private static float[] rayFromIntersection(CadEdit line,float ix,float iy,float pickX,float pickY){
@@ -492,6 +529,29 @@ public class CadView extends View {
         if(Math.hypot(ex-tx,ey-ty)<1e-6)return null;
         return CadEdit.line(ex,ey,tx,ty);
     }
+
+    private DxfParser.SourceEntity findEditableSourceAt(float x,float y){
+        if(vectorDrawing==null)return null;float tolerance=20f*getResources().getDisplayMetrics().density/Math.max(.001f,scale),best=tolerance;DxfParser.SourceEntity found=null;int selectedId=sourceEdits.selectedId();
+        int replacementId=sourceEdits.findReplacement(x,y,tolerance);if(replacementId>=0&&replacementId!=selectedId){DxfParser.SourceEntity replacement=vectorDrawing.sourceById(replacementId);if(replacement!=null&&vectorDrawing.isSourceVisible(replacementId))return replacement;}
+        Set<Integer> hidden=sourceEdits.hiddenSourceIds();
+        for(DxfParser.SourceEntity candidate:vectorDrawing.editableSources()){
+            if(candidate.sourceId==selectedId||hidden.contains(candidate.sourceId)||!vectorDrawing.isSourceVisible(candidate.sourceId))continue;
+            float d=candidate.prototype().hitDistance(x,y);if(d<=best){best=d;found=candidate;}
+        }
+        return found;
+    }
+    private static CadEdit joinGeometry(CadEdit a,CadEdit b,float tolerance){
+        float[] pa=openPath(a),pb=openPath(b);if(pa==null||pb==null)return null;
+        float[] ar=reversePath(pa),br=reversePath(pb);float[][] aa={pa,ar},bb={pb,br};float best=Float.POSITIVE_INFINITY;float[] left=null,right=null;
+        for(float[] x:aa)for(float[] y:bb){float d=(float)Math.hypot(x[x.length-2]-y[0],x[x.length-1]-y[1]);if(d<best){best=d;left=x;right=y;}}
+        if(left==null||right==null||best>Math.max(1e-4f,tolerance))return null;
+        int skip=best<1e-4f?2:0;float[] out=new float[left.length+right.length-skip];System.arraycopy(left,0,out,0,left.length);System.arraycopy(right,skip,out,left.length,right.length-skip);
+        return CadEdit.polyline(out,false);
+    }
+    private static float[] openPath(CadEdit e){
+        if(e==null||e.closed)return null;if(e.type==CadEdit.Type.LINE&&e.xy.length>=4)return e.xy.clone();if(e.type==CadEdit.Type.POLYLINE&&e.xy.length>=4)return e.xy.clone();return null;
+    }
+    private static float[] reversePath(float[] p){float[] out=new float[p.length];int n=p.length/2;for(int i=0;i<n;i++){out[i*2]=p[(n-1-i)*2];out[i*2+1]=p[(n-1-i)*2+1];}return out;}
 
     private DxfParser.SourceEntity findBoundaryLineAt(float x,float y){
         if(vectorDrawing==null)return null;float tolerance=20f*getResources().getDisplayMetrics().density/Math.max(.001f,scale),best=tolerance;DxfParser.SourceEntity found=null;
@@ -565,6 +625,8 @@ public class CadView extends View {
             if(pairCommand==PairCommand.EXTEND){listener.onMeasurement("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");return;}
             if(pairCommand==PairCommand.FILLET){listener.onMeasurement(String.format(Locale.getDefault(),"FILLET • R=%.3f • İkinci çizgiye dokunun",pairValue));return;}
             if(pairCommand==PairCommand.CHAMFER){listener.onMeasurement(String.format(Locale.getDefault(),"CHAMFER • D=%.3f • İkinci çizgiye dokunun",pairValue));return;}
+            if(pairCommand==PairCommand.MATCHPROP){listener.onMeasurement("MATCHPROP • Özelliklerin aktarılacağı hedef nesneye dokunun");return;}
+            if(pairCommand==PairCommand.JOIN){listener.onMeasurement("JOIN • Birleştirilecek ikinci LINE/POLYLINE nesnesine dokunun");return;}
             if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+" • Taşı / Döndür / Kopya / Sil");return;}
             listener.onMeasurement("Nesne seçin • Düzenlenebilir: "+vectorDrawing.editableSourceCount()+" • LINE / Çoklu / Daire / Yazı");return;
         }

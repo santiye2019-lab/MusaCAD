@@ -10,8 +10,8 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, LAYER, PROPERTIES,
-        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
+        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, MATCHPROP, JOIN, LAYER, PROPERTIES,
+        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, REDO, SAVE, HELP, UNSUPPORTED
     }
 
     public static Action parse(String raw){
@@ -48,6 +48,8 @@ public final class CadCommand {
         if(eq(s,"BR","BREAK"))return Action.BREAK;
         if(eq(s,"PE","PEDIT"))return Action.PEDIT;
         if(eq(s,"LI","LIST"))return Action.LIST;
+        if(eq(s,"MA","MATCHPROP"))return Action.MATCHPROP;
+        if(eq(s,"J","JOIN"))return Action.JOIN;
 
         if(eq(s,"LA","LAYER"))return Action.LAYER;
         if(eq(s,"PR","PROPERTIES","PROP"))return Action.PROPERTIES;
@@ -58,6 +60,7 @@ public final class CadCommand {
         if(eq(s,"Z","ZOOM"))return Action.ZOOM;
 
         if(eq(s,"U","UNDO"))return Action.UNDO;
+        if(eq(s,"REDO"))return Action.REDO;
         if(eq(s,"QS","QSAVE","SAVE"))return Action.SAVE;
         if(eq(s,"?","HELP"))return Action.HELP;
 
@@ -76,7 +79,7 @@ public final class CadCommand {
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
             case ARRAY:return "ARRAY";case EXPLODE:return "EXPLODE";case OSNAP:return "OSNAP";case REGEN:return "REGEN";
-            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";
+            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";
             case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
             case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
@@ -91,10 +94,7 @@ public final class CadCommand {
         if(eq(s,"DLI","DIMLINEAR"))return "DIMLINEAR";
         if(eq(s,"H","HATCH"))return "HATCH";
         if(eq(s,"I","INSERT"))return "INSERT";
-        if(eq(s,"J","JOIN"))return "JOIN";
-        if(eq(s,"MA","MATCHPROP"))return "MATCHPROP";
         if(eq(s,"S","STRETCH"))return "STRETCH";
-        if(eq(s,"REDO"))return "REDO";
         return null;
     }
 
