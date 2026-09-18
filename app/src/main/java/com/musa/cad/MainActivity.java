@@ -225,6 +225,12 @@ public class MainActivity extends AppCompatActivity {
                 if(cad.armExtendSelected())result.setText("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");
                 else result.setText("EXTEND • Hedef nesne LINE olmalı");
                 break;
+            case FILLET:
+                runFilletCommand();
+                break;
+            case CHAMFER:
+                runChamferCommand();
+                break;
             case BREAK:
                 if(!ensureTransformSelection("BREAK"))break;
                 if(cad.armBreakSelected())result.setText("BREAK • Çizgiyi böleceğiniz noktaya dokunun");
@@ -357,6 +363,58 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void runFilletCommand(){
+        if(!ensureTransformSelection("FILLET"))return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Yarıçap");
+        input.setText("10");
+        input.setSelectAllOnFocus(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("FILLET • Köşe yuvarlat")
+            .setMessage("Seçili LINE ile dokunacağınız ikinci LINE arasında teğet yay oluşturulur.")
+            .setView(input)
+            .setPositiveButton("DEVAM",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                float radius=Float.parseFloat(input.getText().toString().trim().replace(',','.'));
+                if(!Float.isFinite(radius)||radius<=0f){input.setError("Sıfırdan büyük bir yarıçap girin");return;}
+                if(!cad.armFilletSelected(radius)){dialog.dismiss();result.setText("FILLET • Hedef nesne LINE olmalı");return;}
+                dialog.dismiss();result.setText(String.format(Locale.getDefault(),"FILLET • R=%.3f • İkinci çizgiye dokunun",radius));
+            }catch(Exception e){input.setError("Geçerli bir yarıçap girin");}
+        }));
+        dialog.show();
+    }
+
+    private void runChamferCommand(){
+        if(!ensureTransformSelection("CHAMFER"))return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Pah mesafesi");
+        input.setText("10");
+        input.setSelectAllOnFocus(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("CHAMFER • Pah kır")
+            .setMessage("Her iki çizgide aynı mesafe kullanılarak düz pah oluşturulur.")
+            .setView(input)
+            .setPositiveButton("DEVAM",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                float distance=Float.parseFloat(input.getText().toString().trim().replace(',','.'));
+                if(!Float.isFinite(distance)||distance<=0f){input.setError("Sıfırdan büyük bir mesafe girin");return;}
+                if(!cad.armChamferSelected(distance)){dialog.dismiss();result.setText("CHAMFER • Hedef nesne LINE olmalı");return;}
+                dialog.dismiss();result.setText(String.format(Locale.getDefault(),"CHAMFER • D=%.3f • İkinci çizgiye dokunun",distance));
+            }catch(Exception e){input.setError("Geçerli bir pah mesafesi girin");}
+        }));
+        dialog.show();
+    }
+
     private void runArrayCommand(){
         if(!ensureTransformSelection("ARRAY"))return;
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
@@ -408,6 +466,8 @@ public class MainActivity extends AppCompatActivity {
             "RE / REGEN • Görünümü yenile\n"+
             "TR / TRIM • Seçili çizgiyi ikinci çizgide kes\n"+
             "EX / EXTEND • Seçili çizgiyi ikinci çizgiye uzat\n"+
+            "F / FILLET • İki çizgi arasına teğet yay\n"+
+            "CHA / CHAMFER • İki çizgi arasında düz pah\n"+
             "BR / BREAK • Seçili çizgiyi dokunulan noktadan böl\n"+
             "PE / PEDIT • Polyline açık/kapalı durumunu değiştir\n"+
             "LI / LIST • Seçili nesnenin bilgilerini göster\n"+
@@ -420,7 +480,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "BLOCK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
+            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)

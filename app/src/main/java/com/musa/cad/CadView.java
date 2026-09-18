@@ -33,8 +33,9 @@ public class CadView extends View {
     private float[] snapPoints=new float[0];
     private boolean snapEnabled=true,lastSnapped;
     private boolean moveSelectedArmed,lastActionRegular;
-    private enum PairCommand { NONE, TRIM, EXTEND }
+    private enum PairCommand { NONE, TRIM, EXTEND, FILLET, CHAMFER }
     private PairCommand pairCommand=PairCommand.NONE;
+    private float pairValue;
     private boolean breakArmed;
     private float selectedPickX,selectedPickY;
 
@@ -139,6 +140,17 @@ public class CadView extends View {
         CadEdit selected=sourceEdits.currentSelected();
         if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE)return false;
         pairCommand=PairCommand.EXTEND;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+
+    public boolean armFilletSelected(float radius){
+        CadEdit selected=sourceEdits.currentSelected();
+        if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE||!Float.isFinite(radius)||radius<=0f)return false;
+        pairValue=radius;pairCommand=PairCommand.FILLET;breakArmed=false;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+    public boolean armChamferSelected(float distance){
+        CadEdit selected=sourceEdits.currentSelected();
+        if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE||!Float.isFinite(distance)||distance<=0f)return false;
+        pairValue=distance;pairCommand=PairCommand.CHAMFER;breakArmed=false;moveSelectedArmed=false;notifyValue();invalidate();return true;
     }
 
     public boolean armBreakSelected(){
@@ -383,26 +395,99 @@ public class CadView extends View {
     private void applyPairCommand(float x,float y){
         CadEdit target=sourceEdits.currentSelected();
         if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){pairCommand=PairCommand.NONE;notifyValue();invalidate();return;}
+        PairCommand command=pairCommand;
         DxfParser.SourceEntity boundary=findBoundaryLineAt(x,y);
-        if(boundary==null){if(listener!=null)listener.onMeasurement((pairCommand==PairCommand.TRIM?"TRIM":"EXTEND")+" • Sınır olacak başka bir çizgiye dokunun");return;}
-        CadEdit edge=boundary.prototype();if(edge.type!=CadEdit.Type.LINE||edge.xy.length<4){if(listener!=null)listener.onMeasurement("Sınır nesnesi çizgi olmalı");return;}
+        if(boundary==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İkinci çizgiye dokunun");return;}
+        CadEdit edge=boundary.prototype();
+        if(edge.type!=CadEdit.Type.LINE||edge.xy.length<4){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İkinci nesne LINE olmalı");return;}
         float[] hit=lineIntersection(target.xy[0],target.xy[1],target.xy[2],target.xy[3],edge.xy[0],edge.xy[1],edge.xy[2],edge.xy[3]);
-        if(hit==null){if(listener!=null)listener.onMeasurement((pairCommand==PairCommand.TRIM?"TRIM":"EXTEND")+" • Çizgiler kesişmiyor");return;}
-        float ix=hit[0],iy=hit[1],t=hit[2],u=hit[3];CadEdit replacement=null;
-        if(pairCommand==PairCommand.TRIM){
-            if(t<=1e-4f||t>=.9999f||u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("TRIM • Kesişim hedef çizginin içinde ve sınır çizgisi üzerinde olmalı");return;}
-            float pickT=projectionParameter(selectedPickX,selectedPickY,target.xy[0],target.xy[1],target.xy[2],target.xy[3]);
-            replacement=pickT<t?CadEdit.line(ix,iy,target.xy[2],target.xy[3]):CadEdit.line(target.xy[0],target.xy[1],ix,iy);
-        }else if(pairCommand==PairCommand.EXTEND){
-            if(u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("EXTEND • Uzatma sınır çizgisinin üzerine ulaşmalı");return;}
-            if(t<0f)replacement=CadEdit.line(ix,iy,target.xy[2],target.xy[3]);
-            else if(t>1f)replacement=CadEdit.line(target.xy[0],target.xy[1],ix,iy);
-            else {if(listener!=null)listener.onMeasurement("EXTEND • Hedef çizgi sınırı zaten kesiyor");return;}
+        if(hit==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgiler paralel veya çakışık");return;}
+        float ix=hit[0],iy=hit[1],t=hit[2],u=hit[3];
+
+        if(command==PairCommand.TRIM||command==PairCommand.EXTEND){
+            CadEdit result=null;
+            if(command==PairCommand.TRIM){
+                if(t<=1e-4f||t>=.9999f||u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("TRIM • Kesişim hedef çizginin içinde ve sınır çizgisi üzerinde olmalı");return;}
+                float pickT=projectionParameter(selectedPickX,selectedPickY,target.xy[0],target.xy[1],target.xy[2],target.xy[3]);
+                result=pickT<t?CadEdit.line(ix,iy,target.xy[2],target.xy[3]):CadEdit.line(target.xy[0],target.xy[1],ix,iy);
+            }else{
+                if(u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("EXTEND • Uzatma sınır çizgisinin üzerine ulaşmalı");return;}
+                if(t<0f)result=CadEdit.line(ix,iy,target.xy[2],target.xy[3]);
+                else if(t>1f)result=CadEdit.line(target.xy[0],target.xy[1],ix,iy);
+                else {if(listener!=null)listener.onMeasurement("EXTEND • Hedef çizgi sınırı zaten kesiyor");return;}
+            }
+            if(result!=null&&sourceEdits.replaceSelected(result)){
+                pairCommand=PairCommand.NONE;lastActionRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+                if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İşlem tamamlandı");
+            }
+            return;
         }
-        if(replacement!=null&&sourceEdits.replaceSelected(replacement)){
-            PairCommand done=pairCommand;pairCommand=PairCommand.NONE;lastActionRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
-            if(listener!=null)listener.onMeasurement((done==PairCommand.TRIM?"TRIM":"EXTEND")+" • İşlem tamamlandı");
+
+        float[] d1=rayFromIntersection(target,ix,iy,selectedPickX,selectedPickY);
+        float[] d2=rayFromIntersection(edge,ix,iy,x,y);
+        if(d1==null||d2==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgi yönleri belirlenemedi");return;}
+        float dot=Math.max(-1f,Math.min(1f,d1[0]*d2[0]+d1[1]*d2[1]));
+        float theta=(float)Math.acos(dot);
+        if(theta<Math.toRadians(1d)||theta>Math.toRadians(179d)){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Uygun bir köşe açısı seçin");return;}
+
+        float distance=pairValue;
+        CadEdit connector;
+        float tangentDistance=distance;
+        if(command==PairCommand.FILLET){
+            tangentDistance=(float)(distance/Math.tan(theta/2d));
+            if(!Float.isFinite(tangentDistance)||tangentDistance<=0f){if(listener!=null)listener.onMeasurement("FILLET • Yarıçap bu açı için uygulanamadı");return;}
         }
+        float p1x=ix+d1[0]*tangentDistance,p1y=iy+d1[1]*tangentDistance;
+        float p2x=ix+d2[0]*tangentDistance,p2y=iy+d2[1]*tangentDistance;
+        CadEdit first=keptLineToPoint(target,ix,iy,d1,p1x,p1y);
+        CadEdit second=keptLineToPoint(edge,ix,iy,d2,p2x,p2y);
+        if(first==null||second==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgiler düzenlenemedi");return;}
+
+        if(command==PairCommand.CHAMFER){
+            connector=CadEdit.line(p1x,p1y,p2x,p2y);
+        }else{
+            float bx=d1[0]+d2[0],by=d1[1]+d2[1],bl=(float)Math.hypot(bx,by);
+            if(bl<1e-6f){if(listener!=null)listener.onMeasurement("FILLET • Açıortay oluşturulamadı");return;}
+            bx/=bl;by/=bl;
+            float centerDistance=(float)(distance/Math.sin(theta/2d));
+            float cx=ix+bx*centerDistance,cy=iy+by*centerDistance;
+            float vx=ix-cx,vy=iy-cy,vl=(float)Math.hypot(vx,vy);
+            if(vl<1e-6f){if(listener!=null)listener.onMeasurement("FILLET • Yay merkezi oluşturulamadı");return;}
+            float mx=cx+vx/vl*distance,my=cy+vy/vl*distance;
+            connector=CadEdit.arc(p1x,p1y,mx,my,p2x,p2y);
+            if(connector==null){if(listener!=null)listener.onMeasurement("FILLET • Yay geometrisi oluşturulamadı");return;}
+        }
+
+        boolean replaced=sourceEdits.replaceSelectedAndOther(
+            boundary.sourceId,boundary.range,boundary.prototype(),boundary.layer,boundary.color,boundary.lineType,boundary.lineTypeScale,boundary.lineWeight,
+            first,second);
+        if(!replaced){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İki çizgi birlikte güncellenemedi");return;}
+        edits.add(connector);lastActionRegular=true;pairCommand=PairCommand.NONE;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+        if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • İşlem tamamlandı");
+    }
+
+    private static String pairCommandName(PairCommand command){
+        switch(command){case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";default:return "KOMUT";}
+    }
+
+    private static float[] rayFromIntersection(CadEdit line,float ix,float iy,float pickX,float pickY){
+        if(line==null||line.xy.length<4)return null;
+        float t=projectionParameter(pickX,pickY,line.xy[0],line.xy[1],line.xy[2],line.xy[3]);
+        float px=line.xy[0]+(line.xy[2]-line.xy[0])*t,py=line.xy[1]+(line.xy[3]-line.xy[1])*t;
+        float vx=px-ix,vy=py-iy,len=(float)Math.hypot(vx,vy);
+        if(len<1e-5f){
+            float d1=(float)Math.hypot(line.xy[0]-pickX,line.xy[1]-pickY),d2=(float)Math.hypot(line.xy[2]-pickX,line.xy[3]-pickY);
+            float ex=d1<=d2?line.xy[0]:line.xy[2],ey=d1<=d2?line.xy[1]:line.xy[3];vx=ex-ix;vy=ey-iy;len=(float)Math.hypot(vx,vy);
+        }
+        if(len<1e-6f)return null;return new float[]{vx/len,vy/len};
+    }
+
+    private static CadEdit keptLineToPoint(CadEdit line,float ix,float iy,float[] dir,float tx,float ty){
+        if(line==null||line.xy.length<4||dir==null)return null;
+        float a=(line.xy[0]-ix)*dir[0]+(line.xy[1]-iy)*dir[1],b=(line.xy[2]-ix)*dir[0]+(line.xy[3]-iy)*dir[1];
+        float ex=a>=b?line.xy[0]:line.xy[2],ey=a>=b?line.xy[1]:line.xy[3];
+        if(Math.hypot(ex-tx,ey-ty)<1e-6)return null;
+        return CadEdit.line(ex,ey,tx,ty);
     }
 
     private DxfParser.SourceEntity findBoundaryLineAt(float x,float y){
@@ -472,6 +557,8 @@ public class CadView extends View {
             if(breakArmed){listener.onMeasurement("BREAK • Çizgiyi böleceğiniz noktaya dokunun");return;}
             if(pairCommand==PairCommand.TRIM){listener.onMeasurement("TRIM • Kesme sınırı olacak ikinci çizgiye dokunun");return;}
             if(pairCommand==PairCommand.EXTEND){listener.onMeasurement("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");return;}
+            if(pairCommand==PairCommand.FILLET){listener.onMeasurement(String.format(Locale.getDefault(),"FILLET • R=%.3f • İkinci çizgiye dokunun",pairValue));return;}
+            if(pairCommand==PairCommand.CHAMFER){listener.onMeasurement(String.format(Locale.getDefault(),"CHAMFER • D=%.3f • İkinci çizgiye dokunun",pairValue));return;}
             if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+" • Taşı / Döndür / Kopya / Sil");return;}
             listener.onMeasurement("Nesne seçin • Düzenlenebilir: "+vectorDrawing.editableSourceCount()+" • LINE / Çoklu / Daire / Yazı");return;
         }
