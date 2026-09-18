@@ -19,6 +19,9 @@ public class CadCommandTest {
         expect("CO",CadCommand.Action.COPY);expect("CP",CadCommand.Action.COPY);
         expect("RO",CadCommand.Action.ROTATE);expect("E",CadCommand.Action.ERASE);
         expect("LA",CadCommand.Action.LAYER);expect("PR",CadCommand.Action.PROPERTIES);
+        expect("COL",CadCommand.Action.COLOR);expect("COLOR",CadCommand.Action.COLOR);
+        expect("LW",CadCommand.Action.LINEWEIGHT);expect("LWEIGHT",CadCommand.Action.LINEWEIGHT);
+        expect("LT",CadCommand.Action.LINETYPE);expect("LTYPE",CadCommand.Action.LINETYPE);
         expect("DI",CadCommand.Action.DISTANCE);expect("AA",CadCommand.Action.AREA);
         expect("Z",CadCommand.Action.ZOOM);expect("Z E",CadCommand.Action.ZOOM_EXTENTS);
         expect("ZOOM EXTENTS",CadCommand.Action.ZOOM_EXTENTS);expect("ZE",CadCommand.Action.ZOOM_EXTENTS);
