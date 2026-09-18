@@ -7,7 +7,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="56dp"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
@@ -72,7 +72,7 @@
     <TextView
         android:id="@+id/fileName"
         android:layout_width="match_parent"
-        android:layout_height="28dp"
+        android:layout_height="26dp"
         android:gravity="center_vertical"
         android:paddingStart="10dp"
         android:paddingEnd="10dp"
@@ -86,7 +86,7 @@
     <HorizontalScrollView
         android:id="@+id/topEditStrip"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="58dp"
         android:fillViewport="false"
         android:scrollbars="none"
         android:background="#0B1B25">
@@ -95,57 +95,23 @@
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp">
-            <Button android:id="@+id/layersButton" style="@style/CadTopButton" android:text="Katman" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
-            <Button android:id="@+id/propertiesButton" style="@style/CadTopButton" android:text="Özellik" android:enabled="false" />
-            <CheckBox android:id="@+id/snapToggle" style="@style/CadTopButton" android:button="@null" android:text="Nokta" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
-            <Button android:id="@+id/panButton" style="@style/CadTopButton" android:text="Gezin" android:drawableTop="@drawable/ic_pan" />
-            <Button android:id="@+id/selectEntityButton" style="@style/CadTopButton" android:text="Seç" android:enabled="false" />
-            <Button android:id="@+id/moveEntityButton" style="@style/CadTopButton" android:text="Taşı" android:enabled="false" />
-            <Button android:id="@+id/rotateEntityButton" style="@style/CadTopButton" android:text="Döndür" android:enabled="false" />
-            <Button android:id="@+id/copyEntityButton" style="@style/CadTopButton" android:text="Kopya" android:enabled="false" />
-            <Button android:id="@+id/deleteEntityButton" style="@style/CadTopButton" android:text="Sil" android:enabled="false" />
-            <Button android:id="@+id/undoButton" style="@style/CadTopButton" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
-            <Button android:id="@+id/saveDxfButton" style="@style/CadTopButton" android:text="Kaydet" android:drawableTop="@drawable/ic_save" android:enabled="false" />
-            <Button android:id="@+id/shareToolButton" style="@style/CadTopButton" android:text="Paylaş" android:drawableTop="@drawable/ic_share_pro" android:enabled="false" />
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <HorizontalScrollView
-        android:id="@+id/toolStrip"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:fillViewport="false"
-        android:scrollbars="none"
-        android:background="#0C1D27">
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp">
-            <Button android:id="@+id/calibrateButton" style="@style/CadTopButton" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
-            <Button android:id="@+id/distanceButton" style="@style/CadTopButton" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
-            <Button android:id="@+id/areaButton" style="@style/CadTopButton" android:text="Alan" android:drawableTop="@drawable/ic_area" />
-            <Button android:id="@+id/lineButton" style="@style/CadTopButton" android:text="Çizgi" android:drawableTop="@drawable/ic_line" android:enabled="false" />
-            <Button android:id="@+id/polylineButton" style="@style/CadTopButton" android:text="Çoklu" android:drawableTop="@drawable/ic_polyline" android:enabled="false" />
-            <Button android:id="@+id/rectangleButton" style="@style/CadTopButton" android:text="Dörtgen" android:drawableTop="@drawable/ic_rectangle" android:enabled="false" />
-            <Button android:id="@+id/circleButton" style="@style/CadTopButton" android:text="Daire" android:drawableTop="@drawable/ic_circle" android:enabled="false" />
-            <Button android:id="@+id/textButton" style="@style/CadTopButton" android:text="Yazı" android:drawableTop="@drawable/ic_text" android:enabled="false" />
-            <Button android:id="@+id/finishEditButton" style="@style/CadTopButton" android:text="Bitir" android:drawableTop="@drawable/ic_done" android:enabled="false" />
-            <Button android:id="@+id/zoomInButton" style="@style/CadTopButton" android:text="Yakın +" android:drawableTop="@drawable/ic_zoom_in" />
-            <Button android:id="@+id/zoomOutButton" style="@style/CadTopButton" android:text="Yakın -" android:drawableTop="@drawable/ic_zoom_out" />
-            <Button android:id="@+id/fitButton" style="@style/CadTopButton" android:text="Sığdır" android:drawableTop="@drawable/ic_fit" />
-            <Button android:id="@+id/clearButton" style="@style/CadTopButton" android:text="Temizle" android:drawableTop="@drawable/ic_clear" />
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+            <Button android:id="@+id/layersButton" style="@style/CadTopButtonPurple" android:text="Katman" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
+            <Button android:id="@+id/propertiesButton" style="@style/CadTopButtonPurple" android:text="Özellik" android:enabled="false" />
+            <Button android:id="@+id/colorButton" style="@style/CadTopButtonYellow" android:text="Renk:BYL" android:enabled="false" />
+            <Button android:id="@+id/lineWeightButton" style="@style/CadTopButtonOrange" android:text="LW:BYL" android:enabled="false" />
+            <CheckBox android:id="@+id/snapToggle" style="@style/CadTopButtonTeal" android:button="@null" android:text="Nokta" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
+            <Button android:id="@+id/undoButton" style="@style/CadTopButtonBlue" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
+            <Button android:id="@+id/saveDxfButton" style="@style/CadTopButtonGreen" android:text="Kaydet" android:drawableTop="@drawable/ic_save" android:enabled="false" />
+            <Button android:id="@+id/shareToolButton" style="@style/CadTopButtonBlue" android:text="Paylaş" android:drawableTop="@drawable/ic_share_pro" android:enabled="false" />
         </LinearLayout>
     </HorizontalScrollView>
 
     <LinearLayout
         android:id="@+id/commandBar"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="44dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
@@ -162,10 +128,10 @@
         <EditText
             android:id="@+id/commandInput"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
             android:singleLine="true"
-            android:hint="LINE, PL, C, M, CO, E, LA, PR, ZE..."
+            android:hint="L, PL, C, M, CO, RO, E, LA, PR, ZE..."
             android:textColor="#FFFFFF"
             android:textColorHint="#66818D"
             android:textSize="11sp"
@@ -176,10 +142,10 @@
         <Button
             android:id="@+id/commandSendButton"
             android:layout_width="52dp"
-            android:layout_height="38dp"
+            android:layout_height="36dp"
             android:layout_marginStart="5dp"
-            android:text="↵"
-            android:textSize="17sp"
+            android:text="ENTER"
+            android:textSize="9sp"
             android:textColor="#FFFFFF"
             android:minWidth="0dp"
             android:minHeight="0dp"
@@ -244,13 +210,49 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Komut satırı: LINE • PL • CIRCLE • MOVE • COPY • ERASE • LAYER • PROPERTIES • ZE"
+                    android:text="Komut satırı AutoCAD kısa komutlarıyla çalışır."
                     android:textColor="#6F8D9C"
                     android:textSize="10sp"
                     android:gravity="center" />
             </LinearLayout>
         </ScrollView>
     </FrameLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/toolStrip"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:fillViewport="false"
+        android:scrollbars="none"
+        android:background="#0C1D27">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+            <Button android:id="@+id/panButton" style="@style/CadTopButtonBlue" android:text="Gezin" android:drawableTop="@drawable/ic_pan" />
+            <Button android:id="@+id/selectEntityButton" style="@style/CadTopButtonBlue" android:text="Seç" android:enabled="false" />
+            <Button android:id="@+id/lineButton" style="@style/CadTopButtonGreen" android:text="Çizgi" android:drawableTop="@drawable/ic_line" android:enabled="false" />
+            <Button android:id="@+id/polylineButton" style="@style/CadTopButtonGreen" android:text="Çoklu" android:drawableTop="@drawable/ic_polyline" android:enabled="false" />
+            <Button android:id="@+id/rectangleButton" style="@style/CadTopButtonGreen" android:text="Dörtgen" android:drawableTop="@drawable/ic_rectangle" android:enabled="false" />
+            <Button android:id="@+id/circleButton" style="@style/CadTopButtonGreen" android:text="Daire" android:drawableTop="@drawable/ic_circle" android:enabled="false" />
+            <Button android:id="@+id/textButton" style="@style/CadTopButtonGreen" android:text="Yazı" android:drawableTop="@drawable/ic_text" android:enabled="false" />
+            <Button android:id="@+id/moveEntityButton" style="@style/CadTopButtonOrange" android:text="Taşı" android:enabled="false" />
+            <Button android:id="@+id/rotateEntityButton" style="@style/CadTopButtonOrange" android:text="Döndür" android:enabled="false" />
+            <Button android:id="@+id/copyEntityButton" style="@style/CadTopButtonOrange" android:text="Kopya" android:enabled="false" />
+            <Button android:id="@+id/deleteEntityButton" style="@style/CadTopButtonMagenta" android:text="Sil" android:enabled="false" />
+            <Button android:id="@+id/calibrateButton" style="@style/CadTopButtonTeal" android:text="Ölçek" android:drawableTop="@drawable/ic_scale" />
+            <Button android:id="@+id/distanceButton" style="@style/CadTopButtonTeal" android:text="Mesafe" android:drawableTop="@drawable/ic_distance" />
+            <Button android:id="@+id/areaButton" style="@style/CadTopButtonTeal" android:text="Alan" android:drawableTop="@drawable/ic_area" />
+            <Button android:id="@+id/finishEditButton" style="@style/CadTopButtonGreen" android:text="Bitir" android:drawableTop="@drawable/ic_done" android:enabled="false" />
+            <Button android:id="@+id/zoomInButton" style="@style/CadTopButtonBlue" android:text="Yakın +" android:drawableTop="@drawable/ic_zoom_in" />
+            <Button android:id="@+id/zoomOutButton" style="@style/CadTopButtonBlue" android:text="Yakın -" android:drawableTop="@drawable/ic_zoom_out" />
+            <Button android:id="@+id/fitButton" style="@style/CadTopButtonBlue" android:text="Sığdır" android:drawableTop="@drawable/ic_fit" />
+            <Button android:id="@+id/clearButton" style="@style/CadTopButtonBlue" android:text="Temizle" android:drawableTop="@drawable/ic_clear" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <HorizontalScrollView
         android:id="@+id/documentTabScroll"
