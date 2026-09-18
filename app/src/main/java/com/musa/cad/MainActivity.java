@@ -209,6 +209,16 @@ public class MainActivity extends AppCompatActivity {
                 cad.regenerate();
                 result.setText("REGEN • Görünüm yeniden oluşturuldu");
                 break;
+            case TRIM:
+                if(!ensureTransformSelection("TRIM"))break;
+                if(cad.armTrimSelected())result.setText("TRIM • Kesme sınırı olacak ikinci çizgiye dokunun");
+                else result.setText("TRIM • Hedef nesne LINE olmalı");
+                break;
+            case EXTEND:
+                if(!ensureTransformSelection("EXTEND"))break;
+                if(cad.armExtendSelected())result.setText("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");
+                else result.setText("EXTEND • Hedef nesne LINE olmalı");
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -373,6 +383,8 @@ public class MainActivity extends AppCompatActivity {
             "X / EXPLODE • Çoklu çizgi/dikdörtgeni parçala\n"+
             "OS / OSNAP • Nesne yakalamayı aç/kapat\n"+
             "RE / REGEN • Görünümü yenile\n"+
+            "TR / TRIM • Seçili çizgiyi ikinci çizgide kes\n"+
+            "EX / EXTEND • Seçili çizgiyi ikinci çizgiye uzat\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -382,7 +394,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "ARC, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, PEDIT, POINT, STRETCH, TRIM, XLINE, REDO";
+            "ARC, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, PEDIT, POINT, STRETCH, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
