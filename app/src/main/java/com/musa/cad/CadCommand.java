@@ -10,7 +10,7 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, LAYER, PROPERTIES,
+        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, LAYER, PROPERTIES,
         DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
     }
 
@@ -33,6 +33,10 @@ public final class CadCommand {
         if(eq(s,"SC","SCALE"))return Action.SCALE;
         if(eq(s,"MI","MIRROR"))return Action.MIRROR;
         if(eq(s,"O","OFFSET"))return Action.OFFSET;
+        if(eq(s,"AR","ARRAY"))return Action.ARRAY;
+        if(eq(s,"X","EXPLODE"))return Action.EXPLODE;
+        if(eq(s,"OS","OSNAP"))return Action.OSNAP;
+        if(eq(s,"RE","REGEN"))return Action.REGEN;
 
         if(eq(s,"LA","LAYER"))return Action.LAYER;
         if(eq(s,"PR","PROPERTIES","PROP"))return Action.PROPERTIES;
@@ -60,6 +64,7 @@ public final class CadCommand {
             case RECTANGLE:return "RECTANG";case TEXT:return "TEXT/MTEXT";case SELECT:return "SELECT";
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
+            case ARRAY:return "ARRAY";case EXPLODE:return "EXPLODE";case OSNAP:return "OSNAP";case REGEN:return "REGEN";
             case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
             case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
@@ -69,7 +74,6 @@ public final class CadCommand {
 
     private static String classicUnsupported(String s){
         if(eq(s,"A","ARC"))return "ARC";
-        if(eq(s,"AR","ARRAY"))return "ARRAY";
         if(eq(s,"B","BLOCK"))return "BLOCK";
         if(eq(s,"BR","BREAK"))return "BREAK";
         if(eq(s,"CHA","CHAMFER"))return "CHAMFER";
@@ -84,13 +88,10 @@ public final class CadCommand {
         if(eq(s,"J","JOIN"))return "JOIN";
         if(eq(s,"LI","LIST"))return "LIST";
         if(eq(s,"MA","MATCHPROP"))return "MATCHPROP";
-        if(eq(s,"OS","OSNAP"))return "OSNAP";
         if(eq(s,"PE","PEDIT"))return "PEDIT";
         if(eq(s,"PO","POINT"))return "POINT";
-        if(eq(s,"RE","REGEN"))return "REGEN";
         if(eq(s,"S","STRETCH"))return "STRETCH";
         if(eq(s,"TR","TRIM"))return "TRIM";
-        if(eq(s,"X","EXPLODE"))return "EXPLODE";
         if(eq(s,"XL","XLINE"))return "XLINE";
         if(eq(s,"REDO"))return "REDO";
         return null;
