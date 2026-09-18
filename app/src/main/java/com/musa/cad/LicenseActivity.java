@@ -61,14 +61,10 @@ public class LicenseActivity extends AppCompatActivity {
             case TRIAL_AVAILABLE:
                 status.setText("1 gün ücretsiz deneyin");
                 boolean configured=TrialService.isConfigured();
-                boolean debugFallback=BuildConfig.DEBUG&&!configured;
-                trialButton.setEnabled(!trialRequestRunning&&(configured||debugFallback));
+                trialButton.setEnabled(!trialRequestRunning);
                 trialButton.setAlpha(trialButton.isEnabled()?1f:.45f);
                 trialButton.setText(trialRequestRunning?"DENEME DOĞRULANIYOR…":"1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");
-                if(!configured){
-                    if(debugFallback)message.setText("İç test sürümü: 1 günlük deneme bu cihazda yerel olarak başlatılır.");
-                    else message.setText("Ücretsiz deneme servisi bu sürümde etkin değil. Lisans kodu ile devam edebilirsiniz.");
-                }
+                if(!configured)message.setText("1 günlük ücretsiz deneme bu cihazda 24 saatlik olarak başlatılır. Lisans kodu gerekmez.");
                 break;
             case TRIAL_EXPIRED:
                 status.setText("Ücretsiz deneme sona erdi");
@@ -91,13 +87,13 @@ public class LicenseActivity extends AppCompatActivity {
         }
         LicenseManager.acceptTerms(this);
         if(!TrialService.isConfigured()){
-            if(BuildConfig.DEBUG){
-                if(LicenseManager.startTrial(this)){
-                    Toast.makeText(this,"1 günlük iç test denemesi etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
-                }
-                message.setText("İç test denemesi başlatılamadı.");refresh();return;
+            if(LicenseManager.startTrial(this)){
+                Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
             }
-            message.setText("Ücretsiz deneme servisi bu sürümde etkin değil. Lisans kodu ile devam edebilirsiniz.");refresh();return;
+            LicenseManager.State state=LicenseManager.state(this);
+            if(state==LicenseManager.State.TRIAL_ACTIVE){enterApp();return;}
+            message.setText(state==LicenseManager.State.TRIAL_EXPIRED?"Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.":"1 günlük ücretsiz deneme başlatılamadı. Lütfen yeniden deneyin.");
+            refresh();return;
         }
         trialRequestRunning=true;message.setText("Ücretsiz deneme cihaz için doğrulanıyor…");refresh();
         trialExecutor.execute(()->{
@@ -107,10 +103,12 @@ public class LicenseActivity extends AppCompatActivity {
                 switch(r.status){
                     case ACTIVATED:Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
                     case ALREADY_USED:message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");refresh();return;
-                    case NOT_CONFIGURED:message.setText("Ücretsiz deneme sunucusu bu sürümde yapılandırılmamış. Lisans kodu ile devam edebilirsiniz.");break;
+                    case NOT_CONFIGURED:
+                        if(LicenseManager.startTrial(this)){Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;}
+                        message.setText("1 günlük ücretsiz deneme başlatılamadı. Lütfen yeniden deneyin.");break;
                     case NETWORK_ERROR:message.setText("Ücretsiz denemeyi başlatmak için internet bağlantısını kontrol edin ve yeniden deneyin.");break;
                     case DENIED:message.setText(r.message==null?"Ücretsiz deneme isteği reddedildi.":r.message);break;
-                    case INVALID_RESPONSE:message.setText("Deneme sunucu yanıtı doğrulanamadı. Lisans kodu ile devam edebilirsiniz.");break;
+                    case INVALID_RESPONSE:message.setText("Deneme doğrulaması tamamlanamadı. Lütfen yeniden deneyin.");break;
                 }
                 refresh();
             });
