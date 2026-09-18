@@ -14,6 +14,7 @@ public class CadView extends View {
         void onSelectionReady();
         void onTextRequested(float contentX,float contentY);
         default void onDocumentChanged(){}
+        default void onCadPropertiesChanged(){}
     }
 
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
@@ -371,6 +372,9 @@ public class CadView extends View {
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();return;}
         sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
+        currentLayer=sourceEdits.selectedLayer();currentColorMode=sourceEdits.selectedColorMode();currentColorValue=sourceEdits.selectedColorValue();
+        currentLineType=sourceEdits.selectedLineType();currentLineWeight=sourceEdits.selectedLineWeight();
+        if(listener!=null)listener.onCadPropertiesChanged();
         moveSelectedArmed=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
     }
 
