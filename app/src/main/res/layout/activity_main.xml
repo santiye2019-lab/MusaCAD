@@ -252,6 +252,24 @@
         </ScrollView>
     </FrameLayout>
 
+    <HorizontalScrollView
+        android:id="@+id/documentTabScroll"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:fillViewport="false"
+        android:scrollbars="none"
+        android:visibility="gone"
+        android:background="#091922">
+        <LinearLayout
+            android:id="@+id/documentTabs"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
+    </HorizontalScrollView>
+
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
