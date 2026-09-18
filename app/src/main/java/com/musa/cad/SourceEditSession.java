@@ -72,6 +72,14 @@ public final class SourceEditSession {
         other.deleted=true;other.replacement=null;
         return true;
     }
+    public boolean updateSelectedStyle(Integer color,String lineType,Integer lineWeight){
+        Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
+        if(color!=null)e.color=color;
+        if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
+        if(lineWeight!=null)e.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
+        e.replacement=e.current().copy();return true;
+    }
+
     public boolean matchSelectedPropertiesToOther(int otherId,SourceRange otherRange,CadEdit otherPrototype,String otherLayer,int otherColor,String otherLineType,double otherLineTypeScale,int otherLineWeight){
         Entry source=entries.get(selected);
         if(source==null||source.deleted||otherId<0||otherId==selected||otherRange==null||otherPrototype==null)return false;
