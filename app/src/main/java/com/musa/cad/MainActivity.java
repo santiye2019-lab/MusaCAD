@@ -33,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
     }
     private static final class DocumentSession {
         File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
-        CadView.SessionState viewState;boolean dirty;
+        CadView.SessionState viewState;boolean dirty;long savedEditSignature;
         void dispose(){
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;if(owned!=null&&!owned.isRecycled())owned.recycle();
             if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();
@@ -224,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
         DocumentSession session=activeSession();if(session==null||currentFile==null)return;
         session.file=currentFile;session.workingDxf=editingBaseDxf;session.parsed=activeDxf;session.name=currentDisplayName;
         if(activeDxf!=null)session.bitmap=activeDxf.bitmap;
-        session.viewState=cad.captureSessionState();session.dirty=cad.hasEdits();
+        session.viewState=cad.captureSessionState();session.dirty=currentEditSignature()!=session.savedEditSignature;
     }
 
     private void addLoadedDocument(Loaded loaded){
@@ -260,7 +260,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestCloseDocument(int index){
         if(index<0||index>=documents.size())return;if(index!=activeDocumentIndex)activateDocument(index);
-        if(cad.hasEdits()){
+        if(isActiveDocumentDirty()){
             new AlertDialog.Builder(this).setTitle("Projeyi kapat").setMessage("Bu projede kaydedilmemiş değişiklikler var.")
                 .setPositiveButton("KAYDET VE KAPAT",(d,w)->{closeActiveAfterSave=true;requestEditedDxfSave();})
                 .setNegativeButton("KAYDETMEDEN KAPAT",(d,w)->{closeActiveAfterSave=false;closeActiveDocument();})
@@ -284,7 +284,7 @@ public class MainActivity extends AppCompatActivity {
         documentTabs.removeAllViews();
         if(documents.isEmpty()){documentTabScroll.setVisibility(View.GONE);return;}
         documentTabScroll.setVisibility(View.VISIBLE);
-        DocumentSession current=activeSession();if(current!=null&&currentFile!=null)current.dirty=cad.hasEdits();
+        DocumentSession current=activeSession();if(current!=null&&currentFile!=null)current.dirty=currentEditSignature()!=current.savedEditSignature;
         for(int i=0;i<documents.size();i++){
             final int index=i;DocumentSession session=documents.get(i);boolean active=i==activeDocumentIndex;
             LinearLayout tab=new LinearLayout(this);tab.setOrientation(LinearLayout.HORIZONTAL);tab.setGravity(Gravity.CENTER_VERTICAL);tab.setPadding(dp(9),0,dp(3),0);
@@ -298,6 +298,27 @@ public class MainActivity extends AppCompatActivity {
         add.setBackgroundColor(Color.rgb(12,38,49));add.setOnClickListener(v->open());documentTabs.addView(add,new LinearLayout.LayoutParams(dp(42),dp(32)));
     }
 
+    private boolean isActiveDocumentDirty(){
+        DocumentSession session=activeSession();return session!=null&&currentEditSignature()!=session.savedEditSignature;
+    }
+
+    private long currentEditSignature(){
+        List<CadEdit> additions=cad.getAddedEdits();List<SourceReplacement> replacements=cad.getSourceReplacements();List<SourceRange> removals=cad.getSourceRemovals();
+        if(additions.isEmpty()&&replacements.isEmpty()&&removals.isEmpty())return 0L;
+        long h=1469598103934665603L;
+        for(CadEdit edit:additions)h=hashEdit(h,edit);
+        for(SourceReplacement r:replacements){h=mix(h,r.sourceId);h=mix(h,r.range.startLine);h=mix(h,r.range.endLineExclusive);h=mix(h,r.color);h=mix(h,r.lineWeight);h=mix(h,Double.doubleToLongBits(r.lineTypeScale));h=mix(h,r.layer.hashCode());h=mix(h,r.lineType.hashCode());h=hashEdit(h,r.edit);}
+        for(SourceRange r:removals){h=mix(h,r.sourceId);h=mix(h,r.startLine);h=mix(h,r.endLineExclusive);}
+        return h;
+    }
+    private static long hashEdit(long h,CadEdit e){
+        if(e==null)return mix(h,0);h=mix(h,e.type.ordinal());h=mix(h,e.closed?1:0);h=mix(h,Float.floatToIntBits(e.strokeWidth));h=mix(h,Float.floatToIntBits(e.rotationDegrees));
+        h=mix(h,e.text==null?0:e.text.hashCode());h=mix(h,e.layerName.hashCode());h=mix(h,e.colorMode);h=mix(h,e.colorValue);h=mix(h,e.textStyleName.hashCode());h=mix(h,e.textFamilyHint.hashCode());
+        h=mix(h,e.textShx?1:0);h=mix(h,Float.floatToIntBits(e.textHeight));h=mix(h,Float.floatToIntBits(e.textWidthFactor));h=mix(h,Float.floatToIntBits(e.textOblique));h=mix(h,e.textGenerationFlags);
+        for(float v:e.xy)h=mix(h,Float.floatToIntBits(v));return h;
+    }
+    private static long mix(long h,long value){h^=value;return h*1099511628211L;}
+
     private void resetBackCloseFlow(){backCloseStage=0;backCloseStageAt=0L;closeActiveAfterSave=false;}
 
     @Override public void onBackPressed(){
@@ -310,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
         }
         if(backCloseStage==1){
             backCloseStage=2;
-            if(cad.hasEdits()){
+            if(isActiveDocumentDirty()){
                 AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Değişiklikler kaydedilsin mi?")
                     .setMessage("Projede kaydedilmemiş düzenlemeler var. Üçüncü Geri tuşunda bu proje sekmesi kapanacak.")
                     .setPositiveButton("KAYDET",(d,w)->{requestEditedDxfSave();result.setText("Kaydetme seçildi • ardından Geri = proje sekmesini kapat");})
