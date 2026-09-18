@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 /** One MusaCAD overlay/source edit stored in drawing-content coordinates. */
 public final class CadEdit {
-    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, TEXT }
+    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, HATCH, TEXT }
     public final Type type;
     public final float[] xy;
     public final String text;
@@ -52,6 +52,13 @@ public final class CadEdit {
     public static CadEdit xline(float x1,float y1,float x2,float y2){if(Math.hypot(x2-x1,y2-y1)<1e-6)return null;return new CadEdit(Type.XLINE,new float[]{x1,y1,x2,y2},null,3f,false,0f);}
     public static CadEdit polyline(float[] xy){return polyline(xy,false);}
     public static CadEdit polyline(float[] xy,boolean closed){return new CadEdit(Type.POLYLINE,xy.clone(),null,3f,closed,0f);}
+    public static CadEdit hatch(float[] xy,String pattern,float angleDegrees,float patternScale){
+        if(xy==null||xy.length<6||xy.length%2!=0)return null;
+        String p=pattern==null?"SOLID":pattern.trim().toUpperCase(java.util.Locale.ROOT);
+        if(!"ANSI31".equals(p))p="SOLID";
+        float scale=Float.isFinite(patternScale)&&patternScale>0f?patternScale:1f;
+        return new CadEdit(Type.HATCH,xy.clone(),p,1f,true,angleDegrees,"STANDARD","sans",false,scale,1f,0f,0);
+    }
     public static CadEdit freehand(float[] xy,float strokeWidth){return new CadEdit(Type.POLYLINE,xy.clone(),null,strokeWidth,false,0f);}
     public static CadEdit text(float x,float y,String text){return text(x,y,text,0f);}
     public static CadEdit text(float x,float y,String text,float rotationDegrees){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees);}
@@ -103,6 +110,39 @@ public final class CadEdit {
     }
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit withClosed(boolean value){return new CadEdit(type,xy.clone(),text,strokeWidth,value,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
+    public int stretchVertexCount(){
+        if(type==Type.LINE&&xy.length>=4)return 2;
+        if(type==Type.POLYLINE&&xy.length>=4)return xy.length/2;
+        if(type==Type.RECTANGLE&&xy.length>=4)return 4;
+        return 0;
+    }
+    public float stretchVertexX(int index){
+        if(type==Type.RECTANGLE&&xy.length>=4){switch(index){case 0:return xy[0];case 1:return xy[2];case 2:return xy[2];case 3:return xy[0];default:return Float.NaN;}}
+        int p=index*2;return p>=0&&p<xy.length?xy[p]:Float.NaN;
+    }
+    public float stretchVertexY(int index){
+        if(type==Type.RECTANGLE&&xy.length>=4){switch(index){case 0:return xy[1];case 1:return xy[1];case 2:return xy[3];case 3:return xy[3];default:return Float.NaN;}}
+        int p=index*2+1;return p>=1&&p<xy.length?xy[p]:Float.NaN;
+    }
+    public CadEdit stretchedVertex(int index,float x,float y){
+        if(!Float.isFinite(x)||!Float.isFinite(y))return null;
+        if(type==Type.LINE||type==Type.POLYLINE){
+            int p=index*2;if(p<0||p+1>=xy.length)return null;float[] out=xy.clone();out[p]=x;out[p+1]=y;
+            return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+        }
+        if(type==Type.RECTANGLE&&xy.length>=4){
+            float[] out=xy.clone();
+            switch(index){
+                case 0:out[0]=x;out[1]=y;break;
+                case 1:out[2]=x;out[1]=y;break;
+                case 2:out[2]=x;out[3]=y;break;
+                case 3:out[0]=x;out[3]=y;break;
+                default:return null;
+            }
+            return new CadEdit(type,out,text,strokeWidth,true,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+        }
+        return null;
+    }
 
     public float centerX(){if((type==Type.CIRCLE||type==Type.ELLIPSE||type==Type.POINT)&&xy.length>=2)return xy[0];if(type==Type.ARC&&xy.length>=8)return xy[6];if(type==Type.TEXT&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}
     public float centerY(){if((type==Type.CIRCLE||type==Type.ELLIPSE||type==Type.POINT)&&xy.length>=2)return xy[1];if(type==Type.ARC&&xy.length>=8)return xy[7];if(type==Type.TEXT&&xy.length>=2)return xy[1];return (minY()+maxY())*.5f;}
@@ -120,6 +160,7 @@ public final class CadEdit {
         case POINT:return (float)Math.hypot(x-xy[0],y-xy[1]);
         case XLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float dx=xy[2]-xy[0],dy=xy[3]-xy[1],len=(float)Math.hypot(dx,dy);if(len<1e-6f)return Float.POSITIVE_INFINITY;return Math.abs((x-xy[0])*dy-(y-xy[1])*dx)/len;}
         case POLYLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));if(closed&&xy.length>=6)best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
+        case HATCH:{if(xy.length<6)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
         case TEXT:return (float)Math.hypot(x-xy[0],y-xy[1]);default:return Float.POSITIVE_INFINITY;}}
     private static float segmentDistance(float px,float py,float ax,float ay,float bx,float by){float dx=bx-ax,dy=by-ay;float len=dx*dx+dy*dy;if(len<=1e-12f)return (float)Math.hypot(px-ax,py-ay);float t=((px-ax)*dx+(py-ay)*dy)/len;t=Math.max(0f,Math.min(1f,t));return (float)Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
     private static float normalize(float degrees){if(!Float.isFinite(degrees))return 0f;float v=degrees%360f;if(v<=-180f)v+=360f;if(v>180f)v-=360f;return v;}
