@@ -911,7 +911,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void printDrawing(){
         if(currentFile==null||!currentFile.exists()){Toast.makeText(this,"Yazdırmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;}Bitmap preview=null;
-        try{if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)throw new IOException("DWG önizlemesi yazdırma için hazırlanamadı");}CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),preview,currentDisplayName);}catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
+        try{if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)throw new IOException("DWG önizlemesi yazdırma için hazırlanamadı");}CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),cad.getUserBlocks(),preview,currentDisplayName);}catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
     }
 
     private void previewSelection(){
