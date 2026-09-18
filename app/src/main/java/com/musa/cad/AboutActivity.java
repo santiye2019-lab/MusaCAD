@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class AboutActivity extends AppCompatActivity {
+    public static final String EXTRA_CONTINUE_TO_APP="com.musa.cad.CONTINUE_TO_APP";
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
@@ -33,7 +34,7 @@ public class AboutActivity extends AppCompatActivity {
         ((TextView)findViewById(R.id.versionText)).setText("MusaCAD • Sürüm "+BuildConfig.VERSION_NAME);
 
         findViewById(R.id.openSourceButton).setOnClickListener(v->showOpenSource());
-        findViewById(R.id.aboutBackButton).setOnClickListener(v->finish());
+        findViewById(R.id.aboutBackButton).setOnClickListener(v->{if(getIntent().getBooleanExtra(EXTRA_CONTINUE_TO_APP,false))openMusaCad();else finish();});
         findViewById(R.id.closeAboutButton).setOnClickListener(v->openMusaCad());
     }
 
@@ -41,8 +42,10 @@ public class AboutActivity extends AppCompatActivity {
         android.content.Intent next;
         if(LicenseManager.hasAccess(this))next=new android.content.Intent(this,MainActivity.class);
         else next=new android.content.Intent(this,LicenseActivity.class);
+        next.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(next);
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
+        if(getIntent().getBooleanExtra(EXTRA_CONTINUE_TO_APP,false))finish();
     }
 
     private void showOpenSource(){
