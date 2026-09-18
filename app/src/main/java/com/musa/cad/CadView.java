@@ -7,7 +7,7 @@ import android.view.*;
 import java.util.*;
 
 public class CadView extends View {
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_TEXT, DRAW_DIMLINEAR, DRAW_DIMALIGNED, INSERT_BLOCK }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -21,6 +21,10 @@ public class CadView extends View {
     private final ArrayList<CadEdit> edits=new ArrayList<>();
     private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
     private final SourceEditSession sourceEdits=new SourceEditSession();
+    private final CadBlockLibrary blockLibrary=new CadBlockLibrary();
+    private CadDimension.Style dimensionStyle=new CadDimension.Style(18f,8f,2);
+    private String pendingBlockName="";
+    private float pendingBlockScale=1f,pendingBlockRotation;
     private final Matrix imageMatrix=new Matrix();
     private final Matrix inverse=new Matrix();
     private Bitmap drawing;
@@ -64,7 +68,7 @@ public class CadView extends View {
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
-    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_TEXT||mode==Mode.DRAW_DIMLINEAR||mode==Mode.DRAW_DIMALIGNED||mode==Mode.INSERT_BLOCK;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -95,14 +99,14 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        vectorDrawing=null;drawing=b;edits.clear();redoEdits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
+        vectorDrawing=null;drawing=b;edits.clear();redoEdits.clear();sourceEdits.clear();blockLibrary.clear();pendingBlockName="";unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
+        drawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();sourceEdits.clear();blockLibrary.clear();pendingBlockName="";unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -135,6 +139,18 @@ public class CadView extends View {
     private void addRegularEdits(Collection<CadEdit> list){if(list==null||list.isEmpty())return;for(CadEdit edit:list)if(edit!=null)edits.add(edit);redoEdits.clear();sourceEdits.clearRedo();lastUndoWasRegular=false;}
 
     public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&sourceEdits.hasSelection();}
+
+    public boolean defineBlockFromSelection(String name){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        CadEdit selected=sourceEdits.currentSelected();return selected!=null&&blockLibrary.define(name,selected);
+    }
+    public List<String> blockNames(){return blockLibrary.names();}
+    public boolean armInsertBlock(String name,float scale,float rotation){
+        if(vectorDrawing==null||!blockLibrary.contains(name)||!Float.isFinite(scale)||scale<=0f||!Float.isFinite(rotation))return false;
+        pendingBlockName=name;pendingBlockScale=scale;pendingBlockRotation=rotation;setMode(Mode.INSERT_BLOCK);return true;
+    }
+    public void setDimensionStyle(float textHeight,float arrowSize,int decimals){dimensionStyle=new CadDimension.Style(textHeight,arrowSize,decimals);notifyValue();invalidate();}
+    public CadDimension.Style getDimensionStyle(){return dimensionStyle;}
 
     public boolean armTrimSelected(){
         CadEdit selected=sourceEdits.currentSelected();
@@ -661,6 +677,12 @@ public class CadView extends View {
         if(editMode()&&vectorDrawing==null){notifyValue();return true;}if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();PointF point=screenToContent(screenX,screenY);if(point==null)return true;float[] xy={point.x,point.y};
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
+        if(mode==Mode.INSERT_BLOCK){
+            List<CadEdit> inserted=blockLibrary.insert(pendingBlockName,xy[0],xy[1],pendingBlockScale,pendingBlockRotation);
+            if(inserted.isEmpty()){if(listener!=null)listener.onMeasurement("INSERT • Blok yerleştirilemedi");return true;}
+            addRegularEdits(inserted);lastActionRegular=true;lastSnapped=false;String insertedName=pendingBlockName;pendingBlockName="";mode=Mode.PAN;points.clear();notifyValue();invalidate();
+            if(listener!=null)listener.onMeasurement("INSERT • "+insertedName+" yerleştirildi • "+inserted.size()+" nesne");return true;
+        }
         points.add(new PointF(xy[0],xy[1]));
         if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);addRegularEdit(CadEdit.line(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);addRegularEdit(CadEdit.rectangle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
@@ -669,6 +691,8 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_ELLIPSE&&points.size()==3){PointF c=points.get(0),a=points.get(1),b=points.get(2);CadEdit ellipse=CadEdit.ellipse(c.x,c.y,a.x,a.y,b.x,b.y);if(ellipse==null){points.clear();lastSnapped=false;if(listener!=null)listener.onMeasurement("ELLIPSE • Geçerli ana ve kısa eksen seçin");invalidate();return true;}addRegularEdit(ellipse);lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_POINT&&points.size()==1){PointF p=points.get(0);addRegularEdit(CadEdit.point(p.x,p.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_XLINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);CadEdit xline=CadEdit.xline(a.x,a.y,b.x,b.y);if(xline==null){points.clear();lastSnapped=false;if(listener!=null)listener.onMeasurement("XLINE • İki farklı nokta seçin");invalidate();return true;}addRegularEdit(xline);lastActionRegular=true;points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_DIMLINEAR&&points.size()==3){PointF a=points.get(0),b=points.get(1),p=points.get(2);List<CadEdit> dim=CadDimension.linear(a.x,a.y,b.x,b.y,p.x,p.y,vectorDrawing==null?1d:vectorDrawing.drawingUnitsPerContentPixel(),dimensionStyle);addRegularEdits(dim);lastActionRegular=!dim.isEmpty();points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_DIMALIGNED&&points.size()==3){PointF a=points.get(0),b=points.get(1),p=points.get(2);List<CadEdit> dim=CadDimension.aligned(a.x,a.y,b.x,b.y,p.x,p.y,vectorDrawing==null?1d:vectorDrawing.drawingUnitsPerContentPixel(),dimensionStyle);addRegularEdits(dim);lastActionRegular=!dim.isEmpty();points.clear();lastSnapped=false;}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
@@ -704,6 +728,9 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_ELLIPSE)listener.onMeasurement("Elips: merkez, ana eksen ucu ve kısa eksen yönü seçin • Nokta: "+points.size());
         else if(mode==Mode.DRAW_POINT)listener.onMeasurement("POINT: noktanın yerini seçin");
         else if(mode==Mode.DRAW_XLINE)listener.onMeasurement("XLINE: doğrultuyu belirlemek için iki nokta seçin • Nokta: "+points.size());
+        else if(mode==Mode.DRAW_DIMLINEAR)listener.onMeasurement("DIMLINEAR: 1. nokta, 2. nokta ve ölçü çizgisi konumunu seçin • Nokta: "+points.size());
+        else if(mode==Mode.DRAW_DIMALIGNED)listener.onMeasurement("DIMALIGNED: 1. nokta, 2. nokta ve ölçü çizgisi konumunu seçin • Nokta: "+points.size());
+        else if(mode==Mode.INSERT_BLOCK)listener.onMeasurement("INSERT: "+pendingBlockName+" için yerleştirme noktasına dokunun");
         else if(mode==Mode.DRAW_TEXT)listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
         else if(stylusModeDetected)listener.onMeasurement("Kalem: serbest çizim • Kalem tuşu: gezin • Silgi/2. tuş: geri al • Parmak: gezin/zoom");
         else listener.onMeasurement("Sürükle: gez • İki parmak: yakınlaştır • Çift dokun: sığdır");
