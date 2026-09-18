@@ -10,18 +10,33 @@ import java.util.*;
 
 /** Writes MusaCAD overlay/source edits into a copy of the full source/converted DXF. */
 public final class DxfWriter {
-    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits)throws IOException{write(baseDxf,target,drawing,edits,Collections.emptyList(),Collections.emptyList());}
-    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits,List<SourceRange> removedSources)throws IOException{write(baseDxf,target,drawing,edits,Collections.emptyList(),removedSources);}
-    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources)throws IOException{
-        if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");Matrix contentToWorld=contentToWorldMatrix(drawing);Charset cs=charset(baseDxf);boolean inserted=false;String section="";boolean sectionPending=false;int lineIndex=0;List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits)throws IOException{write(baseDxf,target,drawing,edits,Collections.emptyList(),Collections.emptyList(),Collections.emptyList());}
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> edits,List<SourceRange> removedSources)throws IOException{write(baseDxf,target,drawing,edits,Collections.emptyList(),removedSources,Collections.emptyList());}
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources)throws IOException{write(baseDxf,target,drawing,additions,replacements,removedSources,Collections.emptyList());}
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources,List<CadBlock.Definition> blocks)throws IOException{
+        if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");Matrix contentToWorld=contentToWorldMatrix(drawing);Charset cs=charset(baseDxf);boolean inserted=false,blocksInserted=blocks==null||blocks.isEmpty();String section="";boolean sectionPending=false;int lineIndex=0;List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
         try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(baseDxf),cs),128*1024);BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,cs),128*1024)){
             while(true){FileTransfer.checkCancelled();String codeLine=in.readLine();if(codeLine==null)break;String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}String value=valueLine.trim();
+                if(code==0&&"ENDSEC".equals(value)&&"BLOCKS".equals(section)&&!blocksInserted){writeBlocks(out,contentToWorld,blocks);blocksInserted=true;}
                 if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){writeEdits(out,contentToWorld,additions,"0",null,null,null,null,drawing.activeLayout);writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;}
                 boolean removed=isRemoved(lineIndex,removals);if(!removed){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
                 if(!removed){if(code==0&&"SECTION".equals(value)){sectionPending=true;lineIndex+=2;continue;}if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;lineIndex+=2;continue;}if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;}}lineIndex+=2;
             }
-            if(!inserted)throw new IOException("DXF ENTITIES bölümü bulunamadı");out.flush();
+            if(!inserted)throw new IOException("DXF ENTITIES bölümü bulunamadı");if(!blocksInserted)throw new IOException("DXF BLOCKS bölümü bulunamadı");out.flush();
         }
+    }
+
+    private static void writeBlocks(BufferedWriter out,Matrix contentToWorld,List<CadBlock.Definition> blocks)throws IOException{
+        if(blocks==null||blocks.isEmpty())return;Matrix vectors=vectorMatrix(contentToWorld);
+        for(CadBlock.Definition def:blocks){
+            if(def==null||def.name==null||def.name.trim().isEmpty()||def.members.isEmpty())continue;
+            entity(out,"BLOCK");tag(out,8,"0");tag(out,2,def.name);i(out,70,0);n(out,10,0);n(out,20,0);n(out,30,0);tag(out,3,def.name);tag(out,1,"");
+            for(CadEdit member:def.members)if(member!=null&&member.type!=CadEdit.Type.INSERT)writeEdit(out,vectors,member,"0",null,null,null,null,null);
+            entity(out,"ENDBLK");tag(out,8,"0");
+        }
+    }
+    private static Matrix vectorMatrix(Matrix source){
+        float[] v=new float[9];source.getValues(v);v[Matrix.MTRANS_X]=0f;v[Matrix.MTRANS_Y]=0f;Matrix out=new Matrix();out.setValues(v);return out;
     }
 
     private static boolean isRemoved(int lineIndex,List<SourceRange> removals){for(SourceRange range:removals)if(range!=null&&range.containsLine(lineIndex))return true;return false;}
@@ -39,6 +54,7 @@ public final class DxfWriter {
             case POINT:{if(edit.xy.length<2)break;PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"POINT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,p.x);n(out,20,p.y);n(out,30,0);break;}
             case XLINE:{if(edit.xy.length<4)break;PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);double dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<1e-9)break;entity(out,"XLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,dx/len);n(out,21,dy/len);n(out,31,0);break;}
             case POLYLINE:{entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);int count=edit.xy.length/2;i(out,90,count);i(out,70,edit.closed?1:0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
+            case INSERT:{if(edit.xy.length<2||edit.text==null||edit.text.trim().isEmpty())break;PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"INSERT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);tag(out,2,edit.text.trim());n(out,10,p.x);n(out,20,p.y);n(out,30,0);double scale=Math.max(.000001,edit.insertScale());n(out,41,scale);n(out,42,scale);n(out,43,scale);n(out,50,-edit.rotationDegrees);break;}
             case HATCH:{if(edit.xy.length<6)break;String pattern="ANSI31".equalsIgnoreCase(edit.text)?"ANSI31":"SOLID";boolean solid="SOLID".equals(pattern);entity(out,"HATCH");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);
                 n(out,10,0);n(out,20,0);n(out,30,0);n(out,210,0);n(out,220,0);n(out,230,1);tag(out,2,pattern);i(out,70,solid?1:0);i(out,71,0);
                 i(out,91,1);i(out,92,2);i(out,72,0);i(out,73,1);int count=edit.xy.length/2;i(out,93,count);
