@@ -2,7 +2,9 @@ name: Android quality gate
 
 on:
   push:
-    branches: [ main, 'gandalf/**' ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 concurrency:
@@ -159,8 +161,8 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon lintDebug testDebugUnitTest
-      - name: Verify no APK build in completion branch
-        run: echo "Source/lint/unit tests only; APK assembly intentionally disabled until user approval."
+      - name: Verify APK assembly is disabled pending user approval
+        run: echo "Lint/unit/native tests only; APK assembly intentionally disabled."
       - name: Package corresponding source
         run: |
           tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
