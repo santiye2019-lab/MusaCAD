@@ -98,9 +98,9 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp">
             <Button android:id="@+id/layersButton" style="@style/CadTopButtonPurple" android:text="Katman" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
-            <Button android:id="@+id/propertiesButton" style="@style/CadTopButtonPurple" android:text="Özellik" android:enabled="false" />
-            <Button android:id="@+id/colorButton" style="@style/CadTopButtonYellow" android:text="Renk:BYL" android:enabled="false" />
-            <Button android:id="@+id/lineWeightButton" style="@style/CadTopButtonOrange" android:text="LW:BYL" android:enabled="false" />
+            <Button android:id="@+id/propertiesButton" style="@style/CadTopButtonPurple" android:layout_width="74dp" android:text="Özellik" android:enabled="false" />
+            <Button android:id="@+id/colorButton" style="@style/CadTopButtonYellow" android:layout_width="72dp" android:text="Renk" android:enabled="false" />
+            <Button android:id="@+id/lineWeightButton" style="@style/CadTopButtonOrange" android:layout_width="72dp" android:text="LW BYL" android:enabled="false" />
             <CheckBox android:id="@+id/snapToggle" style="@style/CadTopButtonTeal" android:button="@null" android:text="Nokta" android:drawableTop="@drawable/ic_snap" android:checked="true" android:enabled="false" />
             <Button android:id="@+id/undoButton" style="@style/CadTopButtonBlue" android:text="Geri" android:drawableTop="@drawable/ic_undo" />
             <Button android:id="@+id/saveDxfButton" style="@style/CadTopButtonGreen" android:text="Kaydet" android:drawableTop="@drawable/ic_save" android:enabled="false" />
