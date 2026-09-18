@@ -22,6 +22,8 @@ import java.util.concurrent.*;
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21;
     private static final int MAX_OPEN_DOCUMENTS=4;
+    private static final String[] LINE_WEIGHT_LABELS={"BYLAYER","BYBLOCK","DEFAULT","0.00 mm","0.05 mm","0.09 mm","0.13 mm","0.15 mm","0.18 mm","0.20 mm","0.25 mm","0.30 mm","0.35 mm","0.40 mm","0.50 mm","0.53 mm","0.60 mm","0.70 mm","0.80 mm","0.90 mm","1.00 mm","1.06 mm","1.20 mm","1.40 mm","1.58 mm","2.00 mm","2.11 mm"};
+    private static final int[] LINE_WEIGHT_VALUES={DxfLineStyle.LW_BYLAYER,DxfLineStyle.LW_BYBLOCK,DxfLineStyle.LW_DEFAULT,0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211};
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
@@ -70,17 +72,18 @@ public class MainActivity extends AppCompatActivity {
             public void onSelectionReady(){previewSelection();}
             public void onTextRequested(float x,float y){showTextEditor(x,y);}
             public void onDocumentChanged(){refreshDocumentTabs();}
+            public void onCadPropertiesChanged(){refreshPropertyButtons();}
         });
 
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.fitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineWeightButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.fitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
-        findViewById(R.id.layersButton).setOnClickListener(v->showLayers());findViewById(R.id.propertiesButton).setOnClickListener(v->showDrawingProperties());findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
+        findViewById(R.id.layersButton).setOnClickListener(v->showLayers());findViewById(R.id.propertiesButton).setOnClickListener(v->showDrawingProperties());findViewById(R.id.colorButton).setOnClickListener(v->showQuickColor());findViewById(R.id.lineWeightButton).setOnClickListener(v->showQuickLineWeight());findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.selectEntityButton).setOnClickListener(v->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY));
         findViewById(R.id.moveEntityButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(!cad.armMoveSelected())noSourceSelection();});
@@ -106,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.commandSendButton).setOnClickListener(v->executeCommand());
         commandInput.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||action==android.view.inputmethod.EditorInfo.IME_ACTION_GO||(event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN)){executeCommand();return true;}return false;});
         commandInput.setOnKeyListener((v,keyCode,event)->{if(keyCode==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN){executeCommand();return true;}return false;});
-        updateShareEnabled(false);updateEditorEnabled(false);refreshDocumentTabs();handleIncomingIntent(getIntent());
+        updateShareEnabled(false);updateEditorEnabled(false);refreshPropertyButtons();refreshDocumentTabs();handleIncomingIntent(getIntent());
     }
 
     private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir kaynak nesne seçin",Toast.LENGTH_SHORT).show();}
@@ -209,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateShareEnabled(boolean enabled){shareButton.setEnabled(enabled);shareButton.setAlpha(enabled?1f:.45f);shareToolButton.setEnabled(enabled);shareToolButton.setAlpha(enabled?1f:.55f);}
     private void updateEditorEnabled(boolean enabled){
-        int[] ids={R.id.propertiesButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
+        int[] ids={R.id.propertiesButton,R.id.colorButton,R.id.lineWeightButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
         for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}
     }
     private void selectMode(int id,CadView.Mode mode){View button=findViewById(id);if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.setMode(mode);markModeSelected(id);}
@@ -243,7 +246,7 @@ public class MainActivity extends AppCompatActivity {
         if(session==null)return;
         currentFile=session.file;editingBaseDxf=session.workingDxf;currentDisplayName=session.name==null?"cizim.dwg":session.name;activeDxf=session.parsed;
         hideWelcomePanel();updateShareEnabled(currentFile!=null);updateEditorEnabled(canEdit());findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
-        cad.restoreSession(activeDxf,session.bitmap,session.viewState);markModeSelected(R.id.panButton);
+        cad.restoreSession(activeDxf,session.bitmap,session.viewState);markModeSelected(R.id.panButton);refreshPropertyButtons();
         snapToggle.setEnabled(activeDxf!=null&&activeDxf.snapPoints.length>0);snapToggle.setChecked(activeDxf!=null&&(session.viewState==null||session.viewState.snapEnabled));
         String editable=canEdit()?"  •  düzenlenebilir":"";
         fileName.setText(currentDisplayName+(session.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":"  •  DWG önizleme")+editable);
@@ -272,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
     private void clearActiveDocumentUi(){
         currentFile=null;editingBaseDxf=null;activeDxf=null;currentDisplayName="cizim.dwg";closeActiveAfterSave=false;
         cad.clearDocument();updateShareEnabled(false);updateEditorEnabled(false);findViewById(R.id.layersButton).setEnabled(false);snapToggle.setEnabled(false);snapToggle.setChecked(false);
-        fileName.setText("Henüz proje açılmadı");result.setText("Hazır");if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
+        fileName.setText("Henüz proje açılmadı");result.setText("Hazır");refreshPropertyButtons();if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
     }
 
     private String shortDocumentName(String name){
