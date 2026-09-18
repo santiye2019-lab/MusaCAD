@@ -2,7 +2,6 @@ package com.musa.cad;
 
 import android.os.Bundle;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
@@ -27,9 +26,6 @@ public class AboutActivity extends AppCompatActivity {
             v.setPadding(0,bars.top,0,bars.bottom);
             return insets;
         });
-
-        ImageView photo=findViewById(R.id.developerPhoto);
-        EmbeddedProfilePhoto.loadInto(this,photo);
         ((TextView)findViewById(R.id.versionText)).setText("MusaCAD • Sürüm "+BuildConfig.VERSION_NAME);
 
         findViewById(R.id.openSourceButton).setOnClickListener(v->showOpenSource());
