@@ -334,9 +334,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void open(){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden yeni dosya açılamaz",Toast.LENGTH_SHORT).show();return;}
+        if(documents.size()>=MAX_OPEN_DOCUMENTS){new AlertDialog.Builder(this).setTitle("Açık proje sınırı").setMessage("Telefon belleğini korumak için aynı anda en fazla "+MAX_OPEN_DOCUMENTS+" proje açık tutuluyor. Yeni proje açmak için bir sekmeyi kapatın.").setPositiveButton("TAMAM",null).show();return;}
         startActivityForResult(new Intent(this,RecentFilesActivity.class),OPEN);
     }
-    @Override protected void onActivityResult(int r,int c,Intent data){super.onActivityResult(r,c,data);if(c!=RESULT_OK||data==null||data.getData()==null)return;if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());}
+    @Override protected void onActivityResult(int r,int c,Intent data){
+        super.onActivityResult(r,c,data);
+        if(c!=RESULT_OK||data==null||data.getData()==null){if(r==SAVE_DXF)closeActiveAfterSave=false;return;}
+        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
+    }
     private void cancelLoad(){LoadTask task=activeLoad;activeLoad=null;if(task!=null){if(task.future!=null)task.future.cancel(true);if(task.dialog!=null)task.dialog.dismiss();}}
 
     private void startLoad(Uri uri){
@@ -353,17 +358,14 @@ public class MainActivity extends AppCompatActivity {
                 if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;FileTransfer.checkCancelled();if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,loaded.bitmap);
                 runOnUiThread(()->{
-                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();releaseCurrentFiles();currentFile=loaded.file;editingBaseDxf=loaded.workingDxf;currentDisplayName=loaded.name;activeDxf=loaded.parsed;hideWelcomePanel();updateShareEnabled(true);updateEditorEnabled(canEdit());findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
-                    if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);else cad.setDrawing(loaded.bitmap);markModeSelected(R.id.panButton);snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    String editable=canEdit()?"  •  düzenlenebilir":"";fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme")+editable);
-                    if(loaded.parsed!=null){String fallback=(loaded.parsed.fontFallbacks.isEmpty()&&!loaded.parsed.externalShapeFallback)?"":"  •  SHX fallback";result.setText("Hazır  •  "+loaded.parsed.activeLayout+"  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman  •  "+loaded.parsed.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);}else result.setText("Hazır  •  DWG önizleme modu");
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}
+                    activeLoad=null;task.dialog.dismiss();addLoadedDocument(loaded);
                 });
             }catch(Exception|OutOfMemoryError e){loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});}
         });
     }
 
-    private void releaseCurrentFiles(){if(activeDxf!=null&&activeDxf.bitmap!=null&&!activeDxf.bitmap.isRecycled())activeDxf.bitmap.recycle();if(editingBaseDxf!=null&&editingBaseDxf!=currentFile)editingBaseDxf.delete();if(currentFile!=null)currentFile.delete();activeDxf=null;editingBaseDxf=null;currentFile=null;}
-    @Override protected void onDestroy(){cancelLoad();releaseCurrentFiles();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){cancelLoad();releaseAllDocuments();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
