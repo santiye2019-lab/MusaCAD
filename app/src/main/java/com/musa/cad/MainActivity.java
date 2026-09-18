@@ -143,6 +143,12 @@ public class MainActivity extends AppCompatActivity {
                 selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE);
                 result.setText("CIRCLE • Merkez ve yarıçap noktası seçin");
                 break;
+            case ARC:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_ARC);
+                markModeSelected(0);
+                result.setText("ARC • Başlangıç, yay üzeri ve bitiş olmak üzere 3 nokta seçin");
+                break;
             case RECTANGLE:
                 selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE);
                 result.setText("RECTANG • İki köşe seçin");
@@ -384,6 +390,7 @@ public class MainActivity extends AppCompatActivity {
             "L / LINE • Çizgi\n"+
             "PL / PLINE / POLYLINE • Çoklu çizgi\n"+
             "C / CIRCLE • Daire\n"+
+            "A / ARC • 3 noktadan yay\n"+
             "REC / RECTANG / RECTANGLE • Dikdörtgen\n"+
             "DT / T / TEXT / MTEXT • Yazı\n"+
             "SEL / SELECT • Seç\n"+
@@ -413,7 +420,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "ARC, BLOCK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
+            "BLOCK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
