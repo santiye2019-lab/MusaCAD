@@ -142,7 +142,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="1980 İstanbul doğumlu Musa Otluoğlu, Atatürk Üniversitesi Makine Mühendisliği Bölümü’nden 2004 yılında mezun oldu. Mesleki kariyerinin ilk 6 yılında özel inşaat firmalarında Mekanik İşler Şefliği ve koordinatörlük görevlerinde bulundu. Sonraki 17 yıldır kamuda yapım işlerinin kontrol, denetim ve teknik koordinasyon süreçlerinde kontrol mühendisi olarak görev yapmaktadır."
+                    android:text="1980 İstanbul doğumlu Musa Otluoğlu, Atatürk Üniversitesi Makine Mühendisliği Bölümü’nden 2004 yılında mezun oldu. Meslek hayatının 6 yılını özel inşaat firmalarında Mekanik İşler Şefliği ve koordinatörlük görevlerinde geçirdi. Kamuda ise 17 yıldır yapım işlerinin kontrol, denetim ve teknik koordinasyon süreçlerinde kontrol mühendisi olarak görev yapmaktadır."
                     android:textColor="#D6E7ED"
                     android:textSize="12sp"
                     android:lineSpacingExtra="4dp" />
