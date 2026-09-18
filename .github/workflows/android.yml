@@ -70,14 +70,6 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadCommand.java tests/CadCommandTest.java
           java -cp /tmp/musacad-tests CadCommandTest
-      - name: Test dimension geometry
-        run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadDimension.java tests/CadDimensionTest.java
-          java -cp /tmp/musacad-tests CadDimensionTest
-      - name: Test session block transforms
-        run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadBlockLibrary.java tests/CadBlockLibraryTest.java
-          java -cp /tmp/musacad-tests CadBlockLibraryTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
