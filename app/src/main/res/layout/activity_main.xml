@@ -460,21 +460,52 @@
         android:paddingEnd="8dp"
         android:background="#071A27">
 
-        <TextView
-            android:id="@+id/tabFileName"
+        <HorizontalScrollView
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="10dp"
-            android:text="Dosya açılmadı"
-            android:textColor="#E7F5FA"
+            android:fillViewport="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/projectTabsBox"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tabFileName"
+                    android:layout_width="150dp"
+                    android:layout_height="34dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="10dp"
+                    android:text="Dosya açılmadı"
+                    android:textColor="#E7F5FA"
+                    android:textStyle="bold"
+                    android:textSize="10sp"
+                    android:singleLine="true"
+                    android:ellipsize="middle"
+                    android:background="@drawable/feature_chip_bg" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <Button
+            android:id="@+id/newProjectButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="5dp"
+            android:text="+"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="10sp"
-            android:singleLine="true"
-            android:ellipsize="middle"
-            android:background="@drawable/feature_chip_bg" />
+            android:textSize="20sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:background="@drawable/top_action_bg"
+            android:stateListAnimator="@null"
+            android:contentDescription="Yeni proje aç" />
 
         <ImageButton
             android:id="@+id/finishEditButton"
