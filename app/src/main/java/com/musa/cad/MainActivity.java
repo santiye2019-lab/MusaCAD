@@ -131,10 +131,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void executeCommand(){
         if(commandInput==null)return;
-        String raw=commandInput.getText().toString().trim();if(raw.isEmpty())return;
-        commandInput.setText("");
+        String raw=commandInput.getText().toString().trim();commandInput.setText("");
         android.view.inputmethod.InputMethodManager imm=(android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         if(imm!=null)imm.hideSoftInputFromWindow(commandInput.getWindowToken(),0);
+        if(raw.isEmpty()){
+            if(cad.confirmCurrentCommand()){result.setText("Komut tamamlandı • Enter ile onaylandı");refreshDocumentTabs();return;}
+            if(lastCommandRaw.isEmpty()){result.setText("Komut bekleniyor");return;}
+            raw=lastCommandRaw;result.setText("Son komut tekrarlandı • "+CadCommand.canonical(raw));
+        }else lastCommandRaw=raw;
         CadCommand.Action action=CadCommand.parse(raw);
         switch(action){
             case LINE:selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE);result.setText("LINE • İlk noktayı seçin");break;
