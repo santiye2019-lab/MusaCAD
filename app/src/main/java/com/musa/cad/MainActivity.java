@@ -58,16 +58,21 @@ public class MainActivity extends AppCompatActivity {
         });
 
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
-        modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)};
+        modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.pointQuickButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.propertiesQuickButton,R.id.colorQuickButton,R.id.lineTypeQuickButton,R.id.pointQuickButton,R.id.moreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.bottomLayersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.rightLayersButton).setOnClickListener(v->showLayers());
+        findViewById(R.id.propertiesQuickButton).setOnClickListener(v->showSelectedProperties());
+        findViewById(R.id.colorQuickButton).setOnClickListener(v->showSelectedColorPicker());
+        findViewById(R.id.lineTypeQuickButton).setOnClickListener(v->showSelectedLineTypePicker());
+        findViewById(R.id.pointQuickButton).setOnClickListener(v->selectEditMode(R.id.pointQuickButton,CadView.Mode.DRAW_POINT));
+        findViewById(R.id.moreToolsButton).setOnClickListener(this::showOtherTools);
         findViewById(R.id.bottomMeasureButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
         findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
@@ -642,6 +647,65 @@ public class MainActivity extends AppCompatActivity {
     }
     private boolean canEdit(){return activeDxf!=null&&editingBaseDxf!=null&&editingBaseDxf.exists();}
 
+    private void showSelectedProperties(){
+        if(!canEdit()){Toast.makeText(this,"Özellikler için düzenlenebilir bir çizim açın",Toast.LENGTH_SHORT).show();return;}
+        if(!cad.hasSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("ÖZELLİK • Önce nesne seçin, sonra Özellik düğmesine tekrar basın");return;}
+        String info=cad.selectedEntityInfo();if(info==null){result.setText("ÖZELLİK • Nesne bilgisi alınamadı");return;}
+        new AlertDialog.Builder(this).setTitle("Nesne özellikleri").setMessage(info).setNeutralButton("ÇİZGİ KALINLIĞI",(d,w)->showSelectedLineWeightPicker()).setPositiveButton("TAMAM",null).show();
+    }
+
+    private void showSelectedColorPicker(){
+        if(!canEdit()){Toast.makeText(this,"Renk için düzenlenebilir bir çizim açın",Toast.LENGTH_SHORT).show();return;}
+        if(!cad.hasSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("RENK • Önce nesne seçin, sonra Renk düğmesine tekrar basın");return;}
+        final String[] names={"Beyaz","Kırmızı","Sarı","Yeşil","Camgöbeği","Mavi","Magenta","Turuncu"};
+        final int[] colors={Color.WHITE,Color.RED,Color.YELLOW,Color.GREEN,Color.CYAN,Color.BLUE,Color.MAGENTA,0xFFFFA000};
+        new AlertDialog.Builder(this).setTitle("Nesne rengi").setItems(names,(d,which)->{if(cad.setSelectedColor(colors[which]))result.setText("RENK • "+names[which]+" uygulandı");else result.setText("RENK • Uygulanamadı");}).setNegativeButton("İPTAL",null).show();
+    }
+
+    private void showSelectedLineTypePicker(){
+        if(!canEdit()){Toast.makeText(this,"Çizgi tipi için düzenlenebilir bir çizim açın",Toast.LENGTH_SHORT).show();return;}
+        if(!cad.hasSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("ÇİZGİ TİPİ • Önce nesne seçin, sonra düğmeye tekrar basın");return;}
+        List<String> types=activeDxf==null?Collections.emptyList():activeDxf.lineTypeNames();
+        if(types.isEmpty())types=Collections.singletonList(DxfLineStyle.CONTINUOUS);
+        String[] items=types.toArray(new String[0]);
+        new AlertDialog.Builder(this).setTitle("Çizgi tipi").setItems(items,(d,which)->{if(cad.setSelectedLineType(items[which]))result.setText("ÇİZGİ TİPİ • "+items[which]+" uygulandı");else result.setText("ÇİZGİ TİPİ • Uygulanamadı");}).setNegativeButton("İPTAL",null).show();
+    }
+
+    private void showSelectedLineWeightPicker(){
+        if(!cad.hasSelectedEntity()){result.setText("ÇİZGİ KALINLIĞI • Önce nesne seçin");return;}
+        final String[] names={"0.13 mm","0.18 mm","0.25 mm","0.35 mm","0.50 mm","0.70 mm"};
+        final int[] values={13,18,25,35,50,70};
+        new AlertDialog.Builder(this).setTitle("Çizgi kalınlığı").setItems(names,(d,which)->{if(cad.setSelectedLineWeight(values[which]))result.setText("ÇİZGİ KALINLIĞI • "+names[which]);}).setNegativeButton("İPTAL",null).show();
+    }
+
+    private void runCommandText(String command){if(commandInput==null)return;commandInput.setText(command);executeCommand();}
+
+    private void showOtherTools(View anchor){
+        anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        final String[] items={"Gezin","Ölçek kalibrasyonu","Mesafe ölç","Alan ölç","TRIM","EXTEND","FILLET","CHAMFER","HATCH","STRETCH","BLOCK","INSERT","DIMSTYLE","DIMLINEAR","DIMALIGNED","REDO","Temizle / ölçümü sıfırla"};
+        new AlertDialog.Builder(this).setTitle("Diğer araçlar").setItems(items,(d,which)->{
+            switch(which){
+                case 0:selectMode(R.id.panButton,CadView.Mode.PAN);break;
+                case 1:selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE);break;
+                case 2:selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);break;
+                case 3:selectMode(R.id.areaButton,CadView.Mode.AREA);break;
+                case 4:runCommandText("TR");break;
+                case 5:runCommandText("EX");break;
+                case 6:runCommandText("F");break;
+                case 7:runCommandText("CHA");break;
+                case 8:runCommandText("H");break;
+                case 9:runCommandText("S");break;
+                case 10:runCommandText("B");break;
+                case 11:runCommandText("I");break;
+                case 12:runCommandText("D");break;
+                case 13:runCommandText("DLI");break;
+                case 14:runCommandText("DAL");break;
+                case 15:runCommandText("REDO");break;
+                case 16:cad.clearMeasurement();break;
+            }
+        }).setNegativeButton("İPTAL",null).show();
+    }
+
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
         menu.add(0,MENU_OPEN,0,"Dosya aç");menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,2,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,3,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,4,"Düzenlenmiş DXF kaydet").setEnabled(canEdit());menu.add(0,MENU_PRINT,5,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,6,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,7,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_ABOUT,8,"Geliştirici / Hakkında");
@@ -659,7 +723,7 @@ public class MainActivity extends AppCompatActivity {
         for(int id:ids){View v=findViewById(id);if(v!=null){v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}}
     }
     private void updateEditorEnabled(boolean enabled){
-        int[] ids={R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
+        int[] ids={R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.propertiesQuickButton,R.id.colorQuickButton,R.id.lineTypeQuickButton,R.id.pointQuickButton};
         for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}
         if(editStatusText!=null){
             if(currentFile==null){editStatusText.setText("Dosya yok");editStatusText.setTextColor(0xFF8FB7C5);}
