@@ -167,7 +167,7 @@
             android:singleLine="true"
             android:hint="LINE, PL, C, M, CO, E, LA, PR, ZE..."
             android:textColor="#FFFFFF"
-            android:hintTextColor="#66818D"
+            android:textColorHint="#66818D"
             android:textSize="11sp"
             android:paddingStart="10dp"
             android:paddingEnd="8dp"
