@@ -44,6 +44,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SelectionBounds.java tests/SelectionBoundsTest.java
           java -cp /tmp/musacad-tests SelectionBoundsTest
+      - name: Test CAD command aliases
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadCommand.java tests/CadCommandTest.java
+          java -cp /tmp/musacad-tests CadCommandTest
       - name: Test endpoint snapping
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/SnapPoints.java tests/SnapPointsTest.java
