@@ -5,64 +5,70 @@
     android:orientation="vertical"
     android:background="#061421">
 
-    <!-- Üst başlık -->
+    <!-- Reference header: compact, single-line MusaCAD brand -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
+        android:layout_height="54dp"
         android:gravity="center_vertical"
-        android:paddingStart="9dp"
-        android:paddingEnd="9dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         android:background="#082A42">
 
         <ImageButton
             android:id="@+id/menuButton"
             android:layout_width="42dp"
-            android:layout_height="38dp"
+            android:layout_height="42dp"
             android:src="@drawable/ic_menu"
             android:contentDescription="Ana menü"
             android:background="@drawable/top_action_bg"
             android:padding="10dp" />
 
         <ImageView
-            android:layout_width="42dp"
-            android:layout_height="38dp"
-            android:layout_marginStart="8dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="7dp"
             android:src="@drawable/ic_musacad_mark"
+            android:scaleType="fitCenter"
             android:contentDescription="MusaCAD logo" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:layout_marginStart="6dp"
             android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:paddingStart="8dp">
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/appTitle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="MusaCAD"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="18sp"
-                android:fontFamily="sans-serif-medium" />
+                android:textSize="17sp"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="DWG / DXF Görüntüleyici &amp; Editör"
+                android:text="DWG / DXF"
                 android:textColor="#9FC4DB"
-                android:textSize="7sp"
+                android:textSize="8sp"
                 android:singleLine="true"
-                android:ellipsize="end" />
+                android:maxLines="1"
+                android:includeFontPadding="false" />
         </LinearLayout>
 
         <ImageButton
             android:id="@+id/openButton"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_marginEnd="6dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
             android:src="@drawable/ic_open_file"
             android:contentDescription="Dosya aç"
             android:background="@drawable/top_action_bg"
@@ -70,8 +76,9 @@
 
         <ImageButton
             android:id="@+id/shareButton"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="5dp"
             android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
             android:background="@drawable/top_action_bg"
@@ -81,19 +88,19 @@
 
         <ImageButton
             android:id="@+id/headerMoreButton"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="5dp"
             android:src="@drawable/ic_more"
             android:contentDescription="Diğer menü"
             android:background="@drawable/top_action_bg"
             android:padding="9dp" />
     </LinearLayout>
 
-    <!-- Dosya ve düzenlenebilirlik -->
+    <!-- File name / edit state -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="32dp"
+        android:layout_height="38dp"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
@@ -102,12 +109,13 @@
         <TextView
             android:id="@+id/fileName"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="32dp"
             android:layout_weight="1"
             android:gravity="center_vertical"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:singleLine="true"
+            android:maxLines="1"
             android:ellipsize="middle"
             android:text="Henüz proje açılmadı"
             android:textColor="#E6F2F8"
@@ -117,27 +125,28 @@
 
         <TextView
             android:id="@+id/editStatusText"
-            android:layout_width="92dp"
-            android:layout_height="30dp"
+            android:layout_width="104dp"
+            android:layout_height="32dp"
             android:layout_marginStart="7dp"
             android:gravity="center"
             android:text="Dosya yok"
             android:textColor="#8FB7C5"
             android:textStyle="bold"
             android:textSize="9sp"
+            android:singleLine="true"
             android:background="@drawable/feature_chip_bg" />
     </LinearLayout>
 
-    <!-- Gönderilen örnekteki üst hızlı araç düzeni -->
+    <!-- Reference top quick tools -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_height="62dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="4dp"
         android:paddingEnd="4dp"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         android:background="#071927">
 
         <Button
@@ -164,7 +173,7 @@
         <Button
             android:id="@+id/lineTypeButton"
             style="@style/TopQuickOrange"
-            android:text="Çizgi Tipi"
+            android:text="Çizgi K."
             android:drawableTop="@drawable/ic_line"
             android:enabled="false" />
 
@@ -185,11 +194,11 @@
             android:enabled="false" />
     </LinearLayout>
 
-    <!-- Gerçek komut satırı: eski MusaCAD komut motoruna bağlı -->
+    <!-- Command line, keeps full classic command engine -->
     <LinearLayout
         android:id="@+id/commandBar"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="44dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
@@ -197,8 +206,8 @@
         android:background="#061623">
 
         <TextView
-            android:layout_width="60dp"
-            android:layout_height="30dp"
+            android:layout_width="64dp"
+            android:layout_height="32dp"
             android:gravity="center"
             android:text="Komut:"
             android:textColor="#35D7FF"
@@ -209,11 +218,12 @@
         <EditText
             android:id="@+id/commandInput"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="32dp"
             android:layout_weight="1"
             android:layout_marginStart="5dp"
             android:singleLine="true"
-            android:hint="L, PL, C, REC, M, CO, RO, E, LA, DI, AA, ZE, U, QSAVE..."
+            android:maxLines="1"
+            android:hint="L, PL, C, REC, M, CO, RO, E, LA, DI, AA, ZE..."
             android:textColor="#FFFFFF"
             android:textColorHint="#759BB2"
             android:textSize="10sp"
@@ -223,32 +233,27 @@
             android:imeOptions="actionDone"
             android:inputType="textCapCharacters" />
 
+        <!-- Kept for existing binding; keyboard Enter is the reference interaction -->
         <Button
             android:id="@+id/commandSendButton"
-            android:layout_width="38dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="5dp"
-            android:text="↵"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:background="@drawable/primary_action_bg"
-            android:stateListAnimator="@null" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone"
+            android:text="↵" />
 
         <TextView
-            android:layout_width="34dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="5dp"
+            android:layout_width="46dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="6dp"
             android:gravity="center"
             android:text="TR"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:background="@drawable/feature_chip_bg" />
     </LinearLayout>
 
-    <!-- CAD çalışma alanı -->
+    <!-- CAD canvas: maximized between tool areas -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -305,18 +310,17 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="7dp"
-                        android:text="Üstteki klasör düğmesinden veya alttaki + düğmesinden DWG / DXF dosyası açın."
+                        android:text="Klasör düğmesinden DWG / DXF dosyanızı açın."
                         android:textColor="#9EBBC9"
                         android:textSize="11sp"
-                        android:gravity="center"
-                        android:lineSpacingExtra="2dp" />
+                        android:gravity="center" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>
 
-        <!-- Sağ dikey hızlı görünüm araçları -->
+        <!-- Right-side reference toolbar -->
         <LinearLayout
-            android:layout_width="44dp"
+            android:layout_width="48dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
             android:layout_marginEnd="7dp"
@@ -326,9 +330,19 @@
             android:background="@drawable/main_panel_bg">
 
             <ImageButton
+                android:id="@+id/panButton"
+                android:layout_width="40dp"
+                android:layout_height="38dp"
+                android:src="@drawable/ic_pan"
+                android:contentDescription="Kaydır"
+                android:background="@drawable/top_action_bg"
+                android:padding="9dp" />
+
+            <ImageButton
                 android:id="@+id/rightFitButton"
-                android:layout_width="36dp"
-                android:layout_height="32dp"
+                android:layout_width="40dp"
+                android:layout_height="38dp"
+                android:layout_marginTop="5dp"
                 android:src="@drawable/ic_fit"
                 android:contentDescription="Ekrana sığdır"
                 android:background="@drawable/top_action_bg"
@@ -336,8 +350,8 @@
 
             <ImageButton
                 android:id="@+id/rightZoomInButton"
-                android:layout_width="36dp"
-                android:layout_height="32dp"
+                android:layout_width="40dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_in"
                 android:contentDescription="Yakınlaştır"
@@ -346,8 +360,8 @@
 
             <ImageButton
                 android:id="@+id/rightZoomOutButton"
-                android:layout_width="36dp"
-                android:layout_height="32dp"
+                android:layout_width="40dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_out"
                 android:contentDescription="Uzaklaştır"
@@ -355,8 +369,8 @@
                 android:padding="9dp" />
 
             <TextView
-                android:layout_width="36dp"
-                android:layout_height="38dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_marginTop="5dp"
                 android:gravity="center"
                 android:text="2D"
@@ -366,14 +380,13 @@
                 android:background="@drawable/tool_tile_blue" />
 
             <TextView
-                android:layout_width="36dp"
-                android:layout_height="38dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_marginTop="5dp"
                 android:gravity="center"
                 android:text="3D"
-                android:contentDescription="3D görünüm bu sürümde etkin değil"
                 android:enabled="false"
-                android:alpha="0.45"
+                android:alpha="0.38"
                 android:textColor="#587487"
                 android:textStyle="bold"
                 android:textSize="12sp"
@@ -381,8 +394,8 @@
 
             <ImageButton
                 android:id="@+id/rightLayersButton"
-                android:layout_width="36dp"
-                android:layout_height="32dp"
+                android:layout_width="40dp"
+                android:layout_height="38dp"
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_layers"
                 android:contentDescription="Katmanlar"
@@ -393,7 +406,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Alt araç paneli: gönderilen görseldeki gibi iki sıra -->
+    <!-- Reference 8 x 2 lower command grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="104dp"
@@ -410,224 +423,159 @@
             android:orientation="horizontal"
             android:weightSum="8">
 
-            <Button
-                android:id="@+id/selectEntityButton"
-                style="@style/BottomGridBlue"
-                android:text="Seç"
-                android:drawableTop="@drawable/ic_select"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/lineButton"
-                style="@style/BottomGridBlue"
-                android:text="Çiz"
-                android:drawableTop="@drawable/ic_line"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/rectangleButton"
-                style="@style/BottomGridBlue"
-                android:text="Dörtgen"
-                android:drawableTop="@drawable/ic_rectangle"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/circleButton"
-                style="@style/BottomGridBlue"
-                android:text="Daire"
-                android:drawableTop="@drawable/ic_circle"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/moveEntityButton"
-                style="@style/BottomGridGreen"
-                android:text="Taşı"
-                android:drawableTop="@drawable/ic_move"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/copyEntityButton"
-                style="@style/BottomGridGreen"
-                android:text="Kopyala"
-                android:drawableTop="@drawable/ic_copy"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/rotateEntityButton"
-                style="@style/BottomGridGreen"
-                android:text="Döndür"
-                android:drawableTop="@drawable/ic_rotate"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/deleteEntityButton"
-                style="@style/BottomGridOrange"
-                android:text="Sil"
-                android:drawableTop="@drawable/ic_delete"
-                android:enabled="false" />
+            <Button android:id="@+id/selectEntityButton" style="@style/BottomGridBlue" android:text="Seç" android:drawableTop="@drawable/ic_select" android:enabled="false" />
+            <Button android:id="@+id/lineButton" style="@style/BottomGridBlue" android:text="Çiz" android:drawableTop="@drawable/ic_line" android:enabled="false" />
+            <Button android:id="@+id/rectangleButton" style="@style/BottomGridBlue" android:text="Dikdörtgen" android:drawableTop="@drawable/ic_rectangle" android:enabled="false" />
+            <Button android:id="@+id/circleButton" style="@style/BottomGridBlue" android:text="Daire" android:drawableTop="@drawable/ic_circle" android:enabled="false" />
+            <Button android:id="@+id/moveEntityButton" style="@style/BottomGridGreen" android:text="Taşı" android:drawableTop="@drawable/ic_move" android:enabled="false" />
+            <Button android:id="@+id/copyEntityButton" style="@style/BottomGridGreen" android:text="Kopyala" android:drawableTop="@drawable/ic_copy" android:enabled="false" />
+            <Button android:id="@+id/rotateEntityButton" style="@style/BottomGridGreen" android:text="Döndür" android:drawableTop="@drawable/ic_rotate" android:enabled="false" />
+            <Button android:id="@+id/deleteEntityButton" style="@style/BottomGridOrange" android:text="Sil" android:drawableTop="@drawable/ic_delete" android:enabled="false" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="50dp"
             android:orientation="horizontal"
             android:weightSum="8">
 
-            <Button
-                android:id="@+id/zoomInButton"
-                style="@style/BottomGridBlue"
-                android:text="Yakın +"
-                android:drawableTop="@drawable/ic_zoom_in" />
-
-            <Button
-                android:id="@+id/zoomOutButton"
-                style="@style/BottomGridBlue"
-                android:text="Yakın -"
-                android:drawableTop="@drawable/ic_zoom_out" />
-
-            <Button
-                android:id="@+id/fitButton"
-                style="@style/BottomGridBlue"
-                android:text="Tümü"
-                android:drawableTop="@drawable/ic_fit" />
-
-            <Button
-                android:id="@+id/bottomLayersButton"
-                style="@style/BottomGridBlue"
-                android:text="Katman"
-                android:drawableTop="@drawable/ic_layers"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/bottomMeasureButton"
-                style="@style/BottomGridPurple"
-                android:text="Ölç"
-                android:drawableTop="@drawable/ic_distance" />
-
-            <Button
-                android:id="@+id/textButton"
-                style="@style/BottomGridMagenta"
-                android:text="Yazı"
-                android:drawableTop="@drawable/ic_text"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/hatchButton"
-                style="@style/BottomGridPurple"
-                android:text="Tarama"
-                android:drawableTop="@drawable/ic_hatch"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/moreToolsButton"
-                style="@style/BottomGridOrange"
-                android:text="Diğer"
-                android:drawableTop="@drawable/ic_more" />
+            <Button android:id="@+id/zoomInButton" style="@style/BottomGridBlue" android:text="Yakınlaştır" android:drawableTop="@drawable/ic_zoom_in" />
+            <Button android:id="@+id/zoomOutButton" style="@style/BottomGridBlue" android:text="Uzaklaştır" android:drawableTop="@drawable/ic_zoom_out" />
+            <Button android:id="@+id/fitButton" style="@style/BottomGridBlue" android:text="Tümü" android:drawableTop="@drawable/ic_fit" />
+            <Button android:id="@+id/bottomLayersButton" style="@style/BottomGridBlue" android:text="Katmanlar" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
+            <Button android:id="@+id/bottomMeasureButton" style="@style/BottomGridPurple" android:text="Ölç" android:drawableTop="@drawable/ic_distance" />
+            <Button android:id="@+id/textButton" style="@style/BottomGridPurple" android:text="Yazı" android:drawableTop="@drawable/ic_text" android:enabled="false" />
+            <Button android:id="@+id/hatchButton" style="@style/BottomGridPurple" android:text="Tarama" android:drawableTop="@drawable/ic_hatch" android:enabled="false" />
+            <Button android:id="@+id/moreToolsButton" style="@style/BottomGridBlue" android:text="Diğer" android:drawableTop="@drawable/ic_more" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Aktif çizim sekmesi ve mevcut işlevlerin hızlı bağlantıları -->
+    <!-- File tab / finish / save / share / open -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="44dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="7dp"
-        android:paddingEnd="7dp"
-        android:background="#071927">
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:background="#071A27">
 
-        <TextView
-            android:id="@+id/tabFileName"
+        <HorizontalScrollView
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:paddingStart="11dp"
-            android:paddingEnd="8dp"
-            android:text="Aktif çizim"
-            android:textColor="#E7F4F8"
-            android:textStyle="bold"
-            android:textSize="9sp"
-            android:singleLine="true"
-            android:ellipsize="middle"
-            android:background="@drawable/tool_tile_teal" />
+            android:fillViewport="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/projectTabsBox"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tabFileName"
+                    android:layout_width="150dp"
+                    android:layout_height="34dp"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="10dp"
+                    android:text="Dosya açılmadı"
+                    android:textColor="#E7F5FA"
+                    android:textStyle="bold"
+                    android:textSize="10sp"
+                    android:singleLine="true"
+                    android:ellipsize="middle"
+                    android:background="@drawable/feature_chip_bg" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <Button
-            android:id="@+id/finishEditButton"
-            android:layout_width="46dp"
-            android:layout_height="32dp"
+            android:id="@+id/newProjectButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_marginStart="5dp"
-            android:text="Bitir"
-            android:textAllCaps="false"
+            android:text="+"
             android:textColor="#FFFFFF"
-            android:textSize="8sp"
-            android:drawableTop="@drawable/ic_done"
-            android:background="@drawable/tool_tile_yellow"
-            android:enabled="false"
-            android:stateListAnimator="@null" />
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:background="@drawable/top_action_bg"
+            android:stateListAnimator="@null"
+            android:contentDescription="Yeni proje aç" />
 
-        <Button
+        <ImageButton
+            android:id="@+id/finishEditButton"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/ic_done"
+            android:contentDescription="Komutu bitir"
+            android:background="@drawable/top_action_bg"
+            android:padding="9dp"
+            android:enabled="false" />
+
+        <ImageButton
             android:id="@+id/saveDxfButton"
-            android:layout_width="48dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="4dp"
-            android:text="Kaydet"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="8sp"
-            android:drawableTop="@drawable/ic_save"
-            android:background="@drawable/tool_tile_green"
-            android:enabled="false"
-            android:stateListAnimator="@null" />
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="5dp"
+            android:src="@drawable/ic_save"
+            android:contentDescription="DXF kaydet"
+            android:background="@drawable/top_action_bg"
+            android:padding="9dp"
+            android:enabled="false" />
 
         <ImageButton
             android:id="@+id/shareToolButton"
-            android:layout_width="38dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="5dp"
             android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
             android:background="@drawable/tool_tile_orange"
-            android:padding="8dp"
+            android:padding="9dp"
             android:enabled="false"
-            android:alpha="0.55" />
+            android:alpha="0.45" />
 
         <ImageButton
             android:id="@+id/quickOpenButton"
-            android:layout_width="38dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="5dp"
             android:src="@drawable/ic_open_file"
-            android:contentDescription="Yeni çizim aç"
+            android:contentDescription="Dosya aç"
             android:background="@drawable/top_action_bg"
-            android:padding="8dp" />
+            android:padding="9dp" />
     </LinearLayout>
 
-    <!-- Durum satırı -->
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
-        android:layout_height="26dp"
+        android:layout_height="28dp"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
+        android:text="Hazır"
+        android:textColor="#C8DCE6"
+        android:textSize="9sp"
         android:singleLine="true"
         android:ellipsize="end"
-        android:text="Hazır  •  Model"
-        android:textColor="#CFE0E8"
-        android:textSize="9sp"
-        android:background="#06131F" />
+        android:background="#061421" />
 
-    <!-- Komut satırı ve Ölç menüsü için görünmez durum taşıyıcıları; işlevler korunur -->
+    <!-- Existing capability anchors. Kept in the layout so old listeners/modes remain intact.
+         Their UI entry points are Measure / Other / command line. -->
     <LinearLayout
-        android:layout_width="1dp"
-        android:layout_height="1dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:visibility="gone">
+        <Button android:id="@+id/polylineButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/calibrateButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/distanceButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/areaButton" android:layout_width="1dp" android:layout_height="1dp" />
-        <Button android:id="@+id/panButton" android:layout_width="1dp" android:layout_height="1dp" />
-        <Button android:id="@+id/polylineButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/undoButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/clearButton" android:layout_width="1dp" android:layout_height="1dp" />
     </LinearLayout>

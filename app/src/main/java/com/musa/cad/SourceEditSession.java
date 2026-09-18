@@ -28,6 +28,28 @@ public final class SourceEditSession {
     private int selected=-1;
 
     public void clear(){entries.clear();undo.clear();redo.clear();selected=-1;}
+
+    /** Deep copy used when switching between simultaneously open drawing tabs. */
+    public SourceEditSession snapshotCopy(){
+        SourceEditSession out=new SourceEditSession();
+        out.copyFrom(this);
+        return out;
+    }
+
+    /** Restores a previously captured edit session without sharing mutable state. */
+    public void copyFrom(SourceEditSession other){
+        clear();
+        if(other==null)return;
+        for(Map.Entry<Integer,Entry> item:other.entries.entrySet())entries.put(item.getKey(),item.getValue().copy());
+        for(Undo u:other.undo)undo.addLast(copyUndo(u));
+        for(Undo u:other.redo)redo.addLast(copyUndo(u));
+        selected=other.selected;
+    }
+
+    private static Undo copyUndo(Undo source){
+        if(source==null)return null;
+        return new Undo(source.ids,source.previous,source.selected);
+    }
     public void clearRedo(){redo.clear();}
     public int selectedId(){return selected;}
     public boolean hasSelection(){Entry e=entries.get(selected);return e!=null&&!e.deleted;}

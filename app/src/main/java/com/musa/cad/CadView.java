@@ -15,6 +15,44 @@ public class CadView extends View {
         void onTextRequested(float contentX,float contentY);
     }
 
+    /**
+     * In-memory state for one open drawing tab. Heavy drawing geometry remains owned by
+     * MainActivity's project session; this object stores only view/edit state.
+     */
+    public static final class SessionState {
+        private final ArrayList<CadEdit> edits=new ArrayList<>();
+        private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
+        private final LinkedHashMap<String,CadBlock.Definition> userBlocks=new LinkedHashMap<>();
+        private final SourceEditSession sourceEdits;
+        private final Matrix imageMatrix;
+        private final double unitsPerImagePixel;
+        private final String unitName;
+        private final boolean snapEnabled;
+        private final float[] snapPoints;
+        private final float scale;
+        private final float dimTextHeightContent,dimArrowSizeContent;
+        private final int dimPrecision;
+
+        private SessionState(CadView view){
+            for(CadEdit e:view.edits)edits.add(e.copy());
+            for(CadEdit e:view.redoEdits)redoEdits.addLast(e.copy());
+            for(Map.Entry<String,CadBlock.Definition> item:view.userBlocks.entrySet()){
+                CadBlock.Definition d=item.getValue();
+                userBlocks.put(item.getKey(),new CadBlock.Definition(d.name,d.members));
+            }
+            sourceEdits=view.sourceEdits.snapshotCopy();
+            imageMatrix=new Matrix(view.imageMatrix);
+            unitsPerImagePixel=view.unitsPerImagePixel;
+            unitName=view.unitName;
+            snapEnabled=view.snapEnabled;
+            snapPoints=view.snapPoints.clone();
+            scale=view.scale;
+            dimTextHeightContent=view.dimTextHeightContent;
+            dimArrowSizeContent=view.dimArrowSizeContent;
+            dimPrecision=view.dimPrecision;
+        }
+    }
+
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<PointF> points=new ArrayList<>();
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
@@ -72,6 +110,62 @@ public class CadView extends View {
     private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
+
+    public SessionState captureSessionState(){return new SessionState(this);}
+
+    /** Restores a drawing tab without reparsing the DWG/DXF or discarding its edits. */
+    public void restoreSessionState(DxfParser.Result vector,Bitmap bitmap,SessionState state){
+        vectorDrawing=vector;
+        drawing=vector==null?bitmap:null;
+        selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;multiTouch=false;
+        pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;pendingBlockName="";
+        points.clear();freehandPoints.clear();mode=Mode.PAN;
+
+        edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();
+        if(state==null){
+            unitsPerImagePixel=1d;unitName="piksel";snapEnabled=true;
+            snapPoints=vector==null?new float[0]:vector.snapPoints.clone();
+            dimTextHeightContent=24f;dimArrowSizeContent=14f;dimPrecision=2;
+            imageMatrix.reset();fit();invalidate();notifyValue();return;
+        }
+        for(CadEdit e:state.edits)edits.add(e.copy());
+        for(CadEdit e:state.redoEdits)redoEdits.addLast(e.copy());
+        for(Map.Entry<String,CadBlock.Definition> item:state.userBlocks.entrySet()){
+            CadBlock.Definition d=item.getValue();
+            userBlocks.put(item.getKey(),new CadBlock.Definition(d.name,d.members));
+        }
+        sourceEdits.copyFrom(state.sourceEdits);
+        unitsPerImagePixel=state.unitsPerImagePixel;unitName=state.unitName;
+        snapEnabled=state.snapEnabled;snapPoints=state.snapPoints.clone();
+        scale=state.scale;dimTextHeightContent=state.dimTextHeightContent;dimArrowSizeContent=state.dimArrowSizeContent;dimPrecision=state.dimPrecision;
+        imageMatrix.set(state.imageMatrix);
+        invalidate();notifyValue();
+    }
+
+    /** Stable-enough change fingerprint for save/back navigation prompts. */
+    public long editFingerprint(){
+        long h=1469598103934665603L;
+        for(CadEdit e:edits)h=hashEdit(h,e);
+        for(SourceReplacement r:sourceEdits.replacementRecords()){
+            h=mix(h,r.sourceId);h=mix(h,r.color);h=mix(h,r.layer==null?0:r.layer.hashCode());
+            h=mix(h,r.lineType==null?0:r.lineType.hashCode());h=mix(h,Double.doubleToLongBits(r.lineTypeScale));h=mix(h,r.lineWeight);h=hashEdit(h,r.edit);
+        }
+        for(SourceRange r:sourceEdits.removals()){h=mix(h,r.sourceId);h=mix(h,r.startLine);h=mix(h,r.endLineExclusive);}
+        for(Map.Entry<String,CadBlock.Definition> item:userBlocks.entrySet()){
+            h=mix(h,item.getKey().hashCode());for(CadEdit e:item.getValue().members)h=hashEdit(h,e);
+        }
+        return h;
+    }
+
+    private static long hashEdit(long h,CadEdit e){
+        if(e==null)return mix(h,0);
+        h=mix(h,e.type.ordinal());h=mix(h,e.closed?1:0);h=mix(h,Float.floatToIntBits(e.strokeWidth));h=mix(h,Float.floatToIntBits(e.rotationDegrees));
+        h=mix(h,e.text==null?0:e.text.hashCode());h=mix(h,e.textStyleName==null?0:e.textStyleName.hashCode());h=mix(h,e.textFamilyHint==null?0:e.textFamilyHint.hashCode());
+        h=mix(h,e.textShx?1:0);h=mix(h,Float.floatToIntBits(e.textHeight));h=mix(h,Float.floatToIntBits(e.textWidthFactor));h=mix(h,Float.floatToIntBits(e.textOblique));h=mix(h,e.textGenerationFlags);
+        if(e.xy!=null)for(float v:e.xy)h=mix(h,Float.floatToIntBits(v));
+        return h;
+    }
+    private static long mix(long h,long value){return (h^value)*1099511628211L;}
 
     public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
     public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
