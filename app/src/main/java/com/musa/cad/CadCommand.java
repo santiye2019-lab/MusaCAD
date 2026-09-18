@@ -2,29 +2,109 @@ package com.musa.cad;
 
 import java.util.Locale;
 
-/** Small AutoCAD-like command alias parser used by the mobile command line. */
+/**
+ * AutoCAD-style English command aliases for the mobile command line.
+ * Supported commands execute in MusaCAD; familiar but not-yet-implemented
+ * commands are recognized so experienced CAD users get an explicit status.
+ */
 public final class CadCommand {
-    public enum Action { NONE, LINE, POLYLINE, CIRCLE, RECTANGLE, TEXT, SELECT, MOVE, COPY, ERASE, LAYER, PROPERTIES, ZOOM_EXTENTS, UNDO, SAVE, HELP }
+    public enum Action {
+        NONE, LINE, POLYLINE, CIRCLE, RECTANGLE, TEXT, SELECT,
+        PAN, MOVE, COPY, ROTATE, ERASE, LAYER, PROPERTIES,
+        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
+    }
+
     public static Action parse(String raw){
-        if(raw==null)return Action.NONE;String s=raw.trim().toUpperCase(Locale.ROOT).replace("İ","I");
-        if(s.isEmpty())return Action.NONE;
-        if(eq(s,"L","LINE","CIZGI","ÇIZGI","ÇİZGİ"))return Action.LINE;
-        if(eq(s,"PL","PLINE","POLYLINE","COKLU","ÇOKLU"))return Action.POLYLINE;
-        if(eq(s,"C","CIRCLE","DAIRE","DAİRE"))return Action.CIRCLE;
-        if(eq(s,"REC","RECTANG","RECTANGLE","DORTGEN","DÖRTGEN"))return Action.RECTANGLE;
-        if(eq(s,"T","TEXT","MTEXT","YAZI"))return Action.TEXT;
-        if(eq(s,"S","SELECT","SEC","SEÇ"))return Action.SELECT;
-        if(eq(s,"M","MOVE","TASI","TAŞI"))return Action.MOVE;
-        if(eq(s,"CO","CP","COPY","KOPYA"))return Action.COPY;
-        if(eq(s,"E","ERASE","DEL","DELETE","SIL","SİL"))return Action.ERASE;
-        if(eq(s,"LA","LAYER","KATMAN"))return Action.LAYER;
-        if(eq(s,"PR","PROPERTIES","PROP","OZELLIK","ÖZELLİK","ÖZELLIK"))return Action.PROPERTIES;
-        if(eq(s,"Z","ZE","EXTENTS","FIT","SIGDIR","SIĞDIR"))return Action.ZOOM_EXTENTS;
-        if(eq(s,"U","UNDO","GERI","GERİ"))return Action.UNDO;
-        if(eq(s,"SAVE","KAYDET","DXFSAVE"))return Action.SAVE;
-        if(eq(s,"?","HELP","YARDIM"))return Action.HELP;
+        String s=normalize(raw);if(s.isEmpty())return Action.NONE;
+
+        if(eq(s,"L","LINE"))return Action.LINE;
+        if(eq(s,"PL","PLINE","POLYLINE"))return Action.POLYLINE;
+        if(eq(s,"C","CIRCLE"))return Action.CIRCLE;
+        if(eq(s,"REC","RECTANG","RECTANGLE"))return Action.RECTANGLE;
+        if(eq(s,"DT","TEXT","T","MTEXT"))return Action.TEXT;
+
+        // Do not use S for SELECT: classic AutoCAD users expect S = STRETCH.
+        if(eq(s,"SEL","SELECT"))return Action.SELECT;
+        if(eq(s,"P","PAN"))return Action.PAN;
+        if(eq(s,"M","MOVE"))return Action.MOVE;
+        if(eq(s,"CO","CP","COPY"))return Action.COPY;
+        if(eq(s,"RO","ROTATE"))return Action.ROTATE;
+        if(eq(s,"E","ERASE","DELETE"))return Action.ERASE;
+
+        if(eq(s,"LA","LAYER"))return Action.LAYER;
+        if(eq(s,"PR","PROPERTIES","PROP"))return Action.PROPERTIES;
+        if(eq(s,"DI","DIST","DISTANCE"))return Action.DISTANCE;
+        if(eq(s,"AA","AREA"))return Action.AREA;
+
+        if(eq(s,"ZE","Z E","Z EXTENTS","ZOOM E","ZOOM EXTENTS"))return Action.ZOOM_EXTENTS;
+        if(eq(s,"Z","ZOOM"))return Action.ZOOM;
+
+        if(eq(s,"U","UNDO"))return Action.UNDO;
+        if(eq(s,"QS","QSAVE","SAVE"))return Action.SAVE;
+        if(eq(s,"?","HELP"))return Action.HELP;
+
+        if(classicUnsupported(s)!=null)return Action.UNSUPPORTED;
         return Action.NONE;
     }
-    private static boolean eq(String s,String...v){for(String x:v)if(s.equals(x))return true;return false;}
+
+    public static String canonical(String raw){
+        String s=normalize(raw);
+        String unsupported=classicUnsupported(s);
+        if(unsupported!=null)return unsupported;
+        Action a=parse(raw);
+        switch(a){
+            case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";
+            case RECTANGLE:return "RECTANG";case TEXT:return "TEXT/MTEXT";case SELECT:return "SELECT";
+            case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
+            case ERASE:return "ERASE";case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
+            case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
+            case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
+            case HELP:return "HELP";default:return s;
+        }
+    }
+
+    private static String classicUnsupported(String s){
+        if(eq(s,"A","ARC"))return "ARC";
+        if(eq(s,"AR","ARRAY"))return "ARRAY";
+        if(eq(s,"B","BLOCK"))return "BLOCK";
+        if(eq(s,"BR","BREAK"))return "BREAK";
+        if(eq(s,"CHA","CHAMFER"))return "CHAMFER";
+        if(eq(s,"D","DIMSTYLE"))return "DIMSTYLE";
+        if(eq(s,"DAL","DIMALIGNED"))return "DIMALIGNED";
+        if(eq(s,"DLI","DIMLINEAR"))return "DIMLINEAR";
+        if(eq(s,"EL","ELLIPSE"))return "ELLIPSE";
+        if(eq(s,"EX","EXTEND"))return "EXTEND";
+        if(eq(s,"F","FILLET"))return "FILLET";
+        if(eq(s,"H","HATCH"))return "HATCH";
+        if(eq(s,"I","INSERT"))return "INSERT";
+        if(eq(s,"J","JOIN"))return "JOIN";
+        if(eq(s,"LI","LIST"))return "LIST";
+        if(eq(s,"MA","MATCHPROP"))return "MATCHPROP";
+        if(eq(s,"MI","MIRROR"))return "MIRROR";
+        if(eq(s,"O","OFFSET"))return "OFFSET";
+        if(eq(s,"OS","OSNAP"))return "OSNAP";
+        if(eq(s,"PE","PEDIT"))return "PEDIT";
+        if(eq(s,"PO","POINT"))return "POINT";
+        if(eq(s,"RE","REGEN"))return "REGEN";
+        if(eq(s,"SC","SCALE"))return "SCALE";
+        if(eq(s,"S","STRETCH"))return "STRETCH";
+        if(eq(s,"TR","TRIM"))return "TRIM";
+        if(eq(s,"X","EXPLODE"))return "EXPLODE";
+        if(eq(s,"XL","XLINE"))return "XLINE";
+        if(eq(s,"REDO"))return "REDO";
+        return null;
+    }
+
+    private static String normalize(String raw){
+        if(raw==null)return "";
+        String s=raw.trim().toUpperCase(Locale.ROOT)
+            .replace('İ','I').replaceAll("\\s+"," ");
+        return s;
+    }
+
+    private static boolean eq(String s,String... values){
+        for(String value:values)if(s.equals(value))return true;
+        return false;
+    }
     private CadCommand(){}
 }
