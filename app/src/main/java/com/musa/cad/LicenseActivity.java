@@ -89,7 +89,7 @@ public class LicenseActivity extends AppCompatActivity {
                 switch(r.status){
                     case ACTIVATED:
                         Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();
-                        enterApp();return;
+                        enterAfterLicense();return;
                     case ALREADY_USED:
                         message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");
                         refresh();return;
@@ -113,7 +113,7 @@ public class LicenseActivity extends AppCompatActivity {
     private void startLocalTrialFallback(){
         if(LicenseManager.startTrial(this)){
             Toast.makeText(this,"1 günlük ücretsiz deneme başlatıldı",Toast.LENGTH_SHORT).show();
-            enterApp();
+            enterAfterLicense();
             return;
         }
         message.setText("Bu cihazdaki 1 günlük ücretsiz deneme daha önce başlatılmış veya sona ermiş.");
@@ -126,7 +126,7 @@ public class LicenseActivity extends AppCompatActivity {
         }
         String code=licenseCode.getText().toString().trim();
         LicenseManager.ActivationResult r=LicenseManager.activateCode(this,code);
-        if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;}
+        if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterAfterLicense();return;}
         licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
         message.setText("Lisans kodu bu ekrandaki Cihaz/Lisans Kimliği için üretilmelidir.");
     }
@@ -136,6 +136,15 @@ public class LicenseActivity extends AppCompatActivity {
         ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
         clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Lisans Kimliği",id));
         Toast.makeText(this,"Lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+    }
+
+    private void enterAfterLicense(){
+        if(pendingIntent!=null){enterApp();return;}
+        Intent about=new Intent(this,AboutActivity.class);
+        about.putExtra(AboutActivity.EXTRA_CONTINUE_TO_APP,true);
+        startActivity(about);
+        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
+        finish();
     }
 
     private void enterApp(){
