@@ -32,7 +32,11 @@ public class CadView extends View {
     private boolean multiTouch;
     private float[] snapPoints=new float[0];
     private boolean snapEnabled=true,lastSnapped;
-    private boolean moveSelectedArmed,lastActionRegular;
+    private boolean moveSelectedArmed,lastActionRegular,fastNavigation;
+    private String currentLayer="0",currentTextStyle="STANDARD",currentTextFamily="sans";
+    private int currentColorMode=CadEdit.COLOR_BYLAYER,currentColorValue=7;
+    private boolean currentTextShx;
+    private float currentTextHeight=30f,currentTextWidthFactor=1f;
 
     private boolean selecting,draggingSelection,exporting;
     private float selectionX,selectionY,selectionEndX,selectionEndY;
@@ -46,10 +50,12 @@ public class CadView extends View {
     public CadView(Context c,AttributeSet a){
         super(c,a);setBackgroundColor(Color.rgb(18,24,30));setFocusable(true);
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+            @Override public boolean onScaleBegin(ScaleGestureDetector d){fastNavigation=true;return true;}
             public boolean onScale(ScaleGestureDetector d){
                 float next=Math.max(.001f,Math.min(200f,scale*d.getScaleFactor()));float f=next/scale;scale=next;
                 imageMatrix.postScale(f,f,d.getFocusX(),d.getFocusY());invalidate();return true;
             }
+            @Override public void onScaleEnd(ScaleGestureDetector d){fastNavigation=false;invalidate();}
         });
         gestureDetector=new GestureDetector(c,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDoubleTap(MotionEvent e){if(mode!=Mode.PAN||!hasDrawing())return false;fit();invalidate();notifyValue();return true;}
@@ -62,6 +68,18 @@ public class CadView extends View {
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
     public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
+    public void setDrawingProperties(String layer,int colorMode,int colorValue,String textStyle,String textFamily,boolean textShx,float textHeight,float textWidthFactor){
+        currentLayer=layer==null||layer.trim().isEmpty()?"0":layer.trim();
+        currentColorMode=colorMode>=CadEdit.COLOR_BYLAYER&&colorMode<=CadEdit.COLOR_TRUECOLOR?colorMode:CadEdit.COLOR_BYLAYER;
+        currentColorValue=currentColorMode==CadEdit.COLOR_ACI?Math.max(1,Math.min(255,colorValue)):currentColorMode==CadEdit.COLOR_TRUECOLOR?(colorValue&0x00FFFFFF):colorValue;
+        currentTextStyle=textStyle==null||textStyle.trim().isEmpty()?"STANDARD":textStyle.trim();
+        currentTextFamily=textFamily==null||textFamily.trim().isEmpty()?"sans":textFamily.trim();currentTextShx=textShx;
+        currentTextHeight=Float.isFinite(textHeight)&&textHeight>0?textHeight:30f;currentTextWidthFactor=Float.isFinite(textWidthFactor)&&textWidthFactor>0?textWidthFactor:1f;
+    }
+    public String currentLayer(){return currentLayer;}public int currentColorMode(){return currentColorMode;}public int currentColorValue(){return currentColorValue;}
+    public String currentTextStyle(){return currentTextStyle;}public String currentTextFamily(){return currentTextFamily;}public boolean currentTextShx(){return currentTextShx;}
+    public float currentTextHeight(){return currentTextHeight;}public float currentTextWidthFactor(){return currentTextWidthFactor;}
+    private CadEdit styled(CadEdit edit){return edit.withCadProperties(currentLayer,currentColorMode,currentColorValue);}
     public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
     public boolean isStylusModeDetected(){return stylusModeDetected;}
 
@@ -139,11 +157,14 @@ public class CadView extends View {
     public boolean finishEdit(){
         if(mode!=Mode.DRAW_POLYLINE||points.size()<2)return false;float[] xy=new float[points.size()*2];
         for(int i=0;i<points.size();i++){xy[i*2]=points.get(i).x;xy[i*2+1]=points.get(i).y;}
-        edits.add(CadEdit.polyline(xy));lastActionRegular=true;points.clear();lastSnapped=false;notifyValue();invalidate();return true;
+        edits.add(styled(CadEdit.polyline(xy)));lastActionRegular=true;points.clear();lastSnapped=false;notifyValue();invalidate();return true;
     }
 
-    public void addTextEdit(float x,float y,String text){
-        if(vectorDrawing==null||text==null||text.trim().isEmpty())return;edits.add(CadEdit.text(x,y,text.trim()));lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
+    public void addTextEdit(float x,float y,String text){addTextEdit(x,y,text,currentTextStyle,currentTextFamily,currentTextShx,currentTextHeight,currentTextWidthFactor);}
+    public void addTextEdit(float x,float y,String text,String styleName,String familyHint,boolean shx,float height,float widthFactor){
+        if(vectorDrawing==null||text==null||text.trim().isEmpty())return;
+        CadEdit edit=CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,height,widthFactor,0f,0).withCadProperties(currentLayer,currentColorMode,currentColorValue);
+        edits.add(edit);lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
     }
 
     public void undo(){
@@ -177,7 +198,7 @@ public class CadView extends View {
 
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        if(vectorDrawing!=null)vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+        if(vectorDrawing!=null)vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds(),fastNavigation&&!exporting);
         else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);
 
@@ -193,9 +214,15 @@ public class CadView extends View {
     }
 
     private void drawEdits(Canvas c){
-        for(CadEdit edit:edits)drawEdit(c,edit,Color.rgb(255,193,7));
+        for(CadEdit edit:edits)drawEdit(c,edit,editColor(edit));
         if(vectorDrawing!=null){for(SourceReplacement replacement:sourceEdits.replacementRecords())vectorDrawing.drawSourceReplacement(c,imageMatrix,replacement,false,false);}
         resetTextPaint();paint.setPathEffect(null);paint.setStrokeWidth(3f);
+    }
+
+    private int editColor(CadEdit edit){
+        if(edit.colorMode==CadEdit.COLOR_ACI)return DxfColor.aciArgb(edit.colorValue);
+        if(edit.colorMode==CadEdit.COLOR_TRUECOLOR)return 0xFF000000|(edit.colorValue&0x00FFFFFF);
+        return edit.colorMode==CadEdit.COLOR_BYBLOCK?Color.CYAN:Color.WHITE;
     }
 
     private void drawEdit(Canvas c,CadEdit edit,int color){
@@ -255,8 +282,8 @@ public class CadView extends View {
 
         if(mode==Mode.PAN)gestureDetector.onTouchEvent(e);if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
-        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;}
-        if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
+        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){fastNavigation=true;float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;}
+        if(e.getActionMasked()==MotionEvent.ACTION_UP){if(mode==Mode.PAN){fastNavigation=false;invalidate();return true;}return addCadPoint(e.getX(),e.getY());}return true;
     }
 
     private boolean sourceEditTouch(MotionEvent e){
@@ -282,7 +309,7 @@ public class CadView extends View {
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}if(e.getActionMasked()==MotionEvent.ACTION_MOVE){imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}return true;
     }
 
-    private boolean directPanTouch(MotionEvent e){int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;lastX=e.getX();lastY=e.getY();return true;}if(action==MotionEvent.ACTION_MOVE){imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){stylusDown=false;return true;}return true;}
+    private boolean directPanTouch(MotionEvent e){int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;lastX=e.getX();lastY=e.getY();return true;}if(action==MotionEvent.ACTION_MOVE){fastNavigation=true;imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){stylusDown=false;fastNavigation=false;invalidate();return true;}return true;}
 
     private boolean stylusFreehandTouch(MotionEvent e){
         int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;freehandPoints.clear();freehandPressureSum=0f;freehandPressureSamples=0;addFreehandSample(e.getX(),e.getY(),e.getPressure());invalidate();return true;}
@@ -297,7 +324,7 @@ public class CadView extends View {
 
     private void commitFreehand(){
         if(freehandPoints.size()<2){freehandPoints.clear();return;}float[] xy=new float[freehandPoints.size()*2];for(int i=0;i<freehandPoints.size();i++){xy[i*2]=freehandPoints.get(i).x;xy[i*2+1]=freehandPoints.get(i).y;}
-        float avg=freehandPressureSamples==0?.5f:freehandPressureSum/freehandPressureSamples;edits.add(CadEdit.freehand(xy,pressureWidth(avg)));lastActionRegular=true;freehandPoints.clear();
+        float avg=freehandPressureSamples==0?.5f:freehandPressureSum/freehandPressureSamples;edits.add(styled(CadEdit.freehand(xy,pressureWidth(avg))));lastActionRegular=true;freehandPoints.clear();
     }
 
     private boolean addCadPoint(float screenX,float screenY){
@@ -305,9 +332,9 @@ public class CadView extends View {
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
         points.add(new PointF(xy[0],xy[1]));
-        if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.line(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
-        else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.rectangle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
-        else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.circle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
+        if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.line(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.rectangle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.circle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
