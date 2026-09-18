@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 /** One MusaCAD overlay/source edit stored in drawing-content coordinates. */
 public final class CadEdit {
-    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, HATCH, INSERT, TEXT }
+    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, HATCH, TEXT }
     public final Type type;
     public final float[] xy;
     public final String text;
@@ -63,21 +63,16 @@ public final class CadEdit {
     public static CadEdit text(float x,float y,String text){return text(x,y,text,0f);}
     public static CadEdit text(float x,float y,String text,float rotationDegrees){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees);}
     public static CadEdit styledText(float x,float y,String text,float rotationDegrees,String styleName,String familyHint,boolean shx,float height,float widthFactor,float oblique,int generationFlags){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees,styleName,familyHint,shx,height,widthFactor,oblique,generationFlags);}
-    public static CadEdit insert(String blockName,float x,float y,float scale,float rotationDegrees){
-        String name=CadBlock.normalizeName(blockName);if(name.isEmpty()||!Float.isFinite(scale)||scale<=0f)return null;
-        return new CadEdit(Type.INSERT,new float[]{x,y},name,3f,false,rotationDegrees,"STANDARD","sans",false,scale,1f,0f,0);
-    }
-    public float insertScale(){return type==Type.INSERT&&textHeight>0f?textHeight:1f;}
     public boolean hasTextStyle(){return type==Type.TEXT&&textHeight>0f;}
 
     public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit translated(float dx,float dy){float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){out[i]+=dx;out[i+1]+=dy;}return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
-    public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=(type==Type.TEXT||type==Type.INSERT)?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=type==Type.TEXT?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit scaled(float factor,float pivotX,float pivotY){
         if(!Float.isFinite(factor)||factor<=0f)throw new IllegalArgumentException("scale");
         float[] out=xy.clone();
         for(int i=0;i+1<out.length;i+=2){out[i]=pivotX+(out[i]-pivotX)*factor;out[i+1]=pivotY+(out[i+1]-pivotY)*factor;}
-        float scaledTextHeight=(type==Type.TEXT||type==Type.INSERT)&&textHeight>0f?textHeight*factor:textHeight;
+        float scaledTextHeight=type==Type.TEXT&&textHeight>0f?textHeight*factor:textHeight;
         float scaledStroke=Math.max(1f,strokeWidth*factor);
         return new CadEdit(type,out,text,scaledStroke,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,scaledTextHeight,textWidthFactor,textOblique,textGenerationFlags);
     }
@@ -88,7 +83,7 @@ public final class CadEdit {
             else out[i+1]=2f*pivotY-out[i+1];
         }
         float textRotation=rotationDegrees;
-        if(type==Type.TEXT||type==Type.INSERT)textRotation=verticalAxis?180f-rotationDegrees:-rotationDegrees;
+        if(type==Type.TEXT)textRotation=verticalAxis?180f-rotationDegrees:-rotationDegrees;
         return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
     }
     public CadEdit offset(float distance){
@@ -163,11 +158,13 @@ public final class CadEdit {
         case ARC:{if(xy.length<8)return Float.POSITIVE_INFINITY;float radius=(float)Math.hypot(xy[0]-xy[6],xy[1]-xy[7]);float radial=Math.abs((float)Math.hypot(x-xy[6],y-xy[7])-radius);float a=angle(xy[0]-xy[6],xy[1]-xy[7]),m=angle(xy[2]-xy[6],xy[3]-xy[7]),e=angle(xy[4]-xy[6],xy[5]-xy[7]),p=angle(x-xy[6],y-xy[7]);return onArc(a,m,e,p)?radial:Math.min((float)Math.hypot(x-xy[0],y-xy[1]),(float)Math.hypot(x-xy[4],y-xy[5]));}
         case ELLIPSE:{if(xy.length<6)return Float.POSITIVE_INFINITY;float cx=xy[0],cy=xy[1],ax=xy[2]-cx,ay=xy[3]-cy,bx=xy[4]-cx,by=xy[5]-cy;float aLen=(float)Math.hypot(ax,ay),bLen=(float)Math.hypot(bx,by);if(aLen<1e-6f||bLen<1e-6f)return Float.POSITIVE_INFINITY;float ux=ax/aLen,uy=ay/aLen,vx=bx/bLen,vy=by/bLen;float dx=x-cx,dy=y-cy,localX=dx*ux+dy*uy,localY=dx*vx+dy*vy;float q=(float)Math.sqrt((localX*localX)/(aLen*aLen)+(localY*localY)/(bLen*bLen));return Math.abs(q-1f)*Math.min(aLen,bLen);}
         case POINT:return (float)Math.hypot(x-xy[0],y-xy[1]);
-        case INSERT:return xy.length>=2?(float)Math.hypot(x-xy[0],y-xy[1]):Float.POSITIVE_INFINITY;
         case XLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float dx=xy[2]-xy[0],dy=xy[3]-xy[1],len=(float)Math.hypot(dx,dy);if(len<1e-6f)return Float.POSITIVE_INFINITY;return Math.abs((x-xy[0])*dy-(y-xy[1])*dx)/len;}
         case POLYLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));if(closed&&xy.length>=6)best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
         case HATCH:{if(xy.length<6)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
         case TEXT:return (float)Math.hypot(x-xy[0],y-xy[1]);default:return Float.POSITIVE_INFINITY;}}
+    private static float angle(float x,float y){float a=(float)Math.toDegrees(Math.atan2(y,x));return a<0f?a+360f:a;}
+    private static float ccw(float from,float to){float d=to-from;while(d<0f)d+=360f;while(d>=360f)d-=360f;return d;}
+    private static boolean onArc(float start,float mid,float end,float point){float se=ccw(start,end),sm=ccw(start,mid),sp=ccw(start,point);if(sm<=se+1e-4f)return sp<=se+1e-4f;float es=ccw(end,start),em=ccw(end,mid),ep=ccw(end,point);return em<=es+1e-4f&&ep<=es+1e-4f;}
     private static float segmentDistance(float px,float py,float ax,float ay,float bx,float by){float dx=bx-ax,dy=by-ay;float len=dx*dx+dy*dy;if(len<=1e-12f)return (float)Math.hypot(px-ax,py-ay);float t=((px-ax)*dx+(py-ay)*dy)/len;t=Math.max(0f,Math.min(1f,t));return (float)Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
     private static float normalize(float degrees){if(!Float.isFinite(degrees))return 0f;float v=degrees%360f;if(v<=-180f)v+=360f;if(v>180f)v-=360f;return v;}
 }
