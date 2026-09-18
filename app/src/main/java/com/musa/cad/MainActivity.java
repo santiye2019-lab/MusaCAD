@@ -534,10 +534,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSelectedLineType(){
         if(!ensureSelectedForQuickTool("Çizgi Tipi"))return;
-        ArrayList<String> names=new ArrayList<>(activeDxf.lineTypeNames());if(names.isEmpty())names.add("CONTINUOUS");
+        ArrayList<String> names=new ArrayList<>(activeDxf.lineTypeNames());if(names.isEmpty())names.add("CONTINUOUS");String current=cad.selectedLineType();boolean hasCurrent=false;for(String n:names)if(n.equalsIgnoreCase(current)){hasCurrent=true;break;}if(!hasCurrent&&current!=null&&!current.trim().isEmpty())names.add(0,current);
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
         Spinner spinner=new Spinner(this);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));
-        String current=cad.selectedLineType();for(int i=0;i<names.size();i++)if(names.get(i).equalsIgnoreCase(current)){spinner.setSelection(i);break;}box.addView(spinner);
+        for(int i=0;i<names.size();i++)if(names.get(i).equalsIgnoreCase(current)){spinner.setSelection(i);break;}box.addView(spinner);
         EditText scale=new EditText(this);scale.setSingleLine(true);scale.setHint("Çizgi tipi ölçeği");scale.setText(String.format(Locale.US,"%.3f",cad.selectedLineTypeScale()));scale.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(scale);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Çizgi Tipi").setView(box).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
@@ -581,8 +581,8 @@ public class MainActivity extends AppCompatActivity {
             if(which==0)selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);
             else if(which==1)selectMode(R.id.areaButton,CadView.Mode.AREA);
             else if(which==2)selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE);
-            else if(which==3){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_LINEAR);markModeSelected(0);result.setText("DIMLINEAR • İki ölçü noktası ve ölçü çizgisi konumu seçin");}}
-            else if(which==4){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");}}
+            else if(which==3){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_LINEAR);markModeSelected(0);result.setText("DIMLINEAR • İki ölçü noktası ve ölçü çizgisi konumu seçin");}else Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();}
+            else if(which==4){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");}else Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();}
             else runDimStyleCommand();
         }).setNegativeButton("İPTAL",null).show();
     }
