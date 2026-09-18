@@ -201,17 +201,7 @@ public class MainActivity extends AppCompatActivity {
     }
     private void showQuickColor(){
         if(activeDxf==null)return;
-        String[] items={"BYLAYER","BYBLOCK","Kırmızı • ACI 1","Sarı • ACI 2","Yeşil • ACI 3","Cyan • ACI 4","Mavi • ACI 5","Magenta • ACI 6","Beyaz • ACI 7","True Color RGB…"};
-        new AlertDialog.Builder(this).setTitle("Renk").setItems(items,(d,which)->{
-            if(which==0)setActiveColor(CadEdit.COLOR_BYLAYER,7);
-            else if(which==1)setActiveColor(CadEdit.COLOR_BYBLOCK,7);
-            else if(which>=2&&which<=8)setActiveColor(CadEdit.COLOR_ACI,which-1);
-            else{
-                EditText input=new EditText(this);input.setSingleLine(true);input.setHint("#RRGGBB");input.setText(cad.currentColorMode()==CadEdit.COLOR_TRUECOLOR?String.format(Locale.US,"#%06X",cad.currentColorValue()&0xFFFFFF):"#FFFFFF");
-                AlertDialog picker=new AlertDialog.Builder(this).setTitle("True Color").setView(input).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
-                picker.setOnShowListener(x->picker.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{String hex=input.getText().toString().trim().replace("#","");if(hex.length()!=6)throw new IllegalArgumentException();setActiveColor(CadEdit.COLOR_TRUECOLOR,Integer.parseInt(hex,16));picker.dismiss();}catch(Exception ex){input.setError("#RRGGBB biçiminde renk girin");}}));picker.show();
-            }
-        }).show();
+        showColorPalette(cad.currentColorMode(),cad.currentColorValue(),cad.currentLayer(),this::setActiveColor);
     }
     private void setActiveLineType(String type){
         String value=DxfLineStyle.normalizeName(type);
