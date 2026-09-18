@@ -367,13 +367,13 @@ public class MainActivity extends AppCompatActivity {
         if(additions.isEmpty()&&replacements.isEmpty()&&removals.isEmpty())return 0L;
         long h=1469598103934665603L;
         for(CadEdit edit:additions)h=hashEdit(h,edit);
-        for(SourceReplacement r:replacements){h=mix(h,r.sourceId);h=mix(h,r.range.startLine);h=mix(h,r.range.endLineExclusive);h=mix(h,r.color);h=mix(h,r.lineWeight);h=mix(h,Double.doubleToLongBits(r.lineTypeScale));h=mix(h,r.layer.hashCode());h=mix(h,r.lineType.hashCode());h=hashEdit(h,r.edit);}
+        for(SourceReplacement r:replacements){h=mix(h,r.sourceId);h=mix(h,r.range.startLine);h=mix(h,r.range.endLineExclusive);h=mix(h,r.colorMode);h=mix(h,r.colorValue);h=mix(h,r.lineWeight);h=mix(h,Double.doubleToLongBits(r.lineTypeScale));h=mix(h,r.layer.hashCode());h=mix(h,r.lineType.hashCode());h=hashEdit(h,r.edit);}
         for(SourceRange r:removals){h=mix(h,r.sourceId);h=mix(h,r.startLine);h=mix(h,r.endLineExclusive);}
         return h;
     }
     private static long hashEdit(long h,CadEdit e){
         if(e==null)return mix(h,0);h=mix(h,e.type.ordinal());h=mix(h,e.closed?1:0);h=mix(h,Float.floatToIntBits(e.strokeWidth));h=mix(h,Float.floatToIntBits(e.rotationDegrees));
-        h=mix(h,e.text==null?0:e.text.hashCode());h=mix(h,e.layerName.hashCode());h=mix(h,e.colorMode);h=mix(h,e.colorValue);h=mix(h,e.textStyleName.hashCode());h=mix(h,e.textFamilyHint.hashCode());
+        h=mix(h,e.text==null?0:e.text.hashCode());h=mix(h,e.layerName.hashCode());h=mix(h,e.colorMode);h=mix(h,e.colorValue);h=mix(h,e.lineTypeName.hashCode());h=mix(h,e.lineWeight);h=mix(h,e.textStyleName.hashCode());h=mix(h,e.textFamilyHint.hashCode());
         h=mix(h,e.textShx?1:0);h=mix(h,Float.floatToIntBits(e.textHeight));h=mix(h,Float.floatToIntBits(e.textWidthFactor));h=mix(h,Float.floatToIntBits(e.textOblique));h=mix(h,e.textGenerationFlags);
         for(float v:e.xy)h=mix(h,Float.floatToIntBits(v));return h;
     }
