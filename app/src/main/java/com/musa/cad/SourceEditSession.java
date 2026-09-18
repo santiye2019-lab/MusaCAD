@@ -24,6 +24,31 @@ public final class SourceEditSession {
     private final ArrayDeque<Undo> undo=new ArrayDeque<>();
     private int selected=-1;
 
+    /** Deep-copy state used when switching between open drawing tabs. */
+    public static final class Snapshot {
+        private final LinkedHashMap<Integer,Entry> entries;
+        private final ArrayDeque<Undo> undo;
+        private final int selected;
+        private Snapshot(LinkedHashMap<Integer,Entry> entries,ArrayDeque<Undo> undo,int selected){
+            this.entries=entries;this.undo=undo;this.selected=selected;
+        }
+    }
+
+    public Snapshot snapshot(){
+        LinkedHashMap<Integer,Entry> entryCopy=new LinkedHashMap<>();
+        for(Map.Entry<Integer,Entry> item:entries.entrySet())entryCopy.put(item.getKey(),item.getValue().copy());
+        ArrayDeque<Undo> undoCopy=new ArrayDeque<>();
+        for(Undo item:undo)undoCopy.addLast(new Undo(item.id,item.previous==null?null:item.previous.copy(),item.selected));
+        return new Snapshot(entryCopy,undoCopy,selected);
+    }
+
+    public void restore(Snapshot state){
+        clear();if(state==null)return;
+        for(Map.Entry<Integer,Entry> item:state.entries.entrySet())entries.put(item.getKey(),item.getValue().copy());
+        for(Undo item:state.undo)undo.addLast(new Undo(item.id,item.previous==null?null:item.previous.copy(),item.selected));
+        selected=state.selected;
+    }
+
     public void clear(){entries.clear();undo.clear();selected=-1;}
     public int selectedId(){return selected;}
     public boolean hasSelection(){Entry e=entries.get(selected);return e!=null&&!e.deleted;}
