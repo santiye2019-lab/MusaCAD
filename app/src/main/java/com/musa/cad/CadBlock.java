@@ -19,7 +19,7 @@ public final class CadBlock {
 
     public static String normalizeName(String name){
         if(name==null)return "";
-        return name.trim().replaceAll("[^A-Za-z0-9_\-]","_");
+        return name.trim().replaceAll("[^A-Za-z0-9_-]","_");
     }
 
     public static CadEdit memberRelativeToCenter(CadEdit edit){
