@@ -216,6 +216,117 @@ public class MainActivity extends AppCompatActivity {
     private void markModeSelected(int id){if(modeButtons==null)return;for(View button:modeButtons)button.setSelected(button.getId()==id);}
     private void hideWelcomePanel(){if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;welcomePanel.animate().alpha(0f).setDuration(180).withEndAction(()->{welcomePanel.setVisibility(View.GONE);welcomePanel.setAlpha(1f);}).start();}
 
+    private DocumentSession activeSession(){
+        return activeDocumentIndex>=0&&activeDocumentIndex<documents.size()?documents.get(activeDocumentIndex):null;
+    }
+
+    private void captureActiveSession(){
+        DocumentSession session=activeSession();if(session==null||currentFile==null)return;
+        session.file=currentFile;session.workingDxf=editingBaseDxf;session.parsed=activeDxf;session.name=currentDisplayName;
+        if(activeDxf!=null)session.bitmap=activeDxf.bitmap;
+        session.viewState=cad.captureSessionState();session.dirty=cad.hasEdits();
+    }
+
+    private void addLoadedDocument(Loaded loaded){
+        captureActiveSession();
+        DocumentSession session=new DocumentSession();session.file=loaded.file;session.workingDxf=loaded.workingDxf;session.bitmap=loaded.bitmap;session.parsed=loaded.parsed;session.name=loaded.name;session.dxf=loaded.dxf;
+        documents.add(session);activeDocumentIndex=documents.size()-1;applyDocumentSession(session);resetBackCloseFlow();refreshDocumentTabs();
+    }
+
+    private void activateDocument(int index){
+        if(index<0||index>=documents.size()||index==activeDocumentIndex||activeLoad!=null)return;
+        captureActiveSession();activeDocumentIndex=index;applyDocumentSession(documents.get(index));resetBackCloseFlow();refreshDocumentTabs();
+    }
+
+    private void applyDocumentSession(DocumentSession session){
+        if(session==null)return;
+        currentFile=session.file;editingBaseDxf=session.workingDxf;currentDisplayName=session.name==null?"cizim.dwg":session.name;activeDxf=session.parsed;
+        hideWelcomePanel();updateShareEnabled(currentFile!=null);updateEditorEnabled(canEdit());findViewById(R.id.layersButton).setEnabled(activeDxf!=null);
+        cad.restoreSession(activeDxf,session.bitmap,session.viewState);markModeSelected(R.id.panButton);
+        snapToggle.setEnabled(activeDxf!=null&&activeDxf.snapPoints.length>0);snapToggle.setChecked(activeDxf!=null&&(session.viewState==null||session.viewState.snapEnabled));
+        String editable=canEdit()?"  •  düzenlenebilir":"";
+        fileName.setText(currentDisplayName+(session.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":"  •  DWG önizleme")+editable);
+        if(activeDxf!=null){String fallback=(activeDxf.fontFallbacks.isEmpty()&&!activeDxf.externalShapeFallback)?"":"  •  SHX fallback";result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+editable+fallback);}
+        else result.setText("Hazır  •  DWG önizleme modu");
+    }
+
+    private void closeActiveDocument(){
+        if(activeDocumentIndex<0||activeDocumentIndex>=documents.size())return;
+        captureActiveSession();int closing=activeDocumentIndex;DocumentSession session=documents.remove(closing);session.dispose();
+        if(documents.isEmpty()){activeDocumentIndex=-1;clearActiveDocumentUi();}
+        else{activeDocumentIndex=Math.min(closing,documents.size()-1);applyDocumentSession(documents.get(activeDocumentIndex));}
+        resetBackCloseFlow();refreshDocumentTabs();
+    }
+
+    private void requestCloseDocument(int index){
+        if(index<0||index>=documents.size())return;if(index!=activeDocumentIndex)activateDocument(index);
+        if(cad.hasEdits()){
+            new AlertDialog.Builder(this).setTitle("Projeyi kapat").setMessage("Bu projede kaydedilmemiş değişiklikler var.")
+                .setPositiveButton("KAYDET VE KAPAT",(d,w)->{closeActiveAfterSave=true;requestEditedDxfSave();})
+                .setNegativeButton("KAYDETMEDEN KAPAT",(d,w)->{closeActiveAfterSave=false;closeActiveDocument();})
+                .setNeutralButton("İPTAL",null).show();
+        }else closeActiveDocument();
+    }
+
+    private void clearActiveDocumentUi(){
+        currentFile=null;editingBaseDxf=null;activeDxf=null;currentDisplayName="cizim.dwg";closeActiveAfterSave=false;
+        cad.clearDocument();updateShareEnabled(false);updateEditorEnabled(false);findViewById(R.id.layersButton).setEnabled(false);snapToggle.setEnabled(false);snapToggle.setChecked(false);
+        fileName.setText("Henüz proje açılmadı");result.setText("Hazır");if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
+    }
+
+    private String shortDocumentName(String name){
+        if(name==null||name.trim().isEmpty())return "Çizim";
+        String n=name.trim();return n.length()<=22?n:n.substring(0,19)+"…";
+    }
+
+    private void refreshDocumentTabs(){
+        if(documentTabs==null||documentTabScroll==null)return;
+        documentTabs.removeAllViews();
+        if(documents.isEmpty()){documentTabScroll.setVisibility(View.GONE);return;}
+        documentTabScroll.setVisibility(View.VISIBLE);
+        DocumentSession current=activeSession();if(current!=null&&currentFile!=null)current.dirty=cad.hasEdits();
+        for(int i=0;i<documents.size();i++){
+            final int index=i;DocumentSession session=documents.get(i);boolean active=i==activeDocumentIndex;
+            LinearLayout tab=new LinearLayout(this);tab.setOrientation(LinearLayout.HORIZONTAL);tab.setGravity(Gravity.CENTER_VERTICAL);tab.setPadding(dp(9),0,dp(3),0);
+            LinearLayout.LayoutParams tabLp=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,dp(32));tabLp.setMargins(dp(2),dp(2),dp(2),dp(2));tab.setLayoutParams(tabLp);tab.setBackgroundColor(active?Color.rgb(15,116,128):Color.rgb(20,48,61));
+            TextView label=new TextView(this);label.setSingleLine(true);label.setText(shortDocumentName(session.name)+(session.dirty?" •":""));label.setTextColor(Color.WHITE);label.setTextSize(10);label.setPadding(0,0,dp(5),0);tab.addView(label,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,LinearLayout.LayoutParams.MATCH_PARENT));
+            TextView close=new TextView(this);close.setText("×");close.setTextSize(18);close.setGravity(Gravity.CENTER);close.setTextColor(active?Color.WHITE:Color.rgb(160,184,194));close.setContentDescription("Projeyi kapat");tab.addView(close,new LinearLayout.LayoutParams(dp(28),LinearLayout.LayoutParams.MATCH_PARENT));
+            label.setOnClickListener(v->activateDocument(index));close.setOnClickListener(v->requestCloseDocument(index));
+            documentTabs.addView(tab);
+        }
+        TextView add=new TextView(this);add.setText("+");add.setTextSize(22);add.setTextColor(Color.rgb(111,227,215));add.setGravity(Gravity.CENTER);add.setContentDescription("Yeni proje aç");
+        add.setBackgroundColor(Color.rgb(12,38,49));add.setOnClickListener(v->open());documentTabs.addView(add,new LinearLayout.LayoutParams(dp(42),dp(32)));
+    }
+
+    private void resetBackCloseFlow(){backCloseStage=0;backCloseStageAt=0L;closeActiveAfterSave=false;}
+
+    @Override public void onBackPressed(){
+        if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem tamamlanıyor; kapatma için tekrar deneyin",Toast.LENGTH_SHORT).show();return;}
+        if(activeSession()==null){super.onBackPressed();return;}
+        long now=System.currentTimeMillis();if(backCloseStage==1&&now-backCloseStageAt>6000L)backCloseStage=0;
+        if(backCloseStage==0){
+            backCloseStage=1;backCloseStageAt=now;result.setText("Projeden çıkmak istiyor musunuz? • Geri tuşuna tekrar basın");
+            Toast.makeText(this,"Projeyi kapatma: tekrar Geri'ye basın",Toast.LENGTH_SHORT).show();return;
+        }
+        if(backCloseStage==1){
+            backCloseStage=2;
+            if(cad.hasEdits()){
+                AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Değişiklikler kaydedilsin mi?")
+                    .setMessage("Projede kaydedilmemiş düzenlemeler var. Üçüncü Geri tuşunda bu proje sekmesi kapanacak.")
+                    .setPositiveButton("KAYDET",(d,w)->{requestEditedDxfSave();result.setText("Kaydetme seçildi • ardından Geri = proje sekmesini kapat");})
+                    .setNegativeButton("KAYDETMEDEN DEVAM",(d,w)->result.setText("Kaydetmeden devam • Geri = proje sekmesini kapat"))
+                    .setNeutralButton("İPTAL",(d,w)->resetBackCloseFlow()).create();
+                dialog.setOnCancelListener(d->resetBackCloseFlow());dialog.show();
+            }else result.setText("Kaydedilmemiş değişiklik yok • Geri = proje sekmesini kapat");
+            return;
+        }
+        closeActiveDocument();
+    }
+
+    private void releaseAllDocuments(){
+        captureActiveSession();for(DocumentSession session:documents)session.dispose();documents.clear();activeDocumentIndex=-1;currentFile=null;editingBaseDxf=null;activeDxf=null;
+    }
+
     private void showLicense(){
         String license;try(InputStream in=getAssets().open("COPYING-LibreDWG.txt")){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1)out.write(bytes,0,n);license=out.toString("UTF-8");}catch(IOException e){license="GPL-3.0-or-later";}
         TextView text=new TextView(this);text.setPadding(24,16,24,16);text.setText("MusaCAD — LibreDWG ile çevrimdışı DWG okuma\nKaynak kod: https://github.com/santiye2019-lab/MusaCAD\n\n"+license);android.text.util.Linkify.addLinks(text,android.text.util.Linkify.WEB_URLS);text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());ScrollView scroll=new ScrollView(this);scroll.addView(text);new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
