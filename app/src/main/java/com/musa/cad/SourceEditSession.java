@@ -40,6 +40,7 @@ public final class SourceEditSession {
     public void clearSelection(){selected=-1;}
 
     public CadEdit currentSelected(){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().copy();}
+    public CadEdit currentFor(int id){Entry e=entries.get(id);return e==null||e.deleted?null:e.current().copy();}
 
     public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
     public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
