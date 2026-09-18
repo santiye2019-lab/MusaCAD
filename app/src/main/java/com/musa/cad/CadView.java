@@ -124,6 +124,8 @@ public class CadView extends View {
         return out;
     }
 
+    public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&sourceEdits.hasSelection();}
+
     public boolean armMoveSelected(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;moveSelectedArmed=true;notifyValue();invalidate();return true;
     }
