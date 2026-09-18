@@ -283,6 +283,12 @@ public class MainActivity extends AppCompatActivity {
                 if(cad.armStretchSelected())result.setText("STRETCH • Taşınacak köşe/vertex noktasına dokunun");
                 else result.setText("STRETCH • LINE, açık/kapalı POLYLINE veya RECTANGLE seçin");
                 break;
+            case BLOCK:
+                runBlockCommand();
+                break;
+            case INSERT:
+                runInsertCommand();
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -454,6 +460,64 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void runBlockCommand(){
+        if(!ensureTransformSelection("BLOCK"))return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Blok adı");
+        input.setText("MUSA_BLOCK_1");
+        input.setSelectAllOnFocus(true);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("BLOCK • Blok oluştur")
+            .setMessage("Seçili nesne merkez noktası baz alınarak isimli blok tanımına dönüştürülecek. Kaynak nesne çizimde kalır.")
+            .setView(input)
+            .setPositiveButton("OLUŞTUR",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String name=CadBlock.normalizeName(input.getText().toString());
+            if(name.isEmpty()){input.setError("Geçerli bir blok adı girin");return;}
+            if(!cad.defineBlockFromSelected(name)){input.setError("Seçili nesneden blok oluşturulamadı");return;}
+            dialog.dismiss();result.setText("BLOCK • "+name+" oluşturuldu");
+        }));
+        dialog.show();
+    }
+
+    private void runInsertCommand(){
+        List<String> names=cad.userBlockNames();
+        if(names.isEmpty()){result.setText("INSERT • Önce B / BLOCK ile bir blok oluşturun");return;}
+        String[] items=names.toArray(new String[0]);
+        new AlertDialog.Builder(this)
+            .setTitle("INSERT • Blok seç")
+            .setItems(items,(d,which)->showInsertOptions(items[which]))
+            .setNegativeButton("İPTAL",null)
+            .show();
+    }
+
+    private void showInsertOptions(String name){
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        EditText scale=new EditText(this);scale.setHint("Ölçek");scale.setText("1");scale.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(scale);
+        EditText rotation=new EditText(this);rotation.setHint("Döndürme açısı (°)");rotation.setText("0");rotation.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(rotation);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("INSERT • "+name)
+            .setMessage("Ölçek ve açıyı belirleyin; ardından çizimde yerleştirme noktasına dokunun.")
+            .setView(box)
+            .setPositiveButton("YERLEŞTİR",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                float sc=Float.parseFloat(scale.getText().toString().trim().replace(',','.'));
+                float ro=Float.parseFloat(rotation.getText().toString().trim().replace(',','.'));
+                if(!Float.isFinite(sc)||sc<=0f){scale.setError("Sıfırdan büyük bir ölçek girin");return;}
+                if(!Float.isFinite(ro)){rotation.setError("Geçerli bir açı girin");return;}
+                if(!cad.armInsertBlock(name,sc,ro)){dialog.dismiss();result.setText("INSERT • Blok yerleştirme başlatılamadı");return;}
+                dialog.dismiss();result.setText("INSERT • "+name+" • Yerleştirme noktasına dokunun");
+            }catch(Exception e){scale.setError("Geçerli ölçek ve açı değerleri girin");}
+        }));
+        dialog.show();
+    }
+
     private void runHatchCommand(){
         if(!ensureTransformSelection("HATCH"))return;
         new AlertDialog.Builder(this)
@@ -551,6 +615,8 @@ public class MainActivity extends AppCompatActivity {
             "J / JOIN • İki açık LINE/POLYLINE nesnesini birleştir\n"+
             "H / HATCH • SOLID veya ANSI31 tarama oluştur\n"+
             "S / STRETCH • Seçili vertex/köşeyi yeni konuma taşı\n"+
+            "B / BLOCK • Seçili nesneden isimli blok oluştur\n"+
+            "I / INSERT • Oluşturulan bloğu yerleştir\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -561,7 +627,7 @@ public class MainActivity extends AppCompatActivity {
             "REDO • Geri alınan işlemi yeniden uygula\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, INSERT";
+            "DIMSTYLE, DIMALIGNED, DIMLINEAR";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
@@ -693,9 +759,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final int total=additions.size()+removals.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}});
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}});
     }
 
     private void showShare(){
