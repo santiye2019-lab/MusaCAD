@@ -15,14 +15,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class LicenseActivity extends AppCompatActivity {
-    public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";
+    public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";\n    public static final String EXTRA_STAY_ON_LICENSE="com.musa.cad.STAY_ON_LICENSE";
     private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
     private CheckBox termsCheck;
     private Button trialButton;
     private EditText licenseCode;
     private TextView status,message,installationId;
     private Intent pendingIntent;
-    private volatile boolean trialRequestRunning;
+    private volatile boolean trialRequestRunning;\n    private boolean stayOnLicense;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
@@ -34,6 +34,7 @@ public class LicenseActivity extends AppCompatActivity {
             v.setPadding(0,bars.top,0,bars.bottom);return insets;
         });
 
+        stayOnLicense=getIntent().getBooleanExtra(EXTRA_STAY_ON_LICENSE,false);
         if(android.os.Build.VERSION.SDK_INT>=33)pendingIntent=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT,Intent.class);
         else {
             @SuppressWarnings("deprecation") Intent legacy=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT);pendingIntent=legacy;
@@ -71,8 +72,21 @@ public class LicenseActivity extends AppCompatActivity {
                 trialButton.setEnabled(false);trialButton.setAlpha(.45f);
                 message.setText("Deneme süresi güvenliği için cihaz tarih/saatini otomatik ayara alın.");break;
             case TRIAL_ACTIVE:
+                if(stayOnLicense){
+                    status.setText("1 günlük ücretsiz deneme aktif");
+                    message.setText("Deneme süresi boyunca MusaCAD'ın tüm deneme özelliklerini kullanabilirsiniz.");
+                    trialButton.setEnabled(true);trialButton.setAlpha(1f);trialButton.setText("MUSACAD'A DEVAM ET");
+                    trialButton.setOnClickListener(v->enterApp());
+                }else enterApp();
+                break;
             case LICENSED:
-                enterApp();break;
+                if(stayOnLicense){
+                    status.setText("MusaCAD lisansı aktif");
+                    message.setText("Bu cihaz için lisans doğrulandı.");
+                    trialButton.setEnabled(true);trialButton.setAlpha(1f);trialButton.setText("MUSACAD'A DEVAM ET");
+                    trialButton.setOnClickListener(v->enterApp());
+                }else enterApp();
+                break;
         }
     }
 
