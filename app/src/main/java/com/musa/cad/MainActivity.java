@@ -289,6 +289,17 @@ public class MainActivity extends AppCompatActivity {
             case INSERT:
                 runInsertCommand();
                 break;
+            case DIMSTYLE:
+                runDimStyleCommand();
+                break;
+            case DIMLINEAR:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_LINEAR);markModeSelected(0);result.setText("DIMLINEAR • İki ölçü noktası ve ölçü çizgisi konumu seçin");
+                break;
+            case DIMALIGNED:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -460,6 +471,31 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void runDimStyleCommand(){
+        if(activeDxf==null){result.setText("DIMSTYLE • Önce vektörel bir çizim açın");return;}
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        EditText textHeight=new EditText(this);textHeight.setHint("Yazı yüksekliği (çizim birimi)");textHeight.setText(String.format(Locale.US,"%.3f",cad.dimensionTextHeightDrawing()));textHeight.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(textHeight);
+        EditText arrowSize=new EditText(this);arrowSize.setHint("Ok/tik boyu (çizim birimi)");arrowSize.setText(String.format(Locale.US,"%.3f",cad.dimensionArrowSizeDrawing()));arrowSize.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(arrowSize);
+        EditText precision=new EditText(this);precision.setHint("Ondalık hassasiyet (0-6)");precision.setText(Integer.toString(cad.dimensionPrecision()));precision.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);box.addView(precision);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("DIMSTYLE • Ölçülendirme stili")
+            .setMessage("Değerler çizimin kendi birimindedir. Yeni oluşturulacak ölçülerde kullanılır.")
+            .setView(box)
+            .setPositiveButton("UYGULA",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                double th=Double.parseDouble(textHeight.getText().toString().trim().replace(',','.'));
+                double ar=Double.parseDouble(arrowSize.getText().toString().trim().replace(',','.'));
+                int pr=Integer.parseInt(precision.getText().toString().trim());
+                if(!cad.setDimensionStyle(th,ar,pr)){textHeight.setError("Pozitif değerler ve 0-6 hassasiyet girin");return;}
+                dialog.dismiss();result.setText(String.format(Locale.getDefault(),"DIMSTYLE • Yazı %.3f • Ok %.3f • Hassasiyet %d",th,ar,pr));
+            }catch(Exception e){textHeight.setError("Geçerli ölçülendirme değerleri girin");}
+        }));
+        dialog.show();
+    }
+
     private void runBlockCommand(){
         if(!ensureTransformSelection("BLOCK"))return;
         EditText input=new EditText(this);
@@ -617,6 +653,9 @@ public class MainActivity extends AppCompatActivity {
             "S / STRETCH • Seçili vertex/köşeyi yeni konuma taşı\n"+
             "B / BLOCK • Seçili nesneden isimli blok oluştur\n"+
             "I / INSERT • Oluşturulan bloğu yerleştir\n"+
+            "D / DIMSTYLE • Ölçülendirme stilini ayarla\n"+
+            "DLI / DIMLINEAR • Yatay/dikey doğrusal ölçü\n"+
+            "DAL / DIMALIGNED • Hizalı ölçü\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -625,9 +664,7 @@ public class MainActivity extends AppCompatActivity {
             "Z / ZOOM • Zoom komutu\n"+
             "U / UNDO • Geri al\n"+
             "REDO • Geri alınan işlemi yeniden uygula\n"+
-            "QS / QSAVE / SAVE • Kaydet\n\n"+
-            "Tanınıyor, motor desteği henüz yok\n"+
-            "DIMSTYLE, DIMALIGNED, DIMLINEAR";
+            "QS / QSAVE / SAVE • Kaydet";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
