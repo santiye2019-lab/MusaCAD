@@ -21,6 +21,11 @@ public class SourceEditSessionTest {
         if(!s.hasSelection()||s.replacements().size()!=1)throw new AssertionError("undo restore");
         SourceReplacement restored=s.replacementRecords().get(0);
         if(!"DASHED".equals(restored.lineType)||restored.lineWeight!=50)throw new AssertionError("undo style restore");
+        SourceEditSession.Snapshot snapshot=s.snapshot();
+        SourceEditSession switched=new SourceEditSession();switched.restore(snapshot);
+        if(!switched.hasSelection()||switched.replacementRecords().size()!=1||switched.modifiedCount()!=1)throw new AssertionError("tab snapshot restore");
+        SourceReplacement tabRestored=switched.replacementRecords().get(0);
+        if(!"BORU".equals(tabRestored.layer)||!"DASHED".equals(tabRestored.lineType)||tabRestored.lineWeight!=50)throw new AssertionError("tab snapshot style");
         System.out.println("Source entity edit session/style cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
