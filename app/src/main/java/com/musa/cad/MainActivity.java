@@ -58,17 +58,21 @@ public class MainActivity extends AppCompatActivity {
         });
 
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
-        modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.textButton)};
+        modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.pointButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
+        findViewById(R.id.propertiesButton).setOnClickListener(v->showSelectedProperties());
+        findViewById(R.id.colorButton).setOnClickListener(v->showSelectedColor());
+        findViewById(R.id.lineTypeButton).setOnClickListener(v->showSelectedLineType());
+        findViewById(R.id.pointButton).setOnClickListener(v->selectEditMode(R.id.pointButton,CadView.Mode.DRAW_POINT));
         findViewById(R.id.bottomLayersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.rightLayersButton).setOnClickListener(v->showLayers());
-        findViewById(R.id.bottomMeasureButton).setOnClickListener(v->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE));
+        findViewById(R.id.bottomMeasureButton).setOnClickListener(v->showMeasureTools());
         findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.selectEntityButton).setOnClickListener(v->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY));
@@ -304,8 +308,7 @@ public class MainActivity extends AppCompatActivity {
                 showLayers();
                 break;
             case PROPERTIES:
-                if(activeDxf!=null)showDrawingInfo();
-                else Toast.makeText(this,"Özellikler için önce bir çizim açın",Toast.LENGTH_SHORT).show();
+                showSelectedProperties();
                 break;
             case DISTANCE:
                 selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);
@@ -469,6 +472,92 @@ public class MainActivity extends AppCompatActivity {
             }catch(Exception e){input.setError("Geçerli bir pah mesafesi girin");}
         }));
         dialog.show();
+    }
+
+    private boolean ensureSelectedForQuickTool(String tool){
+        if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();return false;}
+        if(cad.hasSelectedEntity())return true;
+        selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+        result.setText(tool+" • Önce nesne seçin, sonra "+tool+" düğmesine tekrar basın");
+        return false;
+    }
+
+    private void showSelectedProperties(){
+        if(!ensureSelectedForQuickTool("Özellik"))return;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        TextView info=new TextView(this);info.setText(cad.selectedEntityInfo());info.setTextIsSelectable(true);box.addView(info);
+
+        TextView layerLabel=new TextView(this);layerLabel.setText("Katman");layerLabel.setPadding(0,p/2,0,0);box.addView(layerLabel);
+        Spinner layer=new Spinner(this);String[] layers=activeDxf.layerNames.toArray(new String[0]);layer.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layers));
+        String currentLayer=cad.selectedLayer();for(int i=0;i<layers.length;i++)if(layers[i].equals(currentLayer)){layer.setSelection(i);break;}box.addView(layer);
+
+        EditText scale=new EditText(this);scale.setSingleLine(true);scale.setHint("Çizgi tipi ölçeği");scale.setText(String.format(Locale.US,"%.3f",cad.selectedLineTypeScale()));scale.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(scale);
+        EditText weight=new EditText(this);weight.setSingleLine(true);weight.setHint("Çizgi kalınlığı (DXF 1/100 mm; örn. 25)");weight.setText(Integer.toString(cad.selectedLineWeight()));weight.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(weight);
+
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Özellik • Seçili nesne").setView(box).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                double ls=Double.parseDouble(scale.getText().toString().trim().replace(',','.'));
+                int lw=Integer.parseInt(weight.getText().toString().trim());
+                String selectedLayer=(String)layer.getSelectedItem();
+                if(!Double.isFinite(ls)||ls<=0d){scale.setError("Sıfırdan büyük bir ölçek girin");return;}
+                if(!cad.updateSelectedStyle(selectedLayer,null,null,ls,lw)){result.setText("Özellik • Değişiklik uygulanamadı");dialog.dismiss();return;}
+                result.setText("Özellik • Katman / çizgi ölçeği / kalınlık güncellendi");dialog.dismiss();
+            }catch(Exception e){scale.setError("Geçerli ölçek ve kalınlık değerleri girin");}
+        }));
+        dialog.show();
+    }
+
+    private void showSelectedColor(){
+        if(!ensureSelectedForQuickTool("Renk"))return;
+        final String[] labels={"Kırmızı","Sarı","Yeşil","Camgöbeği","Mavi","Mor","Beyaz","Özel RGB…"};
+        final int[] colors={Color.RED,Color.YELLOW,Color.GREEN,Color.CYAN,Color.BLUE,Color.MAGENTA,Color.WHITE};
+        new AlertDialog.Builder(this).setTitle(String.format(Locale.US,"Renk • Mevcut #%06X",cad.selectedColor()&0xFFFFFF))
+            .setItems(labels,(d,which)->{
+                if(which<colors.length){
+                    if(cad.updateSelectedStyle(null,colors[which],null,null,null))result.setText(String.format(Locale.US,"Renk • #%06X uygulandı",colors[which]&0xFFFFFF));
+                    return;
+                }
+                EditText input=new EditText(this);input.setSingleLine(true);input.setHint("#RRGGBB");input.setText(String.format(Locale.US,"#%06X",cad.selectedColor()&0xFFFFFF));input.setSelectAllOnFocus(true);
+                AlertDialog custom=new AlertDialog.Builder(this).setTitle("Özel RGB renk").setView(input).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
+                custom.setOnShowListener(x->custom.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                    try{
+                        String raw=input.getText().toString().trim();if(!raw.startsWith("#"))raw="#"+raw;
+                        int color=Color.parseColor(raw);if(!cad.updateSelectedStyle(null,color,null,null,null)){custom.dismiss();result.setText("Renk • Değişiklik uygulanamadı");return;}
+                        custom.dismiss();result.setText(String.format(Locale.US,"Renk • #%06X uygulandı",color&0xFFFFFF));
+                    }catch(Exception e){input.setError("#RRGGBB biçiminde renk girin");}
+                }));custom.show();
+            }).setNegativeButton("İPTAL",null).show();
+    }
+
+    private void showSelectedLineType(){
+        if(!ensureSelectedForQuickTool("Çizgi Tipi"))return;
+        ArrayList<String> names=new ArrayList<>(activeDxf.lineTypeNames());if(names.isEmpty())names.add("CONTINUOUS");
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        Spinner spinner=new Spinner(this);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));
+        String current=cad.selectedLineType();for(int i=0;i<names.size();i++)if(names.get(i).equalsIgnoreCase(current)){spinner.setSelection(i);break;}box.addView(spinner);
+        EditText scale=new EditText(this);scale.setSingleLine(true);scale.setHint("Çizgi tipi ölçeği");scale.setText(String.format(Locale.US,"%.3f",cad.selectedLineTypeScale()));scale.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(scale);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Çizgi Tipi").setView(box).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                double ls=Double.parseDouble(scale.getText().toString().trim().replace(',','.'));if(!Double.isFinite(ls)||ls<=0d){scale.setError("Sıfırdan büyük bir ölçek girin");return;}
+                String name=(String)spinner.getSelectedItem();if(!cad.updateSelectedStyle(null,null,name,ls,null)){dialog.dismiss();result.setText("Çizgi Tipi • Değişiklik uygulanamadı");return;}
+                dialog.dismiss();result.setText("Çizgi Tipi • "+name+" uygulandı");
+            }catch(Exception e){scale.setError("Geçerli ölçek değeri girin");}
+        }));dialog.show();
+    }
+
+    private void showMeasureTools(){
+        if(activeDxf==null){Toast.makeText(this,"Önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
+        String[] items={"Mesafe","Alan","Ölçek kalibrasyonu","DIMLINEAR","DIMALIGNED","DIMSTYLE"};
+        new AlertDialog.Builder(this).setTitle("Ölç / Ölçülendir").setItems(items,(d,which)->{
+            if(which==0)selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);
+            else if(which==1)selectMode(R.id.areaButton,CadView.Mode.AREA);
+            else if(which==2)selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE);
+            else if(which==3){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_LINEAR);markModeSelected(0);result.setText("DIMLINEAR • İki ölçü noktası ve ölçü çizgisi konumu seçin");}}
+            else if(which==4){if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");}}
+            else runDimStyleCommand();
+        }).setNegativeButton("İPTAL",null).show();
     }
 
     private void runDimStyleCommand(){
@@ -705,7 +794,7 @@ public class MainActivity extends AppCompatActivity {
         for(int id:ids){View v=findViewById(id);if(v!=null){v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}}
     }
     private void updateEditorEnabled(boolean enabled){
-        int[] ids={R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
+        int[] ids={R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
         for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}
         if(editStatusText!=null){
             if(currentFile==null){editStatusText.setText("Dosya yok");editStatusText.setTextColor(0xFF8FB7C5);}
