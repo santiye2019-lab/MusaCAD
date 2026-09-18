@@ -28,6 +28,7 @@ public final class SourceEditSession {
     private int selected=-1;
 
     public void clear(){entries.clear();undo.clear();redo.clear();selected=-1;}
+    public void clearRedo(){redo.clear();}
     public int selectedId(){return selected;}
     public boolean hasSelection(){Entry e=entries.get(selected);return e!=null&&!e.deleted;}
 
