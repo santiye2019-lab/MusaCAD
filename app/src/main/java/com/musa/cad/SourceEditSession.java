@@ -68,6 +68,11 @@ public final class SourceEditSession {
     public void clearSelection(){selected=-1;}
 
     public CadEdit currentSelected(){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().copy();}
+    public String selectedLayer(){Entry e=entries.get(selected);return e==null||e.deleted?"0":e.layer;}
+    public int selectedColorMode(){Entry e=entries.get(selected);return e==null||e.deleted?CadEdit.COLOR_BYLAYER:e.colorMode;}
+    public int selectedColorValue(){Entry e=entries.get(selected);return e==null||e.deleted?7:e.colorValue;}
+    public String selectedLineType(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.BYLAYER:e.lineType;}
+    public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.LW_BYLAYER:e.lineWeight;}
     public boolean setSelectedProperties(String layer,int colorMode,int colorValue,String lineType,int lineWeight){
         Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
         e.layer=layer==null||layer.trim().isEmpty()?"0":layer.trim();
