@@ -18,6 +18,7 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_splash);
+        if(getApplication() instanceof MusaCadApp)((MusaCadApp)getApplication()).markIntroSeen();
 
         Intent incoming=new Intent(getIntent());
         boolean fileEntry=Intent.ACTION_VIEW.equals(incoming.getAction())||Intent.ACTION_SEND.equals(incoming.getAction());
