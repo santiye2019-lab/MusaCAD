@@ -1,1 +1,8 @@
-<resources><color name="cad_blue">#0B3B60</color><color name="cad_accent">#19B5A5</color></resources>
+<resources>
+    <color name="cad_blue">#0B3B60</color>
+    <color name="cad_accent">#19B5A5</color>
+    <color name="tool_text">#F4FBFF</color>
+    <color name="tool_text_dim">#9CB9C8</color>
+    <color name="cad_bg">#061421</color>
+    <color name="cad_panel">#071927</color>
+</resources>

@@ -33,7 +33,16 @@ public class AboutActivity extends AppCompatActivity {
         ((TextView)findViewById(R.id.versionText)).setText("MusaCAD • Sürüm "+BuildConfig.VERSION_NAME);
 
         findViewById(R.id.openSourceButton).setOnClickListener(v->showOpenSource());
-        findViewById(R.id.closeAboutButton).setOnClickListener(v->finish());
+        findViewById(R.id.aboutBackButton).setOnClickListener(v->finish());
+        findViewById(R.id.closeAboutButton).setOnClickListener(v->openMusaCad());
+    }
+
+    private void openMusaCad(){
+        android.content.Intent next;
+        if(LicenseManager.hasAccess(this))next=new android.content.Intent(this,MainActivity.class);
+        else next=new android.content.Intent(this,LicenseActivity.class);
+        startActivity(next);
+        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
     }
 
     private void showOpenSource(){

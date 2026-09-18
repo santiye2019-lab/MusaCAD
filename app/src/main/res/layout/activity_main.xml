@@ -78,6 +78,16 @@
             android:padding="9dp"
             android:enabled="false"
             android:alpha="0.45" />
+
+        <ImageButton
+            android:id="@+id/headerMoreButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/ic_more"
+            android:contentDescription="Diğer menü"
+            android:background="@drawable/top_action_bg"
+            android:padding="9dp" />
     </LinearLayout>
 
     <!-- Dosya ve düzenlenebilirlik -->
@@ -121,7 +131,7 @@
     <!-- Gönderilen örnekteki üst hızlı araç düzeni -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="80dp"
+        android:layout_height="72dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="4dp"
@@ -141,12 +151,14 @@
             android:id="@+id/propertiesButton"
             style="@style/TopQuickPurple"
             android:text="Özellik"
+            android:drawableTop="@drawable/ic_properties"
             android:enabled="false" />
 
         <Button
             android:id="@+id/colorButton"
             style="@style/TopQuickYellow"
             android:text="Renk"
+            android:drawableTop="@drawable/ic_color"
             android:enabled="false" />
 
         <Button
@@ -160,6 +172,7 @@
             android:id="@+id/pointButton"
             style="@style/TopQuickBlue"
             android:text="Nokta"
+            android:drawableTop="@drawable/ic_point"
             android:enabled="false" />
 
         <CheckBox
@@ -383,7 +396,7 @@
     <!-- Alt araç paneli: gönderilen görseldeki gibi iki sıra -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="134dp"
+        android:layout_height="124dp"
         android:orientation="vertical"
         android:paddingStart="2dp"
         android:paddingEnd="2dp"
@@ -393,7 +406,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="64dp"
+            android:layout_height="60dp"
             android:orientation="horizontal"
             android:weightSum="8">
 
@@ -401,6 +414,7 @@
                 android:id="@+id/selectEntityButton"
                 style="@style/BottomGridBlue"
                 android:text="Seç"
+                android:drawableTop="@drawable/ic_select"
                 android:enabled="false" />
 
             <Button
@@ -428,30 +442,34 @@
                 android:id="@+id/moveEntityButton"
                 style="@style/BottomGridGreen"
                 android:text="Taşı"
+                android:drawableTop="@drawable/ic_move"
                 android:enabled="false" />
 
             <Button
                 android:id="@+id/copyEntityButton"
                 style="@style/BottomGridGreen"
                 android:text="Kopyala"
+                android:drawableTop="@drawable/ic_copy"
                 android:enabled="false" />
 
             <Button
                 android:id="@+id/rotateEntityButton"
                 style="@style/BottomGridGreen"
                 android:text="Döndür"
+                android:drawableTop="@drawable/ic_rotate"
                 android:enabled="false" />
 
             <Button
                 android:id="@+id/deleteEntityButton"
                 style="@style/BottomGridOrange"
                 android:text="Sil"
+                android:drawableTop="@drawable/ic_delete"
                 android:enabled="false" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="64dp"
+            android:layout_height="60dp"
             android:orientation="horizontal"
             android:weightSum="8">
 
@@ -497,20 +515,21 @@
                 android:id="@+id/hatchButton"
                 style="@style/BottomGridPurple"
                 android:text="Tarama"
-                android:drawableTop="@drawable/ic_area"
+                android:drawableTop="@drawable/ic_hatch"
                 android:enabled="false" />
 
             <Button
                 android:id="@+id/moreToolsButton"
                 style="@style/BottomGridOrange"
-                android:text="Diğer" />
+                android:text="Diğer"
+                android:drawableTop="@drawable/ic_more" />
         </LinearLayout>
     </LinearLayout>
 
     <!-- Aktif çizim sekmesi ve mevcut işlevlerin hızlı bağlantıları -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="42dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="7dp"
@@ -588,7 +607,7 @@
     <TextView
         android:id="@+id/resultText"
         android:layout_width="match_parent"
-        android:layout_height="34dp"
+        android:layout_height="30dp"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
