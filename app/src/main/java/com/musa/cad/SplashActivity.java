@@ -33,6 +33,7 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_splash);
+        EmbeddedProfilePhoto.loadInto(this, findViewById(R.id.developerPhoto));
 
         View root = findViewById(R.id.splashRoot);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
