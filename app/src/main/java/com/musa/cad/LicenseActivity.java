@@ -15,14 +15,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class LicenseActivity extends AppCompatActivity {
-    public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";\n    public static final String EXTRA_STAY_ON_LICENSE="com.musa.cad.STAY_ON_LICENSE";
+    public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";
+    public static final String EXTRA_STAY_ON_LICENSE="com.musa.cad.STAY_ON_LICENSE";
     private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
     private CheckBox termsCheck;
     private Button trialButton;
     private EditText licenseCode;
     private TextView status,message,installationId;
     private Intent pendingIntent;
-    private volatile boolean trialRequestRunning;\n    private boolean stayOnLicense;
+    private volatile boolean trialRequestRunning;
+    private boolean stayOnLicense;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
