@@ -138,28 +138,32 @@
             android:enabled="false" />
 
         <Button
-            android:id="@+id/calibrateButton"
+            android:id="@+id/propertiesQuickButton"
             style="@style/TopQuickPurple"
-            android:text="Ölçek"
-            android:drawableTop="@drawable/ic_scale" />
+            android:text="Özellik"
+            android:drawableTop="@drawable/ic_scale"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/distanceButton"
+            android:id="@+id/colorQuickButton"
             style="@style/TopQuickYellow"
-            android:text="Mesafe"
-            android:drawableTop="@drawable/ic_distance" />
+            android:text="Renk"
+            android:drawableTop="@drawable/ic_area"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/areaButton"
+            android:id="@+id/lineTypeQuickButton"
             style="@style/TopQuickOrange"
-            android:text="Alan"
-            android:drawableTop="@drawable/ic_area" />
+            android:text="Çizgi Tipi"
+            android:drawableTop="@drawable/ic_line"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/panButton"
+            android:id="@+id/pointQuickButton"
             style="@style/TopQuickBlue"
-            android:text="Gezin"
-            android:drawableTop="@drawable/ic_pan" />
+            android:text="Nokta"
+            android:drawableTop="@drawable/ic_distance"
+            android:enabled="false" />
 
         <CheckBox
             android:id="@+id/snapToggle"
@@ -169,6 +173,19 @@
             android:drawableTop="@drawable/ic_snap"
             android:checked="true"
             android:enabled="false" />
+    </LinearLayout>
+
+    <!-- Eski ölçüm/gezinme işlevleri görünür üst sıradan Diğer menüsüne taşındı.
+         ID'ler mevcut Java bağlantılarını ve komut kısayollarını korumak için tutuluyor. -->
+    <LinearLayout
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone">
+        <Button android:id="@+id/calibrateButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/distanceButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/areaButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/panButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/clearButton" android:layout_width="1dp" android:layout_height="1dp" />
     </LinearLayout>
 
     <!-- Gerçek komut satırı: eski MusaCAD komut motoruna bağlı -->
@@ -199,7 +216,7 @@
             android:layout_weight="1"
             android:layout_marginStart="5dp"
             android:singleLine="true"
-            android:hint="L, PL, C, REC, M, CO, RO, E, LA, DI, AA, ZE, U, QSAVE..."
+            android:hint="L, PL, C, A, EL, TR, F, H, B, DLI, DAL, QSAVE..."
             android:textColor="#FFFFFF"
             android:textColorHint="#759BB2"
             android:textSize="10sp"
@@ -351,17 +368,6 @@
                 android:textSize="12sp"
                 android:background="@drawable/tool_tile_blue" />
 
-            <TextView
-                android:layout_width="40dp"
-                android:layout_height="42dp"
-                android:layout_marginTop="5dp"
-                android:gravity="center"
-                android:text="3D"
-                android:textColor="#587487"
-                android:textStyle="bold"
-                android:textSize="12sp"
-                android:background="@drawable/feature_chip_bg" />
-
             <ImageButton
                 android:id="@+id/rightLayersButton"
                 android:layout_width="40dp"
@@ -497,10 +503,10 @@
                 android:drawableTop="@drawable/ic_undo" />
 
             <Button
-                android:id="@+id/clearButton"
+                android:id="@+id/moreToolsButton"
                 style="@style/BottomGridOrange"
-                android:text="Temizle"
-                android:drawableTop="@drawable/ic_clear" />
+                android:text="Diğer"
+                android:drawableTop="@drawable/ic_menu" />
         </LinearLayout>
     </LinearLayout>
 

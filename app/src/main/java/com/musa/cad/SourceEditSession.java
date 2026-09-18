@@ -41,6 +41,10 @@ public final class SourceEditSession {
     public void clearSelection(){selected=-1;}
 
     public CadEdit currentSelected(){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().copy();}
+    public String selectedLayer(){Entry e=entries.get(selected);return e==null||e.deleted?"":e.layer;}
+    public int selectedColor(){Entry e=entries.get(selected);return e==null||e.deleted?0:e.color;}
+    public String selectedLineType(){Entry e=entries.get(selected);return e==null||e.deleted?"":e.lineType;}
+    public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;}
     public CadEdit currentFor(int id){Entry e=entries.get(id);return e==null||e.deleted?null:e.current().copy();}
 
     public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
@@ -72,6 +76,14 @@ public final class SourceEditSession {
         other.deleted=true;other.replacement=null;
         return true;
     }
+    public boolean updateSelectedStyle(Integer color,String lineType,Integer lineWeight){
+        Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
+        if(color!=null)e.color=color;
+        if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
+        if(lineWeight!=null)e.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
+        e.replacement=e.current().copy();return true;
+    }
+
     public boolean matchSelectedPropertiesToOther(int otherId,SourceRange otherRange,CadEdit otherPrototype,String otherLayer,int otherColor,String otherLineType,double otherLineTypeScale,int otherLineWeight){
         Entry source=entries.get(selected);
         if(source==null||source.deleted||otherId<0||otherId==selected||otherRange==null||otherPrototype==null)return false;
