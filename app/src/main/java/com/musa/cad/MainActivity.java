@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.pointButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
@@ -73,6 +73,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.bottomLayersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.rightLayersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.bottomMeasureButton).setOnClickListener(v->showMeasureTools());
+        findViewById(R.id.hatchButton).setOnClickListener(v->runHatchCommand());
+        findViewById(R.id.moreToolsButton).setOnClickListener(v->showMoreTools());
         findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.selectEntityButton).setOnClickListener(v->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY));
@@ -547,6 +549,31 @@ public class MainActivity extends AppCompatActivity {
         }));dialog.show();
     }
 
+    private void showMoreTools(){
+        if(activeDxf==null){Toast.makeText(this,"Önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
+        String[] items={"Çoklu Çizgi (PL)","Yay (ARC)","Elips (ELLIPSE)","XLINE","TRIM","EXTEND","FILLET","CHAMFER","OFFSET","STRETCH","ARRAY","BLOCK","INSERT","Geri Al","REDO","Ölçümü / seçimi temizle"};
+        new AlertDialog.Builder(this).setTitle("Diğer CAD araçları").setItems(items,(d,which)->{
+            switch(which){
+                case 0:selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE);break;
+                case 1:if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARC);markModeSelected(0);result.setText("ARC • Başlangıç, yay üzeri ve bitiş olmak üzere 3 nokta seçin");}break;
+                case 2:if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("ELLIPSE • Merkez, ana eksen ucu ve kısa eksen yönünü seçin");}break;
+                case 3:if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("XLINE • Doğrultu için iki nokta seçin");}break;
+                case 4:if(ensureTransformSelection("TRIM")){if(cad.armTrimSelected())result.setText("TRIM • Kesme sınırı olacak ikinci çizgiye dokunun");else result.setText("TRIM • Hedef nesne LINE olmalı");}break;
+                case 5:if(ensureTransformSelection("EXTEND")){if(cad.armExtendSelected())result.setText("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");else result.setText("EXTEND • Hedef nesne LINE olmalı");}break;
+                case 6:runFilletCommand();break;
+                case 7:runChamferCommand();break;
+                case 8:runOffsetCommand();break;
+                case 9:if(ensureTransformSelection("STRETCH")){if(cad.armStretchSelected())result.setText("STRETCH • Taşınacak köşe/vertex noktasına dokunun");else result.setText("STRETCH • LINE, POLYLINE veya RECTANGLE seçin");}break;
+                case 10:runArrayCommand();break;
+                case 11:runBlockCommand();break;
+                case 12:runInsertCommand();break;
+                case 13:cad.undo();break;
+                case 14:if(!cad.redo())result.setText("REDO • Yeniden uygulanacak işlem yok");break;
+                case 15:cad.clearMeasurement();break;
+            }
+        }).setNegativeButton("İPTAL",null).show();
+    }
+
     private void showMeasureTools(){
         if(activeDxf==null){Toast.makeText(this,"Önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
         String[] items={"Mesafe","Alan","Ölçek kalibrasyonu","DIMLINEAR","DIMALIGNED","DIMSTYLE"};
@@ -794,7 +821,7 @@ public class MainActivity extends AppCompatActivity {
         for(int id:ids){View v=findViewById(id);if(v!=null){v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}}
     }
     private void updateEditorEnabled(boolean enabled){
-        int[] ids={R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
+        int[] ids={R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.hatchButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
         for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.45f);}
         if(editStatusText!=null){
             if(currentFile==null){editStatusText.setText("Dosya yok");editStatusText.setTextColor(0xFF8FB7C5);}
