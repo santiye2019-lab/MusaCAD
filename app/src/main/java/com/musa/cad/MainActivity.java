@@ -149,6 +149,24 @@ public class MainActivity extends AppCompatActivity {
                 markModeSelected(0);
                 result.setText("ARC • Başlangıç, yay üzeri ve bitiş olmak üzere 3 nokta seçin");
                 break;
+            case ELLIPSE:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_ELLIPSE);
+                markModeSelected(0);
+                result.setText("ELLIPSE • Merkez, ana eksen ucu ve kısa eksen yönünü seçin");
+                break;
+            case POINT:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_POINT);
+                markModeSelected(0);
+                result.setText("POINT • Noktanın yerini seçin");
+                break;
+            case XLINE:
+                if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
+                cad.setMode(CadView.Mode.DRAW_XLINE);
+                markModeSelected(0);
+                result.setText("XLINE • Doğrultu için iki nokta seçin");
+                break;
             case RECTANGLE:
                 selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE);
                 result.setText("RECTANG • İki köşe seçin");
@@ -449,6 +467,9 @@ public class MainActivity extends AppCompatActivity {
             "PL / PLINE / POLYLINE • Çoklu çizgi\n"+
             "C / CIRCLE • Daire\n"+
             "A / ARC • 3 noktadan yay\n"+
+            "EL / ELLIPSE • Merkez ve iki eksenle elips\n"+
+            "PO / POINT • Nokta yerleştir\n"+
+            "XL / XLINE • Sonsuz yardımcı doğru\n"+
             "REC / RECTANG / RECTANGLE • Dikdörtgen\n"+
             "DT / T / TEXT / MTEXT • Yazı\n"+
             "SEL / SELECT • Seç\n"+
@@ -480,7 +501,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
+            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, HATCH, INSERT, JOIN, MATCHPROP, STRETCH, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
