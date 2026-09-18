@@ -79,6 +79,7 @@ public final class CadEdit {
         }
     }
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit withClosed(boolean value){return new CadEdit(type,xy.clone(),text,strokeWidth,value,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
 
     public float centerX(){if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}
     public float centerY(){if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[1];return (minY()+maxY())*.5f;}
