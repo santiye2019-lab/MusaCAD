@@ -10,7 +10,7 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, ARC, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, BREAK, PEDIT, LIST, LAYER, PROPERTIES,
+        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, LAYER, PROPERTIES,
         DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
     }
 
@@ -40,6 +40,8 @@ public final class CadCommand {
         if(eq(s,"RE","REGEN"))return Action.REGEN;
         if(eq(s,"TR","TRIM"))return Action.TRIM;
         if(eq(s,"EX","EXTEND"))return Action.EXTEND;
+        if(eq(s,"F","FILLET"))return Action.FILLET;
+        if(eq(s,"CHA","CHAMFER"))return Action.CHAMFER;
         if(eq(s,"BR","BREAK"))return Action.BREAK;
         if(eq(s,"PE","PEDIT"))return Action.PEDIT;
         if(eq(s,"LI","LIST"))return Action.LIST;
@@ -71,7 +73,7 @@ public final class CadCommand {
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
             case ARRAY:return "ARRAY";case EXPLODE:return "EXPLODE";case OSNAP:return "OSNAP";case REGEN:return "REGEN";
-            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";
+            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";
             case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
             case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
@@ -81,12 +83,10 @@ public final class CadCommand {
 
     private static String classicUnsupported(String s){
         if(eq(s,"B","BLOCK"))return "BLOCK";
-        if(eq(s,"CHA","CHAMFER"))return "CHAMFER";
         if(eq(s,"D","DIMSTYLE"))return "DIMSTYLE";
         if(eq(s,"DAL","DIMALIGNED"))return "DIMALIGNED";
         if(eq(s,"DLI","DIMLINEAR"))return "DIMLINEAR";
         if(eq(s,"EL","ELLIPSE"))return "ELLIPSE";
-        if(eq(s,"F","FILLET"))return "FILLET";
         if(eq(s,"H","HATCH"))return "HATCH";
         if(eq(s,"I","INSERT"))return "INSERT";
         if(eq(s,"J","JOIN"))return "JOIN";
