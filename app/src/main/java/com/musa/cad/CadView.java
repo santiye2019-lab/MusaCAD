@@ -371,7 +371,7 @@ public class CadView extends View {
         if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.isSourceVisible(replacementId))source=candidate;}
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();return;}
-        sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
+        sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.colorMode,source.colorValue,source.rawLineType,source.lineTypeScale,source.rawLineWeight);
         currentLayer=sourceEdits.selectedLayer();currentColorMode=sourceEdits.selectedColorMode();currentColorValue=sourceEdits.selectedColorValue();
         currentLineType=sourceEdits.selectedLineType();currentLineWeight=sourceEdits.selectedLineWeight();
         if(listener!=null)listener.onCadPropertiesChanged();
