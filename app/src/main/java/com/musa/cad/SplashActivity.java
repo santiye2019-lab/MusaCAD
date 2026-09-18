@@ -18,7 +18,10 @@ public class SplashActivity extends AppCompatActivity {
         Intent incoming=new Intent(getIntent());
         boolean fileEntry=Intent.ACTION_VIEW.equals(incoming.getAction())||Intent.ACTION_SEND.equals(incoming.getAction());
         Intent next;
-        if(LicenseManager.hasAccess(this)){
+        if(OnboardingActivity.shouldShow(this)){
+            next=new Intent(this,OnboardingActivity.class);
+            if(fileEntry)next.putExtra(LicenseActivity.EXTRA_PENDING_INTENT,incoming);
+        }else if(LicenseManager.hasAccess(this)){
             next=fileEntry?incoming.setClass(this,MainActivity.class):new Intent(this,MainActivity.class);
         }else{
             next=new Intent(this,LicenseActivity.class);
@@ -47,7 +50,7 @@ public class SplashActivity extends AppCompatActivity {
         content.setScaleY(.94f);
         content.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(480).start();
 
-        handler.postDelayed(launchNext, 1200);
+        handler.postDelayed(launchNext, 850);
     }
 
     @Override protected void onDestroy() {
