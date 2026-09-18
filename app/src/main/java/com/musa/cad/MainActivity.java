@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.graphics.*;
 import android.graphics.pdf.PdfDocument;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -24,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_DOCUMENTS=4;
     private static final String[] LINE_WEIGHT_LABELS={"BYLAYER","BYBLOCK","DEFAULT","0.00 mm","0.05 mm","0.09 mm","0.13 mm","0.15 mm","0.18 mm","0.20 mm","0.25 mm","0.30 mm","0.35 mm","0.40 mm","0.50 mm","0.53 mm","0.60 mm","0.70 mm","0.80 mm","0.90 mm","1.00 mm","1.06 mm","1.20 mm","1.40 mm","1.58 mm","2.00 mm","2.11 mm"};
     private static final int[] LINE_WEIGHT_VALUES={DxfLineStyle.LW_BYLAYER,DxfLineStyle.LW_BYBLOCK,DxfLineStyle.LW_DEFAULT,0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211};
+    private interface ColorPickListener { void onPick(int mode,int value); }
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
@@ -232,6 +234,50 @@ public class MainActivity extends AppCompatActivity {
     private void showQuickLineWeight(){
         if(activeDxf==null)return;
         new AlertDialog.Builder(this).setTitle("Çizgi kalınlığı • LineWeight").setSingleChoiceItems(LINE_WEIGHT_LABELS,lineWeightIndex(cad.currentLineWeight()),(dialog,which)->{setActiveLineWeight(LINE_WEIGHT_VALUES[which]);dialog.dismiss();}).setNegativeButton("İPTAL",null).show();
+    }
+
+    private int previewColor(int mode,int value,String layerName){
+        if(mode==CadEdit.COLOR_BYLAYER&&activeDxf!=null)return activeDxf.layerColor(layerName);
+        if(mode==CadEdit.COLOR_BYBLOCK)return Color.rgb(120,140,150);
+        if(mode==CadEdit.COLOR_ACI)return DxfColor.aciArgb(value);
+        if(mode==CadEdit.COLOR_TRUECOLOR)return 0xFF000000|(value&0x00FFFFFF);
+        return Color.WHITE;
+    }
+    private void updateColorPreview(TextView preview,int mode,int value,String layerName){
+        if(preview==null)return;int color=previewColor(mode,value,layerName);
+        GradientDrawable bg=new GradientDrawable();bg.setColor(color);bg.setCornerRadius(dp(6));bg.setStroke(dp(1),Color.rgb(210,220,225));preview.setBackground(bg);
+        String label=mode==CadEdit.COLOR_BYLAYER?"BYLAYER":mode==CadEdit.COLOR_BYBLOCK?"BYBLOCK":mode==CadEdit.COLOR_ACI?"ACI "+value:String.format(Locale.US,"#%06X",value&0xFFFFFF);
+        preview.setText(label);int lum=(Color.red(color)*299+Color.green(color)*587+Color.blue(color)*114)/1000;preview.setTextColor(lum>150?Color.BLACK:Color.WHITE);
+    }
+    private void showColorPalette(int currentMode,int currentValue,String layerName,ColorPickListener listener){
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(10),dp(6),dp(10),dp(8));
+        LinearLayout top=new LinearLayout(this);top.setOrientation(LinearLayout.HORIZONTAL);
+        Button byLayer=new Button(this);byLayer.setText("BYLAYER");Button byBlock=new Button(this);byBlock.setText("BYBLOCK");Button trueColor=new Button(this);trueColor.setText("TRUECOLOR");
+        for(Button b:new Button[]{byLayer,byBlock,trueColor}){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(46),1f);lp.setMargins(dp(2),0,dp(2),0);top.addView(b,lp);}
+        root.addView(top,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView caption=new TextView(this);caption.setText("AutoCAD Color Index • ACI 1–255");caption.setTextSize(13);caption.setPadding(dp(4),dp(10),0,dp(6));root.addView(caption);
+        GridLayout grid=new GridLayout(this);grid.setColumnCount(8);grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+        ScrollView scroll=new ScrollView(this);scroll.addView(grid);root.addView(scroll,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,dp(430)));
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Renk paleti").setView(root).setNegativeButton("İPTAL",null).create();
+        byLayer.setOnClickListener(v->{listener.onPick(CadEdit.COLOR_BYLAYER,7);dialog.dismiss();});
+        byBlock.setOnClickListener(v->{listener.onPick(CadEdit.COLOR_BYBLOCK,7);dialog.dismiss();});
+        trueColor.setOnClickListener(v->{
+            EditText input=new EditText(this);input.setSingleLine(true);input.setHint("#RRGGBB");input.setText(currentMode==CadEdit.COLOR_TRUECOLOR?String.format(Locale.US,"#%06X",currentValue&0xFFFFFF):"#FFFFFF");
+            AlertDialog hex=new AlertDialog.Builder(this).setTitle("TrueColor RGB").setView(input).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
+            hex.setOnShowListener(x->hex.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(w->{try{String raw=input.getText().toString().trim().replace("#","");if(raw.length()!=6)throw new IllegalArgumentException();listener.onPick(CadEdit.COLOR_TRUECOLOR,Integer.parseInt(raw,16));hex.dismiss();dialog.dismiss();}catch(Exception ex){input.setError("#RRGGBB biçiminde girin");}}));hex.show();
+        });
+        for(int aci=1;aci<=255;aci++){
+            final int value=aci;int color=DxfColor.aciArgb(aci);TextView cell=new TextView(this);cell.setText(Integer.toString(aci));cell.setGravity(Gravity.CENTER);cell.setTextSize(7);cell.setContentDescription("ACI "+aci);
+            int lum=(Color.red(color)*299+Color.green(color)*587+Color.blue(color)*114)/1000;cell.setTextColor(lum>150?Color.BLACK:Color.WHITE);
+            GradientDrawable swatch=new GradientDrawable();swatch.setColor(color);swatch.setCornerRadius(dp(3));swatch.setStroke(dp(1),Color.rgb(70,80,85));cell.setBackground(swatch);
+            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=dp(39);lp.height=dp(39);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(cell,lp);
+            cell.setOnClickListener(v->{listener.onPick(CadEdit.COLOR_ACI,value);dialog.dismiss();});
+        }
+        dialog.show();
+    }
+    private String textStyleLabel(DxfTextStyle.Style style){
+        if(style==null)return "STANDARD";
+        StringBuilder out=new StringBuilder(style.name);if(!style.fontFile.isEmpty())out.append("  •  ").append(style.fontFile);if(!style.bigFontFile.isEmpty())out.append(" + ").append(style.bigFontFile);if(style.usesShx())out.append("  •  SHX");return out.toString();
     }
 
     private void showDrawingProperties(){
