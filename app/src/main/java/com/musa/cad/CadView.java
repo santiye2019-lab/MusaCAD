@@ -7,7 +7,7 @@ import android.view.*;
 import java.util.*;
 
 public class CadView extends View {
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -43,6 +43,8 @@ public class CadView extends View {
     private float selectedPickX,selectedPickY;
     private String pendingBlockName="";
     private float pendingBlockScale=1f,pendingBlockRotation;
+    private float dimTextHeightContent=24f,dimArrowSizeContent=14f;
+    private int dimPrecision=2;
 
     private boolean selecting,draggingSelection,exporting;
     private float selectionX,selectionY,selectionEndX,selectionEndY;
@@ -67,7 +69,7 @@ public class CadView extends View {
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
-    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -132,6 +134,15 @@ public class CadView extends View {
         String key=CadBlock.normalizeName(rawName).toUpperCase(Locale.ROOT);CadBlock.Definition def=userBlocks.get(key);
         if(def==null||!Float.isFinite(blockScale)||blockScale<=0f||!Float.isFinite(rotation))return false;
         pendingBlockName=def.name;pendingBlockScale=blockScale;pendingBlockRotation=rotation;setMode(Mode.DRAW_INSERT);return true;
+    }
+    public double dimensionTextHeightDrawing(){return vectorDrawing==null?dimTextHeightContent:vectorDrawing.drawingDistanceFromContent(dimTextHeightContent);}
+    public double dimensionArrowSizeDrawing(){return vectorDrawing==null?dimArrowSizeContent:vectorDrawing.drawingDistanceFromContent(dimArrowSizeContent);}
+    public int dimensionPrecision(){return dimPrecision;}
+    public boolean setDimensionStyle(double textHeightDrawing,double arrowSizeDrawing,int precision){
+        if(vectorDrawing==null||!Double.isFinite(textHeightDrawing)||textHeightDrawing<=0d||!Double.isFinite(arrowSizeDrawing)||arrowSizeDrawing<=0d||precision<0||precision>6)return false;
+        float text=vectorDrawing.contentLengthFromDrawing(textHeightDrawing),arrow=vectorDrawing.contentLengthFromDrawing(arrowSizeDrawing);
+        if(!Float.isFinite(text)||text<=0f||!Float.isFinite(arrow)||arrow<=0f)return false;
+        dimTextHeightContent=text;dimArrowSizeContent=arrow;dimPrecision=precision;notifyValue();invalidate();return true;
     }
     public List<SourceReplacement> getSourceReplacements(){return sourceEdits.replacementRecords();}
     public List<SourceRange> getSourceRemovals(){return sourceEdits.removals();}
@@ -698,6 +709,8 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_POINT&&points.size()==1){PointF p=points.get(0);addRegularEdit(CadEdit.point(p.x,p.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_XLINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);CadEdit xline=CadEdit.xline(a.x,a.y,b.x,b.y);if(xline==null){points.clear();lastSnapped=false;if(listener!=null)listener.onMeasurement("XLINE • İki farklı nokta seçin");invalidate();return true;}addRegularEdit(xline);lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_INSERT&&points.size()==1){PointF p=points.get(0);CadEdit insert=CadEdit.insert(pendingBlockName,p.x,p.y,pendingBlockScale,pendingBlockRotation);if(insert!=null){addRegularEdit(insert);lastActionRegular=true;}points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_DIM_LINEAR&&points.size()==3){PointF a=points.get(0),b=points.get(1),line=points.get(2);double hv=vectorDrawing.drawingDistanceFromContent(Math.abs(b.x-a.x)),vv=vectorDrawing.drawingDistanceFromContent(Math.abs(b.y-a.y));List<CadEdit> dimension=CadDimension.linear(a.x,a.y,b.x,b.y,line.x,line.y,hv,vv,dimTextHeightContent,dimArrowSizeContent,dimPrecision);if(!dimension.isEmpty()){addRegularEdits(dimension);lastActionRegular=true;}points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_DIM_ALIGNED&&points.size()==3){PointF a=points.get(0),b=points.get(1),line=points.get(2);double value=vectorDrawing.drawingDistanceFromContent(distance(a,b));List<CadEdit> dimension=CadDimension.aligned(a.x,a.y,b.x,b.y,line.x,line.y,value,dimTextHeightContent,dimArrowSizeContent,dimPrecision);if(!dimension.isEmpty()){addRegularEdits(dimension);lastActionRegular=true;}points.clear();lastSnapped=false;}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
@@ -734,6 +747,8 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_POINT)listener.onMeasurement("POINT: noktanın yerini seçin");
         else if(mode==Mode.DRAW_XLINE)listener.onMeasurement("XLINE: doğrultuyu belirlemek için iki nokta seçin • Nokta: "+points.size());
         else if(mode==Mode.DRAW_INSERT)listener.onMeasurement("INSERT: "+pendingBlockName+" bloğunun yerleştirme noktasını seçin");
+        else if(mode==Mode.DRAW_DIM_LINEAR)listener.onMeasurement(points.size()<2?"DIMLINEAR: iki ölçü noktasını seçin":"DIMLINEAR: ölçü çizgisinin konumunu seçin");
+        else if(mode==Mode.DRAW_DIM_ALIGNED)listener.onMeasurement(points.size()<2?"DIMALIGNED: iki ölçü noktasını seçin":"DIMALIGNED: ölçü çizgisinin konumunu seçin");
         else if(mode==Mode.DRAW_TEXT)listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
         else if(stylusModeDetected)listener.onMeasurement("Kalem: serbest çizim • Kalem tuşu: gezin • Silgi/2. tuş: geri al • Parmak: gezin/zoom");
         else listener.onMeasurement("Sürükle: gez • İki parmak: yakınlaştır • Çift dokun: sığdır");
