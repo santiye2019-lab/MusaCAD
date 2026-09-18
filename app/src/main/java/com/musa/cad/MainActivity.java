@@ -159,6 +159,9 @@ public class MainActivity extends AppCompatActivity {
             case ERASE:if(!cad.deleteSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("ERASE • Önce nesne seçin, sonra E yazın");}break;
             case LAYER:showLayers();break;
             case PROPERTIES:showDrawingProperties();break;
+            case COLOR:showQuickColor();break;
+            case LINEWEIGHT:showQuickLineWeight();break;
+            case LINETYPE:showQuickLineType();break;
             case DISTANCE:selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);result.setText("DIST • İki nokta seçin");break;
             case AREA:selectMode(R.id.areaButton,CadView.Mode.AREA);result.setText("AREA • Sınır noktalarını seçin");break;
             case ZOOM:result.setText("ZOOM • Extents için Z E veya ZE kullanın; yakınlaştırma için üst araçları kullanın");break;
@@ -208,6 +211,19 @@ public class MainActivity extends AppCompatActivity {
             }
         }).show();
     }
+    private void setActiveLineType(String type){
+        String value=DxfLineStyle.normalizeName(type);
+        cad.setDrawingProperties(cad.currentLayer(),cad.currentColorMode(),cad.currentColorValue(),value,cad.currentLineWeight(),cad.currentTextStyle(),cad.currentTextFamily(),cad.currentTextShx(),cad.currentTextHeight(),cad.currentTextWidthFactor());
+        boolean selected=cad.applyCurrentPropertiesToSelected();
+        result.setText((selected?"Seçili nesne":"Aktif çizim")+" çizgi tipi: "+value);
+    }
+    private void showQuickLineType(){
+        if(activeDxf==null)return;
+        LinkedHashSet<String> values=new LinkedHashSet<>();values.add(DxfLineStyle.BYLAYER);values.add(DxfLineStyle.BYBLOCK);values.addAll(activeDxf.lineTypeNames());
+        String[] items=values.toArray(new String[0]);int checked=0;for(int i=0;i<items.length;i++)if(items[i].equalsIgnoreCase(cad.currentLineType())){checked=i;break;}
+        new AlertDialog.Builder(this).setTitle("Çizgi tipi • Linetype").setSingleChoiceItems(items,checked,(dialog,which)->{setActiveLineType(items[which]);dialog.dismiss();}).setNegativeButton("İPTAL",null).show();
+    }
+
     private void setActiveLineWeight(int weight){
         cad.setDrawingProperties(cad.currentLayer(),cad.currentColorMode(),cad.currentColorValue(),cad.currentLineType(),weight,cad.currentTextStyle(),cad.currentTextFamily(),cad.currentTextShx(),cad.currentTextHeight(),cad.currentTextWidthFactor());
         boolean selected=cad.applyCurrentPropertiesToSelected();refreshPropertyButtons();
