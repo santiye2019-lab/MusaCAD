@@ -234,7 +234,7 @@ public class CadView extends View {
         if(e==null)return null;
         StringBuilder b=new StringBuilder();
         b.append("Tür: ").append(source==null?e.type.name():source.type);
-        if(source!=null){b.append("\nKatman: ").append(source.layer);b.append("\nÇizgi tipi: ").append(source.lineType);b.append("\nRenk: ").append(source.color);b.append("\nÇizgi kalınlığı: ").append(source.lineWeight);}
+        if(source!=null){b.append("\nKatman: ").append(sourceEdits.selectedLayer());b.append("\nÇizgi tipi: ").append(sourceEdits.selectedLineType());b.append("\nRenk: #").append(String.format(Locale.US,"%06X",sourceEdits.selectedColor()&0xFFFFFF));b.append("\nÇizgi kalınlığı: ").append(sourceEdits.selectedLineWeight());}
         b.append(String.format(Locale.getDefault(),"\nMerkez: %.3f, %.3f",e.centerX(),e.centerY()));
         b.append(String.format(Locale.getDefault(),"\nSınır: [%.3f, %.3f] - [%.3f, %.3f]",e.minX(),e.minY(),e.maxX(),e.maxY()));
         if(e.type==CadEdit.Type.LINE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nUzunluk: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
