@@ -21,7 +21,20 @@ public class SourceEditSessionTest {
         if(!s.hasSelection()||s.replacements().size()!=1)throw new AssertionError("undo restore");
         SourceReplacement restored=s.replacementRecords().get(0);
         if(!"DASHED".equals(restored.lineType)||restored.lineWeight!=50)throw new AssertionError("undo style restore");
-        System.out.println("Source entity edit session/style cases passed");
+        if(!s.redo())throw new AssertionError("redo delete");
+        if(s.hasSelection()||s.replacements().size()!=0)throw new AssertionError("redo delete state");
+        if(!s.undo())throw new AssertionError("undo redo-delete");
+
+        if(!s.updateSelectedStyle(0xFFFF0000,"CONTINUOUS",25))throw new AssertionError("style update");
+        SourceReplacement changed=s.replacementRecords().get(0);
+        if(changed.color!=0xFFFF0000||!"CONTINUOUS".equals(changed.lineType)||changed.lineWeight!=25)throw new AssertionError("style update values");
+        if(!s.undo())throw new AssertionError("undo style update");
+        SourceReplacement styleUndo=s.replacementRecords().get(0);
+        if(styleUndo.color!=0xFF00FF00||!"DASHED".equals(styleUndo.lineType)||styleUndo.lineWeight!=50)throw new AssertionError("undo style values");
+        if(!s.redo())throw new AssertionError("redo style update");
+        SourceReplacement styleRedo=s.replacementRecords().get(0);
+        if(styleRedo.color!=0xFFFF0000||!"CONTINUOUS".equals(styleRedo.lineType)||styleRedo.lineWeight!=25)throw new AssertionError("redo style values");
+        System.out.println("Source entity edit session/style/redo cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
 }
