@@ -33,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
     }
     private static final class DocumentSession {
         File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
-        CadView.SessionState viewState;
+        CadView.SessionState viewState;boolean dirty;
         void dispose(){
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;if(owned!=null&&!owned.isRecycled())owned.recycle();
             if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();
@@ -55,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private int activeDocumentIndex=-1,backCloseStage=0;
     private long backCloseStageAt;
     private String lastCommandRaw="";
+    private boolean closeActiveAfterSave;
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
