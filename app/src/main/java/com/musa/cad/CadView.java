@@ -374,6 +374,11 @@ public class CadView extends View {
         sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.colorMode,source.colorValue,source.rawLineType,source.lineTypeScale,source.rawLineWeight);
         currentLayer=sourceEdits.selectedLayer();currentColorMode=sourceEdits.selectedColorMode();currentColorValue=sourceEdits.selectedColorValue();
         currentLineType=sourceEdits.selectedLineType();currentLineWeight=sourceEdits.selectedLineWeight();
+        CadEdit selectedEdit=sourceEdits.currentSelected();
+        if(selectedEdit!=null&&selectedEdit.type==CadEdit.Type.TEXT&&selectedEdit.hasTextStyle()){
+            currentTextStyle=selectedEdit.textStyleName;currentTextFamily=selectedEdit.textFamilyHint;currentTextShx=selectedEdit.textShx;
+            currentTextHeight=selectedEdit.textHeight;currentTextWidthFactor=selectedEdit.textWidthFactor;
+        }
         if(listener!=null)listener.onCadPropertiesChanged();
         moveSelectedArmed=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
     }
