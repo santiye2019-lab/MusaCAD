@@ -4,8 +4,7 @@ import java.util.Locale;
 
 /**
  * AutoCAD-style English command aliases for the mobile command line.
- * Supported commands execute in MusaCAD; familiar but not-yet-implemented
- * commands are recognized so experienced CAD users get an explicit status.
+ * AutoCAD-style aliases mapped to MusaCAD's implemented mobile CAD actions.
  */
 public final class CadCommand {
     public enum Action {
