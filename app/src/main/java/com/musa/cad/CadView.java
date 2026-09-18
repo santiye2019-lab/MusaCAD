@@ -146,6 +146,35 @@ public class CadView extends View {
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;float offset=24f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);
         CadEdit copy=sourceEdits.copySelected(offset,-offset);if(copy==null)return false;edits.add(copy);lastActionRegular=true;notifyValue();invalidate();return true;
     }
+    public int arraySelectedEntity(int rows,int columns,float columnSpacing,float rowSpacing){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection()||rows<1||columns<1)return 0;
+        int added=0;
+        for(int r=0;r<rows;r++){
+            for(int c=0;c<columns;c++){
+                if(r==0&&c==0)continue;
+                CadEdit copy=sourceEdits.copySelected(c*columnSpacing,r*rowSpacing);
+                if(copy!=null){edits.add(copy);added++;}
+            }
+        }
+        if(added>0){lastActionRegular=true;notifyValue();invalidate();}
+        return added;
+    }
+    public boolean explodeSelectedEntity(){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        CadEdit selected=sourceEdits.currentSelected();if(selected==null)return false;
+        ArrayList<CadEdit> parts=new ArrayList<>();
+        if(selected.type==CadEdit.Type.RECTANGLE&&selected.xy.length>=4){
+            float x1=selected.xy[0],y1=selected.xy[1],x2=selected.xy[2],y2=selected.xy[3];
+            parts.add(CadEdit.line(x1,y1,x2,y1));parts.add(CadEdit.line(x2,y1,x2,y2));
+            parts.add(CadEdit.line(x2,y2,x1,y2));parts.add(CadEdit.line(x1,y2,x1,y1));
+        }else if(selected.type==CadEdit.Type.POLYLINE&&selected.xy.length>=4){
+            for(int i=2;i+1<selected.xy.length;i+=2)parts.add(CadEdit.line(selected.xy[i-2],selected.xy[i-1],selected.xy[i],selected.xy[i+1]));
+            if(selected.closed&&selected.xy.length>=6)parts.add(CadEdit.line(selected.xy[selected.xy.length-2],selected.xy[selected.xy.length-1],selected.xy[0],selected.xy[1]));
+        }else return false;
+        if(parts.isEmpty()||!sourceEdits.deleteSelected())return false;
+        edits.addAll(parts);lastActionRegular=true;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+    public void regenerate(){invalidate();notifyValue();}
     public boolean deleteSelectedEntity(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.deleteSelected())return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
     }

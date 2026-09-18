@@ -192,6 +192,23 @@ public class MainActivity extends AppCompatActivity {
             case OFFSET:
                 runOffsetCommand();
                 break;
+            case ARRAY:
+                runArrayCommand();
+                break;
+            case EXPLODE:
+                if(!ensureTransformSelection("EXPLODE"))break;
+                if(cad.explodeSelectedEntity())result.setText("EXPLODE • Çoklu çizgi/dikdörtgen parçalara ayrıldı");
+                else result.setText("EXPLODE • Bu nesne tipi için patlatma desteklenmiyor");
+                break;
+            case OSNAP:
+                if(activeDxf==null){result.setText("OSNAP • Önce çizim açın");break;}
+                snapToggle.setChecked(!snapToggle.isChecked());
+                result.setText("OSNAP • Nesne yakalama "+(snapToggle.isChecked()?"AÇIK":"KAPALI"));
+                break;
+            case REGEN:
+                cad.regenerate();
+                result.setText("REGEN • Görünüm yeniden oluşturuldu");
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -308,6 +325,33 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void runArrayCommand(){
+        if(!ensureTransformSelection("ARRAY"))return;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        EditText rows=new EditText(this);rows.setHint("Satır sayısı");rows.setText("2");rows.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);box.addView(rows);
+        EditText cols=new EditText(this);cols.setHint("Sütun sayısı");cols.setText("2");cols.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);box.addView(cols);
+        EditText dx=new EditText(this);dx.setHint("Sütun aralığı");dx.setText("100");dx.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(dx);
+        EditText dy=new EditText(this);dy.setHint("Satır aralığı");dy.setText("100");dy.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(dy);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("ARRAY • Dikdörtgen dizi")
+            .setView(box)
+            .setPositiveButton("OLUŞTUR",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                int r=Integer.parseInt(rows.getText().toString().trim()),c=Integer.parseInt(cols.getText().toString().trim());
+                float sx=Float.parseFloat(dx.getText().toString().trim().replace(',','.'));
+                float sy=Float.parseFloat(dy.getText().toString().trim().replace(',','.'));
+                if(r<1||c<1||r>50||c>50){rows.setError("1-50 arasında satır/sütun kullanın");return;}
+                int count=cad.arraySelectedEntity(r,c,sx,sy);
+                if(count<=0){dialog.dismiss();result.setText("ARRAY • Dizi oluşturulamadı");return;}
+                dialog.dismiss();result.setText("ARRAY • "+count+" kopya oluşturuldu");
+            }catch(Exception e){rows.setError("Geçerli satır, sütun ve aralık değerleri girin");}
+        }));
+        dialog.show();
+    }
+
     private void showCommandHelp(){
         String text=
             "Çalışan komutlar\n\n"+
@@ -325,6 +369,10 @@ public class MainActivity extends AppCompatActivity {
             "SC / SCALE • Seçili nesneyi ölçekle\n"+
             "MI / MIRROR • Seçili nesneyi aynala\n"+
             "O / OFFSET • Çizgi/daire/dikdörtgen ofseti\n"+
+            "AR / ARRAY • Dikdörtgen dizi\n"+
+            "X / EXPLODE • Çoklu çizgi/dikdörtgeni parçala\n"+
+            "OS / OSNAP • Nesne yakalamayı aç/kapat\n"+
+            "RE / REGEN • Görünümü yenile\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -334,7 +382,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "ARC, ARRAY, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, OSNAP, PEDIT, POINT, REGEN, STRETCH, TRIM, EXPLODE, XLINE, REDO";
+            "ARC, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, PEDIT, POINT, STRETCH, TRIM, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
