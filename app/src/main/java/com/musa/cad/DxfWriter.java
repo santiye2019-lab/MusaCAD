@@ -25,7 +25,14 @@ public final class DxfWriter {
     }
 
     private static boolean isRemoved(int lineIndex,List<SourceRange> removals){for(SourceRange range:removals)if(range!=null&&range.containsLine(lineIndex))return true;return false;}
-    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements,DxfParser.Result drawing)throws IOException{if(replacements==null)return;for(SourceReplacement replacement:replacements){if(replacement==null)continue;DxfParser.SourceEntity source=drawing.sourceById(replacement.sourceId);String layout=source==null?drawing.activeLayout:source.layout;writeEdit(out,contentToWorld,replacement.edit,replacement.layer,null,replacement.color&0x00FFFFFF,replacement.lineType,replacement.lineTypeScale,replacement.lineWeight,layout);}}
+    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements,DxfParser.Result drawing)throws IOException{
+        if(replacements==null)return;
+        for(SourceReplacement replacement:replacements){
+            if(replacement==null)continue;DxfParser.SourceEntity source=drawing.sourceById(replacement.sourceId);String layout=source==null?drawing.activeLayout:source.layout;
+            Integer aci=null,trueColor=null;if(replacement.colorMode==CadEdit.COLOR_BYBLOCK)aci=0;else if(replacement.colorMode==CadEdit.COLOR_ACI)aci=replacement.colorValue;else if(replacement.colorMode==CadEdit.COLOR_TRUECOLOR)trueColor=replacement.colorValue&0x00FFFFFF;
+            writeEdit(out,contentToWorld,replacement.edit,replacement.layer,aci,trueColor,replacement.lineType,replacement.lineTypeScale,replacement.lineWeight,layout);
+        }
+    }
     private static void writeEdits(BufferedWriter out,Matrix contentToWorld,List<CadEdit> edits,String layout)throws IOException{
         if(edits==null)return;
         for(CadEdit edit:edits){
@@ -33,7 +40,7 @@ public final class DxfWriter {
             if(edit.colorMode==CadEdit.COLOR_BYBLOCK)aci=0;
             else if(edit.colorMode==CadEdit.COLOR_ACI)aci=edit.colorValue;
             else if(edit.colorMode==CadEdit.COLOR_TRUECOLOR)trueColor=edit.colorValue&0x00FFFFFF;
-            writeEdit(out,contentToWorld,edit,edit.layerName,aci,trueColor,null,null,null,layout);
+            writeEdit(out,contentToWorld,edit,edit.layerName,aci,trueColor,edit.lineTypeName,1d,edit.lineWeight,layout);
         }
     }
 
@@ -52,7 +59,8 @@ public final class DxfWriter {
     private static Matrix contentToWorldMatrix(DxfParser.Result drawing)throws IOException{try{Field field=DxfParser.Result.class.getDeclaredField("view");field.setAccessible(true);Matrix worldToContent=(Matrix)field.get(drawing);Matrix inverse=new Matrix();if(worldToContent==null||!worldToContent.invert(inverse))throw new IOException("DXF koordinat dönüşümü oluşturulamadı");return inverse;}catch(ReflectiveOperationException|SecurityException e){throw new IOException("DXF koordinat dönüşümüne erişilemedi",e);}}
     private static Charset charset(File file)throws IOException{String header;try(InputStream in=new FileInputStream(file)){byte[]bytes=new byte[65536];int count=in.read(bytes);header=new String(bytes,0,Math.max(0,count),StandardCharsets.ISO_8859_1);}java.util.regex.Matcher version=java.util.regex.Pattern.compile("AC10([0-9]{2})").matcher(header);if(version.find()&&Integer.parseInt(version.group(1))>=21)return StandardCharsets.UTF_8;java.util.regex.Matcher cp=java.util.regex.Pattern.compile("ANSI_([0-9]+)").matcher(header);try{if(cp.find())return Charset.forName("windows-"+cp.group(1));}catch(Exception ignored){}return Charset.forName("windows-1252");}
     private static double worldTextHeight(Matrix contentToWorld,float contentPixels){float[]vector={0,contentPixels};contentToWorld.mapVectors(vector);return Math.max(.001,Math.hypot(vector[0],vector[1]));}private static PointF w(Matrix m,float x,float y){float[]xy={x,y};m.mapPoints(xy);return new PointF(xy[0],xy[1]);}private static void entity(BufferedWriter o,String type)throws IOException{tag(o,0,type);}
-    private static void common(BufferedWriter o,String layer,Integer aciColor,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight,String layout)throws IOException{tag(o,8,layer);if(layout!=null&&!layout.trim().isEmpty()&&!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layout.trim())){i(o,67,1);tag(o,410,layout.trim());}if(aciColor!=null)i(o,62,aciColor);if(trueColor!=null)tag(o,420,Integer.toString(trueColor));if(lineType!=null&&!lineType.trim().isEmpty())tag(o,6,DxfLineStyle.normalizeName(lineType));if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d&&Math.abs(lineTypeScale-1d)>1e-9)n(o,48,lineTypeScale);if(lineWeight!=null)i(o,370,DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT));}
+    private static void common(BufferedWriter o,String layer,Integer aciColor,Integer trueColor,String lineType,Double lineTypeScale,Integer lineWeight,String layout)throws IOException{tag(o,8,layer);if(layout!=null&&!layout.trim().isEmpty()&&!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layout.trim())){i(o,67,1);tag(o,410,layout.trim());}if(aciColor!=null)i(o,62,aciColor);if(trueColor!=null)tag(o,420,Integer.toString(trueColor));if(lineType!=null&&!lineType.trim().isEmpty())tag(o,6,DxfLineStyle.normalizeName(lineType));if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d&&Math.abs(lineTypeScale-1d)>1e-9)n(o,48,lineTypeScale);if(lineWeight!=null)i(o,370,rawLineWeight(lineWeight));}
+    private static int rawLineWeight(int value){if(value==DxfLineStyle.LW_BYLAYER||value==DxfLineStyle.LW_BYBLOCK||value==DxfLineStyle.LW_DEFAULT)return value;return value>=0&&value<=211?value:DxfLineStyle.DEFAULT_LINEWEIGHT;}
     private static void point(BufferedWriter o,double x,double y)throws IOException{n(o,10,x);n(o,20,y);}private static void i(BufferedWriter o,int code,int v)throws IOException{tag(o,code,Integer.toString(v));}private static void n(BufferedWriter o,int code,double v)throws IOException{tag(o,code,String.format(Locale.US,"%.8f",v));}private static void tag(BufferedWriter o,int code,String v)throws IOException{o.write(String.format(Locale.US,"%3d",code));o.newLine();o.write(v==null?"":v);o.newLine();}private static String safe(String s){return s==null?"":s.replace("\r"," ").replace("\n"," ");}
     private DxfWriter(){}
 }
