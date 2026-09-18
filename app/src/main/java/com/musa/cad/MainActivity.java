@@ -192,10 +192,10 @@ public class MainActivity extends AppCompatActivity {
         if(color!=null){
             int mode=cad==null?CadEdit.COLOR_BYLAYER:cad.currentColorMode(),value=cad==null?7:cad.currentColorValue();String layerName=cad==null?"0":cad.currentLayer();
             String label=mode==CadEdit.COLOR_BYLAYER?"BYL":mode==CadEdit.COLOR_BYBLOCK?"BYB":mode==CadEdit.COLOR_ACI?"A"+value:"RGB";
-            color.setText("Renk:"+label);int swatch=previewColor(mode,value,layerName);int lum=(Color.red(swatch)*299+Color.green(swatch)*587+Color.blue(swatch)*114)/1000;
+            color.setText("Renk");color.setContentDescription("Renk "+label);int swatch=previewColor(mode,value,layerName);int lum=(Color.red(swatch)*299+Color.green(swatch)*587+Color.blue(swatch)*114)/1000;
             color.setBackgroundTintList(ColorStateList.valueOf(swatch));color.setTextColor(lum>150?Color.rgb(16,32,40):Color.WHITE);
         }
-        if(weight!=null)weight.setText("LW:"+(cad==null?"BYL":lineWeightShort(cad.currentLineWeight())));
+        if(weight!=null){String lw=cad==null?"BYL":lineWeightShort(cad.currentLineWeight());weight.setText("LW "+lw);weight.setContentDescription("LineWeight "+lw);}
     }
     private void setActiveColor(int mode,int value){
         cad.setDrawingProperties(cad.currentLayer(),mode,value,cad.currentLineType(),cad.currentLineWeight(),cad.currentTextStyle(),cad.currentTextFamily(),cad.currentTextShx(),cad.currentTextHeight(),cad.currentTextWidthFactor());
