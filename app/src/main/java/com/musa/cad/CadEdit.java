@@ -5,6 +5,7 @@ import java.util.Arrays;
 /** One MusaCAD overlay/source edit stored in drawing-content coordinates. */
 public final class CadEdit {
     public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, TEXT }
+    public static final int COLOR_BYLAYER=0,COLOR_BYBLOCK=1,COLOR_ACI=2,COLOR_TRUECOLOR=3;
     public final Type type;
     public final float[] xy;
     public final String text;
@@ -16,12 +17,17 @@ public final class CadEdit {
     public final boolean textShx;
     public final float textHeight,textWidthFactor,textOblique;
     public final int textGenerationFlags;
+    public final String layerName;
+    public final int colorMode,colorValue;
 
-    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees){this(type,xy,text,strokeWidth,closed,rotationDegrees,"STANDARD","sans",false,0f,1f,0f,0);}
-    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees,String textStyleName,String textFamilyHint,boolean textShx,float textHeight,float textWidthFactor,float textOblique,int textGenerationFlags){
+    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees){this(type,xy,text,strokeWidth,closed,rotationDegrees,"STANDARD","sans",false,0f,1f,0f,0,"0",COLOR_BYLAYER,7);}
+    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees,String textStyleName,String textFamilyHint,boolean textShx,float textHeight,float textWidthFactor,float textOblique,int textGenerationFlags){this(type,xy,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,"0",COLOR_BYLAYER,7);}
+    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees,String textStyleName,String textFamilyHint,boolean textShx,float textHeight,float textWidthFactor,float textOblique,int textGenerationFlags,String layerName,int colorMode,int colorValue){
         this.type=type;this.xy=xy;this.text=text;this.strokeWidth=Math.max(1f,strokeWidth);this.closed=closed;this.rotationDegrees=normalize(rotationDegrees);
         this.textStyleName=textStyleName==null||textStyleName.trim().isEmpty()?"STANDARD":textStyleName.trim();this.textFamilyHint=textFamilyHint==null||textFamilyHint.trim().isEmpty()?"sans":textFamilyHint.trim();this.textShx=textShx;
         this.textHeight=Float.isFinite(textHeight)&&textHeight>0f?textHeight:0f;this.textWidthFactor=Float.isFinite(textWidthFactor)&&textWidthFactor>0f?textWidthFactor:1f;this.textOblique=Float.isFinite(textOblique)?textOblique:0f;this.textGenerationFlags=textGenerationFlags;
+        this.layerName=layerName==null||layerName.trim().isEmpty()?"0":layerName.trim();this.colorMode=colorMode>=COLOR_BYLAYER&&colorMode<=COLOR_TRUECOLOR?colorMode:COLOR_BYLAYER;
+        this.colorValue=this.colorMode==COLOR_ACI?Math.max(1,Math.min(255,colorValue)):this.colorMode==COLOR_TRUECOLOR?(colorValue&0x00FFFFFF):colorValue;
     }
 
     public static CadEdit line(float x1,float y1,float x2,float y2){return new CadEdit(Type.LINE,new float[]{x1,y1,x2,y2},null,3f,false,0f);}
@@ -35,10 +41,12 @@ public final class CadEdit {
     public static CadEdit styledText(float x,float y,String text,float rotationDegrees,String styleName,String familyHint,boolean shx,float height,float widthFactor,float oblique,int generationFlags){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees,styleName,familyHint,shx,height,widthFactor,oblique,generationFlags);}
     public boolean hasTextStyle(){return type==Type.TEXT&&textHeight>0f;}
 
-    public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
-    public CadEdit translated(float dx,float dy){float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){out[i]+=dx;out[i+1]+=dy;}return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
-    public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=type==Type.TEXT?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
-    public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerName,colorMode,colorValue);}
+    public CadEdit translated(float dx,float dy){float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){out[i]+=dx;out[i+1]+=dy;}return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerName,colorMode,colorValue);}
+    public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=type==Type.TEXT?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerName,colorMode,colorValue);}
+    public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags,layerName,colorMode,colorValue);}
+    public CadEdit withTextStyle(String styleName,String familyHint,boolean shx,float height,float widthFactor){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,styleName,familyHint,shx,height,widthFactor,textOblique,textGenerationFlags,layerName,colorMode,colorValue);}
+    public CadEdit withCadProperties(String layer,int mode,int value){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layer,mode,value);}
 
     public float centerX(){if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}
     public float centerY(){if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[1];return (minY()+maxY())*.5f;}
