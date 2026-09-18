@@ -243,13 +243,28 @@ public class CadView extends View {
         if(e==null)return null;
         StringBuilder b=new StringBuilder();
         b.append("Tür: ").append(source==null?e.type.name():source.type);
-        if(source!=null){b.append("\nKatman: ").append(source.layer);b.append("\nÇizgi tipi: ").append(source.lineType);b.append("\nRenk: ").append(source.color);b.append("\nÇizgi kalınlığı: ").append(source.lineWeight);}
+        b.append("\nKatman: ").append(sourceEdits.selectedLayer());
+        b.append("\nÇizgi tipi: ").append(sourceEdits.selectedLineType());
+        b.append(String.format(Locale.getDefault(),"\nÇizgi tipi ölçeği: %.3f",sourceEdits.selectedLineTypeScale()));
+        b.append(String.format(Locale.getDefault(),"\nRenk: #%06X",sourceEdits.selectedColor()&0x00FFFFFF));
+        b.append("\nÇizgi kalınlığı: ").append(sourceEdits.selectedLineWeight());
         b.append(String.format(Locale.getDefault(),"\nMerkez: %.3f, %.3f",e.centerX(),e.centerY()));
         b.append(String.format(Locale.getDefault(),"\nSınır: [%.3f, %.3f] - [%.3f, %.3f]",e.minX(),e.minY(),e.maxX(),e.maxY()));
         if(e.type==CadEdit.Type.LINE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nUzunluk: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
         if(e.type==CadEdit.Type.CIRCLE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nYarıçap: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
         if(e.type==CadEdit.Type.POLYLINE)b.append("\nKapalı: ").append(e.closed?"Evet":"Hayır");
         return b.toString();
+    }
+    public String selectedLayer(){return sourceEdits.hasSelection()?sourceEdits.selectedLayer():null;}
+    public int selectedColor(){return sourceEdits.selectedColor();}
+    public String selectedLineType(){return sourceEdits.hasSelection()?sourceEdits.selectedLineType():null;}
+    public double selectedLineTypeScale(){return sourceEdits.selectedLineTypeScale();}
+    public int selectedLineWeight(){return sourceEdits.selectedLineWeight();}
+    public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        boolean changed=sourceEdits.updateSelectedStyle(layer,color,lineType,lineTypeScale,lineWeight);
+        if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
+        return changed;
     }
 
     public boolean armMoveSelected(){

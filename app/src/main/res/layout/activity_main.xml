@@ -138,28 +138,29 @@
             android:enabled="false" />
 
         <Button
-            android:id="@+id/calibrateButton"
+            android:id="@+id/propertiesButton"
             style="@style/TopQuickPurple"
-            android:text="Ölçek"
-            android:drawableTop="@drawable/ic_scale" />
+            android:text="Özellik"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/distanceButton"
+            android:id="@+id/colorButton"
             style="@style/TopQuickYellow"
-            android:text="Mesafe"
-            android:drawableTop="@drawable/ic_distance" />
+            android:text="Renk"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/areaButton"
+            android:id="@+id/lineTypeButton"
             style="@style/TopQuickOrange"
-            android:text="Alan"
-            android:drawableTop="@drawable/ic_area" />
+            android:text="Çizgi Tipi"
+            android:drawableTop="@drawable/ic_line"
+            android:enabled="false" />
 
         <Button
-            android:id="@+id/panButton"
+            android:id="@+id/pointButton"
             style="@style/TopQuickBlue"
-            android:text="Gezin"
-            android:drawableTop="@drawable/ic_pan" />
+            android:text="Nokta"
+            android:enabled="false" />
 
         <CheckBox
             android:id="@+id/snapToggle"
@@ -357,6 +358,9 @@
                 android:layout_marginTop="5dp"
                 android:gravity="center"
                 android:text="3D"
+                android:contentDescription="3D görünüm bu sürümde etkin değil"
+                android:enabled="false"
+                android:alpha="0.45"
                 android:textColor="#587487"
                 android:textStyle="bold"
                 android:textSize="12sp"
@@ -464,6 +468,12 @@
                 android:drawableTop="@drawable/ic_zoom_out" />
 
             <Button
+                android:id="@+id/fitButton"
+                style="@style/BottomGridBlue"
+                android:text="Tümü"
+                android:drawableTop="@drawable/ic_fit" />
+
+            <Button
                 android:id="@+id/bottomLayersButton"
                 style="@style/BottomGridBlue"
                 android:text="Katman"
@@ -484,23 +494,16 @@
                 android:enabled="false" />
 
             <Button
-                android:id="@+id/polylineButton"
+                android:id="@+id/hatchButton"
                 style="@style/BottomGridPurple"
-                android:text="Çoklu"
-                android:drawableTop="@drawable/ic_polyline"
+                android:text="Tarama"
+                android:drawableTop="@drawable/ic_area"
                 android:enabled="false" />
 
             <Button
-                android:id="@+id/undoButton"
+                android:id="@+id/moreToolsButton"
                 style="@style/BottomGridOrange"
-                android:text="Geri"
-                android:drawableTop="@drawable/ic_undo" />
-
-            <Button
-                android:id="@+id/clearButton"
-                style="@style/BottomGridOrange"
-                android:text="Temizle"
-                android:drawableTop="@drawable/ic_clear" />
+                android:text="Diğer" />
         </LinearLayout>
     </LinearLayout>
 
@@ -596,11 +599,17 @@
         android:textSize="9sp"
         android:background="#06131F" />
 
-    <!-- fitButton Java bağlantısını koruyan görünür düğme sağ araç grubunda kullanılıyor -->
-    <Button
-        android:id="@+id/fitButton"
+    <!-- Komut satırı ve Ölç menüsü için görünmez durum taşıyıcıları; işlevler korunur -->
+    <LinearLayout
         android:layout_width="1dp"
         android:layout_height="1dp"
-        android:visibility="gone"
-        android:text="Sığdır" />
+        android:visibility="gone">
+        <Button android:id="@+id/calibrateButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/distanceButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/areaButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/panButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/polylineButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/undoButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/clearButton" android:layout_width="1dp" android:layout_height="1dp" />
+    </LinearLayout>
 </LinearLayout>

@@ -43,7 +43,7 @@ public final class CadDimension {
         out.add(CadEdit.line(x,y,x+backX-sideX,y+backY-sideY));
     }
 
-    static String format(double value,int precision){
+    public static String format(double value,int precision){
         int p=Math.max(0,Math.min(6,precision));String text=String.format(Locale.US,"%."+p+"f",Math.abs(value));
         if(p>0){while(text.endsWith("0"))text=text.substring(0,text.length()-1);if(text.endsWith("."))text=text.substring(0,text.length()-1);}
         return text;

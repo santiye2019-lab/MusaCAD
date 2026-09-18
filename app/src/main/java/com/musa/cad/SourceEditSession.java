@@ -43,6 +43,22 @@ public final class SourceEditSession {
     public CadEdit currentSelected(){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().copy();}
     public CadEdit currentFor(int id){Entry e=entries.get(id);return e==null||e.deleted?null:e.current().copy();}
 
+    public String selectedLayer(){Entry e=entries.get(selected);return e==null||e.deleted?"0":e.layer;}
+    public int selectedColor(){Entry e=entries.get(selected);return e==null||e.deleted?0xFFFFFFFF:e.color;}
+    public String selectedLineType(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.CONTINUOUS:e.lineType;}
+    public double selectedLineTypeScale(){Entry e=entries.get(selected);return e==null||e.deleted?1d:e.lineTypeScale;}
+    public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;}
+    public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
+        Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
+        if(layer!=null&&!layer.trim().isEmpty())e.layer=layer.trim();
+        if(color!=null)e.color=color;
+        if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
+        if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d)e.lineTypeScale=lineTypeScale;
+        if(lineWeight!=null)e.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
+        if(e.replacement==null)e.replacement=e.current().copy();
+        return true;
+    }
+
     public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
     public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
     public boolean scaleSelected(float factor){Entry e=entries.get(selected);if(e==null||e.deleted||!Float.isFinite(factor)||factor<=0f)return false;save(e);CadEdit c=e.current();e.replacement=c.scaled(factor,c.centerX(),c.centerY());return true;}
