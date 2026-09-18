@@ -198,8 +198,10 @@ public class CadView extends View {
 
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        if(vectorDrawing!=null)vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds(),fastNavigation&&!exporting);
-        else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        if(vectorDrawing!=null){
+            if(fastNavigation&&!exporting&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled())c.drawBitmap(vectorDrawing.bitmap,imageMatrix,paint);
+            else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds(),false);
+        }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
