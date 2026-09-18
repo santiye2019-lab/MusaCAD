@@ -70,6 +70,7 @@ public final class DxfParser {
         public int editableSourceCount(){int count=0;for(SourceEntity s:editableSources)if(activeLayout.equals(s.layout)&&visibleLayers.contains(s.layer))count++;return count;}
         public double drawingUnitsPerContentPixel(){return worldToContentScale>0f?1d/worldToContentScale:1d;}
         public String drawingUnitName(){return drawingUnitName;}
+        public List<String> lineTypeNames(){return new ArrayList<>(lineTypes.keySet());}
         public SourceEntity sourceById(int id){return sourceById.get(id);}public List<SourceEntity>editableSources(){return editableSources;}public boolean isSourceVisible(int id){SourceEntity s=sourceById.get(id);return s!=null&&activeLayout.equals(s.layout)&&visibleLayers.contains(s.layer);}
         public SourceEntity findEditableSource(float x,float y,float tolerance,Set<Integer>hiddenIds){float best=Math.max(0f,tolerance);SourceEntity found=null;Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;for(SourceEntity s:editableSources){if(!activeLayout.equals(s.layout)||hidden.contains(s.sourceId)||!visibleLayers.contains(s.layer))continue;float distance=s.hitDistance(x,y),allowed="TEXT".equals(s.type)?best*1.75f:best;if(distance<=allowed&&(found==null||distance<best)){best=distance;found=s;}}return found;}
         public void drawVector(Canvas canvas,Matrix imageMatrix){drawVector(canvas,imageMatrix,Collections.emptySet());}
