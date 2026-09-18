@@ -47,6 +47,25 @@ public class CadView extends View {
     private float hoverX,hoverY,stylusPressure=.5f,freehandPressureSum;
     private int freehandPressureSamples;
 
+    public static final class SessionState {
+        final ArrayList<CadEdit> edits;
+        final SourceEditSession.Snapshot sourceState;
+        final float[] matrixValues;
+        final float scale;
+        final double unitsPerImagePixel;
+        final String unitName,currentLayer,currentTextStyle,currentTextFamily;
+        final int currentColorMode,currentColorValue;
+        final boolean currentTextShx,snapEnabled;
+        final float currentTextHeight,currentTextWidthFactor;
+        SessionState(ArrayList<CadEdit> edits,SourceEditSession.Snapshot sourceState,float[] matrixValues,float scale,double unitsPerImagePixel,String unitName,
+                     String currentLayer,String currentTextStyle,String currentTextFamily,int currentColorMode,int currentColorValue,boolean currentTextShx,
+                     boolean snapEnabled,float currentTextHeight,float currentTextWidthFactor){
+            this.edits=edits;this.sourceState=sourceState;this.matrixValues=matrixValues;this.scale=scale;this.unitsPerImagePixel=unitsPerImagePixel;this.unitName=unitName;
+            this.currentLayer=currentLayer;this.currentTextStyle=currentTextStyle;this.currentTextFamily=currentTextFamily;this.currentColorMode=currentColorMode;this.currentColorValue=currentColorValue;
+            this.currentTextShx=currentTextShx;this.snapEnabled=snapEnabled;this.currentTextHeight=currentTextHeight;this.currentTextWidthFactor=currentTextWidthFactor;
+        }
+    }
+
     public CadView(Context c,AttributeSet a){
         super(c,a);setBackgroundColor(Color.rgb(18,24,30));setFocusable(true);
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -95,6 +114,33 @@ public class CadView extends View {
     }
 
     public void setListener(Listener l){listener=l;}
+
+    public SessionState captureSessionState(){
+        ArrayList<CadEdit> editCopy=new ArrayList<>();for(CadEdit edit:edits)editCopy.add(edit.copy());
+        float[] matrix=new float[9];imageMatrix.getValues(matrix);
+        return new SessionState(editCopy,sourceEdits.snapshot(),matrix,scale,unitsPerImagePixel,unitName,currentLayer,currentTextStyle,currentTextFamily,
+            currentColorMode,currentColorValue,currentTextShx,snapEnabled,currentTextHeight,currentTextWidthFactor);
+    }
+
+    public void restoreSession(DxfParser.Result result,Bitmap bitmap,SessionState state){
+        selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;fastNavigation=false;points.clear();freehandPoints.clear();
+        vectorDrawing=result;drawing=result==null?bitmap:null;snapPoints=result==null?new float[0]:result.snapPoints.clone();
+        edits.clear();sourceEdits.clear();imageMatrix.reset();scale=1f;unitsPerImagePixel=1d;unitName="piksel";mode=Mode.PAN;
+        currentLayer="0";currentTextStyle="STANDARD";currentTextFamily="sans";currentColorMode=CadEdit.COLOR_BYLAYER;currentColorValue=7;currentTextShx=false;currentTextHeight=30f;currentTextWidthFactor=1f;
+        if(state!=null){
+            for(CadEdit edit:state.edits)edits.add(edit.copy());sourceEdits.restore(state.sourceState);
+            if(state.matrixValues!=null&&state.matrixValues.length==9)imageMatrix.setValues(state.matrixValues);else fit();
+            scale=Float.isFinite(state.scale)&&state.scale>0f?state.scale:1f;unitsPerImagePixel=state.unitsPerImagePixel;unitName=state.unitName==null?"piksel":state.unitName;
+            currentLayer=state.currentLayer==null?"0":state.currentLayer;currentTextStyle=state.currentTextStyle==null?"STANDARD":state.currentTextStyle;
+            currentTextFamily=state.currentTextFamily==null?"sans":state.currentTextFamily;currentColorMode=state.currentColorMode;currentColorValue=state.currentColorValue;
+            currentTextShx=state.currentTextShx;snapEnabled=state.snapEnabled;currentTextHeight=state.currentTextHeight;currentTextWidthFactor=state.currentTextWidthFactor;
+        }else fit();
+        notifyValue();invalidate();
+    }
+
+    public boolean confirmCurrentCommand(){
+        return finishEdit();
+    }
 
     public void setMode(Mode m){
         lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
