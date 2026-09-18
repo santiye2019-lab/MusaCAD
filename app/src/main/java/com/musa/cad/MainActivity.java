@@ -341,9 +341,6 @@ public class MainActivity extends AppCompatActivity {
             case HELP:
                 showCommandHelp();
                 break;
-            case UNSUPPORTED:
-                result.setText(CadCommand.canonical(raw)+" • Komut tanındı; MusaCAD motor desteği henüz yok");
-                break;
             default:
                 result.setText("Bilinmeyen komut: "+raw+" • ? yazarak komutları görün");
                 break;
