@@ -7,7 +7,7 @@ import android.view.*;
 import java.util.*;
 
 public class CadView extends View {
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -61,7 +61,7 @@ public class CadView extends View {
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
-    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -289,6 +289,7 @@ public class CadView extends View {
             case LINE:{float[] v=map(edit.xy);c.drawLine(v[0],v[1],v[2],v[3],paint);break;}
             case RECTANGLE:{float[] v=map(edit.xy);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;}
             case CIRCLE:{float[] v=map(edit.xy);float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);c.drawCircle(v[0],v[1],r,paint);break;}
+            case ARC:{float[] v=map(edit.xy);if(v.length>=8){float r=(float)Math.hypot(v[0]-v[6],v[1]-v[7]);float start=angleDeg(v[0]-v[6],v[1]-v[7]);float mid=angleDeg(v[2]-v[6],v[3]-v[7]);float end=angleDeg(v[4]-v[6],v[5]-v[7]);float sweep=arcSweep(start,mid,end);RectF oval=new RectF(v[6]-r,v[7]-r,v[6]+r,v[7]+r);c.drawArc(oval,start,sweep,false,paint);}break;}
             case POLYLINE:{float[] v=map(edit.xy);if(v.length>=4){Path p=new Path();p.moveTo(v[0],v[1]);for(int i=2;i+1<v.length;i+=2)p.lineTo(v[i],v[i+1]);if(edit.closed)p.close();c.drawPath(p,paint);}break;}
             case TEXT:{
                 float[] v=map(edit.xy);paint.setStyle(Paint.Style.FILL);int save=c.save();c.rotate(edit.rotationDegrees,v[0],v[1]);
@@ -320,6 +321,9 @@ public class CadView extends View {
     private void drawStylusCursor(Canvas c){float r=9f*getResources().getDisplayMetrics().density;paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.5f);paint.setColor(Color.WHITE);c.drawCircle(hoverX,hoverY,r,paint);c.drawLine(hoverX-r*1.5f,hoverY,hoverX+r*1.5f,hoverY,paint);c.drawLine(hoverX,hoverY-r*1.5f,hoverX,hoverY+r*1.5f,paint);paint.setStyle(Paint.Style.FILL);}
     private float pressureWidth(float pressure){float p=Math.max(0f,Math.min(1f,pressure));return 2f+5f*p;}
     private float[] map(float[] source){float[] target=source.clone();imageMatrix.mapPoints(target);return target;}
+    private static float angleDeg(float x,float y){float a=(float)Math.toDegrees(Math.atan2(y,x));return a<0f?a+360f:a;}
+    private static float ccwDelta(float from,float to){float d=to-from;while(d<0f)d+=360f;while(d>=360f)d-=360f;return d;}
+    private static float arcSweep(float start,float mid,float end){float se=ccwDelta(start,end),sm=ccwDelta(start,mid);return sm<=se+1e-4f?se:-(360f-se);}
 
     private void drawWelcome(Canvas c){paint.setTextAlign(Paint.Align.CENTER);paint.setColor(Color.LTGRAY);paint.setTextSize(36);c.drawText("MusaCAD",getWidth()/2f,getHeight()/2f-26,paint);paint.setTextSize(22);c.drawText("DWG / DXF dosyası açın",getWidth()/2f,getHeight()/2f+18,paint);paint.setTextSize(16);paint.setColor(Color.GRAY);c.drawText("İki parmak: yakınlaştır • Çift dokun: sığdır",getWidth()/2f,getHeight()/2f+54,paint);paint.setTextAlign(Paint.Align.LEFT);}
 
@@ -451,6 +455,7 @@ public class CadView extends View {
         if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.line(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.rectangle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(CadEdit.circle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_ARC&&points.size()==3){PointF a=points.get(0),m=points.get(1),b=points.get(2);CadEdit arc=CadEdit.arc(a.x,a.y,m.x,m.y,b.x,b.y);if(arc==null){points.clear();lastSnapped=false;if(listener!=null)listener.onMeasurement("ARC • Üç nokta aynı doğru üzerinde olamaz");invalidate();return true;}edits.add(arc);lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
@@ -477,6 +482,7 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_POLYLINE)listener.onMeasurement("Çoklu çizgi: noktaları seçin • Bitir ile tamamlayın • Nokta: "+points.size());
         else if(mode==Mode.DRAW_RECTANGLE)listener.onMeasurement("Dikdörtgen: iki köşe seçin • Eklenen: "+edits.size());
         else if(mode==Mode.DRAW_CIRCLE)listener.onMeasurement("Daire: merkez ve yarıçap noktası seçin • Eklenen: "+edits.size());
+        else if(mode==Mode.DRAW_ARC)listener.onMeasurement("Yay: başlangıç, yay üzeri ve bitiş olmak üzere 3 nokta seçin • Nokta: "+points.size());
         else if(mode==Mode.DRAW_TEXT)listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
         else if(stylusModeDetected)listener.onMeasurement("Kalem: serbest çizim • Kalem tuşu: gezin • Silgi/2. tuş: geri al • Parmak: gezin/zoom");
         else listener.onMeasurement("Sürükle: gez • İki parmak: yakınlaştır • Çift dokun: sığdır");

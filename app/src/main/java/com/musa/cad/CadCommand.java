@@ -9,7 +9,7 @@ import java.util.Locale;
  */
 public final class CadCommand {
     public enum Action {
-        NONE, LINE, POLYLINE, CIRCLE, RECTANGLE, TEXT, SELECT,
+        NONE, LINE, POLYLINE, CIRCLE, ARC, RECTANGLE, TEXT, SELECT,
         PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, BREAK, PEDIT, LIST, LAYER, PROPERTIES,
         DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
     }
@@ -20,6 +20,7 @@ public final class CadCommand {
         if(eq(s,"L","LINE"))return Action.LINE;
         if(eq(s,"PL","PLINE","POLYLINE"))return Action.POLYLINE;
         if(eq(s,"C","CIRCLE"))return Action.CIRCLE;
+        if(eq(s,"A","ARC"))return Action.ARC;
         if(eq(s,"REC","RECTANG","RECTANGLE"))return Action.RECTANGLE;
         if(eq(s,"DT","TEXT","T","MTEXT"))return Action.TEXT;
 
@@ -65,7 +66,7 @@ public final class CadCommand {
         if(unsupported!=null)return unsupported;
         Action a=parse(raw);
         switch(a){
-            case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";
+            case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";case ARC:return "ARC";
             case RECTANGLE:return "RECTANG";case TEXT:return "TEXT/MTEXT";case SELECT:return "SELECT";
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
@@ -79,7 +80,6 @@ public final class CadCommand {
     }
 
     private static String classicUnsupported(String s){
-        if(eq(s,"A","ARC"))return "ARC";
         if(eq(s,"B","BLOCK"))return "BLOCK";
         if(eq(s,"CHA","CHAMFER"))return "CHAMFER";
         if(eq(s,"D","DIMSTYLE"))return "DIMSTYLE";
