@@ -38,6 +38,46 @@ public final class CadEdit {
     public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit translated(float dx,float dy){float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){out[i]+=dx;out[i+1]+=dy;}return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=type==Type.TEXT?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit scaled(float factor,float pivotX,float pivotY){
+        if(!Float.isFinite(factor)||factor<=0f)throw new IllegalArgumentException("scale");
+        float[] out=xy.clone();
+        for(int i=0;i+1<out.length;i+=2){out[i]=pivotX+(out[i]-pivotX)*factor;out[i+1]=pivotY+(out[i+1]-pivotY)*factor;}
+        float scaledTextHeight=type==Type.TEXT&&textHeight>0f?textHeight*factor:textHeight;
+        float scaledStroke=Math.max(1f,strokeWidth*factor);
+        return new CadEdit(type,out,text,scaledStroke,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,scaledTextHeight,textWidthFactor,textOblique,textGenerationFlags);
+    }
+    public CadEdit mirrored(boolean verticalAxis,float pivotX,float pivotY){
+        float[] out=xy.clone();
+        for(int i=0;i+1<out.length;i+=2){
+            if(verticalAxis)out[i]=2f*pivotX-out[i];
+            else out[i+1]=2f*pivotY-out[i+1];
+        }
+        float textRotation=rotationDegrees;
+        if(type==Type.TEXT)textRotation=verticalAxis?180f-rotationDegrees:-rotationDegrees;
+        return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+    }
+    public CadEdit offset(float distance){
+        if(!Float.isFinite(distance)||Math.abs(distance)<1e-6f)return null;
+        switch(type){
+            case LINE:{
+                if(xy.length<4)return null;float dx=xy[2]-xy[0],dy=xy[3]-xy[1];float len=(float)Math.hypot(dx,dy);if(len<1e-6f)return null;
+                float nx=-dy/len,ny=dx/len,ox=nx*distance,oy=ny*distance;
+                return new CadEdit(type,new float[]{xy[0]+ox,xy[1]+oy,xy[2]+ox,xy[3]+oy},text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+            }
+            case CIRCLE:{
+                if(xy.length<4)return null;float dx=xy[2]-xy[0],dy=xy[3]-xy[1];float r=(float)Math.hypot(dx,dy);float nr=r+distance;if(r<1e-6f||nr<=1e-6f)return null;
+                float k=nr/r;
+                return new CadEdit(type,new float[]{xy[0],xy[1],xy[0]+dx*k,xy[1]+dy*k},text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+            }
+            case RECTANGLE:{
+                if(xy.length<4)return null;float l=Math.min(xy[0],xy[2])-distance,r=Math.max(xy[0],xy[2])+distance,t=Math.min(xy[1],xy[3])-distance,b=Math.max(xy[1],xy[3])+distance;
+                if(r-l<=1e-6f||b-t<=1e-6f)return null;
+                float x1=xy[0]<=xy[2]?l:r,x2=xy[0]<=xy[2]?r:l,y1=xy[1]<=xy[3]?t:b,y2=xy[1]<=xy[3]?b:t;
+                return new CadEdit(type,new float[]{x1,y1,x2,y2},text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);
+            }
+            default:return null;
+        }
+    }
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
 
     public float centerX(){if((type==Type.CIRCLE||type==Type.TEXT)&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}

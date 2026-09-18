@@ -183,6 +183,15 @@ public class MainActivity extends AppCompatActivity {
                     result.setText("ERASE • Önce nesne seçin, sonra E yazın");
                 }
                 break;
+            case SCALE:
+                runScaleCommand();
+                break;
+            case MIRROR:
+                runMirrorCommand();
+                break;
+            case OFFSET:
+                runOffsetCommand();
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -223,6 +232,82 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean ensureTransformSelection(String command){
+        if(cad.hasSelectedEntity())return true;
+        selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+        result.setText(command+" • Önce nesne seçin, sonra komutu tekrar yazın");
+        return false;
+    }
+
+    private void runScaleCommand(){
+        if(!ensureTransformSelection("SCALE"))return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Ölçek katsayısı (örn. 2 veya 0.5)");
+        input.setText("2");
+        input.setSelectAllOnFocus(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("SCALE • Ölçekle")
+            .setMessage("Seçili nesne kendi merkezine göre ölçeklenecek.")
+            .setView(input)
+            .setPositiveButton("UYGULA",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                float factor=Float.parseFloat(input.getText().toString().trim().replace(',','.'));
+                if(!Float.isFinite(factor)||factor<=0f){input.setError("Sıfırdan büyük bir değer girin");return;}
+                if(!cad.scaleSelectedEntity(factor)){dialog.dismiss();result.setText("SCALE • Seçili nesne ölçeklenemedi");return;}
+                dialog.dismiss();result.setText(String.format(Locale.getDefault(),"SCALE • Ölçek %.3f uygulandı",factor));
+            }catch(Exception e){input.setError("Geçerli bir ölçek katsayısı girin");}
+        }));
+        dialog.show();
+    }
+
+    private void runMirrorCommand(){
+        if(!ensureTransformSelection("MIRROR"))return;
+        new AlertDialog.Builder(this)
+            .setTitle("MIRROR • Aynala")
+            .setItems(new String[]{"Dikey eksene göre","Yatay eksene göre"},(d,which)->{
+                boolean vertical=which==0;
+                if(cad.mirrorSelectedEntity(vertical))result.setText("MIRROR • "+(vertical?"Dikey":"Yatay")+" eksene göre aynalandı");
+                else result.setText("MIRROR • Seçili nesne aynalanamadı");
+            })
+            .setNegativeButton("İPTAL",null)
+            .show();
+    }
+
+    private void runOffsetCommand(){
+        if(!ensureTransformSelection("OFFSET"))return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Ofset mesafesi (+ / -)");
+        input.setText("10");
+        input.setSelectAllOnFocus(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("OFFSET • Paralel kopya")
+            .setMessage("Çizgi, daire ve dikdörtgen desteklenir. Negatif değer karşı yön / iç tarafa ofset uygular.")
+            .setView(input)
+            .setPositiveButton("UYGULA",null)
+            .setNegativeButton("İPTAL",null)
+            .create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                float distance=Float.parseFloat(input.getText().toString().trim().replace(',','.'));
+                if(!Float.isFinite(distance)||Math.abs(distance)<1e-6f){input.setError("Sıfırdan farklı bir mesafe girin");return;}
+                if(!cad.offsetSelectedEntity(distance)){
+                    dialog.dismiss();
+                    result.setText("OFFSET • Bu nesne tipinde henüz desteklenmiyor veya mesafe geçersiz");
+                    return;
+                }
+                dialog.dismiss();result.setText(String.format(Locale.getDefault(),"OFFSET • %.3f birim paralel kopya oluşturuldu",distance));
+            }catch(Exception e){input.setError("Geçerli bir mesafe girin");}
+        }));
+        dialog.show();
+    }
+
     private void showCommandHelp(){
         String text=
             "Çalışan komutlar\n\n"+
@@ -237,6 +322,9 @@ public class MainActivity extends AppCompatActivity {
             "CO / CP / COPY • Kopyala\n"+
             "RO / ROTATE • Döndür\n"+
             "E / ERASE / DELETE • Sil\n"+
+            "SC / SCALE • Seçili nesneyi ölçekle\n"+
+            "MI / MIRROR • Seçili nesneyi aynala\n"+
+            "O / OFFSET • Çizgi/daire/dikdörtgen ofseti\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -246,7 +334,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "ARC, ARRAY, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, MIRROR, OFFSET, OSNAP, PEDIT, POINT, REGEN, SCALE, STRETCH, TRIM, EXPLODE, XLINE, REDO";
+            "ARC, ARRAY, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, EXTEND, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, OSNAP, PEDIT, POINT, REGEN, STRETCH, TRIM, EXPLODE, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)

@@ -124,11 +124,23 @@ public class CadView extends View {
         return out;
     }
 
+    public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&sourceEdits.hasSelection();}
+
     public boolean armMoveSelected(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;moveSelectedArmed=true;notifyValue();invalidate();return true;
     }
     public boolean rotateSelectedEntity(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.rotateSelected(90f))return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
+    }
+    public boolean scaleSelectedEntity(float factor){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.scaleSelected(factor))return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
+    }
+    public boolean mirrorSelectedEntity(boolean verticalAxis){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.mirrorSelected(verticalAxis))return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
+    }
+    public boolean offsetSelectedEntity(float distance){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;CadEdit offset=sourceEdits.offsetSelected(distance);if(offset==null)return false;
+        edits.add(offset);lastActionRegular=true;notifyValue();invalidate();return true;
     }
     public boolean copySelectedEntity(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;float offset=24f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);
