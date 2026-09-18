@@ -265,6 +265,16 @@ public class MainActivity extends AppCompatActivity {
                 if(entityInfo==null)result.setText("LIST • Seçili nesne bilgisi alınamadı");
                 else new AlertDialog.Builder(this).setTitle("LIST • Nesne bilgisi").setMessage(entityInfo).setPositiveButton("TAMAM",null).show();
                 break;
+            case MATCHPROP:
+                if(!ensureTransformSelection("MATCHPROP"))break;
+                if(cad.armMatchProperties())result.setText("MATCHPROP • Özelliklerin aktarılacağı hedef nesneye dokunun");
+                else result.setText("MATCHPROP • Kaynak nesne seçilemedi");
+                break;
+            case JOIN:
+                if(!ensureTransformSelection("JOIN"))break;
+                if(cad.armJoinSelected())result.setText("JOIN • Birleştirilecek ikinci LINE/POLYLINE nesnesine dokunun");
+                else result.setText("JOIN • Seçili nesne açık LINE veya POLYLINE olmalı");
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -289,6 +299,9 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case UNDO:
                 cad.undo();
+                break;
+            case REDO:
+                if(!cad.redo())result.setText("REDO • Yeniden uygulanacak işlem yok");
                 break;
             case SAVE:
                 requestEditedDxfSave();
@@ -492,6 +505,8 @@ public class MainActivity extends AppCompatActivity {
             "BR / BREAK • Seçili çizgiyi dokunulan noktadan böl\n"+
             "PE / PEDIT • Polyline açık/kapalı durumunu değiştir\n"+
             "LI / LIST • Seçili nesnenin bilgilerini göster\n"+
+            "MA / MATCHPROP • Seçili nesnenin özelliklerini hedefe aktar\n"+
+            "J / JOIN • İki açık LINE/POLYLINE nesnesini birleştir\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -499,9 +514,10 @@ public class MainActivity extends AppCompatActivity {
             "Z E / ZE / ZOOM EXTENTS • Ekrana sığdır\n"+
             "Z / ZOOM • Zoom komutu\n"+
             "U / UNDO • Geri al\n"+
+            "REDO • Geri alınan işlemi yeniden uygula\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, HATCH, INSERT, JOIN, MATCHPROP, STRETCH, REDO";
+            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, HATCH, INSERT, STRETCH";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
