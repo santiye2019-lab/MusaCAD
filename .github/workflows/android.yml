@@ -165,8 +165,19 @@ jobs:
           test -s /tmp/musa-smoke.dxf
           mkdir -p app/src/main/assets
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
-      - name: Verify APK assembly is disabled pending user approval
-        run: echo "Lint/unit/native tests only; APK assembly intentionally disabled."
+      - name: Build approved installable MusaCAD APK
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]')) }}
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk /tmp/MusaCAD-latest.apk
+          test -s /tmp/MusaCAD-latest.apk
+      - name: Upload approved MusaCAD APK
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-installable-apk
+          path: /tmp/MusaCAD-latest.apk
+          if-no-files-found: error
       - name: Package corresponding source
         run: |
           tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
