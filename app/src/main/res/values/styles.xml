@@ -41,4 +41,68 @@
     <style name="ToolButtonGreen" parent="ToolButton"><item name="android:background">@drawable/tool_tile_green</item></style>
     <style name="ToolButtonMagenta" parent="ToolButton"><item name="android:background">@drawable/tool_tile_magenta</item></style>
     <style name="ToolButtonYellow" parent="ToolButton"><item name="android:background">@drawable/tool_tile_yellow</item></style>
+
+    <style name="TopQuickButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">74dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">3dp</item>
+        <item name="android:layout_marginEnd">3dp</item>
+        <item name="android:textColor">@color/tool_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">4dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">7dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:drawableTint">@color/tool_text</item>
+    </style>
+
+    <style name="TopQuickBlue" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_blue</item></style>
+    <style name="TopQuickTeal" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_teal</item></style>
+    <style name="TopQuickPurple" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_purple</item></style>
+    <style name="TopQuickOrange" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_orange</item></style>
+    <style name="TopQuickGreen" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_green</item></style>
+    <style name="TopQuickYellow" parent="TopQuickButton"><item name="android:background">@drawable/tool_tile_yellow</item></style>
+
+    <style name="BottomGridButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">62dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">3dp</item>
+        <item name="android:textColor">@color/tool_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">8sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">2dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">5dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:drawableTint">@color/tool_text</item>
+    </style>
+
+    <style name="BottomGridBlue" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_blue</item></style>
+    <style name="BottomGridTeal" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_teal</item></style>
+    <style name="BottomGridPurple" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_purple</item></style>
+    <style name="BottomGridOrange" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_orange</item></style>
+    <style name="BottomGridGreen" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_green</item></style>
+    <style name="BottomGridMagenta" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_magenta</item></style>
+    <style name="BottomGridYellow" parent="BottomGridButton"><item name="android:background">@drawable/tool_tile_yellow</item></style>
 </resources>
