@@ -148,6 +148,12 @@ public class CadView extends View {
         mode=m;points.clear();freehandPoints.clear();notifyValue();invalidate();
     }
 
+    public void clearDocument(){
+        snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;fastNavigation=false;
+        vectorDrawing=null;drawing=null;edits.clear();sourceEdits.clear();unitsPerImagePixel=1d;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
+        imageMatrix.reset();scale=1f;invalidate();
+    }
+
     public void setDrawing(Bitmap b){
         snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         vectorDrawing=null;drawing=b;edits.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();
