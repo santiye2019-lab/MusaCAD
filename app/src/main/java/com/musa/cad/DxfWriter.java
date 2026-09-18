@@ -39,6 +39,13 @@ public final class DxfWriter {
             case POINT:{if(edit.xy.length<2)break;PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"POINT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,p.x);n(out,20,p.y);n(out,30,0);break;}
             case XLINE:{if(edit.xy.length<4)break;PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]),b=w(contentToWorld,edit.xy[2],edit.xy[3]);double dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<1e-9)break;entity(out,"XLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,a.x);n(out,20,a.y);n(out,30,0);n(out,11,dx/len);n(out,21,dy/len);n(out,31,0);break;}
             case POLYLINE:{entity(out,"LWPOLYLINE");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);int count=edit.xy.length/2;i(out,90,count);i(out,70,edit.closed?1:0);for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}break;}
+            case HATCH:{if(edit.xy.length<6)break;String pattern="ANSI31".equalsIgnoreCase(edit.text)?"ANSI31":"SOLID";boolean solid="SOLID".equals(pattern);entity(out,"HATCH");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);
+                n(out,10,0);n(out,20,0);n(out,30,0);n(out,210,0);n(out,220,0);n(out,230,1);tag(out,2,pattern);i(out,70,solid?1:0);i(out,71,0);
+                i(out,91,1);i(out,92,2);i(out,72,0);i(out,73,1);int count=edit.xy.length/2;i(out,93,count);
+                for(int k=0;k+1<edit.xy.length;k+=2){PointF p=w(contentToWorld,edit.xy[k],edit.xy[k+1]);point(out,p.x,p.y);}i(out,97,0);
+                i(out,75,0);i(out,76,1);n(out,52,edit.rotationDegrees);n(out,41,worldTextHeight(contentToWorld,Math.max(.001f,edit.textHeight)));i(out,77,0);
+                if(solid){i(out,78,0);}else{i(out,78,1);n(out,53,45d+edit.rotationDegrees);n(out,43,0);n(out,44,0);n(out,45,0);n(out,46,1);i(out,79,0);}
+                i(out,98,0);break;}
             case TEXT:{PointF p=w(contentToWorld,edit.xy[0],edit.xy[1]);entity(out,"TEXT");common(out,layerName,trueColor,lineType,lineTypeScale,lineWeight,layout);n(out,10,p.x);n(out,20,p.y);n(out,30,0);double h=worldTextHeight(contentToWorld,edit.hasTextStyle()?edit.textHeight:30f);n(out,40,h);n(out,50,-edit.rotationDegrees);if(edit.hasTextStyle()){tag(out,7,edit.textStyleName);if(Math.abs(edit.textWidthFactor-1f)>1e-6)n(out,41,edit.textWidthFactor);if(Math.abs(edit.textOblique)>1e-6)n(out,51,edit.textOblique);if(edit.textGenerationFlags!=0)i(out,71,edit.textGenerationFlags);}tag(out,1,safe(edit.text));break;}
         }
     }
