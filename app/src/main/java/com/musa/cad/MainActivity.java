@@ -65,10 +65,11 @@ public class MainActivity extends AppCompatActivity {
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);commandInput=findViewById(R.id.commandInput);
         shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);documentTabs=findViewById(R.id.documentTabs);documentTabScroll=findViewById(R.id.documentTabScroll);
         cad.setListener(new CadView.Listener(){
-            public void onMeasurement(String v){result.setText(v);refreshDocumentTabs();}
+            public void onMeasurement(String v){result.setText(v);}
             public void onCalibrationRequested(double px){showCalibration();}
             public void onSelectionReady(){previewSelection();}
             public void onTextRequested(float x,float y){showTextEditor(x,y);}
+            public void onDocumentChanged(){refreshDocumentTabs();}
         });
 
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
