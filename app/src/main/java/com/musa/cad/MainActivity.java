@@ -21,25 +21,44 @@ import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21;
+    private static final int MAX_OPEN_PROJECTS=4;
+    private static final long BACK_DOUBLE_MS=1800L;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
     private static final class LoadTask {Future<?> future;AlertDialog dialog;TextView progress;}
     private static final class Loaded {
-        File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
+    }
+
+    private static final class ProjectSession {
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty;long lastAccessMs;
+        void dispose(){
+            Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
+            if(owned!=null&&!owned.isRecycled())owned.recycle();
+            if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();
+            if(file!=null)file.delete();
+            file=null;workingDxf=null;bitmap=null;parsed=null;viewState=null;
+        }
     }
 
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
     private CadView cad;
     private TextView fileName,result,editStatusText,tabFileName;
+    private LinearLayout projectTabsBox;
     private EditText commandInput;
     private File currentFile,editingBaseDxf;
     private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
     private View welcomePanel,shareButton,shareToolButton;
+    private final ArrayList<ProjectSession> projects=new ArrayList<>();
+    private ProjectSession currentProject,pendingCloseAfterSave;
+    private boolean pendingOpenBrowserAfterSave;
+    private long lastBackPressMs;
     private String lastCommandRaw="";
 
     @Override protected void onCreate(Bundle b){
@@ -48,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
-        editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);commandInput=findViewById(R.id.commandInput);
+        editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);projectTabsBox=findViewById(R.id.projectTabsBox);commandInput=findViewById(R.id.commandInput);
         shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
@@ -61,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.pointButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.headerMoreButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
@@ -75,7 +94,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.bottomMeasureButton).setOnClickListener(v->showMeasureTools());
         findViewById(R.id.hatchButton).setOnClickListener(v->runHatchCommand());
         findViewById(R.id.moreToolsButton).setOnClickListener(v->showMoreTools());
-        findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());
+        findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());findViewById(R.id.newProjectButton).setOnClickListener(v->open());
+        tabFileName.setOnLongClickListener(v->{if(currentProject!=null)requestCloseProject(currentProject);return true;});
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.selectEntityButton).setOnClickListener(v->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY));
         findViewById(R.id.moveEntityButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(!cad.armMoveSelected())noSourceSelection();});
@@ -790,6 +810,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir kaynak nesne seçin",Toast.LENGTH_SHORT).show();}
 
+    @Override public void onBackPressed(){
+        if(activeLoad!=null){cancelLoad();Toast.makeText(this,"Devam eden işlem iptal edildi",Toast.LENGTH_SHORT).show();return;}
+        if(currentProject!=null&&isProjectDirty(currentProject)){
+            new AlertDialog.Builder(this).setTitle("Değişiklikler kaydedilsin mi?")
+                .setMessage("Projeler ekranına dönmeden önce mevcut düzenlemeleri kaydedebilirsiniz.")
+                .setPositiveButton("KAYDET",(d,w)->{pendingOpenBrowserAfterSave=true;requestEditedDxfSave();})
+                .setNegativeButton("İPTAL",null).show();
+            return;
+        }
+        long now=System.currentTimeMillis();
+        if(now-lastBackPressMs<=BACK_DOUBLE_MS){lastBackPressMs=0;open();return;}
+        lastBackPressMs=now;
+        Toast.makeText(this,"Projeler ekranına dönmek için tekrar geri basın",Toast.LENGTH_SHORT).show();
+    }
+
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleIncomingIntent(intent);}
     private void handleIncomingIntent(Intent intent){
         if(intent==null)return;Uri uri=null;
@@ -843,14 +878,25 @@ public class MainActivity extends AppCompatActivity {
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden yeni dosya açılamaz",Toast.LENGTH_SHORT).show();return;}
         startActivityForResult(new Intent(this,RecentFilesActivity.class),OPEN);
     }
-    @Override protected void onActivityResult(int r,int c,Intent data){super.onActivityResult(r,c,data);if(c!=RESULT_OK||data==null||data.getData()==null)return;if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());}
+    @Override protected void onActivityResult(int r,int c,Intent data){
+        super.onActivityResult(r,c,data);
+        if(r==SAVE_DXF&&c!=RESULT_OK){pendingOpenBrowserAfterSave=false;pendingCloseAfterSave=null;return;}
+        if(c!=RESULT_OK||data==null||data.getData()==null)return;
+        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
+    }
     private void cancelLoad(){LoadTask task=activeLoad;activeLoad=null;if(task!=null){if(task.future!=null)task.future.cancel(true);if(task.dialog!=null)task.dialog.dismiss();}}
 
     private void startLoad(Uri uri){
+        if(uri==null)return;
+        ProjectSession existing=findProject(uri);
+        if(existing!=null){activateProject(existing);return;}
+        if(projects.size()>=MAX_OPEN_PROJECTS){
+            Toast.makeText(this,"Performans için aynı anda en fazla "+MAX_OPEN_PROJECTS+" proje açık tutulur. Bir sekmeye uzun basıp kapatın.",Toast.LENGTH_LONG).show();return;
+        }
         cancelLoad();LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("Dosya okunuyor…");box.addView(task.progress);
         task.dialog=new AlertDialog.Builder(this).setTitle("Çizim açılıyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{
-            Loaded loaded=new Loaded();
+            Loaded loaded=new Loaded();loaded.sourceUri=uri;
             try{
                 FileTransfer.checkCancelled();loaded.name=nameOf(uri);loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{if(activeLoad==task)task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));}));}
@@ -860,17 +906,104 @@ public class MainActivity extends AppCompatActivity {
                 if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;FileTransfer.checkCancelled();if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,loaded.bitmap);
                 runOnUiThread(()->{
-                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();releaseCurrentFiles();currentFile=loaded.file;editingBaseDxf=loaded.workingDxf;currentDisplayName=loaded.name;activeDxf=loaded.parsed;hideWelcomePanel();updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);
-                    if(loaded.parsed!=null)cad.setVectorDrawing(loaded.parsed);else cad.setDrawing(loaded.bitmap);markModeSelected(R.id.panButton);snapToggle.setEnabled(loaded.parsed!=null&&loaded.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(loaded.parsed!=null)cad.setSnapPoints(loaded.parsed.snapPoints);
-                    String editable=canEdit()?"  •  düzenlenebilir":"";fileName.setText(loaded.name+(loaded.dxf?"  •  DXF":loaded.parsed!=null?"  •  DWG":"  •  DWG önizleme")+editable);if(tabFileName!=null)tabFileName.setText(loaded.name);
-                    if(loaded.parsed!=null){String fallback=(loaded.parsed.fontFallbacks.isEmpty()&&!loaded.parsed.externalShapeFallback)?"":"  •  SHX fallback";result.setText("Hazır  •  "+loaded.parsed.activeLayout+"  •  "+loaded.parsed.entityCount+" nesne  •  "+loaded.parsed.layerCount+" katman  •  "+loaded.parsed.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);}else result.setText("Hazır  •  DWG önizleme modu");
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
+                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=loaded.dxf;project.lastAccessMs=System.currentTimeMillis();
+                    projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
             }catch(Exception|OutOfMemoryError e){loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});}
         });
     }
 
-    private void releaseCurrentFiles(){if(activeDxf!=null&&activeDxf.bitmap!=null&&!activeDxf.bitmap.isRecycled())activeDxf.bitmap.recycle();if(editingBaseDxf!=null&&editingBaseDxf!=currentFile)editingBaseDxf.delete();if(currentFile!=null)currentFile.delete();activeDxf=null;editingBaseDxf=null;currentFile=null;}
-    @Override protected void onDestroy(){cancelLoad();releaseCurrentFiles();loader.shutdownNow();super.onDestroy();}
+    private ProjectSession findProject(Uri uri){
+        if(uri==null)return null;String key=uri.toString();
+        for(ProjectSession p:projects)if(p.sourceUri!=null&&key.equals(p.sourceUri.toString()))return p;
+        return null;
+    }
+
+    private void captureCurrentProject(){
+        if(currentProject==null)return;
+        currentProject.file=currentFile;currentProject.workingDxf=editingBaseDxf;currentProject.parsed=activeDxf;currentProject.name=currentDisplayName;
+        currentProject.viewState=cad.captureSessionState();currentProject.dirty=currentProject.baselineSet&&cad.editFingerprint()!=currentProject.savedFingerprint;currentProject.lastAccessMs=System.currentTimeMillis();
+        // The vector preview bitmap is not used for zoom rendering; recycle it for inactive tabs to reduce RAM pressure.
+        if(currentProject.parsed!=null&&currentProject.parsed.bitmap!=null&&!currentProject.parsed.bitmap.isRecycled())currentProject.parsed.bitmap.recycle();
+    }
+
+    private void activateProject(ProjectSession project){
+        if(project==null||activeLoad!=null)return;
+        if(project==currentProject){refreshProjectTabs();return;}
+        captureCurrentProject();
+        currentProject=project;currentFile=project.file;editingBaseDxf=project.workingDxf;activeDxf=project.parsed;currentDisplayName=project.name==null?"cizim.dwg":project.name;project.lastAccessMs=System.currentTimeMillis();
+        if(project.viewState!=null)cad.restoreSessionState(project.parsed,project.parsed==null?project.bitmap:null,project.viewState);
+        else if(project.parsed!=null)cad.setVectorDrawing(project.parsed);else cad.setDrawing(project.bitmap);
+        hideWelcomePanel();markModeSelected(R.id.panButton);
+        snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
+        updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
+    }
+
+    private void renderCurrentProjectStatus(){
+        if(currentProject==null){fileName.setText("Henüz proje açılmadı");result.setText("Hazır");return;}
+        String editable=canEdit()?"  •  düzenlenebilir":"";
+        fileName.setText(currentDisplayName+(currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":"  •  DWG önizleme")+editable);
+        if(activeDxf!=null){
+            String fallback=(activeDxf.fontFallbacks.isEmpty()&&!activeDxf.externalShapeFallback)?"":"  •  SHX fallback";
+            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);
+        }else result.setText("Hazır  •  DWG önizleme modu");
+    }
+
+    private void refreshProjectTabs(){
+        if(projectTabsBox==null||tabFileName==null)return;
+        while(projectTabsBox.getChildCount()>1)projectTabsBox.removeViewAt(1);
+        tabFileName.setText(currentProject==null?"Dosya açılmadı":currentDisplayName);
+        tabFileName.setAlpha(currentProject==null?.65f:1f);
+        for(ProjectSession p:projects){
+            if(p==currentProject)continue;
+            TextView tab=new TextView(this);tab.setText(p.name==null?"Çizim":p.name);tab.setTextColor(0xFFD7EAF4);tab.setTextSize(9f);tab.setGravity(Gravity.CENTER_VERTICAL);tab.setSingleLine(true);tab.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);tab.setPadding(dp(10),0,dp(10),0);tab.setAlpha(.74f);tab.setBackgroundResource(R.drawable.feature_chip_bg);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(132),dp(34));lp.setMarginStart(dp(5));projectTabsBox.addView(tab,lp);
+            tab.setOnClickListener(v->activateProject(p));tab.setOnLongClickListener(v->{requestCloseProject(p);return true;});
+        }
+    }
+
+    private boolean isProjectDirty(ProjectSession p){
+        if(p==null)return false;
+        if(p==currentProject)return p.baselineSet&&cad.editFingerprint()!=p.savedFingerprint;
+        return p.dirty;
+    }
+
+    private void requestCloseProject(ProjectSession project){
+        if(project==null)return;
+        if(project!=currentProject)activateProject(project);
+        if(isProjectDirty(project)){
+            new AlertDialog.Builder(this).setTitle("Kaydedilmemiş değişiklikler")
+                .setMessage("Bu projeyi kapatmadan önce değişiklikleri kaydetmek ister misiniz?")
+                .setPositiveButton("KAYDET",(d,w)->{pendingCloseAfterSave=project;requestEditedDxfSave();})
+                .setNeutralButton("KAYDETMEDEN KAPAT",(d,w)->closeProjectNow(project))
+                .setNegativeButton("İPTAL",null).show();
+        }else closeProjectNow(project);
+    }
+
+    private void closeProjectNow(ProjectSession project){
+        if(project==null)return;
+        boolean active=project==currentProject;
+        projects.remove(project);
+        if(active){
+            cad.restoreSessionState(null,null,null);currentProject=null;currentFile=null;editingBaseDxf=null;activeDxf=null;currentDisplayName="cizim.dwg";
+        }
+        project.dispose();
+        if(active&&!projects.isEmpty())activateProject(projects.get(projects.size()-1));
+        else if(active){
+            updateShareEnabled(false);updateEditorEnabled(false);updateLayerButtons(false);
+            welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);fileName.setText("Henüz proje açılmadı");result.setText("Hazır");
+        }
+        refreshProjectTabs();
+    }
+
+    private void releaseAllProjects(){
+        captureCurrentProject();cad.restoreSessionState(null,null,null);currentProject=null;
+        for(ProjectSession p:new ArrayList<>(projects))p.dispose();projects.clear();
+        activeDxf=null;editingBaseDxf=null;currentFile=null;
+    }
+
+    @Override protected void onDestroy(){cancelLoad();releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
@@ -914,7 +1047,12 @@ public class MainActivity extends AppCompatActivity {
     private void saveEditedDxf(Uri uri){
         if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}});
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();}
+                    Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
+                    ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
+                    boolean goBrowser=pendingOpenBrowserAfterSave;pendingOpenBrowserAfterSave=false;
+                    if(close!=null)closeProjectNow(close);else if(goBrowser)open();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}});
     }
 
     private void showShare(){
