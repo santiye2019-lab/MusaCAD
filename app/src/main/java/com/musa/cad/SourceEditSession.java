@@ -42,6 +42,7 @@ public final class SourceEditSession {
     public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
     public boolean scaleSelected(float factor){Entry e=entries.get(selected);if(e==null||e.deleted||!Float.isFinite(factor)||factor<=0f)return false;save(e);CadEdit c=e.current();e.replacement=c.scaled(factor,c.centerX(),c.centerY());return true;}
     public boolean mirrorSelected(boolean verticalAxis){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.mirrored(verticalAxis,c.centerX(),c.centerY());return true;}
+    public boolean replaceSelected(CadEdit replacement){Entry e=entries.get(selected);if(e==null||e.deleted||replacement==null)return false;save(e);e.replacement=replacement.copy();return true;}
     public CadEdit offsetSelected(float distance){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().offset(distance);}
     public CadEdit copySelected(float dx,float dy){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().translated(dx,dy);}
     public boolean deleteSelected(){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);e.deleted=true;e.replacement=null;selected=-1;return true;}
