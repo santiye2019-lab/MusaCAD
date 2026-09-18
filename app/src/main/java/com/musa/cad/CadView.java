@@ -34,8 +34,8 @@ public class CadView extends View {
     private float[] snapPoints=new float[0];
     private boolean snapEnabled=true,lastSnapped;
     private boolean moveSelectedArmed,lastActionRegular,fastNavigation;
-    private String currentLayer="0",currentTextStyle="STANDARD",currentTextFamily="sans";
-    private int currentColorMode=CadEdit.COLOR_BYLAYER,currentColorValue=7;
+    private String currentLayer="0",currentTextStyle="STANDARD",currentTextFamily="sans",currentLineType=DxfLineStyle.BYLAYER;
+    private int currentColorMode=CadEdit.COLOR_BYLAYER,currentColorValue=7,currentLineWeight=DxfLineStyle.LW_BYLAYER;
     private boolean currentTextShx;
     private float currentTextHeight=30f,currentTextWidthFactor=1f;
 
@@ -54,15 +54,15 @@ public class CadView extends View {
         final float[] matrixValues;
         final float scale;
         final double unitsPerImagePixel;
-        final String unitName,currentLayer,currentTextStyle,currentTextFamily;
-        final int currentColorMode,currentColorValue;
+        final String unitName,currentLayer,currentTextStyle,currentTextFamily,currentLineType;
+        final int currentColorMode,currentColorValue,currentLineWeight;
         final boolean currentTextShx,snapEnabled;
         final float currentTextHeight,currentTextWidthFactor;
         SessionState(ArrayList<CadEdit> edits,SourceEditSession.Snapshot sourceState,float[] matrixValues,float scale,double unitsPerImagePixel,String unitName,
-                     String currentLayer,String currentTextStyle,String currentTextFamily,int currentColorMode,int currentColorValue,boolean currentTextShx,
+                     String currentLayer,String currentTextStyle,String currentTextFamily,String currentLineType,int currentColorMode,int currentColorValue,int currentLineWeight,boolean currentTextShx,
                      boolean snapEnabled,float currentTextHeight,float currentTextWidthFactor){
             this.edits=edits;this.sourceState=sourceState;this.matrixValues=matrixValues;this.scale=scale;this.unitsPerImagePixel=unitsPerImagePixel;this.unitName=unitName;
-            this.currentLayer=currentLayer;this.currentTextStyle=currentTextStyle;this.currentTextFamily=currentTextFamily;this.currentColorMode=currentColorMode;this.currentColorValue=currentColorValue;
+            this.currentLayer=currentLayer;this.currentTextStyle=currentTextStyle;this.currentTextFamily=currentTextFamily;this.currentLineType=currentLineType;this.currentColorMode=currentColorMode;this.currentColorValue=currentColorValue;this.currentLineWeight=currentLineWeight;
             this.currentTextShx=currentTextShx;this.snapEnabled=snapEnabled;this.currentTextHeight=currentTextHeight;this.currentTextWidthFactor=currentTextWidthFactor;
         }
     }
@@ -89,17 +89,26 @@ public class CadView extends View {
 
     public void setSnapPoints(float[] points){snapPoints=points==null?new float[0]:points.clone();lastSnapped=false;}
     public void setDrawingProperties(String layer,int colorMode,int colorValue,String textStyle,String textFamily,boolean textShx,float textHeight,float textWidthFactor){
+        setDrawingProperties(layer,colorMode,colorValue,currentLineType,currentLineWeight,textStyle,textFamily,textShx,textHeight,textWidthFactor);
+    }
+    public void setDrawingProperties(String layer,int colorMode,int colorValue,String lineType,int lineWeight,String textStyle,String textFamily,boolean textShx,float textHeight,float textWidthFactor){
         currentLayer=layer==null||layer.trim().isEmpty()?"0":layer.trim();
         currentColorMode=colorMode>=CadEdit.COLOR_BYLAYER&&colorMode<=CadEdit.COLOR_TRUECOLOR?colorMode:CadEdit.COLOR_BYLAYER;
         currentColorValue=currentColorMode==CadEdit.COLOR_ACI?Math.max(1,Math.min(255,colorValue)):currentColorMode==CadEdit.COLOR_TRUECOLOR?(colorValue&0x00FFFFFF):colorValue;
+        currentLineType=DxfLineStyle.normalizeName(lineType);currentLineWeight=rawLineWeight(lineWeight);
         currentTextStyle=textStyle==null||textStyle.trim().isEmpty()?"STANDARD":textStyle.trim();
         currentTextFamily=textFamily==null||textFamily.trim().isEmpty()?"sans":textFamily.trim();currentTextShx=textShx;
         currentTextHeight=Float.isFinite(textHeight)&&textHeight>0?textHeight:30f;currentTextWidthFactor=Float.isFinite(textWidthFactor)&&textWidthFactor>0?textWidthFactor:1f;
     }
     public String currentLayer(){return currentLayer;}public int currentColorMode(){return currentColorMode;}public int currentColorValue(){return currentColorValue;}
+    public String currentLineType(){return currentLineType;}public int currentLineWeight(){return currentLineWeight;}
     public String currentTextStyle(){return currentTextStyle;}public String currentTextFamily(){return currentTextFamily;}public boolean currentTextShx(){return currentTextShx;}
     public float currentTextHeight(){return currentTextHeight;}public float currentTextWidthFactor(){return currentTextWidthFactor;}
-    private CadEdit styled(CadEdit edit){return edit.withCadProperties(currentLayer,currentColorMode,currentColorValue);}
+    private CadEdit styled(CadEdit edit){return edit.withCadProperties(currentLayer,currentColorMode,currentColorValue,currentLineType,currentLineWeight);}
+    public boolean applyCurrentPropertiesToSelected(){
+        if(!sourceEdits.setSelectedProperties(currentLayer,currentColorMode,currentColorValue,currentLineType,currentLineWeight))return false;
+        lastActionRegular=false;documentChanged();notifyValue();invalidate();return true;
+    }
     public void setSnapEnabled(boolean enabled){snapEnabled=enabled;lastSnapped=false;invalidate();}
     public boolean isStylusModeDetected(){return stylusModeDetected;}
 
@@ -121,21 +130,21 @@ public class CadView extends View {
     public SessionState captureSessionState(){
         ArrayList<CadEdit> editCopy=new ArrayList<>();for(CadEdit edit:edits)editCopy.add(edit.copy());
         float[] matrix=new float[9];imageMatrix.getValues(matrix);
-        return new SessionState(editCopy,sourceEdits.snapshot(),matrix,scale,unitsPerImagePixel,unitName,currentLayer,currentTextStyle,currentTextFamily,
-            currentColorMode,currentColorValue,currentTextShx,snapEnabled,currentTextHeight,currentTextWidthFactor);
+        return new SessionState(editCopy,sourceEdits.snapshot(),matrix,scale,unitsPerImagePixel,unitName,currentLayer,currentTextStyle,currentTextFamily,currentLineType,
+            currentColorMode,currentColorValue,currentLineWeight,currentTextShx,snapEnabled,currentTextHeight,currentTextWidthFactor);
     }
 
     public void restoreSession(DxfParser.Result result,Bitmap bitmap,SessionState state){
         selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;fastNavigation=false;points.clear();freehandPoints.clear();
         vectorDrawing=result;drawing=result==null?bitmap:null;snapPoints=result==null?new float[0]:result.snapPoints.clone();
         edits.clear();sourceEdits.clear();imageMatrix.reset();scale=1f;unitsPerImagePixel=1d;unitName="piksel";mode=Mode.PAN;
-        currentLayer="0";currentTextStyle="STANDARD";currentTextFamily="sans";currentColorMode=CadEdit.COLOR_BYLAYER;currentColorValue=7;currentTextShx=false;currentTextHeight=30f;currentTextWidthFactor=1f;
+        currentLayer="0";currentTextStyle="STANDARD";currentTextFamily="sans";currentLineType=DxfLineStyle.BYLAYER;currentColorMode=CadEdit.COLOR_BYLAYER;currentColorValue=7;currentLineWeight=DxfLineStyle.LW_BYLAYER;currentTextShx=false;currentTextHeight=30f;currentTextWidthFactor=1f;
         if(state!=null){
             for(CadEdit edit:state.edits)edits.add(edit.copy());sourceEdits.restore(state.sourceState);
             if(state.matrixValues!=null&&state.matrixValues.length==9)imageMatrix.setValues(state.matrixValues);else fit();
             scale=Float.isFinite(state.scale)&&state.scale>0f?state.scale:1f;unitsPerImagePixel=state.unitsPerImagePixel;unitName=state.unitName==null?"piksel":state.unitName;
             currentLayer=state.currentLayer==null?"0":state.currentLayer;currentTextStyle=state.currentTextStyle==null?"STANDARD":state.currentTextStyle;
-            currentTextFamily=state.currentTextFamily==null?"sans":state.currentTextFamily;currentColorMode=state.currentColorMode;currentColorValue=state.currentColorValue;
+            currentTextFamily=state.currentTextFamily==null?"sans":state.currentTextFamily;currentLineType=state.currentLineType==null?DxfLineStyle.BYLAYER:state.currentLineType;currentColorMode=state.currentColorMode;currentColorValue=state.currentColorValue;currentLineWeight=rawLineWeight(state.currentLineWeight);
             currentTextShx=state.currentTextShx;snapEnabled=state.snapEnabled;currentTextHeight=state.currentTextHeight;currentTextWidthFactor=state.currentTextWidthFactor;
         }else fit();
         notifyValue();invalidate();
@@ -218,7 +227,7 @@ public class CadView extends View {
     public void addTextEdit(float x,float y,String text){addTextEdit(x,y,text,currentTextStyle,currentTextFamily,currentTextShx,currentTextHeight,currentTextWidthFactor);}
     public void addTextEdit(float x,float y,String text,String styleName,String familyHint,boolean shx,float height,float widthFactor){
         if(vectorDrawing==null||text==null||text.trim().isEmpty())return;
-        CadEdit edit=CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,height,widthFactor,0f,0).withCadProperties(currentLayer,currentColorMode,currentColorValue);
+        CadEdit edit=CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,height,widthFactor,0f,0).withCadProperties(currentLayer,currentColorMode,currentColorValue,currentLineType,currentLineWeight);
         edits.add(edit);lastActionRegular=true;lastSnapped=false;documentChanged();notifyValue();invalidate();
     }
 
@@ -277,13 +286,16 @@ public class CadView extends View {
     }
 
     private int editColor(CadEdit edit){
+        if(vectorDrawing!=null)return vectorDrawing.resolveColor(edit.layerName,edit.colorMode,edit.colorValue);
         if(edit.colorMode==CadEdit.COLOR_ACI)return DxfColor.aciArgb(edit.colorValue);
         if(edit.colorMode==CadEdit.COLOR_TRUECOLOR)return 0xFF000000|(edit.colorValue&0x00FFFFFF);
         return edit.colorMode==CadEdit.COLOR_BYBLOCK?Color.CYAN:Color.WHITE;
     }
+    private int editLineWeight(CadEdit edit){return vectorDrawing!=null?vectorDrawing.resolveLineWeight(edit.layerName,edit.lineWeight):DxfLineStyle.normalizeWeight(edit.lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);}
 
     private void drawEdit(Canvas c,CadEdit edit,int color){
-        paint.setPathEffect(null);paint.setColor(color);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(edit.strokeWidth);
+        paint.setPathEffect(null);paint.setColor(color);paint.setStyle(Paint.Style.STROKE);
+        float cadWidth=DxfLineStyle.screenStroke(editLineWeight(edit));paint.setStrokeWidth(Math.abs(edit.strokeWidth-3f)>.01f?Math.max(cadWidth,edit.strokeWidth):cadWidth);
         switch(edit.type){
             case LINE:{float[] v=map(edit.xy);c.drawLine(v[0],v[1],v[2],v[3],paint);break;}
             case RECTANGLE:{float[] v=map(edit.xy);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),paint);break;}
@@ -301,6 +313,7 @@ public class CadView extends View {
         }
     }
 
+    private static int rawLineWeight(int value){if(value==DxfLineStyle.LW_BYLAYER||value==DxfLineStyle.LW_BYBLOCK||value==DxfLineStyle.LW_DEFAULT)return value;return value>=0&&value<=211?value:DxfLineStyle.DEFAULT_LINEWEIGHT;}
     private void resetTextPaint(){paint.setTypeface(null);paint.setTextScaleX(1f);paint.setTextSkewX(0f);}
 
     private void drawSelectedSource(Canvas c){
