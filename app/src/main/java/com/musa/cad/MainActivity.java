@@ -275,6 +275,14 @@ public class MainActivity extends AppCompatActivity {
                 if(cad.armJoinSelected())result.setText("JOIN • Birleştirilecek ikinci LINE/POLYLINE nesnesine dokunun");
                 else result.setText("JOIN • Seçili nesne açık LINE veya POLYLINE olmalı");
                 break;
+            case HATCH:
+                runHatchCommand();
+                break;
+            case STRETCH:
+                if(!ensureTransformSelection("STRETCH"))break;
+                if(cad.armStretchSelected())result.setText("STRETCH • Taşınacak köşe/vertex noktasına dokunun");
+                else result.setText("STRETCH • LINE, açık/kapalı POLYLINE veya RECTANGLE seçin");
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -446,6 +454,40 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void runHatchCommand(){
+        if(!ensureTransformSelection("HATCH"))return;
+        new AlertDialog.Builder(this)
+            .setTitle("HATCH • Tarama")
+            .setItems(new String[]{"SOLID • Dolu tarama","ANSI31 • 45° çizgili tarama"},(d,which)->{
+                if(which==0){
+                    if(cad.hatchSelected("SOLID",0f,1f))result.setText("HATCH • SOLID tarama oluşturuldu");
+                    else result.setText("HATCH • Kapalı POLYLINE, RECTANGLE, CIRCLE veya ELLIPSE seçin");
+                    return;
+                }
+                LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+                EditText angle=new EditText(this);angle.setHint("Ek açı (derece)");angle.setText("0");angle.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(angle);
+                EditText spacing=new EditText(this);spacing.setHint("Çizgi aralığı / ölçek");spacing.setText("10");spacing.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(spacing);
+                AlertDialog dialog=new AlertDialog.Builder(this)
+                    .setTitle("ANSI31 tarama ayarı")
+                    .setView(box)
+                    .setPositiveButton("OLUŞTUR",null)
+                    .setNegativeButton("İPTAL",null)
+                    .create();
+                dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                    try{
+                        float a=Float.parseFloat(angle.getText().toString().trim().replace(',','.'));
+                        float sc=Float.parseFloat(spacing.getText().toString().trim().replace(',','.'));
+                        if(!Float.isFinite(sc)||sc<=0f){spacing.setError("Sıfırdan büyük bir aralık girin");return;}
+                        if(cad.hatchSelected("ANSI31",a,sc)){dialog.dismiss();result.setText("HATCH • ANSI31 tarama oluşturuldu");}
+                        else {dialog.dismiss();result.setText("HATCH • Kapalı POLYLINE, RECTANGLE, CIRCLE veya ELLIPSE seçin");}
+                    }catch(Exception e){spacing.setError("Geçerli açı ve aralık değerleri girin");}
+                }));
+                dialog.show();
+            })
+            .setNegativeButton("İPTAL",null)
+            .show();
+    }
+
     private void runArrayCommand(){
         if(!ensureTransformSelection("ARRAY"))return;
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
@@ -507,6 +549,8 @@ public class MainActivity extends AppCompatActivity {
             "LI / LIST • Seçili nesnenin bilgilerini göster\n"+
             "MA / MATCHPROP • Seçili nesnenin özelliklerini hedefe aktar\n"+
             "J / JOIN • İki açık LINE/POLYLINE nesnesini birleştir\n"+
+            "H / HATCH • SOLID veya ANSI31 tarama oluştur\n"+
+            "S / STRETCH • Seçili vertex/köşeyi yeni konuma taşı\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -517,7 +561,7 @@ public class MainActivity extends AppCompatActivity {
             "REDO • Geri alınan işlemi yeniden uygula\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, HATCH, INSERT, STRETCH";
+            "BLOCK, DIMSTYLE, DIMALIGNED, DIMLINEAR, INSERT";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
