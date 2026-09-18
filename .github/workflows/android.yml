@@ -147,15 +147,8 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon lintDebug testDebugUnitTest
-      - name: Build debug and release variants
-        run: |
-          ./gradlew --no-daemon assembleDebug assembleRelease
-      - name: Upload internal debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: MusaCAD-internal-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+      - name: Verify no APK build in completion branch
+        run: echo "Source/lint/unit tests only; APK assembly intentionally disabled until user approval."
       - name: Package corresponding source
         run: |
           tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
