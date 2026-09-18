@@ -124,18 +124,24 @@ public class MainActivity extends AppCompatActivity {
             case LINE:selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE);result.setText("LINE • İlk noktayı seçin");break;
             case POLYLINE:selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE);result.setText("PLINE • Noktaları seçin • Bitir ile tamamlayın");break;
             case CIRCLE:selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE);result.setText("CIRCLE • Merkez ve yarıçap noktası seçin");break;
-            case RECTANGLE:selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE);result.setText("RECTANGLE • İki köşe seçin");break;
-            case TEXT:selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT);result.setText("TEXT • Yazı konumuna dokunun");break;
+            case RECTANGLE:selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE);result.setText("RECTANG • İki köşe seçin");break;
+            case TEXT:selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT);result.setText("TEXT/MTEXT • Yazı konumuna dokunun");break;
             case SELECT:selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("SELECT • Nesne seçin");break;
+            case PAN:selectMode(R.id.panButton,CadView.Mode.PAN);result.setText("PAN • Çizimi sürükleyin");break;
             case MOVE:if(!cad.armMoveSelected()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("MOVE • Önce nesne seçin, sonra M yazın");}break;
             case COPY:if(!cad.copySelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("COPY • Önce nesne seçin, sonra CO yazın");}break;
+            case ROTATE:if(!cad.rotateSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("ROTATE • Önce nesne seçin, sonra RO yazın");}break;
             case ERASE:if(!cad.deleteSelectedEntity()){selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);result.setText("ERASE • Önce nesne seçin, sonra E yazın");}break;
             case LAYER:showLayers();break;
             case PROPERTIES:showDrawingProperties();break;
+            case DISTANCE:selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);result.setText("DIST • İki nokta seçin");break;
+            case AREA:selectMode(R.id.areaButton,CadView.Mode.AREA);result.setText("AREA • Sınır noktalarını seçin");break;
+            case ZOOM:result.setText("ZOOM • Extents için Z E veya ZE kullanın; yakınlaştırma için üst araçları kullanın");break;
             case ZOOM_EXTENTS:cad.fitToScreen();result.setText("ZOOM EXTENTS • Çizim ekrana sığdırıldı");break;
             case UNDO:cad.undo();break;
             case SAVE:requestEditedDxfSave();break;
-            case HELP:new AlertDialog.Builder(this).setTitle("MusaCAD komutları").setMessage("L / LINE  • Çizgi\nPL / PLINE • Çoklu çizgi\nC / CIRCLE • Daire\nREC • Dörtgen\nT / TEXT • Yazı\nS / SELECT • Seç\nM / MOVE • Taşı\nCO / COPY • Kopya\nE / ERASE • Sil\nLA / LAYER • Katmanlar\nPR / PROPERTIES • Özellikler\nZE • Ekrana sığdır\nU • Geri al\nSAVE • DXF kaydet").setPositiveButton("TAMAM",null).show();break;
+            case UNSUPPORTED:result.setText(CadCommand.canonical(raw)+" • AutoCAD komutu tanındı, MusaCAD motoru henüz desteklemiyor");break;
+            case HELP:new AlertDialog.Builder(this).setTitle("AutoCAD uyumlu komutlar").setMessage("L / LINE • Çizgi\nPL / PLINE • Polyline\nC / CIRCLE • Daire\nREC / RECTANG • Dörtgen\nDT / TEXT / T / MTEXT • Yazı\nSEL / SELECT • Seç\nP / PAN • Gezin\nM / MOVE • Taşı\nCO / CP / COPY • Kopya\nRO / ROTATE • Döndür\nE / ERASE • Sil\nLA / LAYER • Katman\nPR / PROPERTIES • Özellikler\nDI / DIST • Mesafe\nAA / AREA • Alan\nZ E / ZE • Zoom Extents\nU / UNDO • Geri al\nQS / QSAVE / SAVE • Kaydet\n\nTanınıyor fakat henüz motoru yok: S/STRETCH, TR/TRIM, EX/EXTEND, O/OFFSET, SC/SCALE, MI/MIRROR, F/FILLET, H/HATCH, A/ARC, X/EXPLODE ve diğerleri.").setPositiveButton("TAMAM",null).show();break;
             default:result.setText("Bilinmeyen komut: "+raw+"  •  ? yazarak komutları görün");break;
         }
     }
