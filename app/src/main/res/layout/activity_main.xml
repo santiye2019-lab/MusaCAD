@@ -368,17 +368,6 @@
                 android:textSize="12sp"
                 android:background="@drawable/tool_tile_blue" />
 
-            <TextView
-                android:layout_width="40dp"
-                android:layout_height="42dp"
-                android:layout_marginTop="5dp"
-                android:gravity="center"
-                android:text="3D"
-                android:textColor="#587487"
-                android:textStyle="bold"
-                android:textSize="12sp"
-                android:background="@drawable/feature_chip_bg" />
-
             <ImageButton
                 android:id="@+id/rightLayersButton"
                 android:layout_width="40dp"
