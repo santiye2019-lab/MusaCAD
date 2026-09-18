@@ -2,6 +2,7 @@ package com.musa.cad;
 
 import android.app.*;
 import android.content.*;
+import android.content.res.ColorStateList;
 import android.graphics.*;
 import android.graphics.pdf.PdfDocument;
 import android.graphics.drawable.GradientDrawable;
@@ -189,8 +190,10 @@ public class MainActivity extends AppCompatActivity {
     private void refreshPropertyButtons(){
         Button color=findViewById(R.id.colorButton),weight=findViewById(R.id.lineWeightButton);
         if(color!=null){
-            String label=cad==null?"BYL":cad.currentColorMode()==CadEdit.COLOR_BYLAYER?"BYL":cad.currentColorMode()==CadEdit.COLOR_BYBLOCK?"BYB":cad.currentColorMode()==CadEdit.COLOR_ACI?"A"+cad.currentColorValue():"RGB";
-            color.setText("Renk:"+label);
+            int mode=cad==null?CadEdit.COLOR_BYLAYER:cad.currentColorMode(),value=cad==null?7:cad.currentColorValue();String layerName=cad==null?"0":cad.currentLayer();
+            String label=mode==CadEdit.COLOR_BYLAYER?"BYL":mode==CadEdit.COLOR_BYBLOCK?"BYB":mode==CadEdit.COLOR_ACI?"A"+value:"RGB";
+            color.setText("Renk:"+label);int swatch=previewColor(mode,value,layerName);int lum=(Color.red(swatch)*299+Color.green(swatch)*587+Color.blue(swatch)*114)/1000;
+            color.setBackgroundTintList(ColorStateList.valueOf(swatch));color.setTextColor(lum>150?Color.rgb(16,32,40):Color.WHITE);
         }
         if(weight!=null)weight.setText("LW:"+(cad==null?"BYL":lineWeightShort(cad.currentLineWeight())));
     }
@@ -317,7 +320,19 @@ public class MainActivity extends AppCompatActivity {
         TextView l3=new TextView(this);l3.setText("Yazı tipi / DXF text style");l3.setPadding(0,dp(10),0,0);box.addView(l3);
         ArrayList<String> styleNamesList=new ArrayList<>(activeDxf.textStyleNames());if(styleNamesList.isEmpty())styleNamesList.add(DxfTextStyle.STANDARD);
         String[] styleNames=styleNamesList.toArray(new String[0]);String[] styleLabels=new String[styleNames.length];for(int i=0;i<styleNames.length;i++)styleLabels[i]=textStyleLabel(activeDxf.textStyle(styleNames[i]));
-        Spinner font=new Spinner(this);font.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,styleLabels));int styleSelection=0;for(int i=0;i<styleNames.length;i++)if(styleNames[i].equalsIgnoreCase(cad.currentTextStyle())){styleSelection=i;break;}font.setSelection(styleSelection);box.addView(font);
+        Spinner font=new Spinner(this);
+        ArrayAdapter<String> styleAdapter=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,styleLabels){
+            private View styleRow(View view,int position){
+                TextView text=(TextView)super.getDropDownView(position,view,font);DxfTextStyle.Style st=activeDxf.textStyle(styleNames[Math.max(0,Math.min(position,styleNames.length-1))]);
+                text.setTypeface(st.usesShx()?Typeface.MONOSPACE:Typeface.create(st.familyHint(),Typeface.NORMAL));text.setTextSize(18);text.setPadding(dp(12),dp(10),dp(12),dp(10));return text;
+            }
+            @Override public View getDropDownView(int position,View convertView,ViewGroup parent){return styleRow(convertView,position);}
+            @Override public View getView(int position,View convertView,ViewGroup parent){
+                TextView text=(TextView)super.getView(position,convertView,parent);DxfTextStyle.Style st=activeDxf.textStyle(styleNames[Math.max(0,Math.min(position,styleNames.length-1))]);
+                text.setTypeface(st.usesShx()?Typeface.MONOSPACE:Typeface.create(st.familyHint(),Typeface.NORMAL));return text;
+            }
+        };
+        font.setAdapter(styleAdapter);int styleSelection=0;for(int i=0;i<styleNames.length;i++)if(styleNames[i].equalsIgnoreCase(cad.currentTextStyle())){styleSelection=i;break;}font.setSelection(styleSelection);box.addView(font);
         TextView styleInfo=new TextView(this);styleInfo.setText("Çizimde tanımlı "+styleNames.length+" yazı stili listeleniyor. SHX/TTF dosya adı varsa yanında gösterilir.");styleInfo.setTextSize(10);styleInfo.setTextColor(Color.LTGRAY);styleInfo.setPadding(0,dp(3),0,dp(3));box.addView(styleInfo);
 
         EditText textHeight=new EditText(this);textHeight.setSingleLine(true);textHeight.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);textHeight.setHint("Yazı yüksekliği");textHeight.setText(String.format(Locale.US,"%.2f",cad.currentTextHeight()));box.addView(textHeight);
