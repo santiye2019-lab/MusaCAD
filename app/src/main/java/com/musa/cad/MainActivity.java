@@ -219,6 +219,22 @@ public class MainActivity extends AppCompatActivity {
                 if(cad.armExtendSelected())result.setText("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");
                 else result.setText("EXTEND • Hedef nesne LINE olmalı");
                 break;
+            case BREAK:
+                if(!ensureTransformSelection("BREAK"))break;
+                if(cad.armBreakSelected())result.setText("BREAK • Çizgiyi böleceğiniz noktaya dokunun");
+                else result.setText("BREAK • Hedef nesne LINE olmalı");
+                break;
+            case PEDIT:
+                if(!ensureTransformSelection("PEDIT"))break;
+                if(cad.toggleSelectedPolylineClosed())result.setText("PEDIT • Polyline açık/kapalı durumu değiştirildi");
+                else result.setText("PEDIT • Seçili nesne POLYLINE olmalı");
+                break;
+            case LIST:
+                if(!ensureTransformSelection("LIST"))break;
+                String entityInfo=cad.selectedEntityInfo();
+                if(entityInfo==null)result.setText("LIST • Seçili nesne bilgisi alınamadı");
+                else new AlertDialog.Builder(this).setTitle("LIST • Nesne bilgisi").setMessage(entityInfo).setPositiveButton("TAMAM",null).show();
+                break;
             case LAYER:
                 showLayers();
                 break;
@@ -385,6 +401,9 @@ public class MainActivity extends AppCompatActivity {
             "RE / REGEN • Görünümü yenile\n"+
             "TR / TRIM • Seçili çizgiyi ikinci çizgide kes\n"+
             "EX / EXTEND • Seçili çizgiyi ikinci çizgiye uzat\n"+
+            "BR / BREAK • Seçili çizgiyi dokunulan noktadan böl\n"+
+            "PE / PEDIT • Polyline açık/kapalı durumunu değiştir\n"+
+            "LI / LIST • Seçili nesnenin bilgilerini göster\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
@@ -394,7 +413,7 @@ public class MainActivity extends AppCompatActivity {
             "U / UNDO • Geri al\n"+
             "QS / QSAVE / SAVE • Kaydet\n\n"+
             "Tanınıyor, motor desteği henüz yok\n"+
-            "ARC, BLOCK, BREAK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, LIST, MATCHPROP, PEDIT, POINT, STRETCH, XLINE, REDO";
+            "ARC, BLOCK, CHAMFER, DIMSTYLE, DIMALIGNED, DIMLINEAR, ELLIPSE, FILLET, HATCH, INSERT, JOIN, MATCHPROP, POINT, STRETCH, XLINE, REDO";
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD komutları")
             .setMessage(text)
