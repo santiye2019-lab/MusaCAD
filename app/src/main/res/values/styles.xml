@@ -41,4 +41,28 @@
     <style name="ToolButtonGreen" parent="ToolButton"><item name="android:background">@drawable/tool_tile_green</item></style>
     <style name="ToolButtonMagenta" parent="ToolButton"><item name="android:background">@drawable/tool_tile_magenta</item></style>
     <style name="ToolButtonYellow" parent="ToolButton"><item name="android:background">@drawable/tool_tile_yellow</item></style>
+
+    <style name="CadTopButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_height">54dp</item>
+        <item name="android:layout_marginStart">2dp</item>
+        <item name="android:layout_marginEnd">2dp</item>
+        <item name="android:textColor">#EAF5F7</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">2dp</item>
+        <item name="android:paddingStart">3dp</item>
+        <item name="android:paddingEnd">3dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:background">@drawable/tool_tile_blue</item>
+        <item name="android:drawableTint">#EAF5F7</item>
+    </style>
 </resources>
