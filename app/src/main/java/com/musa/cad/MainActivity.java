@@ -288,8 +288,34 @@ public class MainActivity extends AppCompatActivity {
         Spinner layer=new Spinner(this);String[] layers=activeDxf.layerNames.toArray(new String[0]);ArrayAdapter<String> la=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,layers);layer.setAdapter(la);for(int i=0;i<layers.length;i++)if(layers[i].equals(cad.currentLayer()))layer.setSelection(i);box.addView(layer);
 
         TextView l2=new TextView(this);l2.setText("Renk");l2.setPadding(0,dp(10),0,0);box.addView(l2);
-        Spinner colorMode=new Spinner(this);String[] modes={"BYLAYER","BYBLOCK","ACI renk no","True Color RGB"};colorMode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,modes));colorMode.setSelection(cad.currentColorMode());box.addView(colorMode);
+        Spinner colorMode=new Spinner(this);String[] modes={"BYLAYER","BYBLOCK","ACI renk paleti","True Color RGB"};colorMode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,modes));colorMode.setSelection(cad.currentColorMode());box.addView(colorMode);
         EditText colorValue=new EditText(this);colorValue.setSingleLine(true);colorValue.setHint("ACI: 1-255 veya RGB: #RRGGBB");colorValue.setText(cad.currentColorMode()==CadEdit.COLOR_TRUECOLOR?String.format(Locale.US,"#%06X",cad.currentColorValue()&0xFFFFFF):Integer.toString(cad.currentColorValue()));box.addView(colorValue);
+
+        LinearLayout colorRow=new LinearLayout(this);colorRow.setOrientation(LinearLayout.HORIZONTAL);colorRow.setGravity(Gravity.CENTER_VERTICAL);colorRow.setPadding(0,dp(6),0,dp(4));
+        TextView colorPreview=new TextView(this);colorPreview.setGravity(Gravity.CENTER);colorPreview.setTextSize(11);colorPreview.setTypeface(Typeface.DEFAULT_BOLD);
+        Button paletteButton=new Button(this);paletteButton.setText("RENK PALETİ • 1–255");paletteButton.setTextSize(11);paletteButton.setAllCaps(false);
+        LinearLayout.LayoutParams previewLp=new LinearLayout.LayoutParams(dp(112),dp(44));previewLp.setMargins(0,0,dp(8),0);colorRow.addView(colorPreview,previewLp);colorRow.addView(paletteButton,new LinearLayout.LayoutParams(0,dp(48),1f));box.addView(colorRow);
+        updateColorPreview(colorPreview,cad.currentColorMode(),cad.currentColorValue(),cad.currentLayer());
+
+        colorMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+            public void onNothingSelected(AdapterView<?> parent){}
+            public void onItemSelected(AdapterView<?> parent,View view,int position,long id){
+                boolean explicit=position==CadEdit.COLOR_ACI||position==CadEdit.COLOR_TRUECOLOR;colorValue.setVisibility(explicit?View.VISIBLE:View.GONE);
+                if(position==CadEdit.COLOR_ACI&&colorValue.getText().toString().trim().startsWith("#"))colorValue.setText("7");
+                if(position==CadEdit.COLOR_TRUECOLOR&&!colorValue.getText().toString().trim().startsWith("#"))colorValue.setText("#FFFFFF");
+                int value=7;try{String raw=colorValue.getText().toString().trim();value=position==CadEdit.COLOR_TRUECOLOR?Integer.parseInt(raw.replace("#",""),16):Integer.parseInt(raw);}catch(Exception ignored){}
+                String layerName=layers.length==0?"0":String.valueOf(layer.getSelectedItem());updateColorPreview(colorPreview,position,value,layerName);
+            }
+        });
+        paletteButton.setOnClickListener(v->{
+            int mode=colorMode.getSelectedItemPosition(),value=7;try{String raw=colorValue.getText().toString().trim();value=mode==CadEdit.COLOR_TRUECOLOR?Integer.parseInt(raw.replace("#",""),16):Integer.parseInt(raw);}catch(Exception ignored){}
+            String layerName=layers.length==0?"0":String.valueOf(layer.getSelectedItem());
+            showColorPalette(mode,value,layerName,(pickedMode,pickedValue)->{
+                colorMode.setSelection(pickedMode);colorValue.setText(pickedMode==CadEdit.COLOR_TRUECOLOR?String.format(Locale.US,"#%06X",pickedValue&0xFFFFFF):Integer.toString(pickedValue));
+                colorValue.setVisibility(pickedMode==CadEdit.COLOR_ACI||pickedMode==CadEdit.COLOR_TRUECOLOR?View.VISIBLE:View.GONE);
+                updateColorPreview(colorPreview,pickedMode,pickedValue,layerName);
+            });
+        });
 
         TextView ltLabel=new TextView(this);ltLabel.setText("Çizgi tipi");ltLabel.setPadding(0,dp(10),0,0);box.addView(ltLabel);
         LinkedHashSet<String> typeSet=new LinkedHashSet<>();typeSet.add(DxfLineStyle.BYLAYER);typeSet.add(DxfLineStyle.BYBLOCK);typeSet.addAll(activeDxf.lineTypeNames());String[] lineTypes=typeSet.toArray(new String[0]);
@@ -298,8 +324,11 @@ public class MainActivity extends AppCompatActivity {
         TextView lwLabel=new TextView(this);lwLabel.setText("Çizgi kalınlığı • LineWeight");lwLabel.setPadding(0,dp(10),0,0);box.addView(lwLabel);
         Spinner lineWeight=new Spinner(this);lineWeight.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,LINE_WEIGHT_LABELS));lineWeight.setSelection(lineWeightIndex(cad.currentLineWeight()));box.addView(lineWeight);
 
-        TextView l3=new TextView(this);l3.setText("Yazı tipi / stili");l3.setPadding(0,dp(10),0,0);box.addView(l3);
-        Spinner font=new Spinner(this);String[] fonts={"Sans / Arial benzeri","Serif / Times benzeri","Monospace / SHX benzeri"};font.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,fonts));font.setSelection(cad.currentTextShx()?2:cad.currentTextFamily().toLowerCase(Locale.ROOT).contains("serif")?1:0);box.addView(font);
+        TextView l3=new TextView(this);l3.setText("Yazı tipi / DXF text style");l3.setPadding(0,dp(10),0,0);box.addView(l3);
+        ArrayList<String> styleNamesList=new ArrayList<>(activeDxf.textStyleNames());if(styleNamesList.isEmpty())styleNamesList.add(DxfTextStyle.STANDARD);
+        String[] styleNames=styleNamesList.toArray(new String[0]);String[] styleLabels=new String[styleNames.length];for(int i=0;i<styleNames.length;i++)styleLabels[i]=textStyleLabel(activeDxf.textStyle(styleNames[i]));
+        Spinner font=new Spinner(this);font.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,styleLabels));int styleSelection=0;for(int i=0;i<styleNames.length;i++)if(styleNames[i].equalsIgnoreCase(cad.currentTextStyle())){styleSelection=i;break;}font.setSelection(styleSelection);box.addView(font);
+        TextView styleInfo=new TextView(this);styleInfo.setText("Çizimde tanımlı "+styleNames.length+" yazı stili listeleniyor. SHX/TTF dosya adı varsa yanında gösterilir.");styleInfo.setTextSize(10);styleInfo.setTextColor(Color.LTGRAY);styleInfo.setPadding(0,dp(3),0,dp(3));box.addView(styleInfo);
 
         EditText textHeight=new EditText(this);textHeight.setSingleLine(true);textHeight.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);textHeight.setHint("Yazı yüksekliği");textHeight.setText(String.format(Locale.US,"%.2f",cad.currentTextHeight()));box.addView(textHeight);
         EditText widthFactor=new EditText(this);widthFactor.setSingleLine(true);widthFactor.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);widthFactor.setHint("Yazı genişlik katsayısı");widthFactor.setText(String.format(Locale.US,"%.2f",cad.currentTextWidthFactor()));box.addView(widthFactor);
@@ -313,11 +342,12 @@ public class MainActivity extends AppCompatActivity {
                 if(mode==CadEdit.COLOR_ACI){value=Integer.parseInt(raw);if(value<1||value>255)throw new IllegalArgumentException("ACI renk numarası 1-255 olmalı");}
                 else if(mode==CadEdit.COLOR_TRUECOLOR){String hex=raw.replace("#","").trim();if(hex.length()!=6)throw new IllegalArgumentException("RGB renk #RRGGBB biçiminde olmalı");value=Integer.parseInt(hex,16);}
                 String selectedType=lineTypes[Math.max(0,lineType.getSelectedItemPosition())];int selectedWeight=LINE_WEIGHT_VALUES[Math.max(0,lineWeight.getSelectedItemPosition())];
-                int fi=font.getSelectedItemPosition();String style=fi==2?"SHX_TEST":fi==1?"SERIF":"STANDARD";String family=fi==2?"monospace":fi==1?"serif":"sans";boolean shx=fi==2;
+                int fi=Math.max(0,font.getSelectedItemPosition());String styleName=styleNames[Math.min(fi,styleNames.length-1)];DxfTextStyle.Style selectedStyle=activeDxf.textStyle(styleName);
+                String family=selectedStyle.familyHint();boolean shx=selectedStyle.usesShx();
                 float h=Float.parseFloat(textHeight.getText().toString().trim()),wf=Float.parseFloat(widthFactor.getText().toString().trim());if(!(h>0)||!(wf>0))throw new IllegalArgumentException("Yazı ölçüleri sıfırdan büyük olmalı");
-                cad.setDrawingProperties(layerName,mode,value,selectedType,selectedWeight,style,family,shx,h,wf);
+                cad.setDrawingProperties(layerName,mode,value,selectedType,selectedWeight,selectedStyle.name,family,shx,h,wf);
                 boolean selected=cad.applyCurrentPropertiesToSelected();refreshPropertyButtons();
-                result.setText((selected?"Seçili nesne":"Aktif çizim")+" • "+layerName+" • "+modes[mode]+" • LW "+lineWeightShort(selectedWeight));
+                result.setText((selected?"Seçili nesne":"Aktif çizim")+" • "+layerName+" • "+modes[mode]+" • "+selectedStyle.name+" • LW "+lineWeightShort(selectedWeight));
                 dialog.dismiss();
             }catch(Exception ex){Toast.makeText(this,ex.getMessage()==null?"Özellik değeri geçersiz":ex.getMessage(),Toast.LENGTH_LONG).show();}
         }));dialog.show();
