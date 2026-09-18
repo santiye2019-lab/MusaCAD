@@ -35,6 +35,7 @@ public class CadView extends View {
     private boolean moveSelectedArmed,lastActionRegular;
     private enum PairCommand { NONE, TRIM, EXTEND }
     private PairCommand pairCommand=PairCommand.NONE;
+    private boolean breakArmed;
     private float selectedPickX,selectedPickY;
 
     private boolean selecting,draggingSelection,exporting;
@@ -84,7 +85,7 @@ public class CadView extends View {
     public boolean confirmCurrentCommand(){return finishEdit();}
 
     public void setMode(Mode m){
-        lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;pairCommand=PairCommand.NONE;
+        lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;
         if(m!=Mode.SELECT_ENTITY)sourceEdits.clearSelection();
         mode=m;points.clear();freehandPoints.clear();notifyValue();invalidate();
     }
@@ -138,6 +139,33 @@ public class CadView extends View {
         CadEdit selected=sourceEdits.currentSelected();
         if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE)return false;
         pairCommand=PairCommand.EXTEND;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+
+    public boolean armBreakSelected(){
+        CadEdit selected=sourceEdits.currentSelected();
+        if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE)return false;
+        breakArmed=true;pairCommand=PairCommand.NONE;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+    public boolean toggleSelectedPolylineClosed(){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        CadEdit selected=sourceEdits.currentSelected();if(selected==null||selected.type!=CadEdit.Type.POLYLINE)return false;
+        boolean changed=sourceEdits.replaceSelected(selected.withClosed(!selected.closed));
+        if(changed){lastActionRegular=false;notifyValue();invalidate();}
+        return changed;
+    }
+    public String selectedEntityInfo(){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return null;
+        CadEdit e=sourceEdits.currentSelected();DxfParser.SourceEntity source=vectorDrawing==null?null:vectorDrawing.sourceById(sourceEdits.selectedId());
+        if(e==null)return null;
+        StringBuilder b=new StringBuilder();
+        b.append("Tür: ").append(source==null?e.type.name():source.type);
+        if(source!=null){b.append("\nKatman: ").append(source.layer);b.append("\nÇizgi tipi: ").append(source.lineType);b.append("\nRenk: ").append(source.color);b.append("\nÇizgi kalınlığı: ").append(source.lineWeight);}
+        b.append(String.format(Locale.getDefault(),"\nMerkez: %.3f, %.3f",e.centerX(),e.centerY()));
+        b.append(String.format(Locale.getDefault(),"\nSınır: [%.3f, %.3f] - [%.3f, %.3f]",e.minX(),e.minY(),e.maxX(),e.maxY()));
+        if(e.type==CadEdit.Type.LINE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nUzunluk: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
+        if(e.type==CadEdit.Type.CIRCLE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nYarıçap: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
+        if(e.type==CadEdit.Type.POLYLINE)b.append("\nKapalı: ").append(e.closed?"Evet":"Hayır");
+        return b.toString();
     }
 
     public boolean armMoveSelected(){
@@ -320,6 +348,7 @@ public class CadView extends View {
         if(vectorDrawing==null)return true;int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(action==MotionEvent.ACTION_UP){PointF point=screenToContent(e.getX(),e.getY());if(point==null)return true;
             if(moveSelectedArmed&&sourceEdits.hasSelection()){if(sourceEdits.moveSelectedTo(point.x,point.y)){lastActionRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);}moveSelectedArmed=false;notifyValue();invalidate();return true;}
+            if(breakArmed&&sourceEdits.hasSelection()){applyBreak(point.x,point.y);return true;}
             if(pairCommand!=PairCommand.NONE&&sourceEdits.hasSelection()){applyPairCommand(point.x,point.y);return true;}
             selectSourceAt(point.x,point.y);return true;}
         return true;
@@ -332,7 +361,19 @@ public class CadView extends View {
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();return;}
         sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
-        selectedPickX=x;selectedPickY=y;moveSelectedArmed=false;pairCommand=PairCommand.NONE;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
+        selectedPickX=x;selectedPickY=y;moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();
+    }
+
+    private void applyBreak(float x,float y){
+        CadEdit target=sourceEdits.currentSelected();
+        if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){breakArmed=false;notifyValue();invalidate();return;}
+        float t=projectionParameter(x,y,target.xy[0],target.xy[1],target.xy[2],target.xy[3]);
+        if(t<=.001f||t>=.999f){if(listener!=null)listener.onMeasurement("BREAK • Çizginin uçlarından uzakta bir nokta seçin");return;}
+        float px=target.xy[0]+(target.xy[2]-target.xy[0])*t,py=target.xy[1]+(target.xy[3]-target.xy[1])*t;
+        CadEdit first=CadEdit.line(target.xy[0],target.xy[1],px,py),second=CadEdit.line(px,py,target.xy[2],target.xy[3]);
+        if(!sourceEdits.deleteSelected()){breakArmed=false;return;}
+        edits.add(first);edits.add(second);breakArmed=false;lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+        if(listener!=null)listener.onMeasurement("BREAK • Çizgi iki parçaya bölündü");
     }
 
     private void applyPairCommand(float x,float y){
@@ -423,6 +464,7 @@ public class CadView extends View {
         if(mode==Mode.SELECT_ENTITY){
             if(vectorDrawing==null){listener.onMeasurement("Kaynak nesne düzenleme yalnız vektörel DXF/DWG çizimlerinde kullanılabilir");return;}
             if(moveSelectedArmed){listener.onMeasurement("Taşı: seçili nesnenin yeni merkez noktasına dokunun");return;}
+            if(breakArmed){listener.onMeasurement("BREAK • Çizgiyi böleceğiniz noktaya dokunun");return;}
             if(pairCommand==PairCommand.TRIM){listener.onMeasurement("TRIM • Kesme sınırı olacak ikinci çizgiye dokunun");return;}
             if(pairCommand==PairCommand.EXTEND){listener.onMeasurement("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");return;}
             if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+" • Taşı / Döndür / Kopya / Sil");return;}
