@@ -13,6 +13,7 @@ public class CadView extends View {
         void onCalibrationRequested(double pixelDistance);
         void onSelectionReady();
         void onTextRequested(float contentX,float contentY);
+        default void onDocumentChanged(){}
     }
 
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
@@ -114,6 +115,8 @@ public class CadView extends View {
     }
 
     public void setListener(Listener l){listener=l;}
+    private void documentChanged(){if(listener!=null)listener.onDocumentChanged();}
+
 
     public SessionState captureSessionState(){
         ArrayList<CadEdit> editCopy=new ArrayList<>();for(CadEdit edit:edits)editCopy.add(edit.copy());
@@ -196,37 +199,37 @@ public class CadView extends View {
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;moveSelectedArmed=true;notifyValue();invalidate();return true;
     }
     public boolean rotateSelectedEntity(){
-        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.rotateSelected(90f))return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.rotateSelected(90f))return false;moveSelectedArmed=false;lastActionRegular=false;documentChanged();notifyValue();invalidate();return true;
     }
     public boolean copySelectedEntity(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;float offset=24f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);
-        CadEdit copy=sourceEdits.copySelected(offset,-offset);if(copy==null)return false;edits.add(copy);lastActionRegular=true;notifyValue();invalidate();return true;
+        CadEdit copy=sourceEdits.copySelected(offset,-offset);if(copy==null)return false;edits.add(copy);lastActionRegular=true;documentChanged();notifyValue();invalidate();return true;
     }
     public boolean deleteSelectedEntity(){
-        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.deleteSelected())return false;moveSelectedArmed=false;lastActionRegular=false;notifyValue();invalidate();return true;
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.deleteSelected())return false;moveSelectedArmed=false;lastActionRegular=false;documentChanged();notifyValue();invalidate();return true;
     }
 
     public boolean finishEdit(){
         if(mode!=Mode.DRAW_POLYLINE||points.size()<2)return false;float[] xy=new float[points.size()*2];
         for(int i=0;i<points.size();i++){xy[i*2]=points.get(i).x;xy[i*2+1]=points.get(i).y;}
-        edits.add(styled(CadEdit.polyline(xy)));lastActionRegular=true;points.clear();lastSnapped=false;notifyValue();invalidate();return true;
+        edits.add(styled(CadEdit.polyline(xy)));lastActionRegular=true;points.clear();lastSnapped=false;documentChanged();notifyValue();invalidate();return true;
     }
 
     public void addTextEdit(float x,float y,String text){addTextEdit(x,y,text,currentTextStyle,currentTextFamily,currentTextShx,currentTextHeight,currentTextWidthFactor);}
     public void addTextEdit(float x,float y,String text,String styleName,String familyHint,boolean shx,float height,float widthFactor){
         if(vectorDrawing==null||text==null||text.trim().isEmpty())return;
         CadEdit edit=CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,height,widthFactor,0f,0).withCadProperties(currentLayer,currentColorMode,currentColorValue);
-        edits.add(edit);lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
+        edits.add(edit);lastActionRegular=true;lastSnapped=false;documentChanged();notifyValue();invalidate();
     }
 
     public void undo(){
-        lastSnapped=false;freehandPoints.clear();
+        lastSnapped=false;freehandPoints.clear();boolean changed=false;
         if(selecting){cancelSelection();return;}
         if(!points.isEmpty())points.remove(points.size()-1);
-        else if(mode==Mode.SELECT_ENTITY&&!lastActionRegular&&sourceEdits.undo()){}
-        else if(!edits.isEmpty()){edits.remove(edits.size()-1);lastActionRegular=false;}
-        else if(sourceEdits.undo()){}
-        moveSelectedArmed=false;notifyValue();invalidate();
+        else if(mode==Mode.SELECT_ENTITY&&!lastActionRegular&&sourceEdits.undo()){changed=true;}
+        else if(!edits.isEmpty()){edits.remove(edits.size()-1);lastActionRegular=false;changed=true;}
+        else if(sourceEdits.undo()){changed=true;}
+        if(changed)documentChanged();moveSelectedArmed=false;notifyValue();invalidate();
     }
 
     public void clearMeasurement(){
@@ -343,7 +346,7 @@ public class CadView extends View {
     private boolean sourceEditTouch(MotionEvent e){
         if(vectorDrawing==null)return true;int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(action==MotionEvent.ACTION_UP){PointF point=screenToContent(e.getX(),e.getY());if(point==null)return true;
-            if(moveSelectedArmed&&sourceEdits.hasSelection()){if(sourceEdits.moveSelectedTo(point.x,point.y)){lastActionRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);}moveSelectedArmed=false;notifyValue();invalidate();return true;}
+            if(moveSelectedArmed&&sourceEdits.hasSelection()){if(sourceEdits.moveSelectedTo(point.x,point.y)){lastActionRegular=false;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);documentChanged();}moveSelectedArmed=false;notifyValue();invalidate();return true;}
             selectSourceAt(point.x,point.y);return true;}
         return true;
     }
@@ -378,7 +381,7 @@ public class CadView extends View {
 
     private void commitFreehand(){
         if(freehandPoints.size()<2){freehandPoints.clear();return;}float[] xy=new float[freehandPoints.size()*2];for(int i=0;i<freehandPoints.size();i++){xy[i*2]=freehandPoints.get(i).x;xy[i*2+1]=freehandPoints.get(i).y;}
-        float avg=freehandPressureSamples==0?.5f:freehandPressureSum/freehandPressureSamples;edits.add(styled(CadEdit.freehand(xy,pressureWidth(avg))));lastActionRegular=true;freehandPoints.clear();
+        float avg=freehandPressureSamples==0?.5f:freehandPressureSum/freehandPressureSamples;edits.add(styled(CadEdit.freehand(xy,pressureWidth(avg))));lastActionRegular=true;freehandPoints.clear();documentChanged();
     }
 
     private boolean addCadPoint(float screenX,float screenY){
@@ -386,9 +389,9 @@ public class CadView extends View {
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
         points.add(new PointF(xy[0],xy[1]));
-        if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.line(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
-        else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.rectangle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
-        else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.circle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;}
+        if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.line(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;documentChanged();}
+        else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.rectangle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;documentChanged();}
+        else if(mode==Mode.DRAW_CIRCLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);edits.add(styled(CadEdit.circle(a.x,a.y,b.x,b.y)));lastActionRegular=true;points.clear();lastSnapped=false;documentChanged();}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
