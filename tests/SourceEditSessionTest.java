@@ -12,6 +12,15 @@ public class SourceEditSessionTest {
         SourceReplacement styled=s.replacementRecords().get(0);
         if(!"BORU".equals(styled.layer)||styled.color!=0xFF00FF00||!"DASHED".equals(styled.lineType)||styled.lineWeight!=50||Math.abs(styled.lineTypeScale-.5)>1e-9)
             throw new AssertionError("source style lost");
+        if(!s.updateSelectedStyle("YENI_KATMAN",0xFFFF0000,"CENTER",2.0,35))throw new AssertionError("style update");
+        SourceReplacement updated=s.replacementRecords().get(0);
+        if(!"YENI_KATMAN".equals(updated.layer)||updated.color!=0xFFFF0000||!"CENTER".equals(updated.lineType)||Math.abs(updated.lineTypeScale-2.0)>1e-9||updated.lineWeight!=35)throw new AssertionError("style update values");
+        if(!s.undo())throw new AssertionError("undo style");
+        SourceReplacement styleUndo=s.replacementRecords().get(0);
+        if(!"BORU".equals(styleUndo.layer)||styleUndo.color!=0xFF00FF00||!"DASHED".equals(styleUndo.lineType))throw new AssertionError("style undo values");
+        if(!s.redo())throw new AssertionError("redo style");
+        SourceReplacement styleRedo=s.replacementRecords().get(0);
+        if(!"YENI_KATMAN".equals(styleRedo.layer)||styleRedo.color!=0xFFFF0000||!"CENTER".equals(styleRedo.lineType))throw new AssertionError("style redo values");
         if(!s.rotateSelected(90))throw new AssertionError("rotate");
         CadEdit copy=s.copySelected(5,0);if(copy==null)throw new AssertionError("copy");near(copy.centerX(),25,"copy center x");
         if(s.findReplacement(20,20,2)<0)throw new AssertionError("replacement hit");
