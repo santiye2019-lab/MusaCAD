@@ -11,7 +11,7 @@ public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, RECTANGLE, TEXT, SELECT,
         PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, MATCHPROP, JOIN, HATCH, STRETCH, BLOCK, INSERT, DIMSTYLE, DIMLINEAR, DIMALIGNED, LAYER, PROPERTIES,
-        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, REDO, SAVE, HELP, UNSUPPORTED
+        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, REDO, SAVE, HELP
     }
 
     public static Action parse(String raw){
@@ -71,14 +71,11 @@ public final class CadCommand {
         if(eq(s,"QS","QSAVE","SAVE"))return Action.SAVE;
         if(eq(s,"?","HELP"))return Action.HELP;
 
-        if(classicUnsupported(s)!=null)return Action.UNSUPPORTED;
         return Action.NONE;
     }
 
     public static String canonical(String raw){
         String s=normalize(raw);
-        String unsupported=classicUnsupported(s);
-        if(unsupported!=null)return unsupported;
         Action a=parse(raw);
         switch(a){
             case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";case ARC:return "ARC";case ELLIPSE:return "ELLIPSE";case POINT:return "POINT";case XLINE:return "XLINE";
@@ -94,8 +91,6 @@ public final class CadCommand {
             case HELP:return "HELP";default:return s;
         }
     }
-
-    private static String classicUnsupported(String s){return null;}
 
     private static String normalize(String raw){
         if(raw==null)return "";
