@@ -29,7 +29,7 @@ public class SourceEditSessionTest {
         if(!s.undo())throw new AssertionError("undo delete");
         if(!s.hasSelection()||s.replacements().size()!=1)throw new AssertionError("undo restore");
         SourceReplacement restored=s.replacementRecords().get(0);
-        if(!"DASHED".equals(restored.lineType)||restored.lineWeight!=50)throw new AssertionError("undo style restore");
+        if(!"YENI_KATMAN".equals(restored.layer)||!"CENTER".equals(restored.lineType)||restored.lineWeight!=35||restored.color!=0xFFFF0000)throw new AssertionError("undo delete preserves edited style");
         System.out.println("Source entity edit session/style cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
