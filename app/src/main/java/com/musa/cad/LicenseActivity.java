@@ -87,16 +87,37 @@ public class LicenseActivity extends AppCompatActivity {
             runOnUiThread(()->{
                 if(isFinishing()||isDestroyed())return;trialRequestRunning=false;
                 switch(r.status){
-                    case ACTIVATED:Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterApp();return;
-                    case ALREADY_USED:message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");refresh();return;
-                    case NOT_CONFIGURED:message.setText("Ücretsiz deneme sunucusu bu sürümde yapılandırılmamış. Lisans kodu ile devam edebilirsiniz.");break;
-                    case NETWORK_ERROR:message.setText("Ücretsiz denemeyi başlatmak için internet bağlantısını kontrol edin ve yeniden deneyin.");break;
-                    case DENIED:message.setText(r.message==null?"Ücretsiz deneme isteği reddedildi.":r.message);break;
-                    case INVALID_RESPONSE:message.setText("Deneme sunucu yanıtı doğrulanamadı. Lisans kodu ile devam edebilirsiniz.");break;
+                    case ACTIVATED:
+                        Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();
+                        enterApp();return;
+                    case ALREADY_USED:
+                        message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");
+                        refresh();return;
+                    case NOT_CONFIGURED:
+                        startLocalTrialFallback();
+                        return;
+                    case NETWORK_ERROR:
+                        message.setText("İnternet bağlantısı nedeniyle çevrimiçi deneme doğrulanamadı. Bağlantınızı kontrol edip yeniden deneyin.");
+                        refresh();return;
+                    case DENIED:
+                        message.setText(r.message==null?"Ücretsiz deneme isteği reddedildi.":r.message);
+                        refresh();return;
+                    case INVALID_RESPONSE:
+                        message.setText("Deneme sunucu yanıtı doğrulanamadı. Lütfen yeniden deneyin.");
+                        refresh();return;
                 }
-                refresh();
             });
         });
+    }
+
+    private void startLocalTrialFallback(){
+        if(LicenseManager.startTrial(this)){
+            Toast.makeText(this,"1 günlük ücretsiz deneme başlatıldı",Toast.LENGTH_SHORT).show();
+            enterApp();
+            return;
+        }
+        message.setText("Bu cihazdaki 1 günlük ücretsiz deneme daha önce başlatılmış veya sona ermiş.");
+        refresh();
     }
 
     private void activate(){
