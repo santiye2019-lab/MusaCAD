@@ -9,7 +9,7 @@ import java.util.Locale;
  */
 public final class CadCommand {
     public enum Action {
-        NONE, LINE, POLYLINE, CIRCLE, ARC, RECTANGLE, TEXT, SELECT,
+        NONE, LINE, POLYLINE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, RECTANGLE, TEXT, SELECT,
         PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, LAYER, PROPERTIES,
         DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
     }
@@ -21,6 +21,9 @@ public final class CadCommand {
         if(eq(s,"PL","PLINE","POLYLINE"))return Action.POLYLINE;
         if(eq(s,"C","CIRCLE"))return Action.CIRCLE;
         if(eq(s,"A","ARC"))return Action.ARC;
+        if(eq(s,"EL","ELLIPSE"))return Action.ELLIPSE;
+        if(eq(s,"PO","POINT"))return Action.POINT;
+        if(eq(s,"XL","XLINE"))return Action.XLINE;
         if(eq(s,"REC","RECTANG","RECTANGLE"))return Action.RECTANGLE;
         if(eq(s,"DT","TEXT","T","MTEXT"))return Action.TEXT;
 
@@ -68,7 +71,7 @@ public final class CadCommand {
         if(unsupported!=null)return unsupported;
         Action a=parse(raw);
         switch(a){
-            case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";case ARC:return "ARC";
+            case LINE:return "LINE";case POLYLINE:return "PLINE";case CIRCLE:return "CIRCLE";case ARC:return "ARC";case ELLIPSE:return "ELLIPSE";case POINT:return "POINT";case XLINE:return "XLINE";
             case RECTANGLE:return "RECTANG";case TEXT:return "TEXT/MTEXT";case SELECT:return "SELECT";
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
@@ -86,14 +89,11 @@ public final class CadCommand {
         if(eq(s,"D","DIMSTYLE"))return "DIMSTYLE";
         if(eq(s,"DAL","DIMALIGNED"))return "DIMALIGNED";
         if(eq(s,"DLI","DIMLINEAR"))return "DIMLINEAR";
-        if(eq(s,"EL","ELLIPSE"))return "ELLIPSE";
         if(eq(s,"H","HATCH"))return "HATCH";
         if(eq(s,"I","INSERT"))return "INSERT";
         if(eq(s,"J","JOIN"))return "JOIN";
         if(eq(s,"MA","MATCHPROP"))return "MATCHPROP";
-        if(eq(s,"PO","POINT"))return "POINT";
         if(eq(s,"S","STRETCH"))return "STRETCH";
-        if(eq(s,"XL","XLINE"))return "XLINE";
         if(eq(s,"REDO"))return "REDO";
         return null;
     }

@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 /** One MusaCAD overlay/source edit stored in drawing-content coordinates. */
 public final class CadEdit {
-    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, TEXT }
+    public enum Type { LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, TEXT }
     public final Type type;
     public final float[] xy;
     public final String text;
@@ -37,6 +37,19 @@ public final class CadEdit {
         if(!Float.isFinite(cx)||!Float.isFinite(cy))return null;
         return new CadEdit(Type.ARC,new float[]{sx,sy,mx,my,ex,ey,cx,cy},null,3f,false,0f);
     }
+    public static CadEdit ellipse(float cx,float cy,float majorX,float majorY,float controlX,float controlY){
+        float ux=majorX-cx,uy=majorY-cy,major=(float)Math.hypot(ux,uy);
+        if(major<1e-6f)return null;
+        ux/=major;uy/=major;
+        float vx=-uy,vy=ux;
+        float signedMinor=(controlX-cx)*vx+(controlY-cy)*vy;
+        float minor=Math.abs(signedMinor);
+        if(minor<1e-6f)return null;
+        float sign=signedMinor<0f?-1f:1f;
+        return new CadEdit(Type.ELLIPSE,new float[]{cx,cy,majorX,majorY,cx+vx*minor*sign,cy+vy*minor*sign},null,3f,true,0f);
+    }
+    public static CadEdit point(float x,float y){return new CadEdit(Type.POINT,new float[]{x,y},null,3f,false,0f);}
+    public static CadEdit xline(float x1,float y1,float x2,float y2){if(Math.hypot(x2-x1,y2-y1)<1e-6)return null;return new CadEdit(Type.XLINE,new float[]{x1,y1,x2,y2},null,3f,false,0f);}
     public static CadEdit polyline(float[] xy){return polyline(xy,false);}
     public static CadEdit polyline(float[] xy,boolean closed){return new CadEdit(Type.POLYLINE,xy.clone(),null,3f,closed,0f);}
     public static CadEdit freehand(float[] xy,float strokeWidth){return new CadEdit(Type.POLYLINE,xy.clone(),null,strokeWidth,false,0f);}
@@ -91,17 +104,23 @@ public final class CadEdit {
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit withClosed(boolean value){return new CadEdit(type,xy.clone(),text,strokeWidth,value,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
 
-    public float centerX(){if(type==Type.CIRCLE&&xy.length>=2)return xy[0];if(type==Type.ARC&&xy.length>=8)return xy[6];if(type==Type.TEXT&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}
-    public float centerY(){if(type==Type.CIRCLE&&xy.length>=2)return xy[1];if(type==Type.ARC&&xy.length>=8)return xy[7];if(type==Type.TEXT&&xy.length>=2)return xy[1];return (minY()+maxY())*.5f;}
+    public float centerX(){if((type==Type.CIRCLE||type==Type.ELLIPSE||type==Type.POINT)&&xy.length>=2)return xy[0];if(type==Type.ARC&&xy.length>=8)return xy[6];if(type==Type.TEXT&&xy.length>=2)return xy[0];return (minX()+maxX())*.5f;}
+    public float centerY(){if((type==Type.CIRCLE||type==Type.ELLIPSE||type==Type.POINT)&&xy.length>=2)return xy[1];if(type==Type.ARC&&xy.length>=8)return xy[7];if(type==Type.TEXT&&xy.length>=2)return xy[1];return (minY()+maxY())*.5f;}
     public float minX(){float v=Float.POSITIVE_INFINITY;for(int i=0;i+1<xy.length;i+=2)v=Math.min(v,xy[i]);return Float.isFinite(v)?v:0f;}
     public float maxX(){float v=Float.NEGATIVE_INFINITY;for(int i=0;i+1<xy.length;i+=2)v=Math.max(v,xy[i]);return Float.isFinite(v)?v:0f;}
     public float minY(){float v=Float.POSITIVE_INFINITY;for(int i=1;i<xy.length;i+=2)v=Math.min(v,xy[i]);return Float.isFinite(v)?v:0f;}
     public float maxY(){float v=Float.NEGATIVE_INFINITY;for(int i=1;i<xy.length;i+=2)v=Math.max(v,xy[i]);return Float.isFinite(v)?v:0f;}
 
-    public float hitDistance(float x,float y){switch(type){case LINE:return segmentDistance(x,y,xy[0],xy[1],xy[2],xy[3]);case RECTANGLE:{float l=Math.min(xy[0],xy[2]),r=Math.max(xy[0],xy[2]),t=Math.min(xy[1],xy[3]),b=Math.max(xy[1],xy[3]);return Math.min(Math.min(segmentDistance(x,y,l,t,r,t),segmentDistance(x,y,r,t,r,b)),Math.min(segmentDistance(x,y,r,b,l,b),segmentDistance(x,y,l,b,l,t)));}case CIRCLE:{float radius=(float)Math.hypot(xy[2]-xy[0],xy[3]-xy[1]);return Math.abs((float)Math.hypot(x-xy[0],y-xy[1])-radius);}case ARC:{if(xy.length<8)return Float.POSITIVE_INFINITY;float radius=(float)Math.hypot(xy[0]-xy[6],xy[1]-xy[7]);float radial=Math.abs((float)Math.hypot(x-xy[6],y-xy[7])-radius);float a=angle(xy[0]-xy[6],xy[1]-xy[7]),m=angle(xy[2]-xy[6],xy[3]-xy[7]),e=angle(xy[4]-xy[6],xy[5]-xy[7]),p=angle(x-xy[6],y-xy[7]);return onArc(a,m,e,p)?radial:Math.min((float)Math.hypot(x-xy[0],y-xy[1]),(float)Math.hypot(x-xy[4],y-xy[5]));}case POLYLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));if(closed&&xy.length>=6)best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}case TEXT:return (float)Math.hypot(x-xy[0],y-xy[1]);default:return Float.POSITIVE_INFINITY;}}
-    private static float angle(float x,float y){float a=(float)Math.toDegrees(Math.atan2(y,x));return a<0f?a+360f:a;}
-    private static float ccw(float from,float to){float d=to-from;while(d<0f)d+=360f;while(d>=360f)d-=360f;return d;}
-    private static boolean onArc(float start,float mid,float end,float point){float se=ccw(start,end),sm=ccw(start,mid),sp=ccw(start,point);if(sm<=se+1e-4f)return sp<=se+1e-4f;float es=ccw(end,start),em=ccw(end,mid),ep=ccw(end,point);return em<=es+1e-4f&&ep<=es+1e-4f;}
+    public float hitDistance(float x,float y){switch(type){
+        case LINE:return segmentDistance(x,y,xy[0],xy[1],xy[2],xy[3]);
+        case RECTANGLE:{float l=Math.min(xy[0],xy[2]),r=Math.max(xy[0],xy[2]),t=Math.min(xy[1],xy[3]),b=Math.max(xy[1],xy[3]);return Math.min(Math.min(segmentDistance(x,y,l,t,r,t),segmentDistance(x,y,r,t,r,b)),Math.min(segmentDistance(x,y,r,b,l,b),segmentDistance(x,y,l,b,l,t)));}
+        case CIRCLE:{float radius=(float)Math.hypot(xy[2]-xy[0],xy[3]-xy[1]);return Math.abs((float)Math.hypot(x-xy[0],y-xy[1])-radius);}
+        case ARC:{if(xy.length<8)return Float.POSITIVE_INFINITY;float radius=(float)Math.hypot(xy[0]-xy[6],xy[1]-xy[7]);float radial=Math.abs((float)Math.hypot(x-xy[6],y-xy[7])-radius);float a=angle(xy[0]-xy[6],xy[1]-xy[7]),m=angle(xy[2]-xy[6],xy[3]-xy[7]),e=angle(xy[4]-xy[6],xy[5]-xy[7]),p=angle(x-xy[6],y-xy[7]);return onArc(a,m,e,p)?radial:Math.min((float)Math.hypot(x-xy[0],y-xy[1]),(float)Math.hypot(x-xy[4],y-xy[5]));}
+        case ELLIPSE:{if(xy.length<6)return Float.POSITIVE_INFINITY;float cx=xy[0],cy=xy[1],ax=xy[2]-cx,ay=xy[3]-cy,bx=xy[4]-cx,by=xy[5]-cy;float aLen=(float)Math.hypot(ax,ay),bLen=(float)Math.hypot(bx,by);if(aLen<1e-6f||bLen<1e-6f)return Float.POSITIVE_INFINITY;float ux=ax/aLen,uy=ay/aLen,vx=bx/bLen,vy=by/bLen;float dx=x-cx,dy=y-cy,localX=dx*ux+dy*uy,localY=dx*vx+dy*vy;float q=(float)Math.sqrt((localX*localX)/(aLen*aLen)+(localY*localY)/(bLen*bLen));return Math.abs(q-1f)*Math.min(aLen,bLen);}
+        case POINT:return (float)Math.hypot(x-xy[0],y-xy[1]);
+        case XLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float dx=xy[2]-xy[0],dy=xy[3]-xy[1],len=(float)Math.hypot(dx,dy);if(len<1e-6f)return Float.POSITIVE_INFINITY;return Math.abs((x-xy[0])*dy-(y-xy[1])*dx)/len;}
+        case POLYLINE:{if(xy.length<4)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));if(closed&&xy.length>=6)best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
+        case TEXT:return (float)Math.hypot(x-xy[0],y-xy[1]);default:return Float.POSITIVE_INFINITY;}}
     private static float segmentDistance(float px,float py,float ax,float ay,float bx,float by){float dx=bx-ax,dy=by-ay;float len=dx*dx+dy*dy;if(len<=1e-12f)return (float)Math.hypot(px-ax,py-ay);float t=((px-ax)*dx+(py-ay)*dy)/len;t=Math.max(0f,Math.min(1f,t));return (float)Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
     private static float normalize(float degrees){if(!Float.isFinite(degrees))return 0f;float v=degrees%360f;if(v<=-180f)v+=360f;if(v>180f)v-=360f;return v;}
 }
