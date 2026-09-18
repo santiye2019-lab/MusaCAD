@@ -140,6 +140,10 @@ public class CadView extends View {
 
     public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&sourceEdits.hasSelection();}
 
+    public boolean setSelectedColor(int color){if(mode!=Mode.SELECT_ENTITY)return false;boolean ok=sourceEdits.updateSelectedStyle(color,null,null);if(ok){lastActionRegular=false;notifyValue();invalidate();}return ok;}
+    public boolean setSelectedLineType(String lineType){if(mode!=Mode.SELECT_ENTITY)return false;boolean ok=sourceEdits.updateSelectedStyle(null,lineType,null);if(ok){lastActionRegular=false;notifyValue();invalidate();}return ok;}
+    public boolean setSelectedLineWeight(int lineWeight){if(mode!=Mode.SELECT_ENTITY)return false;boolean ok=sourceEdits.updateSelectedStyle(null,null,lineWeight);if(ok){lastActionRegular=false;notifyValue();invalidate();}return ok;}
+
     public boolean defineBlockFromSelection(String name){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
         CadEdit selected=sourceEdits.currentSelected();return selected!=null&&blockLibrary.define(name,selected);
