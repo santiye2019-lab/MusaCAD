@@ -64,7 +64,7 @@ public final class CadEdit {
     public static CadEdit text(float x,float y,String text,float rotationDegrees){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees);}
     public static CadEdit styledText(float x,float y,String text,float rotationDegrees,String styleName,String familyHint,boolean shx,float height,float widthFactor,float oblique,int generationFlags){return new CadEdit(Type.TEXT,new float[]{x,y},text==null?"":text,3f,false,rotationDegrees,styleName,familyHint,shx,height,widthFactor,oblique,generationFlags);}
     public static CadEdit insert(String blockName,float x,float y,float scale,float rotationDegrees){
-        String name=CadBlock.normalizeName(blockName);if(name.isEmpty()||!Float.isFinite(scale)||scale<=0f)return null;
+        String name=normalizeBlockName(blockName);if(name.isEmpty()||!Float.isFinite(scale)||scale<=0f)return null;
         return new CadEdit(Type.INSERT,new float[]{x,y},name,3f,false,rotationDegrees,"STANDARD","sans",false,scale,1f,0f,0);
     }
     public float insertScale(){return type==Type.INSERT&&textHeight>0f?textHeight:1f;}
@@ -169,5 +169,6 @@ public final class CadEdit {
         case HATCH:{if(xy.length<6)return Float.POSITIVE_INFINITY;float best=Float.POSITIVE_INFINITY;for(int i=2;i+1<xy.length;i+=2)best=Math.min(best,segmentDistance(x,y,xy[i-2],xy[i-1],xy[i],xy[i+1]));best=Math.min(best,segmentDistance(x,y,xy[xy.length-2],xy[xy.length-1],xy[0],xy[1]));return best;}
         case TEXT:return (float)Math.hypot(x-xy[0],y-xy[1]);default:return Float.POSITIVE_INFINITY;}}
     private static float segmentDistance(float px,float py,float ax,float ay,float bx,float by){float dx=bx-ax,dy=by-ay;float len=dx*dx+dy*dy;if(len<=1e-12f)return (float)Math.hypot(px-ax,py-ay);float t=((px-ax)*dx+(py-ay)*dy)/len;t=Math.max(0f,Math.min(1f,t));return (float)Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
+    private static String normalizeBlockName(String name){return name==null?"":name.trim().replaceAll("[^A-Za-z0-9_\\-]","_");}
     private static float normalize(float degrees){if(!Float.isFinite(degrees))return 0f;float v=degrees%360f;if(v<=-180f)v+=360f;if(v>180f)v-=360f;return v;}
 }
