@@ -1052,7 +1052,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
                     boolean goBrowser=pendingOpenBrowserAfterSave;pendingOpenBrowserAfterSave=false;
-                    if(close!=null)closeProjectNow(close);else if(goBrowser)open();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}});
+                    if(close!=null)closeProjectNow(close);else if(goBrowser)open();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingOpenBrowserAfterSave=false;pendingCloseAfterSave=null;error(e);});}});
     }
 
     private void showShare(){
