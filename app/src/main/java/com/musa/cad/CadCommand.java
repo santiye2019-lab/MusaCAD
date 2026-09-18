@@ -10,7 +10,7 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, LAYER, PROPERTIES,
+        PAN, MOVE, COPY, ROTATE, ERASE, LAYER, PROPERTIES, COLOR, LINEWEIGHT, LINETYPE,
         DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, SAVE, HELP, UNSUPPORTED
     }
 
@@ -33,6 +33,9 @@ public final class CadCommand {
 
         if(eq(s,"LA","LAYER"))return Action.LAYER;
         if(eq(s,"PR","PROPERTIES","PROP"))return Action.PROPERTIES;
+        if(eq(s,"COL","COLOR"))return Action.COLOR;
+        if(eq(s,"LW","LWEIGHT","LINEWEIGHT"))return Action.LINEWEIGHT;
+        if(eq(s,"LT","LTYPE","LINETYPE"))return Action.LINETYPE;
         if(eq(s,"DI","DIST","DISTANCE"))return Action.DISTANCE;
         if(eq(s,"AA","AREA"))return Action.AREA;
 
@@ -57,6 +60,7 @@ public final class CadCommand {
             case RECTANGLE:return "RECTANG";case TEXT:return "TEXT/MTEXT";case SELECT:return "SELECT";
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
+            case COLOR:return "COLOR";case LINEWEIGHT:return "LWEIGHT";case LINETYPE:return "LINETYPE";
             case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
             case HELP:return "HELP";default:return s;
