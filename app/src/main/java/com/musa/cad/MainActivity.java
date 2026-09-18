@@ -311,8 +311,7 @@ public class MainActivity extends AppCompatActivity {
                 showLayers();
                 break;
             case PROPERTIES:
-                if(activeDxf!=null)showDrawingInfo();
-                else Toast.makeText(this,"Özellikler için önce bir çizim açın",Toast.LENGTH_SHORT).show();
+                showSelectedProperties();
                 break;
             case DISTANCE:
                 selectMode(R.id.distanceButton,CadView.Mode.DISTANCE);
@@ -414,7 +413,7 @@ public class MainActivity extends AppCompatActivity {
                 if(!Float.isFinite(distance)||Math.abs(distance)<1e-6f){input.setError("Sıfırdan farklı bir mesafe girin");return;}
                 if(!cad.offsetSelectedEntity(distance)){
                     dialog.dismiss();
-                    result.setText("OFFSET • Bu nesne tipinde henüz desteklenmiyor veya mesafe geçersiz");
+                    result.setText("OFFSET • Bu nesne tipi için ofset uygulanamadı veya mesafe geçersiz");
                     return;
                 }
                 dialog.dismiss();result.setText(String.format(Locale.getDefault(),"OFFSET • %.3f birim paralel kopya oluşturuldu",distance));
