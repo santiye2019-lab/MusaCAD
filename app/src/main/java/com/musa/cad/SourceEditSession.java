@@ -41,6 +41,10 @@ public final class SourceEditSession {
     public void clearSelection(){selected=-1;}
 
     public CadEdit currentSelected(){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().copy();}
+    public String selectedLayer(){Entry e=entries.get(selected);return e==null||e.deleted?"":e.layer;}
+    public int selectedColor(){Entry e=entries.get(selected);return e==null||e.deleted?0:e.color;}
+    public String selectedLineType(){Entry e=entries.get(selected);return e==null||e.deleted?"":e.lineType;}
+    public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;}
     public CadEdit currentFor(int id){Entry e=entries.get(id);return e==null||e.deleted?null:e.current().copy();}
 
     public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
