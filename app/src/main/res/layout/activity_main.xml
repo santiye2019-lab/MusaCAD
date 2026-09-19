@@ -437,7 +437,7 @@
             android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
 
         <Button android:id="@+id/groupMeasureToolsButton" style="@style/GroupBarPurple"
-            android:text="Ölç" android:drawableTop="@drawable/ic_distance" />
+            android:text="Ölçme" android:drawableTop="@drawable/ic_distance" />
 
         <Button android:id="@+id/groupViewToolsButton" style="@style/GroupBarBlue"
             android:text="Görünüm" android:drawableTop="@drawable/ic_fit" />
