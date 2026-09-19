@@ -50,7 +50,11 @@
                 android:fontFamily="sans-serif-medium"
                 android:singleLine="true"
                 android:maxLines="1"
-                android:ellipsize="end"
+                android:ellipsize="none"
+                android:autoSizeTextType="uniform"
+                android:autoSizeMinTextSize="11sp"
+                android:autoSizeMaxTextSize="17sp"
+                android:autoSizeStepGranularity="1sp"
                 android:includeFontPadding="false" />
 
             <TextView
