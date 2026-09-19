@@ -1,7 +1,8 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_enabled="false" android:color="#60727F" />
+    <!-- Disabled tools keep their labels/icons readable, like the locked reference. -->
+    <item android:state_enabled="false" android:color="#C6D5DE" />
     <item android:state_checked="true" android:color="#FFFFFF" />
     <item android:state_selected="true" android:color="#FFFFFF" />
     <item android:state_pressed="true" android:color="#FFFFFF" />
-    <item android:color="#D5E2EA" />
+    <item android:color="#E2ECF2" />
 </selector>
