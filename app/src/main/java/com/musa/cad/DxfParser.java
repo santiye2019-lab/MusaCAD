@@ -147,6 +147,24 @@ public final class DxfParser {
 
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
+    /**
+     * Creates an empty vector workspace for a brand-new drawing.
+     * A non-rendering canvas entity keeps the vector pipeline, zoom and export transforms valid
+     * without showing any geometry to the user.
+     */
+    static Result blankDrawing(){
+        final Entity canvasEntity=new Entity(){
+            public void bounds(RectF b){add(b,0f,0f);add(b,(float)SIZE,(float)SIZE);}
+            public void draw(Canvas c,Paint p,Matrix m){/* intentionally blank */}
+        };
+        ArrayList<Entity> document=new ArrayList<>();
+        document.add(new LayerEntity(canvasEntity,"0",DxfBlocks.MODEL_LAYOUT,Color.WHITE,DxfLineStyle.CONTINUOUS,null,1d,-1,1d,-1,null,"MUSACAD_BLANK",null));
+        Matrix view=new Matrix();
+        RectF bounds=new RectF(0f,0f,(float)SIZE,(float)SIZE);
+        LinkedHashSet<String> layouts=new LinkedHashSet<>();layouts.add(DxfBlocks.MODEL_LAYOUT);
+        return new Result(null,0,0,new float[0],document,view,Collections.emptySet(),Collections.emptySet(),layouts,DxfBlocks.MODEL_LAYOUT,bounds,1f,1d,"birim",1d,Collections.emptyMap());
+    }
+
     public static Result render(File file)throws IOException{
         return renderStreaming(file);
     }
