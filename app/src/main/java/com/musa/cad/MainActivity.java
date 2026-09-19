@@ -15,6 +15,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -28,6 +29,10 @@ public class MainActivity extends AppCompatActivity {
     private LoadTask activeLoad;
 
     private static final class LoadTask {Future<?> future;AlertDialog dialog;TextView progress;}
+    private static final class ToolAction {
+        final String label;final int icon;final Runnable action;
+        ToolAction(String label,int icon,Runnable action){this.label=label;this.icon=icon;this.action=action;}
+    }
     private static final class Loaded {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
@@ -80,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.pointButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.headerMoreButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
@@ -94,7 +99,14 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.bottomMeasureButton).setOnClickListener(v->showMeasureTools());
         findViewById(R.id.hatchButton).setOnClickListener(v->runHatchCommand());
         findViewById(R.id.moreToolsButton).setOnClickListener(v->showMoreTools());
-        findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());findViewById(R.id.newProjectButton).setOnClickListener(v->open());
+        findViewById(R.id.groupLineToolsButton).setOnClickListener(v->showLineToolsSheet());
+        findViewById(R.id.groupShapeToolsButton).setOnClickListener(v->showShapeToolsSheet());
+        findViewById(R.id.groupEditToolsButton).setOnClickListener(v->showEditToolsSheet());
+        findViewById(R.id.groupMeasureToolsButton).setOnClickListener(v->showMeasureToolsSheet());
+        findViewById(R.id.groupViewToolsButton).setOnClickListener(v->showViewToolsSheet());
+        findViewById(R.id.groupAnnotateToolsButton).setOnClickListener(v->showAnnotationToolsSheet());
+        findViewById(R.id.groupMoreToolsButton).setOnClickListener(v->showOtherToolsSheet());
+        findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());findViewById(R.id.newProjectButton).setOnClickListener(v->showNewProjectSheet());
         tabFileName.setOnLongClickListener(v->{if(currentProject!=null)requestCloseProject(currentProject);return true;});
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
         findViewById(R.id.selectEntityButton).setOnClickListener(v->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY));
@@ -567,6 +579,126 @@ public class MainActivity extends AppCompatActivity {
                 dialog.dismiss();result.setText("Çizgi Tipi • "+name+" uygulandı");
             }catch(Exception e){scale.setError("Geçerli ölçek değeri girin");}
         }));dialog.show();
+    }
+
+    private ToolAction tool(String label,int icon,Runnable action){return new ToolAction(label,icon,action);}
+
+    private void showToolSheet(String title,ToolAction...tools){
+        BottomSheetDialog sheet=new BottomSheetDialog(this);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);int pad=dp(12);root.setPadding(pad,pad,pad,dp(18));root.setBackgroundColor(0xFF071A27);
+        TextView heading=new TextView(this);heading.setText(title);heading.setTextColor(Color.WHITE);heading.setTextSize(16);heading.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);heading.setPadding(dp(4),dp(2),dp(4),dp(10));root.addView(heading,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
+        ScrollView scroll=new ScrollView(this);GridLayout grid=new GridLayout(this);grid.setColumnCount(4);grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);grid.setUseDefaultMargins(false);
+        for(ToolAction item:tools){
+            Button b=new Button(this);b.setText(item.label);b.setTextColor(0xFFF1F7FA);b.setTextSize(10);b.setAllCaps(false);b.setGravity(Gravity.CENTER);b.setCompoundDrawablesWithIntrinsicBounds(0,item.icon,0,0);b.setCompoundDrawablePadding(dp(4));b.setBackgroundResource(R.drawable.tool_tile_blue);b.setPadding(dp(3),dp(7),dp(3),dp(6));b.setMinWidth(0);b.setMinHeight(0);b.setSingleLine(true);
+            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=dp(70);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(b,lp);
+            b.setOnClickListener(v->{sheet.dismiss();if(item.action!=null)item.action.run();});
+            installInteractiveFeedback(b);
+        }
+        scroll.addView(grid,new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT,ScrollView.LayoutParams.WRAP_CONTENT));root.addView(scroll,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1f));
+        sheet.setContentView(root);sheet.setOnShowListener(d->{View bottom=sheet.findViewById(com.google.android.material.R.id.design_bottom_sheet);if(bottom!=null){bottom.getLayoutParams().height=Math.min(dp(430),getResources().getDisplayMetrics().heightPixels*2/3);bottom.requestLayout();}});
+        sheet.show();
+    }
+
+    private void showLineToolsSheet(){
+        showToolSheet("Çizgi Araçları",
+            tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
+            tool("Çoklu Çizgi",R.drawable.ic_polyline,()->selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE)),
+            tool("Yay",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARC);markModeSelected(0);result.setText("Yay • 3 nokta seçin");}}),
+            tool("XLine",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("XLine • İki nokta seçin");}})
+        );
+    }
+
+    private void showShapeToolsSheet(){
+        showToolSheet("Geometrik Şekiller",
+            tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
+            tool("Daire",R.drawable.ic_circle,()->selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE)),
+            tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
+            tool("Nokta",R.drawable.ic_point,()->selectEditMode(R.id.pointButton,CadView.Mode.DRAW_POINT))
+        );
+    }
+
+    private void showEditToolsSheet(){
+        showToolSheet("Düzenleme Araçları",
+            tool("Taşı",R.drawable.ic_move,()->{if(!cad.armMoveSelected())noSourceSelection();}),
+            tool("Kopyala",R.drawable.ic_copy,()->{if(!cad.copySelectedEntity())noSourceSelection();}),
+            tool("Döndür",R.drawable.ic_rotate,()->{if(!cad.rotateSelectedEntity())noSourceSelection();}),
+            tool("Sil",R.drawable.ic_delete,()->{if(!cad.deleteSelectedEntity())noSourceSelection();}),
+            tool("Kes",R.drawable.ic_line,()->{if(ensureTransformSelection("KES / TRIM")){if(cad.armTrimSelected())result.setText("Kes • Kesme sınırı olacak ikinci çizgiye dokunun");else result.setText("Kes • Hedef nesne çizgi olmalı");}}),
+            tool("Uzat",R.drawable.ic_line,()->{if(ensureTransformSelection("UZAT / EXTEND")){if(cad.armExtendSelected())result.setText("Uzat • Sınır çizgisine dokunun");else result.setText("Uzat • Hedef nesne çizgi olmalı");}}),
+            tool("Offset",R.drawable.ic_line,this::runOffsetCommand),
+            tool("Ölçekle",R.drawable.ic_scale,this::runScaleCommand),
+            tool("Aynala",R.drawable.ic_rotate,this::runMirrorCommand),
+            tool("Fillet",R.drawable.ic_circle,this::runFilletCommand),
+            tool("Pah",R.drawable.ic_line,this::runChamferCommand),
+            tool("Kır",R.drawable.ic_line,()->{if(ensureTransformSelection("KIR / BREAK")){if(cad.armBreakSelected())result.setText("Kır • Bölme noktasına dokunun");else result.setText("Kır • Hedef nesne çizgi olmalı");}}),
+            tool("Stretch",R.drawable.ic_move,()->{if(ensureTransformSelection("STRETCH")){if(cad.armStretchSelected())result.setText("Stretch • Köşe/vertex seçin");}}),
+            tool("Array",R.drawable.ic_copy,this::runArrayCommand),
+            tool("Patlat",R.drawable.ic_more,()->{if(ensureTransformSelection("EXPLODE")){if(cad.explodeSelectedEntity())result.setText("Patlat • Nesne parçalara ayrıldı");else result.setText("Patlat • Bu nesne desteklenmiyor");}}),
+            tool("Birleştir",R.drawable.ic_polyline,()->{if(ensureTransformSelection("JOIN")){if(cad.armJoinSelected())result.setText("Birleştir • İkinci nesneye dokunun");else result.setText("Birleştir • Uygun nesne seçin");}})
+        );
+    }
+
+    private void showMeasureToolsSheet(){
+        showToolSheet("Ölçme Metodları",
+            tool("Mesafe",R.drawable.ic_distance,()->selectMode(R.id.distanceButton,CadView.Mode.DISTANCE)),
+            tool("Alan",R.drawable.ic_area,()->selectMode(R.id.areaButton,CadView.Mode.AREA)),
+            tool("Kalibrasyon",R.drawable.ic_distance,()->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE)),
+            tool("Doğrusal Ölçü",R.drawable.ic_distance,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_LINEAR);markModeSelected(0);result.setText("Doğrusal Ölçü • İki nokta ve ölçü çizgisi konumu seçin");}}),
+            tool("Hizalı Ölçü",R.drawable.ic_distance,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("Hizalı Ölçü • İki nokta ve ölçü çizgisi konumu seçin");}}),
+            tool("Ölçü Stili",R.drawable.ic_properties,this::runDimStyleCommand)
+        );
+    }
+
+    private void showViewToolsSheet(){
+        showToolSheet("Görünüm Araçları",
+            tool("Kaydır",R.drawable.ic_pan,()->selectMode(R.id.panButton,CadView.Mode.PAN)),
+            tool("Yakınlaştır",R.drawable.ic_zoom_in,()->cad.zoomBy(1.35f)),
+            tool("Uzaklaştır",R.drawable.ic_zoom_out,()->cad.zoomBy(1f/1.35f)),
+            tool("Tümü",R.drawable.ic_fit,()->cad.fitToScreen()),
+            tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
+            tool("Model/Layout",R.drawable.ic_layers,this::showLayouts)
+        );
+    }
+
+    private void showAnnotationToolsSheet(){
+        showToolSheet("Yazı / Tarama / Notasyon",
+            tool("Yazı",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
+            tool("Tarama",R.drawable.ic_hatch,this::runHatchCommand),
+            tool("Blok",R.drawable.ic_rectangle,this::runBlockCommand),
+            tool("Blok Ekle",R.drawable.ic_open_file,this::runInsertCommand),
+            tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
+            tool("Renk",R.drawable.ic_color,this::showSelectedColor)
+        );
+    }
+
+    private void showOtherToolsSheet(){
+        showToolSheet("Diğer Araçlar",
+            tool("Geri Al",R.drawable.ic_undo,()->cad.undo()),
+            tool("Yinele",R.drawable.ic_rotate,()->{if(!cad.redo())result.setText("Yinele • İşlem yok");}),
+            tool("Temizle",R.drawable.ic_clear,()->cad.clearMeasurement()),
+            tool("Çizgi Tipi",R.drawable.ic_line,this::showSelectedLineType),
+            tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
+        );
+    }
+
+    private void showNewProjectSheet(){
+        showToolSheet("Yeni Proje",
+            tool("Yeni Boş Çizim",R.drawable.ic_open_file,this::createBlankDrawing),
+            tool("DWG/DXF Aç",R.drawable.ic_open_file,this::open)
+        );
+    }
+
+    private void createBlankDrawing(){
+        if(projects.size()>=MAX_OPEN_PROJECTS){Toast.makeText(this,"Aynı anda en fazla "+MAX_OPEN_PROJECTS+" proje açık tutulur.",Toast.LENGTH_LONG).show();return;}
+        try{
+            int number=projects.size()+1;String name="Yeni Çizim "+number+".dxf";
+            File base=new File(getCacheDir(),"musacad_blank_"+System.currentTimeMillis()+".dxf");
+            String dxf="0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n";
+            try(OutputStream out=new FileOutputStream(base)){out.write(dxf.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
+            ProjectSession project=new ProjectSession();project.file=base;project.workingDxf=base;project.parsed=DxfParser.blankDrawing();project.name=name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
+            projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+            result.setText("Yeni boş çizim hazır • Çizgi, Daire, Dikdörtgen veya diğer araçları seçin");
+        }catch(Exception e){error(e);}
     }
 
     private void showMoreTools(){
