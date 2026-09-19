@@ -147,6 +147,24 @@ public final class DxfParser {
 
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
 
+    /**
+     * Creates an empty vector workspace for a brand-new drawing.
+     * A non-rendering canvas entity keeps the vector pipeline, zoom and export transforms valid
+     * without showing any geometry to the user.
+     */
+    static Result blankDrawing(){
+        final Entity canvasEntity=new Entity(){
+            public void bounds(RectF b){add(b,0f,0f);add(b,(float)SIZE,(float)SIZE);}
+            public void draw(Canvas c,Paint p,Matrix m){/* intentionally blank */}
+        };
+        ArrayList<Entity> document=new ArrayList<>();
+        document.add(new LayerEntity(canvasEntity,"0",DxfBlocks.MODEL_LAYOUT,Color.WHITE,DxfLineStyle.CONTINUOUS,null,1d,-1,1d,-1,null,"MUSACAD_BLANK",null));
+        Matrix view=new Matrix();
+        RectF bounds=new RectF(0f,0f,(float)SIZE,(float)SIZE);
+        LinkedHashSet<String> layouts=new LinkedHashSet<>();layouts.add(DxfBlocks.MODEL_LAYOUT);
+        LinkedHashSet<String> layers=new LinkedHashSet<>();layers.add("0");return new Result(null,0,0,new float[0],document,view,layers,layers,layouts,DxfBlocks.MODEL_LAYOUT,bounds,1f,1d,"birim",1d,Collections.emptyMap());
+    }
+
     public static Result render(File file)throws IOException{
         return renderStreaming(file);
     }
@@ -187,7 +205,7 @@ public final class DxfParser {
 
     private static Result renderLayout(List<Entity>document,Set<String>all,Set<String>visible,Set<String>layouts,String requested,int skipped,double mm,String unitName,double global,Map<String,DxfLineStyle.Pattern>lineTypes)throws IOException{
         String active=findLayout(layouts,requested);ArrayList<Entity>layoutEntities=new ArrayList<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(active.equals(layer.layout))layoutEntities.add(entity);}if(layoutEntities.isEmpty())throw new IOException("Seçilen layout içinde desteklenen geometri bulunamadı");RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);for(Entity e:layoutEntities){FileTransfer.checkCancelled();e.bounds(b);}if(!Float.isFinite(b.left)||!Float.isFinite(b.top)||b.right<b.left||b.bottom<b.top)throw new IOException("Layout sınırları hesaplanamadı");if(b.width()==0){b.left-=.5f;b.right+=.5f;}if(b.height()==0){b.top-=.5f;b.bottom+=.5f;}float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix view=new Matrix();view.postTranslate(-b.left,-b.bottom);view.postScale(s,-s);view.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);RectF contentBounds=new RectF(b);view.mapRect(contentBounds);ArrayList<Entity>shown=new ArrayList<>();for(Entity e:layoutEntities){LayerEntity layer=(LayerEntity)e;if(visible.contains(layer.layer))shown.add(e);}Bitmap bitmap=Bitmap.createBitmap(SIZE,SIZE,Bitmap.Config.ARGB_8888);
-        try{Canvas canvas=new Canvas(bitmap);canvas.drawColor(Color.rgb(18,24,30));Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);drawViewportModels(canvas,paint,view,document,active,visible,false,false,global);for(Entity e:shown){FileTransfer.checkCancelled();((LayerEntity)e).drawStyled(canvas,paint,view,false,false,global);}FileTransfer.checkCancelled();return new Result(bitmap,shown.size(),skipped,snapPoints(shown,view),document,view,all,visible,layouts,active,contentBounds,s,mm,unitName,global,lineTypes);}catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
+        try{Canvas canvas=new Canvas(bitmap);canvas.drawColor(Color.rgb(18,24,30));Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);drawViewportModels(canvas,paint,view,document,active,visible,false,false,global);for(Entity e:shown){FileTransfer.checkCancelled();((LayerEntity)e).drawStyled(canvas,paint,view,false,false,global);}FileTransfer.checkCancelled();int displayCount=0;for(Entity entity:shown){LayerEntity layer=(LayerEntity)entity;if(!"MUSACAD_BLANK".equals(layer.sourceType))displayCount++;}return new Result(bitmap,displayCount,skipped,snapPoints(shown,view),document,view,all,visible,layouts,active,contentBounds,s,mm,unitName,global,lineTypes);}catch(IOException|RuntimeException|OutOfMemoryError e){bitmap.recycle();throw e;}
     }
 
     private static void drawViewportModels(Canvas canvas,Paint paint,Matrix paperMatrix,List<Entity>document,String activeLayout,Set<String>visible,boolean print,boolean mono,double global){

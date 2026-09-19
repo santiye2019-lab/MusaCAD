@@ -410,48 +410,43 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Reference 8 x 2 lower command grid -->
+    <!-- Grouped CAD toolbar. Each tile has icon above and group/function name below.
+         Tapping a group opens its individual functions upward from the bottom. -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="104dp"
-        android:orientation="vertical"
+        android:layout_height="68dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:weightSum="8"
         android:paddingStart="2dp"
         android:paddingEnd="2dp"
         android:paddingTop="2dp"
         android:paddingBottom="2dp"
         android:background="#081B2A">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:orientation="horizontal"
-            android:weightSum="8">
+        <Button android:id="@+id/selectEntityButton" style="@style/GroupBarBlue"
+            android:text="Seç" android:drawableTop="@drawable/ic_select" android:enabled="false" />
 
-            <Button android:id="@+id/selectEntityButton" style="@style/BottomGridBlue" android:text="Seç" android:drawableTop="@drawable/ic_select" android:enabled="false" />
-            <Button android:id="@+id/lineButton" style="@style/BottomGridBlue" android:text="Çiz" android:drawableTop="@drawable/ic_line" android:enabled="false" />
-            <Button android:id="@+id/rectangleButton" style="@style/BottomGridBlue" android:text="Dikdörtgen" android:drawableTop="@drawable/ic_rectangle" android:enabled="false" />
-            <Button android:id="@+id/circleButton" style="@style/BottomGridBlue" android:text="Daire" android:drawableTop="@drawable/ic_circle" android:enabled="false" />
-            <Button android:id="@+id/moveEntityButton" style="@style/BottomGridGreen" android:text="Taşı" android:drawableTop="@drawable/ic_move" android:enabled="false" />
-            <Button android:id="@+id/copyEntityButton" style="@style/BottomGridGreen" android:text="Kopyala" android:drawableTop="@drawable/ic_copy" android:enabled="false" />
-            <Button android:id="@+id/rotateEntityButton" style="@style/BottomGridGreen" android:text="Döndür" android:drawableTop="@drawable/ic_rotate" android:enabled="false" />
-            <Button android:id="@+id/deleteEntityButton" style="@style/BottomGridOrange" android:text="Sil" android:drawableTop="@drawable/ic_delete" android:enabled="false" />
-        </LinearLayout>
+        <Button android:id="@+id/groupLineToolsButton" style="@style/GroupBarBlue"
+            android:text="Çizgi" android:drawableTop="@drawable/ic_line" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:orientation="horizontal"
-            android:weightSum="8">
+        <Button android:id="@+id/groupShapeToolsButton" style="@style/GroupBarBlue"
+            android:text="Şekiller" android:drawableTop="@drawable/ic_circle" />
 
-            <Button android:id="@+id/zoomInButton" style="@style/BottomGridBlue" android:text="Yakınlaştır" android:drawableTop="@drawable/ic_zoom_in" />
-            <Button android:id="@+id/zoomOutButton" style="@style/BottomGridBlue" android:text="Uzaklaştır" android:drawableTop="@drawable/ic_zoom_out" />
-            <Button android:id="@+id/fitButton" style="@style/BottomGridBlue" android:text="Tümü" android:drawableTop="@drawable/ic_fit" />
-            <Button android:id="@+id/bottomLayersButton" style="@style/BottomGridBlue" android:text="Katmanlar" android:drawableTop="@drawable/ic_layers" android:enabled="false" />
-            <Button android:id="@+id/bottomMeasureButton" style="@style/BottomGridPurple" android:text="Ölç" android:drawableTop="@drawable/ic_distance" />
-            <Button android:id="@+id/textButton" style="@style/BottomGridPurple" android:text="Yazı" android:drawableTop="@drawable/ic_text" android:enabled="false" />
-            <Button android:id="@+id/hatchButton" style="@style/BottomGridPurple" android:text="Tarama" android:drawableTop="@drawable/ic_hatch" android:enabled="false" />
-            <Button android:id="@+id/moreToolsButton" style="@style/BottomGridBlue" android:text="Diğer" android:drawableTop="@drawable/ic_more" />
-        </LinearLayout>
+        <Button android:id="@+id/groupEditToolsButton" style="@style/GroupBarGreen"
+            android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
+
+        <Button android:id="@+id/groupMeasureToolsButton" style="@style/GroupBarPurple"
+            android:text="Ölçme" android:drawableTop="@drawable/ic_distance" />
+
+        <Button android:id="@+id/groupViewToolsButton" style="@style/GroupBarBlue"
+            android:text="Görünüm" android:drawableTop="@drawable/ic_fit" />
+
+        <Button android:id="@+id/groupAnnotateToolsButton" style="@style/GroupBarPurple"
+            android:text="Notasyon" android:drawableTop="@drawable/ic_text" />
+
+        <Button android:id="@+id/groupMoreToolsButton" style="@style/GroupBarOrange"
+            android:text="Diğer" android:drawableTop="@drawable/ic_more" />
     </LinearLayout>
 
     <!-- File tab / finish / save / share / open -->
@@ -576,7 +571,22 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone">
+        <Button android:id="@+id/lineButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/polylineButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/rectangleButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/circleButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/moveEntityButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/copyEntityButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/rotateEntityButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/deleteEntityButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/zoomInButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/zoomOutButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/fitButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/bottomLayersButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/bottomMeasureButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/textButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/hatchButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/moreToolsButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/calibrateButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/distanceButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/areaButton" android:layout_width="1dp" android:layout_height="1dp" />
