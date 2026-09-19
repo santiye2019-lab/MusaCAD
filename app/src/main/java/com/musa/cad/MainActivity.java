@@ -620,10 +620,10 @@ public class MainActivity extends AppCompatActivity {
     private void showEditToolsSheet(){
         showToolSheet("Düzenleme Araçları",
             tool("Taşı",R.drawable.ic_move,()->{if(!cad.armMoveSelected())noSourceSelection();}),
-            tool("Kopyala",R.drawable.ic_copy,()->{if(!cad.copySelectedEntity())noSourceSelection();}),
+            tool("Kopyalama",R.drawable.ic_copy,()->{if(!cad.copySelectedEntity())noSourceSelection();}),
             tool("Döndür",R.drawable.ic_rotate,()->{if(!cad.rotateSelectedEntity())noSourceSelection();}),
             tool("Sil",R.drawable.ic_delete,()->{if(!cad.deleteSelectedEntity())noSourceSelection();}),
-            tool("Kes",R.drawable.ic_line,()->{if(ensureTransformSelection("KES / TRIM")){if(cad.armTrimSelected())result.setText("Kes • Kesme sınırı olacak ikinci çizgiye dokunun");else result.setText("Kes • Hedef nesne çizgi olmalı");}}),
+            tool("Kesme",R.drawable.ic_line,()->{if(ensureTransformSelection("KES / TRIM")){if(cad.armTrimSelected())result.setText("Kesme • Kesme sınırı olacak ikinci çizgiye dokunun");else result.setText("Kesme • Hedef nesne çizgi olmalı");}}),
             tool("Uzat",R.drawable.ic_line,()->{if(ensureTransformSelection("UZAT / EXTEND")){if(cad.armExtendSelected())result.setText("Uzat • Sınır çizgisine dokunun");else result.setText("Uzat • Hedef nesne çizgi olmalı");}}),
             tool("Offset",R.drawable.ic_line,this::runOffsetCommand),
             tool("Ölçekle",R.drawable.ic_scale,this::runScaleCommand),
