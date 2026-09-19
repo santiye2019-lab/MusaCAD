@@ -853,11 +853,11 @@ public class MainActivity extends AppCompatActivity {
     private void updateShareEnabled(boolean enabled){shareButton.setEnabled(enabled);shareButton.setAlpha(enabled?1f:.45f);shareToolButton.setEnabled(enabled);shareToolButton.setAlpha(enabled?1f:.55f);}
     private void updateLayerButtons(boolean enabled){
         int[] ids={R.id.layersButton,R.id.bottomLayersButton,R.id.rightLayersButton};
-        for(int id:ids){View v=findViewById(id);if(v!=null){v.setEnabled(enabled);v.setAlpha(enabled?1f:.82f);}}
+        for(int id:ids){View v=findViewById(id);if(v!=null){v.setEnabled(enabled);v.setAlpha(1f);}}
     }
     private void updateEditorEnabled(boolean enabled){
         int[] ids={R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.hatchButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton};
-        for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(enabled?1f:.82f);}
+        for(int id:ids){View v=findViewById(id);v.setEnabled(enabled);v.setAlpha(1f);}
         if(editStatusText!=null){
             if(currentFile==null){editStatusText.setText("Dosya yok");editStatusText.setTextColor(0xFF8FB7C5);}
             else if(enabled){editStatusText.setText("● Düzenlenebilir");editStatusText.setTextColor(0xFF63E6BE);}
