@@ -7,46 +7,221 @@
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:src="@drawable/musacad_about_locked"
-        android:scaleType="fitXY"
-        android:contentDescription="MusaCAD geliştirici hakkında ekranı" />
+        android:src="@drawable/about_blueprint"
+        android:scaleType="centerCrop"
+        android:alpha="0.42"
+        android:contentDescription="@null" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:paddingTop="22dp"
+            android:paddingBottom="28dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:background="@drawable/about_panel_bg"
+                android:padding="2dp">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/about_hero_reference"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="Mühendislik ve teknik çizim referans görseli" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#32030D14" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="16dp"
+                    android:text="MusaCAD • Geliştirici"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-black" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-44dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="118dp"
+                    android:layout_height="118dp"
+                    android:background="@drawable/profile_frame_bg"
+                    android:padding="4dp"
+                    android:src="@drawable/musa_profile"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:contentDescription="Musa Otluoğlu profil fotoğrafı" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Musa Otluoğlu"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-black" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Makine Mühendisi"
+                    android:textColor="#69D7CE"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="vertical"
+                android:background="@drawable/about_panel_bg"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hakkında"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:text="1980 İstanbul doğumlu Musa Otluoğlu, Atatürk Üniversitesi Makine Mühendisliği bölümünden 2004 yılında mezun oldu. Meslek hayatının ilk 6 yılında özel inşaat firmalarında Mekanik İşler Şefliği ve koordinatörlük görevlerinde bulundu. Sonraki 17 yıldır kamuda kontrol ve denetim mühendisliği görevini sürdürmektedir."
+                    android:textColor="#D9E9ED"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="MusaCAD; sahada ve hareket hâlindeyken teknik çizimleri görüntülemek, ölçmek, düzenlemek ve paylaşmak için geliştirilen mobil CAD uygulamasıdır."
+                    android:textColor="#AFCBD2"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:weightSum="3">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/about_stat_bg"
+                    android:gravity="center"
+                    android:text="2004&#10;MEZUNİYET"
+                    android:textColor="#E5F4F7"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/about_stat_bg"
+                    android:gravity="center"
+                    android:text="6 YIL&#10;ÖZEL SEKTÖR"
+                    android:textColor="#E5F4F7"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/about_stat_bg"
+                    android:gravity="center"
+                    android:text="17 YIL&#10;KAMU"
+                    android:textColor="#E5F4F7"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/openSourceButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/feature_chip_bg"
+                android:text="Açık Kaynak ve Lisanslar"
+                android:textAllCaps="false"
+                android:textColor="#D9F3F6"
+                android:textSize="13sp"
+                android:stateListAnimator="@null" />
+
+            <Button
+                android:id="@+id/closeAboutButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/primary_action_bg"
+                android:text="MusaCAD'ı Kullan"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:stateListAnimator="@null" />
+
+            <TextView
+                android:id="@+id/versionText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:textColor="#6FA3AF"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </ScrollView>
 
     <Button
         android:id="@+id/aboutBackButton"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="top|start"
-        android:layout_marginStart="4dp"
-        android:layout_marginTop="4dp"
-        android:background="@android:color/transparent"
-        android:text=""
-        android:contentDescription="Geri"
-        android:stateListAnimator="@null" />
-
-    <Button
-        android:id="@+id/closeAboutButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginStart="24dp"
-        android:layout_marginEnd="24dp"
-        android:layout_marginBottom="75dp"
-        android:background="@android:color/transparent"
-        android:text=""
-        android:contentDescription="MusaCAD'ı Kullan"
-        android:stateListAnimator="@null" />
-
-    <Button
-        android:id="@+id/openSourceButton"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:layout_gravity="bottom|start"
-        android:visibility="invisible"
-        android:text="" />
-
-    <TextView
-        android:id="@+id/versionText"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:visibility="invisible" />
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/feature_chip_bg"
+        android:text="‹"
+        android:textColor="#FFFFFF"
+        android:textSize="30sp"
+        android:textStyle="bold"
+        android:stateListAnimator="@null"
+        android:contentDescription="Geri" />
 </FrameLayout>
