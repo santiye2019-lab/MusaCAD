@@ -1,287 +1,54 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/splashRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#061421">
 
-    <ImageView
+    <FrameLayout
+        android:id="@+id/splashContent"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:src="@drawable/splash_scene_reference"
-        android:scaleType="centerCrop"
-        android:alpha="0.72"
-        android:contentDescription="@null" />
+        android:layout_height="match_parent">
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        android:clipToPadding="false"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:id="@+id/splashContent"
+        <ImageView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="800dp"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="14dp">
+            android:layout_height="match_parent"
+            android:src="@drawable/musacad_intro_locked"
+            android:scaleType="fitXY"
+            android:contentDescription="MusaCAD giriş ekranı" />
 
-            <TextView
-                android:id="@+id/splashVersion"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:text="v1.0.0"
-                android:textColor="#EAF5FB"
-                android:textSize="10sp" />
+        <TextView
+            android:id="@+id/splashVersion"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="invisible" />
 
-            <ImageView
-                android:layout_width="108dp"
-                android:layout_height="96dp"
-                android:layout_marginTop="-2dp"
-                android:src="@drawable/ic_musacad_mark"
-                android:scaleType="fitCenter"
-                android:contentDescription="MusaCAD logo" />
+        <Button
+            android:id="@+id/startButton"
+            android:layout_width="82%"
+            android:layout_height="58dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="74dp"
+            android:background="@android:color/transparent"
+            android:text=""
+            android:contentDescription="Başla"
+            android:stateListAnimator="@null" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="-2dp"
-                android:text="MusaCAD"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="42sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false" />
+        <Button
+            android:id="@+id/licenseInfoButton"
+            android:layout_width="82%"
+            android:layout_height="48dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="22dp"
+            android:background="@android:color/transparent"
+            android:text=""
+            android:contentDescription="Lisans Bilgisi"
+            android:stateListAnimator="@null" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:gravity="center"
-                android:text="Profesyonel CAD Deneyimi\nHer Zaman Yanınızda"
-                android:textColor="#EAF4FA"
-                android:textSize="14sp"
-                android:lineSpacingExtra="1dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="78dp"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal"
-                android:weightSum="4"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:background="@drawable/about_panel_bg">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <ImageView
-                        android:layout_width="27dp"
-                        android:layout_height="27dp"
-                        android:src="@drawable/ic_open_file"
-                        app:tint="#138CFF"
-                        android:contentDescription="@null" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center"
-                        android:text="DWG / DXF\nGörüntüleme"
-                        android:textColor="#FFFFFF"
-                        android:textSize="8sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <ImageView
-                        android:layout_width="27dp"
-                        android:layout_height="27dp"
-                        android:src="@drawable/ic_distance"
-                        app:tint="#62E5B3"
-                        android:contentDescription="@null" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center"
-                        android:text="Ölçü Alma\nAlan Hesabı"
-                        android:textColor="#FFFFFF"
-                        android:textSize="8sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <ImageView
-                        android:layout_width="27dp"
-                        android:layout_height="27dp"
-                        android:src="@drawable/ic_text"
-                        app:tint="#FFAC6B"
-                        android:contentDescription="@null" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center"
-                        android:text="Düzenleme\nve Notasyon"
-                        android:textColor="#FFFFFF"
-                        android:textSize="8sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-                    <ImageView
-                        android:layout_width="27dp"
-                        android:layout_height="27dp"
-                        android:src="@drawable/ic_share_pro"
-                        app:tint="#AF58FF"
-                        android:contentDescription="@null" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center"
-                        android:text="Paylaşım\nPDF / Resim"
-                        android:textColor="#FFFFFF"
-                        android:textSize="8sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Locked photographic reference scene supplied by Musa -->
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="360dp"
-                android:layout_marginTop="10dp"
-                android:clipChildren="true"
-                android:background="#081824">
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:src="@drawable/splash_scene_reference"
-                    android:scaleType="centerCrop"
-                    android:contentDescription="MusaCAD mühendislik çalışma alanı" />
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:src="@drawable/about_blueprint"
-                    android:scaleType="fitXY"
-                    android:alpha="0.16"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:orientation="horizontal"
-                android:weightSum="4">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="◎\nHızlı"
-                    android:textColor="#F0F6FA"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="◆\nGüvenilir"
-                    android:textColor="#F0F6FA"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="⚙\nPratik"
-                    android:textColor="#F0F6FA"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="▣\nMobil"
-                    android:textColor="#F0F6FA"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/startButton"
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="3dp"
-                android:text="Başla   ›"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="17sp"
-                android:background="@drawable/primary_action_bg"
-                android:stateListAnimator="@null" />
-
-            <Button
-                android:id="@+id/licenseInfoButton"
-                android:layout_width="match_parent"
-                android:layout_height="46dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="9dp"
-                android:text="Lisans Bilgisi"
-                android:textAllCaps="false"
-                android:textColor="#DDECF4"
-                android:textSize="13sp"
-                android:background="@drawable/feature_chip_bg"
-                android:stateListAnimator="@null" />
-
-            <Button
-                android:id="@+id/aboutLinkButton"
-                android:layout_width="1dp"
-                android:layout_height="1dp"
-                android:visibility="gone"
-                android:text="Geliştirici Hakkında" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:text="“Daha verimli, daha güçlü projeler için...”"
-                android:textColor="#D8E4EB"
-                android:textSize="9sp"
-                android:textStyle="italic" />
-        </LinearLayout>
-    </ScrollView>
+        <Button
+            android:id="@+id/aboutLinkButton"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone"
+            android:text="" />
+    </FrameLayout>
 </FrameLayout>
