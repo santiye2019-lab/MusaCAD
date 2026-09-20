@@ -28,6 +28,8 @@ public class AboutActivity extends AppCompatActivity {
             return insets;
         });
         ((TextView)findViewById(R.id.versionText)).setText("MusaCAD • Sürüm "+BuildConfig.VERSION_NAME);
+        EmbeddedImages.applyAboutReference((android.widget.ImageView)findViewById(R.id.aboutReferenceImage));
+        EmbeddedImages.applyProfile((android.widget.ImageView)findViewById(R.id.aboutProfileImage));
 
         findViewById(R.id.openSourceButton).setOnClickListener(v->showOpenSource());
         findViewById(R.id.aboutBackButton).setOnClickListener(v->returnToLicenseOrFinish());
