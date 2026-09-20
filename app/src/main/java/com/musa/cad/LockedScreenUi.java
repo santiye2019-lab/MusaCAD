@@ -4,13 +4,10 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.ColorDrawable;
-import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 
 final class LockedScreenUi {
@@ -27,38 +24,36 @@ final class LockedScreenUi {
             FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(w,h,Gravity.CENTER);
             stage.setLayoutParams(lp);
             stage.removeAllViews();
+
             ImageView art=new ImageView(a);
             art.setId(R.id.lockedArtwork);
             art.setScaleType(ImageView.ScaleType.FIT_XY);
+            art.setAdjustViewBounds(false);
             stage.addView(art,new FrameLayout.LayoutParams(-1,-1));
             if(ready!=null)ready.run();
         });
     }
 
     static void loadArtwork(Activity a, ImageView target, String assetPrefix, int fallbackDrawable){
-        try{
-            StringBuilder encoded=new StringBuilder();
-            for(int i=0;i<99;i++){
-                String name=assetPrefix+"_"+String.format(java.util.Locale.US,"%02d",i)+".b64";
-                try(InputStream in=a.getAssets().open(name)){
-                    ByteArrayOutputStream out=new ByteArrayOutputStream();
-                    byte[] buf=new byte[8192]; int n;
-                    while((n=in.read(buf))!=-1)out.write(buf,0,n);
-                    encoded.append(out.toString("UTF-8"));
-                }catch(IOException missing){break;}
-            }
-            if(encoded.length()>0){
-                byte[] bytes=Base64.decode(encoded.toString(),Base64.DEFAULT);
-                Bitmap bmp=BitmapFactory.decodeByteArray(bytes,0,bytes.length);
-                if(bmp!=null){target.setImageBitmap(bmp);return;}
+        try(InputStream in=a.getAssets().open(assetPrefix+".webp")){
+            Bitmap bmp=BitmapFactory.decodeStream(in);
+            if(bmp!=null){
+                target.setImageBitmap(bmp);
+                target.setAlpha(1f);
+                target.setVisibility(View.VISIBLE);
+                return;
             }
         }catch(Throwable ignored){}
         target.setImageResource(fallbackDrawable);
+        target.setAlpha(1f);
+        target.setVisibility(View.VISIBLE);
     }
 
     static View hotspot(Activity a, FrameLayout stage, float x,float y,float w,float h, View.OnClickListener click){
         View v=new View(a);
-        v.setClickable(true); v.setFocusable(true);
+        v.setClickable(true);
+        v.setFocusable(true);
+        v.setContentDescription("MusaCAD işlem alanı");
         v.setBackground(new ColorDrawable(0x01000000));
         FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
             Math.max(1,Math.round(stage.getWidth()*w/ART_W)),
