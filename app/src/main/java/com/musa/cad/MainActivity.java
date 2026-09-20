@@ -24,7 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final long BACK_DOUBLE_MS=1800L;
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private LoadTask activeLoad;
 
@@ -945,9 +945,11 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onBackPressed(){
         if(activeLoad!=null){cancelLoad();Toast.makeText(this,"Devam eden işlem iptal edildi",Toast.LENGTH_SHORT).show();return;}
         if(currentProject!=null&&isProjectDirty(currentProject)){
-            new AlertDialog.Builder(this).setTitle("Değişiklikler kaydedilsin mi?")
-                .setMessage("Projeler ekranına dönmeden önce mevcut düzenlemeleri kaydedebilirsiniz.")
-                .setPositiveButton("KAYDET",(d,w)->{pendingOpenBrowserAfterSave=true;requestEditedDxfSave();})
+            ProjectSession project=currentProject;
+            new AlertDialog.Builder(this).setTitle("Kaydedilmemiş değişiklikler")
+                .setMessage("Bu projeyi kapatmadan önce değişiklikleri kaydetmek ister misiniz?")
+                .setPositiveButton("KAYDET VE KAPAT",(d,w)->{pendingCloseAfterSave=project;pendingOpenBrowserAfterSave=true;requestEditedDxfSave();})
+                .setNeutralButton("KAYDETMEDEN KAPAT",(d,w)->{closeProjectNow(project);open();})
                 .setNegativeButton("İPTAL",null).show();
             return;
         }
@@ -973,8 +975,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_OPEN,0,"Dosya aç");menu.add(0,MENU_LAYERS,1,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,2,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,3,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,4,"Düzenlenmiş DXF kaydet").setEnabled(canEdit());menu.add(0,MENU_PRINT,5,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,6,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,7,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_ABOUT,8,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Düzenlenmiş DXF kaydet").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_ABOUT,9,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     private void showDrawingInfo(){
@@ -1184,7 +1186,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
                     boolean goBrowser=pendingOpenBrowserAfterSave;pendingOpenBrowserAfterSave=false;
-                    if(close!=null)closeProjectNow(close);else if(goBrowser)open();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingOpenBrowserAfterSave=false;pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);if(goBrowser)open();});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingOpenBrowserAfterSave=false;pendingCloseAfterSave=null;error(e);});}});
     }
 
     private void showShare(){
