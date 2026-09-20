@@ -32,6 +32,7 @@ public class SplashActivity extends AppCompatActivity {
         });
 
         ((TextView)findViewById(R.id.splashVersion)).setText("v"+BuildConfig.VERSION_NAME);
+        EmbeddedImages.applySplashReference((android.widget.ImageView)findViewById(R.id.splashReferenceImage));
         View content=findViewById(R.id.splashContent);
         content.setAlpha(0f);
         content.setTranslationY(24f);
