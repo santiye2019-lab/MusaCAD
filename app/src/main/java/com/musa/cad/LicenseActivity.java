@@ -6,10 +6,7 @@ import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
 import java.io.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,171 +15,104 @@ public class LicenseActivity extends AppCompatActivity {
     public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";
     public static final String EXTRA_STAY_ON_LICENSE="com.musa.cad.STAY_ON_LICENSE";
     private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
-    private CheckBox termsCheck;
-    private Button trialButton;
-    private EditText licenseCode;
-    private TextView status,message,installationId;
-    private Intent pendingIntent;
-    private volatile boolean trialRequestRunning;
+    private EditText licenseCode; private Intent pendingIntent; private volatile boolean trialRequestRunning;
     private boolean stayOnLicense;
-
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         setContentView(R.layout.activity_license);
-        View root=findViewById(R.id.licenseRoot);
-        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{
-            Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(0,bars.top,0,bars.bottom);return insets;
-        });
-
         stayOnLicense=getIntent().getBooleanExtra(EXTRA_STAY_ON_LICENSE,false);
         if(android.os.Build.VERSION.SDK_INT>=33)pendingIntent=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT,Intent.class);
-        else {
-            @SuppressWarnings("deprecation") Intent legacy=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT);pendingIntent=legacy;
-        }
+        else { @SuppressWarnings("deprecation") Intent legacy=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT);pendingIntent=legacy; }
 
-        termsCheck=findViewById(R.id.termsCheck);
-        trialButton=findViewById(R.id.trialButton);
-        licenseCode=findViewById(R.id.licenseCode);
-        status=findViewById(R.id.licenseStatus);
-        message=findViewById(R.id.licenseMessage);
-        installationId=findViewById(R.id.installationId);
-        installationId.setText(LicenseManager.installationId(this));
-        termsCheck.setChecked(LicenseManager.termsAccepted(this));
+        FrameLayout root=findViewById(R.id.licenseRoot),stage=findViewById(R.id.artworkStage);
+        LockedScreenUi.fitStage(this,root,stage,()->{
+            ImageView art=stage.findViewById(R.id.lockedArtwork);
+            LockedScreenUi.loadArtwork(this,art,"locked/screen3",R.drawable.splash_scene_reference);
 
-        findViewById(R.id.termsButton).setOnClickListener(v->showTerms());
-        findViewById(R.id.copyInstallationIdButton).setOnClickListener(v->copyInstallationId());
-        trialButton.setOnClickListener(v->startTrial());
-        findViewById(R.id.activateButton).setOnClickListener(v->activate());
+            licenseCode=new EditText(this);
+            licenseCode.setSingleLine(true);
+            licenseCode.setTextColor(0xFFFFFFFF); licenseCode.setTextSize(15f);
+            licenseCode.setHint("Lisans Kodunu Girin"); licenseCode.setHintTextColor(0xFF7891A8);
+            licenseCode.setPadding(dp(18),0,dp(18),0);
+            licenseCode.setBackgroundColor(0xD9082036);
+            stage.addView(licenseCode);
+            LockedScreenUi.position(licenseCode,stage,132,714,666,92);
+
+            LockedScreenUi.hotspot(this,stage,108,428,714,128,v->startTrial());
+            LockedScreenUi.hotspot(this,stage,128,570,688,122,v->showInstallationId());
+            LockedScreenUi.hotspot(this,stage,128,829,688,84,v->activate());
+            LockedScreenUi.hotspot(this,stage,128,930,688,62,v->showTerms(false));
+            LockedScreenUi.hotspot(this,stage,116,1245,620,58,v->showTerms(false));
+            LockedScreenUi.hotspot(this,stage,65,1445,185,135,v->enterAppIfAllowed());
+            LockedScreenUi.hotspot(this,stage,273,1445,185,135,v->enterAppIfAllowed());
+            LockedScreenUi.hotspot(this,stage,482,1445,185,135,v->enterAppIfAllowed());
+            LockedScreenUi.hotspot(this,stage,690,1445,185,135,v->enterAppIfAllowed());
+        });
         refresh();
     }
 
+    private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private void refresh(){
         LicenseManager.State s=LicenseManager.state(this);
-        switch(s){
-            case TRIAL_AVAILABLE:
-                status.setText("1 gün ücretsiz deneyin");
-                trialButton.setEnabled(!trialRequestRunning);trialButton.setAlpha(trialRequestRunning?.55f:1f);
-                trialButton.setText(trialRequestRunning?"DENEME DOĞRULANIYOR…":"1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT");break;
-            case TRIAL_EXPIRED:
-                status.setText("Ücretsiz deneme sona erdi");
-                trialButton.setEnabled(false);trialButton.setAlpha(.45f);
-                trialButton.setText("DENEME SÜRESİ KULLANILDI");break;
-            case CLOCK_ERROR:
-                status.setText("Cihaz saati doğrulanamadı");
-                trialButton.setEnabled(false);trialButton.setAlpha(.45f);
-                message.setText("Deneme süresi güvenliği için cihaz tarih/saatini otomatik ayara alın.");break;
-            case TRIAL_ACTIVE:
-                if(stayOnLicense){
-                    status.setText("1 günlük ücretsiz deneme aktif");
-                    message.setText("Deneme süresi boyunca MusaCAD'ın tüm deneme özelliklerini kullanabilirsiniz.");
-                    trialButton.setEnabled(true);trialButton.setAlpha(1f);trialButton.setText("MUSACAD'A DEVAM ET");
-                    trialButton.setOnClickListener(v->enterApp());
-                }else enterApp();
-                break;
-            case LICENSED:
-                if(stayOnLicense){
-                    status.setText("MusaCAD lisansı aktif");
-                    message.setText("Bu cihaz için lisans doğrulandı.");
-                    trialButton.setEnabled(true);trialButton.setAlpha(1f);trialButton.setText("MUSACAD'A DEVAM ET");
-                    trialButton.setOnClickListener(v->enterApp());
-                }else enterApp();
-                break;
-        }
+        if((s==LicenseManager.State.TRIAL_ACTIVE||s==LicenseManager.State.LICENSED)&&!stayOnLicense)enterApp();
     }
-
     private void startTrial(){
         if(trialRequestRunning)return;
-        if(!termsCheck.isChecked()){
-            Toast.makeText(this,"Önce lisans ve deneme koşullarını kabul edin",Toast.LENGTH_LONG).show();return;
-        }
-        LicenseManager.acceptTerms(this);trialRequestRunning=true;message.setText("Ücretsiz deneme cihaz için doğrulanıyor…");refresh();
+        if(!LicenseManager.termsAccepted(this)){showTerms(true);return;}
+        trialRequestRunning=true;
         trialExecutor.execute(()->{
             TrialService.Result r=TrialService.start(getApplicationContext());
             runOnUiThread(()->{
-                if(isFinishing()||isDestroyed())return;trialRequestRunning=false;
-                switch(r.status){
-                    case ACTIVATED:
-                        Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();
-                        enterAfterLicense();return;
-                    case ALREADY_USED:
-                        message.setText("Bu cihaz 1 günlük ücretsiz denemeyi daha önce kullandı.");
-                        refresh();return;
-                    case NOT_CONFIGURED:
-                        startLocalTrialFallback();
-                        return;
-                    case NETWORK_ERROR:
-                        message.setText("İnternet bağlantısı nedeniyle çevrimiçi deneme doğrulanamadı. Bağlantınızı kontrol edip yeniden deneyin.");
-                        refresh();return;
-                    case DENIED:
-                        message.setText(r.message==null?"Ücretsiz deneme isteği reddedildi.":r.message);
-                        refresh();return;
-                    case INVALID_RESPONSE:
-                        message.setText("Deneme sunucu yanıtı doğrulanamadı. Lütfen yeniden deneyin.");
-                        refresh();return;
-                }
+                trialRequestRunning=false;
+                if(r.status==TrialService.Status.ACTIVATED){Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();enterAfterLicense();}
+                else if(r.status==TrialService.Status.NOT_CONFIGURED)startLocalTrialFallback();
+                else if(r.status==TrialService.Status.ALREADY_USED)Toast.makeText(this,"Bu cihaz ücretsiz denemeyi daha önce kullandı",Toast.LENGTH_LONG).show();
+                else Toast.makeText(this,r.message==null?"Deneme başlatılamadı":r.message,Toast.LENGTH_LONG).show();
             });
         });
     }
-
     private void startLocalTrialFallback(){
-        if(LicenseManager.startTrial(this)){
-            Toast.makeText(this,"1 günlük ücretsiz deneme başlatıldı",Toast.LENGTH_SHORT).show();
-            enterAfterLicense();
-            return;
-        }
-        message.setText("Bu cihazdaki 1 günlük ücretsiz deneme daha önce başlatılmış veya sona ermiş.");
-        refresh();
+        if(LicenseManager.startTrial(this)){Toast.makeText(this,"1 günlük ücretsiz deneme başlatıldı",Toast.LENGTH_SHORT).show();enterAfterLicense();}
+        else Toast.makeText(this,"Bu cihazdaki ücretsiz deneme daha önce kullanılmış veya sona ermiş",Toast.LENGTH_LONG).show();
     }
-
     private void activate(){
-        if(!termsCheck.isChecked()){
-            Toast.makeText(this,"Önce lisans koşullarını kabul edin",Toast.LENGTH_LONG).show();return;
-        }
-        String code=licenseCode.getText().toString().trim();
+        if(!LicenseManager.termsAccepted(this)){showTerms(false);Toast.makeText(this,"Lisans koşullarını kabul ettikten sonra tekrar Etkinleştir'e basın",Toast.LENGTH_LONG).show();return;}
+        String code=licenseCode==null?"":licenseCode.getText().toString().trim();
         LicenseManager.ActivationResult r=LicenseManager.activateCode(this,code);
-        if(r==LicenseManager.ActivationResult.ACTIVATED){LicenseManager.acceptTerms(this);Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterAfterLicense();return;}
-        licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
-        message.setText("Lisans kodu bu ekrandaki Cihaz/Lisans Kimliği için üretilmelidir.");
+        if(r==LicenseManager.ActivationResult.ACTIVATED){Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();enterAfterLicense();}
+        else { if(licenseCode!=null)licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil"); }
     }
-
-    private void copyInstallationId(){
-        String id=LicenseManager.installationId(this);
-        ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Lisans Kimliği",id));
-        Toast.makeText(this,"Lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+    private void showInstallationId(){
+        final String id=LicenseManager.installationId(this);
+        new AlertDialog.Builder(this).setTitle("Cihaz / Lisans Kimliği").setMessage(id)
+            .setPositiveButton("KOPYALA",(d,w)->{
+                ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+                c.setPrimaryClip(ClipData.newPlainText("MusaCAD Lisans Kimliği",id));
+                Toast.makeText(this,"Lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+            }).setNegativeButton("KAPAT",null).show();
     }
-
-    private void enterAfterLicense(){
-        if(pendingIntent!=null){enterApp();return;}
-        Intent about=new Intent(this,AboutActivity.class);
-        about.putExtra(AboutActivity.EXTRA_CONTINUE_TO_APP,true);
-        startActivity(about);
-        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
-        finish();
-    }
-
-    private void enterApp(){
-        Intent next=pendingIntent==null?new Intent(this,MainActivity.class):new Intent(pendingIntent).setClass(this,MainActivity.class);
-        next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);startActivity(next);
-        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);finish();
-    }
-
-    private void showTerms(){
-        TextView text=new TextView(this);int p=Math.round(18*getResources().getDisplayMetrics().density);text.setPadding(p,p,p,p);
-        text.setText(readAsset("MUSACAD-LICENSE-TERMS-TR.txt"));text.setTextIsSelectable(true);text.setTextSize(12f);
+    private void showTerms(boolean startAfterAccept){
+        TextView text=new TextView(this);int p=dp(18);text.setPadding(p,p,p,p);text.setText(readAsset("MUSACAD-LICENSE-TERMS-TR.txt"));text.setTextIsSelectable(true);text.setTextSize(12f);
         ScrollView scroll=new ScrollView(this);scroll.addView(text);
         new AlertDialog.Builder(this).setTitle("MusaCAD lisans koşulları").setView(scroll)
-            .setPositiveButton("KABUL EDİYORUM",(d,w)->{termsCheck.setChecked(true);LicenseManager.acceptTerms(this);})
+            .setPositiveButton("KABUL EDİYORUM",(d,w)->{LicenseManager.acceptTerms(this);if(startAfterAccept)startTrial();})
             .setNegativeButton("KAPAT",null).show();
     }
-
     private String readAsset(String name){
         try(InputStream in=getAssets().open(name);ByteArrayOutputStream out=new ByteArrayOutputStream()){
             byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return out.toString("UTF-8");
         }catch(IOException e){return "Lisans koşulları okunamadı.";}
     }
-
+    private void enterAfterLicense(){
+        if(pendingIntent!=null){enterApp();return;}
+        Intent about=new Intent(this,AboutActivity.class);about.putExtra(AboutActivity.EXTRA_CONTINUE_TO_APP,true);
+        startActivity(about);overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);finish();
+    }
+    private void enterAppIfAllowed(){if(LicenseManager.hasAccess(this))enterApp();else Toast.makeText(this,"Önce denemeyi başlatın veya lisansı etkinleştirin",Toast.LENGTH_SHORT).show();}
+    private void enterApp(){
+        Intent next=pendingIntent==null?new Intent(this,MainActivity.class):new Intent(pendingIntent).setClass(this,MainActivity.class);
+        next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);startActivity(next);overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);finish();
+    }
     @Override protected void onDestroy(){trialExecutor.shutdownNow();super.onDestroy();}
 }

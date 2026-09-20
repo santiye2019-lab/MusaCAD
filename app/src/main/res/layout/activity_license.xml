@@ -1,261 +1,40 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/licenseRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="@drawable/splash_background">
-
-    <LinearLayout
+    android:background="#031321">
+    <FrameLayout
+        android:id="@+id/artworkStage"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
-        android:paddingTop="30dp"
-        android:paddingBottom="30dp">
-
-        <FrameLayout
-            android:layout_width="94dp"
-            android:layout_height="94dp"
-            android:background="@drawable/splash_logo_bg"
-            android:elevation="8dp">
-            <ImageView
-                android:layout_width="66dp"
-                android:layout_height="66dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_musacad_mark"
-                android:contentDescription="MusaCAD logo" />
-        </FrameLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="MusaCAD"
+        android:layout_height="match_parent"
+        android:layout_gravity="center">
+        <ImageView
+            android:id="@+id/lockedArtwork"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/splash_scene_reference"
+            android:contentDescription="MusaCAD kilitli lisans tasarımı" />
+        <EditText
+            android:id="@+id/licenseCode"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:singleLine="true"
+            android:inputType="textVisiblePassword"
             android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="31sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Lisans ve erişim merkezi"
-            android:textColor="#CDE4EE"
-            android:textStyle="bold"
-            android:textSize="12sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Profesyonel mobil CAD çalışma alanı"
-            android:textColor="#8FB7C5"
-            android:textSize="10sp" />
-
-        <!-- Ücretsiz deneme -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:orientation="vertical"
-            android:padding="18dp"
-            android:background="@drawable/license_trial_card_bg"
-            android:elevation="6dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="24 SAAT ÜCRETSİZ"
-                android:textColor="#72E0C9"
-                android:textStyle="bold"
-                android:textSize="10sp"
-                android:letterSpacing="0.08"
-                android:paddingStart="11dp"
-                android:paddingEnd="11dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:background="@drawable/feature_chip_bg" />
-
-            <TextView
-                android:id="@+id/licenseStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="1 gün ücretsiz deneyin"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="21sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="7dp"
-                android:text="MusaCAD'in görüntüleme, ölçüm, katman, düzenleme ve çıktı özelliklerini 24 saat boyunca deneyin. Deneme için lisans kodu gerekmez."
-                android:textColor="#C4DBD8"
-                android:textSize="12sp"
-                android:lineSpacingExtra="2dp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="15dp"
-                android:background="#355F5D" />
-
-            <CheckBox
-                android:id="@+id/termsCheck"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Lisans ve deneme koşullarını okudum, kabul ediyorum"
-                android:textColor="#EFFBFA"
-                android:textSize="11sp"
-                android:buttonTint="#2BC7A5" />
-
-            <Button
-                android:id="@+id/termsButton"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="6dp"
-                android:text="KOŞULLARI GÖRÜNTÜLE"
-                android:textColor="#DDF8F2"
-                android:textSize="10sp"
-                android:background="@drawable/feature_chip_bg"
-                android:stateListAnimator="@null" />
-
-            <Button
-                android:id="@+id/trialButton"
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="12dp"
-                android:text="1 GÜNLÜK ÜCRETSİZ DENEMEYİ BAŞLAT"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="11sp"
-                android:background="@drawable/trial_action_bg"
-                android:stateListAnimator="@null" />
-        </LinearLayout>
-
-        <!-- Ücretli / kalıcı lisans -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="vertical"
-            android:padding="18dp"
-            android:background="@drawable/license_paid_card_bg"
-            android:elevation="4dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="LİSANSLI KULLANIM"
-                android:textColor="#83C7FF"
-                android:textStyle="bold"
-                android:textSize="10sp"
-                android:letterSpacing="0.08"
-                android:paddingStart="11dp"
-                android:paddingEnd="11dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:background="@drawable/feature_chip_bg" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="Lisansım var"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="19sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:text="Satın alınmış MusaCAD lisansınızı bu cihaz için etkinleştirin."
-                android:textColor="#BCD2E2"
-                android:textSize="11sp"
-                android:lineSpacingExtra="2dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="CİHAZ / LİSANS KİMLİĞİ"
-                android:textColor="#88B9DB"
-                android:textStyle="bold"
-                android:textSize="9sp"
-                android:letterSpacing="0.05" />
-
-            <TextView
-                android:id="@+id/installationId"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:text="-"
-                android:textIsSelectable="true"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:fontFamily="monospace"
-                android:padding="11dp"
-                android:background="@drawable/feature_chip_bg" />
-
-            <Button
-                android:id="@+id/copyInstallationIdButton"
-                android:layout_width="match_parent"
-                android:layout_height="42dp"
-                android:layout_marginTop="7dp"
-                android:text="KİMLİĞİ KOPYALA"
-                android:textColor="#D9EEFF"
-                android:textSize="10sp"
-                android:background="@drawable/feature_chip_bg"
-                android:stateListAnimator="@null" />
-
-            <EditText
-                android:id="@+id/licenseCode"
-                android:layout_width="match_parent"
-                android:layout_height="76dp"
-                android:layout_marginTop="12dp"
-                android:hint="İmzalı MusaCAD lisans kodunu buraya yapıştırın"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#7996AA"
-                android:gravity="top|start"
-                android:inputType="textVisiblePassword|textMultiLine"
-                android:padding="12dp"
-                android:background="@drawable/feature_chip_bg" />
-
-            <Button
-                android:id="@+id/activateButton"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="10dp"
-                android:text="LİSANSI ETKİNLEŞTİR"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="11sp"
-                android:background="@drawable/license_action_bg"
-                android:stateListAnimator="@null" />
-
-            <TextView
-                android:id="@+id/licenseMessage"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Lisans kodu bu cihaz kimliğine özel, çevrimdışı ve dijital imzalı olarak doğrulanır."
-                android:textColor="#8FB7C5"
-                android:textSize="10sp"
-                android:lineSpacingExtra="2dp" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:gravity="center"
-            android:text="MusaCAD • Güvenli cihaz tabanlı lisans doğrulama"
-            android:textColor="#7A9AAA"
-            android:textSize="9sp" />
-    </LinearLayout>
-</ScrollView>
+            android:textSize="16sp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:background="#D9082036"
+            android:hint="Lisans Kodunu Girin"
+            android:textColorHint="#8EA8BD" />
+        <TextView android:id="@+id/licenseStatus" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/licenseMessage" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/installationId" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <CheckBox android:id="@+id/termsCheck" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <Button android:id="@+id/trialButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <Button android:id="@+id/termsButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <Button android:id="@+id/copyInstallationIdButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <Button android:id="@+id/activateButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>
