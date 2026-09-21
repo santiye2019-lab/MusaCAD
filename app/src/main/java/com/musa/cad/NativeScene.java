@@ -10,7 +10,8 @@ public final class NativeScene {
     private static final RectF UNIT_OVAL=new RectF(-1f,-1f,1f,1f);
     private final float[] raw;
     private final int[] offsets;
-    private final RectF[] bounds;
+    /** Packed primitive bounds: left, top, right, bottom. Avoids one RectF object per entity. */
+    private final float[] bounds;
     private final Matrix worldToContent;
     private final RectF worldBounds;
     private final Grid grid;
@@ -31,9 +32,14 @@ public final class NativeScene {
         if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
         boolean truncated=version>=2&&values.length>=7&&values[6]!=0f;
         int p=version>=2?7:6;
-        ArrayList<Integer> os=new ArrayList<>();ArrayList<RectF> bs=new ArrayList<>();
+        int maxPossible=Math.max(1,(values.length-p)/4);
+        int initial=expected>0?Math.min(expected,maxPossible):Math.min(1024,maxPossible);
+        int[] os=new int[Math.max(1,initial)];
+        float[] bs=new float[Math.max(4,os.length*4)];
+        int count=0;
+        RectF b=new RectF();
         while(p<values.length){
-            int start=p,type=Math.round(values[p++]);RectF b=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+            int start=p,type=Math.round(values[p++]);b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
             if(type==1){
                 if(p+5>values.length)break;p++;float x1=values[p++],y1=values[p++],x2=values[p++],y2=values[p++];add(b,x1,y1);add(b,x2,y2);
             }else if(type==2){
@@ -44,16 +50,23 @@ public final class NativeScene {
                 if(p+9>values.length)break;p++;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
                 float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
             }else break;
-            if(valid(b)){os.add(start);bs.add(b);}
+            if(valid(b)){
+                if(count==os.length){
+                    int next=Math.min(maxPossible,Math.max(count+1,os.length+(os.length>>1)+1));
+                    os=Arrays.copyOf(os,next);bs=Arrays.copyOf(bs,next*4);
+                }
+                os[count]=start;int k=count*4;bs[k]=b.left;bs[k+1]=b.top;bs[k+2]=b.right;bs[k+3]=b.bottom;count++;
+            }
         }
-        if(os.isEmpty())throw new IOException("Native sahnede görüntülenebilir geometri yok");
-        int[] offsets=new int[os.size()];RectF[] bounds=new RectF[os.size()];for(int i=0;i<offsets.length;i++){offsets[i]=os.get(i);bounds[i]=bs.get(i);}
+        if(count==0)throw new IOException("Native sahnede görüntülenebilir geometri yok");
+        if(count!=os.length){os=Arrays.copyOf(os,count);bs=Arrays.copyOf(bs,count*4);}
+        int[] offsets=os;float[] bounds=bs;
         Matrix view=new Matrix();float scale=Math.min((SIZE-2f*MARGIN)/wb.width(),(SIZE-2f*MARGIN)/wb.height());
         view.postTranslate(-wb.left,-wb.bottom);view.postScale(scale,-scale);view.postTranslate(MARGIN+(SIZE-2*MARGIN-wb.width()*scale)/2f,MARGIN+(SIZE-2*MARGIN-wb.height()*scale)/2f);
         return new NativeScene(values,offsets,bounds,view,wb,truncated||expected>offsets.length);
     }
 
-    private NativeScene(float[] raw,int[] offsets,RectF[] bounds,Matrix view,RectF worldBounds,boolean truncated){
+    private NativeScene(float[] raw,int[] offsets,float[] bounds,Matrix view,RectF worldBounds,boolean truncated){
         this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;grid=new Grid(bounds,worldBounds);
     }
 
@@ -65,7 +78,8 @@ public final class NativeScene {
         Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);
         Matrix combined=new Matrix();combined.setConcat(fit,worldToContent);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);
         float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
-        for(int i=0;i<offsets.length;i++)drawPrimitive(i,canvas,paint,combined,line,point,path,local,target);
+        int stride=Math.max(1,(offsets.length+59999)/60000);
+        for(int i=0;i<offsets.length;i+=stride)drawPrimitive(i,canvas,paint,combined,line,point,path,local,target);
         return out;
     }
 
@@ -80,10 +94,15 @@ public final class NativeScene {
     public void draw(Canvas canvas,Matrix contentToScreen){
         if(canvas==null||contentToScreen==null)return;
         combinedMatrix.setConcat(contentToScreen,worldToContent);
-        Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;
-        if(combinedMatrix.invert(inverseMatrix)){inverseMatrix.mapRect(visibleRect);float pad=Math.max(worldBounds.width(),worldBounds.height())*.001f;visibleRect.inset(-pad,-pad);visible=visibleRect;}
+        Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;float worldPerPixel=0f;
+        if(combinedMatrix.invert(inverseMatrix)){
+            inverseMatrix.mapRect(visibleRect);
+            if(clip.width()>0&&clip.height()>0)worldPerPixel=Math.max(visibleRect.width()/clip.width(),visibleRect.height()/clip.height());
+            float pad=worldPerPixel>0f?worldPerPixel*12f:0f;visibleRect.inset(-pad,-pad);visible=visibleRect;
+        }
         drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
-        grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix);
+        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.18f:0f;
+        grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
     }
 
     private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
@@ -103,23 +122,34 @@ public final class NativeScene {
 
     private final class Grid {
         final int cells;final RectF area;final float cw,ch,epsilon;final IntList[] buckets;final IntList overflow=new IntList();final int[] seen;int query=1;
-        Grid(RectF[] bounds,RectF area){
-            this.area=new RectF(area);cells=bounds.length>60000?64:bounds.length>10000?48:32;cw=Math.max(1e-9f,area.width()/cells);ch=Math.max(1e-9f,area.height()/cells);epsilon=Math.max(1e-7f,Math.max(area.width(),area.height())*1e-7f);buckets=new IntList[cells*cells];seen=new int[bounds.length];
-            for(int i=0;i<bounds.length;i++){RectF b=bounds[i];int x0=x(b.left),x1=x(b.right),y0=y(b.top),y1=y(b.bottom);int span=(x1-x0+1)*(y1-y0+1);if(span>64){overflow.add(i);continue;}for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++){int at=yy*cells+xx;if(buckets[at]==null)buckets[at]=new IntList();buckets[at].add(i);}}
+        Grid(float[] packedBounds,RectF area){
+            this.area=new RectF(area);int count=packedBounds.length/4;cells=count>60000?64:count>10000?48:32;cw=Math.max(1e-9f,area.width()/cells);ch=Math.max(1e-9f,area.height()/cells);epsilon=Math.max(1e-7f,Math.max(area.width(),area.height())*1e-7f);buckets=new IntList[cells*cells];seen=new int[count];
+            for(int i=0;i<count;i++){
+                int k=i*4;float left=packedBounds[k],top=packedBounds[k+1],right=packedBounds[k+2],bottom=packedBounds[k+3];
+                int x0=x(left),x1=x(right),y0=y(top),y1=y(bottom);int span=(x1-x0+1)*(y1-y0+1);if(span>64){overflow.add(i);continue;}
+                for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++){int at=yy*cells+xx;if(buckets[at]==null)buckets[at]=new IntList();buckets[at].add(i);}
+            }
         }
-        void draw(Canvas c,Paint p,Matrix m,RectF visible,float[]line,float[]point,Path path,Matrix local,Matrix target){
+        void draw(Canvas c,Paint p,Matrix m,RectF visible,float[]line,float[]point,Path path,Matrix local,Matrix target,float minWorldSpan){
             int mark=nextMark();
-            if(visible==null){for(int i=0;i<offsets.length;i++)drawOne(i,c,p,m,line,point,path,local,target,mark,null);return;}
-            drawList(overflow,c,p,m,line,point,path,local,target,mark,visible);if(!overlaps(area,visible,epsilon))return;int x0=x(visible.left),x1=x(visible.right),y0=y(visible.top),y1=y(visible.bottom);for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++)drawList(buckets[yy*cells+xx],c,p,m,line,point,path,local,target,mark,visible);
+            if(visible==null){for(int i=0;i<offsets.length;i++)drawOne(i,c,p,m,line,point,path,local,target,mark,null,minWorldSpan);return;}
+            drawList(overflow,c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);if(!overlaps(area,visible,epsilon))return;int x0=x(visible.left),x1=x(visible.right),y0=y(visible.top),y1=y(visible.bottom);for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++)drawList(buckets[yy*cells+xx],c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);
         }
-        void drawList(IntList list,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible){if(list==null)return;for(int i=0;i<list.size;i++)drawOne(list.data[i],c,p,m,line,point,path,local,target,mark,visible);}
-        void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible){if(seen[index]==mark)return;seen[index]=mark;if(visible!=null&&!overlaps(bounds[index],visible,epsilon))return;drawPrimitive(index,c,p,m,line,point,path,local,target);}
+        void drawList(IntList list,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){if(list==null)return;for(int i=0;i<list.size;i++)drawOne(list.data[i],c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);}
+        void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){
+            if(seen[index]==mark)return;seen[index]=mark;
+            if(visible!=null&&!overlaps(bounds,index,visible,epsilon))return;
+            if(minWorldSpan>0f&&tooSmall(bounds,index,minWorldSpan))return;
+            drawPrimitive(index,c,p,m,line,point,path,local,target);
+        }
         int nextMark(){if(query==Integer.MAX_VALUE){Arrays.fill(seen,0);query=1;}return ++query;}
         int x(float v){return Math.max(0,Math.min(cells-1,(int)((v-area.left)/cw)));}int y(float v){return Math.max(0,Math.min(cells-1,(int)((v-area.top)/ch)));}
     }
     private static final class IntList{int[]data=new int[8];int size;void add(int v){if(size==data.length)data=Arrays.copyOf(data,data.length*2);data[size++]=v;}}
 
     private static boolean overlaps(RectF a,RectF b,float e){return a.right+e>=b.left&&b.right+e>=a.left&&a.bottom+e>=b.top&&b.bottom+e>=a.top;}
+    private static boolean overlaps(float[] packed,int index,RectF b,float e){int k=index*4;return packed[k+2]+e>=b.left&&b.right+e>=packed[k]&&packed[k+3]+e>=b.top&&b.bottom+e>=packed[k+1];}
+    private static boolean tooSmall(float[] packed,int index,float minSpan){int k=index*4;return packed[k+2]-packed[k]<minSpan&&packed[k+3]-packed[k+1]<minSpan;}
     private static boolean finite(float v){return Float.isFinite(v);}private static boolean valid(RectF b){return finite(b.left)&&finite(b.top)&&finite(b.right)&&finite(b.bottom)&&b.right>=b.left&&b.bottom>=b.top;}
     private static void add(RectF b,float x,float y){if(!finite(x)||!finite(y))return;b.left=Math.min(b.left,x);b.top=Math.min(b.top,y);b.right=Math.max(b.right,x);b.bottom=Math.max(b.bottom,y);}
 }
