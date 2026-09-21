@@ -65,6 +65,7 @@ public class CadView extends View {
     private final Matrix inverse=new Matrix();
     private Bitmap drawing;
     private DxfParser.Result vectorDrawing;
+    private NativeScene nativeDrawing;
     private Mode mode=Mode.PAN;
     private Listener listener;
     private float lastX,lastY,scale=1f,fitScale=1f;
@@ -109,7 +110,7 @@ public class CadView extends View {
         });
     }
 
-    private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
+    private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
     private boolean shouldUsePreviewForNavigation(){float base=Math.max(1e-6f,fitScale);return canUseFastVectorPreview()&&scale/base<=2.5f;}
     private float clampNavigationScale(float candidate){float base=Math.max(1e-6f,fitScale);float min=Math.max(1e-6f,base*MIN_RELATIVE_ZOOM);float max=Math.min(1_000_000f,Math.max(base,base*MAX_RELATIVE_ZOOM));return Math.max(min,Math.min(max,candidate));}
@@ -119,8 +120,8 @@ public class CadView extends View {
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
     private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
-    private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
-    private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
+    private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():nativeDrawing!=null?nativeDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
+    private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():nativeDrawing!=null?nativeDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
     public SessionState captureSessionState(){return new SessionState(this);}
 
@@ -128,6 +129,7 @@ public class CadView extends View {
     public void restoreSessionState(DxfParser.Result vector,Bitmap bitmap,SessionState state){
         stopFastNavigation();
         vectorDrawing=vector;
+        nativeDrawing=null;
         drawing=vector==null?bitmap:null;
         selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;multiTouch=false;
         pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;pendingBlockName="";
@@ -206,14 +208,34 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        vectorDrawing=null;drawing=b;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        vectorDrawing=null;nativeDrawing=null;drawing=b;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
+    }
+
+    /** Fast first-paint path. Editing remains disabled until upgradeNativeDrawing installs the full vector model. */
+    public void setNativeDrawing(NativeScene result){
+        if(result==null)throw new IllegalArgumentException("Native çizim yok");
+        stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        drawing=null;vectorDrawing=null;nativeDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        imageMatrix.reset();fit();invalidate();notifyValue();
+    }
+
+    /** Swaps the fast native preview for the complete editable model without changing the current zoom/pan. */
+    public void upgradeNativeDrawing(DxfParser.Result result){
+        if(result==null)throw new IllegalArgumentException("Çizim yok");
+        stopFastNavigation();drawing=null;nativeDrawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();invalidate();notifyValue();
+    }
+
+    public void restoreNativeSessionState(NativeScene result,SessionState state){
+        if(result==null)throw new IllegalArgumentException("Native çizim yok");
+        setNativeDrawing(result);
+        if(state!=null){imageMatrix.set(state.imageMatrix);scale=state.scale;fitScale=computeFitScale();invalidate();}
     }
 
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        drawing=null;nativeDrawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -478,7 +500,7 @@ public class CadView extends View {
         if(vectorDrawing!=null){
             if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-        }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));

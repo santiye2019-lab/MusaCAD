@@ -6,14 +6,8 @@
 #include "dwg.h"
 #include "bits.h"
 #include "out_dxf.h"
+#include "native_scene.h"
 
-/*
- * MusaCAD native engine session.
- *
- * Phase 1 keeps a parsed Dwg_Data object behind an opaque handle.  The stable
- * application path still exports DXF, but the same session API is the base for
- * direct viewport/entity queries in later phases without changing Java tools.
- */
 typedef struct {
     Dwg_Data *dwg;
     int read_status;
@@ -96,7 +90,6 @@ static MusaCadStats session_stats(MusaCadSession *session) {
     return stats;
 }
 
-/* Kept common to host smoke tests and the legacy Android bridge. */
 static int convert_dwg(const char *input,const char *output) {
     int read_error=0;
     MusaCadSession *session=session_open(input,&read_error);
@@ -109,7 +102,16 @@ static int convert_dwg(const char *input,const char *output) {
 #ifdef MUSA_HOST
 int main(int argc,char **argv){
     if(argc!=3)return 2;
-    int result=convert_dwg(argv[1],argv[2]);
+    int read_error=0;
+    MusaCadSession *session=session_open(argv[1],&read_error);
+    if(!session){fprintf(stderr,"MusaCAD native open failed: %d\n",read_error);return 1;}
+    MusaNativeScene scene={0};
+    int scene_status=musa_scene_build(session->dwg,&scene);
+    fprintf(stderr,"MusaCAD native scene: status=%d primitives=%d floats=%zu\n",scene_status,scene.primitives,scene.count);
+    if(scene_status<0||scene.primitives<=0){musa_scene_free(&scene);session_close(session);return 1;}
+    musa_scene_free(&scene);
+    int result=session_export_dxf(session,argv[2]);
+    session_close(session);
     fprintf(stderr,"MusaCAD converter status: %d\n",result);
     return result<0?1:0;
 }
@@ -185,6 +187,21 @@ JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_statsNative(JNIEn
     };
     jlongArray out=(*env)->NewLongArray(env,12);
     if(out)(*env)->SetLongArrayRegion(env,out,0,12,values);
+    return out;
+}
+
+JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNative(JNIEnv *env,jclass cls,jlong handle){
+    (void)cls;
+    MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
+    if(!session)return NULL;
+    MusaNativeScene scene={0};
+    pthread_mutex_lock(&engine_lock);
+    int status=musa_scene_build(session->dwg,&scene);
+    pthread_mutex_unlock(&engine_lock);
+    if(status<0||scene.count==0||scene.count>(size_t)2147483647){musa_scene_free(&scene);return NULL;}
+    jfloatArray out=(*env)->NewFloatArray(env,(jsize)scene.count);
+    if(out)(*env)->SetFloatArrayRegion(env,out,0,(jsize)scene.count,(const jfloat*)scene.values);
+    musa_scene_free(&scene);
     return out;
 }
 
