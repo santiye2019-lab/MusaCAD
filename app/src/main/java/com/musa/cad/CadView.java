@@ -84,7 +84,8 @@ public class CadView extends View {
     private float dimTextHeightContent=24f,dimArrowSizeContent=14f;
     private int dimPrecision=2;
 
-    private boolean selecting,draggingSelection,exporting;
+    private boolean selecting,draggingSelection,exporting,fastNavigation;
+    private final Runnable endFastNavigation=()->{fastNavigation=false;invalidate();};
     private float selectionX,selectionY,selectionEndX,selectionEndY;
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
@@ -97,6 +98,7 @@ public class CadView extends View {
         super(c,a);setBackgroundColor(Color.rgb(18,24,30));setFocusable(true);
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             public boolean onScale(ScaleGestureDetector d){
+                beginFastNavigation();
                 float next=Math.max(.001f,Math.min(200f,scale*d.getScaleFactor()));float f=next/scale;scale=next;
                 imageMatrix.postScale(f,f,d.getFocusX(),d.getFocusY());invalidate();return true;
             }
@@ -107,6 +109,12 @@ public class CadView extends View {
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
+    private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
+    private void beginFastNavigation(){
+        if(!canUseFastVectorPreview())return;
+        fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,140L);
+    }
+    private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
     private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
@@ -115,6 +123,7 @@ public class CadView extends View {
 
     /** Restores a drawing tab without reparsing the DWG/DXF or discarding its edits. */
     public void restoreSessionState(DxfParser.Result vector,Bitmap bitmap,SessionState state){
+        stopFastNavigation();
         vectorDrawing=vector;
         drawing=vector==null?bitmap:null;
         selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;multiTouch=false;
@@ -176,7 +185,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
+        stopFastNavigation();vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
@@ -193,21 +202,21 @@ public class CadView extends View {
     }
 
     public void setDrawing(Bitmap b){
-        snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         vectorDrawing=null;drawing=b;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
-        snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         drawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
     public void zoomBy(float factor){
-        if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;float next=Math.max(.001f,Math.min(200f,scale*factor));float applied=next/scale;scale=next;
+        if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;beginFastNavigation();float next=Math.max(.001f,Math.min(200f,scale*factor));float applied=next/scale;scale=next;
         imageMatrix.postScale(applied,applied,getWidth()/2f,getHeight()/2f);invalidate();notifyValue();
     }
 
@@ -462,8 +471,10 @@ public class CadView extends View {
 
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        if(vectorDrawing!=null)vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-        else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        if(vectorDrawing!=null){
+            if(fastNavigation&&canUseFastVectorPreview())c.drawBitmap(vectorDrawing.bitmap,imageMatrix,paint);
+            else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+        }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
@@ -571,7 +582,7 @@ public class CadView extends View {
 
         if(mode==Mode.PAN)gestureDetector.onTouchEvent(e);if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
-        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;}
+        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){beginFastNavigation();float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();invalidate();return true;}
         if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
     }
 
@@ -784,10 +795,10 @@ public class CadView extends View {
 
     private boolean fingerNavigationTouch(MotionEvent e){
         if(stylusDown)return true;if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
-        if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}if(e.getActionMasked()==MotionEvent.ACTION_MOVE){imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}return true;
+        if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}if(e.getActionMasked()==MotionEvent.ACTION_MOVE){beginFastNavigation();imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}return true;
     }
 
-    private boolean directPanTouch(MotionEvent e){int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;lastX=e.getX();lastY=e.getY();return true;}if(action==MotionEvent.ACTION_MOVE){imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){stylusDown=false;return true;}return true;}
+    private boolean directPanTouch(MotionEvent e){int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;lastX=e.getX();lastY=e.getY();return true;}if(action==MotionEvent.ACTION_MOVE){beginFastNavigation();imageMatrix.postTranslate(e.getX()-lastX,e.getY()-lastY);lastX=e.getX();lastY=e.getY();invalidate();return true;}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){stylusDown=false;return true;}return true;}
 
     private boolean stylusFreehandTouch(MotionEvent e){
         int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN){stylusDown=true;freehandPoints.clear();freehandPressureSum=0f;freehandPressureSamples=0;addFreehandSample(e.getX(),e.getY(),e.getPressure());invalidate();return true;}
