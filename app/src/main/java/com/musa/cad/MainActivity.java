@@ -1081,7 +1081,7 @@ public class MainActivity extends AppCompatActivity {
                     try{
                         int status=engine.exportDxf(converted);FileTransfer.checkCancelled();
                         if(converted.length()>512L*1024*1024)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
-                        DxfParser.Result parsed=DxfParser.render(converted);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
+                        DxfParser.Result parsed=DxfParser.render(converted,loaded.nativeScene==null);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
                         loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
                     }finally{if(!keep)converted.delete();}
                 }
