@@ -1013,7 +1013,7 @@ public class MainActivity extends AppCompatActivity {
     }
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
-        if(r==SAVE_DXF&&c!=RESULT_OK){pendingOpenBrowserAfterSave=false;pendingCloseAfterSave=null;return;}
+        if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
         if(c!=RESULT_OK||data==null||data.getData()==null)return;
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
