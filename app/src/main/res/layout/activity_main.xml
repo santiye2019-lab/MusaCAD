@@ -7,6 +7,7 @@
 
     <!-- Reference header: compact, single-line MusaCAD brand -->
     <LinearLayout
+        android:id="@+id/editorTopHeader"
         android:layout_width="match_parent"
         android:layout_height="54dp"
         android:gravity="center_vertical"
@@ -103,6 +104,7 @@
 
     <!-- File name / edit state -->
     <LinearLayout
+        android:id="@+id/fileModeBar"
         android:layout_width="match_parent"
         android:layout_height="38dp"
         android:gravity="center_vertical"
@@ -143,6 +145,7 @@
 
     <!-- Reference top quick tools -->
     <LinearLayout
+        android:id="@+id/quickToolsBar"
         android:layout_width="match_parent"
         android:layout_height="62dp"
         android:orientation="horizontal"
@@ -259,6 +262,7 @@
 
     <!-- CAD canvas: maximized between tool areas -->
     <FrameLayout
+        android:id="@+id/editorCanvasFrame"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -322,8 +326,44 @@
             </LinearLayout>
         </ScrollView>
 
+        <!-- Reserved host for the reference-style expandable category panel.
+             Checkpoint-01 defines the shell only; category contents are wired in later checkpoints. -->
+        <LinearLayout
+            android:id="@+id/toolPanelHost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="58dp"
+            android:layout_marginBottom="8dp"
+            android:orientation="vertical"
+            android:padding="10dp"
+            android:visibility="gone"
+            android:background="@drawable/main_panel_bg"
+            android:elevation="10dp">
+
+            <TextView
+                android:id="@+id/toolPanelTitle"
+                android:layout_width="match_parent"
+                android:layout_height="32dp"
+                android:gravity="center_vertical"
+                android:text="Araçlar"
+                android:textColor="#35D7FF"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+
+            <GridLayout
+                android:id="@+id/toolPanelGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="5"
+                android:alignmentMode="alignMargins"
+                android:useDefaultMargins="false" />
+        </LinearLayout>
+
         <!-- Right-side reference toolbar -->
         <LinearLayout
+            android:id="@+id/rightToolRail"
             android:layout_width="48dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
@@ -410,44 +450,109 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Grouped CAD toolbar. Each tile has icon above and group/function name below.
-         Tapping a group opens its individual functions upward from the bottom. -->
-    <LinearLayout
+    <!-- Reference-style bottom category navigation.
+         Existing command engine remains intact; category wiring is added checkpoint by checkpoint. -->
+    <HorizontalScrollView
+        android:id="@+id/categoryScroll"
         android:layout_width="match_parent"
-        android:layout_height="68dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:weightSum="8"
-        android:paddingStart="2dp"
-        android:paddingEnd="2dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:layout_height="70dp"
+        android:fillViewport="false"
+        android:scrollbars="none"
+        android:overScrollMode="never"
         android:background="#081B2A">
 
-        <Button android:id="@+id/selectEntityButton" style="@style/GroupBarBlue"
-            android:text="Seç" android:drawableTop="@drawable/ic_select" android:enabled="false" />
+        <LinearLayout
+            android:id="@+id/bottomCategoryBar"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
-        <Button android:id="@+id/groupLineToolsButton" style="@style/GroupBarBlue"
-            android:text="Çizgi" android:drawableTop="@drawable/ic_line" />
+            <Button
+                android:id="@+id/groupAnnotateToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="68dp"
+                android:layout_height="64dp"
+                android:text="Ek açıklama"
+                android:drawableTop="@drawable/ic_text" />
 
-        <Button android:id="@+id/groupShapeToolsButton" style="@style/GroupBarBlue"
-            android:text="Şekiller" android:drawableTop="@drawable/ic_circle" />
+            <Button
+                android:id="@+id/groupLineToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="62dp"
+                android:layout_height="64dp"
+                android:text="Çiz"
+                android:drawableTop="@drawable/ic_line" />
 
-        <Button android:id="@+id/groupEditToolsButton" style="@style/GroupBarGreen"
-            android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
+            <Button
+                android:id="@+id/groupEditToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="66dp"
+                android:layout_height="64dp"
+                android:text="Düzenle"
+                android:drawableTop="@drawable/ic_move" />
 
-        <Button android:id="@+id/groupMeasureToolsButton" style="@style/GroupBarPurple"
-            android:text="Ölçme" android:drawableTop="@drawable/ic_distance" />
+            <Button
+                android:id="@+id/groupLayerToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:text="Katman"
+                android:drawableTop="@drawable/ic_layers" />
 
-        <Button android:id="@+id/groupViewToolsButton" style="@style/GroupBarBlue"
-            android:text="Görünüm" android:drawableTop="@drawable/ic_fit" />
+            <Button
+                android:id="@+id/groupMeasureToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:text="Ölçüm"
+                android:drawableTop="@drawable/ic_distance" />
 
-        <Button android:id="@+id/groupAnnotateToolsButton" style="@style/GroupBarPurple"
-            android:text="Notasyon" android:drawableTop="@drawable/ic_text" />
+            <Button
+                android:id="@+id/groupDimensionToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:text="Boyut"
+                android:drawableTop="@drawable/ic_scale" />
 
-        <Button android:id="@+id/groupMoreToolsButton" style="@style/GroupBarOrange"
-            android:text="Diğer" android:drawableTop="@drawable/ic_more" />
-    </LinearLayout>
+            <Button
+                android:id="@+id/groupColorToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="62dp"
+                android:layout_height="64dp"
+                android:text="Renk"
+                android:drawableTop="@drawable/ic_color" />
+
+            <Button
+                android:id="@+id/groupMoreToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="62dp"
+                android:layout_height="64dp"
+                android:text="Alet"
+                android:drawableTop="@drawable/ic_more" />
+
+            <Button
+                android:id="@+id/groupLayoutToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:text="Düzen"
+                android:drawableTop="@drawable/ic_rectangle" />
+
+            <Button
+                android:id="@+id/groupViewToolsButton"
+                style="@style/ToolButtonBlue"
+                android:layout_width="72dp"
+                android:layout_height="64dp"
+                android:text="Görsel stil"
+                android:drawableTop="@drawable/ic_fit" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <!-- File tab / finish / save / share / open -->
     <LinearLayout
@@ -571,6 +676,9 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone">
+        <!-- Legacy capability anchors kept so MainActivity bindings stay stable during the staged redesign. -->
+        <Button android:id="@+id/selectEntityButton" android:layout_width="1dp" android:layout_height="1dp" />
+        <Button android:id="@+id/groupShapeToolsButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/lineButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/polylineButton" android:layout_width="1dp" android:layout_height="1dp" />
         <Button android:id="@+id/rectangleButton" android:layout_width="1dp" android:layout_height="1dp" />
