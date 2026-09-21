@@ -1078,6 +1078,10 @@ public class MainActivity extends AppCompatActivity {
                         try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
                         if(!accepted.get())throw new InterruptedIOException("Dosya açma iptal edildi");
                         loaded.handedOff=true;
+                        Bitmap quickRecent=loaded.bitmap;boolean recycleQuick=false;
+                        if(loaded.nativeScene!=null){try{quickRecent=loaded.nativeScene.thumbnail(360,240);recycleQuick=true;}catch(Exception ignored){}}
+                        RecentFileStore.record(getApplicationContext(),uri,loaded.name,quickRecent);
+                        if(recycleQuick&&quickRecent!=null&&!quickRecent.isRecycled())quickRecent.recycle();
                     }
 
                     FileTransfer.checkCancelled();
@@ -1306,7 +1310,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void printDrawing(){
         if(currentFile==null||!currentFile.exists()){Toast.makeText(this,"Yazdırmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;}Bitmap preview=null;
-        try{if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)throw new IOException("DWG önizlemesi yazdırma için hazırlanamadı");}CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),cad.getUserBlocks(),preview,currentDisplayName);}catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
+        try{if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)preview=cad.snapshot();}CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),cad.getUserBlocks(),preview,currentDisplayName);}catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
     }
 
     private void previewSelection(){

@@ -54,6 +54,12 @@ public final class NativeScene {
 
     public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
 
+    /** Small vector thumbnail without allocating the old full-size raster preview. */
+    public Bitmap thumbnail(int width,int height){
+        int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(Color.rgb(18,24,30));
+        Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);draw(canvas,fit);return out;
+    }
+
     public PointF contentToWorld(float x,float y){
         float[]pt={x,y};Matrix inv=new Matrix();if(!worldToContent.invert(inv))return new PointF(x,y);inv.mapPoints(pt);return new PointF(pt[0],pt[1]);
     }
