@@ -116,6 +116,18 @@ static void emit_ellipse_curve(MusaNativeScene *s,int aci,Affine2 m,Dwg_Entity_E
     double sweep=e->end_angle-e->start_angle;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
     emit_curve(s,aci,m,e->center.x,e->center.y,ux,uy,vx,vy,e->start_angle,sweep);
 }
+static void emit_lw_segment(MusaNativeScene *s,int aci,Affine2 parent,Dwg_Entity_LWPOLYLINE *e,dwg_point_2d a,dwg_point_2d b,double bulge){
+    double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
+    if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
+        BITCODE_2DPOINT ia={a.x,a.y},ib={b.x,b.y},pa,pb;transform_OCS_2d(&pa,ia,e->extrusion);transform_OCS_2d(&pb,ib,e->extrusion);emit_line(s,aci,parent,pa.x,pa.y,pb.x,pb.y);return;
+    }
+    double theta=4.0*atan(bulge),h=chord*(1.0-bulge*bulge)/(4.0*bulge);
+    double nx=-dy/chord,ny=dx/chord,cx=(a.x+b.x)*0.5+nx*h,cy=(a.y+b.y)*0.5+ny*h;
+    double radius=chord*(1.0+bulge*bulge)/(4.0*fabs(bulge)),start=atan2(a.y-cy,a.x-cx);
+    BITCODE_2DPOINT ic={cx,cy},ix={cx+radius,cy},iy={cx,cy+radius},pc,px,py;
+    transform_OCS_2d(&pc,ic,e->extrusion);transform_OCS_2d(&px,ix,e->extrusion);transform_OCS_2d(&py,iy,e->extrusion);
+    emit_curve(s,aci,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
+}
 
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth);
 
@@ -169,8 +181,14 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         }
         case DWG_TYPE_LWPOLYLINE:{
             Dwg_Entity_LWPOLYLINE *e=obj->tio.entity->tio.LWPOLYLINE;if(!e)break;int error=0;BITCODE_RL n=dwg_ent_lwpline_get_numpoints(e,&error);if(error||n<2)break;
-            dwg_point_2d *pts=dwg_ent_lwpline_get_points(e,&error);if(error||!pts)break;int closed=(e->flag&512)||(e->flag&1);
-            if(begin_poly(s,aci,closed,(int)n)){for(BITCODE_RL i=0;i<n;i++){BITCODE_2DPOINT in={pts[i].x,pts[i].y},p;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);}finish_poly(s);}free(pts);break;
+            dwg_point_2d *pts=dwg_ent_lwpline_get_points(e,&error);if(error||!pts)break;int closed=(e->flag&512)||(e->flag&1),has_bulge=0;
+            if(e->bulges&&e->num_bulges==n)for(BITCODE_RL i=0;i<n;i++)if(isfinite(e->bulges[i])&&fabs(e->bulges[i])>1e-12){has_bulge=1;break;}
+            if(has_bulge){
+                BITCODE_RL segments=closed?n:n-1;for(BITCODE_RL i=0;i<segments&&!s->truncated;i++){BITCODE_RL j=(i+1)%n;emit_lw_segment(s,aci,parent,e,pts[i],pts[j],e->bulges[i]);}
+            }else if(begin_poly(s,aci,closed,(int)n)){
+                for(BITCODE_RL i=0;i<n;i++){BITCODE_2DPOINT in={pts[i].x,pts[i].y},p;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);}finish_poly(s);
+            }
+            free(pts);break;
         }
         case DWG_TYPE_POLYLINE_2D:{
             Dwg_Entity_POLYLINE_2D *e=obj->tio.entity->tio.POLYLINE_2D;if(!e)break;int error=0;BITCODE_RL n=dwg_object_polyline_2d_get_numpoints(obj,&error);if(error||n<2)break;
