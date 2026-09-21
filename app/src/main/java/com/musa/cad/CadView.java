@@ -111,11 +111,12 @@ public class CadView extends View {
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
+    private boolean canUseNativeFastScene(){return nativeDrawing!=null&&sourceEdits.modifiedCount()==0;}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
     private boolean shouldUsePreviewForNavigation(){float base=Math.max(1e-6f,fitScale);return canUseFastVectorPreview()&&scale/base<=2.5f;}
     private float clampNavigationScale(float candidate){float base=Math.max(1e-6f,fitScale);float min=Math.max(1e-6f,base*MIN_RELATIVE_ZOOM);float max=Math.min(1_000_000f,Math.max(base,base*MAX_RELATIVE_ZOOM));return Math.max(min,Math.min(max,candidate));}
     private void beginFastNavigation(){
-        if(nativeDrawing==null&&!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
+        if(!canUseNativeFastScene()&&!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
         fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
@@ -195,7 +196,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        stopFastNavigation();vectorDrawing=result;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
+        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
@@ -517,7 +518,7 @@ public class CadView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         if(vectorDrawing!=null){
-            if(fastNavigation&&nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);
+            if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix);
             else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
         }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
