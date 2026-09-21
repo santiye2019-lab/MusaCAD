@@ -17,7 +17,7 @@ public final class FileTransfer {
         // MainActivity in v0.6 still passes the old 32 MB constant. Upgrade only that legacy value;
         // keep explicit smaller/larger limits intact so callers and tests retain normal semantics.
         long limit=requestedLimit==LEGACY_32_MB?LARGE_DRAWING_LIMIT:requestedLimit;
-        byte[] buffer=new byte[65536];long total=0,nextProgress=0;
+        byte[] buffer=new byte[256*1024];long total=0,nextProgress=0;
         while(true){
             checkCancelled();int count=in.read(buffer);checkCancelled();
             if(count<0)break;if(count==0)continue;

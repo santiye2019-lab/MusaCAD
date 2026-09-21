@@ -7,6 +7,7 @@ import android.view.*;
 import java.util.*;
 
 public class CadView extends View {
+    private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
     public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
@@ -66,7 +67,7 @@ public class CadView extends View {
     private DxfParser.Result vectorDrawing;
     private Mode mode=Mode.PAN;
     private Listener listener;
-    private float lastX,lastY,scale=1f;
+    private float lastX,lastY,scale=1f,fitScale=1f;
     private double unitsPerImagePixel=1d;
     private String unitName="piksel";
     private boolean multiTouch;
@@ -99,7 +100,7 @@ public class CadView extends View {
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             public boolean onScale(ScaleGestureDetector d){
                 beginFastNavigation();
-                float next=Math.max(.001f,Math.min(200f,scale*d.getScaleFactor()));float f=next/scale;scale=next;
+                float next=clampNavigationScale(scale*d.getScaleFactor());float f=next/scale;scale=next;
                 imageMatrix.postScale(f,f,d.getFocusX(),d.getFocusY());invalidate();return true;
             }
         });
@@ -110,9 +111,11 @@ public class CadView extends View {
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null;}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
+    private boolean shouldUsePreviewForNavigation(){float base=Math.max(1e-6f,fitScale);return canUseFastVectorPreview()&&scale/base<=2.5f;}
+    private float clampNavigationScale(float candidate){float base=Math.max(1e-6f,fitScale);float min=Math.max(1e-6f,base*MIN_RELATIVE_ZOOM);float max=Math.min(1_000_000f,Math.max(base,base*MAX_RELATIVE_ZOOM));return Math.max(min,Math.min(max,candidate));}
     private void beginFastNavigation(){
-        if(!canUseFastVectorPreview())return;
-        fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,140L);
+        if(!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
+        fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
     private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
@@ -146,7 +149,7 @@ public class CadView extends View {
         sourceEdits.copyFrom(state.sourceEdits);
         unitsPerImagePixel=state.unitsPerImagePixel;unitName=state.unitName;
         snapEnabled=state.snapEnabled;snapPoints=state.snapPoints.clone();
-        scale=state.scale;dimTextHeightContent=state.dimTextHeightContent;dimArrowSizeContent=state.dimArrowSizeContent;dimPrecision=state.dimPrecision;
+        fitScale=computeFitScale();scale=state.scale;dimTextHeightContent=state.dimTextHeightContent;dimArrowSizeContent=state.dimArrowSizeContent;dimPrecision=state.dimPrecision;
         imageMatrix.set(state.imageMatrix);
         invalidate();notifyValue();
     }
@@ -216,7 +219,7 @@ public class CadView extends View {
 
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
     public void zoomBy(float factor){
-        if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;beginFastNavigation();float next=Math.max(.001f,Math.min(200f,scale*factor));float applied=next/scale;scale=next;
+        if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;beginFastNavigation();float next=clampNavigationScale(scale*factor);float applied=next/scale;scale=next;
         imageMatrix.postScale(applied,applied,getWidth()/2f,getHeight()/2f);invalidate();notifyValue();
     }
 
@@ -462,9 +465,10 @@ public class CadView extends View {
         unitsPerImagePixel=realDistance/px;unitName=unit;lastSnapped=false;points.clear();mode=Mode.DISTANCE;notifyValue();invalidate();
     }
 
+    private float computeFitScale(){int width=contentWidth(),height=contentHeight();if(width<=0||height<=0||getWidth()==0||getHeight()==0)return Math.max(1e-6f,fitScale);return Math.max(1e-6f,Math.min((float)getWidth()/width,(float)getHeight()/height));}
     private void fit(){
         int width=contentWidth(),height=contentHeight();if(width<=0||height<=0||getWidth()==0||getHeight()==0)return;
-        float s=Math.min((float)getWidth()/width,(float)getHeight()/height);imageMatrix.reset();imageMatrix.postScale(s,s);imageMatrix.postTranslate((getWidth()-width*s)/2f,(getHeight()-height*s)/2f);scale=s;
+        float s=computeFitScale();fitScale=s;imageMatrix.reset();imageMatrix.postScale(s,s);imageMatrix.postTranslate((getWidth()-width*s)/2f,(getHeight()-height*s)/2f);scale=s;
     }
 
     @Override protected void onSizeChanged(int w,int h,int ow,int oh){if(selecting)cancelSelection();if(ow==0)fit();}
@@ -472,7 +476,7 @@ public class CadView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         if(vectorDrawing!=null){
-            if(fastNavigation&&canUseFastVectorPreview())c.drawBitmap(vectorDrawing.bitmap,imageMatrix,paint);
+            if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
         }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);

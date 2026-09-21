@@ -589,8 +589,8 @@ public class MainActivity extends AppCompatActivity {
         TextView heading=new TextView(this);heading.setText(title);heading.setTextColor(Color.WHITE);heading.setTextSize(16);heading.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);heading.setPadding(dp(4),dp(2),dp(4),dp(10));root.addView(heading,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
         ScrollView scroll=new ScrollView(this);GridLayout grid=new GridLayout(this);grid.setColumnCount(4);grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);grid.setUseDefaultMargins(false);
         for(ToolAction item:tools){
-            Button b=new Button(this);b.setText(item.label);b.setTextColor(0xFFF1F7FA);b.setTextSize(10);b.setAllCaps(false);b.setGravity(Gravity.CENTER);b.setCompoundDrawablesWithIntrinsicBounds(0,item.icon,0,0);b.setCompoundDrawablePadding(dp(4));b.setBackgroundResource(R.drawable.tool_tile_blue);b.setPadding(dp(3),dp(7),dp(3),dp(6));b.setMinWidth(0);b.setMinHeight(0);b.setSingleLine(true);
-            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=dp(70);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(b,lp);
+            Button b=new Button(this);b.setText(item.label);b.setTextColor(0xFFF1F7FA);b.setTextSize(11);b.setAllCaps(false);b.setGravity(Gravity.CENTER);b.setCompoundDrawablesWithIntrinsicBounds(0,item.icon,0,0);b.setCompoundDrawablePadding(dp(5));b.setBackgroundResource(R.drawable.tool_tile_blue);b.setPadding(dp(3),dp(7),dp(3),dp(6));b.setMinWidth(0);b.setMinHeight(0);b.setSingleLine(false);b.setMaxLines(2);
+            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=0;lp.height=dp(78);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(b,lp);
             b.setOnClickListener(v->{sheet.dismiss();if(item.action!=null)item.action.run();});
             installInteractiveFeedback(b);
         }
@@ -1037,12 +1037,13 @@ public class MainActivity extends AppCompatActivity {
                 if(loaded.dxf){loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;}
                 else try{NativeDwg.Conversion conversion=NativeDwg.readWithWorkingCopy(loaded.file,getCacheDir());loaded.parsed=conversion.result;loaded.workingDxf=conversion.dxf;}catch(InterruptedIOException cancelled){throw cancelled;}catch(IOException|UnsatisfiedLinkError conversionError){FileTransfer.checkCancelled();loaded.bitmap=DwgPreview.read(loaded.file);if(loaded.bitmap==null)throw new IOException("DWG geometri veya önizleme açılamadı",conversionError);}
                 if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;FileTransfer.checkCancelled();if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
-                RecentFileStore.record(getApplicationContext(),uri,loaded.name,loaded.bitmap);
+                Bitmap recentPreview=loaded.bitmap;
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=loaded.dxf;project.lastAccessMs=System.currentTimeMillis();
                     projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
+                RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});}
         });
     }
