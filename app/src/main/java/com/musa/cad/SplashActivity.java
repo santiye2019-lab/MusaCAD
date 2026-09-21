@@ -22,7 +22,7 @@ public class SplashActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.splashRoot), stage=findViewById(R.id.artworkStage);
         LockedScreenUi.fitStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
-            LockedScreenUi.loadArtwork(this,art,"locked/screen1",R.drawable.splash_scene_reference);
+            art.setImageResource(R.drawable.musacad_screen_1);
             View.OnClickListener enter=v->openApp();
             LockedScreenUi.hotspot(this,stage,102,455,170,160,enter);
             LockedScreenUi.hotspot(this,stage,294,455,170,160,enter);

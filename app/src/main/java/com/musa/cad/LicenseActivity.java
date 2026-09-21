@@ -28,7 +28,7 @@ public class LicenseActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.licenseRoot),stage=findViewById(R.id.artworkStage);
         LockedScreenUi.fitStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
-            LockedScreenUi.loadArtwork(this,art,"locked/screen3",R.drawable.splash_scene_reference);
+            art.setImageResource(R.drawable.musacad_screen_3);
 
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
