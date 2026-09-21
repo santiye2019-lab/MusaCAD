@@ -1,0 +1,2 @@
+MusaCAD APK build trigger.
+This file is used only to request an approved installable APK build from GitHub Actions.
