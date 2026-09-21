@@ -181,7 +181,12 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         }
         case DWG_TYPE_SOLID:{
             Dwg_Entity_SOLID *e=obj->tio.entity->tio.SOLID;if(!e||!begin_poly(s,aci,1,4))break;
-            BITCODE_2DPOINT in,p;in=e->corner1;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);in=e->corner2;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);in=e->corner3;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);in=e->corner4;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);finish_poly(s);break;
+            BITCODE_2DPOINT in,p;
+            in.x=e->corner1.x;in.y=e->corner1.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner2.x;in.y=e->corner2.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner3.x;in.y=e->corner3.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner4.x;in.y=e->corner4.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            finish_poly(s);break;
         }
         case DWG_TYPE__3DFACE:{
             Dwg_Entity__3DFACE *e=obj->tio.entity->tio._3DFACE;if(!e||!begin_poly(s,aci,1,4))break;
@@ -205,6 +210,11 @@ int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
         for(BITCODE_BL i=0;i<dwg->num_objects&&!scene->truncated;i++)emit_object(&dwg->object[i],scene,identity,0);
     }
     if(!scene->has_bounds||scene->primitives<=0){musa_scene_free(scene);return -3;}
+    /* Prefer DWG model extents so the compact native scene and the later
+       complete DXF model use nearly identical normalization. */
+    double ex0=dwg_model_x_min(dwg),ey0=dwg_model_y_min(dwg),ex1=dwg_model_x_max(dwg),ey1=dwg_model_y_max(dwg);
+    if(isfinite(ex0)&&isfinite(ey0)&&isfinite(ex1)&&isfinite(ey1)&&ex1>ex0&&ey1>ey0&&
+       ex1-ex0<1e30&&ey1-ey0<1e30){scene->min_x=ex0;scene->min_y=ey0;scene->max_x=ex1;scene->max_y=ey1;}
     if(scene->max_x-scene->min_x<1e-9){scene->min_x-=.5;scene->max_x+=.5;}
     if(scene->max_y-scene->min_y<1e-9){scene->min_y-=.5;scene->max_y+=.5;}
     scene->values[0]=MUSA_SCENE_VERSION;scene->values[1]=(float)scene->primitives;

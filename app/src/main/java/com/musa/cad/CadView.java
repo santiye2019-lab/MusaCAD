@@ -115,7 +115,7 @@ public class CadView extends View {
     private boolean shouldUsePreviewForNavigation(){float base=Math.max(1e-6f,fitScale);return canUseFastVectorPreview()&&scale/base<=2.5f;}
     private float clampNavigationScale(float candidate){float base=Math.max(1e-6f,fitScale);float min=Math.max(1e-6f,base*MIN_RELATIVE_ZOOM);float max=Math.min(1_000_000f,Math.max(base,base*MAX_RELATIVE_ZOOM));return Math.max(min,Math.min(max,candidate));}
     private void beginFastNavigation(){
-        if(!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
+        if(nativeDrawing==null&&!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
         fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
@@ -127,10 +127,15 @@ public class CadView extends View {
 
     /** Restores a drawing tab without reparsing the DWG/DXF or discarding its edits. */
     public void restoreSessionState(DxfParser.Result vector,Bitmap bitmap,SessionState state){
+        restoreSessionState(vector,null,bitmap,state);
+    }
+
+    /** Restores a project and optionally keeps its native fast-navigation scene. */
+    public void restoreSessionState(DxfParser.Result vector,NativeScene nativeScene,Bitmap bitmap,SessionState state){
         stopFastNavigation();
         vectorDrawing=vector;
-        nativeDrawing=null;
-        drawing=vector==null?bitmap:null;
+        nativeDrawing=nativeScene;
+        drawing=(vector==null&&nativeScene==null)?bitmap:null;
         selecting=false;draggingSelection=false;moveSelectedArmed=false;lastSnapped=false;multiTouch=false;
         pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;pendingBlockName="";
         points.clear();freehandPoints.clear();mode=Mode.PAN;
@@ -223,7 +228,7 @@ public class CadView extends View {
     /** Swaps the fast native preview for the complete editable model without changing the current zoom/pan. */
     public void upgradeNativeDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
-        stopFastNavigation();drawing=null;nativeDrawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();invalidate();notifyValue();
+        stopFastNavigation();drawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();invalidate();notifyValue();
     }
 
     public void restoreNativeSessionState(NativeScene result,SessionState state){
@@ -498,7 +503,8 @@ public class CadView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         if(vectorDrawing!=null){
-            if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
+            if(fastNavigation&&nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);
+            else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
         }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawEdits(c);drawLiveFreehand(c);
