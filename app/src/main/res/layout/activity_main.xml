@@ -224,11 +224,11 @@
             android:enabled="false" />
     </LinearLayout>
 
-    <!-- Command line, keeps full classic command engine -->
+    <!-- Command line: reference-style compact CAD command entry -->
     <LinearLayout
         android:id="@+id/commandBar"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="46dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
@@ -236,8 +236,9 @@
         android:background="#061623">
 
         <TextView
-            android:layout_width="64dp"
-            android:layout_height="32dp"
+            android:id="@+id/commandLabel"
+            android:layout_width="66dp"
+            android:layout_height="34dp"
             android:gravity="center"
             android:text="Komut:"
             android:textColor="#35D7FF"
@@ -248,22 +249,21 @@
         <EditText
             android:id="@+id/commandInput"
             android:layout_width="0dp"
-            android:layout_height="32dp"
+            android:layout_height="34dp"
             android:layout_weight="1"
             android:layout_marginStart="5dp"
             android:singleLine="true"
             android:maxLines="1"
-            android:hint="L, PL, C, REC, M, CO, RO, E, LA, DI, AA, ZE..."
+            android:hint="L, PL, C, REC, M, CO, RO, E, LA..."
             android:textColor="#FFFFFF"
             android:textColorHint="#759BB2"
-            android:textSize="10sp"
+            android:textSize="9.5sp"
             android:paddingStart="10dp"
             android:paddingEnd="8dp"
             android:background="@drawable/feature_chip_bg"
             android:imeOptions="actionDone"
             android:inputType="textCapCharacters" />
 
-        <!-- Kept for existing binding; keyboard Enter is the reference interaction -->
         <Button
             android:id="@+id/commandSendButton"
             android:layout_width="1dp"
@@ -272,14 +272,15 @@
             android:text="↵" />
 
         <TextView
-            android:layout_width="46dp"
-            android:layout_height="32dp"
+            android:id="@+id/languageChip"
+            android:layout_width="50dp"
+            android:layout_height="34dp"
             android:layout_marginStart="6dp"
             android:gravity="center"
-            android:text="TR"
+            android:text="TR ▾"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="10sp"
+            android:textSize="9sp"
             android:background="@drawable/feature_chip_bg" />
     </LinearLayout>
 
