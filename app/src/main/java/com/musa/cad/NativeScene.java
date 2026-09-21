@@ -94,13 +94,14 @@ public final class NativeScene {
     public void draw(Canvas canvas,Matrix contentToScreen){
         if(canvas==null||contentToScreen==null)return;
         combinedMatrix.setConcat(contentToScreen,worldToContent);
-        Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;
-        if(combinedMatrix.invert(inverseMatrix)){inverseMatrix.mapRect(visibleRect);float pad=Math.max(worldBounds.width(),worldBounds.height())*.001f;visibleRect.inset(-pad,-pad);visible=visibleRect;}
-        drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
-        float minWorldSpan=0f;
-        if(visible!=null&&offsets.length>50000&&clip.width()>0&&clip.height()>0){
-            minWorldSpan=Math.max(visible.width()/clip.width(),visible.height()/clip.height())*.18f;
+        Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;float worldPerPixel=0f;
+        if(combinedMatrix.invert(inverseMatrix)){
+            inverseMatrix.mapRect(visibleRect);
+            if(clip.width()>0&&clip.height()>0)worldPerPixel=Math.max(visibleRect.width()/clip.width(),visibleRect.height()/clip.height());
+            float pad=worldPerPixel>0f?worldPerPixel*12f:0f;visibleRect.inset(-pad,-pad);visible=visibleRect;
         }
+        drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
+        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.18f:0f;
         grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
     }
 
