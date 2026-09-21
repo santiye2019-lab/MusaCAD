@@ -6,14 +6,13 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
 
 public class SplashActivity extends AppCompatActivity {
     private Intent pendingIntent;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        LockedScreenUi.enableImmersive(this);
         setContentView(R.layout.activity_splash);
 
         if(getApplication() instanceof MusaCadApp){
@@ -22,22 +21,35 @@ public class SplashActivity extends AppCompatActivity {
 
         Intent incoming=new Intent(getIntent());
         boolean fileEntry=Intent.ACTION_VIEW.equals(incoming.getAction())
-                || Intent.ACTION_SEND.equals(incoming.getAction());
+                ||Intent.ACTION_SEND.equals(incoming.getAction());
         pendingIntent=fileEntry?incoming:null;
 
         FrameLayout root=findViewById(R.id.splashRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fitStage(this,root,stage,()->{
+        LockedScreenUi.fillStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_1);
 
             View.OnClickListener next=v->continueFlow();
-            LockedScreenUi.hotspot(this,stage,104,451,168,160,next);
-            LockedScreenUi.hotspot(this,stage,293,451,168,160,next);
-            LockedScreenUi.hotspot(this,stage,484,451,171,160,next);
-            LockedScreenUi.hotspot(this,stage,677,451,168,160,next);
+
+            // Üstteki dört gerçek özellik kartı
+            LockedScreenUi.hotspot(this,stage,81,430,192,205,next);
+            LockedScreenUi.hotspot(this,stage,288,430,192,205,next);
+            LockedScreenUi.hotspot(this,stage,497,430,192,205,next);
+            LockedScreenUi.hotspot(this,stage,703,430,164,205,next);
+
+            // Alttaki dört yüzer özellik düğmesi
+            LockedScreenUi.hotspot(this,stage,49,1430,194,170,next);
+            LockedScreenUi.hotspot(this,stage,263,1430,194,170,next);
+            LockedScreenUi.hotspot(this,stage,478,1430,194,170,next);
+            LockedScreenUi.hotspot(this,stage,694,1430,194,170,next);
         });
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus){
+        super.onWindowFocusChanged(hasFocus);
+        if(hasFocus)LockedScreenUi.enableImmersive(this);
     }
 
     private void continueFlow(){

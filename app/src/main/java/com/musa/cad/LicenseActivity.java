@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
 import java.io.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,7 +21,7 @@ public class LicenseActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        LockedScreenUi.enableImmersive(this);
         setContentView(R.layout.activity_license);
 
         stayOnLicense=getIntent().getBooleanExtra(EXTRA_STAY_ON_LICENSE,false);
@@ -37,28 +36,35 @@ public class LicenseActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.licenseRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fitStage(this,root,stage,()->{
+        LockedScreenUi.fillStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_3);
 
+            // Görseldeki gerçek lisans kodu kutusunun üstündeki canlı EditText
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(0xFFFFFFFF);
             licenseCode.setTextSize(15f);
-            licenseCode.setHint("");
-            licenseCode.setPadding(dp(10),0,dp(10),0);
-            licenseCode.setBackgroundColor(0xCC0A2440);
+            licenseCode.setHint("XXXX-XXXX-XXXX-XXXX");
+            licenseCode.setHintTextColor(0xFF7593B4);
+            licenseCode.setPadding(dp(15),0,dp(15),0);
+            licenseCode.setBackgroundColor(0xB50A2440);
             stage.addView(licenseCode);
-            LockedScreenUi.position(licenseCode,stage,252,754,520,48);
+            LockedScreenUi.position(licenseCode,stage,250,718,545,92);
 
-            LockedScreenUi.hotspot(this,stage,92,403,748,144,v->startTrial());
-            LockedScreenUi.hotspot(this,stage,128,580,672,116,v->showInstallationId());
-            LockedScreenUi.hotspot(this,stage,127,829,676,87,v->activate());
-            LockedScreenUi.hotspot(this,stage,127,932,680,63,v->showTerms(false));
-            LockedScreenUi.hotspot(this,stage,99,1245,626,73,v->showTerms(false));
+            // Görseldeki gerçek butonların tam üstündeki şeffaf tıklama katmanları
+            LockedScreenUi.hotspot(this,stage,90,402,752,150,v->startTrial());
+            LockedScreenUi.hotspot(this,stage,128,829,676,88,v->activate());
+            LockedScreenUi.hotspot(this,stage,128,932,676,64,v->showTerms(false));
+            LockedScreenUi.hotspot(this,stage,96,1246,632,74,v->showTerms(false));
         });
 
         refresh();
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus){
+        super.onWindowFocusChanged(hasFocus);
+        if(hasFocus)LockedScreenUi.enableImmersive(this);
     }
 
     private int dp(int v){
@@ -74,7 +80,6 @@ public class LicenseActivity extends AppCompatActivity {
 
     private void startTrial(){
         if(trialRequestRunning)return;
-
         if(!LicenseManager.termsAccepted(this)){
             showTerms(true);
             return;
@@ -85,7 +90,6 @@ public class LicenseActivity extends AppCompatActivity {
             TrialService.Result r=TrialService.start(getApplicationContext());
             runOnUiThread(()->{
                 trialRequestRunning=false;
-
                 if(r.status==TrialService.Status.ACTIVATED){
                     Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();
                     enterAfterLicense();
@@ -115,30 +119,14 @@ public class LicenseActivity extends AppCompatActivity {
             Toast.makeText(this,"Lisans koşullarını kabul ettikten sonra tekrar Etkinleştir'e basın",Toast.LENGTH_LONG).show();
             return;
         }
-
         String code=licenseCode==null?"":licenseCode.getText().toString().trim();
         LicenseManager.ActivationResult r=LicenseManager.activateCode(this,code);
-
         if(r==LicenseManager.ActivationResult.ACTIVATED){
             Toast.makeText(this,"Lisans etkinleştirildi",Toast.LENGTH_SHORT).show();
             enterAfterLicense();
         }else if(licenseCode!=null){
             licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
         }
-    }
-
-    private void showInstallationId(){
-        final String id=LicenseManager.installationId(this);
-        new AlertDialog.Builder(this)
-            .setTitle("Cihaz / Lisans Kimliği")
-            .setMessage(id)
-            .setPositiveButton("KOPYALA",(d,w)->{
-                ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
-                c.setPrimaryClip(ClipData.newPlainText("MusaCAD Lisans Kimliği",id));
-                Toast.makeText(this,"Lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
-            })
-            .setNegativeButton("KAPAT",null)
-            .show();
     }
 
     private void showTerms(boolean startAfterAccept){
