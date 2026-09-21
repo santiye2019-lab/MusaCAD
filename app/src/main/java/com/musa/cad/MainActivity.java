@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
     private File currentFile,editingBaseDxf;
     private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
+    private int[] categoryButtons;
     private View welcomePanel,shareButton,shareToolButton;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
@@ -86,8 +87,9 @@ public class MainActivity extends AppCompatActivity {
         snapToggle=findViewById(R.id.snapToggle);snapToggle.setOnCheckedChangeListener((button,checked)->cad.setSnapEnabled(checked));
         modeButtons=new View[]{findViewById(R.id.panButton),findViewById(R.id.selectEntityButton),findViewById(R.id.calibrateButton),findViewById(R.id.distanceButton),findViewById(R.id.areaButton),findViewById(R.id.lineButton),findViewById(R.id.polylineButton),findViewById(R.id.rectangleButton),findViewById(R.id.circleButton),findViewById(R.id.pointButton),findViewById(R.id.textButton)};
         markModeSelected(R.id.panButton);
+        categoryButtons=new int[]{R.id.groupAnnotateToolsButton,R.id.groupLineToolsButton,R.id.groupEditToolsButton,R.id.groupLayerToolsButton,R.id.groupMeasureToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupMoreToolsButton,R.id.groupLayoutToolsButton,R.id.groupViewToolsButton};
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.headerMoreButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
@@ -104,13 +106,17 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.bottomMeasureButton).setOnClickListener(v->showMeasureTools());
         findViewById(R.id.hatchButton).setOnClickListener(v->runHatchCommand());
         findViewById(R.id.moreToolsButton).setOnClickListener(v->showMoreTools());
-        findViewById(R.id.groupLineToolsButton).setOnClickListener(v->showLineToolsSheet());
+        findViewById(R.id.groupLineToolsButton).setOnClickListener(v->openCategory(R.id.groupLineToolsButton,this::showLineToolsSheet));
         findViewById(R.id.groupShapeToolsButton).setOnClickListener(v->showShapeToolsSheet());
-        findViewById(R.id.groupEditToolsButton).setOnClickListener(v->showEditToolsSheet());
-        findViewById(R.id.groupMeasureToolsButton).setOnClickListener(v->showMeasureToolsSheet());
-        findViewById(R.id.groupViewToolsButton).setOnClickListener(v->showViewToolsSheet());
-        findViewById(R.id.groupAnnotateToolsButton).setOnClickListener(v->showAnnotationToolsSheet());
-        findViewById(R.id.groupMoreToolsButton).setOnClickListener(v->showOtherToolsSheet());
+        findViewById(R.id.groupEditToolsButton).setOnClickListener(v->openCategory(R.id.groupEditToolsButton,this::showEditToolsSheet));
+        findViewById(R.id.groupLayerToolsButton).setOnClickListener(v->openCategory(R.id.groupLayerToolsButton,this::showLayers));
+        findViewById(R.id.groupMeasureToolsButton).setOnClickListener(v->openCategory(R.id.groupMeasureToolsButton,this::showMeasureToolsSheet));
+        findViewById(R.id.groupDimensionToolsButton).setOnClickListener(v->openCategory(R.id.groupDimensionToolsButton,this::showMeasureToolsSheet));
+        findViewById(R.id.groupColorToolsButton).setOnClickListener(v->openCategory(R.id.groupColorToolsButton,this::showSelectedColor));
+        findViewById(R.id.groupMoreToolsButton).setOnClickListener(v->openCategory(R.id.groupMoreToolsButton,this::showOtherToolsSheet));
+        findViewById(R.id.groupLayoutToolsButton).setOnClickListener(v->openCategory(R.id.groupLayoutToolsButton,this::showLayouts));
+        findViewById(R.id.groupViewToolsButton).setOnClickListener(v->openCategory(R.id.groupViewToolsButton,this::showViewToolsSheet));
+        findViewById(R.id.groupAnnotateToolsButton).setOnClickListener(v->openCategory(R.id.groupAnnotateToolsButton,this::showAnnotationToolsSheet));
         findViewById(R.id.openButton).setOnClickListener(v->open());findViewById(R.id.quickOpenButton).setOnClickListener(v->open());findViewById(R.id.newProjectButton).setOnClickListener(v->showNewProjectSheet());
         tabFileName.setOnLongClickListener(v->{if(currentProject!=null)requestCloseProject(currentProject);return true;});
         findViewById(R.id.panButton).setOnClickListener(v->selectMode(R.id.panButton,CadView.Mode.PAN));
@@ -1002,6 +1008,16 @@ public class MainActivity extends AppCompatActivity {
             else {editStatusText.setText("Salt görüntüleme");editStatusText.setTextColor(0xFFFFC766);}
         }
     }
+    private void selectCategory(int id){
+        if(categoryButtons==null)return;
+        for(int categoryId:categoryButtons){View button=findViewById(categoryId);if(button!=null)button.setSelected(categoryId==id);}
+    }
+    private void openCategory(int id,Runnable action){
+        selectCategory(id);
+        View button=findViewById(id);if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        if(action!=null)action.run();
+    }
+
     private void selectMode(int id,CadView.Mode mode){View button=findViewById(id);if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.setMode(mode);markModeSelected(id);}
     private void selectEditMode(int id,CadView.Mode mode){if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();return;}selectMode(id,mode);}
     private void markModeSelected(int id){if(modeButtons==null)return;for(View button:modeButtons)button.setSelected(button.getId()==id);}

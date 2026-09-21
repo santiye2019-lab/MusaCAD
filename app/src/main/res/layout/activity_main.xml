@@ -498,7 +498,7 @@
 
             <Button
                 android:id="@+id/groupAnnotateToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="68dp"
                 android:layout_height="64dp"
                 android:text="Ek açıklama"
@@ -506,7 +506,7 @@
 
             <Button
                 android:id="@+id/groupLineToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="62dp"
                 android:layout_height="64dp"
                 android:text="Çiz"
@@ -514,7 +514,7 @@
 
             <Button
                 android:id="@+id/groupEditToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="66dp"
                 android:layout_height="64dp"
                 android:text="Düzenle"
@@ -522,7 +522,7 @@
 
             <Button
                 android:id="@+id/groupLayerToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:text="Katman"
@@ -530,7 +530,7 @@
 
             <Button
                 android:id="@+id/groupMeasureToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:text="Ölçüm"
@@ -538,7 +538,7 @@
 
             <Button
                 android:id="@+id/groupDimensionToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:text="Boyut"
@@ -546,7 +546,7 @@
 
             <Button
                 android:id="@+id/groupColorToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="62dp"
                 android:layout_height="64dp"
                 android:text="Renk"
@@ -554,7 +554,7 @@
 
             <Button
                 android:id="@+id/groupMoreToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="62dp"
                 android:layout_height="64dp"
                 android:text="Alet"
@@ -562,7 +562,7 @@
 
             <Button
                 android:id="@+id/groupLayoutToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:text="Düzen"
@@ -570,7 +570,7 @@
 
             <Button
                 android:id="@+id/groupViewToolsButton"
-                style="@style/ToolButtonBlue"
+                style="@style/CategoryBarButton"
                 android:layout_width="72dp"
                 android:layout_height="64dp"
                 android:text="Görsel stil"
