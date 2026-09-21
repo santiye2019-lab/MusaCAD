@@ -109,12 +109,12 @@ static void emit_arc_curve(MusaNativeScene *s,int aci,Affine2 m,double cx,double
 }
 static void emit_ellipse_curve(MusaNativeScene *s,int aci,Affine2 m,Dwg_Entity_ELLIPSE *e){
     if(!e||!isfinite(e->center.x)||!isfinite(e->center.y)||!isfinite(e->sm_axis.x)||!isfinite(e->sm_axis.y)||!isfinite(e->axis_ratio))return;
-    BITCODE_3DPOINT c,p0,p90,in0=e->center,in90=e->center;double ratio=fabs(e->axis_ratio);
-    in0.x+=e->sm_axis.x;in0.y+=e->sm_axis.y;in0.z+=e->sm_axis.z;
-    in90.x+=-e->sm_axis.y*ratio;in90.y+=e->sm_axis.x*ratio;
-    transform_OCS(&c,e->center,e->extrusion);transform_OCS(&p0,in0,e->extrusion);transform_OCS(&p90,in90,e->extrusion);
+    /* LibreDWG exposes ELLIPSE center and major-axis vector in drawing coordinates.
+       Do not apply the circle/arc OCS transform a second time here. */
+    double ratio=fabs(e->axis_ratio);
+    double ux=e->sm_axis.x,uy=e->sm_axis.y,vx=-e->sm_axis.y*ratio,vy=e->sm_axis.x*ratio;
     double sweep=e->end_angle-e->start_angle;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
-    emit_curve(s,aci,m,c.x,c.y,p0.x-c.x,p0.y-c.y,p90.x-c.x,p90.y-c.y,e->start_angle,sweep);
+    emit_curve(s,aci,m,e->center.x,e->center.y,ux,uy,vx,vy,e->start_angle,sweep);
 }
 
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth);
