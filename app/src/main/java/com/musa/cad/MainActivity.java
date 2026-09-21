@@ -33,13 +33,14 @@ public class MainActivity extends AppCompatActivity {
         ToolAction(String label,int icon,Runnable action){this.label=label;this.icon=icon;this.action=action;}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;String name;boolean dxf;
-        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty;long lastAccessMs;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;
         void dispose(){
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
             if(owned!=null&&!owned.isRecycled())owned.recycle();
@@ -1032,19 +1033,93 @@ public class MainActivity extends AppCompatActivity {
             Loaded loaded=new Loaded();loaded.sourceUri=uri;
             try{
                 FileTransfer.checkCancelled();loaded.name=nameOf(uri);loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
-                try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){FileTransfer.copy(in,out,32L*1024*1024,bytes->runOnUiThread(()->{if(activeLoad==task)task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));}));}
-                runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Çizim hazırlanıyor…");});FileTransfer.checkCancelled();
-                if(loaded.dxf){loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;}
-                else try{NativeDwg.Conversion conversion=NativeDwg.readWithWorkingCopy(loaded.file,getCacheDir());loaded.parsed=conversion.result;loaded.workingDxf=conversion.dxf;}catch(InterruptedIOException cancelled){throw cancelled;}catch(IOException|UnsatisfiedLinkError conversionError){FileTransfer.checkCancelled();loaded.bitmap=DwgPreview.read(loaded.file);if(loaded.bitmap==null)throw new IOException("DWG geometri veya önizleme açılamadı",conversionError);}
-                if(loaded.parsed!=null)loaded.bitmap=loaded.parsed.bitmap;FileTransfer.checkCancelled();if(loaded.bitmap==null)throw new IOException(loaded.dxf?"Desteklenen DXF geometrisi bulunamadı":"DWG içinde görüntülenebilir önizleme bulunamadı");
+                try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){FileTransfer.copy(in,out,512L*1024*1024,bytes->runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));}));}
+                FileTransfer.checkCancelled();
+
+                if(loaded.dxf){
+                    runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Vektör çizim hazırlanıyor…");});
+                    loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
+                    if(loaded.bitmap==null)throw new IOException("Desteklenen DXF geometrisi bulunamadı");
+                    Bitmap recentPreview=loaded.bitmap;
+                    runOnUiThread(()->{
+                        if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
+                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    });
+                    RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
+                    return;
+                }
+
+                runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Native DWG motoru açılıyor…");});
+                try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
+                    NativeScene fast=null;
+                    try{fast=engine.fastScene();}catch(IOException ignored){}
+                    if(fast!=null){
+                        loaded.nativeScene=fast;
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();
+                        loaded.project=project;
+                        java.util.concurrent.CountDownLatch attached=new java.util.concurrent.CountDownLatch(1);
+                        java.util.concurrent.atomic.AtomicBoolean accepted=new java.util.concurrent.atomic.AtomicBoolean(false);
+                        runOnUiThread(()->{
+                            try{
+                                if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                                if(task.dialog!=null)task.dialog.dismiss();
+                                projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                                result.setText("Native hızlı görünüm hazır • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
+                            }finally{attached.countDown();}
+                        });
+                        try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
+                        if(!accepted.get())throw new InterruptedIOException("Dosya açma iptal edildi");
+                        loaded.handedOff=true;
+                    }
+
+                    FileTransfer.checkCancelled();
+                    runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText("Tam vektör model hazırlanıyor…");});
+                    File converted=File.createTempFile("MusaCAD_donusen_",".dxf",getCacheDir());boolean keep=false;
+                    try{
+                        int status=engine.exportDxf(converted);FileTransfer.checkCancelled();
+                        if(converted.length()>512L*1024*1024)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
+                        DxfParser.Result parsed=DxfParser.render(converted);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
+                        loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
+                    }finally{if(!keep)converted.delete();}
+                }
+
+                if(loaded.handedOff&&loaded.project!=null){
+                    ProjectSession project=loaded.project;DxfParser.Result parsed=loaded.parsed;File working=loaded.workingDxf;Bitmap recentPreview=parsed.bitmap;
+                    RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
+                        if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
+                        project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.nativeScene=null;project.preparingEditor=false;project.prepareError=null;
+                        if(currentProject==project){
+                            editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
+                            project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
+                        }
+                        if(activeLoad==task)activeLoad=null;refreshProjectTabs();
+                    });
+                    return;
+                }
+
+                if(loaded.bitmap==null)throw new IOException("DWG içinde görüntülenebilir geometri bulunamadı");
                 Bitmap recentPreview=loaded.bitmap;
                 runOnUiThread(()->{
-                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
-                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=loaded.dxf;project.lastAccessMs=System.currentTimeMillis();
-                    projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();
+                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
-            }catch(Exception|OutOfMemoryError e){loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});}
+            }catch(Exception|OutOfMemoryError e){
+                if(loaded.handedOff&&loaded.project!=null){
+                    ProjectSession project=loaded.project;String message=e.getMessage()==null?"Tam vektör model hazırlanamadı":e.getMessage();
+                    if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
+                    runOnUiThread(()->{
+                        if(activeLoad==task)activeLoad=null;
+                        if(projects.contains(project)){project.preparingEditor=false;project.prepareError=message;if(currentProject==project){updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
+                    });
+                }else{
+                    loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
+                }
+            }
         });
     }
 
@@ -1067,8 +1142,11 @@ public class MainActivity extends AppCompatActivity {
         if(project==currentProject){refreshProjectTabs();return;}
         captureCurrentProject();
         currentProject=project;currentFile=project.file;editingBaseDxf=project.workingDxf;activeDxf=project.parsed;currentDisplayName=project.name==null?"cizim.dwg":project.name;project.lastAccessMs=System.currentTimeMillis();
-        if(project.viewState!=null)cad.restoreSessionState(project.parsed,project.parsed==null?project.bitmap:null,project.viewState);
-        else if(project.parsed!=null)cad.setVectorDrawing(project.parsed);else cad.setDrawing(project.bitmap);
+        if(project.viewState!=null){
+            if(project.parsed!=null)cad.restoreSessionState(project.parsed,null,project.viewState);
+            else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
+            else cad.restoreSessionState(null,project.bitmap,project.viewState);
+        }else if(project.parsed!=null)cad.setVectorDrawing(project.parsed);else if(project.nativeScene!=null)cad.setNativeDrawing(project.nativeScene);else cad.setDrawing(project.bitmap);
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
@@ -1077,10 +1155,15 @@ public class MainActivity extends AppCompatActivity {
     private void renderCurrentProjectStatus(){
         if(currentProject==null){fileName.setText("Henüz proje açılmadı");result.setText("Hazır");return;}
         String editable=canEdit()?"  •  düzenlenebilir":"";
-        fileName.setText(currentDisplayName+(currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":"  •  DWG önizleme")+editable);
+        String mode=currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
+        fileName.setText(currentDisplayName+mode+editable);
         if(activeDxf!=null){
             String fallback=(activeDxf.fontFallbacks.isEmpty()&&!activeDxf.externalShapeFallback)?"":"  •  SHX fallback";
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);
+        }else if(currentProject.nativeScene!=null){
+            if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri  •  tam vektör hazırlanıyor");
+            else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
+            else result.setText("Hazır  •  Native DWG görünümü");
         }else result.setText("Hazır  •  DWG önizleme modu");
     }
 
