@@ -37,7 +37,7 @@ public final class NativeDwg {
             NativeCadEngine.Stats nativeStats=engine.stats();
             int status=engine.exportDxf(converted);
             FileTransfer.checkCancelled();
-            if(converted.length()>256L*1024*1024)throw new IOException("Dönüştürülen çizim 256 MB sınırını aşıyor");
+            if(converted.length()>512L*1024*1024)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
             DxfParser.Result result=DxfParser.render(converted);
             if(result==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
             result.conversionWarnings=status;keep=true;

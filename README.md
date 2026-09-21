@@ -6,7 +6,9 @@ MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düze
 
 - Android dosya seçicisinden DWG ve DXF açma
 - Dosya yöneticisinden desteklenen DWG/DXF dosyalarını doğrudan MusaCAD ile açma
-- LibreDWG tabanlı çevrimdışı DWG → DXF dönüştürme
+- LibreDWG tabanlı kalıcı native DWG oturumu ve çevrimdışı DWG → DXF düzenleme modeli
+- DWG açılır açılmaz native hızlı vektör sahne; tam düzenlenebilir model hazır olunca kesintisiz geçiş
+- Büyük çizimlerde zoom/pan sırasında native vektör gezinme katmanı, parmak bırakılınca tam CAD vektörü
 - Dönüşüm başarısızsa DWG içindeki gömülü önizlemeyi kullanma
 - Vektörel DXF görüntüleme ve yakınlaştırmada yeniden çizim
 - İki parmakla zoom, tek parmakla gezinme, çift dokunmayla ekrana sığdırma
@@ -20,7 +22,7 @@ MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düze
 - Görünümü PNG olarak paylaşma
 - Tam görünümü doğrudan PDF çizim yüzeyine aktararak paylaşma
 - Ekranda alan seçip seçili alanı PNG veya PDF olarak paylaşma
-- Büyük dosya açma yolu için 256 MB üst sınır
+- Büyük dosya açma yolu için 512 MB üst sınır
 - Arka planda dosya okuma/dönüştürme ve iptal desteği
 
 ## Desteklenen 2B geometri
@@ -31,7 +33,7 @@ Her DWG/DXF nesnesinin birebir desteklendiği iddia edilmez. Dinamik bloklar, ha
 
 ## Netlik
 
-Vektörel olarak çözülebilen DWG/DXF geometri ekranda bitmap büyütmek yerine yeniden çizilir. Bu nedenle zoom sırasında çizgiler ve desteklenen yazılar mümkün olduğunca net kalır. DWG dönüştürülemez ve yalnız gömülü önizleme bulunursa görüntü raster önizleme olduğu için ayrıntı seviyesi kaynak DWG önizlemesiyle sınırlıdır.
+Vektörel olarak çözülebilen DWG/DXF geometri ekranda bitmap büyütmek yerine yeniden çizilir. DWG dosyalarında ilk görüntü ve aktif zoom/pan sırasında LibreDWG oturumundan üretilen kompakt native vektör sahne kullanılır; hareket durduğunda tam DXF vektör modeli devralır. Böylece büyük projelerde gezinme yükü azalırken yüksek yakınlaştırmada bitmap bulanıklığına dönülmez. Native sahne üretilemeyen dosyalarda varsa gömülü DWG önizlemesi ilk görüntü olarak kullanılabilir; tam vektör model hazır olduğunda onun yerini alır.
 
 ## Ölçüm
 
@@ -56,7 +58,7 @@ seçenekleri bulunur. Tam görünüm PDF'i doğrudan CAD görünümünden PDF ca
 
 ## Büyük dosyalar
 
-Eski 32 MB açma sınırı kaldırılmış, mevcut büyük çizim yolu 256 MB üst sınıra yükseltilmiştir. DXF ayrıştırıcısında ayrıca bellek tüketimini sınırlamak için etiket/satır sınırı bulunur. Çok büyük veya çok karmaşık dosyalarda telefonun RAM miktarı yine pratik sınır oluşturabilir.
+Eski 32 MB açma sınırı kaldırılmış, dosya kopyalama ve dönüştürülmüş DXF yolu 512 MB üst sınıra yükseltilmiştir. Native hızlı sahne en fazla sınırlı bir kompakt geometri akışı tutar; tam DXF ayrıştırıcısında da bellek tüketimini sınırlayan streaming ve indeksleme yolu kullanılır. Çok büyük veya çok karmaşık dosyalarda telefonun RAM miktarı yine pratik sınır oluşturabilir.
 
 ## Lisans
 

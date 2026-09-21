@@ -1054,9 +1054,11 @@ public class MainActivity extends AppCompatActivity {
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     NativeScene fast=null;
                     try{fast=engine.fastScene();}catch(IOException ignored){}
-                    if(fast!=null){
-                        loaded.nativeScene=fast;
-                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();
+                    Bitmap embeddedPreview=null;
+                    if(fast==null){try{embeddedPreview=DwgPreview.read(loaded.file);}catch(Exception ignored){}}
+                    if(fast!=null||embeddedPreview!=null){
+                        loaded.nativeScene=fast;loaded.bitmap=embeddedPreview;
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.bitmap=embeddedPreview;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();
                         loaded.project=project;
                         java.util.concurrent.CountDownLatch attached=new java.util.concurrent.CountDownLatch(1);
                         java.util.concurrent.atomic.AtomicBoolean accepted=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -1065,7 +1067,7 @@ public class MainActivity extends AppCompatActivity {
                                 if(activeLoad!=task||isFinishing()||isDestroyed())return;
                                 if(task.dialog!=null)task.dialog.dismiss();
                                 projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
-                                result.setText("Native hızlı görünüm hazır • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
+                                result.setText((project.nativeScene!=null?"Native hızlı görünüm":"Hızlı DWG önizleme")+" hazır • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
                             }finally{attached.countDown();}
                         });
                         try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
@@ -1090,11 +1092,13 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(()->{
                         if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
+                        Bitmap oldPreview=project.bitmap;
                         project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
                         }
+                        if(oldPreview!=null&&oldPreview!=parsed.bitmap&&!oldPreview.isRecycled())oldPreview.recycle();
                         if(activeLoad==task)activeLoad=null;refreshProjectTabs();
                     });
                     return;
@@ -1164,7 +1168,8 @@ public class MainActivity extends AppCompatActivity {
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri  •  tam vektör hazırlanıyor");
             else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
             else result.setText("Hazır  •  Native DWG görünümü");
-        }else result.setText("Hazır  •  DWG önizleme modu");
+        }else if(currentProject.preparingEditor)result.setText("Hazır  •  Hızlı DWG önizleme  •  tam vektör hazırlanıyor");
+        else result.setText("Hazır  •  DWG önizleme modu");
     }
 
     private void refreshProjectTabs(){
