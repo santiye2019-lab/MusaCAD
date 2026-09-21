@@ -94,11 +94,17 @@ public final class DxfParser {
     }
 
     private static final class LayerEntity implements Entity{
-        final Entity entity;final String layer,layout;final int color;final String lineType;final DxfLineStyle.Pattern linePattern;final double lineTypeScale,blockScale;final int lineWeight,sourceId;final SourceRange sourceRange;final String sourceType;final CadEdit sourceEditWorld;final boolean unbounded;private RectF cachedBounds;private boolean boundsReady;long queryMark;
+        private static final ThreadLocal<RectF> BOUNDS_SCRATCH=ThreadLocal.withInitial(RectF::new);
+        final Entity entity;final String layer,layout;final int color;final String lineType;final DxfLineStyle.Pattern linePattern;final double lineTypeScale,blockScale;final int lineWeight,sourceId;final SourceRange sourceRange;final String sourceType;final CadEdit sourceEditWorld;final boolean unbounded;
+        private float boundLeft,boundTop,boundRight,boundBottom;private boolean boundsReady,boundsValid;long queryMark;
         LayerEntity(Entity e,String layer,String layout,int color,String lineType,DxfLineStyle.Pattern pattern,double scale,int weight,double blockScale,int sourceId,SourceRange range,String type,CadEdit edit){entity=e;this.layer=layer;this.layout=layout;this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);linePattern=pattern;lineTypeScale=safeLineTypeScale(scale);lineWeight=weight;this.blockScale=blockScale;this.sourceId=sourceId;sourceRange=range;sourceType=type;sourceEditWorld=edit;unbounded=isUnboundedEntity(e);}
-        private RectF boundsCached(){if(boundsReady)return cachedBounds;boundsReady=true;RectF r=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);entity.bounds(r);if(!Float.isFinite(r.left)||!Float.isFinite(r.top)||!Float.isFinite(r.right)||!Float.isFinite(r.bottom)||r.right<r.left||r.bottom<r.top){cachedBounds=null;return null;}cachedBounds=new RectF(r);return cachedBounds;}
-        boolean intersects(RectF visible){if(unbounded||visible==null)return true;RectF r=boundsCached();if(r==null)return true;float left=r.left,top=r.top,right=r.right,bottom=r.bottom;if(right-left<.001f){left-=.5f;right+=.5f;}if(bottom-top<.001f){top-=.5f;bottom+=.5f;}return left<visible.right&&visible.left<right&&top<visible.bottom&&visible.top<bottom;}
-        public void bounds(RectF b){RectF r=boundsCached();if(r==null)return;add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean mono,double global){p.setColor(mono?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));DxfLineStyle.Dash dash=linePattern==null?null:linePattern.dash(matrixScale(m),global,lineTypeScale,blockScale);p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));entity.draw(c,p,m);p.setPathEffect(null);drawComplexLineText(c,p,m,entity,linePattern,global,lineTypeScale,blockScale);}
+        private boolean ensureBounds(){
+            if(boundsReady)return boundsValid;boundsReady=true;RectF r=BOUNDS_SCRATCH.get();r.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);entity.bounds(r);
+            boundsValid=Float.isFinite(r.left)&&Float.isFinite(r.top)&&Float.isFinite(r.right)&&Float.isFinite(r.bottom)&&r.right>=r.left&&r.bottom>=r.top;
+            if(boundsValid){boundLeft=r.left;boundTop=r.top;boundRight=r.right;boundBottom=r.bottom;}return boundsValid;
+        }
+        boolean intersects(RectF visible){if(unbounded||visible==null)return true;if(!ensureBounds())return true;float left=boundLeft,top=boundTop,right=boundRight,bottom=boundBottom;if(right-left<.001f){left-=.5f;right+=.5f;}if(bottom-top<.001f){top-=.5f;bottom+=.5f;}return left<visible.right&&visible.left<right&&top<visible.bottom&&visible.top<bottom;}
+        public void bounds(RectF b){if(!ensureBounds())return;add(b,boundLeft,boundTop);add(b,boundRight,boundBottom);}public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean mono,double global){p.setColor(mono?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));DxfLineStyle.Dash dash=linePattern==null?null:linePattern.dash(matrixScale(m),global,lineTypeScale,blockScale);p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));entity.draw(c,p,m);p.setPathEffect(null);drawComplexLineText(c,p,m,entity,linePattern,global,lineTypeScale,blockScale);}
     }
 
 
@@ -110,10 +116,10 @@ public final class DxfParser {
             all=source==null?Collections.emptyList():source;
             if(all.size()<MIN_INDEXED_ENTITIES){bounds=null;cells=null;grid=0;cellW=cellH=0f;return;}
             RectF total=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
-            for(LayerEntity layer:all){if(layer.unbounded){overflow.add(layer);continue;}RectF r=layer.boundsCached();if(r==null){overflow.add(layer);continue;}add(total,r.left,r.top);add(total,r.right,r.bottom);}
+            for(LayerEntity layer:all){if(layer.unbounded){overflow.add(layer);continue;}if(!layer.ensureBounds()){overflow.add(layer);continue;}add(total,layer.boundLeft,layer.boundTop);add(total,layer.boundRight,layer.boundBottom);}
             if(!Float.isFinite(total.left)||!Float.isFinite(total.top)||!Float.isFinite(total.right)||!Float.isFinite(total.bottom)||total.width()<=0f||total.height()<=0f){bounds=null;cells=null;grid=0;cellW=cellH=0f;return;}
             bounds=new RectF(total);grid=all.size()>=20000?48:32;cellW=Math.max(1e-6f,bounds.width()/grid);cellH=Math.max(1e-6f,bounds.height()/grid);cells=(ArrayList<LayerEntity>[])new ArrayList[grid*grid];
-            for(LayerEntity layer:all){if(layer.unbounded)continue;RectF r=layer.boundsCached();if(r==null)continue;int x0=cellX(r.left),x1=cellX(r.right),y0=cellY(r.top),y1=cellY(r.bottom);int span=(x1-x0+1)*(y1-y0+1);if(span>MAX_CELLS_PER_ENTITY){overflow.add(layer);continue;}for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++){int at=y*grid+x;ArrayList<LayerEntity>bucket=cells[at];if(bucket==null)cells[at]=bucket=new ArrayList<>();bucket.add(layer);}}
+            for(LayerEntity layer:all){if(layer.unbounded||!layer.ensureBounds())continue;int x0=cellX(layer.boundLeft),x1=cellX(layer.boundRight),y0=cellY(layer.boundTop),y1=cellY(layer.boundBottom);int span=(x1-x0+1)*(y1-y0+1);if(span>MAX_CELLS_PER_ENTITY){overflow.add(layer);continue;}for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++){int at=y*grid+x;ArrayList<LayerEntity>bucket=cells[at];if(bucket==null)cells[at]=bucket=new ArrayList<>();bucket.add(layer);}}
         }
         void draw(Canvas canvas,Paint paint,Matrix combined,RectF visible,Set<Integer>hiddenIds,double global){
             Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;
@@ -285,7 +291,21 @@ public final class DxfParser {
         return null;
     }
     private static CadEdit mapEditToContent(CadEdit world,Matrix view){float[]xy=world.xy.clone();view.mapPoints(xy);switch(world.type){case LINE:return CadEdit.line(xy[0],xy[1],xy[2],xy[3]);case CIRCLE:return CadEdit.circle(xy[0],xy[1],xy[2],xy[3]);case ARC:return xy.length>=8?CadEdit.arc(xy[0],xy[1],xy[2],xy[3],xy[4],xy[5]):world.copy();case ELLIPSE:return xy.length>=6?CadEdit.ellipse(xy[0],xy[1],xy[2],xy[3],xy[4],xy[5]):world.copy();case POINT:return CadEdit.point(xy[0],xy[1]);case XLINE:return xy.length>=4?CadEdit.xline(xy[0],xy[1],xy[2],xy[3]):world.copy();case POLYLINE:return CadEdit.polyline(xy,world.closed);case TEXT:{float h=world.hasTextStyle()?world.textHeight*matrixScale(view):0f;return CadEdit.styledText(xy[0],xy[1],world.text,-world.rotationDegrees,world.textStyleName,world.textFamilyHint,world.textShx,h,world.textWidthFactor,world.textOblique,world.textGenerationFlags);}case RECTANGLE:return CadEdit.rectangle(xy[0],xy[1],xy[2],xy[3]);default:return world.copy();}}
-    private static float[]snapPoints(List<Entity>entities,Matrix matrix){ArrayList<PointF>points=new ArrayList<>();for(Entity wrapped:entities){Entity entity=((LayerEntity)wrapped).entity;Matrix transform=new Matrix();if(entity instanceof Transformed){transform=((Transformed)entity).matrix;entity=((Transformed)entity).entity;}ArrayList<PointF>local=new ArrayList<>();if(entity instanceof Line){Line l=(Line)entity;local.add(new PointF(l.x1,l.y1));local.add(new PointF(l.x2,l.y2));}else if(entity instanceof Marker){Marker p=(Marker)entity;local.add(new PointF(p.x,p.y));}else if(entity instanceof EllipseCurve){EllipseCurve e=(EllipseCurve)entity;local.add(new PointF(e.cx,e.cy));local.add(new PointF(e.cx+e.mx,e.cy+e.my));local.add(new PointF(e.cx-e.my*e.ratio,e.cy+e.mx*e.ratio));}else if(entity instanceof XLine){XLine x=(XLine)entity;local.add(new PointF(x.x,x.y));}else if(entity instanceof Poly)local.addAll(((Poly)entity).snapPts);for(PointF point:local){float[]xy={point.x,point.y};transform.mapPoints(xy);points.add(new PointF(xy[0],xy[1]));}}float[]result=new float[points.size()*2];for(int i=0;i<points.size();i++){result[i*2]=points.get(i).x;result[i*2+1]=points.get(i).y;}matrix.mapPoints(result);return result;}
+    private static final class FloatBuilder{float[]data=new float[256];int size;void add(float x,float y){if(size+2>data.length)data=Arrays.copyOf(data,data.length+(data.length>>1)+2);data[size++]=x;data[size++]=y;}float[]toArray(){return size==data.length?data:Arrays.copyOf(data,size);}}
+    private static void addMapped(FloatBuilder out,Matrix matrix,float x,float y,float[]pair){pair[0]=x;pair[1]=y;matrix.mapPoints(pair);out.add(pair[0],pair[1]);}
+    private static float[]snapPoints(List<Entity>entities,Matrix matrix){
+        FloatBuilder out=new FloatBuilder();Matrix combined=new Matrix();float[]pair=new float[2];
+        for(Entity wrapped:entities){
+            Entity entity=((LayerEntity)wrapped).entity;
+            if(entity instanceof Transformed){Transformed transformed=(Transformed)entity;combined.setConcat(matrix,transformed.matrix);entity=transformed.entity;}else combined.set(matrix);
+            if(entity instanceof Line){Line l=(Line)entity;addMapped(out,combined,l.x1,l.y1,pair);addMapped(out,combined,l.x2,l.y2,pair);}
+            else if(entity instanceof Marker){Marker p=(Marker)entity;addMapped(out,combined,p.x,p.y,pair);}
+            else if(entity instanceof EllipseCurve){EllipseCurve e=(EllipseCurve)entity;addMapped(out,combined,e.cx,e.cy,pair);addMapped(out,combined,e.cx+e.mx,e.cy+e.my,pair);addMapped(out,combined,e.cx-e.my*e.ratio,e.cy+e.mx*e.ratio,pair);}
+            else if(entity instanceof XLine){XLine x=(XLine)entity;addMapped(out,combined,x.x,x.y,pair);}
+            else if(entity instanceof Poly)for(PointF point:((Poly)entity).snapPts)addMapped(out,combined,point.x,point.y,pair);
+        }
+        return out.toArray();
+    }
 
     private static Entity parse(String type,List<String>a,int from,int to,Map<String,DxfTextStyle.Style>styles){
         if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
