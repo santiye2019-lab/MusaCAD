@@ -17,7 +17,7 @@ public class AboutActivity extends AppCompatActivity {
         LockedScreenUi.fitStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_2);
-            LockedScreenUi.hotspot(this,stage,38,1235,865,100,v->openMusaCad());
+            LockedScreenUi.hotspot(this,stage,35,1233,858,101,v->openMusaCad());
             LockedScreenUi.hotspot(this,stage,60,1353,125,125,v->openMusaCad());
             LockedScreenUi.hotspot(this,stage,214,1353,125,125,v->openMusaCad());
             LockedScreenUi.hotspot(this,stage,368,1353,125,125,v->openMusaCad());

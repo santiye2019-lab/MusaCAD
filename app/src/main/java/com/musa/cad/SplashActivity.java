@@ -24,10 +24,10 @@ public class SplashActivity extends AppCompatActivity {
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_1);
             View.OnClickListener enter=v->openApp();
-            LockedScreenUi.hotspot(this,stage,102,455,170,160,enter);
-            LockedScreenUi.hotspot(this,stage,294,455,170,160,enter);
-            LockedScreenUi.hotspot(this,stage,486,455,170,160,enter);
-            LockedScreenUi.hotspot(this,stage,678,455,170,160,enter);
+            LockedScreenUi.hotspot(this,stage,104,451,168,160,enter);
+            LockedScreenUi.hotspot(this,stage,293,451,168,160,enter);
+            LockedScreenUi.hotspot(this,stage,484,451,171,160,enter);
+            LockedScreenUi.hotspot(this,stage,677,451,168,160,enter);
             LockedScreenUi.hotspot(this,stage,52,1460,190,150,enter);
             LockedScreenUi.hotspot(this,stage,263,1460,190,150,enter);
             LockedScreenUi.hotspot(this,stage,474,1460,190,150,enter);

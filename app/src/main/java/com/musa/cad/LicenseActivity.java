@@ -33,17 +33,17 @@ public class LicenseActivity extends AppCompatActivity {
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(0xFFFFFFFF); licenseCode.setTextSize(15f);
-            licenseCode.setHint("Lisans Kodunu Girin"); licenseCode.setHintTextColor(0xFF7891A8);
-            licenseCode.setPadding(dp(18),0,dp(18),0);
-            licenseCode.setBackgroundColor(0xD9082036);
+            licenseCode.setHint(""); licenseCode.setHintTextColor(0xFF7891A8);
+            licenseCode.setPadding(dp(10),0,dp(10),0);
+            licenseCode.setBackgroundColor(0xCC0A2440);
             stage.addView(licenseCode);
-            LockedScreenUi.position(licenseCode,stage,132,714,666,92);
+            LockedScreenUi.position(licenseCode,stage,252,754,520,48);
 
-            LockedScreenUi.hotspot(this,stage,108,428,714,128,v->startTrial());
-            LockedScreenUi.hotspot(this,stage,128,570,688,122,v->showInstallationId());
-            LockedScreenUi.hotspot(this,stage,128,829,688,84,v->activate());
-            LockedScreenUi.hotspot(this,stage,128,930,688,62,v->showTerms(false));
-            LockedScreenUi.hotspot(this,stage,116,1245,620,58,v->showTerms(false));
+            LockedScreenUi.hotspot(this,stage,92,403,748,144,v->startTrial());
+            LockedScreenUi.hotspot(this,stage,128,580,672,116,v->showInstallationId());
+            LockedScreenUi.hotspot(this,stage,127,829,676,87,v->activate());
+            LockedScreenUi.hotspot(this,stage,127,932,680,63,v->showTerms(false));
+            LockedScreenUi.hotspot(this,stage,99,1245,626,73,v->showTerms(false));
             LockedScreenUi.hotspot(this,stage,65,1445,185,135,v->enterAppIfAllowed());
             LockedScreenUi.hotspot(this,stage,273,1445,185,135,v->enterAppIfAllowed());
             LockedScreenUi.hotspot(this,stage,482,1445,185,135,v->enterAppIfAllowed());
