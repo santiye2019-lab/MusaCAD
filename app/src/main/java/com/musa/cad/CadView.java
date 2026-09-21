@@ -225,10 +225,24 @@ public class CadView extends View {
         imageMatrix.reset();fit();invalidate();notifyValue();
     }
 
-    /** Swaps the fast native preview for the complete editable model without changing the current zoom/pan. */
+    /** Swaps in the complete editor while preserving the same DWG world point and zoom. */
     public void upgradeNativeDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
-        stopFastNavigation();drawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();invalidate();notifyValue();
+        stopFastNavigation();
+        NativeScene oldNative=nativeDrawing;PointF worldAnchor=null;float worldScreenScale=0f;float screenX=getWidth()/2f,screenY=getHeight()/2f;
+        if(oldNative!=null&&getWidth()>0&&getHeight()>0){
+            float[]content={screenX,screenY};Matrix inv=new Matrix();
+            if(imageMatrix.invert(inv)){inv.mapPoints(content);worldAnchor=oldNative.contentToWorld(content[0],content[1]);worldScreenScale=scale*oldNative.drawingToContentScale();}
+        }
+        drawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();
+        if(oldNative!=null)oldNative.alignTo(result.drawingToContentMatrix());
+        fitScale=computeFitScale();
+        if(worldAnchor!=null&&Float.isFinite(worldScreenScale)&&worldScreenScale>0f){
+            PointF content=result.contentPointFromDrawing(worldAnchor.x,worldAnchor.y);
+            float next=clampNavigationScale(worldScreenScale/result.drawingToContentScale());
+            imageMatrix.reset();imageMatrix.setScale(next,next);imageMatrix.postTranslate(screenX-content.x*next,screenY-content.y*next);scale=next;
+        }else fit();
+        invalidate();notifyValue();
     }
 
     public void restoreNativeSessionState(NativeScene result,SessionState state){

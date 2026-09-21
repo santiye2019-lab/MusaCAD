@@ -86,6 +86,10 @@ public final class DxfParser {
         public Set<String> lineTypeNames(){return Collections.unmodifiableSet(new TreeSet<>(lineTypes.keySet()));}
         public double drawingDistanceFromContent(double contentDistance){return worldToContentScale>0d?contentDistance/worldToContentScale:contentDistance;}
         public float contentLengthFromDrawing(double drawingLength){return worldToContentScale>0d?(float)(drawingLength*worldToContentScale):(float)drawingLength;}
+        public float drawingToContentScale(){return Math.max(1e-9f,worldToContentScale);}
+        public Matrix drawingToContentMatrix(){return new Matrix(view);}
+        public PointF contentPointFromDrawing(float x,float y){float[]p={x,y};view.mapPoints(p);return new PointF(p[0],p[1]);}
+        public PointF drawingPointFromContent(float x,float y){float[]p={x,y};Matrix inv=new Matrix();if(!view.invert(inv))return new PointF(x,y);inv.mapPoints(p);return new PointF(p[0],p[1]);}
         public boolean hasPhysicalUnits(){return Double.isFinite(millimetersPerUnit)&&millimetersPerUnit>0;}public String drawingUnitName(){return drawingUnitName;}public float drawingAspectRatio(){return contentBounds.height()>0?contentBounds.width()/contentBounds.height():1f;}public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
     }
 

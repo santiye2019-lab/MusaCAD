@@ -15,11 +15,13 @@ typedef struct {
 } MusaNativeScene;
 
 /*
- * Compact float stream:
- * header = [1, primitiveCount, minX, minY, maxX, maxY]
+ * Compact float stream, v2:
+ * header = [2, primitiveCount, minX, minY, maxX, maxY, truncated]
  * LINE   = [1, aci, x1, y1, x2, y2]
  * POLY   = [2, aci, closed(0/1), pointCount, x1, y1, ...]
  * POINT  = [3, aci, x, y]
+ * CURVE  = [4, aci, cx, cy, ux, uy, vx, vy, startRadians, sweepRadians]
+ *          point(t) = center + U*cos(t) + V*sin(t)
  */
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene);
 void musa_scene_free(MusaNativeScene *scene);

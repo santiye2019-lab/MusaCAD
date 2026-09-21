@@ -13,10 +13,24 @@ Use Java 17, Android SDK 35, NDK 27.2.12479018 and CMake 3.22.1, then run
 ./gradlew assembleDebug. arm64-v8a and x86_64 are the configured architectures.
 Native objects are linked with a 16 KiB maximum page size.
 
-The bridge in app/src/main/cpp/dwg_bridge.c keeps a parsed DWG in an opaque native session.\napp/src/main/cpp/native_scene.c walks model-space geometry (including nested INSERT blocks)\nand emits a compact vector scene for fast first paint and gesture navigation. The proven\nASCII DXF conversion remains the complete editable fallback/model and is prepared after\nthe first native frame. The same native code is built as a host executable; its smoke test\nnow requires both a non-empty native scene and a successful DXF conversion from the pinned\nupstream example_2013.dwg. Android JNI/device rendering still requires physical-device tests.\n
+The bridge in app/src/main/cpp/dwg_bridge.c keeps a parsed DWG in an opaque
+native session. app/src/main/cpp/native_scene.c walks model-space geometry,
+including nested INSERT blocks, and emits a compact vector scene for fast first
+paint and gesture navigation. The proven ASCII DXF conversion remains the
+complete editable model and is prepared after the first native frame. The same
+native code is built as a host executable; its smoke test requires both a
+non-empty native scene and a successful DXF conversion from the pinned upstream
+example_2013.dwg. Android JNI/device rendering still requires physical-device
+testing.
+
 CI publishes the application source, build scripts, license and pinned LibreDWG
 source together as MusaCAD-source.tar.gz, alongside the host converter. Retain
 and provide this corresponding-source bundle whenever distributing its APK.
 Tap the MUSA CAD title to view the license and source repository link.
 
-Runtime limits: native DWG parsing/conversion itself is not interruptible. Cancellation\ndiscards the result after the native call returns. The compact fast scene intentionally\nprioritizes common 2D primitives and block geometry; the full editable DXF model replaces\nit after preparation and remains the source of complete supported layers, text, hatches,\nlayouts, source edits and export. Original sharing always sends the user's DWG.\n
+Runtime limits: native DWG parsing/conversion itself is not interruptible.
+Cancellation discards the result after the native call returns. The compact
+fast scene intentionally prioritizes common 2D primitives and block geometry;
+the full editable DXF model remains the source of complete supported layers,
+text, hatches, layouts, source edits and export. Original sharing always sends
+the user's DWG.

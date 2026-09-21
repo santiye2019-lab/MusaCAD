@@ -13,9 +13,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define MUSA_SCENE_VERSION 1.0f
-#define MUSA_SCENE_MAX_FLOATS (16u*1024u*1024u)
-#define MUSA_CURVE_SEGMENTS 48
+#define MUSA_SCENE_VERSION 2.0f
+/* Fast scene is temporary; bound peak native + Java copies on very large DWGs. */
+#define MUSA_SCENE_MAX_FLOATS (8u*1024u*1024u)
 #define MUSA_MAX_BLOCK_DEPTH 24
 
 typedef struct { double a,b,c,d,tx,ty; } Affine2;
@@ -96,23 +96,25 @@ static void emit_poly_point(MusaNativeScene *s,Affine2 m,double x,double y){
 }
 static void finish_poly(MusaNativeScene *s){s->primitives++;}
 
-static void emit_arc_poly(MusaNativeScene *s,int aci,Affine2 m,double cx,double cy,double r,double start,double end,int full){
-    if(!isfinite(cx)||!isfinite(cy)||!isfinite(r)||r<=0)return;
-    double sweep=full?2.0*M_PI:end-start;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
-    int n=full?MUSA_CURVE_SEGMENTS+1:(int)ceil(MUSA_CURVE_SEGMENTS*sweep/(2.0*M_PI))+1;
-    if(n<8)n=8;if(n>97)n=97;
-    if(!begin_poly(s,aci,full,n))return;
-    for(int i=0;i<n;i++){double t=start+sweep*(double)i/(double)(n-1);emit_poly_point(s,m,cx+r*cos(t),cy+r*sin(t));}
-    finish_poly(s);
+static int emit_curve(MusaNativeScene *s,int aci,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double sweep){
+    double wcx,wcy,pu_x,pu_y,pv_x,pv_y;map2(m,cx,cy,&wcx,&wcy);map2(m,cx+ux,cy+uy,&pu_x,&pu_y);map2(m,cx+vx,cy+vy,&pv_x,&pv_y);
+    ux=pu_x-wcx;uy=pu_y-wcy;vx=pv_x-wcx;vy=pv_y-wcy;
+    if(!finite2(wcx,wcy)||!finite2(ux,uy)||!finite2(vx,vy)||!isfinite(start)||!isfinite(sweep)||fabs(sweep)<1e-12||!reserve_scene(s,10))return 0;
+    pushf(s,4);pushf(s,(float)aci);pushf(s,(float)wcx);pushf(s,(float)wcy);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);pushf(s,(float)start);pushf(s,(float)sweep);
+    double rx=hypot(ux,vx),ry=hypot(uy,vy);add_bounds(s,wcx-rx,wcy-ry);add_bounds(s,wcx+rx,wcy+ry);s->primitives++;return 1;
 }
-static void emit_ellipse_poly(MusaNativeScene *s,int aci,Affine2 m,Dwg_Entity_ELLIPSE *e){
+static void emit_arc_curve(MusaNativeScene *s,int aci,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double end,int full){
+    double sweep=full?2.0*M_PI:end-start;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
+    emit_curve(s,aci,m,cx,cy,ux,uy,vx,vy,start,sweep);
+}
+static void emit_ellipse_curve(MusaNativeScene *s,int aci,Affine2 m,Dwg_Entity_ELLIPSE *e){
     if(!e||!isfinite(e->center.x)||!isfinite(e->center.y)||!isfinite(e->sm_axis.x)||!isfinite(e->sm_axis.y)||!isfinite(e->axis_ratio))return;
-    double start=e->start_angle,end=e->end_angle,sweep=end-start;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
-    int full=fabs(sweep-2.0*M_PI)<1e-4;int n=full?MUSA_CURVE_SEGMENTS+1:(int)ceil(MUSA_CURVE_SEGMENTS*sweep/(2.0*M_PI))+1;if(n<8)n=8;
-    if(!begin_poly(s,aci,full,n))return;
-    double mx=e->sm_axis.x,my=e->sm_axis.y,ratio=fabs(e->axis_ratio);
-    for(int i=0;i<n;i++){double t=start+sweep*(double)i/(double)(n-1);double x=e->center.x+mx*cos(t)-my*ratio*sin(t);double y=e->center.y+my*cos(t)+mx*ratio*sin(t);emit_poly_point(s,m,x,y);}
-    finish_poly(s);
+    BITCODE_3DPOINT c,p0,p90,in0=e->center,in90=e->center;double ratio=fabs(e->axis_ratio);
+    in0.x+=e->sm_axis.x;in0.y+=e->sm_axis.y;in0.z+=e->sm_axis.z;
+    in90.x+=-e->sm_axis.y*ratio;in90.y+=e->sm_axis.x*ratio;
+    transform_OCS(&c,e->center,e->extrusion);transform_OCS(&p0,in0,e->extrusion);transform_OCS(&p90,in90,e->extrusion);
+    double sweep=e->end_angle-e->start_angle;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
+    emit_curve(s,aci,m,c.x,c.y,p0.x-c.x,p0.y-c.y,p90.x-c.x,p90.y-c.y,e->start_angle,sweep);
 }
 
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth);
@@ -149,19 +151,21 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             emit_line(s,aci,parent,a.x,a.y,b.x,b.y);break;
         }
         case DWG_TYPE_CIRCLE:{
-            Dwg_Entity_CIRCLE *e=obj->tio.entity->tio.CIRCLE;BITCODE_3DPOINT c;
-            if(!e)break;transform_OCS(&c,e->center,e->extrusion);emit_arc_poly(s,aci,parent,c.x,c.y,e->radius,0,2*M_PI,1);break;
+            Dwg_Entity_CIRCLE *e=obj->tio.entity->tio.CIRCLE;BITCODE_3DPOINT c,px,py,inx,iny;
+            if(!e)break;inx=e->center;iny=e->center;inx.x+=e->radius;iny.y+=e->radius;transform_OCS(&c,e->center,e->extrusion);transform_OCS(&px,inx,e->extrusion);transform_OCS(&py,iny,e->extrusion);
+            emit_arc_curve(s,aci,parent,c.x,c.y,px.x-c.x,px.y-c.y,py.x-c.x,py.y-c.y,0,2*M_PI,1);break;
         }
         case DWG_TYPE_ARC:{
-            Dwg_Entity_ARC *e=obj->tio.entity->tio.ARC;BITCODE_3DPOINT c;
-            if(!e)break;transform_OCS(&c,e->center,e->extrusion);emit_arc_poly(s,aci,parent,c.x,c.y,e->radius,e->start_angle,e->end_angle,0);break;
+            Dwg_Entity_ARC *e=obj->tio.entity->tio.ARC;BITCODE_3DPOINT c,px,py,inx,iny;
+            if(!e)break;inx=e->center;iny=e->center;inx.x+=e->radius;iny.y+=e->radius;transform_OCS(&c,e->center,e->extrusion);transform_OCS(&px,inx,e->extrusion);transform_OCS(&py,iny,e->extrusion);
+            emit_arc_curve(s,aci,parent,c.x,c.y,px.x-c.x,px.y-c.y,py.x-c.x,py.y-c.y,e->start_angle,e->end_angle,0);break;
         }
         case DWG_TYPE_POINT:{
             Dwg_Entity_POINT *e=obj->tio.entity->tio.POINT;BITCODE_3DPOINT in={e->x,e->y,e->z},p;
             if(!e)break;transform_OCS(&p,in,e->extrusion);emit_point(s,aci,parent,p.x,p.y);break;
         }
         case DWG_TYPE_ELLIPSE:{
-            Dwg_Entity_ELLIPSE *e=obj->tio.entity->tio.ELLIPSE;if(e)emit_ellipse_poly(s,aci,parent,e);break;
+            Dwg_Entity_ELLIPSE *e=obj->tio.entity->tio.ELLIPSE;if(e)emit_ellipse_curve(s,aci,parent,e);break;
         }
         case DWG_TYPE_LWPOLYLINE:{
             Dwg_Entity_LWPOLYLINE *e=obj->tio.entity->tio.LWPOLYLINE;if(!e)break;int error=0;BITCODE_RL n=dwg_ent_lwpline_get_numpoints(e,&error);if(error||n<2)break;
@@ -198,8 +202,8 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
     if(!dwg||!scene)return -1;memset(scene,0,sizeof(*scene));
-    if(!reserve_scene(scene,6))return -2;
-    for(int i=0;i<6;i++)pushf(scene,0);
+    if(!reserve_scene(scene,7))return -2;
+    for(int i=0;i<7;i++)pushf(scene,0);
     Dwg_Object_Ref *model=dwg_model_space_ref(dwg);
     if(model&&model->obj){
         Dwg_Object *obj=get_first_owned_entity(model->obj);
@@ -218,7 +222,7 @@ int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
     if(scene->max_x-scene->min_x<1e-9){scene->min_x-=.5;scene->max_x+=.5;}
     if(scene->max_y-scene->min_y<1e-9){scene->min_y-=.5;scene->max_y+=.5;}
     scene->values[0]=MUSA_SCENE_VERSION;scene->values[1]=(float)scene->primitives;
-    scene->values[2]=(float)scene->min_x;scene->values[3]=(float)scene->min_y;scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;
+    scene->values[2]=(float)scene->min_x;scene->values[3]=(float)scene->min_y;scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;scene->values[6]=scene->truncated?1.0f:0.0f;
     return scene->truncated?1:0;
 }
 void musa_scene_free(MusaNativeScene *scene){if(!scene)return;free(scene->values);memset(scene,0,sizeof(*scene));}
