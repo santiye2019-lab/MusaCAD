@@ -1056,7 +1056,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Native DWG motoru açılıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     NativeScene fast=null;
-                    try{fast=engine.fastScene();}catch(IOException ignored){}
+                    try{fast=engine.fastScene();}catch(IOException|OutOfMemoryError ignored){}
                     Bitmap embeddedPreview=null;
                     if(fast==null){try{embeddedPreview=DwgPreview.read(loaded.file);}catch(Exception ignored){}}
                     if(fast!=null||embeddedPreview!=null){

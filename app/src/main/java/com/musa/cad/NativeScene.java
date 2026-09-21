@@ -14,6 +14,11 @@ public final class NativeScene {
     private final Matrix worldToContent;
     private final RectF worldBounds;
     private final Grid grid;
+    private final Paint drawPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Matrix combinedMatrix=new Matrix(),inverseMatrix=new Matrix(),localMatrix=new Matrix(),targetMatrix=new Matrix();
+    private final RectF visibleRect=new RectF();
+    private final float[] drawLine=new float[4],drawPoint=new float[2];
+    private final Path drawPath=new Path();
     public final int primitiveCount;
     public final boolean truncated;
 
@@ -57,7 +62,11 @@ public final class NativeScene {
     /** Small vector thumbnail without allocating the old full-size raster preview. */
     public Bitmap thumbnail(int width,int height){
         int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(Color.rgb(18,24,30));
-        Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);draw(canvas,fit);return out;
+        Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);
+        Matrix combined=new Matrix();combined.setConcat(fit,worldToContent);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);
+        float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
+        for(int i=0;i<offsets.length;i++)drawPrimitive(i,canvas,paint,combined,line,point,path,local,target);
+        return out;
     }
 
     public PointF contentToWorld(float x,float y){
@@ -70,9 +79,11 @@ public final class NativeScene {
 
     public void draw(Canvas canvas,Matrix contentToScreen){
         if(canvas==null||contentToScreen==null)return;
-        Matrix combined=new Matrix();combined.setConcat(contentToScreen,worldToContent);
-        Rect clip=canvas.getClipBounds();RectF visible=new RectF(clip);Matrix inv=new Matrix();if(combined.invert(inv)){inv.mapRect(visible);float pad=Math.max(worldBounds.width(),worldBounds.height())*.001f;visible.inset(-pad,-pad);}else visible=null;
-        Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);grid.draw(canvas,paint,combined,visible);
+        combinedMatrix.setConcat(contentToScreen,worldToContent);
+        Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;
+        if(combinedMatrix.invert(inverseMatrix)){inverseMatrix.mapRect(visibleRect);float pad=Math.max(worldBounds.width(),worldBounds.height())*.001f;visibleRect.inset(-pad,-pad);visible=visibleRect;}
+        drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
+        grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix);
     }
 
     private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
@@ -96,8 +107,8 @@ public final class NativeScene {
             this.area=new RectF(area);cells=bounds.length>60000?64:bounds.length>10000?48:32;cw=Math.max(1e-9f,area.width()/cells);ch=Math.max(1e-9f,area.height()/cells);epsilon=Math.max(1e-7f,Math.max(area.width(),area.height())*1e-7f);buckets=new IntList[cells*cells];seen=new int[bounds.length];
             for(int i=0;i<bounds.length;i++){RectF b=bounds[i];int x0=x(b.left),x1=x(b.right),y0=y(b.top),y1=y(b.bottom);int span=(x1-x0+1)*(y1-y0+1);if(span>64){overflow.add(i);continue;}for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++){int at=yy*cells+xx;if(buckets[at]==null)buckets[at]=new IntList();buckets[at].add(i);}}
         }
-        void draw(Canvas c,Paint p,Matrix m,RectF visible){
-            int mark=nextMark();float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
+        void draw(Canvas c,Paint p,Matrix m,RectF visible,float[]line,float[]point,Path path,Matrix local,Matrix target){
+            int mark=nextMark();
             if(visible==null){for(int i=0;i<offsets.length;i++)drawOne(i,c,p,m,line,point,path,local,target,mark,null);return;}
             drawList(overflow,c,p,m,line,point,path,local,target,mark,visible);if(!overlaps(area,visible,epsilon))return;int x0=x(visible.left),x1=x(visible.right),y0=y(visible.top),y1=y(visible.bottom);for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++)drawList(buckets[yy*cells+xx],c,p,m,line,point,path,local,target,mark,visible);
         }
