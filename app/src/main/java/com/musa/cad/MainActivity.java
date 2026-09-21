@@ -40,8 +40,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static final class ProjectSession {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
-        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;
+        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         void dispose(){
+            LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
             if(owned!=null&&!owned.isRecycled())owned.recycle();
             if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();
@@ -1010,6 +1011,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void open(){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden yeni dosya açılamaz",Toast.LENGTH_SHORT).show();return;}
+        if(hasPreparingProject()){Toast.makeText(this,"Açık DWG'nin tam düzenleme modeli hazırlanıyor; mevcut sekmeler kullanılabilir",Toast.LENGTH_SHORT).show();return;}
         startActivityForResult(new Intent(this,RecentFilesActivity.class),OPEN);
     }
     @Override protected void onActivityResult(int r,int c,Intent data){
@@ -1024,6 +1026,7 @@ public class MainActivity extends AppCompatActivity {
         if(uri==null)return;
         ProjectSession existing=findProject(uri);
         if(existing!=null){activateProject(existing);return;}
+        if(hasPreparingProject()){Toast.makeText(this,"Açık DWG'nin tam düzenleme modeli hazırlanıyor; yeni dosya bundan sonra açılabilir",Toast.LENGTH_SHORT).show();return;}
         if(projects.size()>=MAX_OPEN_PROJECTS){
             Toast.makeText(this,"Performans için aynı anda en fazla "+MAX_OPEN_PROJECTS+" proje açık tutulur. Bir sekmeye uzun basıp kapatın.",Toast.LENGTH_LONG).show();return;
         }
@@ -1066,8 +1069,10 @@ public class MainActivity extends AppCompatActivity {
                             try{
                                 if(activeLoad!=task||isFinishing()||isDestroyed())return;
                                 if(task.dialog!=null)task.dialog.dismiss();
+                                activeLoad=null;project.prepareTask=task;
                                 projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
-                                result.setText((project.nativeScene!=null?"Native hızlı görünüm":"Hızlı DWG önizleme")+" hazır • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
+                                String partial=project.nativeScene!=null&&project.nativeScene.truncated?" • hızlı sahne kısmi":"";
+                                result.setText((project.nativeScene!=null?"Native hızlı görünüm":"Hızlı DWG önizleme")+" hazır"+partial+" • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
                             }finally{attached.countDown();}
                         });
                         try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
@@ -1093,7 +1098,7 @@ public class MainActivity extends AppCompatActivity {
                         if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
                         Bitmap oldPreview=project.bitmap;
-                        project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
+                        project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
@@ -1118,7 +1123,7 @@ public class MainActivity extends AppCompatActivity {
                     if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
                     runOnUiThread(()->{
                         if(activeLoad==task)activeLoad=null;
-                        if(projects.contains(project)){project.preparingEditor=false;project.prepareError=message;if(currentProject==project){updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
+                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
                     });
                 }else{
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
@@ -1132,6 +1137,7 @@ public class MainActivity extends AppCompatActivity {
         for(ProjectSession p:projects)if(p.sourceUri!=null&&key.equals(p.sourceUri.toString()))return p;
         return null;
     }
+    private boolean hasPreparingProject(){for(ProjectSession p:projects)if(p.preparingEditor)return true;return false;}
 
     private void captureCurrentProject(){
         if(currentProject==null)return;
@@ -1165,7 +1171,7 @@ public class MainActivity extends AppCompatActivity {
             String fallback=(activeDxf.fontFallbacks.isEmpty()&&!activeDxf.externalShapeFallback)?"":"  •  SHX fallback";
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);
         }else if(currentProject.nativeScene!=null){
-            if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri  •  tam vektör hazırlanıyor");
+            if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
             else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
             else result.setText("Hazır  •  Native DWG görünümü");
         }else if(currentProject.preparingEditor)result.setText("Hazır  •  Hızlı DWG önizleme  •  tam vektör hazırlanıyor");
