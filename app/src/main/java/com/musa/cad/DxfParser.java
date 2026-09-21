@@ -73,7 +73,7 @@ public final class DxfParser {
         public void drawVector(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(imageMatrix,view);
             drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayers,false,false,globalLineTypeScale);
-            Rect clip=canvas.getClipBounds();RectF visibleWorld=new RectF(clip);Matrix inverse=new Matrix();if(!combined.invert(inverse))visibleWorld=null;else {inverse.mapRect(visibleWorld);visibleWorld.inset(-1f,-1f);}
+            Rect clip=canvas.getClipBounds();RectF visibleWorld=new RectF(clip);Matrix inverse=new Matrix();if(!combined.invert(inverse))visibleWorld=null;else {inverse.mapRect(visibleWorld);if(clip.width()>0&&clip.height()>0){float worldPerPixel=Math.max(visibleWorld.width()/clip.width(),visibleWorld.height()/clip.height());float pad=worldPerPixel*10f;visibleWorld.inset(-pad,-pad);}}
             spatialIndex.draw(canvas,paint,combined,visibleWorld,hiddenIds,globalLineTypeScale);
         }
         public void drawPreview(Canvas canvas,Matrix contentToScreen,Paint paint){
@@ -103,7 +103,7 @@ public final class DxfParser {
             boundsValid=Float.isFinite(r.left)&&Float.isFinite(r.top)&&Float.isFinite(r.right)&&Float.isFinite(r.bottom)&&r.right>=r.left&&r.bottom>=r.top;
             if(boundsValid){boundLeft=r.left;boundTop=r.top;boundRight=r.right;boundBottom=r.bottom;}return boundsValid;
         }
-        boolean intersects(RectF visible){if(unbounded||visible==null)return true;if(!ensureBounds())return true;float left=boundLeft,top=boundTop,right=boundRight,bottom=boundBottom;if(right-left<.001f){left-=.5f;right+=.5f;}if(bottom-top<.001f){top-=.5f;bottom+=.5f;}return left<visible.right&&visible.left<right&&top<visible.bottom&&visible.top<bottom;}
+        boolean intersects(RectF visible){if(unbounded||visible==null)return true;if(!ensureBounds())return true;return boundRight>=visible.left&&visible.right>=boundLeft&&boundBottom>=visible.top&&visible.bottom>=boundTop;}
         public void bounds(RectF b){if(!ensureBounds())return;add(b,boundLeft,boundTop);add(b,boundRight,boundBottom);}public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean mono,double global){p.setColor(mono?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));DxfLineStyle.Dash dash=linePattern==null?null:linePattern.dash(matrixScale(m),global,lineTypeScale,blockScale);p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));entity.draw(c,p,m);p.setPathEffect(null);drawComplexLineText(c,p,m,entity,linePattern,global,lineTypeScale,blockScale);}
     }
 
