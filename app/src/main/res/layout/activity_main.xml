@@ -265,7 +265,7 @@
             android:textColor="@color/editor_cyan"
             android:textStyle="bold"
             android:textSize="11sp"
-            android:background="@drawable/feature_chip_bg" />
+            android:background="@drawable/command_label_bg" />
 
         <EditText
             android:id="@+id/commandInput"
@@ -281,7 +281,7 @@
             android:textSize="9.5sp"
             android:paddingStart="10dp"
             android:paddingEnd="8dp"
-            android:background="@drawable/feature_chip_bg"
+            android:background="@drawable/command_input_bg"
             android:imeOptions="actionDone"
             android:inputType="textCapCharacters" />
 
@@ -302,7 +302,7 @@
             android:textColor="#FFFFFF"
             android:textStyle="bold"
             android:textSize="9sp"
-            android:background="@drawable/feature_chip_bg" />
+            android:background="@drawable/language_chip_bg" />
     </LinearLayout>
 
     <!-- CAD canvas: maximized between tool areas -->
