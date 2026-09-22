@@ -391,8 +391,7 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- Reserved host for the reference-style expandable category panel.
-             Checkpoint-01 defines the shell only; category contents are wired in later checkpoints. -->
+        <!-- Reference-style expandable category panel used by all editor tool groups. -->
         <LinearLayout
             android:id="@+id/toolPanelHost"
             android:layout_width="match_parent"
@@ -533,15 +532,14 @@
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_layers"
                 android:contentDescription="Katmanlar"
-                android:background="@drawable/top_action_bg"
+                android:background="@drawable/right_rail_button_bg"
                 android:padding="9dp"
                 android:enabled="false"
                 android:alpha="0.45" />
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Reference-style bottom category navigation.
-         Existing command engine remains intact; category wiring is added checkpoint by checkpoint. -->
+    <!-- Reference-style bottom category navigation; existing CAD command engine remains intact. -->
     <HorizontalScrollView
         android:id="@+id/categoryScroll"
         android:layout_width="match_parent"
