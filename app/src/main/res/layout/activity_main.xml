@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#061421">
+    android:background="@color/cad_bg">
 
     <!-- Reference header: compact, single-line MusaCAD brand -->
     <LinearLayout
@@ -13,7 +13,7 @@
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
-        android:background="#082A42">
+        android:background="@color/editor_header">
 
         <ImageButton
             android:id="@+id/menuButton"
@@ -62,7 +62,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="DWG / DXF"
-                android:textColor="#9FC4DB"
+                android:textColor="@color/editor_text_secondary"
                 android:textSize="8sp"
                 android:singleLine="true"
                 android:maxLines="1"
@@ -110,7 +110,7 @@
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
-        android:background="#071D2C">
+        android:background="@color/editor_file_bar">
 
         <TextView
             android:id="@+id/fileName"
@@ -159,7 +159,7 @@
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:text="Sahne görünümü ▾"
-            android:textColor="#FFC766"
+            android:textColor="@color/editor_mode_warn"
             android:textStyle="bold"
             android:textSize="8sp"
             android:singleLine="true"
@@ -177,7 +177,7 @@
         android:paddingEnd="4dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
-        android:background="#071927">
+        android:background="@color/editor_toolbar">
 
         <Button
             android:id="@+id/layersButton"
@@ -251,7 +251,7 @@
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
-        android:background="#061623">
+        android:background="@color/editor_command_bar">
 
         <TextView
             android:id="@+id/commandLabel"
@@ -259,7 +259,7 @@
             android:layout_height="34dp"
             android:gravity="center"
             android:text="Komut:"
-            android:textColor="#35D7FF"
+            android:textColor="@color/editor_cyan"
             android:textStyle="bold"
             android:textSize="11sp"
             android:background="@drawable/feature_chip_bg" />
@@ -274,7 +274,7 @@
             android:maxLines="1"
             android:hint="L, PL, C, REC, M, CO, RO, E, LA..."
             android:textColor="#FFFFFF"
-            android:textColorHint="#759BB2"
+            android:textColorHint="@color/editor_text_dim"
             android:textSize="9.5sp"
             android:paddingStart="10dp"
             android:paddingEnd="8dp"
@@ -308,7 +308,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#07131D">
+        android:background="@color/editor_canvas">
 
         <com.musa.cad.CadView
             android:id="@+id/cadView"
@@ -417,7 +417,7 @@
                     android:layout_weight="1"
                     android:gravity="center_vertical"
                     android:text="Araçlar"
-                    android:textColor="#35D7FF"
+                    android:textColor="@color/editor_cyan"
                     android:textStyle="bold"
                     android:textSize="13sp" />
 
@@ -538,7 +538,7 @@
         android:fillViewport="false"
         android:scrollbars="none"
         android:overScrollMode="never"
-        android:background="#081B2A">
+        android:background="@color/editor_category_bar">
 
         <LinearLayout
             android:id="@+id/bottomCategoryBar"

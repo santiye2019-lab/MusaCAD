@@ -4,4 +4,16 @@
     <color name="tool_text_dim">#9CB9C8</color>
     <color name="cad_bg">#061421</color>
     <color name="cad_panel">#071927</color>
+    <color name="editor_header">#082A42</color>
+    <color name="editor_file_bar">#071D2C</color>
+    <color name="editor_toolbar">#071927</color>
+    <color name="editor_command_bar">#061623</color>
+    <color name="editor_canvas">#07131D</color>
+    <color name="editor_category_bar">#081B2A</color>
+    <color name="editor_cyan">#35D7FF</color>
+    <color name="editor_text_primary">#FFFFFF</color>
+    <color name="editor_text_secondary">#9FC4DB</color>
+    <color name="editor_text_dim">#759BB2</color>
+    <color name="editor_mode_warn">#FFC766</color>
 </resources>
+
