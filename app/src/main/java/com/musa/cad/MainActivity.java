@@ -61,7 +61,9 @@ public class MainActivity extends AppCompatActivity {
     private String currentDisplayName="cizim.dwg";
     private View[] modeButtons;
     private int[] categoryButtons;
-    private View welcomePanel,shareButton,shareToolButton;
+    private View welcomePanel,shareButton,shareToolButton,toolPanelHost;
+    private TextView toolPanelTitle;
+    private GridLayout toolPanelGrid;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
     private String lastCommandRaw="";
@@ -77,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
         editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);projectTabsBox=findViewById(R.id.projectTabsBox);commandInput=findViewById(R.id.commandInput);
         shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);
+        toolPanelHost=findViewById(R.id.toolPanelHost);toolPanelTitle=findViewById(R.id.toolPanelTitle);toolPanelGrid=findViewById(R.id.toolPanelGrid);
+        findViewById(R.id.toolPanelClose).setOnClickListener(v->hideToolPanel());
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
             public void onCalibrationRequested(double px){showCalibration();}
@@ -89,10 +93,10 @@ public class MainActivity extends AppCompatActivity {
         markModeSelected(R.id.panButton);
         categoryButtons=new int[]{R.id.groupAnnotateToolsButton,R.id.groupLineToolsButton,R.id.groupEditToolsButton,R.id.groupLayerToolsButton,R.id.groupMeasureToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupMoreToolsButton,R.id.groupLayoutToolsButton,R.id.groupViewToolsButton};
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.toolPanelClose,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
-        findViewById(R.id.menuButton).setOnClickListener(this::showMainMenu);findViewById(R.id.headerMoreButton).setOnClickListener(this::showMainMenu);findViewById(R.id.appTitle).setOnClickListener(this::showMainMenu);
+        findViewById(R.id.menuButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.headerMoreButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.appTitle).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});
         findViewById(R.id.closeFileButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)Toast.makeText(this,"Açık proje yok",Toast.LENGTH_SHORT).show();else requestCloseProject(currentProject);});
         findViewById(R.id.nativeModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)result.setText("DWG Native • Önce çizim açın");else if(currentProject.nativeScene!=null)result.setText("DWG Native • hızlı sahne etkin");else result.setText("Vektör görünüm • tam çizim modeli");});
         findViewById(R.id.sceneModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);showViewToolsSheet();});
@@ -594,6 +598,38 @@ public class MainActivity extends AppCompatActivity {
 
     private ToolAction tool(String label,int icon,Runnable action){return new ToolAction(label,icon,action);}
 
+    private void hideToolPanel(){
+        if(toolPanelHost!=null)toolPanelHost.setVisibility(View.GONE);
+    }
+
+    private void showToolPanel(String title,ToolAction...tools){
+        if(toolPanelHost==null||toolPanelGrid==null||toolPanelTitle==null)return;
+        toolPanelTitle.setText(title);
+        toolPanelGrid.removeAllViews();
+        for(ToolAction item:tools){
+            Button b=new Button(this);
+            b.setText(item.label);
+            b.setTextColor(0xFFF1F7FA);
+            b.setTextSize(9f);
+            b.setAllCaps(false);
+            b.setGravity(Gravity.CENTER);
+            b.setCompoundDrawablesWithIntrinsicBounds(0,item.icon,0,0);
+            b.setCompoundDrawablePadding(dp(5));
+            b.setBackgroundResource(R.drawable.tool_tile_bg);
+            b.setPadding(dp(2),dp(7),dp(2),dp(5));
+            b.setMinWidth(0);b.setMinHeight(0);b.setSingleLine(false);b.setMaxLines(2);
+            boolean enabled=item.action!=null;b.setEnabled(enabled);b.setAlpha(enabled?1f:.38f);
+            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();
+            lp.width=0;lp.height=dp(78);lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);
+            lp.setMargins(dp(2),dp(2),dp(2),dp(2));
+            toolPanelGrid.addView(b,lp);
+            if(enabled)b.setOnClickListener(v->{hideToolPanel();item.action.run();});
+            installInteractiveFeedback(b);
+        }
+        toolPanelHost.setVisibility(View.VISIBLE);
+        toolPanelHost.bringToFront();
+    }
+
     private void showToolSheet(String title,ToolAction...tools){
         BottomSheetDialog sheet=new BottomSheetDialog(this);
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);int pad=dp(12);root.setPadding(pad,pad,pad,dp(18));root.setBackgroundColor(0xFF071A27);
@@ -611,11 +647,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showLineToolsSheet(){
-        showToolSheet("Çizgi Araçları",
-            tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
-            tool("Çoklu Çizgi",R.drawable.ic_polyline,()->selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE)),
+        showToolPanel("Çiz",
+            tool("Polyline",R.drawable.ic_polyline,()->selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE)),
+            tool("Eskiz",R.drawable.ic_line,null),
+            tool("Daire",R.drawable.ic_circle,()->selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE)),
             tool("Yay",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARC);markModeSelected(0);result.setText("Yay • 3 nokta seçin");}}),
-            tool("XLine",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("XLine • İki nokta seçin");}})
+            tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
+            tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
+            tool("Akıllı Kalem",R.drawable.ic_line,null),
+            tool("Multileader",R.drawable.ic_text,null),
+            tool("Revcloud",R.drawable.ic_polyline,null),
+            tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand)
         );
     }
 
