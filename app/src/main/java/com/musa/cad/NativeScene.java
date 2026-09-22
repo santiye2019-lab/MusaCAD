@@ -26,28 +26,33 @@ public final class NativeScene {
     static NativeScene fromRaw(float[] values)throws IOException{
         if(values==null||values.length<6)throw new IOException("Native sahne üretilemedi");
         int version=Math.round(values[0]);
-        if(version!=1&&version!=2)throw new IOException("Native sahne sürümü desteklenmiyor");
+        if(version!=1&&version!=2&&version!=3)throw new IOException("Native sahne sürümü desteklenmiyor");
         int expected=Math.max(0,Math.round(values[1]));
         RectF wb=new RectF(values[2],values[3],values[4],values[5]);
         if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
         boolean truncated=version>=2&&values.length>=7&&values[6]!=0f;
         int p=version>=2?7:6;
-        int maxPossible=Math.max(1,(values.length-p)/4);
+        int maxPossible=Math.max(1,(values.length-p)/(version>=3?3:4));
         int initial=expected>0?Math.min(expected,maxPossible):Math.min(1024,maxPossible);
         int[] os=new int[Math.max(1,initial)];
         float[] bs=new float[Math.max(4,os.length*4)];
         int count=0;
         RectF b=new RectF();
         while(p<values.length){
-            int start=p,type=Math.round(values[p++]);b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+            int start=p,encoded=Math.round(values[p++]),type;
+            if(version>=3)type=encoded>>>8;else{type=encoded;if(p>=values.length)break;p++;}
+            b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
             if(type==1){
-                if(p+5>values.length)break;p++;float x1=values[p++],y1=values[p++],x2=values[p++],y2=values[p++];add(b,x1,y1);add(b,x2,y2);
+                if(p+4>values.length)break;float x1=values[p++],y1=values[p++],x2=values[p++],y2=values[p++];add(b,x1,y1);add(b,x2,y2);
             }else if(type==2){
-                if(p+3>values.length)break;p+=2;int n=Math.round(values[p++]);if(n<2||p+n*2>values.length)break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
+                int n;
+                if(version>=3){if(p>=values.length)break;n=Math.abs(Math.round(values[p++]));}
+                else{if(p+2>values.length)break;p++;n=Math.round(values[p++]);}
+                if(n<2||p+n*2>values.length)break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
             }else if(type==3){
-                if(p+3>values.length)break;p++;add(b,values[p++],values[p++]);
+                if(p+2>values.length)break;add(b,values[p++],values[p++]);
             }else if(type==4){
-                if(p+9>values.length)break;p++;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
+                if(p+8>values.length)break;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
                 float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
             }else break;
             if(valid(b)){
@@ -63,11 +68,12 @@ public final class NativeScene {
         int[] offsets=os;float[] bounds=bs;
         Matrix view=new Matrix();float scale=Math.min((SIZE-2f*MARGIN)/wb.width(),(SIZE-2f*MARGIN)/wb.height());
         view.postTranslate(-wb.left,-wb.bottom);view.postScale(scale,-scale);view.postTranslate(MARGIN+(SIZE-2*MARGIN-wb.width()*scale)/2f,MARGIN+(SIZE-2*MARGIN-wb.height()*scale)/2f);
-        return new NativeScene(values,offsets,bounds,view,wb,truncated||expected>offsets.length);
+        return new NativeScene(values,offsets,bounds,view,wb,truncated||expected>offsets.length,version);
     }
 
-    private NativeScene(float[] raw,int[] offsets,float[] bounds,Matrix view,RectF worldBounds,boolean truncated){
-        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;grid=new Grid(bounds,worldBounds);
+    private final int streamVersion;
+    private NativeScene(float[] raw,int[] offsets,float[] bounds,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
+        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;this.streamVersion=streamVersion;grid=new Grid(bounds,worldBounds);
     }
 
     public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
@@ -106,11 +112,15 @@ public final class NativeScene {
     }
 
     private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
-        int p=offsets[index],type=Math.round(raw[p++]),aci=Math.round(raw[p++]);paint.setColor(DxfColor.aciArgb(aci));
+        int p=offsets[index],encoded=Math.round(raw[p++]),type,aci;
+        if(streamVersion>=3){type=encoded>>>8;aci=encoded&255;}else{type=encoded;aci=Math.round(raw[p++]);}
+        paint.setColor(DxfColor.aciArgb(aci));
         if(type==1){
             line[0]=raw[p++];line[1]=raw[p++];line[2]=raw[p++];line[3]=raw[p++];matrix.mapPoints(line);canvas.drawLine(line[0],line[1],line[2],line[3],paint);
         }else if(type==2){
-            boolean closed=raw[p++]!=0;int n=Math.round(raw[p++]);path.rewind();for(int i=0;i<n;i++){point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);if(i==0)path.moveTo(point[0],point[1]);else path.lineTo(point[0],point[1]);}if(closed)path.close();canvas.drawPath(path,paint);
+            boolean closed;int n;
+            if(streamVersion>=3){int signed=Math.round(raw[p++]);closed=signed<0;n=Math.abs(signed);}else{closed=raw[p++]!=0;n=Math.round(raw[p++]);}
+            path.rewind();for(int i=0;i<n;i++){point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);if(i==0)path.moveTo(point[0],point[1]);else path.lineTo(point[0],point[1]);}if(closed)path.close();canvas.drawPath(path,paint);
         }else if(type==3){
             point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);float r=3.5f;canvas.drawLine(point[0]-r,point[1],point[0]+r,point[1],paint);canvas.drawLine(point[0],point[1]-r,point[0],point[1]+r,paint);
         }else if(type==4){

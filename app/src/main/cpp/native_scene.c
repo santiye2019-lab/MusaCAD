@@ -13,9 +13,11 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define MUSA_SCENE_VERSION 2.0f
-/* Fast scene is temporary; bound peak native + Java copies on very large DWGs. */
-#define MUSA_SCENE_MAX_FLOATS (8u*1024u*1024u)
+#define MUSA_SCENE_VERSION 3.0f
+/* v3 packs primitive metadata to keep first paint complete on dense DWGs.
+   The modest 9M cap limits native + Java transfer peaks while allowing the
+   Karagumruk reference drawing to stay untruncated after packing. */
+#define MUSA_SCENE_MAX_FLOATS (9u*1024u*1024u)
 #define MUSA_MAX_BLOCK_DEPTH 24
 
 typedef struct { double a,b,c,d,tx,ty; } Affine2;
@@ -47,6 +49,9 @@ static int reserve_scene(MusaNativeScene *s,size_t extra){
     s->values=next;s->capacity=cap;return 1;
 }
 static int pushf(MusaNativeScene *s,float v){if(!reserve_scene(s,1))return 0;s->values[s->count++]=v;return 1;}
+static int push_code(MusaNativeScene *s,int type,int aci){
+    return pushf(s,(float)(type*256+(aci&255)));
+}
 static void add_bounds(MusaNativeScene *s,double x,double y){
     if(!finite2(x,y))return;
     if(!s->has_bounds){s->min_x=s->max_x=x;s->min_y=s->max_y=y;s->has_bounds=1;return;}
@@ -77,17 +82,17 @@ static int entity_aci(Dwg_Object *obj){
 }
 static int emit_line(MusaNativeScene *s,int aci,Affine2 m,double x1,double y1,double x2,double y2){
     double ax,ay,bx,by;map2(m,x1,y1,&ax,&ay);map2(m,x2,y2,&bx,&by);
-    if(!finite2(ax,ay)||!finite2(bx,by)||!reserve_scene(s,6))return 0;
-    pushf(s,1);pushf(s,(float)aci);pushf(s,(float)ax);pushf(s,(float)ay);pushf(s,(float)bx);pushf(s,(float)by);
+    if(!finite2(ax,ay)||!finite2(bx,by)||!reserve_scene(s,5))return 0;
+    push_code(s,1,aci);pushf(s,(float)ax);pushf(s,(float)ay);pushf(s,(float)bx);pushf(s,(float)by);
     add_bounds(s,ax,ay);add_bounds(s,bx,by);s->primitives++;return 1;
 }
 static int emit_point(MusaNativeScene *s,int aci,Affine2 m,double x,double y){
-    double ax,ay;map2(m,x,y,&ax,&ay);if(!finite2(ax,ay)||!reserve_scene(s,4))return 0;
-    pushf(s,3);pushf(s,(float)aci);pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);s->primitives++;return 1;
+    double ax,ay;map2(m,x,y,&ax,&ay);if(!finite2(ax,ay)||!reserve_scene(s,3))return 0;
+    push_code(s,3,aci);pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);s->primitives++;return 1;
 }
 static int begin_poly(MusaNativeScene *s,int aci,int closed,int n){
-    if(n<2||!reserve_scene(s,4u+(size_t)n*2u))return 0;
-    pushf(s,2);pushf(s,(float)aci);pushf(s,closed?1.0f:0.0f);pushf(s,(float)n);return 1;
+    if(n<2||!reserve_scene(s,2u+(size_t)n*2u))return 0;
+    push_code(s,2,aci);pushf(s,(float)(closed?-n:n));return 1;
 }
 static void emit_poly_point(MusaNativeScene *s,Affine2 m,double x,double y){
     double ax,ay;map2(m,x,y,&ax,&ay);
@@ -99,8 +104,8 @@ static void finish_poly(MusaNativeScene *s){s->primitives++;}
 static int emit_curve(MusaNativeScene *s,int aci,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double sweep){
     double wcx,wcy,pu_x,pu_y,pv_x,pv_y;map2(m,cx,cy,&wcx,&wcy);map2(m,cx+ux,cy+uy,&pu_x,&pu_y);map2(m,cx+vx,cy+vy,&pv_x,&pv_y);
     ux=pu_x-wcx;uy=pu_y-wcy;vx=pv_x-wcx;vy=pv_y-wcy;
-    if(!finite2(wcx,wcy)||!finite2(ux,uy)||!finite2(vx,vy)||!isfinite(start)||!isfinite(sweep)||fabs(sweep)<1e-12||!reserve_scene(s,10))return 0;
-    pushf(s,4);pushf(s,(float)aci);pushf(s,(float)wcx);pushf(s,(float)wcy);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);pushf(s,(float)start);pushf(s,(float)sweep);
+    if(!finite2(wcx,wcy)||!finite2(ux,uy)||!finite2(vx,vy)||!isfinite(start)||!isfinite(sweep)||fabs(sweep)<1e-12||!reserve_scene(s,9))return 0;
+    push_code(s,4,aci);pushf(s,(float)wcx);pushf(s,(float)wcy);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);pushf(s,(float)start);pushf(s,(float)sweep);
     double rx=hypot(ux,vx),ry=hypot(uy,vy);add_bounds(s,wcx-rx,wcy-ry);add_bounds(s,wcx+rx,wcy+ry);s->primitives++;return 1;
 }
 static void emit_arc_curve(MusaNativeScene *s,int aci,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double end,int full){
