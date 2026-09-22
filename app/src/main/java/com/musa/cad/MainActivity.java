@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private View welcomePanel,shareButton,shareToolButton,toolPanelHost;
     private TextView toolPanelTitle;
     private GridLayout toolPanelGrid;
+    private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
     private String lastCommandRaw="";
@@ -79,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
         editStatusText=findViewById(R.id.editStatusText);tabFileName=findViewById(R.id.tabFileName);projectTabsBox=findViewById(R.id.projectTabsBox);commandInput=findViewById(R.id.commandInput);
         shareButton=findViewById(R.id.shareButton);shareToolButton=findViewById(R.id.shareToolButton);
-        toolPanelHost=findViewById(R.id.toolPanelHost);toolPanelTitle=findViewById(R.id.toolPanelTitle);toolPanelGrid=findViewById(R.id.toolPanelGrid);
+        toolPanelHost=findViewById(R.id.toolPanelHost);toolPanelTitle=findViewById(R.id.toolPanelTitle);toolPanelGrid=findViewById(R.id.toolPanelGrid);categoryScroll=findViewById(R.id.categoryScroll);
         findViewById(R.id.toolPanelClose).setOnClickListener(v->hideToolPanel());
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);}
@@ -1129,7 +1130,18 @@ public class MainActivity extends AppCompatActivity {
     }
     private void selectCategory(int id){
         if(categoryButtons==null)return;
-        for(int categoryId:categoryButtons){View button=findViewById(categoryId);if(button!=null)button.setSelected(categoryId==id);}
+        View selected=null;
+        for(int categoryId:categoryButtons){
+            View button=findViewById(categoryId);
+            if(button!=null){button.setSelected(categoryId==id);if(categoryId==id)selected=button;}
+        }
+        if(selected!=null&&categoryScroll!=null){
+            final View target=selected;
+            categoryScroll.post(()->{
+                int center=target.getLeft()+target.getWidth()/2-categoryScroll.getWidth()/2;
+                categoryScroll.smoothScrollTo(Math.max(0,center),0);
+            });
+        }
     }
     private void openCategory(int id,Runnable action){
         selectCategory(id);
