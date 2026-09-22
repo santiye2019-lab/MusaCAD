@@ -170,7 +170,7 @@
     <LinearLayout
         android:id="@+id/quickToolsBar"
         android:layout_width="match_parent"
-        android:layout_height="62dp"
+        android:layout_height="54dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="4dp"
@@ -182,43 +182,61 @@
         <Button
             android:id="@+id/layersButton"
             style="@style/TopQuickBlue"
-            android:text="Katman"
+            android:layout_width="50dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
+            android:text=""
             android:drawableTop="@drawable/ic_layers"
             android:enabled="false" />
 
         <Button
             android:id="@+id/propertiesButton"
             style="@style/TopQuickPurple"
-            android:text="Özellik"
+            android:layout_width="50dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
+            android:text=""
             android:drawableTop="@drawable/ic_properties"
             android:enabled="false" />
 
         <Button
             android:id="@+id/colorButton"
             style="@style/TopQuickYellow"
-            android:text="Renk"
+            android:layout_width="50dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
+            android:text=""
             android:drawableTop="@drawable/ic_color"
             android:enabled="false" />
 
         <Button
             android:id="@+id/lineTypeButton"
             style="@style/TopQuickOrange"
-            android:text="Çizgi K."
+            android:layout_width="50dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
+            android:text=""
             android:drawableTop="@drawable/ic_line"
             android:enabled="false" />
 
         <Button
             android:id="@+id/pointButton"
             style="@style/TopQuickBlue"
-            android:text="Nokta"
+            android:layout_width="50dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
+            android:text=""
             android:drawableTop="@drawable/ic_point"
             android:enabled="false" />
 
         <CheckBox
             android:id="@+id/snapToggle"
             style="@style/TopQuickTeal"
+            android:layout_width="104dp"
+            android:layout_weight="0"
+            android:layout_height="46dp"
             android:button="@null"
-            android:text="Yakalama"
+            android:text="Yakalama ▾"
             android:drawableTop="@drawable/ic_snap"
             android:checked="true"
             android:enabled="false" />
@@ -296,6 +314,26 @@
             android:id="@+id/cadView"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/resultText"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_gravity="start|top"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="64dp"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="Hazır"
+            android:textColor="#C8DCE6"
+            android:textSize="8.5sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:background="@drawable/feature_chip_bg"
+            android:elevation="3dp" />
+
 
         <ScrollView
             android:id="@+id/welcomePanel"
@@ -595,10 +633,12 @@
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- File tab / finish / save / share / open -->
+    <!-- Legacy project action row: bindings retained, visual surface replaced by reference editor chrome. -->
     <LinearLayout
+        android:id="@+id/legacyProjectActionsBar"
         android:layout_width="match_parent"
         android:layout_height="44dp"
+        android:visibility="gone"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
@@ -697,19 +737,7 @@
             android:padding="9dp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/resultText"
-        android:layout_width="match_parent"
-        android:layout_height="28dp"
-        android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:text="Hazır"
-        android:textColor="#C8DCE6"
-        android:textSize="9sp"
-        android:singleLine="true"
-        android:ellipsize="end"
-        android:background="#061421" />
+
 
     <!-- Existing capability anchors. Kept in the layout so old listeners/modes remain intact.
          Their UI entry points are Measure / Other / command line. -->
