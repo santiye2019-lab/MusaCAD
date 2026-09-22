@@ -454,14 +454,14 @@
         <!-- Right-side reference toolbar -->
         <LinearLayout
             android:id="@+id/rightToolRail"
-            android:layout_width="50dp"
+            android:layout_width="48dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
-            android:layout_marginEnd="5dp"
+            android:layout_marginEnd="6dp"
             android:orientation="vertical"
             android:gravity="center"
             android:padding="4dp"
-            android:background="@drawable/tool_panel_bg">
+            android:background="@drawable/right_rail_bg">
 
             <ImageButton
                 android:id="@+id/panButton"
@@ -469,7 +469,7 @@
                 android:layout_height="38dp"
                 android:src="@drawable/ic_pan"
                 android:contentDescription="Kaydır"
-                android:background="@drawable/top_action_bg"
+                android:background="@drawable/right_rail_button_bg"
                 android:padding="9dp" />
 
             <ImageButton
@@ -479,7 +479,7 @@
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_fit"
                 android:contentDescription="Ekrana sığdır"
-                android:background="@drawable/top_action_bg"
+                android:background="@drawable/right_rail_button_bg"
                 android:padding="9dp" />
 
             <ImageButton
@@ -489,7 +489,7 @@
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_in"
                 android:contentDescription="Yakınlaştır"
-                android:background="@drawable/top_action_bg"
+                android:background="@drawable/right_rail_button_bg"
                 android:padding="9dp" />
 
             <ImageButton
@@ -499,7 +499,7 @@
                 android:layout_marginTop="5dp"
                 android:src="@drawable/ic_zoom_out"
                 android:contentDescription="Uzaklaştır"
-                android:background="@drawable/top_action_bg"
+                android:background="@drawable/right_rail_button_bg"
                 android:padding="9dp" />
 
             <TextView
@@ -511,7 +511,7 @@
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
                 android:textSize="12sp"
-                android:background="@drawable/tool_tile_blue" />
+                android:background="@drawable/right_rail_mode_selected_bg" />
 
             <TextView
                 android:layout_width="40dp"
@@ -520,11 +520,11 @@
                 android:gravity="center"
                 android:text="3D"
                 android:enabled="false"
-                android:alpha="0.38"
-                android:textColor="#587487"
+                android:alpha="0.45"
+                android:textColor="#6A8795"
                 android:textStyle="bold"
                 android:textSize="12sp"
-                android:background="@drawable/feature_chip_bg" />
+                android:background="@drawable/right_rail_mode_disabled_bg" />
 
             <ImageButton
                 android:id="@+id/rightLayersButton"
