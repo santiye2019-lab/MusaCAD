@@ -659,6 +659,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Akıllı Kalem",R.drawable.ic_line,null),
             tool("Multileader",R.drawable.ic_text,null),
             tool("Revcloud",R.drawable.ic_polyline,null),
+            tool("Divide",R.drawable.ic_point,null),
             tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand)
         );
     }
@@ -737,20 +738,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void showAnnotationToolsSheet(){
         showToolPanel("Ek açıklama",
-            tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
-            tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
-            tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
-            tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
-            tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand),
-            tool("Blok",R.drawable.ic_rectangle,this::runBlockCommand),
-            tool("Blok ekle",R.drawable.ic_open_file,this::runInsertCommand),
-            tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
+            tool("Taslak kroki",R.drawable.ic_line,null),
             tool("Ok",R.drawable.ic_line,null),
+            tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
             tool("Revcloud",R.drawable.ic_polyline,null),
             tool("Ses",R.drawable.ic_more,null),
             tool("Görüntü",R.drawable.ic_open_file,null),
             tool("Video",R.drawable.ic_more,null),
             tool("Kılavuz",R.drawable.ic_text,null),
+            tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
+            tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
+            tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
             tool("Numbering",R.drawable.ic_text,null)
         );
     }
