@@ -786,16 +786,63 @@ public class MainActivity extends AppCompatActivity {
             tool("Blok ekle",R.drawable.ic_open_file,this::runInsertCommand),
             tool("Çizgi Tipi",R.drawable.ic_line,this::showSelectedLineType),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
-            tool("Bulmak",R.drawable.ic_select,null),
-            tool("Artımlı Kopya",R.drawable.ic_copy,null),
-            tool("Sayaç bloğu",R.drawable.ic_properties,null),
+            tool("Bulmak",R.drawable.ic_select,()->showEntitySearch(false)),
+            tool("Artımlı Kopya",R.drawable.ic_copy,this::runArrayCommand),
+            tool("Sayaç bloğu",R.drawable.ic_properties,this::showBlockCount),
             tool("Graphic lookup",R.drawable.ic_select,null),
-            tool("Açıklama ara",R.drawable.ic_text,null),
+            tool("Açıklama ara",R.drawable.ic_text,()->showEntitySearch(true)),
             tool("Yer imi",R.drawable.ic_more,null),
             tool("Copy across",R.drawable.ic_copy,null),
             tool("Paste across",R.drawable.ic_copy,null),
             tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
         );
+    }
+
+    private void showBlockCount(){
+        if(activeDxf==null){result.setText("Sayaç bloğu • Önce çizim açın");return;}
+        int count=0;
+        LinkedHashMap<String,Integer> byLayer=new LinkedHashMap<>();
+        for(DxfParser.SourceEntity source:activeDxf.editableSources()){
+            CadEdit edit=source.prototype();
+            if(!"INSERT".equalsIgnoreCase(source.type)&&edit.type!=CadEdit.Type.INSERT)continue;
+            count++;String layer=source.layer==null?"0":source.layer;byLayer.put(layer,byLayer.getOrDefault(layer,0)+1);
+        }
+        StringBuilder detail=new StringBuilder("Toplam blok yerleşimi: ").append(count);
+        int shown=0;
+        for(Map.Entry<String,Integer> entry:byLayer.entrySet()){
+            if(shown++>=12){detail.append("\n…");break;}
+            detail.append("\n").append(entry.getKey()).append(": ").append(entry.getValue());
+        }
+        new AlertDialog.Builder(this).setTitle("Sayaç bloğu").setMessage(detail.toString()).setPositiveButton("TAMAM",null).show();
+        result.setText("Sayaç bloğu • "+count+" blok");
+    }
+
+    private void showEntitySearch(boolean textOnly){
+        if(activeDxf==null){result.setText("Bul • Önce çizim açın");return;}
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint(textOnly?"Açıklama / metin":"Katman, nesne tipi veya metin");
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(textOnly?"Açıklama ara":"Bulmak").setView(input).setPositiveButton("ARA",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String query=input.getText().toString().trim().toLowerCase(Locale.ROOT);
+            if(query.isEmpty()){input.setError("Aranacak ifadeyi girin");return;}
+            int count=0;StringBuilder lines=new StringBuilder();
+            for(DxfParser.SourceEntity source:activeDxf.editableSources()){
+                CadEdit edit=source.prototype();
+                boolean isText="TEXT".equalsIgnoreCase(source.type)||"MTEXT".equalsIgnoreCase(source.type)||edit.type==CadEdit.Type.TEXT;
+                if(textOnly&&!isText)continue;
+                String label=(source.type==null?"":source.type)+" • "+(source.layer==null?"0":source.layer);
+                String text=edit.text==null?"":edit.text;
+                String hay=(label+" "+text).toLowerCase(Locale.ROOT);
+                if(!hay.contains(query))continue;
+                count++;
+                if(count<=30){lines.append(label);if(!text.isEmpty())lines.append(" • ").append(text.replace('\n',' '));lines.append("\n");}
+            }
+            dialog.dismiss();
+            String message=count==0?"Eşleşme bulunamadı":("Eşleşme: "+count+"\n\n"+lines+(count>30?"… İlk 30 sonuç gösteriliyor.":""));
+            TextView out=new TextView(this);out.setText(message);out.setTextIsSelectable(true);int p=dp(16);out.setPadding(p,p/2,p,p);
+            ScrollView scroll=new ScrollView(this);scroll.addView(out);
+            new AlertDialog.Builder(this).setTitle(textOnly?"Açıklama sonuçları":"Bul sonuçları").setView(scroll).setPositiveButton("TAMAM",null).show();
+            result.setText((textOnly?"Açıklama ara":"Bul")+" • "+count+" eşleşme");
+        }));dialog.show();
     }
 
     private void showLayerToolsPanel(){
