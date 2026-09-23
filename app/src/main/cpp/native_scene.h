@@ -15,15 +15,16 @@ typedef struct {
 } MusaNativeScene;
 
 /*
- * Compact float stream, v3:
- * header = [3, primitiveCount, minX, minY, maxX, maxY, truncated]
- * code   = type*256 + ACI
- * LINE   = [code(1), x1, y1, x2, y2]
- * POLY   = [code(2), signedPointCount, x1, y1, ...] (negative count = closed)
- * POINT  = [code(3), x, y]
- * CURVE  = [code(4), cx, cy, ux, uy, vx, vy, startRadians, sweepRadians]
+ * Compact float stream, v4:
+ * header = [4, primitiveCount, minX, minY, maxX, maxY, truncated]
+ * ACI metadata      = [type*256 + ACI]
+ * TrueColor metadata= [-(type*256+1), RGB24]
+ * LINE   = [metadata..., x1, y1, x2, y2]
+ * POLY   = [metadata..., signedPointCount, x1, y1, ...] (negative count = closed)
+ * POINT  = [metadata..., x, y]
+ * CURVE  = [metadata..., cx, cy, ux, uy, vx, vy, startRadians, sweepRadians]
  *          point(t) = center + U*cos(t) + V*sin(t)
- * Java keeps backward parsing for v1/v2 scenes.
+ * Java keeps backward parsing for v1/v2/v3 scenes.
  */
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene);
 void musa_scene_free(MusaNativeScene *scene);

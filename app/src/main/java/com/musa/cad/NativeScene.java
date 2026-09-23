@@ -26,7 +26,7 @@ public final class NativeScene {
     static NativeScene fromRaw(float[] values)throws IOException{
         if(values==null||values.length<6)throw new IOException("Native sahne üretilemedi");
         int version=Math.round(values[0]);
-        if(version!=1&&version!=2&&version!=3)throw new IOException("Native sahne sürümü desteklenmiyor");
+        if(version!=1&&version!=2&&version!=3&&version!=4)throw new IOException("Native sahne sürümü desteklenmiyor");
         int expected=Math.max(0,Math.round(values[1]));
         RectF wb=new RectF(values[2],values[3],values[4],values[5]);
         if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
@@ -40,7 +40,10 @@ public final class NativeScene {
         RectF b=new RectF();
         while(p<values.length){
             int start=p,encoded=Math.round(values[p++]),type;
-            if(version>=3)type=encoded>>>8;else{type=encoded;if(p>=values.length)break;p++;}
+            if(version>=4&&encoded<0){
+                type=(-encoded-1)>>>8;if(p>=values.length)break;p++;
+            }else if(version>=3)type=encoded>>>8;
+            else{type=encoded;if(p>=values.length)break;p++;}
             b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
             if(type==1){
                 if(p+4>values.length)break;float x1=values[p++],y1=values[p++],x2=values[p++],y2=values[p++];add(b,x1,y1);add(b,x2,y2);
@@ -112,9 +115,12 @@ public final class NativeScene {
     }
 
     private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
-        int p=offsets[index],encoded=Math.round(raw[p++]),type,aci;
-        if(streamVersion>=3){type=encoded>>>8;aci=encoded&255;}else{type=encoded;aci=Math.round(raw[p++]);}
-        paint.setColor(DxfColor.aciArgb(aci));
+        int p=offsets[index],encoded=Math.round(raw[p++]),type,color;
+        if(streamVersion>=4&&encoded<0){
+            type=(-encoded-1)>>>8;color=DxfColor.trueColorArgb(Math.round(raw[p++]));
+        }else if(streamVersion>=3){type=encoded>>>8;color=DxfColor.aciArgb(encoded&255);}
+        else{type=encoded;color=DxfColor.aciArgb(Math.round(raw[p++]));}
+        paint.setColor(color);
         if(type==1){
             line[0]=raw[p++];line[1]=raw[p++];line[2]=raw[p++];line[3]=raw[p++];matrix.mapPoints(line);canvas.drawLine(line[0],line[1],line[2],line[3],paint);
         }else if(type==2){
