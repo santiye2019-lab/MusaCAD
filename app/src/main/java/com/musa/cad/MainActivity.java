@@ -765,7 +765,7 @@ public class MainActivity extends AppCompatActivity {
     private void showAnnotationToolsSheet(){
         showToolPanel("Ek açıklama",
             tool("Taslak kroki",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Taslak kroki • Serbest çizim etkin");}}),
-            tool("Ok",R.drawable.ic_line,null),
+            tool("Ok",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARROW);markModeSelected(0);result.setText("Ok • Önce ok ucunu, sonra kuyruk noktasını seçin");}}),
             tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
             tool("Revcloud",R.drawable.ic_polyline,null),
             tool("Ses",R.drawable.ic_more,null),
