@@ -70,6 +70,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadCommand.java tests/CadCommandTest.java
           java -cp /tmp/musacad-tests CadCommandTest
+      - name: Test reference UI tool parity
+        run: |
+          javac -d /tmp/musacad-tests tests/ReferenceToolParityTest.java
+          java -cp /tmp/musacad-tests ReferenceToolParityTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
