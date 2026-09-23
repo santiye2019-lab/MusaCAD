@@ -110,8 +110,15 @@ public final class NativeScene {
             float pad=worldPerPixel>0f?worldPerPixel*12f:0f;visibleRect.inset(-pad,-pad);visible=visibleRect;
         }
         drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
-        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.18f:0f;
+        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
         grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
+    }
+
+    private int primitiveType(int index){
+        int encoded=Math.round(raw[offsets[index]]);
+        if(streamVersion>=4&&encoded<0)return (-encoded-1)>>>8;
+        if(streamVersion>=3)return encoded>>>8;
+        return encoded;
     }
 
     private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
@@ -155,7 +162,7 @@ public final class NativeScene {
         void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){
             if(seen[index]==mark)return;seen[index]=mark;
             if(visible!=null&&!overlaps(bounds,index,visible,epsilon))return;
-            if(minWorldSpan>0f&&tooSmall(bounds,index,minWorldSpan))return;
+            if(minWorldSpan>0f&&primitiveType(index)!=3&&tooSmall(bounds,index,minWorldSpan))return;
             drawPrimitive(index,c,p,m,line,point,path,local,target);
         }
         int nextMark(){if(query==Integer.MAX_VALUE){Arrays.fill(seen,0);query=1;}return ++query;}
