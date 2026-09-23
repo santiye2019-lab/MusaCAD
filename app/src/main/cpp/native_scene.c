@@ -134,6 +134,19 @@ static void emit_ellipse_curve(MusaNativeScene *s,SceneColor color,Affine2 m,Dwg
     double sweep=e->end_angle-e->start_angle;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
     emit_curve(s,color,m,e->center.x,e->center.y,ux,uy,vx,vy,e->start_angle,sweep);
 }
+static void emit_hatch_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,BITCODE_2RD a,BITCODE_2RD b,double bulge){
+    double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
+    if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
+        BITCODE_2DPOINT ia={a.x,a.y},ib={b.x,b.y},pa,pb;transform_OCS_2d(&pa,ia,extrusion);transform_OCS_2d(&pb,ib,extrusion);emit_line(s,color,parent,pa.x,pa.y,pb.x,pb.y);return;
+    }
+    double theta=4.0*atan(bulge),h=chord*(1.0-bulge*bulge)/(4.0*bulge);
+    double nx=-dy/chord,ny=dx/chord,cx=(a.x+b.x)*0.5+nx*h,cy=(a.y+b.y)*0.5+ny*h;
+    double radius=chord*(1.0+bulge*bulge)/(4.0*fabs(bulge)),start=atan2(a.y-cy,a.x-cx);
+    BITCODE_2DPOINT ic={cx,cy},ix={cx+radius,cy},iy={cx,cy+radius},pc,px,py;
+    transform_OCS_2d(&pc,ic,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
+    emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
+}
+
 static void emit_lw_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Entity_LWPOLYLINE *e,dwg_point_2d a,dwg_point_2d b,double bulge){
     double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
     if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
@@ -227,6 +240,37 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             in.x=e->corner3.x;in.y=e->corner3.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
             in.x=e->corner4.x;in.y=e->corner4.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
             finish_poly(s);break;
+        }
+        case DWG_TYPE_TRACE:{
+            Dwg_Entity_TRACE *e=obj->tio.entity->tio.TRACE;if(!e||!begin_poly(s,color,1,4))break;
+            BITCODE_2DPOINT in,p;
+            in.x=e->corner1.x;in.y=e->corner1.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner2.x;in.y=e->corner2.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner3.x;in.y=e->corner3.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            in.x=e->corner4.x;in.y=e->corner4.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+            finish_poly(s);break;
+        }
+        case DWG_TYPE_HATCH:{
+            Dwg_Entity_HATCH *e=obj->tio.entity->tio.HATCH;if(!e||!e->paths||e->num_paths<=0)break;
+            for(BITCODE_BL pi=0;pi<e->num_paths&&!s->truncated;pi++){
+                Dwg_HATCH_Path *path=&e->paths[pi];
+                if(!(path->flag&2)||!path->polyline_paths||path->num_segs_or_paths<2)continue;
+                BITCODE_BL n=path->num_segs_or_paths;
+                if(path->bulges_present){
+                    BITCODE_BL segments=path->closed?n:n-1;
+                    for(BITCODE_BL i=0;i<segments&&!s->truncated;i++){
+                        BITCODE_BL j=(i+1)%n;
+                        emit_hatch_segment(s,color,parent,e->extrusion,path->polyline_paths[i].point,path->polyline_paths[j].point,path->polyline_paths[i].bulge);
+                    }
+                }else if(begin_poly(s,color,path->closed!=0,(int)n)){
+                    for(BITCODE_BL i=0;i<n;i++){
+                        BITCODE_2DPOINT in={path->polyline_paths[i].point.x,path->polyline_paths[i].point.y},p;
+                        transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+                    }
+                    finish_poly(s);
+                }
+            }
+            break;
         }
         case DWG_TYPE__3DFACE:{
             Dwg_Entity__3DFACE *e=obj->tio.entity->tio._3DFACE;if(!e||!begin_poly(s,color,1,4))break;
