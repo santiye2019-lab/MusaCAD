@@ -98,6 +98,8 @@ public final class DxfParser {
         public Matrix drawingToContentMatrix(){return new Matrix(view);}
         public PointF contentPointFromDrawing(float x,float y){float[]p={x,y};view.mapPoints(p);return new PointF(p[0],p[1]);}
         public PointF drawingPointFromContent(float x,float y){float[]p={x,y};Matrix inv=new Matrix();if(!view.invert(inv))return new PointF(x,y);inv.mapPoints(p);return new PointF(p[0],p[1]);}
+        public CadEdit drawingEditFromContent(CadEdit content){if(content==null)return null;Matrix inv=new Matrix();if(!view.invert(inv))return content.copy();return mapEditToContent(content,inv);}
+        public CadEdit contentEditFromDrawing(CadEdit drawing){return drawing==null?null:mapEditToContent(drawing,view);}
         public boolean hasPhysicalUnits(){return Double.isFinite(millimetersPerUnit)&&millimetersPerUnit>0;}public String drawingUnitName(){return drawingUnitName;}public float drawingAspectRatio(){return contentBounds.height()>0?contentBounds.width()/contentBounds.height():1f;}public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
     }
 

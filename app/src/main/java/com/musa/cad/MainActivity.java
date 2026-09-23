@@ -69,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
+    private CadEdit crossProjectClipboard;
+    private String crossProjectClipboardSource="";
     private String lastCommandRaw="";
 
     @Override protected void onCreate(Bundle b){
@@ -861,10 +863,28 @@ public class MainActivity extends AppCompatActivity {
             tool("Graphic lookup",R.drawable.ic_select,this::showGraphicLookup),
             tool("Açıklama ara",R.drawable.ic_text,()->showEntitySearch(true)),
             tool("Yer imi",R.drawable.ic_more,this::showViewBookmark),
-            tool("Copy across",R.drawable.ic_copy,null),
-            tool("Paste across",R.drawable.ic_copy,null),
+            tool("Copy across",R.drawable.ic_copy,this::copyAcrossProjects),
+            tool("Paste across",R.drawable.ic_copy,this::pasteAcrossProjects),
             tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
         );
+    }
+
+    private void copyAcrossProjects(){
+        if(!ensureSelectedForQuickTool("Copy across"))return;
+        if(activeDxf==null){result.setText("Copy across • Tam vektör model gerekli");return;}
+        CadEdit selected=cad.selectedEntityCopy();
+        CadEdit drawing=activeDxf.drawingEditFromContent(selected);
+        if(drawing==null){result.setText("Copy across • Seçili nesne kopyalanamadı");return;}
+        crossProjectClipboard=drawing;crossProjectClipboardSource=currentDisplayName;
+        result.setText("Copy across • Nesne panoya alındı • "+currentDisplayName);
+    }
+
+    private void pasteAcrossProjects(){
+        if(!canEdit()||activeDxf==null){result.setText("Paste across • Düzenlenebilir bir hedef çizim açın");return;}
+        if(crossProjectClipboard==null){result.setText("Paste across • Önce Copy across ile bir nesne kopyalayın");return;}
+        CadEdit content=activeDxf.contentEditFromDrawing(crossProjectClipboard);
+        if(content==null||!cad.addImportedEdit(content)){result.setText("Paste across • Nesne yapıştırılamadı");return;}
+        result.setText("Paste across • "+(crossProjectClipboardSource.isEmpty()?"Panodaki nesne":crossProjectClipboardSource+" kaynağındaki nesne")+" eklendi");
     }
 
     private void showGraphicLookup(){
