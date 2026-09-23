@@ -5,15 +5,15 @@ import java.util.*;
 /** Non-destructive source-entity mutation state used by CadView. */
 public final class SourceEditSession {
     private static final class Entry {
-        final int id;final SourceRange range;final CadEdit original;String layer;int color;String lineType;double lineTypeScale;int lineWeight;
+        final int id;final SourceRange range;final CadEdit original;String layer;int color,colorMode;String lineType;double lineTypeScale;int lineWeight;
         CadEdit replacement;boolean deleted;
         Entry(int id,SourceRange range,CadEdit original,String layer,int color,String lineType,double lineTypeScale,int lineWeight){
-            this.id=id;this.range=range;this.original=original.copy();this.layer=layer==null?"0":layer;this.color=color;
+            this.id=id;this.range=range;this.original=original.copy();this.layer=layer==null?"0":layer;this.color=color;this.colorMode=SourceReplacement.COLOR_EXPLICIT;
             this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=Double.isFinite(lineTypeScale)&&lineTypeScale>0d?lineTypeScale:1d;
             this.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
         }
         CadEdit current(){return replacement==null?original:replacement;}
-        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.replacement=replacement==null?null:replacement.copy();e.deleted=deleted;return e;}
+        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.colorMode=colorMode;e.replacement=replacement==null?null:replacement.copy();e.deleted=deleted;return e;}
     }
     private static final class Undo {
         final int[] ids;final Entry[] previous;final int selected;
@@ -73,12 +73,17 @@ public final class SourceEditSession {
     public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
         Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
         if(layer!=null&&!layer.trim().isEmpty())e.layer=layer.trim();
-        if(color!=null)e.color=color;
+        if(color!=null){e.color=color;e.colorMode=SourceReplacement.COLOR_EXPLICIT;}
         if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
         if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d)e.lineTypeScale=lineTypeScale;
         if(lineWeight!=null)e.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
         if(e.replacement==null)e.replacement=e.current().copy();
         return true;
+    }
+    public boolean updateSelectedColorMode(int mode){
+        Entry e=entries.get(selected);if(e==null||e.deleted)return false;
+        if(mode!=SourceReplacement.COLOR_BYLAYER&&mode!=SourceReplacement.COLOR_BYBLOCK&&mode!=SourceReplacement.COLOR_EXPLICIT)return false;
+        save(e);e.colorMode=mode;if(e.replacement==null)e.replacement=e.current().copy();return true;
     }
 
     public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
@@ -135,7 +140,7 @@ public final class SourceEditSession {
 
     public List<SourceReplacement> replacementRecords(){
         ArrayList<SourceReplacement> out=new ArrayList<>();
-        for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
+        for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
         return out;
     }
 

@@ -445,6 +445,12 @@ public class CadView extends View {
         if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
         return changed;
     }
+    public boolean updateSelectedColorMode(int mode){
+        if(this.mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        boolean changed=sourceEdits.updateSelectedColorMode(mode);
+        if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
+        return changed;
+    }
 
     public boolean armMoveSelected(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;moveSelectedArmed=true;notifyValue();invalidate();return true;

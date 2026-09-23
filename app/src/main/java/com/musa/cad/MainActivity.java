@@ -983,10 +983,16 @@ public class MainActivity extends AppCompatActivity {
         showToolPanel("Renk",
             tool("Renk ayarı",R.drawable.ic_color,this::showSelectedColor),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
-            tool("ByLayer",R.drawable.ic_layers,null),
-            tool("ByBlock",R.drawable.ic_rectangle,null),
+            tool("ByLayer",R.drawable.ic_layers,()->applySelectedColorMode(SourceReplacement.COLOR_BYLAYER,"ByLayer")),
+            tool("ByBlock",R.drawable.ic_rectangle,()->applySelectedColorMode(SourceReplacement.COLOR_BYBLOCK,"ByBlock")),
             tool("ACI 1–255",R.drawable.ic_color,this::showAciColorPicker)
         );
+    }
+
+    private void applySelectedColorMode(int mode,String label){
+        if(!ensureSelectedForQuickTool(label))return;
+        if(cad.updateSelectedColorMode(mode))result.setText(label+" • Kaydetmede DXF renk modu uygulanacak");
+        else result.setText(label+" • Değişiklik uygulanamadı");
     }
 
     private void showAciColorPicker(){
