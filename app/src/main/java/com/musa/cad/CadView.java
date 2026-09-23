@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -120,7 +120,7 @@ public class CadView extends View {
         fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
-    private boolean editMode(){return mode==Mode.FREEHAND||mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_DIM_RADIUS||mode==Mode.DRAW_DIM_DIAMETER||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.FREEHAND||mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_DIM_ANGULAR||mode==Mode.DRAW_DIM_RADIUS||mode==Mode.DRAW_DIM_DIAMETER||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():nativeDrawing!=null?nativeDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():nativeDrawing!=null?nativeDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -635,6 +635,29 @@ public class CadView extends View {
         if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
     }
 
+    private void addAngularDimension(PointF a,PointF vertex,PointF c){
+        float u1x=a.x-vertex.x,u1y=a.y-vertex.y,u2x=c.x-vertex.x,u2y=c.y-vertex.y;
+        float l1=(float)Math.hypot(u1x,u1y),l2=(float)Math.hypot(u2x,u2y);
+        if(l1<1e-6f||l2<1e-6f){if(listener!=null)listener.onMeasurement("Açısal ölçü • Geçerli 3 nokta seçin");return;}
+        u1x/=l1;u1y/=l1;u2x/=l2;u2y/=l2;
+        double dot=Math.max(-1d,Math.min(1d,u1x*u2x+u1y*u2y)),angle=Math.acos(dot);
+        float radius=Math.max(dimTextHeightContent*3f,Math.min(l1,l2)*.62f);
+        float sx=vertex.x+u1x*radius,sy=vertex.y+u1y*radius,ex=vertex.x+u2x*radius,ey=vertex.y+u2y*radius;
+        float bx=u1x+u2x,by=u1y+u2y,bl=(float)Math.hypot(bx,by);
+        if(bl<1e-5f){bx=-u1y;by=u1x;bl=1f;}bx/=bl;by/=bl;
+        float mx=vertex.x+bx*radius,my=vertex.y+by*radius;
+        CadEdit arc=CadEdit.arc(sx,sy,mx,my,ex,ey);
+        if(arc==null){if(listener!=null)listener.onMeasurement("Açısal ölçü • Yay oluşturulamadı");return;}
+        ArrayList<CadEdit> out=new ArrayList<>();
+        out.add(CadEdit.line(vertex.x,vertex.y,a.x,a.y));out.add(CadEdit.line(vertex.x,vertex.y,c.x,c.y));out.add(arc);
+        float dsx=mx-sx,dsy=my-sy,dsl=(float)Math.hypot(dsx,dsy);if(dsl>1e-6f)addRadialArrow(out,sx,sy,dsx/dsl,dsy/dsl,dimArrowSizeContent);
+        float dex=mx-ex,dey=my-ey,del=(float)Math.hypot(dex,dey);if(del>1e-6f)addRadialArrow(out,ex,ey,dex/del,dey/del,dimArrowSizeContent);
+        String label=CadDimension.format(Math.toDegrees(angle),dimPrecision)+"°";
+        out.add(CadEdit.styledText(vertex.x+bx*(radius+dimTextHeightContent*.85f),vertex.y+by*(radius+dimTextHeightContent*.85f),label,0f,"STANDARD","sans",false,dimTextHeightContent,1f,0f,0));
+        addRegularEdits(out);lastActionRegular=true;redoEdits.clear();
+        if(listener!=null)listener.onMeasurement("Açısal ölçü: "+formatMeasured(Math.toDegrees(angle))+"°");
+    }
+
     private void addRadialDimensionAt(PointF point,boolean diameter){
         if(listener==null)return;
         if(vectorDrawing==null){listener.onMeasurement("Ölçülendirme • Tam vektör model hazır değil");return;}
@@ -941,6 +964,7 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_INSERT&&points.size()==1){PointF p=points.get(0);CadEdit insert=CadEdit.insert(pendingBlockName,p.x,p.y,pendingBlockScale,pendingBlockRotation);if(insert!=null){addRegularEdit(insert);lastActionRegular=true;}points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_DIM_LINEAR&&points.size()==3){PointF a=points.get(0),b=points.get(1),line=points.get(2);double hv=vectorDrawing.drawingDistanceFromContent(Math.abs(b.x-a.x)),vv=vectorDrawing.drawingDistanceFromContent(Math.abs(b.y-a.y));List<CadEdit> dimension=CadDimension.linear(a.x,a.y,b.x,b.y,line.x,line.y,hv,vv,dimTextHeightContent,dimArrowSizeContent,dimPrecision);if(!dimension.isEmpty()){addRegularEdits(dimension);lastActionRegular=true;}points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_DIM_ALIGNED&&points.size()==3){PointF a=points.get(0),b=points.get(1),line=points.get(2);double value=vectorDrawing.drawingDistanceFromContent(distance(a,b));List<CadEdit> dimension=CadDimension.aligned(a.x,a.y,b.x,b.y,line.x,line.y,value,dimTextHeightContent,dimArrowSizeContent,dimPrecision);if(!dimension.isEmpty()){addRegularEdits(dimension);lastActionRegular=true;}points.clear();lastSnapped=false;}
+        else if(mode==Mode.DRAW_DIM_ANGULAR&&points.size()==3){addAngularDimension(points.get(0),points.get(1),points.get(2));points.clear();lastSnapped=false;}
         else if(mode==Mode.CALIBRATE&&points.size()==2&&listener!=null)listener.onCalibrationRequested(distance(points.get(0),points.get(1)));
         notifyValue();invalidate();return true;
     }
@@ -992,6 +1016,7 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_INSERT)listener.onMeasurement("INSERT: "+pendingBlockName+" bloğunun yerleştirme noktasını seçin");
         else if(mode==Mode.DRAW_DIM_LINEAR)listener.onMeasurement(points.size()<2?"DIMLINEAR: iki ölçü noktasını seçin":"DIMLINEAR: ölçü çizgisinin konumunu seçin");
         else if(mode==Mode.DRAW_DIM_ALIGNED)listener.onMeasurement(points.size()<2?"DIMALIGNED: iki ölçü noktasını seçin":"DIMALIGNED: ölçü çizgisinin konumunu seçin");
+        else if(mode==Mode.DRAW_DIM_ANGULAR)listener.onMeasurement("Açısal ölçü • İlk kol, köşe ve ikinci kol için 3 nokta seçin • Nokta: "+points.size());
         else if(mode==Mode.DRAW_DIM_RADIUS)listener.onMeasurement("Radius ölçüsü • Bir daireye dokunun");
         else if(mode==Mode.DRAW_DIM_DIAMETER)listener.onMeasurement("Çap ölçüsü • Bir daireye dokunun");
         else if(mode==Mode.DRAW_TEXT)listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
