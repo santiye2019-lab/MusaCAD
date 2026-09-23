@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private GridLayout toolPanelGrid;
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
+    private Set<String> previousVisibleLayers=new HashSet<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
     private String lastCommandRaw="";
 
@@ -847,14 +848,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLayerToolsPanel(){
         showToolPanel("Katman",
-            tool("Katman Listesi",R.drawable.ic_layers,this::showLayers),
-            tool("Tümünü Göster",R.drawable.ic_layers,this::showAllLayers),
-            tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
             tool("Yeni katman",R.drawable.ic_layers,null),
-            tool("Katmanı Kapat",R.drawable.ic_layers,null),
-            tool("Diğer katman",R.drawable.ic_layers,null),
-            tool("Önceki katman",R.drawable.ic_layers,null),
-            tool("Varsayılan",R.drawable.ic_layers,null)
+            tool("Katman Listesi",R.drawable.ic_layers,this::showLayers),
+            tool("Katmanı Kapat",R.drawable.ic_layers,this::hideSelectedLayer),
+            tool("Diğer katmanlar",R.drawable.ic_layers,this::isolateSelectedLayer),
+            tool("Önceki katman",R.drawable.ic_layers,this::restorePreviousLayers),
+            tool("Tüm Katmanlar",R.drawable.ic_layers,this::showAllLayers),
+            tool("Katmanı varsayılan",R.drawable.ic_layers,null),
+            tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties)
         );
     }
 
@@ -908,6 +909,25 @@ public class MainActivity extends AppCompatActivity {
             tool("Yeni görünüm",R.drawable.ic_rectangle,null),
             tool("Viewport",R.drawable.ic_rectangle,null)
         );
+    }
+
+    private void hideSelectedLayer(){
+        if(!ensureSelectedForQuickTool("Katmanı Kapat"))return;
+        String layer=cad.selectedLayer();if(layer==null||layer.trim().isEmpty()){result.setText("Katmanı Kapat • Katman bulunamadı");return;}
+        HashSet<String> visible=new HashSet<>(activeDxf.visibleLayers);visible.remove(layer);
+        if(visible.isEmpty()){result.setText("Katmanı Kapat • Son görünür katman kapatılamaz");return;}
+        applyLayers(visible);result.setText("Katman kapatılıyor • "+layer);
+    }
+
+    private void isolateSelectedLayer(){
+        if(!ensureSelectedForQuickTool("Diğer katmanlar"))return;
+        String layer=cad.selectedLayer();if(layer==null||layer.trim().isEmpty()){result.setText("Katman yalıt • Katman bulunamadı");return;}
+        HashSet<String> visible=new HashSet<>();visible.add(layer);applyLayers(visible);result.setText("Katman yalıtılıyor • "+layer);
+    }
+
+    private void restorePreviousLayers(){
+        if(activeDxf==null||previousVisibleLayers.isEmpty()){result.setText("Önceki katman • Kayıtlı görünüm yok");return;}
+        applyLayers(new HashSet<>(previousVisibleLayers));
     }
 
     private void showAllLayers(){
@@ -1529,7 +1549,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyLayers(Set<String> selected){
-        if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;DxfParser.Result source=activeDxf;LoadTask task=new LoadTask();activeLoad=task;task.dialog=new AlertDialog.Builder(this).setTitle("Katmanlar hazırlanıyor").setMessage("Görünüm güncelleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;
+        previousVisibleLayers=new HashSet<>(activeDxf.visibleLayers);DxfParser.Result source=activeDxf;LoadTask task=new LoadTask();activeLoad=task;task.dialog=new AlertDialog.Builder(this).setTitle("Katmanlar hazırlanıyor").setMessage("Görünüm güncelleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try{DxfParser.Result updated=source.withVisibleLayers(selected);runOnUiThread(()->{if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){if(updated.bitmap!=null&&!updated.bitmap.isRecycled())updated.bitmap.recycle();return;}activeLoad=null;task.dialog.dismiss();cad.replaceVisibleDrawing(updated);activeDxf=updated;if(currentProject!=null){currentProject.parsed=updated;currentProject.nativeScene=null;}if(source.bitmap!=null&&!source.bitmap.isRecycled())source.bitmap.recycle();snapToggle.setEnabled(updated.snapPoints.length>0);result.setText("Hazır  •  "+updated.activeLayout+"  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");});}catch(Exception|OutOfMemoryError e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));});}});
     }
 
