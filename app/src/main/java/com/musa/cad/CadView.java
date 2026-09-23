@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -865,7 +865,7 @@ public class CadView extends View {
     }
 
     private boolean addCadPoint(float screenX,float screenY){
-        if(editMode()&&vectorDrawing==null){notifyValue();return true;}if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();PointF point=screenToContent(screenX,screenY);if(point==null)return true;float[] xy={point.x,point.y};
+        if(editMode()&&vectorDrawing==null){notifyValue();return true;}if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();if(mode==Mode.ANGLE&&points.size()>=3)points.clear();PointF point=screenToContent(screenX,screenY);if(point==null)return true;float[] xy={point.x,point.y};
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
         points.add(new PointF(xy[0],xy[1]));
@@ -907,6 +907,16 @@ public class CadView extends View {
         else if(mode==Mode.CALIBRATE)listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
         else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Mesafe: %.3f %s",sum*unitsPerImagePixel,unitName));}
         else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));}
+        else if(mode==Mode.ANGLE){
+            if(points.size()<3)listener.onMeasurement("Açı • Köşe ortada olacak şekilde 3 nokta seçin");
+            else{
+                PointF a=points.get(0),b=points.get(1),d=points.get(2);
+                double ux=a.x-b.x,uy=a.y-b.y,vx=d.x-b.x,vy=d.y-b.y;
+                double lu=Math.hypot(ux,uy),lv=Math.hypot(vx,vy);
+                if(lu<1e-9||lv<1e-9)listener.onMeasurement("Açı • Geçerli 3 nokta seçin");
+                else{double cos=(ux*vx+uy*vy)/(lu*lv);cos=Math.max(-1d,Math.min(1d,cos));listener.onMeasurement(String.format(Locale.getDefault(),"Açı: %.2f°",Math.toDegrees(Math.acos(cos))));}
+            }
+        }
         else if(mode==Mode.DRAW_LINE)listener.onMeasurement("Çizgi: iki nokta seçin • Eklenen: "+edits.size());
         else if(mode==Mode.DRAW_POLYLINE)listener.onMeasurement("Çoklu çizgi: noktaları seçin • Bitir ile tamamlayın • Nokta: "+points.size());
         else if(mode==Mode.DRAW_RECTANGLE)listener.onMeasurement("Dikdörtgen: iki köşe seçin • Eklenen: "+edits.size());

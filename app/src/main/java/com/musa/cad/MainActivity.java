@@ -709,7 +709,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Varlık",R.drawable.ic_select,()->selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY)),
             tool("ID Noktası",R.drawable.ic_point,()->selectEditMode(R.id.pointButton,CadView.Mode.DRAW_POINT)),
             tool("Kalibrasyon",R.drawable.ic_scale,()->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE)),
-            tool("Açı",R.drawable.ic_distance,null),
+            tool("Açı",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("Açı • Köşe ortada olacak şekilde 3 nokta seçin");}),
             tool("Yay uzunluğu",R.drawable.ic_distance,null),
             tool("Cephe",R.drawable.ic_distance,null),
             tool("Sonuç",R.drawable.ic_properties,null),
