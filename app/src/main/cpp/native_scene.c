@@ -147,6 +147,47 @@ static void emit_hatch_segment(MusaNativeScene *s,SceneColor color,Affine2 paren
     emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
 }
 
+static double positive_sweep(double angle){
+    while(angle<0)angle+=2.0*M_PI;
+    while(angle>=2.0*M_PI)angle-=2.0*M_PI;
+    return angle;
+}
+static void emit_hatch_path_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,Dwg_HATCH_PathSeg *seg){
+    if(!seg||s->truncated)return;
+    if(seg->curve_type==1){
+        BITCODE_2DPOINT a={seg->first_endpoint.x,seg->first_endpoint.y},b={seg->second_endpoint.x,seg->second_endpoint.y},pa,pb;
+        transform_OCS_2d(&pa,a,extrusion);transform_OCS_2d(&pb,b,extrusion);
+        emit_line(s,color,parent,pa.x,pa.y,pb.x,pb.y);
+    }else if(seg->curve_type==2&&isfinite(seg->radius)&&seg->radius>1e-12){
+        BITCODE_2DPOINT ic={seg->center.x,seg->center.y},ix={seg->center.x+seg->radius,seg->center.y},iy={seg->center.x,seg->center.y+seg->radius},pc,px,py;
+        transform_OCS_2d(&pc,ic,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
+        double sweep=seg->is_ccw?positive_sweep(seg->end_angle-seg->start_angle):-positive_sweep(seg->start_angle-seg->end_angle);
+        if(fabs(sweep)<1e-12)sweep=seg->is_ccw?2.0*M_PI:-2.0*M_PI;
+        emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,seg->start_angle,sweep);
+    }else if(seg->curve_type==3){
+        double ux=seg->endpoint.x,uy=seg->endpoint.y,ratio=fabs(seg->minor_major_ratio);
+        if(!finite2(ux,uy)||ratio<1e-12)return;
+        double vx=-uy*ratio,vy=ux*ratio;
+        BITCODE_2DPOINT ic={seg->center.x,seg->center.y},iu={seg->center.x+ux,seg->center.y+uy},iv={seg->center.x+vx,seg->center.y+vy},pc,pu,pv;
+        transform_OCS_2d(&pc,ic,extrusion);transform_OCS_2d(&pu,iu,extrusion);transform_OCS_2d(&pv,iv,extrusion);
+        double sweep=seg->is_ccw?positive_sweep(seg->end_angle-seg->start_angle):-positive_sweep(seg->start_angle-seg->end_angle);
+        if(fabs(sweep)<1e-12)sweep=seg->is_ccw?2.0*M_PI:-2.0*M_PI;
+        emit_curve(s,color,parent,pc.x,pc.y,pu.x-pc.x,pu.y-pc.y,pv.x-pc.x,pv.y-pc.y,seg->start_angle,sweep);
+    }else if(seg->curve_type==4){
+        BITCODE_BL n=seg->num_fitpts>=2&&seg->fitpts?seg->num_fitpts:seg->num_control_points;
+        if(n<2)return;
+        if(begin_poly(s,color,seg->is_periodic!=0,(int)n)){
+            for(BITCODE_BL i=0;i<n;i++){
+                BITCODE_2DPOINT in,p;
+                if(seg->num_fitpts>=2&&seg->fitpts){in.x=seg->fitpts[i].x;in.y=seg->fitpts[i].y;}
+                else {in.x=seg->control_points[i].point.x;in.y=seg->control_points[i].point.y;}
+                transform_OCS_2d(&p,in,extrusion);emit_poly_point(s,parent,p.x,p.y);
+            }
+            finish_poly(s);
+        }
+    }
+}
+
 static void emit_lw_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Entity_LWPOLYLINE *e,dwg_point_2d a,dwg_point_2d b,double bulge){
     double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
     if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
@@ -253,21 +294,23 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         case DWG_TYPE_HATCH:{
             Dwg_Entity_HATCH *e=obj->tio.entity->tio.HATCH;if(!e||!e->paths||e->num_paths<=0)break;
             for(BITCODE_BL pi=0;pi<e->num_paths&&!s->truncated;pi++){
-                Dwg_HATCH_Path *path=&e->paths[pi];
-                if(!(path->flag&2)||!path->polyline_paths||path->num_segs_or_paths<2)continue;
-                BITCODE_BL n=path->num_segs_or_paths;
-                if(path->bulges_present){
-                    BITCODE_BL segments=path->closed?n:n-1;
-                    for(BITCODE_BL i=0;i<segments&&!s->truncated;i++){
-                        BITCODE_BL j=(i+1)%n;
-                        emit_hatch_segment(s,color,parent,e->extrusion,path->polyline_paths[i].point,path->polyline_paths[j].point,path->polyline_paths[i].bulge);
+                Dwg_HATCH_Path *path=&e->paths[pi];BITCODE_BL n=path->num_segs_or_paths;
+                if((path->flag&2)&&path->polyline_paths&&n>=2){
+                    if(path->bulges_present){
+                        BITCODE_BL segments=path->closed?n:n-1;
+                        for(BITCODE_BL i=0;i<segments&&!s->truncated;i++){
+                            BITCODE_BL j=(i+1)%n;
+                            emit_hatch_segment(s,color,parent,e->extrusion,path->polyline_paths[i].point,path->polyline_paths[j].point,path->polyline_paths[i].bulge);
+                        }
+                    }else if(begin_poly(s,color,path->closed!=0,(int)n)){
+                        for(BITCODE_BL i=0;i<n;i++){
+                            BITCODE_2DPOINT in={path->polyline_paths[i].point.x,path->polyline_paths[i].point.y},p;
+                            transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
+                        }
+                        finish_poly(s);
                     }
-                }else if(begin_poly(s,color,path->closed!=0,(int)n)){
-                    for(BITCODE_BL i=0;i<n;i++){
-                        BITCODE_2DPOINT in={path->polyline_paths[i].point.x,path->polyline_paths[i].point.y},p;
-                        transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
-                    }
-                    finish_poly(s);
+                }else if(path->segs&&n>0){
+                    for(BITCODE_BL i=0;i<n&&!s->truncated;i++)emit_hatch_path_segment(s,color,parent,e->extrusion,&path->segs[i]);
                 }
             }
             break;
