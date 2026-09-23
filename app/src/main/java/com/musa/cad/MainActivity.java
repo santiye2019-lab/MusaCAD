@@ -817,8 +817,40 @@ public class MainActivity extends AppCompatActivity {
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
             tool("ByLayer",R.drawable.ic_layers,null),
             tool("ByBlock",R.drawable.ic_rectangle,null),
-            tool("ACI 1–255",R.drawable.ic_color,null)
+            tool("ACI 1–255",R.drawable.ic_color,this::showAciColorPicker)
         );
+    }
+
+    private void showAciColorPicker(){
+        if(!ensureSelectedForQuickTool("ACI Renk"))return;
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);int pad=dp(14);root.setPadding(pad,pad/2,pad,pad/2);
+        TextView info=new TextView(this);info.setText("AutoCAD Color Index • 1–255");info.setTextSize(12f);info.setPadding(0,0,0,dp(8));root.addView(info);
+        final int[] selected={7};
+        final TextView chosen=new TextView(this);chosen.setText("Seçili ACI: 7");chosen.setTextSize(11f);chosen.setPadding(0,dp(6),0,dp(4));
+        GridLayout palette=new GridLayout(this);palette.setColumnCount(7);palette.setAlignmentMode(GridLayout.ALIGN_BOUNDS);palette.setUseDefaultMargins(false);
+        int[] samples={1,2,3,4,5,6,7,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,250};
+        for(int aci:samples){
+            TextView swatch=new TextView(this);swatch.setText(Integer.toString(aci));swatch.setTextSize(7f);swatch.setGravity(Gravity.CENTER);
+            int argb=DxfColor.aciArgb(aci);double luminance=.2126*Color.red(argb)+.7152*Color.green(argb)+.0722*Color.blue(argb);
+            swatch.setTextColor(luminance>150?Color.BLACK:Color.WHITE);
+            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);bg.setColor(argb);bg.setStroke(dp(1),0xFF6A8795);swatch.setBackground(bg);
+            GridLayout.LayoutParams lp=new GridLayout.LayoutParams();lp.width=dp(38);lp.height=dp(38);lp.setMargins(dp(3),dp(3),dp(3),dp(3));palette.addView(swatch,lp);
+            swatch.setOnClickListener(v->{selected[0]=aci;chosen.setText("Seçili ACI: "+aci);});
+            installInteractiveFeedback(swatch);
+        }
+        root.addView(palette);root.addView(chosen);
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("1–255");input.setText("7");input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);root.addView(input);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Renk ayarı").setView(root).setPositiveButton("TAMAM",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                String raw=input.getText().toString().trim();
+                int aci=raw.isEmpty()?selected[0]:Integer.parseInt(raw);
+                if(aci<1||aci>255){input.setError("1 ile 255 arasında bir değer girin");return;}
+                int color=DxfColor.aciArgb(aci);
+                if(!cad.updateSelectedStyle(null,color,null,null,null)){dialog.dismiss();result.setText("ACI renk • Değişiklik uygulanamadı");return;}
+                dialog.dismiss();result.setText("ACI renk • "+aci+" uygulandı");
+            }catch(Exception e){input.setError("1 ile 255 arasında bir değer girin");}
+        }));dialog.show();
     }
 
     private void showLayoutToolsPanel(){
