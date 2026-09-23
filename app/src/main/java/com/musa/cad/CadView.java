@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, ID_POINT, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_NUMBER, DRAW_ARROW, DRAW_MULTILEADER, DRAW_REVCLOUD, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, FACADE, ANGLE, ARC_LENGTH, ID_POINT, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_NUMBER, DRAW_ARROW, DRAW_MULTILEADER, DRAW_REVCLOUD, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -75,7 +75,7 @@ public class CadView extends View {
     private Mode mode=Mode.PAN;
     private Listener listener;
     private float lastX,lastY,scale=1f,fitScale=1f;
-    private double unitsPerImagePixel=1d;
+    private double unitsPerImagePixel=1d,facadeHeightDrawing=1d;
     private String unitName="piksel";
     private boolean multiTouch;
     private float[] snapPoints=new float[0];
@@ -216,6 +216,10 @@ public class CadView extends View {
 
     public void setListener(Listener l){listener=l;}
 
+    public void setFacadeHeight(double heightDrawing){
+        if(!Double.isFinite(heightDrawing)||heightDrawing<=0d)throw new IllegalArgumentException("height");
+        facadeHeightDrawing=heightDrawing;setMode(Mode.FACADE);
+    }
     public boolean confirmCurrentCommand(){return finishEdit();}
 
     public void setNumberingStart(int start){numberingNext=Math.max(1,start);setMode(Mode.DRAW_NUMBER);}
@@ -1087,6 +1091,10 @@ public class CadView extends View {
         else if(mode==Mode.CALIBRATE)listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
         else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":"Mesafe: "+formatMeasured(sum*unitsPerImagePixel)+" "+unitName);}
         else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":"Alan: "+formatMeasured(a)+" "+unitName+"²");}
+        else if(mode==Mode.FACADE){
+            double length=0d;for(int i=1;i<points.size();i++)length+=distance(points.get(i-1),points.get(i))*unitsPerImagePixel;
+            listener.onMeasurement(points.size()<2?"Cephe • En az iki taban/iz noktası seçin":"Cephe: "+formatMeasured(length*facadeHeightDrawing)+" "+unitName+"²  •  Uzunluk "+formatMeasured(length)+" "+unitName+"  •  Yükseklik "+formatMeasured(facadeHeightDrawing)+" "+unitName);
+        }
         else if(mode==Mode.ANGLE){
             if(points.size()<3)listener.onMeasurement("Açı • Köşe ortada olacak şekilde 3 nokta seçin");
             else{

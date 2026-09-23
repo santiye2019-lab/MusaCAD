@@ -715,17 +715,34 @@ public class MainActivity extends AppCompatActivity {
             tool("Kalibrasyon",R.drawable.ic_scale,()->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE)),
             tool("Açı",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("Açı • Köşe ortada olacak şekilde 3 nokta seçin");}),
             tool("Yay uzunluğu",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("Yay uzunluğu • Bir yay veya daireye dokunun");}),
-            tool("Cephe",R.drawable.ic_distance,null),
+            tool("Cephe",R.drawable.ic_distance,this::showFacadeMeasureSetup),
             tool("Sonuç",R.drawable.ic_properties,this::showMeasurementResults),
             tool("Sonuç sayısı",R.drawable.ic_properties,this::showMeasurementCount),
             tool("Hassas",R.drawable.ic_scale,this::showMeasurementPrecision)
         );
     }
 
+    private void showFacadeMeasureSetup(){
+        if(activeDxf==null){result.setText("Cephe • Önce çizim açın");return;}
+        EditText height=new EditText(this);height.setSingleLine(true);height.setHint("Cephe yüksekliği ("+activeDxf.drawingUnitName()+")");height.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);height.setText("1");
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Cephe ölçümü")
+            .setMessage("Kiriş, kolon veya duvar yan yüzeyi için yüksekliği girin. Ardından çizimde taban/iz boyunca noktaları seçin; MusaCAD toplam uzunluk × yüksekliği hesaplar.")
+            .setView(height).setPositiveButton("BAŞLAT",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                double h=Double.parseDouble(height.getText().toString().trim().replace(',','.'));
+                if(!Double.isFinite(h)||h<=0d){height.setError("Sıfırdan büyük yükseklik girin");return;}
+                cad.setFacadeHeight(h);markModeSelected(0);dialog.dismiss();
+                result.setText("Cephe • Taban/iz boyunca en az iki nokta seçin • Yükseklik "+String.format(Locale.getDefault(),"%.3f",h)+" "+activeDxf.drawingUnitName());
+            }catch(Exception e){height.setError("Geçerli bir yükseklik girin");}
+        }));dialog.show();
+    }
+
     private boolean isCompletedMeasurement(String value){
         if(value==null)return false;
         String v=value.trim();
-        return v.startsWith("Mesafe:")||v.startsWith("Alan:")||v.startsWith("Açı:")||v.startsWith("Yay uzunluğu:")||
+        return v.startsWith("Mesafe:")||v.startsWith("Alan:")||v.startsWith("Cephe:")||v.startsWith("Açı:")||v.startsWith("Yay uzunluğu:")||
                v.startsWith("ID Noktası • X=")||v.startsWith("Radius ölçüsü:")||v.startsWith("Çap ölçüsü:")||
                v.startsWith("Açısal ölçü:");
     }
