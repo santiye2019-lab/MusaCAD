@@ -887,6 +887,7 @@ public class CadView extends View {
     private boolean isStylus(MotionEvent e){if(e==null||e.getPointerCount()<1)return false;int type=e.getToolType(0);return type==MotionEvent.TOOL_TYPE_STYLUS||type==MotionEvent.TOOL_TYPE_ERASER;}
     private boolean isStylusErase(MotionEvent e){if(e.getToolType(0)==MotionEvent.TOOL_TYPE_ERASER)return true;return (e.getButtonState()&MotionEvent.BUTTON_STYLUS_SECONDARY)!=0;}
 
+    private String formatMeasured(double value){return String.format(Locale.getDefault(),"%."+Math.max(0,Math.min(6,dimPrecision))+"f",value);}
     private void notifyValue(){
         if(listener==null)return;if(selecting){listener.onMeasurement("Alanı sürükleyerek seçin • İptal: GERİ");return;}
         if(mode==Mode.SELECT_ENTITY){
@@ -905,8 +906,8 @@ public class CadView extends View {
         }
         if(mode==Mode.FREEHAND)listener.onMeasurement("Eskiz • Parmağınız veya kaleminizle serbest çizim yapın");
         else if(mode==Mode.CALIBRATE)listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
-        else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Mesafe: %.3f %s",sum*unitsPerImagePixel,unitName));}
-        else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));}
+        else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":"Mesafe: "+formatMeasured(sum*unitsPerImagePixel)+" "+unitName);}
+        else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":"Alan: "+formatMeasured(a)+" "+unitName+"²");}
         else if(mode==Mode.ANGLE){
             if(points.size()<3)listener.onMeasurement("Açı • Köşe ortada olacak şekilde 3 nokta seçin");
             else{
@@ -914,7 +915,7 @@ public class CadView extends View {
                 double ux=a.x-b.x,uy=a.y-b.y,vx=d.x-b.x,vy=d.y-b.y;
                 double lu=Math.hypot(ux,uy),lv=Math.hypot(vx,vy);
                 if(lu<1e-9||lv<1e-9)listener.onMeasurement("Açı • Geçerli 3 nokta seçin");
-                else{double cos=(ux*vx+uy*vy)/(lu*lv);cos=Math.max(-1d,Math.min(1d,cos));listener.onMeasurement(String.format(Locale.getDefault(),"Açı: %.2f°",Math.toDegrees(Math.acos(cos))));}
+                else{double cos=(ux*vx+uy*vy)/(lu*lv);cos=Math.max(-1d,Math.min(1d,cos));listener.onMeasurement("Açı: "+formatMeasured(Math.toDegrees(Math.acos(cos)))+"°");}
             }
         }
         else if(mode==Mode.DRAW_LINE)listener.onMeasurement("Çizgi: iki nokta seçin • Eklenen: "+edits.size());

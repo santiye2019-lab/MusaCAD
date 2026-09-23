@@ -714,8 +714,25 @@ public class MainActivity extends AppCompatActivity {
             tool("Cephe",R.drawable.ic_distance,null),
             tool("Sonuç",R.drawable.ic_properties,null),
             tool("Sonuç sayısı",R.drawable.ic_properties,null),
-            tool("Hassas",R.drawable.ic_scale,null)
+            tool("Hassas",R.drawable.ic_scale,this::showMeasurementPrecision)
         );
+    }
+
+    private void showMeasurementPrecision(){
+        if(activeDxf==null){result.setText("Hassasiyet • Önce çizim açın");return;}
+        String[] items={"0 ondalık","1 ondalık","2 ondalık","3 ondalık","4 ondalık","5 ondalık","6 ondalık"};
+        new AlertDialog.Builder(this)
+            .setTitle("Ölçüm hassasiyeti")
+            .setSingleChoiceItems(items,cad.dimensionPrecision(),null)
+            .setPositiveButton("UYGULA",(dialog,which)->{
+                AlertDialog a=(AlertDialog)dialog;
+                int selected=a.getListView().getCheckedItemPosition();
+                if(selected<0)selected=cad.dimensionPrecision();
+                if(cad.setDimensionStyle(cad.dimensionTextHeightDrawing(),cad.dimensionArrowSizeDrawing(),selected))
+                    result.setText("Ölçüm hassasiyeti • "+selected+" ondalık basamak");
+            })
+            .setNegativeButton("İPTAL",null)
+            .show();
     }
 
     private void showDimensionToolsPanel(){
