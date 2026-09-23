@@ -174,4 +174,42 @@
         <item name="android:background">@drawable/category_tile_bg</item>
     </style>
 
+
+    <style name="HomeQuickButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">76dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:textColor">#EFFFFF</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">6dp</item>
+        <item name="android:padding">7dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:drawableTint">#BFEFFF</item>
+        <item name="android:background">@drawable/home_action_bg</item>
+    </style>
+
+    <style name="HomeCategoryButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">72dp</item>
+        <item name="android:layout_marginEnd">5dp</item>
+        <item name="android:textColor">#BFD2DC</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">7.5sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:drawablePadding">4dp</item>
+        <item name="android:padding">5dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:drawableTint">#87DDF5</item>
+        <item name="android:background">@drawable/home_category_bg</item>
+    </style>
 </resources>

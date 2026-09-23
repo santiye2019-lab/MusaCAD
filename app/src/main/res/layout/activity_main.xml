@@ -344,49 +344,215 @@
             android:layout_height="match_parent"
             android:fillViewport="true"
             android:background="#F207131D"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp">
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:clipToPadding="false">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="center"
-                android:paddingTop="18dp"
+                android:paddingTop="14dp"
                 android:paddingBottom="18dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="18dp"
-                    android:background="@drawable/main_panel_bg">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp"
+                    android:background="@drawable/home_card_bg">
 
                     <ImageView
-                        android:layout_width="50dp"
-                        android:layout_height="50dp"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
                         android:src="@drawable/ic_musacad_mark"
                         android:contentDescription="MusaCAD" />
 
-                    <TextView
-                        android:layout_width="match_parent"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="MusaCAD çalışma alanı"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold"
-                        android:textSize="18sp"
-                        android:gravity="center" />
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="MusaCAD"
+                            android:textColor="#FFFFFF"
+                            android:textStyle="bold"
+                            android:textSize="22sp"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="DWG / DXF çalışma alanı"
+                            android:textColor="@color/editor_text_secondary"
+                            android:textSize="10.5sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="28dp"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:text="DWG Native hazır"
+                            android:textColor="#BFFBF3"
+                            android:textStyle="bold"
+                            android:textSize="9sp"
+                            android:background="@drawable/home_status_bg" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginStart="4dp"
+                    android:text="Hızlı Başlat"
+                    android:textColor="#F2FBFF"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
+                <GridLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:columnCount="2"
+                    android:useDefaultMargins="false"
+                    android:alignmentMode="alignMargins">
+
+                    <Button
+                        android:id="@+id/homeOpenButton"
+                        style="@style/HomeQuickButton"
+                        android:text="DWG / DXF Aç"
+                        android:drawableTop="@drawable/ic_open_file" />
+
+                    <Button
+                        android:id="@+id/homeNewButton"
+                        style="@style/HomeQuickButton"
+                        android:text="Yeni Çizim"
+                        android:drawableTop="@drawable/ic_line" />
+
+                    <Button
+                        android:id="@+id/homeRecentButton"
+                        style="@style/HomeQuickButton"
+                        android:text="Son Projeler"
+                        android:drawableTop="@drawable/ic_layers" />
+
+                    <Button
+                        android:id="@+id/homeImportButton"
+                        style="@style/HomeQuickButton"
+                        android:text="İçe Aktar"
+                        android:drawableTop="@drawable/ic_share_pro" />
+                </GridLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginStart="4dp"
+                    android:text="Araç Kategorileri"
+                    android:textColor="#F2FBFF"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="78dp"
+                    android:layout_marginTop="8dp"
+                    android:scrollbars="none"
+                    android:overScrollMode="never">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <Button style="@style/HomeCategoryButton" android:text="Ek açıklama" android:drawableTop="@drawable/ic_text" />
+                        <Button style="@style/HomeCategoryButton" android:text="Çiz" android:drawableTop="@drawable/ic_line" />
+                        <Button style="@style/HomeCategoryButton" android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
+                        <Button style="@style/HomeCategoryButton" android:text="Katman" android:drawableTop="@drawable/ic_layers" />
+                        <Button style="@style/HomeCategoryButton" android:text="Ölçüm" android:drawableTop="@drawable/ic_distance" />
+                        <Button style="@style/HomeCategoryButton" android:text="Boyut" android:drawableTop="@drawable/ic_scale" />
+                        <Button style="@style/HomeCategoryButton" android:text="Renk" android:drawableTop="@drawable/ic_color" />
+                        <Button style="@style/HomeCategoryButton" android:text="Alet" android:drawableTop="@drawable/ic_more" />
+                        <Button style="@style/HomeCategoryButton" android:text="Düzen" android:drawableTop="@drawable/ic_rectangle" />
+                        <Button style="@style/HomeCategoryButton" android:text="Görsel stil" android:drawableTop="@drawable/ic_fit" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="vertical"
+                    android:padding="14dp"
+                    android:background="@drawable/home_card_bg">
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="7dp"
-                        android:text="Klasör düğmesinden DWG / DXF dosyanızı açın."
-                        android:textColor="#9EBBC9"
-                        android:textSize="11sp"
-                        android:gravity="center" />
+                        android:text="Son Açılanlar"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:text="Son kullandığınız DWG / DXF dosyalarına hızlıca dönün."
+                        android:textColor="@color/editor_text_secondary"
+                        android:textSize="10sp" />
+
+                    <Button
+                        android:id="@+id/homeRecentCardButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="10dp"
+                        android:text="Dosya geçmişini aç"
+                        android:textAllCaps="false"
+                        android:textColor="#EFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="10sp"
+                        android:background="@drawable/home_action_bg"
+                        android:stateListAnimator="@null" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:background="@drawable/home_status_bg">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Çevrimdışı DWG motoru • Hızlı sahne • Vektörel düzenleme"
+                        android:textColor="#CDE8F2"
+                        android:textSize="9.5sp" />
+
+                    <Button
+                        android:id="@+id/homeLicenseButton"
+                        android:layout_width="74dp"
+                        android:layout_height="34dp"
+                        android:layout_marginStart="8dp"
+                        android:text="Lisans"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="9sp"
+                        android:background="@drawable/home_action_bg"
+                        android:stateListAnimator="@null" />
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>

@@ -161,7 +161,15 @@ public class MainActivity extends AppCompatActivity {
             if(keyCode==KeyEvent.KEYCODE_ENTER&&event.getAction()==KeyEvent.ACTION_DOWN){executeCommand();return true;}
             return false;
         });
-        updateShareEnabled(false);updateEditorEnabled(false);handleIncomingIntent(getIntent());
+        int[] homeInteractive={R.id.homeOpenButton,R.id.homeNewButton,R.id.homeRecentButton,R.id.homeImportButton,R.id.homeRecentCardButton,R.id.homeLicenseButton};
+        for(int id:homeInteractive)installInteractiveFeedback(findViewById(id));
+        findViewById(R.id.homeOpenButton).setOnClickListener(v->open());
+        findViewById(R.id.homeNewButton).setOnClickListener(v->createBlankDrawing());
+        findViewById(R.id.homeRecentButton).setOnClickListener(v->open());
+        findViewById(R.id.homeImportButton).setOnClickListener(v->open());
+        findViewById(R.id.homeRecentCardButton).setOnClickListener(v->open());
+        findViewById(R.id.homeLicenseButton).setOnClickListener(v->showLicense());
+        updateShareEnabled(false);updateEditorEnabled(false);showHomeUi();handleIncomingIntent(getIntent());
     }
 
     private void executeCommand(){
@@ -1151,7 +1159,21 @@ public class MainActivity extends AppCompatActivity {
     private void selectMode(int id,CadView.Mode mode){View button=findViewById(id);if(button!=null)button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);cad.setMode(mode);markModeSelected(id);}
     private void selectEditMode(int id,CadView.Mode mode){if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();return;}selectMode(id,mode);}
     private void markModeSelected(int id){if(modeButtons==null)return;for(View button:modeButtons)button.setSelected(button.getId()==id);}
-    private void hideWelcomePanel(){if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;welcomePanel.animate().alpha(0f).setDuration(180).withEndAction(()->{welcomePanel.setVisibility(View.GONE);welcomePanel.setAlpha(1f);}).start();}
+    private void setEditorChromeVisible(boolean visible){
+        int state=visible?View.VISIBLE:View.GONE;
+        int[] ids={R.id.fileModeBar,R.id.quickToolsBar,R.id.commandBar,R.id.categoryScroll,R.id.rightToolRail,R.id.resultText};
+        for(int id:ids){View v=findViewById(id);if(v!=null)v.setVisibility(state);}
+        if(!visible)hideToolPanel();
+    }
+    private void showHomeUi(){
+        setEditorChromeVisible(false);
+        if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
+    }
+    private void hideWelcomePanel(){
+        setEditorChromeVisible(true);
+        if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;
+        welcomePanel.animate().alpha(0f).setDuration(180).withEndAction(()->{welcomePanel.setVisibility(View.GONE);welcomePanel.setAlpha(1f);}).start();
+    }
 
     private void showLicense(){
         String license;try(InputStream in=getAssets().open("COPYING-LibreDWG.txt")){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1)out.write(bytes,0,n);license=out.toString("UTF-8");}catch(IOException e){license="GPL-3.0-or-later";}
@@ -1376,7 +1398,7 @@ public class MainActivity extends AppCompatActivity {
         if(active&&!projects.isEmpty())activateProject(projects.get(projects.size()-1));
         else if(active){
             updateShareEnabled(false);updateEditorEnabled(false);updateLayerButtons(false);
-            welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);fileName.setText("Henüz proje açılmadı");result.setText("Hazır");
+            showHomeUi();fileName.setText("Henüz proje açılmadı");result.setText("Hazır");
         }
         refreshProjectTabs();
     }
