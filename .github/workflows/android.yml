@@ -114,6 +114,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
           java -cp /tmp/musacad-tests DxfMLeaderTest
+      - name: Test DXF wipeout clipping
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfWipeout.java tests/DxfWipeoutTest.java
+          java -cp /tmp/musacad-tests DxfWipeoutTest
       - name: Test DXF paper-space viewport geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
