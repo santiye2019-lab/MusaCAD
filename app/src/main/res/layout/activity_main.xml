@@ -185,8 +185,8 @@
         <Button
             android:id="@+id/layersButton"
             style="@style/TopQuickBlue"
-            android:layout_width="50dp"
-            android:layout_weight="0"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="46dp"
             android:text=""
             android:drawableTop="@drawable/ic_layers"
@@ -195,8 +195,8 @@
         <Button
             android:id="@+id/propertiesButton"
             style="@style/TopQuickPurple"
-            android:layout_width="50dp"
-            android:layout_weight="0"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="46dp"
             android:text=""
             android:drawableTop="@drawable/ic_properties"
@@ -205,8 +205,8 @@
         <Button
             android:id="@+id/colorButton"
             style="@style/TopQuickYellow"
-            android:layout_width="50dp"
-            android:layout_weight="0"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="46dp"
             android:text=""
             android:drawableTop="@drawable/ic_color"
@@ -215,8 +215,8 @@
         <Button
             android:id="@+id/lineTypeButton"
             style="@style/TopQuickOrange"
-            android:layout_width="50dp"
-            android:layout_weight="0"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="46dp"
             android:text=""
             android:drawableTop="@drawable/ic_line"
@@ -225,8 +225,8 @@
         <Button
             android:id="@+id/pointButton"
             style="@style/TopQuickBlue"
-            android:layout_width="50dp"
-            android:layout_weight="0"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="46dp"
             android:text=""
             android:drawableTop="@drawable/ic_point"
@@ -235,7 +235,7 @@
         <CheckBox
             android:id="@+id/snapToggle"
             style="@style/TopQuickTeal"
-            android:layout_width="104dp"
+            android:layout_width="92dp"
             android:layout_weight="0"
             android:layout_height="46dp"
             android:button="@null"
