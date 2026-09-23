@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
+        String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
@@ -967,13 +968,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLayerToolsPanel(){
         showToolPanel("Katman",
-            tool("Yeni katman",R.drawable.ic_layers,null),
+            tool("Yeni katman",R.drawable.ic_layers,this::showCreateLayer),
             tool("Katman Listesi",R.drawable.ic_layers,this::showLayers),
             tool("Katmanı Kapat",R.drawable.ic_layers,this::hideSelectedLayer),
             tool("Diğer katmanlar",R.drawable.ic_layers,this::isolateSelectedLayer),
             tool("Önceki katman",R.drawable.ic_layers,this::restorePreviousLayers),
             tool("Tüm Katmanlar",R.drawable.ic_layers,this::showAllLayers),
-            tool("Katmanı varsayılan",R.drawable.ic_layers,null),
+            tool("Katmanı varsayılan",R.drawable.ic_layers,this::showSetDefaultLayer),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties)
         );
     }
@@ -1044,6 +1045,49 @@ public class MainActivity extends AppCompatActivity {
             if(cad.fitContentRect(bounds))result.setText("Viewport "+vp.id+" • Görünüme odaklandı");
             else result.setText("Viewport • Görünüm sınırı kullanılamadı");
         }).setNegativeButton("İPTAL",null).show();
+    }
+
+    private void showCreateLayer(){
+        if(activeDxf==null||editingBaseDxf==null||!editingBaseDxf.exists()){result.setText("Yeni katman • Önce düzenlenebilir bir çizim açın");return;}
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Katman adı");input.setText("MUSA_LAYER");input.setSelectAllOnFocus(true);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Yeni katman").setView(input).setPositiveButton("OLUŞTUR",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String name=input.getText().toString().trim();
+            if(name.isEmpty()){input.setError("Katman adı girin");return;}
+            if(name.length()>120||name.matches(".*[<>/\\\":;?*|=,].*")){input.setError("Geçerli bir DXF katman adı girin");return;}
+            for(String existing:activeDxf.layerNames)if(existing.equalsIgnoreCase(name)){input.setError("Bu katman zaten var");return;}
+            dialog.dismiss();createLayerAsync(name);
+        }));dialog.show();
+    }
+
+    private void createLayerAsync(String name){
+        if(activeLoad!=null||editingBaseDxf==null)return;
+        final File base=editingBaseDxf;final ProjectSession project=currentProject;final DxfParser.Result before=activeDxf;
+        LoadTask task=new LoadTask();activeLoad=task;task.dialog=new AlertDialog.Builder(this).setTitle("Yeni katman").setMessage(name+" oluşturuluyor…").setCancelable(false).create();task.dialog.show();
+        task.future=loader.submit(()->{
+            try{
+                DxfLayerEditor.addLayer(base,name);
+                DxfParser.Result updated=DxfParser.render(base);
+                runOnUiThread(()->{
+                    if(activeLoad!=task||currentProject!=project||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();activeDxf=updated;project.parsed=updated;project.nativeScene=null;
+                    cad.replaceVisibleDrawing(updated);snapToggle.setEnabled(updated.snapPoints.length>0);updateLayerButtons(true);refreshProjectTabs();
+                    result.setText("Yeni katman • "+name+" oluşturuldu");
+                    if(before.bitmap!=null&&before.bitmap!=updated.bitmap&&!before.bitmap.isRecycled())before.bitmap.recycle();
+                });
+            }catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e);});}
+        });
+    }
+
+    private void showSetDefaultLayer(){
+        if(activeDxf==null||currentProject==null){result.setText("Katmanı varsayılan • Önce çizim açın");return;}
+        String[] layers=activeDxf.layerNames.toArray(new String[0]);int checked=0;
+        for(int i=0;i<layers.length;i++)if(layers[i].equalsIgnoreCase(currentProject.defaultLayer)){checked=i;break;}
+        new AlertDialog.Builder(this).setTitle("Katmanı varsayılan").setSingleChoiceItems(layers,checked,null)
+            .setPositiveButton("UYGULA",(d,w)->{
+                AlertDialog a=(AlertDialog)d;int pos=a.getListView().getCheckedItemPosition();if(pos<0)pos=0;
+                currentProject.defaultLayer=layers[pos];result.setText("Varsayılan katman • "+currentProject.defaultLayer);
+            }).setNegativeButton("İPTAL",null).show();
     }
 
     private void hideSelectedLayer(){
@@ -1718,9 +1762,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
                     if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();}
                     Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
