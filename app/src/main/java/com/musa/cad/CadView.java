@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -143,7 +143,7 @@ public class CadView extends View {
 
         edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();
         if(state==null){
-            unitsPerImagePixel=1d;unitName="piksel";snapEnabled=true;
+            unitsPerImagePixel=vector==null?1d:vector.drawingDistanceFromContent(1d);unitName=vector==null?"piksel":vector.drawingUnitName();snapEnabled=true;
             snapPoints=vector==null?new float[0]:vector.snapPoints.clone();
             dimTextHeightContent=24f;dimArrowSizeContent=14f;dimPrecision=2;
             imageMatrix.reset();fit();invalidate();notifyValue();return;
@@ -236,6 +236,7 @@ public class CadView extends View {
             if(imageMatrix.invert(inv)){inv.mapPoints(content);worldAnchor=oldNative.contentToWorld(content[0],content[1]);worldScreenScale=scale*oldNative.drawingToContentScale();}
         }
         drawing=null;vectorDrawing=result;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();
+        if("piksel".equals(unitName)){unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();}
         if(oldNative!=null)oldNative.alignTo(result.drawingToContentMatrix());
         fitScale=computeFitScale();
         if(worldAnchor!=null&&Float.isFinite(worldScreenScale)&&worldScreenScale>0f){
@@ -255,7 +256,7 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;nativeDrawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        drawing=null;nativeDrawing=null;vectorDrawing=result;edits.clear();redoEdits.clear();userBlocks.clear();sourceEdits.clear();unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -634,6 +635,25 @@ public class CadView extends View {
         if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
     }
 
+    private void measureArcLengthAt(PointF point){
+        if(listener==null)return;
+        if(vectorDrawing==null){listener.onMeasurement("Yay uzunluğu • Tam vektör model hazır değil");return;}
+        float tolerance=22f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);
+        DxfParser.SourceEntity source=vectorDrawing.findEditableSource(point.x,point.y,tolerance,sourceEdits.hiddenSourceIds());
+        if(source==null){listener.onMeasurement("Yay uzunluğu • Yay veya daire bulunamadı");return;}
+        CadEdit edit=source.prototype();double contentLength;
+        if(edit.type==CadEdit.Type.CIRCLE&&edit.xy.length>=4){
+            double r=Math.hypot(edit.xy[2]-edit.xy[0],edit.xy[3]-edit.xy[1]);contentLength=2d*Math.PI*r;
+        }else if(edit.type==CadEdit.Type.ARC&&edit.xy.length>=8){
+            double cx=edit.xy[6],cy=edit.xy[7];
+            double start=Math.atan2(edit.xy[1]-cy,edit.xy[0]-cx),mid=Math.atan2(edit.xy[3]-cy,edit.xy[2]-cx),end=Math.atan2(edit.xy[5]-cy,edit.xy[4]-cx);
+            double se=positiveAngle(end-start),sm=positiveAngle(mid-start);double sweep=sm<=se+1e-8?se:(Math.PI*2d-se);
+            double r=Math.hypot(edit.xy[0]-cx,edit.xy[1]-cy);contentLength=r*sweep;
+        }else{listener.onMeasurement("Yay uzunluğu • Seçilen nesne yay veya daire değil");return;}
+        listener.onMeasurement("Yay uzunluğu: "+formatMeasured(contentLength*unitsPerImagePixel)+" "+unitName);
+    }
+    private static double positiveAngle(double value){double full=Math.PI*2d;value%=full;if(value<0d)value+=full;return value;}
+
     private boolean sourceEditTouch(MotionEvent e){
         if(vectorDrawing==null)return true;int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(action==MotionEvent.ACTION_UP){PointF point=screenToContent(e.getX(),e.getY());if(point==null)return true;
@@ -868,6 +888,7 @@ public class CadView extends View {
         if(editMode()&&vectorDrawing==null){notifyValue();return true;}if(mode==Mode.CALIBRATE&&points.size()>=2)points.clear();if(mode==Mode.ANGLE&&points.size()>=3)points.clear();PointF point=screenToContent(screenX,screenY);if(point==null)return true;float[] xy={point.x,point.y};
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
+        if(mode==Mode.ARC_LENGTH){measureArcLengthAt(new PointF(xy[0],xy[1]));lastSnapped=false;invalidate();return true;}
         points.add(new PointF(xy[0],xy[1]));
         if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);addRegularEdit(CadEdit.line(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
         else if(mode==Mode.DRAW_RECTANGLE&&points.size()==2){PointF a=points.get(0),b=points.get(1);addRegularEdit(CadEdit.rectangle(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
@@ -918,6 +939,7 @@ public class CadView extends View {
                 else{double cos=(ux*vx+uy*vy)/(lu*lv);cos=Math.max(-1d,Math.min(1d,cos));listener.onMeasurement("Açı: "+formatMeasured(Math.toDegrees(Math.acos(cos)))+"°");}
             }
         }
+        else if(mode==Mode.ARC_LENGTH)listener.onMeasurement("Yay uzunluğu • Bir yay veya daireye dokunun");
         else if(mode==Mode.DRAW_LINE)listener.onMeasurement("Çizgi: iki nokta seçin • Eklenen: "+edits.size());
         else if(mode==Mode.DRAW_POLYLINE)listener.onMeasurement("Çoklu çizgi: noktaları seçin • Bitir ile tamamlayın • Nokta: "+points.size());
         else if(mode==Mode.DRAW_RECTANGLE)listener.onMeasurement("Dikdörtgen: iki köşe seçin • Eklenen: "+edits.size());

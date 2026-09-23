@@ -710,7 +710,7 @@ public class MainActivity extends AppCompatActivity {
             tool("ID Noktası",R.drawable.ic_point,()->selectEditMode(R.id.pointButton,CadView.Mode.DRAW_POINT)),
             tool("Kalibrasyon",R.drawable.ic_scale,()->selectMode(R.id.calibrateButton,CadView.Mode.CALIBRATE)),
             tool("Açı",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("Açı • Köşe ortada olacak şekilde 3 nokta seçin");}),
-            tool("Yay uzunluğu",R.drawable.ic_distance,null),
+            tool("Yay uzunluğu",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("Yay uzunluğu • Bir yay veya daireye dokunun");}),
             tool("Cephe",R.drawable.ic_distance,null),
             tool("Sonuç",R.drawable.ic_properties,null),
             tool("Sonuç sayısı",R.drawable.ic_properties,null),
