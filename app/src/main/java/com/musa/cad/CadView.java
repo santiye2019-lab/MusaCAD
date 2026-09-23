@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, ID_POINT, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -967,6 +967,11 @@ public class CadView extends View {
         int snapped=snapEnabled?SnapPoints.nearest(snapPoints,xy[0],xy[1],scale,18*getResources().getDisplayMetrics().density):-1;lastSnapped=snapped>=0;if(lastSnapped){xy[0]=snapPoints[snapped];xy[1]=snapPoints[snapped+1];}
         if(mode==Mode.DRAW_TEXT){if(listener!=null)listener.onTextRequested(xy[0],xy[1]);lastSnapped=false;notifyValue();invalidate();return true;}
         if(mode==Mode.ARC_LENGTH){measureArcLengthAt(new PointF(xy[0],xy[1]));lastSnapped=false;invalidate();return true;}
+        if(mode==Mode.ID_POINT){
+            PointF drawingPoint=vectorDrawing==null?new PointF(xy[0],xy[1]):vectorDrawing.drawingPointFromContent(xy[0],xy[1]);
+            if(listener!=null)listener.onMeasurement("ID Noktası • X="+formatMeasured(drawingPoint.x)+"  Y="+formatMeasured(drawingPoint.y)+"  ("+unitName+")");
+            lastSnapped=false;invalidate();return true;
+        }
         if(mode==Mode.DRAW_DIM_RADIUS||mode==Mode.DRAW_DIM_DIAMETER){addRadialDimensionAt(new PointF(xy[0],xy[1]),mode==Mode.DRAW_DIM_DIAMETER);lastSnapped=false;invalidate();return true;}
         points.add(new PointF(xy[0],xy[1]));
         if(mode==Mode.DRAW_LINE&&points.size()==2){PointF a=points.get(0),b=points.get(1);addRegularEdit(CadEdit.line(a.x,a.y,b.x,b.y));lastActionRegular=true;points.clear();lastSnapped=false;}
@@ -1020,6 +1025,7 @@ public class CadView extends View {
             }
         }
         else if(mode==Mode.ARC_LENGTH)listener.onMeasurement("Yay uzunluğu • Bir yay veya daireye dokunun");
+        else if(mode==Mode.ID_POINT)listener.onMeasurement("ID Noktası • Koordinatını görmek için çizimde bir noktaya dokunun");
         else if(mode==Mode.DRAW_LINE)listener.onMeasurement("Çizgi: iki nokta seçin • Eklenen: "+edits.size());
         else if(mode==Mode.DRAW_POLYLINE)listener.onMeasurement("Çoklu çizgi: noktaları seçin • Bitir ile tamamlayın • Nokta: "+points.size());
         else if(mode==Mode.DRAW_RECTANGLE)listener.onMeasurement("Dikdörtgen: iki köşe seçin • Eklenen: "+edits.size());
