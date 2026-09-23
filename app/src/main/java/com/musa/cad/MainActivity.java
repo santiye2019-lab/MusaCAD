@@ -1009,8 +1009,24 @@ public class MainActivity extends AppCompatActivity {
             tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
             tool("Sığdır",R.drawable.ic_fit,()->cad.fitToScreen()),
             tool("Yeni görünüm",R.drawable.ic_rectangle,this::saveCurrentView),
-            tool("Viewport",R.drawable.ic_rectangle,null)
+            tool("Viewport",R.drawable.ic_rectangle,this::showViewportBrowser)
         );
+    }
+
+    private void showViewportBrowser(){
+        if(activeDxf==null){result.setText("Viewport • Önce çizim açın");return;}
+        List<DxfViewport.View> viewports=activeDxf.viewports();
+        if(viewports.isEmpty()){result.setText("Viewport • Aktif düzende viewport bulunamadı");return;}
+        String[] labels=new String[viewports.size()];
+        for(int i=0;i<viewports.size();i++){
+            DxfViewport.View vp=viewports.get(i);
+            labels[i]="Viewport "+vp.id+" • "+String.format(Locale.getDefault(),"%.3f",vp.scale())+"x • "+String.format(Locale.getDefault(),"%.1f × %.1f",vp.paperWidth,vp.paperHeight);
+        }
+        new AlertDialog.Builder(this).setTitle("Viewport • "+activeDxf.activeLayout).setItems(labels,(d,which)->{
+            DxfViewport.View vp=viewports.get(which);RectF bounds=activeDxf.viewportContentBounds(vp);
+            if(cad.fitContentRect(bounds))result.setText("Viewport "+vp.id+" • Görünüme odaklandı");
+            else result.setText("Viewport • Görünüm sınırı kullanılamadı");
+        }).setNegativeButton("İPTAL",null).show();
     }
 
     private void hideSelectedLayer(){

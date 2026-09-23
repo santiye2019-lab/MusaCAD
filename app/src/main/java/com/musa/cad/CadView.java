@@ -274,6 +274,14 @@ public class CadView extends View {
     }
 
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
+    public boolean fitContentRect(RectF content){
+        if(!hasDrawing()||content==null||content.width()<=0f||content.height()<=0f||getWidth()<=0||getHeight()<=0)return false;
+        int pad=Math.max(12,Math.round(18f*getResources().getDisplayMetrics().density));
+        RectF target=new RectF(pad,pad,Math.max(pad+1,getWidth()-pad),Math.max(pad+1,getHeight()-pad));
+        imageMatrix.reset();imageMatrix.setRectToRect(content,target,Matrix.ScaleToFit.CENTER);
+        float[] values=new float[9];imageMatrix.getValues(values);scale=Math.max(1e-6f,(float)Math.hypot(values[Matrix.MSCALE_X],values[Matrix.MSKEW_Y]));
+        stopFastNavigation();invalidate();notifyValue();return true;
+    }
     public void zoomBy(float factor){
         if(!hasDrawing()||!Float.isFinite(factor)||factor<=0f)return;beginFastNavigation();float next=clampNavigationScale(scale*factor);float applied=next/scale;scale=next;
         imageMatrix.postScale(applied,applied,getWidth()/2f,getHeight()/2f);invalidate();notifyValue();
