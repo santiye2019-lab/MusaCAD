@@ -41,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
     private static final class ProjectSession {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
         CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
+        final Set<String> previousVisibleLayers=new HashSet<>();
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
@@ -66,7 +67,6 @@ public class MainActivity extends AppCompatActivity {
     private GridLayout toolPanelGrid;
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
-    private Set<String> previousVisibleLayers=new HashSet<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
     private String lastCommandRaw="";
 
@@ -926,8 +926,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void restorePreviousLayers(){
-        if(activeDxf==null||previousVisibleLayers.isEmpty()){result.setText("Önceki katman • Kayıtlı görünüm yok");return;}
-        applyLayers(new HashSet<>(previousVisibleLayers));
+        if(activeDxf==null||currentProject==null||currentProject.previousVisibleLayers.isEmpty()){result.setText("Önceki katman • Kayıtlı görünüm yok");return;}
+        applyLayers(new HashSet<>(currentProject.previousVisibleLayers));
     }
 
     private void showAllLayers(){
@@ -1550,7 +1550,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void applyLayers(Set<String> selected){
         if(activeDxf==null||activeLoad!=null||activeDxf.visibleLayers.equals(selected))return;
-        previousVisibleLayers=new HashSet<>(activeDxf.visibleLayers);DxfParser.Result source=activeDxf;LoadTask task=new LoadTask();activeLoad=task;task.dialog=new AlertDialog.Builder(this).setTitle("Katmanlar hazırlanıyor").setMessage("Görünüm güncelleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+        if(currentProject!=null){currentProject.previousVisibleLayers.clear();currentProject.previousVisibleLayers.addAll(activeDxf.visibleLayers);}DxfParser.Result source=activeDxf;LoadTask task=new LoadTask();activeLoad=task;task.dialog=new AlertDialog.Builder(this).setTitle("Katmanlar hazırlanıyor").setMessage("Görünüm güncelleniyor…").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try{DxfParser.Result updated=source.withVisibleLayers(selected);runOnUiThread(()->{if(activeLoad!=task||activeDxf!=source||isFinishing()||isDestroyed()){if(updated.bitmap!=null&&!updated.bitmap.isRecycled())updated.bitmap.recycle();return;}activeLoad=null;task.dialog.dismiss();cad.replaceVisibleDrawing(updated);activeDxf=updated;if(currentProject!=null){currentProject.parsed=updated;currentProject.nativeScene=null;}if(source.bitmap!=null&&!source.bitmap.isRecycled())source.bitmap.recycle();snapToggle.setEnabled(updated.snapPoints.length>0);result.setText("Hazır  •  "+updated.activeLayout+"  •  "+updated.entityCount+" nesne  •  "+updated.visibleLayers.size()+"/"+updated.layerCount+" katman");});}catch(Exception|OutOfMemoryError e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Yeterli bellek yok"));});}});
     }
 
