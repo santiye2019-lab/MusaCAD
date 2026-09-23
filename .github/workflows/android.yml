@@ -110,6 +110,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfHatch.java tests/DxfHatchTest.java
           java -cp /tmp/musacad-tests DxfHatchTest
+      - name: Test DXF multileader decoding
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfMLeader.java tests/DxfMLeaderTest.java
+          java -cp /tmp/musacad-tests DxfMLeaderTest
       - name: Test DXF paper-space viewport geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
