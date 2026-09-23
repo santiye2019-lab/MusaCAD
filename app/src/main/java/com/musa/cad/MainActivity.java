@@ -667,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
             tool("Akıllı Kalem",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Akıllı Kalem • Basınca duyarlı serbest çizim etkin");}}),
             tool("Multileader",R.drawable.ic_text,null),
-            tool("Revcloud",R.drawable.ic_polyline,null),
+            tool("Revcloud",R.drawable.ic_polyline,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("Revcloud • Bulut alanının iki karşı köşesini seçin");}}),
             tool("Divide",R.drawable.ic_point,this::runDivideCommand),
             tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand)
         );
@@ -767,7 +767,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Taslak kroki",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Taslak kroki • Serbest çizim etkin");}}),
             tool("Ok",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARROW);markModeSelected(0);result.setText("Ok • Önce ok ucunu, sonra kuyruk noktasını seçin");}}),
             tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
-            tool("Revcloud",R.drawable.ic_polyline,null),
+            tool("Revcloud",R.drawable.ic_polyline,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("Revcloud • Bulut alanının iki karşı köşesini seçin");}}),
             tool("Ses",R.drawable.ic_more,null),
             tool("Görüntü",R.drawable.ic_open_file,null),
             tool("Video",R.drawable.ic_more,null),
