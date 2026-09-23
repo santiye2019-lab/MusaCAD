@@ -659,12 +659,12 @@ public class MainActivity extends AppCompatActivity {
     private void showLineToolsSheet(){
         showToolPanel("Çiz",
             tool("Polyline",R.drawable.ic_polyline,()->selectEditMode(R.id.polylineButton,CadView.Mode.DRAW_POLYLINE)),
-            tool("Eskiz",R.drawable.ic_line,null),
+            tool("Eskiz",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Eskiz • Parmağınız veya kaleminizle serbest çizin");}}),
             tool("Daire",R.drawable.ic_circle,()->selectEditMode(R.id.circleButton,CadView.Mode.DRAW_CIRCLE)),
             tool("Yay",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARC);markModeSelected(0);result.setText("Yay • 3 nokta seçin");}}),
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
             tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
-            tool("Akıllı Kalem",R.drawable.ic_line,null),
+            tool("Akıllı Kalem",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Akıllı Kalem • Basınca duyarlı serbest çizim etkin");}}),
             tool("Multileader",R.drawable.ic_text,null),
             tool("Revcloud",R.drawable.ic_polyline,null),
             tool("Divide",R.drawable.ic_point,null),
@@ -746,7 +746,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showAnnotationToolsSheet(){
         showToolPanel("Ek açıklama",
-            tool("Taslak kroki",R.drawable.ic_line,null),
+            tool("Taslak kroki",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Taslak kroki • Serbest çizim etkin");}}),
             tool("Ok",R.drawable.ic_line,null),
             tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
             tool("Revcloud",R.drawable.ic_polyline,null),

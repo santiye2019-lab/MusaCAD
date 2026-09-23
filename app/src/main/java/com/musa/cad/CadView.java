@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -120,7 +120,7 @@ public class CadView extends View {
         fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
-    private boolean editMode(){return mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.FREEHAND||mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():nativeDrawing!=null?nativeDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():nativeDrawing!=null?nativeDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -624,6 +624,7 @@ public class CadView extends View {
             boolean buttonPan=(e.getButtonState()&MotionEvent.BUTTON_STYLUS_PRIMARY)!=0;if(buttonPan)return directPanTouch(e);
         }
         if(mode==Mode.SELECT_ENTITY)return sourceEditTouch(e);
+        if(mode==Mode.FREEHAND)return stylusFreehandTouch(e);
         if(stylusModeDetected&&!stylus)return fingerNavigationTouch(e);
         if(stylus&&mode==Mode.PAN)return stylusFreehandTouch(e);
 
@@ -902,7 +903,8 @@ public class CadView extends View {
             if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+" • Taşı / Döndür / Kopya / Sil");return;}
             listener.onMeasurement("Nesne seçin • Düzenlenebilir: "+vectorDrawing.editableSourceCount()+" • LINE / Çoklu / Daire / Yazı");return;
         }
-        if(mode==Mode.CALIBRATE)listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
+        if(mode==Mode.FREEHAND)listener.onMeasurement("Eskiz • Parmağınız veya kaleminizle serbest çizim yapın");
+        else if(mode==Mode.CALIBRATE)listener.onMeasurement(points.size()<2?"Bilinen uzunluğun iki ucunu seçin":"Gerçek uzunluğu girin");
         else if(mode==Mode.DISTANCE){double sum=0;for(int i=1;i<points.size();i++)sum+=distance(points.get(i-1),points.get(i));listener.onMeasurement(points.size()<2?"Mesafe için en az 2 nokta seçin":String.format(Locale.getDefault(),"Mesafe: %.3f %s",sum*unitsPerImagePixel,unitName));}
         else if(mode==Mode.AREA){double a=0;if(points.size()>2){for(int i=0;i<points.size();i++){PointF p=points.get(i),q=points.get((i+1)%points.size());a+=p.x*q.y-q.x*p.y;}a=Math.abs(a)/2*unitsPerImagePixel*unitsPerImagePixel;}listener.onMeasurement(points.size()<3?"Alan için en az 3 nokta seçin":String.format(Locale.getDefault(),"Alan: %.3f %s²",a,unitName));}
         else if(mode==Mode.DRAW_LINE)listener.onMeasurement("Çizgi: iki nokta seçin • Eklenen: "+edits.size());
