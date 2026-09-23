@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
@@ -31,6 +31,10 @@ public class MainActivity extends AppCompatActivity {
     private static final class ToolAction {
         final String label;final int icon;final Runnable action;
         ToolAction(String label,int icon,Runnable action){this.label=label;this.icon=icon;this.action=action;}
+    }
+    private static final class MediaAttachment {
+        final String kind,name,mime,uri;
+        MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
@@ -43,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
+        final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
@@ -843,9 +848,9 @@ public class MainActivity extends AppCompatActivity {
             tool("Ok",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARROW);markModeSelected(0);result.setText("Ok • Önce ok ucunu, sonra kuyruk noktasını seçin");}}),
             tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
             tool("Revcloud",R.drawable.ic_polyline,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("Revcloud • Bulut alanının iki karşı köşesini seçin");}}),
-            tool("Ses",R.drawable.ic_more,null),
-            tool("Görüntü",R.drawable.ic_open_file,null),
-            tool("Video",R.drawable.ic_more,null),
+            tool("Ses",R.drawable.ic_more,()->pickMedia(PICK_AUDIO,"audio/*")),
+            tool("Görüntü",R.drawable.ic_open_file,()->pickMedia(PICK_IMAGE,"image/*")),
+            tool("Video",R.drawable.ic_more,()->pickMedia(PICK_VIDEO,"video/*")),
             tool("Kılavuz",R.drawable.ic_text,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("Kılavuz • Sonsuz yardımcı doğru için iki nokta seçin");}}),
             tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
@@ -883,8 +888,39 @@ public class MainActivity extends AppCompatActivity {
             tool("Yer imi",R.drawable.ic_more,this::showViewBookmark),
             tool("Copy across",R.drawable.ic_copy,this::copyAcrossProjects),
             tool("Paste across",R.drawable.ic_copy,this::pasteAcrossProjects),
+            tool("Medya Ekleri",R.drawable.ic_open_file,this::showMediaAttachments),
             tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
         );
+    }
+
+    private void pickMedia(int request,String mime){
+        if(!canEdit()||currentProject==null){result.setText("Medya • Düzenlenebilir bir çizim açın");return;}
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType(mime);
+        startActivityForResult(intent,request);
+    }
+
+    private void handleMediaPicked(int request,Uri uri){
+        if(uri==null||currentProject==null)return;
+        String kind=request==PICK_AUDIO?"Ses":request==PICK_IMAGE?"Görüntü":"Video";
+        String mime=request==PICK_AUDIO?"audio/*":request==PICK_IMAGE?"image/*":"video/*";
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        String name=nameOf(uri);if(name==null||name.trim().isEmpty())name=kind+" eki";
+        PointF center=cad.visibleCenterContent();
+        cad.addTextEdit(center.x,center.y,kind+" • "+name);
+        currentProject.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
+        result.setText(kind+" • "+name+" eklendi • görünüm merkezine bağlantı notu yerleştirildi");
+    }
+
+    private void showMediaAttachments(){
+        if(currentProject==null||currentProject.mediaAttachments.isEmpty()){result.setText("Medya Ekleri • Bu projede ek yok");return;}
+        String[] labels=new String[currentProject.mediaAttachments.size()];
+        for(int i=0;i<labels.length;i++){MediaAttachment m=currentProject.mediaAttachments.get(i);labels[i]=m.kind+" • "+m.name;}
+        new AlertDialog.Builder(this).setTitle("Medya Ekleri").setItems(labels,(d,which)->{
+            MediaAttachment m=currentProject.mediaAttachments.get(which);
+            try{
+                Intent view=new Intent(Intent.ACTION_VIEW,Uri.parse(m.uri));view.setType(m.mime);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(view);
+            }catch(Exception e){Toast.makeText(this,"Bu medya için açılabilir uygulama bulunamadı",Toast.LENGTH_LONG).show();}
+        }).setNegativeButton("KAPAT",null).show();
     }
 
     private void copyAcrossProjects(){
@@ -1505,6 +1541,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
         if(c!=RESULT_OK||data==null||data.getData()==null)return;
+        if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
     private void cancelLoad(){LoadTask task=activeLoad;activeLoad=null;if(task!=null){if(task.future!=null)task.future.cancel(true);if(task.dialog!=null)task.dialog.dismiss();}}

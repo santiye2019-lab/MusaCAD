@@ -277,6 +277,12 @@ public class CadView extends View {
         imageMatrix.reset();fit();invalidate();
     }
 
+    public PointF visibleCenterContent(){
+        float[] p={getWidth()/2f,getHeight()/2f};Matrix inv=new Matrix();
+        if(imageMatrix.invert(inv))inv.mapPoints(p);
+        return new PointF(p[0],p[1]);
+    }
+
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
     public boolean fitContentRect(RectF content){
         if(!hasDrawing()||content==null||content.width()<=0f||content.height()<=0f||getWidth()<=0||getHeight()<=0)return false;
