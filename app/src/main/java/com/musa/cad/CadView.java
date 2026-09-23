@@ -449,6 +449,21 @@ public class CadView extends View {
         if(added>0){lastActionRegular=true;notifyValue();invalidate();}
         return added;
     }
+    public int divideSelectedEntity(int segments){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection()||segments<2||segments>200)return 0;
+        CadEdit selected=sourceEdits.currentSelected();if(selected==null)return 0;
+        ArrayList<CadEdit> marks=new ArrayList<>();
+        if(selected.type==CadEdit.Type.LINE&&selected.xy.length>=4){
+            float x1=selected.xy[0],y1=selected.xy[1],x2=selected.xy[2],y2=selected.xy[3];
+            for(int i=1;i<segments;i++){float t=i/(float)segments;marks.add(CadEdit.point(x1+(x2-x1)*t,y1+(y2-y1)*t));}
+        }else if(selected.type==CadEdit.Type.CIRCLE&&selected.xy.length>=4){
+            float cx=selected.xy[0],cy=selected.xy[1],r=(float)Math.hypot(selected.xy[2]-cx,selected.xy[3]-cy);
+            if(r<1e-6f)return 0;
+            for(int i=0;i<segments;i++){double a=2d*Math.PI*i/segments;marks.add(CadEdit.point(cx+(float)Math.cos(a)*r,cy+(float)Math.sin(a)*r));}
+        }else return 0;
+        addRegularEdits(marks);lastActionRegular=true;notifyValue();invalidate();return marks.size();
+    }
+
     public boolean explodeSelectedEntity(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
         CadEdit selected=sourceEdits.currentSelected();if(selected==null)return false;

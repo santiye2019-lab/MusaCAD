@@ -667,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Akıllı Kalem",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Akıllı Kalem • Basınca duyarlı serbest çizim etkin");}}),
             tool("Multileader",R.drawable.ic_text,null),
             tool("Revcloud",R.drawable.ic_polyline,null),
-            tool("Divide",R.drawable.ic_point,null),
+            tool("Divide",R.drawable.ic_point,this::runDivideCommand),
             tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand)
         );
     }
@@ -743,8 +743,8 @@ public class MainActivity extends AppCompatActivity {
             tool("Açısal",R.drawable.ic_distance,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ANGULAR);markModeSelected(0);result.setText("Açısal ölçü • İlk kol, köşe ve ikinci kol için 3 nokta seçin");}}),
             tool("Radius",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_RADIUS);markModeSelected(0);result.setText("Radius ölçüsü • Bir daireye dokunun");}}),
             tool("Çap",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_DIAMETER);markModeSelected(0);result.setText("Çap ölçüsü • Bir daireye dokunun");}}),
-            tool("Yay boyu",R.drawable.ic_line,null),
-            tool("Three-point",R.drawable.ic_distance,null)
+            tool("Yay boyu",R.drawable.ic_line,()->{cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("Yay boyu • Bir yay veya daireye dokunun");}),
+            tool("Three-point",R.drawable.ic_distance,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ANGULAR);markModeSelected(0);result.setText("Three-point • İlk kol, köşe ve ikinci kol için 3 nokta seçin");}})
         );
     }
 
@@ -1088,6 +1088,21 @@ public class MainActivity extends AppCompatActivity {
             })
             .setNegativeButton("İPTAL",null)
             .show();
+    }
+
+    private void runDivideCommand(){
+        if(!ensureTransformSelection("DIVIDE"))return;
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Parça sayısı (2–200)");input.setText("2");input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("DIVIDE • Eşit böl").setMessage("Seçili çizgi veya daire üzerine eşit aralıklı nokta nesneleri yerleştirir.").setView(input).setPositiveButton("UYGULA",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                int segments=Integer.parseInt(input.getText().toString().trim());
+                if(segments<2||segments>200){input.setError("2 ile 200 arasında değer girin");return;}
+                int added=cad.divideSelectedEntity(segments);
+                if(added<=0){input.setError("DIVIDE yalnız çizgi veya daire üzerinde uygulanabilir");return;}
+                dialog.dismiss();result.setText("DIVIDE • "+added+" nokta eklendi");
+            }catch(Exception e){input.setError("Geçerli bir parça sayısı girin");}
+        }));dialog.show();
     }
 
     private void runArrayCommand(){
