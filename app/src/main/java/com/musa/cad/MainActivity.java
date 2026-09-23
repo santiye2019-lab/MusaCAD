@@ -741,8 +741,8 @@ public class MainActivity extends AppCompatActivity {
             tool("Hizalı",R.drawable.ic_distance,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("Hizalı Ölçü • İki nokta ve ölçü çizgisi konumu seçin");}}),
             tool("Ölçü Stili",R.drawable.ic_properties,this::runDimStyleCommand),
             tool("Açısal",R.drawable.ic_distance,null),
-            tool("Radius",R.drawable.ic_circle,null),
-            tool("Çap",R.drawable.ic_circle,null),
+            tool("Radius",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_RADIUS);markModeSelected(0);result.setText("Radius ölçüsü • Bir daireye dokunun");}}),
+            tool("Çap",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_DIM_DIAMETER);markModeSelected(0);result.setText("Çap ölçüsü • Bir daireye dokunun");}}),
             tool("Yay boyu",R.drawable.ic_line,null),
             tool("Three-point",R.drawable.ic_distance,null)
         );
