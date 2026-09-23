@@ -54,6 +54,12 @@ public class CadView extends View {
         }
     }
 
+    public static final class ViewBookmark {
+        private final Matrix matrix;
+        private final float scale;
+        private ViewBookmark(Matrix matrix,float scale){this.matrix=new Matrix(matrix);this.scale=scale;}
+    }
+
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<PointF> points=new ArrayList<>();
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
@@ -126,6 +132,11 @@ public class CadView extends View {
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():nativeDrawing!=null?nativeDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
     public SessionState captureSessionState(){return new SessionState(this);}
+    public ViewBookmark captureViewBookmark(){return hasDrawing()?new ViewBookmark(imageMatrix,scale):null;}
+    public boolean restoreViewBookmark(ViewBookmark bookmark){
+        if(bookmark==null||!hasDrawing())return false;
+        stopFastNavigation();imageMatrix.set(bookmark.matrix);scale=bookmark.scale;fitScale=computeFitScale();invalidate();notifyValue();return true;
+    }
 
     /** Restores a drawing tab without reparsing the DWG/DXF or discarding its edits. */
     public void restoreSessionState(DxfParser.Result vector,Bitmap bitmap,SessionState state){

@@ -40,8 +40,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static final class ProjectSession {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
-        CadView.SessionState viewState;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
+        CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         final Set<String> previousVisibleLayers=new HashSet<>();
+        final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
@@ -84,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
         toolPanelHost=findViewById(R.id.toolPanelHost);toolPanelTitle=findViewById(R.id.toolPanelTitle);toolPanelGrid=findViewById(R.id.toolPanelGrid);categoryScroll=findViewById(R.id.categoryScroll);
         findViewById(R.id.toolPanelClose).setOnClickListener(v->hideToolPanel());
         cad.setListener(new CadView.Listener(){
-            public void onMeasurement(String v){result.setText(v);}
+            public void onMeasurement(String v){result.setText(v);recordMeasurement(v);}
             public void onCalibrationRequested(double px){showCalibration();}
             public void onSelectionReady(){previewSelection();}
             public void onTextRequested(float x,float y){showTextEditor(x,y);}
@@ -713,10 +714,64 @@ public class MainActivity extends AppCompatActivity {
             tool("Açı",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("Açı • Köşe ortada olacak şekilde 3 nokta seçin");}),
             tool("Yay uzunluğu",R.drawable.ic_distance,()->{cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("Yay uzunluğu • Bir yay veya daireye dokunun");}),
             tool("Cephe",R.drawable.ic_distance,null),
-            tool("Sonuç",R.drawable.ic_properties,null),
-            tool("Sonuç sayısı",R.drawable.ic_properties,null),
+            tool("Sonuç",R.drawable.ic_properties,this::showMeasurementResults),
+            tool("Sonuç sayısı",R.drawable.ic_properties,this::showMeasurementCount),
             tool("Hassas",R.drawable.ic_scale,this::showMeasurementPrecision)
         );
+    }
+
+    private boolean isCompletedMeasurement(String value){
+        if(value==null)return false;
+        String v=value.trim();
+        return v.startsWith("Mesafe:")||v.startsWith("Alan:")||v.startsWith("Açı:")||v.startsWith("Yay uzunluğu:")||
+               v.startsWith("ID Noktası • X=")||v.startsWith("Radius ölçüsü:")||v.startsWith("Çap ölçüsü:")||
+               v.startsWith("Açısal ölçü:");
+    }
+
+    private void recordMeasurement(String value){
+        if(currentProject==null||!isCompletedMeasurement(value))return;
+        ArrayDeque<String> history=currentProject.measurementHistory;
+        if(!history.isEmpty()&&value.equals(history.peekLast()))return;
+        history.addLast(value);
+        while(history.size()>50)history.removeFirst();
+    }
+
+    private void showMeasurementResults(){
+        if(currentProject==null){result.setText("Sonuç • Önce çizim açın");return;}
+        ArrayDeque<String> history=currentProject.measurementHistory;
+        if(history.isEmpty()){result.setText("Sonuç • Henüz tamamlanmış ölçüm yok");return;}
+        StringBuilder text=new StringBuilder();int index=1;
+        for(String value:history)text.append(index++).append(". ").append(value).append("\n");
+        TextView out=new TextView(this);out.setText(text.toString().trim());out.setTextIsSelectable(true);out.setTextSize(12f);int p=dp(16);out.setPadding(p,p/2,p,p);
+        ScrollView scroll=new ScrollView(this);scroll.addView(out);
+        new AlertDialog.Builder(this).setTitle("Ölçüm sonuçları • "+history.size()).setView(scroll)
+            .setNeutralButton("TEMİZLE",(d,w)->{history.clear();result.setText("Ölçüm sonuçları temizlendi");})
+            .setPositiveButton("TAMAM",null).show();
+    }
+
+    private void showMeasurementCount(){
+        if(currentProject==null){result.setText("Sonuç sayısı • Önce çizim açın");return;}
+        int count=currentProject.measurementHistory.size();
+        result.setText("Sonuç sayısı • "+count);
+        new AlertDialog.Builder(this).setTitle("Sonuç sayısı").setMessage("Bu projede kayıtlı tamamlanmış ölçüm: "+count).setPositiveButton("TAMAM",null).show();
+    }
+
+    private void saveCurrentView(){
+        if(currentProject==null){result.setText("Yeni görünüm • Önce çizim açın");return;}
+        currentProject.viewBookmark=cad.captureViewBookmark();
+        result.setText(currentProject.viewBookmark==null?"Yeni görünüm • Görünüm kaydedilemedi":"Yeni görünüm • Mevcut görünüm kaydedildi");
+    }
+
+    private void showViewBookmark(){
+        if(currentProject==null){result.setText("Yer imi • Önce çizim açın");return;}
+        String[] items=currentProject.viewBookmark==null?new String[]{"Mevcut görünümü kaydet"}:new String[]{"Mevcut görünümü kaydet","Kayıtlı görünüme dön","Yer imini temizle"};
+        new AlertDialog.Builder(this).setTitle("Yer imi").setItems(items,(d,which)->{
+            if(which==0)saveCurrentView();
+            else if(which==1){
+                if(cad.restoreViewBookmark(currentProject.viewBookmark))result.setText("Yer imi • Kayıtlı görünüme dönüldü");
+                else result.setText("Yer imi • Görünüm geri yüklenemedi");
+            }else if(which==2){currentProject.viewBookmark=null;result.setText("Yer imi • Temizlendi");}
+        }).setNegativeButton("İPTAL",null).show();
     }
 
     private void showMeasurementPrecision(){
@@ -771,7 +826,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Ses",R.drawable.ic_more,null),
             tool("Görüntü",R.drawable.ic_open_file,null),
             tool("Video",R.drawable.ic_more,null),
-            tool("Kılavuz",R.drawable.ic_text,null),
+            tool("Kılavuz",R.drawable.ic_text,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("Kılavuz • Sonsuz yardımcı doğru için iki nokta seçin");}}),
             tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
             tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
@@ -805,7 +860,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Sayaç bloğu",R.drawable.ic_properties,this::showBlockCount),
             tool("Graphic lookup",R.drawable.ic_select,null),
             tool("Açıklama ara",R.drawable.ic_text,()->showEntitySearch(true)),
-            tool("Yer imi",R.drawable.ic_more,null),
+            tool("Yer imi",R.drawable.ic_more,this::showViewBookmark),
             tool("Copy across",R.drawable.ic_copy,null),
             tool("Paste across",R.drawable.ic_copy,null),
             tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
@@ -919,7 +974,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Model / Layout",R.drawable.ic_layers,this::showLayouts),
             tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
             tool("Sığdır",R.drawable.ic_fit,()->cad.fitToScreen()),
-            tool("Yeni görünüm",R.drawable.ic_rectangle,null),
+            tool("Yeni görünüm",R.drawable.ic_rectangle,this::saveCurrentView),
             tool("Viewport",R.drawable.ic_rectangle,null)
         );
     }
