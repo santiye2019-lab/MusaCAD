@@ -8,7 +8,7 @@ import java.util.*;
 
 public class CadView extends View {
     private static final float MIN_RELATIVE_ZOOM=.05f,MAX_RELATIVE_ZOOM=8192f;
-    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, ID_POINT, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_NUMBER, DRAW_ARROW, DRAW_REVCLOUD, DRAW_TEXT }
+    public enum Mode { PAN, SELECT_ENTITY, CALIBRATE, DISTANCE, AREA, ANGLE, ARC_LENGTH, ID_POINT, FREEHAND, DRAW_LINE, DRAW_POLYLINE, DRAW_RECTANGLE, DRAW_CIRCLE, DRAW_ARC, DRAW_ELLIPSE, DRAW_POINT, DRAW_XLINE, DRAW_INSERT, DRAW_DIM_LINEAR, DRAW_DIM_ALIGNED, DRAW_DIM_ANGULAR, DRAW_DIM_RADIUS, DRAW_DIM_DIAMETER, DRAW_NUMBER, DRAW_ARROW, DRAW_MULTILEADER, DRAW_REVCLOUD, DRAW_TEXT }
     public interface Listener {
         void onMeasurement(String value);
         void onCalibrationRequested(double pixelDistance);
@@ -127,7 +127,7 @@ public class CadView extends View {
         fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,90L);
     }
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
-    private boolean editMode(){return mode==Mode.FREEHAND||mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_DIM_ANGULAR||mode==Mode.DRAW_DIM_RADIUS||mode==Mode.DRAW_DIM_DIAMETER||mode==Mode.DRAW_NUMBER||mode==Mode.DRAW_ARROW||mode==Mode.DRAW_REVCLOUD||mode==Mode.DRAW_TEXT;}
+    private boolean editMode(){return mode==Mode.FREEHAND||mode==Mode.DRAW_LINE||mode==Mode.DRAW_POLYLINE||mode==Mode.DRAW_RECTANGLE||mode==Mode.DRAW_CIRCLE||mode==Mode.DRAW_ARC||mode==Mode.DRAW_ELLIPSE||mode==Mode.DRAW_POINT||mode==Mode.DRAW_XLINE||mode==Mode.DRAW_INSERT||mode==Mode.DRAW_DIM_LINEAR||mode==Mode.DRAW_DIM_ALIGNED||mode==Mode.DRAW_DIM_ANGULAR||mode==Mode.DRAW_DIM_RADIUS||mode==Mode.DRAW_DIM_DIAMETER||mode==Mode.DRAW_NUMBER||mode==Mode.DRAW_ARROW||mode==Mode.DRAW_MULTILEADER||mode==Mode.DRAW_REVCLOUD||mode==Mode.DRAW_TEXT;}
     private int contentWidth(){return vectorDrawing!=null?vectorDrawing.contentWidth():nativeDrawing!=null?nativeDrawing.contentWidth():drawing!=null?drawing.getWidth():0;}
     private int contentHeight(){return vectorDrawing!=null?vectorDrawing.contentHeight():nativeDrawing!=null?nativeDrawing.contentHeight():drawing!=null?drawing.getHeight():0;}
 
@@ -1013,6 +1013,20 @@ public class CadView extends View {
             }
             points.clear();lastSnapped=false;
         }
+        else if(mode==Mode.DRAW_MULTILEADER&&points.size()==2){
+            PointF tip=points.get(0),tail=points.get(1);float dx=tail.x-tip.x,dy=tail.y-tip.y,len=(float)Math.hypot(dx,dy);
+            if(len>1e-6f){
+                float ux=dx/len,uy=dy/len,nx=-uy,ny=ux;float size=Math.max(10f,Math.min(42f,len*.18f));
+                ArrayList<CadEdit> leader=new ArrayList<>();leader.add(CadEdit.line(tip.x,tip.y,tail.x,tail.y));
+                leader.add(CadEdit.line(tip.x,tip.y,tip.x+ux*size+nx*size*.42f,tip.y+uy*size+ny*size*.42f));
+                leader.add(CadEdit.line(tip.x,tip.y,tip.x+ux*size-nx*size*.42f,tip.y+uy*size-ny*size*.42f));
+                float landing=Math.max(size*1.5f,dimTextHeightContent*2.2f);float dir=dx>=0f?1f:-1f;
+                leader.add(CadEdit.line(tail.x,tail.y,tail.x+dir*landing,tail.y));
+                addRegularEdits(leader);lastActionRegular=true;
+                if(listener!=null)listener.onTextRequested(tail.x+dir*landing,tail.y-dimTextHeightContent*.25f);
+            }
+            points.clear();lastSnapped=false;
+        }
         else if(mode==Mode.DRAW_REVCLOUD&&points.size()==2){
             PointF a=points.get(0),b=points.get(1);float left=Math.min(a.x,b.x),right=Math.max(a.x,b.x),top=Math.min(a.y,b.y),bottom=Math.max(a.y,b.y);
             ArrayList<CadEdit> cloud=new ArrayList<>();
@@ -1088,6 +1102,7 @@ public class CadView extends View {
         else if(mode==Mode.DRAW_DIM_DIAMETER)listener.onMeasurement("Çap ölçüsü • Bir daireye dokunun");
         else if(mode==Mode.DRAW_NUMBER)listener.onMeasurement("Numbering • Yerleştirmek için dokunun • Sıradaki: "+numberingNext);
         else if(mode==Mode.DRAW_ARROW)listener.onMeasurement(points.isEmpty()?"Ok • Ok ucunu seçin":"Ok • Kuyruk noktasını seçin");
+        else if(mode==Mode.DRAW_MULTILEADER)listener.onMeasurement(points.isEmpty()?"Multileader • Ok ucunu seçin":"Multileader • Metin bağlantı noktasını seçin");
         else if(mode==Mode.DRAW_REVCLOUD)listener.onMeasurement(points.isEmpty()?"Revcloud • İlk köşeyi seçin":"Revcloud • Karşı köşeyi seçin");
         else if(mode==Mode.DRAW_TEXT)listener.onMeasurement("Yazı: yerleştirmek istediğiniz noktaya dokunun • Eklenen: "+edits.size());
         else if(stylusModeDetected)listener.onMeasurement("Kalem: serbest çizim • Kalem tuşu: gezin • Silgi/2. tuş: geri al • Parmak: gezin/zoom");

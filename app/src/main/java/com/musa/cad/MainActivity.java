@@ -667,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
             tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
             tool("Akıllı Kalem",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Akıllı Kalem • Basınca duyarlı serbest çizim etkin");}}),
-            tool("Multileader",R.drawable.ic_text,null),
+            tool("Multileader",R.drawable.ic_text,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_MULTILEADER);markModeSelected(0);result.setText("Multileader • Ok ucunu ve metin bağlantı noktasını seçin");}}),
             tool("Revcloud",R.drawable.ic_polyline,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("Revcloud • Bulut alanının iki karşı köşesini seçin");}}),
             tool("Divide",R.drawable.ic_point,this::runDivideCommand),
             tool("Hatch",R.drawable.ic_hatch,this::runHatchCommand)
@@ -858,13 +858,27 @@ public class MainActivity extends AppCompatActivity {
             tool("Bulmak",R.drawable.ic_select,()->showEntitySearch(false)),
             tool("Artımlı Kopya",R.drawable.ic_copy,this::runArrayCommand),
             tool("Sayaç bloğu",R.drawable.ic_properties,this::showBlockCount),
-            tool("Graphic lookup",R.drawable.ic_select,null),
+            tool("Graphic lookup",R.drawable.ic_select,this::showGraphicLookup),
             tool("Açıklama ara",R.drawable.ic_text,()->showEntitySearch(true)),
             tool("Yer imi",R.drawable.ic_more,this::showViewBookmark),
             tool("Copy across",R.drawable.ic_copy,null),
             tool("Paste across",R.drawable.ic_copy,null),
             tool("Yardım",R.drawable.ic_more,this::showCommandHelp)
         );
+    }
+
+    private void showGraphicLookup(){
+        if(!canEdit()){result.setText("Graphic lookup • Tam vektör model gerekli");return;}
+        if(!cad.hasSelectedEntity()){
+            selectEditMode(R.id.selectEntityButton,CadView.Mode.SELECT_ENTITY);
+            result.setText("Graphic lookup • Çizimde incelemek istediğiniz nesneyi seçin, sonra araca tekrar basın");
+            return;
+        }
+        String info=cad.selectedEntityInfo();
+        TextView out=new TextView(this);out.setText(info);out.setTextIsSelectable(true);out.setTextSize(12f);int p=dp(16);out.setPadding(p,p/2,p,p);
+        ScrollView scroll=new ScrollView(this);scroll.addView(out);
+        new AlertDialog.Builder(this).setTitle("Graphic lookup").setView(scroll).setPositiveButton("TAMAM",null).show();
+        result.setText("Graphic lookup • Seçili nesne bilgileri açıldı");
     }
 
     private void showBlockCount(){
