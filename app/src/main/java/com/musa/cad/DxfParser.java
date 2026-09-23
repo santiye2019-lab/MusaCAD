@@ -368,9 +368,27 @@ public final class DxfParser {
             return new Label(x,y,height,angle,plain,style,width,oblique,generation,x2,y2,hasSecond,horizontal,vertical,0);
         }
         if("LINE".equals(type))return new Line(f(a,from,to,10),f(a,from,to,20),f(a,from,to,11),f(a,from,to,21));if("XLINE".equals(type)){float dx=f(a,from,to,11),dy=f(a,from,to,21);if(Math.hypot(dx,dy)<1e-6)return null;return new XLine(f(a,from,to,10),f(a,from,to,20),dx,dy);}if("POINT".equals(type))return new Marker(f(a,from,to,10),f(a,from,to,20),Math.max(.1f,fv(a,from,to,40,.5f)));if("CIRCLE".equals(type))return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),0,360);if("ARC".equals(type)){float start=f(a,from,to,50),end=f(a,from,to,51),sweep=end-start;if(sweep<0)sweep+=360;return new Circle(f(a,from,to,10),f(a,from,to,20),Math.abs(f(a,from,to,40)),start,sweep);}if("ELLIPSE".equals(type)){float mx=f(a,from,to,11),my=f(a,from,to,21);if(Math.hypot(mx,my)<1e-6)return null;return new EllipseCurve(f(a,from,to,10),f(a,from,to,20),mx,my,fv(a,from,to,40,1f),fv(a,from,to,41,0f),fv(a,from,to,42,(float)(Math.PI*2)));}if("LWPOLYLINE".equals(type)){boolean closed=(((int)f(a,from,to,70))&1)!=0;return bulgePoly(lwVertices(a,from,to),closed);}if("SPLINE".equals(type)){try{return splinePoly(DxfSpline.parse(a,from,to));}catch(IOException ignored){return null;}}if("LEADER".equals(type)){ArrayList<PointF>p=repeatedPoints(a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}if("MULTILEADER".equals(type)){
-            DxfMLeader.Result ml=DxfMLeader.parse(a,from,to);ArrayList<Entity>parts=new ArrayList<>();
-            for(List<DxfMLeader.Point>line:ml.leaderLines){ArrayList<PointF>pts=new ArrayList<>();for(DxfMLeader.Point q:line)pts.add(new PointF((float)q.x,(float)q.y));if(pts.size()>=2)parts.add(new Poly(pts,false));}
-            String plain=DxfText.plain(ml.text);if(!plain.trim().isEmpty()){
+            DxfMLeader.Result ml=DxfMLeader.parse(a,from,to);ArrayList<Entity>parts=new ArrayList<>();String plain=DxfText.plain(ml.text);
+            boolean landingAdded=false;
+            for(List<DxfMLeader.Point>line:ml.leaderLines){
+                ArrayList<PointF>pts=new ArrayList<>();for(DxfMLeader.Point q:line)pts.add(new PointF((float)q.x,(float)q.y));
+                if(pts.size()<2)continue;
+                PointF first=pts.get(0),tip=pts.get(pts.size()-1),prev=pts.get(pts.size()-2);
+                if(!landingAdded&&!plain.trim().isEmpty()){
+                    float tx=(float)ml.textX,ty=(float)ml.textY;
+                    if(Math.hypot(first.x-tx,first.y-ty)>1e-6)parts.add(new Line(tx,ty,first.x,first.y));
+                    landingAdded=true;
+                }
+                parts.add(new Poly(pts,false));
+                float dx=prev.x-tip.x,dy=prev.y-tip.y,len=(float)Math.hypot(dx,dy);
+                if(len>1e-6f){
+                    float ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+                    float base=(float)Math.max(.01d,ml.textHeight),size=Math.max(base*.9f,Math.min(base*2.4f,len*.24f));
+                    parts.add(new Line(tip.x,tip.y,tip.x+ux*size+nx*size*.36f,tip.y+uy*size+ny*size*.36f));
+                    parts.add(new Line(tip.x,tip.y,tip.x+ux*size-nx*size*.36f,tip.y+uy*size-ny*size*.36f));
+                }
+            }
+            if(!plain.trim().isEmpty()){
                 DxfTextStyle.Style style=DxfTextStyle.resolve(styles,DxfTextStyle.STANDARD);
                 DxfMText.Result rich=DxfMText.parse(ml.text);
                 parts.add(new MTextLabel((float)ml.textX,(float)ml.textY,(float)Math.max(.01d,ml.textHeight),(float)ml.rotationDegrees,rich,style,1f,0f,1));
