@@ -775,8 +775,21 @@ public class MainActivity extends AppCompatActivity {
             tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
             tool("Elips",R.drawable.ic_circle,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ELLIPSE);markModeSelected(0);result.setText("Elips • Merkez ve eksenleri seçin");}}),
-            tool("Numbering",R.drawable.ic_text,null)
+            tool("Numbering",R.drawable.ic_text,this::showNumberingSetup)
         );
+    }
+
+    private void showNumberingSetup(){
+        if(!canEdit()){result.setText("Numbering • Düzenlenebilir bir çizim açın");return;}
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Başlangıç numarası");input.setText("1");input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Numbering").setMessage("Başlangıç numarasını belirleyin; sonra çizimde dokunduğunuz her noktaya sıradaki numara yerleşir.").setView(input).setPositiveButton("BAŞLAT",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try{
+                int start=Integer.parseInt(input.getText().toString().trim());
+                if(start<1||start>999999){input.setError("1 ile 999999 arasında değer girin");return;}
+                cad.setNumberingStart(start);markModeSelected(0);dialog.dismiss();result.setText("Numbering • Sıradaki: "+start+" • Yerleştirmek için dokunun");
+            }catch(Exception e){input.setError("Geçerli başlangıç numarası girin");}
+        }));dialog.show();
     }
 
     private void showOtherToolsSheet(){
