@@ -41,6 +41,8 @@ public final class NativeScene {
         String[] ts=new String[os.length];
         int count=0;
         RectF b=new RectF();
+        Paint textMetrics=new Paint(Paint.ANTI_ALIAS_FLAG);
+        textMetrics.setTextSize(1f);
         while(p<values.length){
             int start=p,encoded=Math.round(values[p++]),type;String parsedText=null;
             if(version>=4&&encoded<0){
@@ -64,8 +66,12 @@ public final class NativeScene {
                 if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.max(0,Math.round(values[p++]));int words=(bytes+2)/3;if(p+words>values.length)break;
                 byte[] utf8=new byte[bytes];int at=0;for(int wi=0;wi<words;wi++){int packed=Math.round(values[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
                 parsedText=DxfText.plain(new String(utf8,java.nio.charset.StandardCharsets.UTF_8)).replace('\n',' ');
-                float glyphs=Math.max(1f,bytes*.65f),shift=(ha==2?-glyphs:(ha==1||ha==3||ha==4||ha==5?-.5f*glyphs:0f));
-                add(b,x+ux*shift,y+uy*shift);add(b,x+ux*(shift+glyphs),y+uy*(shift+glyphs));add(b,x+ux*shift-vx,y+uy*shift-vy);add(b,x+ux*(shift+glyphs)-vx,y+uy*(shift+glyphs)-vy);
+                float width=textMetrics.measureText(parsedText);
+                float shift=ha==2?-width:(ha==1||ha==3||ha==4||ha==5?-.5f*width:0f);
+                // Keep culling conservative for every vertical alignment and font fallback.
+                for(float along:new float[]{shift-1f,shift+width+1f})
+                    for(float across:new float[]{-2f,2f})
+                        add(b,x+ux*along+vx*across,y+uy*along+vy*across);
             }else break;
             if(valid(b)){
                 if(count==os.length){
