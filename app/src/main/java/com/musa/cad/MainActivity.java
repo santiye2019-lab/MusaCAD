@@ -104,13 +104,14 @@ public class MainActivity extends AppCompatActivity {
         markModeSelected(R.id.panButton);
         categoryButtons=new int[]{R.id.groupAnnotateToolsButton,R.id.groupLineToolsButton,R.id.groupEditToolsButton,R.id.groupLayerToolsButton,R.id.groupMeasureToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupMoreToolsButton,R.id.groupLayoutToolsButton,R.id.groupViewToolsButton};
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.toolPanelClose,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.right3dButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.toolPanelClose,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.headerMoreButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.appTitle).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});
         findViewById(R.id.closeFileButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)Toast.makeText(this,"Açık proje yok",Toast.LENGTH_SHORT).show();else requestCloseProject(currentProject);});
         findViewById(R.id.nativeModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)result.setText("DWG Native • Önce çizim açın");else if(currentProject.nativeScene!=null)result.setText("DWG Native • hızlı sahne etkin");else result.setText("Vektör görünüm • tam çizim modeli");});
         findViewById(R.id.sceneModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);showViewToolsSheet();});
+        findViewById(R.id.right3dButton).setOnClickListener(v->open3d());
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.propertiesButton).setOnClickListener(v->showSelectedProperties());
         findViewById(R.id.colorButton).setOnClickListener(v->showSelectedColor());
@@ -361,6 +362,17 @@ public class MainActivity extends AppCompatActivity {
             case INSERT:
                 runInsertCommand();
                 break;
+            case DIVIDE:
+                runDivideCommand();
+                break;
+            case REVCLOUD:
+                if(!canEdit()){result.setText("REVCLOUD • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("REVCLOUD • Bulut alanının iki karşı köşesini seçin");
+                break;
+            case MULTILEADER:
+                if(!canEdit()){result.setText("MLEADER • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_MULTILEADER);markModeSelected(0);result.setText("MLEADER • Ok ucunu ve metin bağlantı noktasını seçin");
+                break;
             case DIMSTYLE:
                 runDimStyleCommand();
                 break;
@@ -371,6 +383,18 @@ public class MainActivity extends AppCompatActivity {
             case DIMALIGNED:
                 if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
                 cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");
+                break;
+            case DIMANGULAR:
+                if(!canEdit()){result.setText("DIMANGULAR • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_ANGULAR);markModeSelected(0);result.setText("DIMANGULAR • İlk kol, köşe ve ikinci kol için 3 nokta seçin");
+                break;
+            case DIMRADIUS:
+                if(!canEdit()){result.setText("DIMRADIUS • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_RADIUS);markModeSelected(0);result.setText("DIMRADIUS • Bir daireye dokunun");
+                break;
+            case DIMDIAMETER:
+                if(!canEdit()){result.setText("DIMDIAMETER • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_DIAMETER);markModeSelected(0);result.setText("DIMDIAMETER • Bir daireye dokunun");
                 break;
             case LAYER:
                 showLayers();
@@ -386,12 +410,27 @@ public class MainActivity extends AppCompatActivity {
                 selectMode(R.id.areaButton,CadView.Mode.AREA);
                 result.setText("AREA • Sınır noktalarını seçin");
                 break;
+            case ANGLE:
+                cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("ANGLE • Köşe ortada olacak şekilde 3 nokta seçin");
+                break;
+            case ID_POINT:
+                cad.setMode(CadView.Mode.ID_POINT);markModeSelected(0);result.setText("ID • Koordinat için bir noktaya dokunun");
+                break;
+            case ARC_LENGTH:
+                cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("ARCLEN • Bir yay veya daireye dokunun");
+                break;
             case ZOOM:
                 result.setText("ZOOM • Extents için Z E veya ZE kullanın");
                 break;
             case ZOOM_EXTENTS:
                 cad.fitToScreen();
                 result.setText("ZOOM EXTENTS • Çizim ekrana sığdırıldı");
+                break;
+            case VIEW_3D:
+                open3d();
+                break;
+            case VIEW_2D:
+                cad.regenerate();result.setText("2D görünüm etkin");
                 break;
             case UNDO:
                 cad.undo();
@@ -829,6 +868,14 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+    private void open3d(){
+        File model=currentProject==null?null:currentProject.workingDxf;
+        if(model==null||!model.isFile()){
+            Toast.makeText(this,currentProject!=null&&currentProject.preparingEditor?"3B görünüm için DWG dönüşümü hazırlanıyor":"Önce 3B yüzey içeren DWG/DXF açın",Toast.LENGTH_LONG).show();return;
+        }
+        Intent intent=new Intent(this,Mesh3dActivity.class);intent.putExtra(Mesh3dActivity.EXTRA_DXF,model.getAbsolutePath());startActivity(intent);
+    }
+
     private void showViewToolsSheet(){
         showToolPanel("Görsel stil",
             tool("Kaydır",R.drawable.ic_pan,()->selectMode(R.id.panButton,CadView.Mode.PAN)),
@@ -836,7 +883,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Yakınlaştır",R.drawable.ic_zoom_in,()->cad.zoomBy(1.35f)),
             tool("Uzaklaştır",R.drawable.ic_zoom_out,()->cad.zoomBy(1f/1.35f)),
             tool("2D",R.drawable.ic_fit,()->{cad.regenerate();result.setText("2D görünüm etkin");}),
-            tool("3D",R.drawable.ic_fit,null),
+            tool("3D",R.drawable.ic_fit,this::open3d),
             tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
             tool("Model/Layout",R.drawable.ic_layers,this::showLayouts)
         );
@@ -1411,15 +1458,26 @@ public class MainActivity extends AppCompatActivity {
             "S / STRETCH • Seçili vertex/köşeyi yeni konuma taşı\n"+
             "B / BLOCK • Seçili nesneden isimli blok oluştur\n"+
             "I / INSERT • Oluşturulan bloğu yerleştir\n"+
+            "DIV / DIVIDE • Seçili çizgi veya daireyi eşit böl\n"+
+            "REVCLOUD • Bulut işareti çiz\n"+
+            "MLEADER • Ok ve çoklu açıklama çiz\n"+
             "D / DIMSTYLE • Ölçülendirme stilini ayarla\n"+
             "DLI / DIMLINEAR • Yatay/dikey doğrusal ölçü\n"+
             "DAL / DIMALIGNED • Hizalı ölçü\n"+
+            "DAN / DIMANGULAR • Açısal ölçü\n"+
+            "DRA / DIMRADIUS • Yarıçap ölçüsü\n"+
+            "DDI / DIMDIAMETER • Çap ölçüsü\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
             "AA / AREA • Alan\n"+
+            "ANG / ANGLE • Açı ölç\n"+
+            "ID • Nokta koordinatı\n"+
+            "ARCLEN • Yay uzunluğu\n"+
             "Z E / ZE / ZOOM EXTENTS • Ekrana sığdır\n"+
             "Z / ZOOM • Zoom komutu\n"+
+            "3D / 3DORBIT • 3B yüzey görünümü\n"+
+            "2D • 2B görünüme dön\n"+
             "U / UNDO • Geri al\n"+
             "REDO • Geri alınan işlemi yeniden uygula\n"+
             "QS / QSAVE / SAVE • Kaydet";

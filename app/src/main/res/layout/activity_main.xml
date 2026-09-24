@@ -686,13 +686,12 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="5dp"
                 android:gravity="center"
+                android:id="@+id/right3dButton"
                 android:text="3D"
-                android:enabled="false"
-                android:alpha="0.45"
-                android:textColor="#6A8795"
+                android:textColor="#FFFFFF"
                 android:textStyle="bold"
                 android:textSize="12sp"
-                android:background="@drawable/right_rail_mode_disabled_bg" />
+                android:background="@drawable/right_rail_button_bg" />
 
             <ImageButton
                 android:id="@+id/rightLayersButton"

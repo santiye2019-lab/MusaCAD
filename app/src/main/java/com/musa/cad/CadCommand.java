@@ -10,8 +10,8 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, MATCHPROP, JOIN, HATCH, STRETCH, BLOCK, INSERT, DIMSTYLE, DIMLINEAR, DIMALIGNED, LAYER, PROPERTIES,
-        DISTANCE, AREA, ZOOM, ZOOM_EXTENTS, UNDO, REDO, SAVE, HELP, UNSUPPORTED
+        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, MATCHPROP, JOIN, HATCH, STRETCH, BLOCK, INSERT, DIVIDE, REVCLOUD, MULTILEADER, DIMSTYLE, DIMLINEAR, DIMALIGNED, DIMANGULAR, DIMRADIUS, DIMDIAMETER, LAYER, PROPERTIES,
+        DISTANCE, AREA, ANGLE, ID_POINT, ARC_LENGTH, ZOOM, ZOOM_EXTENTS, VIEW_3D, VIEW_2D, UNDO, REDO, SAVE, HELP, UNSUPPORTED
     }
 
     public static Action parse(String raw){
@@ -54,17 +54,28 @@ public final class CadCommand {
         if(eq(s,"S","STRETCH"))return Action.STRETCH;
         if(eq(s,"B","BLOCK"))return Action.BLOCK;
         if(eq(s,"I","INSERT"))return Action.INSERT;
+        if(eq(s,"DIV","DIVIDE"))return Action.DIVIDE;
+        if(eq(s,"REVCLOUD"))return Action.REVCLOUD;
+        if(eq(s,"MLEADER","MULTILEADER"))return Action.MULTILEADER;
         if(eq(s,"D","DIMSTYLE"))return Action.DIMSTYLE;
         if(eq(s,"DLI","DIMLINEAR"))return Action.DIMLINEAR;
         if(eq(s,"DAL","DIMALIGNED"))return Action.DIMALIGNED;
+        if(eq(s,"DAN","DIMANGULAR"))return Action.DIMANGULAR;
+        if(eq(s,"DRA","DIMRADIUS"))return Action.DIMRADIUS;
+        if(eq(s,"DDI","DIMDIAMETER"))return Action.DIMDIAMETER;
 
         if(eq(s,"LA","LAYER"))return Action.LAYER;
         if(eq(s,"PR","PROPERTIES","PROP"))return Action.PROPERTIES;
         if(eq(s,"DI","DIST","DISTANCE"))return Action.DISTANCE;
         if(eq(s,"AA","AREA"))return Action.AREA;
+        if(eq(s,"ANG","ANGLE"))return Action.ANGLE;
+        if(eq(s,"ID"))return Action.ID_POINT;
+        if(eq(s,"ARCLEN","ARC_LENGTH"))return Action.ARC_LENGTH;
 
         if(eq(s,"ZE","Z E","Z EXTENTS","ZOOM E","ZOOM EXTENTS"))return Action.ZOOM_EXTENTS;
         if(eq(s,"Z","ZOOM"))return Action.ZOOM;
+        if(eq(s,"3D","3DVIEW","3DORBIT"))return Action.VIEW_3D;
+        if(eq(s,"2D","2DVIEW"))return Action.VIEW_2D;
 
         if(eq(s,"U","UNDO"))return Action.UNDO;
         if(eq(s,"REDO"))return Action.REDO;
@@ -86,9 +97,9 @@ public final class CadCommand {
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
             case ARRAY:return "ARRAY";case EXPLODE:return "EXPLODE";case OSNAP:return "OSNAP";case REGEN:return "REGEN";
-            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";case HATCH:return "HATCH";case STRETCH:return "STRETCH";case BLOCK:return "BLOCK";case INSERT:return "INSERT";case DIMSTYLE:return "DIMSTYLE";case DIMLINEAR:return "DIMLINEAR";case DIMALIGNED:return "DIMALIGNED";
+            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";case HATCH:return "HATCH";case STRETCH:return "STRETCH";case BLOCK:return "BLOCK";case INSERT:return "INSERT";case DIVIDE:return "DIVIDE";case REVCLOUD:return "REVCLOUD";case MULTILEADER:return "MLEADER";case DIMSTYLE:return "DIMSTYLE";case DIMLINEAR:return "DIMLINEAR";case DIMALIGNED:return "DIMALIGNED";case DIMANGULAR:return "DIMANGULAR";case DIMRADIUS:return "DIMRADIUS";case DIMDIAMETER:return "DIMDIAMETER";
             case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
-            case DISTANCE:return "DIST";case AREA:return "AREA";case ZOOM:return "ZOOM";
+            case DISTANCE:return "DIST";case AREA:return "AREA";case ANGLE:return "ANGLE";case ID_POINT:return "ID";case ARC_LENGTH:return "ARCLEN";case ZOOM:return "ZOOM";case VIEW_3D:return "3D";case VIEW_2D:return "2D";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";
             case HELP:return "HELP";default:return s;
         }
