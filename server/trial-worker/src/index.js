@@ -240,7 +240,8 @@ async function sha256Hex(value) {
 }
 
 function pemBytes(pem, label) {
-  const clean = String(pem || "")
+  const normalized = String(pem || "").replace(/\\n/g, "\n");
+  const clean = normalized
     .replace(`-----BEGIN ${label}-----`, "")
     .replace(`-----END ${label}-----`, "")
     .replace(/\s/g, "");
