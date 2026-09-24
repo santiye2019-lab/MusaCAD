@@ -16,6 +16,7 @@ public final class LicenseManager {
     private static final String K_TRIAL_TOKEN="trial_token_v2";
     private static final String K_SERVER_TRIAL_USED="server_trial_used_v2";
     private static final String K_SIGNED_TRIAL_LAST_SEEN="signed_trial_last_seen_v2";
+    private static final String K_PLAY_ENTITLED="play_entitled_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -27,6 +28,7 @@ public final class LicenseManager {
         SharedPreferences p=prefs(c);
         String paid=p.getString(K_LICENSE_TOKEN,null);
         if(paid!=null&&verifyStoredPaidToken(c,paid))return State.LICENSED;
+        if(p.getBoolean(K_PLAY_ENTITLED,false))return State.LICENSED;
 
         String signedTrial=p.getString(K_TRIAL_TOKEN,null);
         if(signedTrial!=null){
@@ -96,6 +98,15 @@ public final class LicenseManager {
 
     /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
+
+    /** Cached Google Play ownership, refreshed from Play Billing when the app process starts. */
+    public static void setPlayEntitlement(Context c,boolean active){
+        prefs(c).edit().putBoolean(K_PLAY_ENTITLED,active).apply();
+    }
+
+    public static boolean hasPlayEntitlement(Context c){
+        return prefs(c).getBoolean(K_PLAY_ENTITLED,false);
+    }
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;

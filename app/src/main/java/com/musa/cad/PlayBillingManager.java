@@ -1,0 +1,227 @@
+package com.musa.cad;
+
+import android.app.Activity;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+
+import com.android.billingclient.api.AcknowledgePurchaseParams;
+import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.BillingClientStateListener;
+import com.android.billingclient.api.BillingFlowParams;
+import com.android.billingclient.api.BillingResult;
+import com.android.billingclient.api.ProductDetails;
+import com.android.billingclient.api.Purchase;
+import com.android.billingclient.api.PendingPurchasesParams;
+import com.android.billingclient.api.PurchasesUpdatedListener;
+import com.android.billingclient.api.QueryProductDetailsParams;
+import com.android.billingclient.api.QueryPurchasesParams;
+
+import java.util.Collections;
+import java.util.List;
+
+/** Google Play one-time, non-consumable MusaCAD Pro purchase/restore flow. */
+public final class PlayBillingManager implements PurchasesUpdatedListener, BillingClientStateListener {
+    public interface Listener {
+        void onProductReady(boolean ready,String displayPrice);
+        void onEntitlementChanged(boolean active);
+        void onBillingMessage(String message);
+    }
+
+    private final Context context;
+    private final Listener listener;
+    private final Handler mainHandler=new Handler(Looper.getMainLooper());
+    private final BillingClient billingClient;
+    private ProductDetails productDetails;
+    private String offerToken;
+    private boolean started;
+
+    public PlayBillingManager(Context context,Listener listener){
+        this.context=context.getApplicationContext();
+        this.listener=listener;
+        billingClient=BillingClient.newBuilder(this.context)
+            .setListener(this)
+            .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+            .enableAutoServiceReconnection()
+            .build();
+    }
+
+    public void start(){
+        if(started)return;
+        started=true;
+        billingClient.startConnection(this);
+    }
+
+    public void refresh(){
+        if(!billingClient.isReady())return;
+        queryOwnedPurchases();
+        queryProduct();
+    }
+
+    public void launchPurchase(Activity activity){
+        if(activity==null)return;
+        if(!billingClient.isReady()){
+            notifyMessage("Google Play bağlantısı henüz hazır değil");
+            return;
+        }
+        if(productDetails==null||offerToken==null||offerToken.isEmpty()){
+            queryProduct();
+            notifyMessage("Satın alma bilgileri hazırlanıyor");
+            return;
+        }
+
+        BillingFlowParams.ProductDetailsParams item=
+            BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .setOfferToken(offerToken)
+                .build();
+        BillingFlowParams params=BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(Collections.singletonList(item))
+            .build();
+        BillingResult result=billingClient.launchBillingFlow(activity,params);
+        if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK){
+            notifyMessage(result.getDebugMessage().isEmpty()?"Google Play satın alma ekranı açılamadı":result.getDebugMessage());
+        }
+    }
+
+    @Override public void onBillingSetupFinished(BillingResult result){
+        if(result.getResponseCode()==BillingClient.BillingResponseCode.OK){
+            queryOwnedPurchases();
+            queryProduct();
+        }else{
+            notifyProductReady(false,"");
+        }
+    }
+
+    @Override public void onBillingServiceDisconnected(){
+        notifyProductReady(false,"");
+    }
+
+    @Override public void onPurchasesUpdated(BillingResult result,List<Purchase> purchases){
+        int code=result.getResponseCode();
+        if(code==BillingClient.BillingResponseCode.OK&&purchases!=null){
+            boolean matched=false;
+            for(Purchase purchase:purchases){
+                if(matchesProduct(purchase)){
+                    matched=true;
+                    processPurchase(purchase);
+                }
+            }
+            if(!matched)queryOwnedPurchases();
+        }else if(code==BillingClient.BillingResponseCode.USER_CANCELED){
+            notifyMessage("Satın alma iptal edildi");
+        }else if(code!=BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED){
+            notifyMessage(result.getDebugMessage().isEmpty()?"Satın alma tamamlanamadı":result.getDebugMessage());
+        }else{
+            queryOwnedPurchases();
+        }
+    }
+
+    private void queryProduct(){
+        String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
+        if(productId.isEmpty()){
+            notifyProductReady(false,"");
+            return;
+        }
+        QueryProductDetailsParams.Product product=
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(productId)
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build();
+        QueryProductDetailsParams params=QueryProductDetailsParams.newBuilder()
+            .setProductList(Collections.singletonList(product))
+            .build();
+
+        billingClient.queryProductDetailsAsync(params,(result,detailsResult)->{
+            if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK
+                    ||detailsResult==null
+                    ||detailsResult.getProductDetailsList().isEmpty()){
+                productDetails=null;
+                offerToken=null;
+                notifyProductReady(false,"");
+                return;
+            }
+            ProductDetails details=detailsResult.getProductDetailsList().get(0);
+            List<ProductDetails.OneTimePurchaseOfferDetails> offers=details.getOneTimePurchaseOfferDetailsList();
+            if(offers==null||offers.isEmpty()){
+                productDetails=null;
+                offerToken=null;
+                notifyProductReady(false,"");
+                return;
+            }
+            ProductDetails.OneTimePurchaseOfferDetails offer=offers.get(0);
+            productDetails=details;
+            offerToken=offer.getOfferToken();
+            notifyProductReady(true,offer.getFormattedPrice());
+        });
+    }
+
+    private void queryOwnedPurchases(){
+        QueryPurchasesParams params=QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.INAPP)
+            .build();
+        billingClient.queryPurchasesAsync(params,(result,purchases)->{
+            if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK)return;
+            boolean owned=false;
+            if(purchases!=null){
+                for(Purchase purchase:purchases){
+                    if(matchesProduct(purchase)&&purchase.getPurchaseState()==Purchase.PurchaseState.PURCHASED){
+                        owned=true;
+                        processPurchase(purchase);
+                    }
+                }
+            }
+            if(!owned){
+                LicenseManager.setPlayEntitlement(context,false);
+                notifyEntitlement(false);
+            }
+        });
+    }
+
+    private boolean matchesProduct(Purchase purchase){
+        if(purchase==null)return false;
+        String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
+        return !productId.isEmpty()&&purchase.getProducts()!=null&&purchase.getProducts().contains(productId);
+    }
+
+    private void processPurchase(Purchase purchase){
+        if(purchase.getPurchaseState()==Purchase.PurchaseState.PENDING){
+            notifyMessage("Ödeme beklemede. Google Play onayı tamamlandığında Pro açılacak.");
+            return;
+        }
+        if(purchase.getPurchaseState()!=Purchase.PurchaseState.PURCHASED)return;
+
+        LicenseManager.setPlayEntitlement(context,true);
+        notifyEntitlement(true);
+
+        if(!purchase.isAcknowledged()){
+            AcknowledgePurchaseParams params=AcknowledgePurchaseParams.newBuilder()
+                .setPurchaseToken(purchase.getPurchaseToken())
+                .build();
+            billingClient.acknowledgePurchase(params,result->{
+                if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK){
+                    notifyMessage("Satın alma alındı; Google Play onayı daha sonra yeniden denenecek");
+                }
+            });
+        }
+    }
+
+    private void notifyProductReady(boolean ready,String price){
+        if(listener==null)return;
+        mainHandler.post(()->listener.onProductReady(ready,price==null?"":price));
+    }
+
+    private void notifyEntitlement(boolean active){
+        if(listener==null)return;
+        mainHandler.post(()->listener.onEntitlementChanged(active));
+    }
+
+    private void notifyMessage(String message){
+        if(listener==null||message==null||message.trim().isEmpty())return;
+        mainHandler.post(()->listener.onBillingMessage(message));
+    }
+
+    public void close(){
+        if(billingClient.isReady())billingClient.endConnection();
+    }
+}
