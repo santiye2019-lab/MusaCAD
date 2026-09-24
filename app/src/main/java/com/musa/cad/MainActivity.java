@@ -362,6 +362,17 @@ public class MainActivity extends AppCompatActivity {
             case INSERT:
                 runInsertCommand();
                 break;
+            case DIVIDE:
+                runDivideCommand();
+                break;
+            case REVCLOUD:
+                if(!canEdit()){result.setText("REVCLOUD • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("REVCLOUD • Bulut alanının iki karşı köşesini seçin");
+                break;
+            case MULTILEADER:
+                if(!canEdit()){result.setText("MLEADER • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_MULTILEADER);markModeSelected(0);result.setText("MLEADER • Ok ucunu ve metin bağlantı noktasını seçin");
+                break;
             case DIMSTYLE:
                 runDimStyleCommand();
                 break;
@@ -372,6 +383,18 @@ public class MainActivity extends AppCompatActivity {
             case DIMALIGNED:
                 if(!canEdit()){Toast.makeText(this,"Bu çizim düzenleme için vektörel olarak açılamadı",Toast.LENGTH_SHORT).show();break;}
                 cad.setMode(CadView.Mode.DRAW_DIM_ALIGNED);markModeSelected(0);result.setText("DIMALIGNED • İki ölçü noktası ve ölçü çizgisi konumu seçin");
+                break;
+            case DIMANGULAR:
+                if(!canEdit()){result.setText("DIMANGULAR • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_ANGULAR);markModeSelected(0);result.setText("DIMANGULAR • İlk kol, köşe ve ikinci kol için 3 nokta seçin");
+                break;
+            case DIMRADIUS:
+                if(!canEdit()){result.setText("DIMRADIUS • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_RADIUS);markModeSelected(0);result.setText("DIMRADIUS • Bir daireye dokunun");
+                break;
+            case DIMDIAMETER:
+                if(!canEdit()){result.setText("DIMDIAMETER • Önce düzenlenebilir çizim açın");break;}
+                cad.setMode(CadView.Mode.DRAW_DIM_DIAMETER);markModeSelected(0);result.setText("DIMDIAMETER • Bir daireye dokunun");
                 break;
             case LAYER:
                 showLayers();
@@ -387,12 +410,27 @@ public class MainActivity extends AppCompatActivity {
                 selectMode(R.id.areaButton,CadView.Mode.AREA);
                 result.setText("AREA • Sınır noktalarını seçin");
                 break;
+            case ANGLE:
+                cad.setMode(CadView.Mode.ANGLE);markModeSelected(0);result.setText("ANGLE • Köşe ortada olacak şekilde 3 nokta seçin");
+                break;
+            case ID_POINT:
+                cad.setMode(CadView.Mode.ID_POINT);markModeSelected(0);result.setText("ID • Koordinat için bir noktaya dokunun");
+                break;
+            case ARC_LENGTH:
+                cad.setMode(CadView.Mode.ARC_LENGTH);markModeSelected(0);result.setText("ARCLEN • Bir yay veya daireye dokunun");
+                break;
             case ZOOM:
                 result.setText("ZOOM • Extents için Z E veya ZE kullanın");
                 break;
             case ZOOM_EXTENTS:
                 cad.fitToScreen();
                 result.setText("ZOOM EXTENTS • Çizim ekrana sığdırıldı");
+                break;
+            case VIEW_3D:
+                open3d();
+                break;
+            case VIEW_2D:
+                cad.regenerate();result.setText("2D görünüm etkin");
                 break;
             case UNDO:
                 cad.undo();
@@ -1420,15 +1458,26 @@ public class MainActivity extends AppCompatActivity {
             "S / STRETCH • Seçili vertex/köşeyi yeni konuma taşı\n"+
             "B / BLOCK • Seçili nesneden isimli blok oluştur\n"+
             "I / INSERT • Oluşturulan bloğu yerleştir\n"+
+            "DIV / DIVIDE • Seçili çizgi veya daireyi eşit böl\n"+
+            "REVCLOUD • Bulut işareti çiz\n"+
+            "MLEADER • Ok ve çoklu açıklama çiz\n"+
             "D / DIMSTYLE • Ölçülendirme stilini ayarla\n"+
             "DLI / DIMLINEAR • Yatay/dikey doğrusal ölçü\n"+
             "DAL / DIMALIGNED • Hizalı ölçü\n"+
+            "DAN / DIMANGULAR • Açısal ölçü\n"+
+            "DRA / DIMRADIUS • Yarıçap ölçüsü\n"+
+            "DDI / DIMDIAMETER • Çap ölçüsü\n"+
             "LA / LAYER • Katman\n"+
             "PR / PROPERTIES / PROP • Özellik/Bilgi\n"+
             "DI / DIST / DISTANCE • Mesafe\n"+
             "AA / AREA • Alan\n"+
+            "ANG / ANGLE • Açı ölç\n"+
+            "ID • Nokta koordinatı\n"+
+            "ARCLEN • Yay uzunluğu\n"+
             "Z E / ZE / ZOOM EXTENTS • Ekrana sığdır\n"+
             "Z / ZOOM • Zoom komutu\n"+
+            "3D / 3DORBIT • 3B yüzey görünümü\n"+
+            "2D • 2B görünüme dön\n"+
             "U / UNDO • Geri al\n"+
             "REDO • Geri alınan işlemi yeniden uygula\n"+
             "QS / QSAVE / SAVE • Kaydet";

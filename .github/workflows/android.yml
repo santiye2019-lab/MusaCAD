@@ -172,7 +172,7 @@ jobs:
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon lintDebug testDebugUnitTest
+          ./gradlew --no-daemon lintDebug testDebugUnitTest compileReleaseJavaWithJavac
       - name: Build and smoke-test native converter
         run: |
           cmake -S app/src/main/cpp -B /tmp/musa-native -DCMAKE_BUILD_TYPE=Release
