@@ -3,17 +3,35 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#031321">
-    <FrameLayout
-        android:id="@+id/artworkStage"
+
+    <!-- Decorative full-bleed layer. It may crop, but never distorts the artwork. -->
+    <ImageView
+        android:id="@+id/splashBackdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_gravity="center">
-        <ImageView
-            android:id="@+id/lockedArtwork"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/splash_scene_reference"
-            android:contentDescription="MusaCAD kilitli açılış tasarımı" />
-    </FrameLayout>
+        android:scaleType="centerCrop"
+        android:alpha="0.32"
+        android:src="@drawable/musacad_screen_welcome"
+        android:contentDescription="@null" />
+
+    <!-- Primary artwork: always fully visible and aspect-ratio safe. -->
+    <ImageView
+        android:id="@+id/splashArtwork"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="false"
+        android:src="@drawable/musacad_screen_welcome"
+        android:contentDescription="MusaCAD 2D ve 3D profesyonel CAD karşılama ekranı" />
+
+    <!-- Transparent real touch target positioned over the artwork CTA at runtime. -->
+    <View
+        android:id="@+id/startButtonHotspot"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Hadi Başlayalım"
+        android:background="@android:color/transparent" />
+
 </FrameLayout>
