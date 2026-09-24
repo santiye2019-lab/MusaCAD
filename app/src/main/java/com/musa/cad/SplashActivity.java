@@ -1,10 +1,11 @@
 package com.musa.cad;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class SplashActivity extends AppCompatActivity {
@@ -25,31 +26,47 @@ public class SplashActivity extends AppCompatActivity {
         pendingIntent=fileEntry?incoming:null;
 
         FrameLayout root=findViewById(R.id.splashRoot);
-        FrameLayout stage=findViewById(R.id.artworkStage);
+        View start=findViewById(R.id.startButtonHotspot);
 
-        LockedScreenUi.fillStage(this,root,stage,()->{
-            ImageView art=stage.findViewById(R.id.lockedArtwork);
-            art.setImageResource(R.drawable.musacad_screen_1);
-
-            View.OnClickListener next=v->continueFlow();
-
-            // Üstteki dört gerçek özellik kartı
-            LockedScreenUi.hotspot(this,stage,81,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,288,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,497,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,703,430,164,205,next);
-
-            // Alttaki dört yüzer özellik düğmesi
-            LockedScreenUi.hotspot(this,stage,49,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,263,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,478,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,694,1430,194,170,next);
+        // Only the visible "Hadi Başlayalım" button continues the onboarding flow.
+        start.setOnClickListener(v->continueFlow());
+        start.setOnTouchListener((v,e)->{
+            if(e.getAction()==MotionEvent.ACTION_DOWN)v.setBackgroundColor(0x1822A7FF);
+            else if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL)
+                v.setBackgroundColor(Color.TRANSPARENT);
+            return false;
         });
+
+        root.post(()->positionStartButton(root,start));
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
         super.onWindowFocusChanged(hasFocus);
         if(hasFocus)LockedScreenUi.enableImmersive(this);
+    }
+
+    private void positionStartButton(FrameLayout root,View start){
+        if(root.getWidth()<=0||root.getHeight()<=0)return;
+
+        float scale=Math.min(
+            root.getWidth()/LockedScreenUi.ART_W,
+            root.getHeight()/LockedScreenUi.ART_H
+        );
+        float shownW=LockedScreenUi.ART_W*scale;
+        float shownH=LockedScreenUi.ART_H*scale;
+        float offsetX=(root.getWidth()-shownW)/2f;
+        float offsetY=(root.getHeight()-shownH)/2f;
+
+        // Generated artwork coordinates for the visible "Hadi Başlayalım" CTA.
+        float x=175f,y=1410f,w=590f,h=135f;
+        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
+            Math.max(1,Math.round(w*scale)),
+            Math.max(1,Math.round(h*scale))
+        );
+        lp.leftMargin=Math.round(offsetX+x*scale);
+        lp.topMargin=Math.round(offsetY+y*scale);
+        start.setLayoutParams(lp);
+        start.bringToFront();
     }
 
     private void continueFlow(){
