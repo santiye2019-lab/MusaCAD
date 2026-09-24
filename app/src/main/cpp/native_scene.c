@@ -449,6 +449,18 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                         break;
                     }
                 }
+                const char *label=ctx->content.txt.default_text;
+                double height=(isfinite(ctx->text_height)&&ctx->text_height>1e-12)?ctx->text_height:1.0;
+                double dx=ctx->content.txt.direction.x,dy=ctx->content.txt.direction.y,len=hypot(dx,dy);
+                if(!isfinite(len)||len<1e-12){double rot=isfinite(ctx->content.txt.rotation)?ctx->content.txt.rotation:0.0;dx=cos(rot);dy=sin(rot);len=1.0;}
+                dx/=len;dy/=len;
+                double ax,ay,px,py,qx,qy;
+                map2(parent,ctx->content.txt.location.x,ctx->content.txt.location.y,&ax,&ay);
+                map2(parent,ctx->content.txt.location.x+dx*height,ctx->content.txt.location.y+dy*height,&px,&py);
+                map2(parent,ctx->content.txt.location.x+dy*height,ctx->content.txt.location.y-dx*height,&qx,&qy);
+                SceneColor textColor=color_value(&ctx->content.txt.color,color);
+                int hAlign=e->text_alignment==1?1:e->text_alignment==2?2:0;
+                emit_text_basis(s,textColor,ax,ay,px-ax,py-ay,qx-ax,qy-ay,hAlign,2,label);
             }
             break;
         }
