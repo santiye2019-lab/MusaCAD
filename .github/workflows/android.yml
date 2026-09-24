@@ -145,6 +145,12 @@ jobs:
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java
           java -cp /tmp/musacad-license-tool LicenseGenerator >/tmp/license-generator-usage.txt || test $? -eq 2
           grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
+      - name: Test displayed device ID to offline license round trip
+        run: |
+          grep -q 'LicenseManager.installationId(this)' app/src/main/java/com/musa/cad/LicenseActivity.java
+          grep -q 'Cihaz / Lisans Kimliği' app/src/main/java/com/musa/cad/LicenseActivity.java
+          javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
+          java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
       - name: Test DXF block expansion, colors, styles and source origins
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
