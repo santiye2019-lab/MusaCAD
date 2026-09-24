@@ -1,4 +1,4 @@
-name: Trial hardening gate
+name: License backend hardening gate
 
 on:
   push:
@@ -12,6 +12,9 @@ on:
       - 'app/src/main/java/com/musa/cad/TrialService.java'
       - 'app/src/main/java/com/musa/cad/TrialToken.java'
       - 'app/src/main/java/com/musa/cad/LicenseToken.java'
+      - 'app/src/main/java/com/musa/cad/PlayBillingManager.java'
+      - 'app/src/main/java/com/musa/cad/PlayPurchaseVerifier.java'
+      - 'app/build.gradle'
       - 'tests/DeviceIdentityHashTest.java'
       - 'tests/SignedTrialPolicyTest.java'
       - 'tests/TrialTokenTest.java'
@@ -43,5 +46,10 @@ jobs:
           java -cp /tmp/musacad-trial-tests TrialTokenTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
-      - name: Test reinstall-resistant trial service
+      - name: Test trial and Google Play backend
         run: cd server/trial-worker && npm test
+      - name: Check secure Play client routing
+        run: |
+          grep -q 'setObfuscatedAccountId(LicenseManager.installationId(context))' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          grep -q 'PlayPurchaseVerifier.verify(context,purchaseToken)' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          if grep -q 'acknowledgePurchase' app/src/main/java/com/musa/cad/PlayBillingManager.java; then exit 1; fi
