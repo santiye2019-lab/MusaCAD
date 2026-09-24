@@ -15,6 +15,8 @@ public class LicenseActivity extends AppCompatActivity {
 
     private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
     private EditText licenseCode;
+    private Button playPurchaseButton;
+    private PlayBillingManager playBilling;
     private Intent pendingIntent;
     private volatile boolean trialRequestRunning;
     private boolean stayOnLicense;
@@ -25,6 +27,25 @@ public class LicenseActivity extends AppCompatActivity {
         setContentView(R.layout.activity_license);
 
         stayOnLicense=getIntent().getBooleanExtra(EXTRA_STAY_ON_LICENSE,false);
+        playBilling=new PlayBillingManager(this,new PlayBillingManager.Listener(){
+            @Override public void onProductReady(boolean ready,String displayPrice){
+                if(playPurchaseButton==null)return;
+                playPurchaseButton.setEnabled(ready);
+                playPurchaseButton.setText(ready&&displayPrice!=null&&!displayPrice.isEmpty()
+                    ?"GOOGLE PLAY İLE SATIN AL • "+displayPrice
+                    :"GOOGLE PLAY İLE SATIN AL");
+            }
+            @Override public void onEntitlementChanged(boolean active){
+                if(active&&!stayOnLicense){
+                    Toast.makeText(LicenseActivity.this,"Google Play satın alımı doğrulandı",Toast.LENGTH_SHORT).show();
+                    enterAfterLicense();
+                }
+            }
+            @Override public void onBillingMessage(String message){
+                if(message!=null&&!message.isEmpty())
+                    Toast.makeText(LicenseActivity.this,message,Toast.LENGTH_LONG).show();
+            }
+        });
         if(android.os.Build.VERSION.SDK_INT>=33){
             pendingIntent=getIntent().getParcelableExtra(EXTRA_PENDING_INTENT,Intent.class);
         }else{
@@ -72,6 +93,24 @@ public class LicenseActivity extends AppCompatActivity {
             stage.addView(deviceId);
             LockedScreenUi.position(deviceId,stage,128,1015,676,105);
 
+            playPurchaseButton=new Button(this);
+            playPurchaseButton.setText("GOOGLE PLAY İLE SATIN AL");
+            playPurchaseButton.setTextSize(13f);
+            playPurchaseButton.setAllCaps(false);
+            playPurchaseButton.setTextColor(0xFFFFFFFF);
+            playPurchaseButton.setBackgroundColor(0xFF1263A8);
+            playPurchaseButton.setEnabled(false);
+            playPurchaseButton.setOnClickListener(v->{
+                if(!LicenseManager.termsAccepted(this)){
+                    showTerms(false);
+                    Toast.makeText(this,"Satın almadan önce lisans koşullarını kabul edin",Toast.LENGTH_LONG).show();
+                    return;
+                }
+                playBilling.launchPurchase(this);
+            });
+            stage.addView(playPurchaseButton);
+            LockedScreenUi.position(playPurchaseButton,stage,128,1135,676,80);
+
             // Görseldeki gerçek butonların tam üstündeki şeffaf tıklama katmanları
             LockedScreenUi.hotspot(this,stage,90,402,752,150,v->startTrial());
             LockedScreenUi.hotspot(this,stage,128,829,676,88,v->activate());
@@ -80,6 +119,7 @@ public class LicenseActivity extends AppCompatActivity {
         });
 
         refresh();
+        playBilling.start();
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
@@ -200,8 +240,14 @@ public class LicenseActivity extends AppCompatActivity {
         finish();
     }
 
+    @Override protected void onResume(){
+        super.onResume();
+        if(playBilling!=null)playBilling.refresh();
+    }
+
     @Override protected void onDestroy(){
         trialExecutor.shutdownNow();
+        if(playBilling!=null)playBilling.close();
         super.onDestroy();
     }
 }
