@@ -159,18 +159,9 @@ static void emit_wipeout(MusaNativeScene *s,Affine2 parent,Dwg_Entity_WIPEOUT *e
 static size_t bounded_text_len(const char *value){
     if(!value)return 0;size_t n=0;while(n<4096&&value[n])n++;return n;
 }
-static void emit_text_ocs(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,
-                          BITCODE_2DPOINT ins,BITCODE_2DPOINT align,double rotation,double height,double width_factor,
-                          int halign,int valign,const char *value){
-    size_t bytes=bounded_text_len(value);if(bytes==0||!isfinite(height)||height<=1e-12)return;
-    if(!isfinite(rotation))rotation=0;double wf=isfinite(width_factor)&&fabs(width_factor)>1e-9?fabs(width_factor):1.0;
-    BITCODE_2DPOINT base=((halign!=0||valign!=0)&&finite2(align.x,align.y))?align:ins;
-    double co=cos(rotation),si=sin(rotation);
-    BITCODE_2DPOINT ix={base.x+co*height*wf,base.y+si*height*wf};
-    BITCODE_2DPOINT iy={base.x+si*height,base.y-co*height};
-    BITCODE_2DPOINT pb,px,py;transform_OCS_2d(&pb,base,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
-    double ax,ay,bx,by,cx,cy;map2(parent,pb.x,pb.y,&ax,&ay);map2(parent,px.x,px.y,&bx,&by);map2(parent,py.x,py.y,&cx,&cy);
-    double ux=bx-ax,uy=by-ay,vx=cx-ax,vy=cy-ay;if(!finite2(ax,ay)||!finite2(ux,uy)||!finite2(vx,vy))return;
+static void emit_text_basis(MusaNativeScene *s,SceneColor color,double ax,double ay,double ux,double uy,double vx,double vy,
+                            int halign,int valign,const char *value){
+    size_t bytes=bounded_text_len(value);if(bytes==0||!finite2(ax,ay)||!finite2(ux,uy)||!finite2(vx,vy))return;
     size_t words=(bytes+2u)/3u;if(!reserve_scene(s,9u+color_words(color)+words))return;
     push_code(s,6,color);pushf(s,(float)ax);pushf(s,(float)ay);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);
     pushf(s,(float)halign);pushf(s,(float)valign);pushf(s,(float)bytes);
@@ -185,6 +176,33 @@ static void emit_text_ocs(MusaNativeScene *s,SceneColor color,Affine2 parent,BIT
     double shift=(halign==1||halign==4||halign==3||halign==5)?-.5*glyphs:(halign==2?-glyphs:0.0);
     double x0=ax+ux*shift,y0=ay+uy*shift,x1=ax+ux*(shift+glyphs),y1=ay+uy*(shift+glyphs);
     add_bounds(s,x0,y0);add_bounds(s,x1,y1);add_bounds(s,x0-vx,y0-vy);add_bounds(s,x1-vx,y1-vy);s->primitives++;
+}
+static void emit_text_ocs(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,
+                          BITCODE_2DPOINT ins,BITCODE_2DPOINT align,double rotation,double height,double width_factor,
+                          int halign,int valign,const char *value){
+    if(bounded_text_len(value)==0||!isfinite(height)||height<=1e-12)return;
+    if(!isfinite(rotation))rotation=0;double wf=isfinite(width_factor)&&fabs(width_factor)>1e-9?fabs(width_factor):1.0;
+    BITCODE_2DPOINT base=((halign!=0||valign!=0)&&finite2(align.x,align.y))?align:ins;
+    double co=cos(rotation),si=sin(rotation);
+    BITCODE_2DPOINT ix={base.x+co*height*wf,base.y+si*height*wf};
+    BITCODE_2DPOINT iy={base.x+si*height,base.y-co*height};
+    BITCODE_2DPOINT pb,px,py;transform_OCS_2d(&pb,base,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
+    double ax,ay,bx,by,cx,cy;map2(parent,pb.x,pb.y,&ax,&ay);map2(parent,px.x,px.y,&bx,&by);map2(parent,py.x,py.y,&cx,&cy);
+    emit_text_basis(s,color,ax,ay,bx-ax,by-ay,cx-ax,cy-ay,halign,valign,value);
+}
+static void emit_mtext(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Entity_MTEXT *e){
+    if(!e||bounded_text_len(e->text)==0||!isfinite(e->text_height)||e->text_height<=1e-12)return;
+    double dx=e->x_axis_dir.x,dy=e->x_axis_dir.y,len=hypot(dx,dy);if(!isfinite(len)||len<1e-12){dx=1.0;dy=0.0;len=1.0;}dx/=len;dy/=len;
+    double ax,ay,px,py,qx,qy;map2(parent,e->ins_pt.x,e->ins_pt.y,&ax,&ay);
+    map2(parent,e->ins_pt.x+dx*e->text_height,e->ins_pt.y+dy*e->text_height,&px,&py);
+    map2(parent,e->ins_pt.x+dy*e->text_height,e->ins_pt.y-dx*e->text_height,&qx,&qy);
+    int h=0,v=3;switch(e->attachment){
+        case 2:h=1;v=3;break;case 3:h=2;v=3;break;
+        case 4:h=0;v=2;break;case 5:h=1;v=2;break;case 6:h=2;v=2;break;
+        case 7:h=0;v=1;break;case 8:h=1;v=1;break;case 9:h=2;v=1;break;
+        default:h=0;v=3;break;
+    }
+    emit_text_basis(s,color,ax,ay,px-ax,py-ay,qx-ax,qy-ay,h,v,e->text);
 }
 
 
@@ -348,6 +366,10 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         case DWG_TYPE_ATTDEF:{
             Dwg_Entity_ATTDEF *e=obj->tio.entity->tio.ATTDEF;if(!e||(e->flags&1))break;
             emit_text_ocs(s,color,parent,e->extrusion,e->ins_pt,e->alignment_pt,e->rotation,e->height,e->width_factor,e->horiz_alignment,e->vert_alignment,e->default_value);
+            break;
+        }
+        case DWG_TYPE_MTEXT:{
+            Dwg_Entity_MTEXT *e=obj->tio.entity->tio.MTEXT;if(e)emit_mtext(s,color,parent,e);
             break;
         }
         case DWG_TYPE_ELLIPSE:{
