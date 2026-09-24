@@ -2,7 +2,7 @@ name: Android quality gate
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'gandalf/android-integration-*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
