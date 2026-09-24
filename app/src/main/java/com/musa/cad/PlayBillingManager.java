@@ -65,6 +65,10 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
 
     public void launchPurchase(Activity activity){
         if(activity==null)return;
+        if(!secureVerificationConfigured()){
+            notifyMessage("Google Play satın alma doğrulama sunucusu yapılandırılmadı");
+            return;
+        }
         if(!billingClient.isReady()){
             notifyMessage("Google Play bağlantısı henüz hazır değil");
             return;
@@ -125,7 +129,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
 
     private void queryProduct(){
         String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
-        if(productId.isEmpty()){
+        if(productId.isEmpty()||!secureVerificationConfigured()){
             notifyProductReady(false,"");
             return;
         }
@@ -242,6 +246,11 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                     ?"Google Play doğrulama yanıtı geçersiz":verification.message);
                 break;
         }
+    }
+
+    private boolean secureVerificationConfigured(){
+        String endpoint=BuildConfig.PLAY_VERIFY_URL==null?"":BuildConfig.PLAY_VERIFY_URL.trim();
+        return endpoint.startsWith("https://");
     }
 
     private void notifyProductReady(boolean ready,String price){
