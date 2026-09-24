@@ -1,13 +1,12 @@
 package com.musa.cad;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,20 +29,30 @@ public final class Dxf3dEditor {
         }
         if(replacements.isEmpty())throw new IOException("Kaydedilecek 3B değişiklik yok");
         int changed=0,recordLine=-1,line=0;
-        try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(source),StandardCharsets.UTF_8));
-            BufferedWriter writer=new BufferedWriter(new OutputStreamWriter(target,StandardCharsets.UTF_8))){
-            String code,value;
-            while((code=reader.readLine())!=null){
-                value=reader.readLine();if(value==null)throw new IOException("DXF etiket çifti eksik");
+        try(BufferedInputStream reader=new BufferedInputStream(new FileInputStream(source));
+            BufferedOutputStream writer=new BufferedOutputStream(target)){
+            byte[] code,value;
+            while((code=readLine(reader))!=null){
+                value=readLine(reader);if(value==null)throw new IOException("DXF etiket çifti eksik");
                 int tag;
-                try{tag=Integer.parseInt(code.trim());}catch(NumberFormatException e){throw new IOException("Geçersiz DXF etiketi",e);}
+                try{tag=Integer.parseInt(new String(code,StandardCharsets.US_ASCII).trim());}catch(NumberFormatException e){throw new IOException("Geçersiz DXF etiketi",e);}
                 if(tag==0)recordLine=line;
                 Float replacement=replacements.get(key(recordLine,tag));
-                if(replacement!=null){value=Float.toString(replacement);changed++;}
-                writer.write(code);writer.newLine();writer.write(value);writer.newLine();line+=2;
+                writer.write(code);
+                if(replacement!=null){
+                    writer.write(Float.toString(replacement).getBytes(StandardCharsets.US_ASCII));
+                    int n=value.length;if(n>0&&value[n-1]=='\n'){if(n>1&&value[n-2]=='\r')writer.write('\r');writer.write('\n');}
+                    changed++;
+                }else writer.write(value);
+                line+=2;
             }
             if(changed!=replacements.size())throw new IOException("Bazı 3B kaynak koordinatları bulunamadı");
         }
+    }
+    private static byte[] readLine(BufferedInputStream in)throws IOException{
+        ByteArrayOutputStream line=new ByteArrayOutputStream(64);int b;
+        while((b=in.read())!=-1){line.write(b);if(b=='\n')break;if(line.size()>1024*1024)throw new IOException("DXF satırı çok uzun");}
+        return line.size()==0?null:line.toByteArray();
     }
     private static long key(int line,int code){return ((long)line<<16)|(code&65535L);}
 }
