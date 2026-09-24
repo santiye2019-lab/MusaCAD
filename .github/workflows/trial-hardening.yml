@@ -43,3 +43,5 @@ jobs:
           java -cp /tmp/musacad-trial-tests TrialTokenTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
+      - name: Test reinstall-resistant trial service
+        run: cd server/trial-worker && npm test
