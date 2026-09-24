@@ -79,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="";
     private int pendingHomeCategory;
+    private Uri homeFeaturedUri;
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
@@ -180,6 +181,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.homeImportButton).setOnClickListener(v->open(true));
         findViewById(R.id.homeRecentCardButton).setOnClickListener(v->open());
         findViewById(R.id.homeLicenseButton).setOnClickListener(v->showLicense());
+        findViewById(R.id.homeFeaturedOpen).setOnClickListener(v->openFeaturedRecent());
         findViewById(R.id.homeAnnotateCategory).setOnClickListener(v->openHomeCategory(R.id.groupAnnotateToolsButton));
         findViewById(R.id.homeDrawCategory).setOnClickListener(v->openHomeCategory(R.id.groupLineToolsButton));
         findViewById(R.id.homeEditCategory).setOnClickListener(v->openHomeCategory(R.id.groupEditToolsButton));
@@ -1529,9 +1531,35 @@ public class MainActivity extends AppCompatActivity {
         if(!visible)hideToolPanel();
     }
     private void showHomeUi(){
+        updateHomeFeatured();
         setEditorChromeVisible(false);
         if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
     }
+    private void updateHomeFeatured(){
+        View card=findViewById(R.id.homeFeatured);ImageView preview=findViewById(R.id.homeFeaturedPreview);
+        Object previous=preview.getTag();preview.setImageDrawable(null);preview.setTag(null);
+        if(previous instanceof Bitmap&&!((Bitmap)previous).isRecycled())((Bitmap)previous).recycle();
+        List<RecentFileStore.Entry> recents=RecentFileStore.list(this);
+        if(recents.isEmpty()){homeFeaturedUri=null;card.setVisibility(View.GONE);return;}
+        RecentFileStore.Entry latest=recents.get(0);homeFeaturedUri=Uri.parse(latest.uri);
+        ((TextView)findViewById(R.id.homeFeaturedTitle)).setText(latest.name);
+        ((TextView)findViewById(R.id.homeFeaturedMeta)).setText(latest.typeLabel()+"  •  "+RecentFileStore.accessLabel(latest.lastAccessMs));
+        Bitmap thumb=RecentFileStore.thumbnail(this,latest);
+        if(thumb!=null){preview.setImageBitmap(thumb);preview.setTag(thumb);}
+        else preview.setImageResource(R.drawable.ic_musacad_mark);
+        card.setVisibility(View.VISIBLE);
+    }
+    private void openFeaturedRecent(){
+        if(homeFeaturedUri==null){open();return;}
+        try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(homeFeaturedUri,"r")){
+            if(fd==null)throw new IOException("Dosya açılamadı");
+        }catch(Exception e){
+            RecentFileStore.remove(this,homeFeaturedUri.toString());updateHomeFeatured();
+            Toast.makeText(this,"Bu dosyaya erişim yok. Yeniden seçin.",Toast.LENGTH_LONG).show();open();return;
+        }
+        startLoad(homeFeaturedUri);
+    }
+
     private void hideWelcomePanel(){
         setEditorChromeVisible(true);
         if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;
@@ -1793,7 +1821,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){cancelLoad();releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
