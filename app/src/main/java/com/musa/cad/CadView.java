@@ -653,7 +653,16 @@ public class CadView extends View {
         if(edit.type==CadEdit.Type.CIRCLE&&v.length>=4){float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;}
         else {for(int i=0;i+1<v.length;i+=2){left=Math.min(left,v[i]);right=Math.max(right,v[i]);top=Math.min(top,v[i+1]);bottom=Math.max(bottom,v[i+1]);}}
         if(!Float.isFinite(left)){return;}float pad=Math.max(10f,8f*getResources().getDisplayMetrics().density);left-=pad;right+=pad;top-=pad;bottom+=pad;
-        paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f);paint.setColor(moveSelectedArmed?Color.CYAN:Color.YELLOW);c.drawRect(left,top,right,bottom,paint);paint.setStyle(Paint.Style.FILL);
+        paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.5f);paint.setColor(moveSelectedArmed?Color.CYAN:Color.YELLOW);c.drawRect(left,top,right,bottom,paint);
+        // Reference-style CAD grips: four corners, edge midpoints and center. These
+        // are deliberately screen-space sized so they remain easy to see at any zoom.
+        float grip=Math.max(5f,4f*getResources().getDisplayMetrics().density),cx=(left+right)*.5f,cy=(top+bottom)*.5f;
+        float[][] grips={{left,top},{cx,top},{right,top},{right,cy},{right,bottom},{cx,bottom},{left,bottom},{left,cy},{cx,cy}};
+        paint.setStyle(Paint.Style.FILL);paint.setColor(moveSelectedArmed?Color.CYAN:Color.rgb(55,155,255));
+        for(float[] g:grips)c.drawRect(g[0]-grip,g[1]-grip,g[0]+grip,g[1]+grip,paint);
+        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.25f);paint.setColor(Color.WHITE);
+        for(float[] g:grips)c.drawRect(g[0]-grip,g[1]-grip,g[0]+grip,g[1]+grip,paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawLiveFreehand(Canvas c){
