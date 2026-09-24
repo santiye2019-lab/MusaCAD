@@ -500,7 +500,7 @@
                         android:text="Son Açılanlar"
                         android:textColor="#FFFFFF"
                         android:textStyle="bold"
-                        android:textSize="13sp" />
+                        android:textSize="12sp" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -563,11 +563,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="58dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="56dp"
+            android:layout_marginBottom="4dp"
             android:orientation="vertical"
-            android:padding="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="8dp"
             android:visibility="gone"
             android:background="@drawable/tool_panel_bg"
             android:elevation="12dp">
@@ -582,7 +585,7 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="34dp"
+                android:layout_height="30dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
@@ -599,8 +602,8 @@
 
                 <ImageButton
                     android:id="@+id/toolPanelClose"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:src="@drawable/ic_clear"
                     android:contentDescription="Araç panelini kapat"
                     android:background="@drawable/feature_chip_bg"
@@ -709,7 +712,7 @@
     <HorizontalScrollView
         android:id="@+id/categoryScroll"
         android:layout_width="match_parent"
-        android:layout_height="70dp"
+        android:layout_height="62dp"
         android:fillViewport="false"
         android:scrollbars="none"
         android:overScrollMode="never"
@@ -730,7 +733,7 @@
                 android:id="@+id/groupAnnotateToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="68dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Ek açıklama"
                 android:drawableTop="@drawable/ic_text" />
 
@@ -738,7 +741,7 @@
                 android:id="@+id/groupLineToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Çiz"
                 android:drawableTop="@drawable/ic_line" />
 
@@ -746,7 +749,7 @@
                 android:id="@+id/groupEditToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="66dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Düzenle"
                 android:drawableTop="@drawable/ic_move" />
 
@@ -754,7 +757,7 @@
                 android:id="@+id/groupLayerToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Katman"
                 android:drawableTop="@drawable/ic_layers" />
 
@@ -762,7 +765,7 @@
                 android:id="@+id/groupMeasureToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Ölçüm"
                 android:drawableTop="@drawable/ic_distance" />
 
@@ -770,7 +773,7 @@
                 android:id="@+id/groupDimensionToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Boyut"
                 android:drawableTop="@drawable/ic_scale" />
 
@@ -778,7 +781,7 @@
                 android:id="@+id/groupColorToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Renk"
                 android:drawableTop="@drawable/ic_color" />
 
@@ -786,7 +789,7 @@
                 android:id="@+id/groupMoreToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Alet"
                 android:drawableTop="@drawable/ic_more" />
 
@@ -794,7 +797,7 @@
                 android:id="@+id/groupLayoutToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Düzen"
                 android:drawableTop="@drawable/ic_rectangle" />
 
@@ -802,7 +805,7 @@
                 android:id="@+id/groupViewToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="72dp"
-                android:layout_height="64dp"
+                android:layout_height="58dp"
                 android:text="Görsel stil"
                 android:drawableTop="@drawable/ic_fit" />
         </LinearLayout>
