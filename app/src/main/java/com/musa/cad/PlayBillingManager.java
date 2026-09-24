@@ -5,7 +5,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingClientStateListener;
 import com.android.billingclient.api.BillingFlowParams;
@@ -19,8 +18,12 @@ import com.android.billingclient.api.QueryPurchasesParams;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-/** Google Play one-time, non-consumable MusaCAD Pro purchase/restore flow. */
+/** Google Play one-time MusaCAD Pro purchase/restore flow with mandatory backend verification. */
 public final class PlayBillingManager implements PurchasesUpdatedListener, BillingClientStateListener {
     public interface Listener {
         void onProductReady(boolean ready,String displayPrice);
@@ -32,6 +35,8 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
     private final Listener listener;
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
     private final BillingClient billingClient;
+    private final ExecutorService verifierExecutor=Executors.newSingleThreadExecutor();
+    private final Set<String> verifyingTokens=ConcurrentHashMap.newKeySet();
     private ProductDetails productDetails;
     private String offerToken;
     private boolean started;
@@ -77,6 +82,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                 .build();
         BillingFlowParams params=BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(Collections.singletonList(item))
+            .setObfuscatedAccountId(LicenseManager.installationId(context))
             .build();
         BillingResult result=billingClient.launchBillingFlow(activity,params);
         if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK){
@@ -191,18 +197,50 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
         }
         if(purchase.getPurchaseState()!=Purchase.PurchaseState.PURCHASED)return;
 
-        LicenseManager.setPlayEntitlement(context,true);
-        notifyEntitlement(true);
+        String token=purchase.getPurchaseToken();
+        if(token==null||token.trim().isEmpty()){
+            notifyMessage("Google Play satın alma jetonu alınamadı");
+            return;
+        }
+        token=token.trim();
+        if(!verifyingTokens.add(token))return;
+        final String purchaseToken=token;
+        verifierExecutor.execute(()->{
+            PlayPurchaseVerifier.Result verification=PlayPurchaseVerifier.verify(context,purchaseToken);
+            verifyingTokens.remove(purchaseToken);
+            handleVerification(verification);
+        });
+    }
 
-        if(!purchase.isAcknowledged()){
-            AcknowledgePurchaseParams params=AcknowledgePurchaseParams.newBuilder()
-                .setPurchaseToken(purchase.getPurchaseToken())
-                .build();
-            billingClient.acknowledgePurchase(params,result->{
-                if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK){
-                    notifyMessage("Satın alma alındı; Google Play onayı daha sonra yeniden denenecek");
-                }
-            });
+    private void handleVerification(PlayPurchaseVerifier.Result verification){
+        if(verification==null)return;
+        switch(verification.status){
+            case ACTIVE:
+                LicenseManager.setPlayEntitlement(context,true);
+                notifyEntitlement(true);
+                notifyMessage("Google Play satın alımı sunucuda doğrulandı");
+                break;
+            case PENDING:
+                notifyMessage("Ödeme beklemede. Google Play işlemi tamamlanınca Pro açılacak.");
+                break;
+            case DENIED:
+                LicenseManager.setPlayEntitlement(context,false);
+                notifyEntitlement(false);
+                notifyMessage(verification.message==null||verification.message.isEmpty()
+                    ?"Google Play satın alımı doğrulanamadı":verification.message);
+                break;
+            case NOT_CONFIGURED:
+                notifyMessage("Google Play satın alma doğrulama sunucusu yapılandırılmadı");
+                break;
+            case NETWORK_ERROR:
+                notifyMessage(verification.message==null||verification.message.isEmpty()
+                    ?"Google Play doğrulama sunucusuna ulaşılamadı":verification.message);
+                break;
+            case INVALID_RESPONSE:
+            default:
+                notifyMessage(verification.message==null||verification.message.isEmpty()
+                    ?"Google Play doğrulama yanıtı geçersiz":verification.message);
+                break;
         }
     }
 
@@ -222,6 +260,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
     }
 
     public void close(){
+        verifierExecutor.shutdownNow();
         if(billingClient.isReady())billingClient.endConnection();
     }
 }
