@@ -58,9 +58,9 @@
 - [x] Endpoint snapping test
 - [x] DXF block expansion test
 - [x] File transfer / cancellation / large drawing regression test
-- [ ] Android lintDebug
-- [ ] Gradle unit tests
-- [ ] assembleDebug
-- [ ] assembleRelease
+- [x] Android lintDebug
+- [x] Gradle unit tests
+- [x] assembleDebug
+- [x] assembleRelease
 
-Son dört madde GitHub Actions kalite kapısının başarılı tamamlanmasıyla işaretlenecektir. APK kullanıcıya yalnız bu kalite kapısı geçtikten sonra verilecektir.
+Checkpoint-49 kalite kapısı GitHub Actions üzerinde başarıyla tamamlandı. Checkpoint-50 seçim/grip görsel iyileştirmesinin ardından son sürüm için aynı kapı yeniden çalıştırılır; APK yalnız son kapı başarıyla geçtikten sonra üretilir.
