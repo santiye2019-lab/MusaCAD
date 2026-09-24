@@ -1,7 +1,9 @@
 import com.musa.cad.Dxf3dMesh;
 import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import com.musa.cad.Dxf3dEditor;
 
 public final class Dxf3dMeshTest {
     public static void main(String[] args) throws Exception {
@@ -18,6 +20,10 @@ public final class Dxf3dMeshTest {
             if(mesh.xyz[8]!=0||mesh.xyz[11]!=5||mesh.xyz[14]!=5||mesh.radius<=0)throw new AssertionError("Z coordinates");
             double dx=mesh.xyz[3]-mesh.xyz[0],dy=mesh.xyz[4]-mesh.xyz[1],dz=mesh.xyz[5]-mesh.xyz[2];
             if(Math.abs(Math.sqrt(dx*dx+dy*dy+dz*dz)-3)>1e-6)throw new AssertionError("distance");
+            float[] original=mesh.xyz.clone();mesh.xyz[2]=7;mesh.xyz[14]=8;
+            ByteArrayOutputStream target=new ByteArrayOutputStream();Dxf3dEditor.write(file,target,mesh,original);
+            Files.write(file.toPath(),target.toByteArray());Dxf3dMesh edited=Dxf3dMesh.read(file);
+            if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
     }
     private static String vertex(int x,int y,int z){return "0\nVERTEX\n70\n192\n10\n"+x+"\n20\n"+y+"\n30\n"+z+"\n";}

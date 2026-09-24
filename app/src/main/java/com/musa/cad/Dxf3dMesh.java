@@ -11,12 +11,12 @@ import java.util.HashSet;
 public final class Dxf3dMesh {
     private static final int MAX_VERTICES=2_000_000,MAX_TRIANGLES=4_000_000;
     public final float[] xyz;
-    public final int[] triangles,edges;
+    public final int[] triangles,edges,sourceLines,coordinateSlots;
     public final float cx,cy,cz,radius;
     public final int unsupportedSolids;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int unsupportedSolids){
-        this.xyz=xyz;this.triangles=triangles;this.unsupportedSolids=unsupportedSolids;
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] sourceLines,int[] coordinateSlots,int unsupportedSolids){
+        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.unsupportedSolids=unsupportedSolids;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i<triangles.length;i+=3){
             edge(seen,lines,triangles[i],triangles[i+1]);edge(seen,lines,triangles[i+1],triangles[i+2]);edge(seen,lines,triangles[i+2],triangles[i]);
@@ -36,7 +36,7 @@ public final class Dxf3dMesh {
     private static final class Face{final int[] index;final int base;Face(int[] index,int base){this.index=index;this.base=base;}}
 
     public static Dxf3dMesh read(File file)throws IOException{
-        FloatBuffer points=new FloatBuffer();IntBuffer triangles=new IntBuffer();int solids=0;
+        FloatBuffer points=new FloatBuffer();IntBuffer triangles=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();int solids=0;
         String section="";boolean polyface=false;int base=0;int vertexCount=0;ArrayList<Face> faces=new ArrayList<>();
         try(DxfStream stream=new DxfStream(file,StandardCharsets.UTF_8)){
             DxfBlocks.Record r;
@@ -50,7 +50,7 @@ public final class Dxf3dMesh {
                 }
                 if("VERTEX".equals(r.type)&&polyface){
                     int flags=(int)r.number(70,0);
-                    if((flags&64)!=0){addPoint(points,r,10,20,30);vertexCount++;}
+                    if((flags&64)!=0){addPoint(points,r,10,20,30);sourceLines.add(r.sourceStart);coordinateSlots.add(0);vertexCount++;}
                     else if((flags&128)!=0){
                         int[] indices=new int[4];for(int k=0;k<4;k++)indices[k]=Math.abs((int)r.number(71+k,0));
                         faces.add(new Face(indices,base));
@@ -62,15 +62,15 @@ public final class Dxf3dMesh {
                     polyface=false;faces.clear();continue;
                 }
                 if("3DFACE".equals(r.type)){
-                    int start=points.n/3;for(int k=0;k<3;k++)addPoint(points,r,10+k,20+k,30+k);
-                    if(r.has(13)&&r.has(23)){addPoint(points,r,13,23,33);appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);}
+                    int start=points.n/3;for(int k=0;k<3;k++){addPoint(points,r,10+k,20+k,30+k);sourceLines.add(r.sourceStart);coordinateSlots.add(k);}
+                    if(r.has(13)&&r.has(23)){addPoint(points,r,13,23,33);sourceLines.add(r.sourceStart);coordinateSlots.add(3);appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);}
                     else appendTriangle(triangles,start,start+1,start+2);
                 }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type))solids++;
             }
         }
         if(polyface)throw new IOException("3B polyface nesnesinin SEQEND kaydı eksik");
         if(points.n==0||triangles.n==0)throw new IOException(solids>0?"Katı 3B nesneler için geometri çözümleyici gerekli":"Bu çizimde desteklenen 3B yüzey bulunamadı");
-        return new Dxf3dMesh(points.toArray(),triangles.toArray(),solids);
+        return new Dxf3dMesh(points.toArray(),triangles.toArray(),sourceLines.toArray(),coordinateSlots.toArray(),solids);
     }
     private static void addPoint(FloatBuffer out,DxfBlocks.Record r,int x,int y,int z)throws IOException{
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");

@@ -39,6 +39,8 @@ public final class Mesh3dView extends View {
         if(second>=0){int i=second*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);float value=distance(first,second);canvas.drawText(String.format(Locale.getDefault(),"3B mesafe: %.3f çizim birimi",value),18f,getHeight()-22f,caption);}
     }
     private float distance(int a,int b){int i=a*3,j=b*3;float x=model.xyz[i]-model.xyz[j],y=model.xyz[i+1]-model.xyz[j+1],z=model.xyz[i+2]-model.xyz[j+2];return (float)Math.sqrt(x*x+y*y+z*z);}
+    public int selectedVertex(){return first;}
+    public void geometryChanged(){invalidate();}
     private void select(float x,float y){int at=-1;float best=36f*getResources().getDisplayMetrics().density;best*=best;
         for(int i=0;i<screen.length;i+=2){float dx=screen[i]-x,dy=screen[i+1]-y,dist=dx*dx+dy*dy;if(dist<best){best=dist;at=i/2;}}
         if(at<0)return;if(first<0||second>=0){first=at;second=-1;}else second=at;invalidate();
