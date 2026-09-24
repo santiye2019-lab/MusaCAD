@@ -79,19 +79,32 @@ static SceneColor scene_aci(int aci){
 static SceneColor scene_true(unsigned int rgb){
     SceneColor out;out.aci=7;out.rgb=rgb&0x00ffffffu;out.truecolor=1;return out;
 }
-static SceneColor entity_color(Dwg_Object *obj){
-    if(!obj||!obj->tio.entity)return scene_aci(7);
+static Dwg_Object_LAYER *entity_layer(Dwg_Object *obj){
+    if(!obj||!obj->tio.entity)return NULL;
+    Dwg_Object_Ref *lr=obj->tio.entity->layer;
+    if(!lr||!lr->obj||lr->obj->fixedtype!=DWG_TYPE_LAYER||!lr->obj->tio.object)return NULL;
+    return lr->obj->tio.object->tio.LAYER;
+}
+static SceneColor color_value(Dwg_Color *value,SceneColor fallback){
+    if(!value)return fallback;
+    if((value->flag&0x80)!=0)return scene_true((unsigned int)value->rgb);
+    int aci=(int)value->index;if(aci>=1&&aci<=255)return scene_aci(aci);
+    return fallback;
+}
+static int layer_is_zero(Dwg_Object_LAYER *layer){return layer&&layer->name&&strcmp(layer->name,"0")==0;}
+static SceneColor effective_layer_color(Dwg_Object *obj,SceneColor inheritedLayer,int insideBlock){
+    Dwg_Object_LAYER *layer=entity_layer(obj);
+    if(insideBlock&&layer_is_zero(layer))return inheritedLayer;
+    return layer?color_value(&layer->color,scene_aci(7)):inheritedLayer;
+}
+static SceneColor entity_color(Dwg_Object *obj,SceneColor byBlock,SceneColor layerColor){
+    if(!obj||!obj->tio.entity)return layerColor;
     Dwg_Color *entity=&obj->tio.entity->color;
     if((entity->flag&0x80)!=0)return scene_true((unsigned int)entity->rgb);
     int aci=(int)entity->index;
+    if(aci==0)return byBlock;
     if(aci>=1&&aci<=255)return scene_aci(aci);
-    Dwg_Object_Ref *lr=obj->tio.entity->layer;
-    if(lr&&lr->obj&&lr->obj->fixedtype==DWG_TYPE_LAYER&&lr->obj->tio.object&&lr->obj->tio.object->tio.LAYER){
-        Dwg_Color *layer=&lr->obj->tio.object->tio.LAYER->color;
-        if((layer->flag&0x80)!=0)return scene_true((unsigned int)layer->rgb);
-        int layer_aci=(int)layer->index;if(layer_aci>=1&&layer_aci<=255)return scene_aci(layer_aci);
-    }
-    return scene_aci(7);
+    return layerColor;
 }
 static int emit_line(MusaNativeScene *s,SceneColor color,Affine2 m,double x1,double y1,double x2,double y2){
     double ax,ay,bx,by;map2(m,x1,y1,&ax,&ay);map2(m,x2,y2,&bx,&by);
@@ -243,9 +256,9 @@ static void emit_lw_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,D
     emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
 }
 
-static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth);
+static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer);
 
-static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth){
+static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor insertColor,SceneColor insertLayer){
     if(depth>=MUSA_MAX_BLOCK_DEPTH||!obj||!obj->tio.entity||!obj->tio.entity->tio.INSERT)return;
     Dwg_Entity_INSERT *ins=obj->tio.entity->tio.INSERT;
     if(!ins->block_header)return;
@@ -263,14 +276,15 @@ static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     local.ty-=local.b*hdr->base_pt.x+local.d*hdr->base_pt.y;
     Affine2 combined=multiply2(parent,local);
     Dwg_Object *child=get_first_owned_entity(block);
-    while(child&&!s->truncated){emit_object(child,s,combined,depth+1);child=get_next_owned_entity(block,child);}
+    while(child&&!s->truncated){emit_object(child,s,combined,depth+1,insertColor,insertLayer);child=get_next_owned_entity(block,child);}
 }
 
-static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth){
+static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer){
     if(!obj||s->truncated||obj->supertype!=DWG_SUPERTYPE_ENTITY||layer_invisible(obj))return;
-    SceneColor color=entity_color(obj);
+    SceneColor layerColor=effective_layer_color(obj,inheritedLayer,depth>0);
+    SceneColor color=entity_color(obj,byBlock,layerColor);
     switch(obj->fixedtype){
-        case DWG_TYPE_INSERT: emit_insert(obj,s,parent,depth); break;
+        case DWG_TYPE_INSERT: emit_insert(obj,s,parent,depth,color,layerColor); break;
         case DWG_TYPE_LINE:{
             Dwg_Entity_LINE *e=obj->tio.entity->tio.LINE;BITCODE_3DPOINT a,b;
             if(!e)break;transform_OCS(&a,e->start,e->extrusion);transform_OCS(&b,e->end,e->extrusion);
@@ -415,10 +429,11 @@ int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
     if(model&&model->obj){
         Dwg_Object *obj=get_first_owned_entity(model->obj);
         Affine2 identity=identity2();
-        while(obj&&!scene->truncated){emit_object(obj,scene,identity,0);obj=get_next_owned_entity(model->obj,obj);}
+        SceneColor root=scene_aci(7);
+        while(obj&&!scene->truncated){emit_object(obj,scene,identity,0,root,root);obj=get_next_owned_entity(model->obj,obj);}
     }else{
-        Affine2 identity=identity2();
-        for(BITCODE_BL i=0;i<dwg->num_objects&&!scene->truncated;i++)emit_object(&dwg->object[i],scene,identity,0);
+        Affine2 identity=identity2();SceneColor root=scene_aci(7);
+        for(BITCODE_BL i=0;i<dwg->num_objects&&!scene->truncated;i++)emit_object(&dwg->object[i],scene,identity,0,root,root);
     }
     if(!scene->has_bounds||scene->primitives<=0){musa_scene_free(scene);return -3;}
     /* Prefer DWG model extents so the compact native scene and the later
