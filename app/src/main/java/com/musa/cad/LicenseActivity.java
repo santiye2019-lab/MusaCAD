@@ -94,7 +94,11 @@ public class LicenseActivity extends AppCompatActivity {
                     Toast.makeText(this,"1 günlük ücretsiz deneme etkinleştirildi",Toast.LENGTH_SHORT).show();
                     enterAfterLicense();
                 }else if(r.status==TrialService.Status.NOT_CONFIGURED){
-                    startLocalTrialFallback();
+                    if(BuildConfig.DEBUG){
+                        startLocalTrialFallback();
+                    }else{
+                        Toast.makeText(this,"Ücretsiz deneme servisi yapılandırılmadı. Lütfen daha sonra tekrar deneyin.",Toast.LENGTH_LONG).show();
+                    }
                 }else if(r.status==TrialService.Status.ALREADY_USED){
                     Toast.makeText(this,"Bu cihaz ücretsiz denemeyi daha önce kullandı",Toast.LENGTH_LONG).show();
                 }else{
