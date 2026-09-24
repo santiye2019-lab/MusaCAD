@@ -1,10 +1,16 @@
 package com.musa.cad;
 
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class SplashActivity extends AppCompatActivity {
@@ -30,26 +36,59 @@ public class SplashActivity extends AppCompatActivity {
         LockedScreenUi.fillStage(this,root,stage,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_1);
+            art.setContentDescription("MusaCAD açılış ekranı");
 
-            View.OnClickListener next=v->continueFlow();
+            // 3D capability is now explicitly visible on the first screen.
+            TextView threeD=new TextView(this);
+            threeD.setText("2D + 3D CAD DESTEĞİ");
+            threeD.setTextColor(Color.WHITE);
+            threeD.setTextSize(13f);
+            threeD.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+            threeD.setGravity(Gravity.CENTER);
+            threeD.setLetterSpacing(.05f);
+            threeD.setContentDescription("MusaCAD iki boyutlu ve üç boyutlu CAD desteği");
+            GradientDrawable badgeBg=new GradientDrawable();
+            badgeBg.setColor(Color.argb(220,5,35,51));
+            badgeBg.setCornerRadius(dp(18));
+            badgeBg.setStroke(dp(1),Color.rgb(50,205,225));
+            threeD.setBackground(badgeBg);
+            stage.addView(threeD);
+            LockedScreenUi.position(threeD,stage,239,365,463,62);
 
-            // Üstteki dört gerçek özellik kartı
-            LockedScreenUi.hotspot(this,stage,81,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,288,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,497,430,192,205,next);
-            LockedScreenUi.hotspot(this,stage,703,430,164,205,next);
-
-            // Alttaki dört yüzer özellik düğmesi
-            LockedScreenUi.hotspot(this,stage,49,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,263,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,478,1430,194,170,next);
-            LockedScreenUi.hotspot(this,stage,694,1430,194,170,next);
+            // Deliberate CTA: the intro no longer advances from invisible hotspots.
+            Button start=new Button(this);
+            start.setText("Hadi Başlayalım");
+            start.setAllCaps(false);
+            start.setTextColor(Color.WHITE);
+            start.setTextSize(17f);
+            start.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+            start.setGravity(Gravity.CENTER);
+            start.setPadding(dp(12),0,dp(12),0);
+            start.setStateListAnimator(null);
+            start.setContentDescription("Hadi başlayalım, MusaCAD'e devam et");
+            GradientDrawable buttonBg=new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(0,151,178),Color.rgb(0,201,211)}
+            );
+            buttonBg.setCornerRadius(dp(24));
+            buttonBg.setStroke(dp(1),Color.argb(210,255,255,255));
+            start.setBackground(buttonBg);
+            start.setOnClickListener(v->{
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                continueFlow();
+            });
+            stage.addView(start);
+            LockedScreenUi.position(start,stage,171,1304,599,92);
         });
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
         super.onWindowFocusChanged(hasFocus);
         if(hasFocus)LockedScreenUi.enableImmersive(this);
+    }
+
+    private int dp(int value){
+        return Math.round(value*getResources().getDisplayMetrics().density);
     }
 
     private void continueFlow(){

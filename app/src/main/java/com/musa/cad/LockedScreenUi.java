@@ -3,6 +3,7 @@ package com.musa.cad;
 import android.app.Activity;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -35,8 +36,15 @@ final class LockedScreenUi {
     static void fillStage(Activity a, FrameLayout root, FrameLayout stage, Runnable ready){
         root.post(()->{
             if(root.getWidth()<=0||root.getHeight()<=0)return;
+
+            // Keep the locked artwork at its native 941x1672 aspect ratio.
+            // The root remains immersive/full-screen, while the artwork is contained
+            // without stretching text or graphics on tall/wide phones.
+            float scale=Math.min(root.getWidth()/ART_W,root.getHeight()/ART_H);
+            int stageW=Math.max(1,Math.round(ART_W*scale));
+            int stageH=Math.max(1,Math.round(ART_H*scale));
             FrameLayout.LayoutParams stageLp=
-                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT);
+                new FrameLayout.LayoutParams(stageW,stageH,Gravity.CENTER);
             stage.setLayoutParams(stageLp);
             stage.removeAllViews();
 
