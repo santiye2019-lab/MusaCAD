@@ -12,6 +12,8 @@ public final class NativeScene {
     private final int[] offsets;
     /** Packed primitive bounds: left, top, right, bottom. Avoids one RectF object per entity. */
     private final float[] bounds;
+    /** Decoded once at scene creation; avoids thousands of UTF-8/String allocations while panning and zooming. */
+    private final String[] textValues;
     private final Matrix worldToContent;
     private final RectF worldBounds;
     private final Grid grid;
@@ -36,10 +38,11 @@ public final class NativeScene {
         int initial=expected>0?Math.min(expected,maxPossible):Math.min(1024,maxPossible);
         int[] os=new int[Math.max(1,initial)];
         float[] bs=new float[Math.max(4,os.length*4)];
+        String[] ts=new String[os.length];
         int count=0;
         RectF b=new RectF();
         while(p<values.length){
-            int start=p,encoded=Math.round(values[p++]),type;
+            int start=p,encoded=Math.round(values[p++]),type;String parsedText=null;
             if(version>=4&&encoded<0){
                 type=(-encoded-1)>>>8;if(p>=values.length)break;p++;
             }else if(version>=3)type=encoded>>>8;
@@ -58,29 +61,31 @@ public final class NativeScene {
                 if(p+8>values.length)break;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
                 float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
             }else if(type==6){
-                if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.max(0,Math.round(values[p++]));int words=(bytes+2)/3;if(p+words>values.length)break;p+=words;
+                if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.max(0,Math.round(values[p++]));int words=(bytes+2)/3;if(p+words>values.length)break;
+                byte[] utf8=new byte[bytes];int at=0;for(int wi=0;wi<words;wi++){int packed=Math.round(values[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
+                parsedText=DxfText.plain(new String(utf8,java.nio.charset.StandardCharsets.UTF_8)).replace('\n',' ');
                 float glyphs=Math.max(1f,bytes*.65f),shift=(ha==2?-glyphs:(ha==1||ha==3||ha==4||ha==5?-.5f*glyphs:0f));
                 add(b,x+ux*shift,y+uy*shift);add(b,x+ux*(shift+glyphs),y+uy*(shift+glyphs));add(b,x+ux*shift-vx,y+uy*shift-vy);add(b,x+ux*(shift+glyphs)-vx,y+uy*(shift+glyphs)-vy);
             }else break;
             if(valid(b)){
                 if(count==os.length){
                     int next=Math.min(maxPossible,Math.max(count+1,os.length+(os.length>>1)+1));
-                    os=Arrays.copyOf(os,next);bs=Arrays.copyOf(bs,next*4);
+                    os=Arrays.copyOf(os,next);bs=Arrays.copyOf(bs,next*4);ts=Arrays.copyOf(ts,next);
                 }
-                os[count]=start;int k=count*4;bs[k]=b.left;bs[k+1]=b.top;bs[k+2]=b.right;bs[k+3]=b.bottom;count++;
+                os[count]=start;ts[count]=parsedText;int k=count*4;bs[k]=b.left;bs[k+1]=b.top;bs[k+2]=b.right;bs[k+3]=b.bottom;count++;
             }
         }
         if(count==0)throw new IOException("Native sahnede görüntülenebilir geometri yok");
-        if(count!=os.length){os=Arrays.copyOf(os,count);bs=Arrays.copyOf(bs,count*4);}
-        int[] offsets=os;float[] bounds=bs;
+        if(count!=os.length){os=Arrays.copyOf(os,count);bs=Arrays.copyOf(bs,count*4);ts=Arrays.copyOf(ts,count);}
+        int[] offsets=os;float[] bounds=bs;String[] textValues=ts;
         Matrix view=new Matrix();float scale=Math.min((SIZE-2f*MARGIN)/wb.width(),(SIZE-2f*MARGIN)/wb.height());
         view.postTranslate(-wb.left,-wb.bottom);view.postScale(scale,-scale);view.postTranslate(MARGIN+(SIZE-2*MARGIN-wb.width()*scale)/2f,MARGIN+(SIZE-2*MARGIN-wb.height()*scale)/2f);
-        return new NativeScene(values,offsets,bounds,view,wb,truncated||expected>offsets.length,version);
+        return new NativeScene(values,offsets,bounds,textValues,view,wb,truncated||expected>offsets.length,version);
     }
 
     private final int streamVersion;
-    private NativeScene(float[] raw,int[] offsets,float[] bounds,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
-        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;this.streamVersion=streamVersion;grid=new Grid(bounds,worldBounds);
+    private NativeScene(float[] raw,int[] offsets,float[] bounds,String[] textValues,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
+        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.textValues=textValues;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;this.streamVersion=streamVersion;grid=new Grid(bounds,worldBounds);
     }
 
     public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
@@ -147,14 +152,13 @@ public final class NativeScene {
             path.rewind();path.addArc(UNIT_OVAL,(float)Math.toDegrees(start),(float)Math.toDegrees(sweep));
             local.setValues(new float[]{ux,vx,cx,uy,vy,cy,0f,0f,1f});target.setConcat(matrix,local);path.transform(target);canvas.drawPath(path,paint);
         }else if(type==6){
-            float x=raw[p++],y=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++];int ha=Math.round(raw[p++]),va=Math.round(raw[p++]),bytes=Math.max(0,Math.round(raw[p++]));
-            byte[] utf8=new byte[bytes];int at=0;while(at<bytes){int packed=Math.round(raw[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
-            String value=DxfText.plain(new String(utf8,java.nio.charset.StandardCharsets.UTF_8));if(value.isEmpty())return;
+            float x=raw[p++],y=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++];int ha=Math.round(raw[p++]),va=Math.round(raw[p++]);p++;
+            String value=textValues!=null&&index<textValues.length?textValues[index]:null;if(value==null||value.isEmpty())return;
             local.setValues(new float[]{ux,vx,x,uy,vy,y,0f,0f,1f});target.setConcat(matrix,local);
             Paint.Style oldStyle=paint.getStyle();float oldSize=paint.getTextSize();Paint.Align oldAlign=paint.getTextAlign();
             paint.setStyle(Paint.Style.FILL);paint.setTextSize(1f);paint.setTextAlign(ha==2?Paint.Align.RIGHT:(ha==1||ha==3||ha==4||ha==5?Paint.Align.CENTER:Paint.Align.LEFT));
-            Paint.FontMetrics fm=paint.getFontMetrics();float base=va==1?-fm.descent:va==2?-(fm.ascent+fm.descent)*.5f:va==3?-fm.ascent:0f;
-            int save=canvas.save();canvas.concat(target);String[] lines=value.split("\\n",-1);for(int li=0;li<lines.length;li++)canvas.drawText(lines[li],0f,base+li*1.2f,paint);canvas.restoreToCount(save);
+            float ascent=paint.ascent(),descent=paint.descent();float base=va==1?-descent:va==2?-(ascent+descent)*.5f:va==3?-ascent:0f;
+            int save=canvas.save();canvas.concat(target);canvas.drawText(value,0f,base,paint);canvas.restoreToCount(save);
             paint.setTextAlign(oldAlign);paint.setTextSize(oldSize);paint.setStyle(oldStyle);
         }
     }
