@@ -51,6 +51,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".Mesh3dActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".RecentFilesActivity"
             android:screenOrientation="portrait"
             android:exported="false" />

@@ -17,6 +17,10 @@ public final class CadCommandTest {
         expect("I",CadCommand.Action.INSERT);expect("D",CadCommand.Action.DIMSTYLE);expect("DLI",CadCommand.Action.DIMLINEAR);expect("DAL",CadCommand.Action.DIMALIGNED);
         expect("LA",CadCommand.Action.LAYER);expect("PR",CadCommand.Action.PROPERTIES);expect("DI",CadCommand.Action.DISTANCE);expect("AA",CadCommand.Action.AREA);
         expect("ZE",CadCommand.Action.ZOOM_EXTENTS);expect("U",CadCommand.Action.UNDO);expect("REDO",CadCommand.Action.REDO);expect("QS",CadCommand.Action.SAVE);
+        expect("3D",CadCommand.Action.VIEW_3D);expect("3DORBIT",CadCommand.Action.VIEW_3D);expect("2D",CadCommand.Action.VIEW_2D);
+        expect("DIVIDE",CadCommand.Action.DIVIDE);expect("REVCLOUD",CadCommand.Action.REVCLOUD);expect("MLEADER",CadCommand.Action.MULTILEADER);
+        expect("DAN",CadCommand.Action.DIMANGULAR);expect("DRA",CadCommand.Action.DIMRADIUS);expect("DDI",CadCommand.Action.DIMDIAMETER);
+        expect("ANGLE",CadCommand.Action.ANGLE);expect("ID",CadCommand.Action.ID_POINT);expect("ARCLEN",CadCommand.Action.ARC_LENGTH);
         expect("?",CadCommand.Action.HELP);
         if(CadCommand.parse("NOT_A_COMMAND")==CadCommand.Action.UNSUPPORTED)throw new AssertionError("unknown command should not be unsupported");
         System.out.println("CadCommandTest OK");
