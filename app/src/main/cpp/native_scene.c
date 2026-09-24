@@ -187,6 +187,18 @@ static void emit_hatch_path_segment(MusaNativeScene *s,SceneColor color,Affine2 
         }
     }
 }
+static void emit_arrow_head(MusaNativeScene *s,SceneColor color,Affine2 parent,double tipx,double tipy,double prevx,double prevy,double size){
+    double dx=prevx-tipx,dy=prevy-tipy,len=hypot(dx,dy);if(len<1e-12||!isfinite(size)||size<=0)return;
+    dx/=len;dy/=len;double nx=-dy,ny=dx;
+    emit_line(s,color,parent,tipx,tipy,tipx+dx*size+nx*size*.36,tipy+dy*size+ny*size*.36);
+    emit_line(s,color,parent,tipx,tipy,tipx+dx*size-nx*size*.36,tipy+dy*size-ny*size*.36);
+}
+static void emit_leader_points(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_3DPOINT *pts,BITCODE_BL n,double arrow_size){
+    if(!pts||n<2)return;
+    for(BITCODE_BL i=1;i<n&&!s->truncated;i++)emit_line(s,color,parent,pts[i-1].x,pts[i-1].y,pts[i].x,pts[i].y);
+    if(!s->truncated)emit_arrow_head(s,color,parent,pts[n-1].x,pts[n-1].y,pts[n-2].x,pts[n-2].y,arrow_size);
+}
+
 
 static void emit_lw_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Entity_LWPOLYLINE *e,dwg_point_2d a,dwg_point_2d b,double bulge){
     double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
@@ -290,6 +302,43 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             in.x=e->corner3.x;in.y=e->corner3.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
             in.x=e->corner4.x;in.y=e->corner4.y;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);
             finish_poly(s);break;
+        }
+        case DWG_TYPE_LEADER:{
+            Dwg_Entity_LEADER *e=obj->tio.entity->tio.LEADER;
+            if(e&&e->points&&e->num_points>=2){
+                double arrow=(isfinite(e->dimasz)&&e->dimasz>0)?e->dimasz:1.0;
+                emit_leader_points(s,color,parent,e->points,e->num_points,arrow);
+            }
+            break;
+        }
+        case DWG_TYPE_MULTILEADER:{
+            Dwg_Entity_MULTILEADER *e=obj->tio.entity->tio.MULTILEADER;
+            if(!e)break;
+            Dwg_MLEADER_AnnotContext *ctx=&e->ctx;
+            double default_arrow=(isfinite(ctx->arrow_size)&&ctx->arrow_size>0)?ctx->arrow_size:((isfinite(e->arrow_size)&&e->arrow_size>0)?e->arrow_size:1.0);
+            for(BITCODE_BL li=0;li<ctx->num_leaders&&!s->truncated;li++){
+                Dwg_LEADER_Node *node=&ctx->leaders[li];
+                for(BITCODE_BL lj=0;lj<node->num_lines&&!s->truncated;lj++){
+                    Dwg_LEADER_Line *line=&node->lines[lj];
+                    double arrow=(isfinite(line->arrow_size)&&line->arrow_size>0)?line->arrow_size:default_arrow;
+                    emit_leader_points(s,color,parent,line->points,line->num_points,arrow);
+                }
+                if(node->has_dogleg&&node->has_lastleaderlinepoint&&isfinite(node->dogleg_length)&&node->dogleg_length>0){
+                    double x1=node->lastleaderlinepoint.x,y1=node->lastleaderlinepoint.y;
+                    double x2=x1+node->dogleg_vector.x*node->dogleg_length,y2=y1+node->dogleg_vector.y*node->dogleg_length;
+                    emit_line(s,color,parent,x1,y1,x2,y2);
+                }
+            }
+            if(ctx->has_content_txt&&ctx->content.txt.type==2&&isfinite(ctx->content.txt.location.x)&&isfinite(ctx->content.txt.location.y)){
+                for(BITCODE_BL li=0;li<ctx->num_leaders&&!s->truncated;li++){
+                    Dwg_LEADER_Node *node=&ctx->leaders[li];
+                    if(node->has_lastleaderlinepoint){
+                        emit_line(s,color,parent,ctx->content.txt.location.x,ctx->content.txt.location.y,node->lastleaderlinepoint.x,node->lastleaderlinepoint.y);
+                        break;
+                    }
+                }
+            }
+            break;
         }
         case DWG_TYPE_HATCH:{
             Dwg_Entity_HATCH *e=obj->tio.entity->tio.HATCH;if(!e||!e->paths||e->num_paths<=0)break;
