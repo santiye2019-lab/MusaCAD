@@ -13,10 +13,10 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define MUSA_SCENE_VERSION 5.0f
-/* v5 keeps the compact v4 color encoding and adds filled mask polygons for
-   WIPEOUT so native first paint respects drawing occlusion. The 9M cap remains
-   bounded for large-phone memory safety. */
+#define MUSA_SCENE_VERSION 6.0f
+/* v6 keeps the compact v5 geometry stream and adds packed UTF-8 single-line
+   text primitives so labels can appear during native first paint. The 9M cap
+   remains bounded for large-phone memory safety. */
 #define MUSA_SCENE_MAX_FLOATS (9u*1024u*1024u)
 #define MUSA_MAX_BLOCK_DEPTH 24
 
@@ -156,6 +156,37 @@ static void emit_wipeout(MusaNativeScene *s,Affine2 parent,Dwg_Entity_WIPEOUT *e
     }
     finish_poly(s);
 }
+static size_t bounded_text_len(const char *value){
+    if(!value)return 0;size_t n=0;while(n<4096&&value[n])n++;return n;
+}
+static void emit_text_ocs(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,
+                          BITCODE_2DPOINT ins,BITCODE_2DPOINT align,double rotation,double height,double width_factor,
+                          int halign,int valign,const char *value){
+    size_t bytes=bounded_text_len(value);if(bytes==0||!isfinite(height)||height<=1e-12)return;
+    if(!isfinite(rotation))rotation=0;double wf=isfinite(width_factor)&&fabs(width_factor)>1e-9?fabs(width_factor):1.0;
+    BITCODE_2DPOINT base=((halign!=0||valign!=0)&&finite2(align.x,align.y))?align:ins;
+    double co=cos(rotation),si=sin(rotation);
+    BITCODE_2DPOINT ix={base.x+co*height*wf,base.y+si*height*wf};
+    BITCODE_2DPOINT iy={base.x+si*height,base.y-co*height};
+    BITCODE_2DPOINT pb,px,py;transform_OCS_2d(&pb,base,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
+    double ax,ay,bx,by,cx,cy;map2(parent,pb.x,pb.y,&ax,&ay);map2(parent,px.x,px.y,&bx,&by);map2(parent,py.x,py.y,&cx,&cy);
+    double ux=bx-ax,uy=by-ay,vx=cx-ax,vy=cy-ay;if(!finite2(ax,ay)||!finite2(ux,uy)||!finite2(vx,vy))return;
+    size_t words=(bytes+2u)/3u;if(!reserve_scene(s,9u+color_words(color)+words))return;
+    push_code(s,6,color);pushf(s,(float)ax);pushf(s,(float)ay);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);
+    pushf(s,(float)halign);pushf(s,(float)valign);pushf(s,(float)bytes);
+    const unsigned char *raw=(const unsigned char*)value;
+    for(size_t i=0;i<bytes;i+=3){
+        unsigned int packed=raw[i];
+        if(i+1<bytes)packed|=((unsigned int)raw[i+1])<<8;
+        if(i+2<bytes)packed|=((unsigned int)raw[i+2])<<16;
+        pushf(s,(float)packed);
+    }
+    double glyphs=(double)bytes*.65;if(glyphs<1.0)glyphs=1.0;
+    double shift=(halign==1||halign==4||halign==3||halign==5)?-.5*glyphs:(halign==2?-glyphs:0.0);
+    double x0=ax+ux*shift,y0=ay+uy*shift,x1=ax+ux*(shift+glyphs),y1=ay+uy*(shift+glyphs);
+    add_bounds(s,x0,y0);add_bounds(s,x1,y1);add_bounds(s,x0-vx,y0-vy);add_bounds(s,x1-vx,y1-vy);s->primitives++;
+}
+
 
 static int emit_curve(MusaNativeScene *s,SceneColor color,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double sweep){
     double wcx,wcy,pu_x,pu_y,pv_x,pv_y;map2(m,cx,cy,&wcx,&wcy);map2(m,cx+ux,cy+uy,&pu_x,&pu_y);map2(m,cx+vx,cy+vy,&pv_x,&pv_y);
@@ -303,6 +334,21 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         case DWG_TYPE_POINT:{
             Dwg_Entity_POINT *e=obj->tio.entity->tio.POINT;BITCODE_3DPOINT in={e->x,e->y,e->z},p;
             if(!e)break;transform_OCS(&p,in,e->extrusion);emit_point(s,color,parent,p.x,p.y);break;
+        }
+        case DWG_TYPE_TEXT:{
+            Dwg_Entity_TEXT *e=obj->tio.entity->tio.TEXT;if(!e)break;
+            emit_text_ocs(s,color,parent,e->extrusion,e->ins_pt,e->alignment_pt,e->rotation,e->height,e->width_factor,e->horiz_alignment,e->vert_alignment,e->text_value);
+            break;
+        }
+        case DWG_TYPE_ATTRIB:{
+            Dwg_Entity_ATTRIB *e=obj->tio.entity->tio.ATTRIB;if(!e||(e->flags&1))break;
+            emit_text_ocs(s,color,parent,e->extrusion,e->ins_pt,e->alignment_pt,e->rotation,e->height,e->width_factor,e->horiz_alignment,e->vert_alignment,e->text_value);
+            break;
+        }
+        case DWG_TYPE_ATTDEF:{
+            Dwg_Entity_ATTDEF *e=obj->tio.entity->tio.ATTDEF;if(!e||(e->flags&1))break;
+            emit_text_ocs(s,color,parent,e->extrusion,e->ins_pt,e->alignment_pt,e->rotation,e->height,e->width_factor,e->horiz_alignment,e->vert_alignment,e->default_value);
+            break;
         }
         case DWG_TYPE_ELLIPSE:{
             Dwg_Entity_ELLIPSE *e=obj->tio.entity->tio.ELLIPSE;if(e)emit_ellipse_curve(s,color,parent,e);break;

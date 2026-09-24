@@ -15,8 +15,8 @@ typedef struct {
 } MusaNativeScene;
 
 /*
- * Compact float stream, v5:
- * header = [5, primitiveCount, minX, minY, maxX, maxY, truncated]
+ * Compact float stream, v6:
+ * header = [6, primitiveCount, minX, minY, maxX, maxY, truncated]
  * ACI metadata      = [type*256 + ACI]
  * TrueColor metadata= [-(type*256+1), RGB24]
  * LINE   = [metadata..., x1, y1, x2, y2]
@@ -25,7 +25,8 @@ typedef struct {
  * CURVE  = [metadata..., cx, cy, ux, uy, vx, vy, startRadians, sweepRadians]
  *          point(t) = center + U*cos(t) + V*sin(t)
  * MASK    = [metadata(type=5)..., -pointCount, x1, y1, ...] (filled canvas-background wipeout)
- * Java keeps backward parsing for v1/v2/v3/v4 scenes.
+ * TEXT    = [metadata(type=6)..., x,y, ux,uy, vx,vy, hAlign,vAlign, byteCount, packed UTF-8/3 bytes per float]
+ * Java keeps backward parsing for v1/v2/v3/v4/v5 scenes.
  */
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene);
 void musa_scene_free(MusaNativeScene *scene);

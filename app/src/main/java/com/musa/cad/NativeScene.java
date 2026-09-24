@@ -26,7 +26,7 @@ public final class NativeScene {
     static NativeScene fromRaw(float[] values)throws IOException{
         if(values==null||values.length<6)throw new IOException("Native sahne üretilemedi");
         int version=Math.round(values[0]);
-        if(version!=1&&version!=2&&version!=3&&version!=4&&version!=5)throw new IOException("Native sahne sürümü desteklenmiyor");
+        if(version!=1&&version!=2&&version!=3&&version!=4&&version!=5&&version!=6)throw new IOException("Native sahne sürümü desteklenmiyor");
         int expected=Math.max(0,Math.round(values[1]));
         RectF wb=new RectF(values[2],values[3],values[4],values[5]);
         if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
@@ -57,6 +57,10 @@ public final class NativeScene {
             }else if(type==4){
                 if(p+8>values.length)break;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
                 float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
+            }else if(type==6){
+                if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.max(0,Math.round(values[p++]));int words=(bytes+2)/3;if(p+words>values.length)break;p+=words;
+                float glyphs=Math.max(1f,bytes*.65f),shift=(ha==2?-glyphs:(ha==1||ha==3||ha==4||ha==5?-.5f*glyphs:0f));
+                add(b,x+ux*shift,y+uy*shift);add(b,x+ux*(shift+glyphs),y+uy*(shift+glyphs));add(b,x+ux*shift-vx,y+uy*shift-vy);add(b,x+ux*(shift+glyphs)-vx,y+uy*(shift+glyphs)-vy);
             }else break;
             if(valid(b)){
                 if(count==os.length){
@@ -142,6 +146,16 @@ public final class NativeScene {
             float cx=raw[p++],cy=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++],start=raw[p++],sweep=raw[p++];
             path.rewind();path.addArc(UNIT_OVAL,(float)Math.toDegrees(start),(float)Math.toDegrees(sweep));
             local.setValues(new float[]{ux,vx,cx,uy,vy,cy,0f,0f,1f});target.setConcat(matrix,local);path.transform(target);canvas.drawPath(path,paint);
+        }else if(type==6){
+            float x=raw[p++],y=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++];int ha=Math.round(raw[p++]),va=Math.round(raw[p++]),bytes=Math.max(0,Math.round(raw[p++]));
+            byte[] utf8=new byte[bytes];int at=0;while(at<bytes){int packed=Math.round(raw[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
+            String value=DxfText.plain(new String(utf8,java.nio.charset.StandardCharsets.UTF_8));if(value.isEmpty())return;
+            local.setValues(new float[]{ux,vx,x,uy,vy,y,0f,0f,1f});target.setConcat(matrix,local);
+            Paint.Style oldStyle=paint.getStyle();float oldSize=paint.getTextSize();Paint.Align oldAlign=paint.getTextAlign();
+            paint.setStyle(Paint.Style.FILL);paint.setTextSize(1f);paint.setTextAlign(ha==2?Paint.Align.RIGHT:(ha==1||ha==3||ha==4||ha==5?Paint.Align.CENTER:Paint.Align.LEFT));
+            Paint.FontMetrics fm=paint.getFontMetrics();float base=va==1?-fm.descent:va==2?-(fm.ascent+fm.descent)*.5f:va==3?-fm.ascent:0f;
+            int save=canvas.save();canvas.concat(target);String[] lines=value.split("\\n",-1);for(int li=0;li<lines.length;li++)canvas.drawText(lines[li],0f,base+li*1.2f,paint);canvas.restoreToCount(save);
+            paint.setTextAlign(oldAlign);paint.setTextSize(oldSize);paint.setStyle(oldStyle);
         }
     }
 
