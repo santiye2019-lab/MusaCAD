@@ -54,7 +54,7 @@ public final class DxfBlocks {
 
     public static final class Result {
         public final List<Placement>placements=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
-        public int skipped,units;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;
+        public int skipped,units;public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;
     }
 
     public static Result expand(List<String>tags)throws IOException{return expand(tags,DxfLineStyle.DEFAULT_LINEWEIGHT);}
@@ -93,6 +93,10 @@ public final class DxfBlocks {
                         result.units=headerInt(r,"$INSUNITS",70,0);
                         result.defaultLineweight=DxfLineStyle.normalizeWeight(headerInt(r,"$LWDEFAULT",370,DxfLineStyle.DEFAULT_LINEWEIGHT),DxfLineStyle.DEFAULT_LINEWEIGHT);
                         result.globalLineTypeScale=safeScale(headerDouble(r,"$LTSCALE",40,1d));
+                        double x0=headerDouble(r,"$EXTMIN",10,Double.NaN),y0=headerDouble(r,"$EXTMIN",20,Double.NaN);
+                        double x1=headerDouble(r,"$EXTMAX",10,Double.NaN),y1=headerDouble(r,"$EXTMAX",20,Double.NaN);
+                        if(Double.isFinite(x0)&&Double.isFinite(y0)&&Double.isFinite(x1)&&Double.isFinite(y1)&&x1>x0&&y1>y0)
+                            result.modelExtents=new float[]{(float)x0,(float)y0,(float)x1,(float)y1};
                     }
                     continue;
                 }
