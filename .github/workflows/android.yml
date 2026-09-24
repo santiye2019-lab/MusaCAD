@@ -151,6 +151,17 @@ jobs:
           grep -q 'Cihaz / Lisans Kimliği' app/src/main/java/com/musa/cad/LicenseActivity.java
           javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
           java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
+      - name: Test secure Google Play entitlement flow
+        run: |
+          grep -q 'setObfuscatedAccountId(LicenseManager.installationId(context))' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          grep -q 'PlayPurchaseVerifier.verify(context,purchaseToken)' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          grep -q 'PLAY_VERIFY_URL' app/build.gradle
+          if grep -q 'acknowledgePurchase' app/src/main/java/com/musa/cad/PlayBillingManager.java; then
+            echo "Client-side purchase acknowledgement must not be used when secure backend verification is enabled"
+            exit 1
+          fi
+          cd server/trial-worker
+          npm test
       - name: Test DXF block expansion, colors, styles and source origins
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
