@@ -52,6 +52,26 @@ public class LicenseActivity extends AppCompatActivity {
             stage.addView(licenseCode);
             LockedScreenUi.position(licenseCode,stage,250,718,545,92);
 
+            // Lisans üreticide kullanılacak telefona özel kimlik. Dokununca panoya kopyalanır.
+            TextView deviceId=new TextView(this);
+            String deviceLicenseId=LicenseManager.installationId(this);
+            deviceId.setText("Cihaz / Lisans Kimliği (dokun-kopyala)\n"+deviceLicenseId);
+            deviceId.setTextColor(0xFFFFFFFF);
+            deviceId.setTextSize(12f);
+            deviceId.setGravity(android.view.Gravity.CENTER);
+            deviceId.setPadding(dp(12),dp(6),dp(12),dp(6));
+            deviceId.setBackgroundColor(0xB50A2440);
+            deviceId.setTextIsSelectable(true);
+            deviceId.setOnClickListener(v->{
+                ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+                if(clipboard!=null){
+                    clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Cihaz Kimliği",deviceLicenseId));
+                    Toast.makeText(this,"Cihaz kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+                }
+            });
+            stage.addView(deviceId);
+            LockedScreenUi.position(deviceId,stage,128,1015,676,105);
+
             // Görseldeki gerçek butonların tam üstündeki şeffaf tıklama katmanları
             LockedScreenUi.hotspot(this,stage,90,402,752,150,v->startTrial());
             LockedScreenUi.hotspot(this,stage,128,829,676,88,v->activate());
