@@ -408,6 +408,58 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/homeFeatured"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:visibility="gone"
+                    android:background="@drawable/home_card_bg">
+
+                    <ImageView
+                        android:id="@+id/homeFeaturedPreview"
+                        android:layout_width="112dp"
+                        android:layout_height="82dp"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Son açılan çizim önizlemesi" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/homeFeaturedTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:maxLines="2"
+                            android:ellipsize="end"
+                            android:textColor="#FFFFFF"
+                            android:textStyle="bold"
+                            android:textSize="13sp" />
+                        <TextView
+                            android:id="@+id/homeFeaturedMeta"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textColor="@color/editor_text_secondary"
+                            android:textSize="10sp" />
+                        <Button
+                            android:id="@+id/homeFeaturedOpen"
+                            android:layout_width="match_parent"
+                            android:layout_height="36dp"
+                            android:layout_marginTop="6dp"
+                            android:text="Projeyi Aç"
+                            android:textAllCaps="false"
+                            android:textSize="10sp"
+                            android:background="@drawable/home_action_bg" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -473,16 +525,16 @@
                         android:layout_height="match_parent"
                         android:orientation="horizontal">
 
-                        <Button style="@style/HomeCategoryButton" android:text="Ek açıklama" android:drawableTop="@drawable/ic_text" />
-                        <Button style="@style/HomeCategoryButton" android:text="Çiz" android:drawableTop="@drawable/ic_line" />
-                        <Button style="@style/HomeCategoryButton" android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
-                        <Button style="@style/HomeCategoryButton" android:text="Katman" android:drawableTop="@drawable/ic_layers" />
-                        <Button style="@style/HomeCategoryButton" android:text="Ölçüm" android:drawableTop="@drawable/ic_distance" />
-                        <Button style="@style/HomeCategoryButton" android:text="Boyut" android:drawableTop="@drawable/ic_scale" />
-                        <Button style="@style/HomeCategoryButton" android:text="Renk" android:drawableTop="@drawable/ic_color" />
-                        <Button style="@style/HomeCategoryButton" android:text="Alet" android:drawableTop="@drawable/ic_more" />
-                        <Button style="@style/HomeCategoryButton" android:text="Düzen" android:drawableTop="@drawable/ic_rectangle" />
-                        <Button style="@style/HomeCategoryButton" android:text="Görsel stil" android:drawableTop="@drawable/ic_fit" />
+                        <Button android:id="@+id/homeAnnotateCategory" style="@style/HomeCategoryButton" android:text="Ek açıklama" android:drawableTop="@drawable/ic_text" />
+                        <Button android:id="@+id/homeDrawCategory" style="@style/HomeCategoryButton" android:text="Çiz" android:drawableTop="@drawable/ic_line" />
+                        <Button android:id="@+id/homeEditCategory" style="@style/HomeCategoryButton" android:text="Düzenle" android:drawableTop="@drawable/ic_move" />
+                        <Button android:id="@+id/homeLayerCategory" style="@style/HomeCategoryButton" android:text="Katman" android:drawableTop="@drawable/ic_layers" />
+                        <Button android:id="@+id/homeMeasureCategory" style="@style/HomeCategoryButton" android:text="Ölçüm" android:drawableTop="@drawable/ic_distance" />
+                        <Button android:id="@+id/homeDimensionCategory" style="@style/HomeCategoryButton" android:text="Boyut" android:drawableTop="@drawable/ic_scale" />
+                        <Button android:id="@+id/homeColorCategory" style="@style/HomeCategoryButton" android:text="Renk" android:drawableTop="@drawable/ic_color" />
+                        <Button android:id="@+id/homeOtherCategory" style="@style/HomeCategoryButton" android:text="Alet" android:drawableTop="@drawable/ic_more" />
+                        <Button android:id="@+id/homeLayoutCategory" style="@style/HomeCategoryButton" android:text="Düzen" android:drawableTop="@drawable/ic_rectangle" />
+                        <Button android:id="@+id/homeViewCategory" style="@style/HomeCategoryButton" android:text="Görsel stil" android:drawableTop="@drawable/ic_fit" />
                     </LinearLayout>
                 </HorizontalScrollView>
 
