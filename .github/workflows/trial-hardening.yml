@@ -52,4 +52,6 @@ jobs:
         run: |
           grep -q 'setObfuscatedAccountId(LicenseManager.installationId(context))' app/src/main/java/com/musa/cad/PlayBillingManager.java
           grep -q 'PlayPurchaseVerifier.verify(context,purchaseToken)' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          grep -q 'secureVerificationConfigured()' app/src/main/java/com/musa/cad/PlayBillingManager.java
+          grep -q 'endpoint.startsWith("https://")' app/src/main/java/com/musa/cad/PlayBillingManager.java
           if grep -q 'acknowledgePurchase' app/src/main/java/com/musa/cad/PlayBillingManager.java; then exit 1; fi
