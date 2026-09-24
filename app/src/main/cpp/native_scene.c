@@ -13,10 +13,10 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define MUSA_SCENE_VERSION 4.0f
-/* v4 keeps the compact v3 ACI encoding and adds an optional exact 24-bit
-   TrueColor word only for entities/layers that actually use group-420 color.
-   The 9M cap remains bounded for large-phone memory safety. */
+#define MUSA_SCENE_VERSION 5.0f
+/* v5 keeps the compact v4 color encoding and adds filled mask polygons for
+   WIPEOUT so native first paint respects drawing occlusion. The 9M cap remains
+   bounded for large-phone memory safety. */
 #define MUSA_SCENE_MAX_FLOATS (9u*1024u*1024u)
 #define MUSA_MAX_BLOCK_DEPTH 24
 
@@ -113,6 +113,36 @@ static void emit_poly_point(MusaNativeScene *s,Affine2 m,double x,double y){
     pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);
 }
 static void finish_poly(MusaNativeScene *s){s->primitives++;}
+
+static int begin_fill_poly(MusaNativeScene *s,int n){
+    SceneColor color=scene_aci(7);
+    if(n<3||!reserve_scene(s,1u+color_words(color)+(size_t)n*2u))return 0;
+    push_code(s,5,color);pushf(s,(float)(-n));return 1;
+}
+static void emit_wipeout(MusaNativeScene *s,Affine2 parent,Dwg_Entity_WIPEOUT *e){
+    if(!e)return;
+    BITCODE_BL n=(e->clip_verts&&e->num_clip_verts>=3)?e->num_clip_verts:4;
+    if(n<3||n>100000||!begin_fill_poly(s,(int)n))return;
+    if(e->clip_verts&&e->num_clip_verts>=3){
+        for(BITCODE_BL i=0;i<n;i++){
+            double px=e->clip_verts[i].x+.5,py=e->clip_verts[i].y+.5;
+            double x=e->pt0.x+e->uvec.x*px+e->vvec.x*py;
+            double y=e->pt0.y+e->uvec.y*px+e->vvec.y*py;
+            emit_poly_point(s,parent,x,y);
+        }
+    }else{
+        double width=fabs(e->image_size.x);if(!isfinite(width)||width<1.0)width=1.0;
+        double height=fabs(e->image_size.y);if(!isfinite(height)||height<1.0)height=1.0;
+        double pts[8]={-.5,-.5,width-.5,-.5,width-.5,height-.5,-.5,height-.5};
+        for(int i=0;i<4;i++){
+            double px=pts[i*2]+.5,py=pts[i*2+1]+.5;
+            double x=e->pt0.x+e->uvec.x*px+e->vvec.x*py;
+            double y=e->pt0.y+e->uvec.y*px+e->vvec.y*py;
+            emit_poly_point(s,parent,x,y);
+        }
+    }
+    finish_poly(s);
+}
 
 static int emit_curve(MusaNativeScene *s,SceneColor color,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double sweep){
     double wcx,wcy,pu_x,pu_y,pv_x,pv_y;map2(m,cx,cy,&wcx,&wcy);map2(m,cx+ux,cy+uy,&pu_x,&pu_y);map2(m,cx+vx,cy+vy,&pv_x,&pv_y);
@@ -338,6 +368,11 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                     }
                 }
             }
+            break;
+        }
+        case DWG_TYPE_WIPEOUT:{
+            Dwg_Entity_WIPEOUT *e=obj->tio.entity->tio.WIPEOUT;
+            if(e)emit_wipeout(s,parent,e);
             break;
         }
         case DWG_TYPE_HATCH:{

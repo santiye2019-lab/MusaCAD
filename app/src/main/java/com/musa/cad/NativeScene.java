@@ -26,7 +26,7 @@ public final class NativeScene {
     static NativeScene fromRaw(float[] values)throws IOException{
         if(values==null||values.length<6)throw new IOException("Native sahne üretilemedi");
         int version=Math.round(values[0]);
-        if(version!=1&&version!=2&&version!=3&&version!=4)throw new IOException("Native sahne sürümü desteklenmiyor");
+        if(version!=1&&version!=2&&version!=3&&version!=4&&version!=5)throw new IOException("Native sahne sürümü desteklenmiyor");
         int expected=Math.max(0,Math.round(values[1]));
         RectF wb=new RectF(values[2],values[3],values[4],values[5]);
         if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
@@ -47,11 +47,11 @@ public final class NativeScene {
             b.set(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
             if(type==1){
                 if(p+4>values.length)break;float x1=values[p++],y1=values[p++],x2=values[p++],y2=values[p++];add(b,x1,y1);add(b,x2,y2);
-            }else if(type==2){
+            }else if(type==2||type==5){
                 int n;
                 if(version>=3){if(p>=values.length)break;n=Math.abs(Math.round(values[p++]));}
                 else{if(p+2>values.length)break;p++;n=Math.round(values[p++]);}
-                if(n<2||p+n*2>values.length)break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
+                if(n<(type==5?3:2)||p+n*2>values.length)break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
             }else if(type==3){
                 if(p+2>values.length)break;add(b,values[p++],values[p++]);
             }else if(type==4){
@@ -83,7 +83,7 @@ public final class NativeScene {
 
     /** Small vector thumbnail without allocating the old full-size raster preview. */
     public Bitmap thumbnail(int width,int height){
-        int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(Color.rgb(18,24,30));
+        int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(Color.rgb(7,19,29));
         Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);
         Matrix combined=new Matrix();combined.setConcat(fit,worldToContent);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);
         float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
@@ -130,10 +130,12 @@ public final class NativeScene {
         paint.setColor(color);
         if(type==1){
             line[0]=raw[p++];line[1]=raw[p++];line[2]=raw[p++];line[3]=raw[p++];matrix.mapPoints(line);canvas.drawLine(line[0],line[1],line[2],line[3],paint);
-        }else if(type==2){
+        }else if(type==2||type==5){
             boolean closed;int n;
             if(streamVersion>=3){int signed=Math.round(raw[p++]);closed=signed<0;n=Math.abs(signed);}else{closed=raw[p++]!=0;n=Math.round(raw[p++]);}
-            path.rewind();for(int i=0;i<n;i++){point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);if(i==0)path.moveTo(point[0],point[1]);else path.lineTo(point[0],point[1]);}if(closed)path.close();canvas.drawPath(path,paint);
+            path.rewind();for(int i=0;i<n;i++){point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);if(i==0)path.moveTo(point[0],point[1]);else path.lineTo(point[0],point[1]);}if(closed||type==5)path.close();
+            if(type==5){Paint.Style old=paint.getStyle();int oldColor=paint.getColor();paint.setStyle(Paint.Style.FILL);paint.setColor(Color.rgb(7,19,29));canvas.drawPath(path,paint);paint.setColor(oldColor);paint.setStyle(old);}
+            else canvas.drawPath(path,paint);
         }else if(type==3){
             point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);float r=3.5f;canvas.drawLine(point[0]-r,point[1],point[0]+r,point[1],paint);canvas.drawLine(point[0],point[1]-r,point[0],point[1]+r,paint);
         }else if(type==4){
