@@ -32,7 +32,8 @@ public final class ReferenceToolParityTest {
         Matcher matcher=nullTool.matcher(source);
         ArrayList<String> disabled=new ArrayList<>();
         while(matcher.find())disabled.add(matcher.group(1));
-        require(disabled.equals(Collections.singletonList("3D")),"Unexpected disabled reference tools: "+disabled);
-        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; 3D intentionally disabled.");
+        require(disabled.isEmpty(),"Unexpected disabled reference tools: "+disabled);
+        require(source.contains("tool(\"3D\",R.drawable.ic_fit,this::open3d)"),"3D view action missing");
+        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; 3D view enabled.");
     }
 }
