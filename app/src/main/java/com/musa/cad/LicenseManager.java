@@ -9,8 +9,6 @@ import java.util.Locale;
 
 public final class LicenseManager {
     private static final String PREFS="musacad_license_state";
-    private static final String K_TRIAL_START="trial_start_v1";
-    private static final String K_LAST_SEEN="last_seen_v1";
     private static final String K_TERMS_VERSION="terms_version";
     private static final String K_LICENSE_TOKEN="license_token_v1";
     private static final String K_TRIAL_TOKEN="trial_token_v2";
@@ -41,13 +39,7 @@ public final class LicenseManager {
             return State.TRIAL_EXPIRED;
         }
         if(p.getBoolean(K_SERVER_TRIAL_USED,false))return State.TRIAL_EXPIRED;
-
-        // Legacy pre-server trial state is retained only for development/migration compatibility.
-        long start=p.getLong(K_TRIAL_START,0L);
-        if(start<=0)return State.TRIAL_AVAILABLE;
-        long last=p.getLong(K_LAST_SEEN,0L),now=System.currentTimeMillis();
-        if(last>0&&now+TrialPolicy.CLOCK_ROLLBACK_TOLERANCE_MS<last)return State.CLOCK_ERROR;
-        return TrialPolicy.isActive(start,last,now)?State.TRIAL_ACTIVE:State.TRIAL_EXPIRED;
+        return State.TRIAL_AVAILABLE;
     }
 
     public static boolean hasAccess(Context c){
@@ -60,32 +52,25 @@ public final class LicenseManager {
     public static boolean termsAccepted(Context c){return prefs(c).getInt(K_TERMS_VERSION,0)>=TERMS_VERSION;}
     public static void acceptTerms(Context c){prefs(c).edit().putInt(K_TERMS_VERSION,TERMS_VERSION).apply();}
 
-    /** Legacy local trial start retained for old development installs; production UI uses TrialService. */
-    public static boolean startTrial(Context c){
-        if(!termsAccepted(c))return false;
-        SharedPreferences p=prefs(c);
-        if(p.getBoolean(K_SERVER_TRIAL_USED,false)||p.getString(K_TRIAL_TOKEN,null)!=null)return state(c)==State.TRIAL_ACTIVE;
-        if(p.getLong(K_TRIAL_START,0L)>0)return state(c)==State.TRIAL_ACTIVE;
-        long now=System.currentTimeMillis();
-        p.edit().putLong(K_TRIAL_START,now).putLong(K_LAST_SEEN,now).apply();
-        return true;
-    }
-
-    /** Accepts only a finite signed token whose expiry is approximately one day from activation. */
+    /** Accepts only a finite server-signed token whose expiry is approximately one day from activation. */
     public static boolean activateTrialToken(Context c,String token){
         if(token==null||token.trim().isEmpty())return false;
         long now=System.currentTimeMillis();TrialToken.Result r=verifyTrialToken(c,token,now);
         if(r==null||!SignedTrialPolicy.validWindow(r.valid,r.expiresAtMs,now))return false;
-        prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putLong(K_SIGNED_TRIAL_LAST_SEEN,now).putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_START).remove(K_LAST_SEEN).commit();
+        prefs(c).edit().putString(K_TRIAL_TOKEN,token.trim()).putLong(K_SIGNED_TRIAL_LAST_SEEN,now).putBoolean(K_SERVER_TRIAL_USED,true).commit();
         return true;
     }
 
-    public static void markServerTrialUsed(Context c){prefs(c).edit().putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_TOKEN).remove(K_SIGNED_TRIAL_LAST_SEEN).apply();}
+    public static void markServerTrialUsed(Context c){
+        prefs(c).edit().putBoolean(K_SERVER_TRIAL_USED,true).remove(K_TRIAL_TOKEN).remove(K_SIGNED_TRIAL_LAST_SEEN).apply();
+    }
 
     public static long remainingMs(Context c){
         SharedPreferences p=prefs(c);String signedTrial=p.getString(K_TRIAL_TOKEN,null);long now=System.currentTimeMillis();
-        if(signedTrial!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);TrialToken.Result r=verifyTrialToken(c,signedTrial,now);return r==null?0L:SignedTrialPolicy.remainingMs(r.valid,r.expiresAtMs,last,now);}
-        return TrialPolicy.remainingMs(p.getLong(K_TRIAL_START,0L),p.getLong(K_LAST_SEEN,0L),now);
+        if(signedTrial==null)return 0L;
+        long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);
+        TrialToken.Result r=verifyTrialToken(c,signedTrial,now);
+        return r==null?0L:SignedTrialPolicy.remainingMs(r.valid,r.expiresAtMs,last,now);
     }
 
     public static String remainingLabel(Context c){
@@ -94,27 +79,35 @@ public final class LicenseManager {
         return hours>0?String.format(Locale.getDefault(),"Deneme: %d sa %d dk kaldı",hours,mins):String.format(Locale.getDefault(),"Deneme: %d dk kaldı",mins);
     }
 
-    /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
+    /** Stable on normal reinstall when Android supplies the same app/signing-key scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
     public static ActivationResult activateCode(Context c,String code){
-        if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
+        if(code==null||code.trim().isEmpty()||!DeviceIdentityHash.isValidPublicId(installationId(c)))return ActivationResult.INVALID_CODE;
         try{LicenseToken.Result r=verifyPaidToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();return ActivationResult.ACTIVATED;}
         catch(Exception e){return ActivationResult.INVALID_CODE;}
     }
 
-    private static boolean verifyStoredPaidToken(Context c,String token){LicenseToken.Result r=verifyPaidToken(c,token,System.currentTimeMillis());if(r!=null&&r.valid)return true;prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;}
+    private static boolean verifyStoredPaidToken(Context c,String token){
+        LicenseToken.Result r=verifyPaidToken(c,token,System.currentTimeMillis());
+        if(r!=null&&r.valid)return true;
+        prefs(c).edit().remove(K_LICENSE_TOKEN).apply();
+        return false;
+    }
 
     private static LicenseToken.Result verifyPaidToken(Context c,String token,long now){
-        try{return LicenseToken.verify(token,installationId(c),now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));}
-        catch(Exception e){return null;}
+        try{
+            String id=installationId(c);if(!DeviceIdentityHash.isValidPublicId(id))return null;
+            return LicenseToken.verify(token,id,now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));
+        }catch(Exception e){return null;}
     }
 
     private static TrialToken.Result verifyTrialToken(Context c,String token,long now){
         try{
+            String id=installationId(c);if(!DeviceIdentityHash.isValidPublicId(id))return null;
             String publicKey=BuildConfig.TRIAL_PUBLIC_KEY_PEM==null?"":BuildConfig.TRIAL_PUBLIC_KEY_PEM.trim();
             if(publicKey.isEmpty())return null;
-            return TrialToken.verify(token,installationId(c),now,publicKey);
+            return TrialToken.verify(token,id,now,publicKey);
         }catch(Exception e){return null;}
     }
 
@@ -126,8 +119,9 @@ public final class LicenseManager {
 
     private static void touch(Context c){
         long now=System.currentTimeMillis();SharedPreferences p=prefs(c);
-        if(p.getString(K_TRIAL_TOKEN,null)!=null){long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();return;}
-        long last=p.getLong(K_LAST_SEEN,0L);if(now>last)p.edit().putLong(K_LAST_SEEN,now).apply();
+        if(p.getString(K_TRIAL_TOKEN,null)==null)return;
+        long last=p.getLong(K_SIGNED_TRIAL_LAST_SEEN,0L);
+        if(now>last)p.edit().putLong(K_SIGNED_TRIAL_LAST_SEEN,now).apply();
     }
     private LicenseManager(){}
 }
