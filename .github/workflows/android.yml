@@ -138,8 +138,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/LicenseToken.java tests/LicenseTokenTest.java
           java -cp /tmp/musacad-license-tests LicenseTokenTest
-      - name: Check trial service source
-        run: node --check server/trial-worker/src/index.js
+      - name: Check trial service and reinstall identity rules
+        run: |
+          node --check server/trial-worker/src/index.js
+          node server/trial-worker/test.mjs
       - name: Compile offline license generator
         run: |
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java

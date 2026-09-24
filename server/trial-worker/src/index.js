@@ -44,12 +44,12 @@ export default {
   }
 };
 
-function validDeviceId(value) {
-  return /^MC-[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]{8}$/.test(value) || /^MC-FALLBACK-[0-9A-F-]{36}$/.test(value);
+export function validDeviceId(value) {
+  return /^MC-[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]{8}$/.test(String(value || ""));
 }
 
 async function signToken(deviceId, expiresAtMs, privateKeyPem) {
-  const payload = `MT1|${deviceId}|${expiresAtMs}`;
+  const payload = "MT1|" + deviceId + "|" + expiresAtMs;
   const key = await crypto.subtle.importKey(
     "pkcs8",
     pemBytes(privateKeyPem, "PRIVATE KEY"),
@@ -59,13 +59,13 @@ async function signToken(deviceId, expiresAtMs, privateKeyPem) {
   );
   const payloadBytes = new TextEncoder().encode(payload);
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, payloadBytes);
-  return `MT1.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
+  return "MT1." + base64url(payloadBytes) + "." + base64url(new Uint8Array(signature));
 }
 
 function pemBytes(pem, label) {
   const clean = String(pem || "")
-    .replace(`-----BEGIN ${label}-----`, "")
-    .replace(`-----END ${label}-----`, "")
+    .replace("-----BEGIN " + label + "-----", "")
+    .replace("-----END " + label + "-----", "")
     .replace(/\s/g, "");
   if (!clean) throw new Error("missing private key");
   const binary = atob(clean);

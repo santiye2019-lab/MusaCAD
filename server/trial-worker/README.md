@@ -4,7 +4,7 @@ This service prevents the one-day free trial from resetting just because the And
 
 ## Security model
 
-- The Android app sends its privacy-preserving MusaCAD device/license ID over HTTPS.
+- The Android app sends its privacy-preserving MusaCAD device/license ID over HTTPS.\n- Production builds do not grant a local fallback trial: if a reinstall-stable device ID or trial service is unavailable, the free trial fails closed.
 - D1 stores the first trial start and fixed expiry for that device ID.
 - The service signs `MT1|<deviceId>|<expiresAtMs>` with RSA/SHA-256.
 - The release build receives the matching trial public key through `MUSACAD_TRIAL_PUBLIC_KEY_PEM` and verifies the signed token locally.
