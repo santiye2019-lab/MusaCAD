@@ -3,12 +3,12 @@ package com.musa.cad;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,7 +30,7 @@ public final class Dxf3dEditor {
         }
         if(replacements.isEmpty())throw new IOException("Kaydedilecek 3B değişiklik yok");
         int changed=0,recordLine=-1,line=0;
-        try(BufferedReader reader=new BufferedReader(new InputStreamReader(Files.newInputStream(source.toPath()),StandardCharsets.UTF_8));
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(source),StandardCharsets.UTF_8));
             BufferedWriter writer=new BufferedWriter(new OutputStreamWriter(target,StandardCharsets.UTF_8))){
             String code,value;
             while((code=reader.readLine())!=null){
