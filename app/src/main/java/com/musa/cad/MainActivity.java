@@ -1659,6 +1659,7 @@ public class MainActivity extends AppCompatActivity {
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
+                            if(pendingHomeCategory!=0)cad.post(this::showPendingHomeCategory);
                         }else{
                             if(project.nativeScene!=null)project.nativeScene.alignTo(parsed.drawingToContentMatrix());
                             project.viewState=null;
@@ -1683,7 +1684,7 @@ public class MainActivity extends AppCompatActivity {
                     if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
                     runOnUiThread(()->{
                         if(activeLoad==task)activeLoad=null;
-                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
+                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){pendingHomeCategory=0;updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
                     });
                 }else{
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
@@ -1720,7 +1721,7 @@ public class MainActivity extends AppCompatActivity {
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
-        if(pendingHomeCategory!=0)cad.postDelayed(this::showPendingHomeCategory,220);
+        if(pendingHomeCategory!=0&&!project.preparingEditor)cad.postDelayed(this::showPendingHomeCategory,220);
     }
 
     private void renderCurrentProjectStatus(){
