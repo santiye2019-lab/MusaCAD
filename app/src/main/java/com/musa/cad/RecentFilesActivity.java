@@ -17,6 +17,7 @@ import java.util.*;
 
 /** MusaCAD file-opening screen: most-recent drawings first, then the Android document picker. */
 public class RecentFilesActivity extends AppCompatActivity {
+    public static final String EXTRA_PICK_IMMEDIATELY="com.musa.cad.PICK_IMMEDIATELY";
     private static final int PICK_FILE=91;
     private LinearLayout listBox;
 
@@ -31,6 +32,7 @@ public class RecentFilesActivity extends AppCompatActivity {
             v.setPadding(side,bars.top+vertical,side,bars.bottom+vertical);return insets;
         });
         renderRecents();
+        if(getIntent().getBooleanExtra(EXTRA_PICK_IMMEDIATELY,false))browse();
     }
 
     private View buildUi(){

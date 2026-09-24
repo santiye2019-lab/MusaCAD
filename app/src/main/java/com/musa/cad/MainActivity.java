@@ -78,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="";
+    private int pendingHomeCategory;
+    private Uri homeFeaturedUri;
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
@@ -176,9 +178,20 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.homeOpenButton).setOnClickListener(v->open());
         findViewById(R.id.homeNewButton).setOnClickListener(v->createBlankDrawing());
         findViewById(R.id.homeRecentButton).setOnClickListener(v->open());
-        findViewById(R.id.homeImportButton).setOnClickListener(v->open());
+        findViewById(R.id.homeImportButton).setOnClickListener(v->open(true));
         findViewById(R.id.homeRecentCardButton).setOnClickListener(v->open());
         findViewById(R.id.homeLicenseButton).setOnClickListener(v->showLicense());
+        findViewById(R.id.homeFeaturedOpen).setOnClickListener(v->openFeaturedRecent());
+        findViewById(R.id.homeAnnotateCategory).setOnClickListener(v->openHomeCategory(R.id.groupAnnotateToolsButton));
+        findViewById(R.id.homeDrawCategory).setOnClickListener(v->openHomeCategory(R.id.groupLineToolsButton));
+        findViewById(R.id.homeEditCategory).setOnClickListener(v->openHomeCategory(R.id.groupEditToolsButton));
+        findViewById(R.id.homeLayerCategory).setOnClickListener(v->openHomeCategory(R.id.groupLayerToolsButton));
+        findViewById(R.id.homeMeasureCategory).setOnClickListener(v->openHomeCategory(R.id.groupMeasureToolsButton));
+        findViewById(R.id.homeDimensionCategory).setOnClickListener(v->openHomeCategory(R.id.groupDimensionToolsButton));
+        findViewById(R.id.homeColorCategory).setOnClickListener(v->openHomeCategory(R.id.groupColorToolsButton));
+        findViewById(R.id.homeOtherCategory).setOnClickListener(v->openHomeCategory(R.id.groupMoreToolsButton));
+        findViewById(R.id.homeLayoutCategory).setOnClickListener(v->openHomeCategory(R.id.groupLayoutToolsButton));
+        findViewById(R.id.homeViewCategory).setOnClickListener(v->openHomeCategory(R.id.groupViewToolsButton));
         updateShareEnabled(false);updateEditorEnabled(false);showHomeUi();handleIncomingIntent(getIntent());
     }
 
@@ -1518,9 +1531,35 @@ public class MainActivity extends AppCompatActivity {
         if(!visible)hideToolPanel();
     }
     private void showHomeUi(){
+        updateHomeFeatured();
         setEditorChromeVisible(false);
         if(welcomePanel!=null){welcomePanel.setVisibility(View.VISIBLE);welcomePanel.setAlpha(1f);}
     }
+    private void updateHomeFeatured(){
+        View card=findViewById(R.id.homeFeatured);ImageView preview=findViewById(R.id.homeFeaturedPreview);
+        Object previous=preview.getTag();preview.setImageDrawable(null);preview.setTag(null);
+        if(previous instanceof Bitmap&&!((Bitmap)previous).isRecycled())((Bitmap)previous).recycle();
+        List<RecentFileStore.Entry> recents=RecentFileStore.list(this);
+        if(recents.isEmpty()){homeFeaturedUri=null;card.setVisibility(View.GONE);return;}
+        RecentFileStore.Entry latest=recents.get(0);homeFeaturedUri=Uri.parse(latest.uri);
+        ((TextView)findViewById(R.id.homeFeaturedTitle)).setText(latest.name);
+        ((TextView)findViewById(R.id.homeFeaturedMeta)).setText(latest.typeLabel()+"  •  "+RecentFileStore.accessLabel(latest.lastAccessMs));
+        Bitmap thumb=RecentFileStore.thumbnail(this,latest);
+        if(thumb!=null){preview.setImageBitmap(thumb);preview.setTag(thumb);}
+        else preview.setImageResource(R.drawable.ic_musacad_mark);
+        card.setVisibility(View.VISIBLE);
+    }
+    private void openFeaturedRecent(){
+        if(homeFeaturedUri==null){open();return;}
+        try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(homeFeaturedUri,"r")){
+            if(fd==null)throw new IOException("Dosya açılamadı");
+        }catch(Exception e){
+            RecentFileStore.remove(this,homeFeaturedUri.toString());updateHomeFeatured();
+            Toast.makeText(this,"Bu dosyaya erişim yok. Yeniden seçin.",Toast.LENGTH_LONG).show();open();return;
+        }
+        startLoad(homeFeaturedUri);
+    }
+
     private void hideWelcomePanel(){
         setEditorChromeVisible(true);
         if(welcomePanel==null||welcomePanel.getVisibility()!=View.VISIBLE)return;
@@ -1532,17 +1571,35 @@ public class MainActivity extends AppCompatActivity {
         TextView text=new TextView(this);text.setPadding(24,16,24,16);text.setText("MusaCAD — LibreDWG ile çevrimdışı DWG okuma\nKaynak kod: https://github.com/santiye2019-lab/MusaCAD\n\n"+license);android.text.util.Linkify.addLinks(text,android.text.util.Linkify.WEB_URLS);text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());ScrollView scroll=new ScrollView(this);scroll.addView(text);new AlertDialog.Builder(this).setTitle("Lisans ve kaynak kod").setView(scroll).setPositiveButton("KAPAT",null).show();
     }
 
-    private void open(){
+    private void open(){open(false);}
+    private void open(boolean directPicker){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden yeni dosya açılamaz",Toast.LENGTH_SHORT).show();return;}
         if(hasPreparingProject()){Toast.makeText(this,"Açık DWG'nin tam düzenleme modeli hazırlanıyor; mevcut sekmeler kullanılabilir",Toast.LENGTH_SHORT).show();return;}
-        startActivityForResult(new Intent(this,RecentFilesActivity.class),OPEN);
+        Intent intent=new Intent(this,RecentFilesActivity.class);
+        if(directPicker)intent.putExtra(RecentFilesActivity.EXTRA_PICK_IMMEDIATELY,true);
+        startActivityForResult(intent,OPEN);
     }
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
         if(c!=RESULT_OK||data==null||data.getData()==null)return;
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
+    }
+    private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
+    private void showPendingHomeCategory(){
+        int id=pendingHomeCategory;pendingHomeCategory=0;
+        if(id==R.id.groupAnnotateToolsButton)openCategory(id,this::showAnnotationToolsSheet);
+        else if(id==R.id.groupLineToolsButton)openCategory(id,this::showLineToolsSheet);
+        else if(id==R.id.groupEditToolsButton)openCategory(id,this::showEditToolsSheet);
+        else if(id==R.id.groupLayerToolsButton)openCategory(id,this::showLayerToolsPanel);
+        else if(id==R.id.groupMeasureToolsButton)openCategory(id,this::showMeasureToolsSheet);
+        else if(id==R.id.groupDimensionToolsButton)openCategory(id,this::showDimensionToolsPanel);
+        else if(id==R.id.groupColorToolsButton)openCategory(id,this::showColorToolsPanel);
+        else if(id==R.id.groupMoreToolsButton)openCategory(id,this::showOtherToolsSheet);
+        else if(id==R.id.groupLayoutToolsButton)openCategory(id,this::showLayoutToolsPanel);
+        else if(id==R.id.groupViewToolsButton)openCategory(id,this::showViewToolsSheet);
     }
     private void cancelLoad(){LoadTask task=activeLoad;activeLoad=null;if(task!=null){if(task.future!=null)task.future.cancel(true);if(task.dialog!=null)task.dialog.dismiss();}}
 
@@ -1630,6 +1687,7 @@ public class MainActivity extends AppCompatActivity {
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
+                            if(pendingHomeCategory!=0)cad.post(this::showPendingHomeCategory);
                         }else{
                             if(project.nativeScene!=null)project.nativeScene.alignTo(parsed.drawingToContentMatrix());
                             project.viewState=null;
@@ -1654,7 +1712,7 @@ public class MainActivity extends AppCompatActivity {
                     if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
                     runOnUiThread(()->{
                         if(activeLoad==task)activeLoad=null;
-                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
+                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){pendingHomeCategory=0;updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
                     });
                 }else{
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
@@ -1691,6 +1749,7 @@ public class MainActivity extends AppCompatActivity {
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
+        if(pendingHomeCategory!=0&&!project.preparingEditor)cad.postDelayed(this::showPendingHomeCategory,220);
     }
 
     private void renderCurrentProjectStatus(){
@@ -1762,7 +1821,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){cancelLoad();releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
