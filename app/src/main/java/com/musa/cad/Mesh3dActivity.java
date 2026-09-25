@@ -39,8 +39,8 @@ public final class Mesh3dActivity extends Activity {
         new Thread(()->{
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
-                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
-                    TextView hint=new TextView(this);hint.setText("← Geri   •   Tek parmak: döndür   •   İki parmak: yakınlaştır   •   İki köşe: 3B ölçüm\n"+(mesh.triangles.length/3)+" üçgen  •  "+(mesh.xyz.length/3)+" köşe"+(mesh.unsupportedSolids>0?"  •  Katı modeller görüntülenemedi":""));
+                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
+                    TextView hint=new TextView(this);hint.setText("← Geri   •   Tek parmak: döndür   •   İki parmak: yakınlaştır   •   İki köşe: 3B ölçüm\n"+(mesh.triangles.length/3)+" üçgen  •  "+(mesh.edges.length/2)+" kenar  •  "+(mesh.xyz.length/3)+" köşe"+(mesh.unsupportedSolids>0?"  •  Bazı katı modeller henüz desteklenmiyor":""));
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
                     addViewControls(root);
                     addEditControls(root);

@@ -28,6 +28,7 @@ public final class Mesh3dView extends View {
         surface.setStyle(Paint.Style.FILL);
         marker.setColor(Color.YELLOW);caption.setColor(Color.WHITE);caption.setTextSize(14f*getResources().getDisplayMetrics().scaledDensity);
         setBackgroundColor(Color.rgb(7,19,29));
+        wireframe=model.triangles.length==0;
     }
     @Override protected void onDraw(Canvas canvas){
         super.onDraw(canvas);float co=(float)Math.cos(yaw),si=(float)Math.sin(yaw),cp=(float)Math.cos(pitch),sp=(float)Math.sin(pitch);
@@ -38,13 +39,21 @@ public final class Mesh3dView extends View {
             float perspective=Math.max(.45f,Math.min(2.5f,1f/(1f+depth/(model.radius*2.5f))));
             screen[j]=getWidth()*.5f+right*scale*perspective;screen[j+1]=getHeight()*.5f-up*scale*perspective;this.depth[i/3]=depth;
         }
-        if(wireframe){
-            int count=0;for(int i=0;i<model.edges.length;i+=2){int a=model.edges[i]*2,b=model.edges[i+1]*2;segments[count++]=screen[a];segments[count++]=screen[a+1];segments[count++]=screen[b];segments[count++]=screen[b+1];}
-            canvas.drawLines(segments,0,count,lines);
-        }else drawSurfaces(canvas);
+        if(wireframe||model.triangles.length==0)drawEdges(canvas);
+        else{drawSurfaces(canvas);drawEdges(canvas);}
         if(first>=0){int i=first*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);}
         if(second>=0){int i=second*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);float value=distance(first,second);canvas.drawText(String.format(Locale.getDefault(),"3B mesafe: %.3f çizim birimi",value),18f,105f*getResources().getDisplayMetrics().density,caption);}
     }
+    private void drawEdges(Canvas canvas){
+        int count=0;
+        for(int i=0;i<model.edges.length;i+=2){
+            int a=model.edges[i]*2,b=model.edges[i+1]*2;
+            segments[count++]=screen[a];segments[count++]=screen[a+1];
+            segments[count++]=screen[b];segments[count++]=screen[b+1];
+        }
+        if(count>0)canvas.drawLines(segments,0,count,lines);
+    }
+
     private void drawSurfaces(Canvas canvas){
         for(int f=0;f<faceOrder.length;f++){
             int i=f*3,a=model.triangles[i],b=model.triangles[i+1],c=model.triangles[i+2];

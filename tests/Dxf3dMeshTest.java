@@ -31,6 +31,28 @@ public final class Dxf3dMeshTest {
             Files.write(file.toPath(),target.toByteArray());Dxf3dMesh edited=Dxf3dMesh.read(file);
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
+        testLineAndPolyline();
     }
+
+    private static void testLineAndPolyline() throws Exception {
+        File file=File.createTempFile("mesh3d-lines-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\nLINE\n10\n1\n20\n2\n30\n3\n11\n4\n21\n6\n31\n8\n"
+                +"0\nPOLYLINE\n70\n9\n"
+                +"0\nVERTEX\n10\n0\n20\n0\n30\n0\n"
+                +"0\nVERTEX\n10\n5\n20\n0\n30\n2\n"
+                +"0\nVERTEX\n10\n5\n20\n5\n30\n4\n"
+                +"0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.triangles.length!=0)throw new AssertionError("line-only model must not invent surfaces");
+            if(mesh.xyz.length!=15)throw new AssertionError("LINE + 3D POLYLINE vertex count");
+            if(mesh.edges.length!=8)throw new AssertionError("LINE + closed 3D POLYLINE edges");
+            if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
+                throw new AssertionError("3D line/polyline Z coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
     private static String vertex(int x,int y,int z){return "0\nVERTEX\n70\n192\n10\n"+x+"\n20\n"+y+"\n30\n"+z+"\n";}
 }
