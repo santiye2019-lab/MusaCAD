@@ -182,6 +182,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
           java -cp /tmp/musacad-tests FileTransferTest
+      - name: Test automatic recovery snapshot store
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RecoveryStore.java tests/RecoveryStoreTest.java
+          java -cp /tmp/musacad-tests RecoveryStoreTest
       - name: Test large DXF streaming under bounded heap
         run: |
           javac -d /tmp/musacad-tests \
