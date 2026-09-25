@@ -77,8 +77,8 @@ public class LicenseActivity extends AppCompatActivity {
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(Color.WHITE);
-            licenseCode.setTextSize(14f);
-            licenseCode.setHint("XXXX-XXXX-XXXX-XXXX");
+            licenseCode.setTextSize(16f);
+            licenseCode.setHint("12 haneli lisans kodu");
             licenseCode.setHintTextColor(0xFF7890A8);
             licenseCode.setPadding(dp(12),0,dp(12),0);
             GradientDrawable codeBg=new GradientDrawable();
@@ -93,28 +93,35 @@ public class LicenseActivity extends AppCompatActivity {
             LockedScreenUi.hotspot(this,stage,458,597,64,58,SCREEN_W,SCREEN_H,v->pasteLicenseCode());
             LockedScreenUi.hotspot(this,stage,78,663,445,67,SCREEN_W,SCREEN_H,v->activate());
 
-            // 3) Telefona özel cihaz/lisans kimliği
-            final String deviceLicenseId=LicenseManager.installationId(this);
+            // 3) Telefona özel 12 karakterlik Serial
+            final String serial=LicenseManager.serialId(this);
+
+            TextView serialLabel=new TextView(this);
+            serialLabel.setText("Serial");
+            serialLabel.setTextColor(0xFF9CDFFF);
+            serialLabel.setTextSize(10.5f);
+            serialLabel.setGravity(Gravity.CENTER);
+            stage.addView(serialLabel);
+            LockedScreenUi.position(serialLabel,stage,168,778,300,28,SCREEN_W,SCREEN_H);
+
             TextView deviceId=new TextView(this);
-            deviceId.setSingleLine(false);
-            deviceId.setMaxLines(2);
-            deviceId.setText(formatDeviceIdForDisplay(deviceLicenseId));
+            deviceId.setSingleLine(true);
+            deviceId.setText(serial);
             deviceId.setTextColor(0xFFE7F7FF);
-            deviceId.setTextSize(8.8f);
+            deviceId.setTextSize(15f);
             deviceId.setGravity(Gravity.CENTER);
-            deviceId.setHorizontallyScrolling(false);
             deviceId.setTextIsSelectable(true);
             deviceId.setPadding(dp(4),0,dp(4),0);
             GradientDrawable idBg=new GradientDrawable();
-            idBg.setColor(0xD30A223A);
+            idBg.setColor(0xEC0A223A);
             idBg.setCornerRadius(dp(8));
             idBg.setStroke(dp(1),0xFF2E9EE8);
             deviceId.setBackground(idBg);
-            deviceId.setContentDescription("MusaCAD cihaz lisans kimliği. Dokunarak kopyala.");
-            deviceId.setOnClickListener(v->copyDeviceId(deviceLicenseId));
+            deviceId.setContentDescription("MusaCAD Serial. Dokunarak kopyala.");
+            deviceId.setOnClickListener(v->copySerial(serial));
             stage.addView(deviceId);
-            LockedScreenUi.position(deviceId,stage,168,814,300,50,SCREEN_W,SCREEN_H);
-            LockedScreenUi.hotspot(this,stage,458,817,65,50,SCREEN_W,SCREEN_H,v->copyDeviceId(deviceLicenseId));
+            LockedScreenUi.position(deviceId,stage,168,810,300,54,SCREEN_W,SCREEN_H);
+            LockedScreenUi.hotspot(this,stage,458,817,65,50,SCREEN_W,SCREEN_H,v->copySerial(serial));
 
             // 4) Google Play: yalnızca yıllık lisans yenileme
             LockedScreenUi.hotspot(this,stage,60,930,482,139,SCREEN_W,SCREEN_H,v->launchYearlyRenewal());
@@ -196,20 +203,11 @@ public class LicenseActivity extends AppCompatActivity {
         }
     }
 
-    private String formatDeviceIdForDisplay(String value){
-        if(value==null)return "";
-        String[] parts=value.split("-");
-        if(parts.length==4&&"MC".equals(parts[0])){
-            return parts[0]+"-"+parts[1]+"-\n"+parts[2]+"-"+parts[3];
-        }
-        return value;
-    }
-
-    private void copyDeviceId(String value){
+    private void copySerial(String value){
         ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
         if(clipboard!=null){
-            clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Cihaz Kimliği",value));
-            Toast.makeText(this,"Cihaz / lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+            clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Serial",value));
+            Toast.makeText(this,"Serial kopyalandı",Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -225,7 +223,13 @@ public class LicenseActivity extends AppCompatActivity {
             msg.append("\nGoogle Play yıllık lisans bitişi: ")
                .append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(playExpiry)));
         }
-        msg.append("\n\nCihaz / Lisans Kimliği:\n").append(LicenseManager.installationId(this));
+        msg.append("\n\nSerial: ").append(LicenseManager.serialId(this));
+        String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
+        if(stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
+            long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
+            if(shortExpiry==0L)msg.append("\nKısa lisans: Süresiz");
+            else msg.append("\nKısa lisans bitişi: ").append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(shortExpiry)));
+        }
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD Lisans Bilgisi")
             .setMessage(msg.toString())
@@ -303,8 +307,10 @@ public class LicenseActivity extends AppCompatActivity {
             updateRenewalButton();
             enterAfterLicense();
         }else if(licenseCode!=null){
-            if(BuildConfig.DEBUG&&code.startsWith("MCT1.")){
-                licenseCode.setError("TEST kodu bu cihaz kimliğiyle eşleşmiyor veya süresi dolmuş. Cihaz kimliğini kopyala düğmesiyle tam olarak alın.");
+            if(ShortLicenseCode.looksLikeShortCode(code)){
+                licenseCode.setError("12 haneli lisans kodu bu Serial ile eşleşmiyor veya süresi dolmuş");
+            }else if(BuildConfig.DEBUG&&code.startsWith("MCT1.")){
+                licenseCode.setError("TEST kodu bu cihaza ait değil veya süresi dolmuş");
             }else{
                 licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
             }
