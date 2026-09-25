@@ -10,7 +10,7 @@ public final class ReferenceToolParityTest {
     }
     public static void main(String[] args)throws Exception{
         String source=Files.readString(Path.of("app/src/main/java/com/musa/cad/MainActivity.java"),StandardCharsets.UTF_8);
-        String[] categories={"Ek açıklama","Çiz","Düzenle","Katman","Ölçüm","Boyut","Renk","Alet","Düzen","Görsel stil"};
+        String[] categories={"Ek açıklama","Çiz","Düzenle","Katman","Ölçüm","Boyut","Renk","Alet","Düzen","Görsel stil","3D Araçları"};
         for(String label:categories)require(source.contains("showToolPanel(\""+label+"\""),"Missing category panel: "+label);
 
         String[][] required={
@@ -33,7 +33,10 @@ public final class ReferenceToolParityTest {
         ArrayList<String> disabled=new ArrayList<>();
         while(matcher.find())disabled.add(matcher.group(1));
         require(disabled.isEmpty(),"Unexpected disabled reference tools: "+disabled);
-        require(source.contains("tool(\"3D\",R.drawable.ic_fit,this::open3d)"),"3D view action missing");
-        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; 3D view enabled.");
+        require(source.contains("tool(\"3D Araçları\",R.drawable.ic_fit,this::show3dToolsSheet)"),"3D tools entry missing");
+        String[] required3d={"İzometrik","Orbit / Döndür","Ön Görünüş","Üst Görünüş","Sağ Görünüş","Tel Kafes","Yüzey","3B Ölçüm","3B Düzenle"};
+        for(String label:required3d)require(source.contains("tool(\""+label+"\""),"Missing 3D tool: "+label);
+        require(source.contains("right3dButton).setOnClickListener(v->show3dToolsSheet())"),"3D rail button must open the 3D tool palette");
+        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; expanded 3D tools enabled.");
     }
 }
