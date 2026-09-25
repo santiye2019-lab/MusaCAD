@@ -24,6 +24,7 @@ MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düze
 - Ekranda alan seçip seçili alanı PNG veya PDF olarak paylaşma
 - Büyük dosya açma yolu için 512 MB üst sınır
 - Arka planda dosya okuma/dönüştürme ve iptal desteği
+- Kaydedilmemiş DXF düzenlemeleri için otomatik kurtarma kopyası; beklenmedik kapanma sonrası Kurtar / Sil / Sonra akışı
 
 ## Desteklenen 2B geometri
 
