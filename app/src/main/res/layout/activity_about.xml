@@ -3,6 +3,23 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#031321">
+
+    <!-- Background fills the physical screen; foreground keeps the reference
+         aspect ratio so biography text and graphics are never flattened. -->
+    <ImageView
+        android:id="@+id/fullBleedArtwork"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/musacad_screen_2"
+        android:alpha="0.28"
+        android:contentDescription="@null" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#66031321" />
+
     <FrameLayout
         android:id="@+id/artworkStage"
         android:layout_width="match_parent"
@@ -13,7 +30,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitXY"
-            android:src="@drawable/about_hero_reference"
+            android:src="@drawable/musacad_screen_2"
             android:contentDescription="MusaCAD kilitli geliştirici tasarımı" />
     </FrameLayout>
 </FrameLayout>

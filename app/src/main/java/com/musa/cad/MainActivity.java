@@ -86,6 +86,8 @@ public class MainActivity extends AppCompatActivity {
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
+    private AlertDialog projectCloseDialog;
+    private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="";
@@ -1555,14 +1557,7 @@ public class MainActivity extends AppCompatActivity {
     private void handleBackNavigation(){
         if(activeLoad!=null){cancelLoad();Toast.makeText(this,"Devam eden işlem iptal edildi",Toast.LENGTH_SHORT).show();return;}
         if(currentProject!=null){
-            ProjectSession project=currentProject;
-            if(isProjectDirty(project)){
-                new AlertDialog.Builder(this).setTitle("Kaydedilmemiş değişiklikler")
-                    .setMessage("Bu projeden çıkmadan önce değişiklikleri kaydetmek ister misiniz?")
-                    .setPositiveButton("KAYDET VE ÇIK",(d,w)->{pendingCloseAfterSave=project;requestEditedDxfSave();})
-                    .setNeutralButton("KAYDETMEDEN ÇIK",(d,w)->closeProjectNow(project))
-                    .setNegativeButton("İPTAL",null).show();
-            }else closeProjectNow(project);
+            requestCloseProject(currentProject);
             return;
         }
         finish();
@@ -2036,17 +2031,56 @@ public class MainActivity extends AppCompatActivity {
     private void requestCloseProject(ProjectSession project){
         if(project==null)return;
         if(project!=currentProject)activateProject(project);
-        if(isProjectDirty(project)){
-            new AlertDialog.Builder(this).setTitle("Kaydedilmemiş değişiklikler")
-                .setMessage("Bu projeyi kapatmadan önce değişiklikleri kaydetmek ister misiniz?")
-                .setPositiveButton("KAYDET",(d,w)->{pendingCloseAfterSave=project;requestEditedDxfSave();})
-                .setNeutralButton("KAYDETMEDEN KAPAT",(d,w)->closeProjectNow(project))
-                .setNegativeButton("İPTAL",null).show();
-        }else closeProjectNow(project);
+        if(projectCloseDialog!=null&&projectCloseDialog.isShowing())return;
+
+        final boolean dirty=isProjectDirty(project);
+        String name=project.name==null||project.name.trim().isEmpty()?"Bu proje":project.name;
+        String message=dirty
+            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydetmek, kaydetmeden kapatmak veya işlemi iptal etmek için seçim yapın.\n\nİkinci kez geri tuşuna basarsanız proje kaydedilmeden kapanır; MusaCAD açık kalır."
+            : name+" kapatılsın mı?\n\nİkinci kez geri tuşuna basarsanız proje kapanır; MusaCAD açık kalır.";
+
+        AlertDialog.Builder builder=new AlertDialog.Builder(this)
+            .setTitle(dirty?"Projeyi kapat • Kaydedilmemiş değişiklikler":"Projeyi kapat")
+            .setMessage(message)
+            .setNegativeButton("İPTAL",null);
+
+        if(dirty){
+            builder.setPositiveButton("KAYDET VE KAPAT",(d,w)->{
+                pendingCloseAfterSave=project;
+                requestEditedDxfSave();
+            });
+            builder.setNeutralButton("KAYDETMEDEN KAPAT",(d,w)->closeProjectNow(project));
+        }else{
+            builder.setPositiveButton("KAPAT",(d,w)->closeProjectNow(project));
+        }
+
+        projectCloseTarget=project;
+        projectCloseDialog=builder.create();
+        projectCloseDialog.setCanceledOnTouchOutside(false);
+        projectCloseDialog.setOnKeyListener((dialog,keyCode,event)->{
+            if(keyCode==KeyEvent.KEYCODE_BACK&&event.getAction()==KeyEvent.ACTION_UP){
+                ProjectSession target=projectCloseTarget;
+                dialog.dismiss();
+                projectCloseDialog=null;
+                projectCloseTarget=null;
+                if(target!=null&&projects.contains(target))closeProjectNow(target);
+                return true;
+            }
+            return keyCode==KeyEvent.KEYCODE_BACK;
+        });
+        projectCloseDialog.setOnDismissListener(d->{
+            if(projectCloseDialog==d){
+                projectCloseDialog=null;
+                projectCloseTarget=null;
+            }
+        });
+        projectCloseDialog.show();
     }
 
     private void closeProjectNow(ProjectSession project){
         if(project==null)return;
+        if(projectCloseDialog!=null&&projectCloseDialog.isShowing())projectCloseDialog.dismiss();
+        projectCloseDialog=null;projectCloseTarget=null;
         clearRecovery(project);
         boolean active=project==currentProject;
         projects.remove(project);
