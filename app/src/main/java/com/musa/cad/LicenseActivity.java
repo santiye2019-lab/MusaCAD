@@ -73,7 +73,15 @@ public class LicenseActivity extends AppCompatActivity {
             // 1) Ücretsiz deneme
             LockedScreenUi.hotspot(this,stage,60,344,482,132,SCREEN_W,SCREEN_H,v->startTrial());
 
-            // 2) Lisans kodu alanı
+            // 2) Lisans kodu
+            TextView codeLabel=new TextView(this);
+            codeLabel.setText("Lisans Kodu");
+            codeLabel.setTextColor(0xFF9CDFFF);
+            codeLabel.setTextSize(10.5f);
+            codeLabel.setGravity(Gravity.CENTER_VERTICAL);
+            stage.addView(codeLabel);
+            LockedScreenUi.position(codeLabel,stage,83,565,369,28,SCREEN_W,SCREEN_H);
+
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(Color.WHITE);
