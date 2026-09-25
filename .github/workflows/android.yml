@@ -205,7 +205,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           src=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
-          start=src.index("loaded.handedOff=true;")
+          start=src.index("// Recent-file thumbnail generation is deliberately off the critical DWG path.")
           export=src.index("engine.exportDxf(converted)",start)
           critical=src[start:export]
           assert "scheduleRecentNativeRecord" in critical
