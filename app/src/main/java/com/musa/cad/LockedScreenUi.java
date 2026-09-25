@@ -34,15 +34,17 @@ final class LockedScreenUi {
     }
 
     static void fillStage(Activity a, FrameLayout root, FrameLayout stage, Runnable ready){
+        fillStage(a,root,stage,ART_W,ART_H,ready);
+    }
+
+    static void fillStage(Activity a, FrameLayout root, FrameLayout stage, float artW,float artH,Runnable ready){
         root.post(()->{
             if(root.getWidth()<=0||root.getHeight()<=0)return;
 
-            // Keep the locked artwork at its native 941x1672 aspect ratio.
-            // The root remains immersive/full-screen, while the artwork is contained
-            // without stretching text or graphics on tall/wide phones.
-            float scale=Math.min(root.getWidth()/ART_W,root.getHeight()/ART_H);
-            int stageW=Math.max(1,Math.round(ART_W*scale));
-            int stageH=Math.max(1,Math.round(ART_H*scale));
+            // Preserve each locked artwork's native aspect ratio so text and graphics never stretch.
+            float scale=Math.min(root.getWidth()/artW,root.getHeight()/artH);
+            int stageW=Math.max(1,Math.round(artW*scale));
+            int stageH=Math.max(1,Math.round(artH*scale));
             FrameLayout.LayoutParams stageLp=
                 new FrameLayout.LayoutParams(stageW,stageH,Gravity.CENTER);
             stage.setLayoutParams(stageLp);
@@ -64,17 +66,22 @@ final class LockedScreenUi {
     }
 
     static View hotspot(Activity a, FrameLayout stage, float x,float y,float w,float h, View.OnClickListener click){
+        return hotspot(a,stage,x,y,w,h,ART_W,ART_H,click);
+    }
+
+    static View hotspot(Activity a, FrameLayout stage, float x,float y,float w,float h,
+                        float artW,float artH,View.OnClickListener click){
         View v=new View(a);
         v.setClickable(true);
         v.setFocusable(true);
         v.setContentDescription("MusaCAD işlem alanı");
         v.setBackground(new ColorDrawable(0x01000000));
         FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
-            Math.max(1,Math.round(stage.getWidth()*w/ART_W)),
-            Math.max(1,Math.round(stage.getHeight()*h/ART_H))
+            Math.max(1,Math.round(stage.getWidth()*w/artW)),
+            Math.max(1,Math.round(stage.getHeight()*h/artH))
         );
-        lp.leftMargin=Math.round(stage.getWidth()*x/ART_W);
-        lp.topMargin=Math.round(stage.getHeight()*y/ART_H);
+        lp.leftMargin=Math.round(stage.getWidth()*x/artW);
+        lp.topMargin=Math.round(stage.getHeight()*y/artH);
         stage.addView(v,lp);
         v.bringToFront();
         v.setOnClickListener(click);
@@ -88,12 +95,16 @@ final class LockedScreenUi {
     }
 
     static void position(View v, FrameLayout stage, float x,float y,float w,float h){
+        position(v,stage,x,y,w,h,ART_W,ART_H);
+    }
+
+    static void position(View v, FrameLayout stage, float x,float y,float w,float h,float artW,float artH){
         FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
-            Math.max(1,Math.round(stage.getWidth()*w/ART_W)),
-            Math.max(1,Math.round(stage.getHeight()*h/ART_H))
+            Math.max(1,Math.round(stage.getWidth()*w/artW)),
+            Math.max(1,Math.round(stage.getHeight()*h/artH))
         );
-        lp.leftMargin=Math.round(stage.getWidth()*x/ART_W);
-        lp.topMargin=Math.round(stage.getHeight()*y/ART_H);
+        lp.leftMargin=Math.round(stage.getWidth()*x/artW);
+        lp.topMargin=Math.round(stage.getHeight()*y/artH);
         v.setLayoutParams(lp);
         v.bringToFront();
     }

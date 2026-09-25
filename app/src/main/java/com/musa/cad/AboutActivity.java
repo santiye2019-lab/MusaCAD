@@ -54,6 +54,7 @@ public class AboutActivity extends AppCompatActivity {
         // Ekran akışı: 1) Splash -> 2) Tanıtım/3D -> 3) Lisans.
         // Geçerli lisans/deneme varsa LicenseActivity kendi kontrolüyle ana uygulamaya devam eder.
         Intent next=new Intent(this,LicenseActivity.class);
+        next.putExtra(LicenseActivity.EXTRA_STAY_ON_LICENSE,true);
         next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(next);
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);

@@ -11,7 +11,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-/** Verifies Google Play purchases on the MusaCAD backend before Pro entitlement is granted. */
+/** Verifies Google Play yearly renewals on the MusaCAD backend before entitlement is granted. */
 public final class PlayPurchaseVerifier {
     private static final int TIMEOUT_MS=10000,MAX_RESPONSE_BYTES=32768;
 
@@ -19,7 +19,13 @@ public final class PlayPurchaseVerifier {
     public static final class Result {
         public final Status status;
         public final String message;
-        Result(Status status,String message){this.status=status;this.message=message;}
+        public final long expiresAtMs;
+        Result(Status status,String message){this(status,message,0L);}
+        Result(Status status,String message,long expiresAtMs){
+            this.status=status;
+            this.message=message;
+            this.expiresAtMs=expiresAtMs;
+        }
     }
 
     public static Result verify(Context context,String purchaseToken){
@@ -68,8 +74,12 @@ public final class PlayPurchaseVerifier {
             JSONObject json=new JSONObject(response);
             String status=json.optString("status","").trim().toLowerCase(Locale.ROOT);
             String message=json.optString("message","");
-            if("active".equals(status)&&code>=200&&code<300)
-                return new Result(Status.ACTIVE,message);
+            if("active".equals(status)&&code>=200&&code<300){
+                long expiresAtMs=json.optLong("expiresAtMs",0L);
+                if(expiresAtMs<=System.currentTimeMillis())
+                    return new Result(Status.DENIED,"Yıllık lisans süresi geçersiz veya sona ermiş");
+                return new Result(Status.ACTIVE,message,expiresAtMs);
+            }
             if("pending".equals(status)||code==202)
                 return new Result(Status.PENDING,message.isEmpty()?"Ödeme beklemede":message);
             if("denied".equals(status)||"cancelled".equals(status)||code==401||code==403||code==409)

@@ -192,7 +192,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                 }
             }
             if(!owned){
-                LicenseManager.setPlayEntitlement(context,false);
+                LicenseManager.setPlayEntitlement(context,false,0L);
                 notifyEntitlement(false);
             }
         });
@@ -230,7 +230,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
         if(verification==null)return;
         switch(verification.status){
             case ACTIVE:
-                LicenseManager.setPlayEntitlement(context,true);
+                LicenseManager.setPlayEntitlement(context,true,verification.expiresAtMs);
                 notifyEntitlement(true);
                 notifyMessage("Google Play yıllık lisans yenilemesi doğrulandı");
                 break;
@@ -238,7 +238,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                 notifyMessage("Ödeme beklemede. Google Play yıllık lisans yenilemesi tamamlanınca erişim güncellenecek.");
                 break;
             case DENIED:
-                LicenseManager.setPlayEntitlement(context,false);
+                LicenseManager.setPlayEntitlement(context,false,0L);
                 notifyEntitlement(false);
                 notifyMessage(verification.message==null||verification.message.isEmpty()
                     ?"Google Play satın alımı doğrulanamadı":verification.message);

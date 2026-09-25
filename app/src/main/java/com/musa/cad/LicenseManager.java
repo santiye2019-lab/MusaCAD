@@ -18,6 +18,7 @@ public final class LicenseManager {
     private static final String K_SIGNED_TRIAL_LAST_SEEN="signed_trial_last_seen_v2";
     private static final String K_PLAY_ENTITLED="play_entitled_v1";
     private static final String K_EVER_PAID_LICENSE="ever_paid_license_v1";
+    private static final String K_PLAY_EXPIRES_AT_MS="play_expires_at_ms_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -35,8 +36,12 @@ public final class LicenseManager {
             if(verifyStoredPaidToken(c,paid))return State.LICENSED;
         }
         if(p.getBoolean(K_PLAY_ENTITLED,false)){
-            p.edit().putBoolean(K_EVER_PAID_LICENSE,true).apply();
-            return State.LICENSED;
+            long expiresAt=p.getLong(K_PLAY_EXPIRES_AT_MS,0L);
+            if(expiresAt>System.currentTimeMillis()){
+                p.edit().putBoolean(K_EVER_PAID_LICENSE,true).apply();
+                return State.LICENSED;
+            }
+            p.edit().putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS).apply();
         }
 
         String signedTrial=p.getString(K_TRIAL_TOKEN,null);
@@ -108,11 +113,19 @@ public final class LicenseManager {
     /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
-    /** Cached Google Play ownership, refreshed from Play Billing when the app process starts. */
-    public static void setPlayEntitlement(Context c,boolean active){
+    /** Cached yearly Google Play entitlement with server-verified expiry. */
+    public static void setPlayEntitlement(Context c,boolean active,long expiresAtMs){
         SharedPreferences.Editor e=prefs(c).edit().putBoolean(K_PLAY_ENTITLED,active);
-        if(active)e.putBoolean(K_EVER_PAID_LICENSE,true);
+        if(active&&expiresAtMs>System.currentTimeMillis()){
+            e.putBoolean(K_EVER_PAID_LICENSE,true).putLong(K_PLAY_EXPIRES_AT_MS,expiresAtMs);
+        }else{
+            e.putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS);
+        }
         e.apply();
+    }
+
+    public static long playExpiryAtMs(Context c){
+        return prefs(c).getLong(K_PLAY_EXPIRES_AT_MS,0L);
     }
 
     /** Google Play is intentionally restricted to yearly renewal of a previously paid MusaCAD license. */
@@ -124,7 +137,9 @@ public final class LicenseManager {
     }
 
     public static boolean hasPlayEntitlement(Context c){
-        return prefs(c).getBoolean(K_PLAY_ENTITLED,false);
+        SharedPreferences p=prefs(c);
+        return p.getBoolean(K_PLAY_ENTITLED,false)
+            && p.getLong(K_PLAY_EXPIRES_AT_MS,0L)>System.currentTimeMillis();
     }
 
     public static ActivationResult activateCode(Context c,String code){
