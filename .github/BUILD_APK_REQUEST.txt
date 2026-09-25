@@ -1,2 +1,2 @@
 MusaCAD APK build request for current main branch.
-Includes 12-character Serial + 12-character license code flow, updated 3D tools, 3D geometry support, and fixed second-screen animation.
+Includes stable debug signing, 12-character Serial + 12-character license code flow, updated 3D tools, 3D geometry support, and fixed second-screen animation.
