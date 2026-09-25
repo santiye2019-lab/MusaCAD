@@ -193,6 +193,8 @@ jobs:
           grep -q 'ValueAnimator.ofFloat' app/src/main/java/com/musa/cad/AboutActivity.java
           grep -q 'ValueAnimator.INFINITE' app/src/main/java/com/musa/cad/AboutActivity.java
           grep -q 'LicenseManager.hasAccess(this)' app/src/main/java/com/musa/cad/AboutActivity.java
+          grep -q 'LicenseManager.hasAccess(this)' app/src/main/java/com/musa/cad/SplashActivity.java
+          grep -q 'new Intent(this,MainActivity.class)' app/src/main/java/com/musa/cad/SplashActivity.java
           grep -q 'putString(K_LICENSE_TOKEN' app/src/main/java/com/musa/cad/LicenseManager.java
           grep -q 'verifyStoredPaidToken' app/src/main/java/com/musa/cad/LicenseManager.java
           grep -q 'İkinci kez geri tuşuna basarsanız proje' app/src/main/java/com/musa/cad/MainActivity.java
