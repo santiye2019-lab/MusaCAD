@@ -42,9 +42,9 @@ final class LockedScreenUi {
             if(root.getWidth()<=0||root.getHeight()<=0)return;
 
             // Preserve each locked artwork's native aspect ratio so text and graphics never stretch.
-            float scale=Math.min(root.getWidth()/artW,root.getHeight()/artH);
-            int stageW=Math.max(1,Math.round(artW*scale));
-            int stageH=Math.max(1,Math.round(artH*scale));
+            LockedScreenLayout.Size fitted=LockedScreenLayout.fit(root.getWidth(),root.getHeight(),artW,artH);
+            int stageW=fitted.width;
+            int stageH=fitted.height;
             FrameLayout.LayoutParams stageLp=
                 new FrameLayout.LayoutParams(stageW,stageH,Gravity.CENTER);
             stage.setLayoutParams(stageLp);

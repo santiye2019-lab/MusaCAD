@@ -186,6 +186,20 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RecoveryStore.java tests/RecoveryStoreTest.java
           java -cp /tmp/musacad-tests RecoveryStoreTest
+      - name: Test Group 1 full-screen aspect preservation
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/LockedScreenLayout.java tests/LockedScreenLayoutTest.java
+          java -cp /tmp/musacad-tests LockedScreenLayoutTest
+          grep -q 'ValueAnimator.ofFloat' app/src/main/java/com/musa/cad/AboutActivity.java
+          grep -q 'ValueAnimator.INFINITE' app/src/main/java/com/musa/cad/AboutActivity.java
+          grep -q 'LicenseManager.hasAccess(this)' app/src/main/java/com/musa/cad/AboutActivity.java
+          grep -q 'LicenseManager.hasAccess(this)' app/src/main/java/com/musa/cad/SplashActivity.java
+          grep -q 'new Intent(this,MainActivity.class)' app/src/main/java/com/musa/cad/SplashActivity.java
+          grep -q 'putString(K_LICENSE_TOKEN' app/src/main/java/com/musa/cad/LicenseManager.java
+          grep -q 'verifyStoredPaidToken' app/src/main/java/com/musa/cad/LicenseManager.java
+          grep -q 'İkinci kez geri tuşuna basarsanız proje' app/src/main/java/com/musa/cad/MainActivity.java
+          grep -q 'lastAccessMs' app/src/main/java/com/musa/cad/RecentFileStore.java
+          grep -q 'thumbnail' app/src/main/java/com/musa/cad/RecentFileStore.java
       - name: Test large DXF streaming under bounded heap
         run: |
           javac -d /tmp/musacad-tests \

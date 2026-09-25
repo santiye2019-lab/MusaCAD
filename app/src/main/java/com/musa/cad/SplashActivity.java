@@ -104,7 +104,14 @@ public class SplashActivity extends AppCompatActivity {
                 startActivity(next);
             }
         }else{
-            startActivity(new Intent(this,AboutActivity.class));
+            // Returning licensed/trial users do not need to pass through activation/about again.
+            // The first splash remains the deliberate entry screen; after its CTA, valid access
+            // goes straight to the CAD workspace.
+            if(LicenseManager.hasAccess(this)){
+                startActivity(new Intent(this,MainActivity.class));
+            }else{
+                startActivity(new Intent(this,AboutActivity.class));
+            }
         }
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
         finish();
