@@ -144,11 +144,29 @@ public final class LicenseManager {
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
-        try{LicenseToken.Result r=verifyPaidToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).putBoolean(K_EVER_PAID_LICENSE,true).commit();return ActivationResult.ACTIVATED;}
-        catch(Exception e){return ActivationResult.INVALID_CODE;}
+        try{
+            long now=System.currentTimeMillis();
+            // Compatibility with the MusaCAD Lisans TEST app previously delivered to the user.
+            // Test tokens are deliberately accepted only by debug builds, never release builds.
+            if(BuildConfig.DEBUG&&DebugLicenseToken.verify(code,installationId(c),now)){
+                prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).putBoolean(K_EVER_PAID_LICENSE,true).commit();
+                return ActivationResult.ACTIVATED;
+            }
+            LicenseToken.Result r=verifyPaidToken(c,code,now);
+            if(r==null||!r.valid)return ActivationResult.INVALID_CODE;
+            prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).putBoolean(K_EVER_PAID_LICENSE,true).commit();
+            return ActivationResult.ACTIVATED;
+        }catch(Exception e){return ActivationResult.INVALID_CODE;}
     }
 
-    private static boolean verifyStoredPaidToken(Context c,String token){LicenseToken.Result r=verifyPaidToken(c,token,System.currentTimeMillis());if(r!=null&&r.valid)return true;prefs(c).edit().remove(K_LICENSE_TOKEN).apply();return false;}
+    private static boolean verifyStoredPaidToken(Context c,String token){
+        long now=System.currentTimeMillis();
+        if(BuildConfig.DEBUG&&DebugLicenseToken.verify(token,installationId(c),now))return true;
+        LicenseToken.Result r=verifyPaidToken(c,token,now);
+        if(r!=null&&r.valid)return true;
+        prefs(c).edit().remove(K_LICENSE_TOKEN).apply();
+        return false;
+    }
 
     private static LicenseToken.Result verifyPaidToken(Context c,String token,long now){
         try{return LicenseToken.verify(token,installationId(c),now,readAsset(c,"MUSACAD-LICENSE-PUBLIC.pem"));}

@@ -96,11 +96,11 @@ public class LicenseActivity extends AppCompatActivity {
             // 3) Telefona özel cihaz/lisans kimliği
             final String deviceLicenseId=LicenseManager.installationId(this);
             TextView deviceId=new TextView(this);
-            deviceId.setSingleLine(true);
-            deviceId.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            deviceId.setSingleLine(false);
+            deviceId.setMaxLines(2);
             deviceId.setText(deviceLicenseId);
             deviceId.setTextColor(0xFFE7F7FF);
-            deviceId.setTextSize(11f);
+            deviceId.setTextSize(9.3f);
             deviceId.setGravity(Gravity.CENTER);
             deviceId.setPadding(dp(5),0,dp(5),0);
             GradientDrawable idBg=new GradientDrawable();
@@ -111,7 +111,7 @@ public class LicenseActivity extends AppCompatActivity {
             deviceId.setContentDescription("MusaCAD cihaz lisans kimliği. Dokunarak kopyala.");
             deviceId.setOnClickListener(v->copyDeviceId(deviceLicenseId));
             stage.addView(deviceId);
-            LockedScreenUi.position(deviceId,stage,176,818,284,44,SCREEN_W,SCREEN_H);
+            LockedScreenUi.position(deviceId,stage,168,814,300,50,SCREEN_W,SCREEN_H);
             LockedScreenUi.hotspot(this,stage,458,817,65,50,SCREEN_W,SCREEN_H,v->copyDeviceId(deviceLicenseId));
 
             // 4) Google Play: yalnızca yıllık lisans yenileme
