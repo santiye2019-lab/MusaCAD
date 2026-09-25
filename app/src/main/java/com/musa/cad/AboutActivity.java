@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class AboutActivity extends AppCompatActivity {
     public static final String EXTRA_CONTINUE_TO_APP="com.musa.cad.CONTINUE_TO_APP";
+    private static final float SCREEN_W=600f,SCREEN_H=1535f;
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
@@ -24,7 +25,7 @@ public class AboutActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.aboutRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fillStage(this,root,stage,()->{
+        LockedScreenUi.fillStage(this,root,stage,SCREEN_W,SCREEN_H,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_2);
             art.setContentDescription("MusaCAD ikinci ekran");
@@ -34,9 +35,9 @@ public class AboutActivity extends AppCompatActivity {
             Cad3dPreviewView preview=new Cad3dPreviewView(this);
             preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             stage.addView(preview);
-            LockedScreenUi.position(preview,stage,555,465,310,335);
+            LockedScreenUi.position(preview,stage,310,400,270,430,SCREEN_W,SCREEN_H);
 
-            LockedScreenUi.hotspot(this,stage,35,1248,870,115,v->openMusaCad());
+            LockedScreenUi.hotspot(this,stage,22,1146,555,106,SCREEN_W,SCREEN_H,v->openMusaCad());
         });
     }
 
@@ -48,8 +49,15 @@ public class AboutActivity extends AppCompatActivity {
     @Override public void onBackPressed(){ finish(); }
 
     private void openMusaCad(){
-        Intent next=new Intent(this,LicenseActivity.class);
-        next.putExtra(LicenseActivity.EXTRA_STAY_ON_LICENSE,true);
+        // A valid paid/trial license is remembered. Do not ask for activation again
+        // on every normal app launch; go directly to the CAD workspace.
+        Intent next;
+        if(LicenseManager.hasAccess(this)){
+            next=new Intent(this,MainActivity.class);
+        }else{
+            next=new Intent(this,LicenseActivity.class);
+            next.putExtra(LicenseActivity.EXTRA_STAY_ON_LICENSE,true);
+        }
         next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(next);
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
@@ -115,8 +123,8 @@ public class AboutActivity extends AppCompatActivity {
 
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
-            float cx=getWidth()*0.50f,cy=getHeight()*0.52f;
-            float scale=Math.min(getWidth(),getHeight())*0.31f;
+            float cx=getWidth()*0.50f,cy=getHeight()*0.50f;
+            float scale=Math.min(getWidth(),getHeight())*0.39f;
 
             // Rotating holographic base rings.
             for(int i=0;i<3;i++){

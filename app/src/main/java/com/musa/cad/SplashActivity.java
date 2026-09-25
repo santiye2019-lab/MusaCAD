@@ -14,6 +14,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class SplashActivity extends AppCompatActivity {
+    private static final float SCREEN_W=600f,SCREEN_H=1535f;
     private Intent pendingIntent;
 
     @Override protected void onCreate(Bundle savedInstanceState){
@@ -33,7 +34,7 @@ public class SplashActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.splashRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fillStage(this,root,stage,()->{
+        LockedScreenUi.fillStage(this,root,stage,SCREEN_W,SCREEN_H,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
             art.setImageResource(R.drawable.musacad_screen_1);
             art.setContentDescription("MusaCAD açılış ekranı");
@@ -53,7 +54,7 @@ public class SplashActivity extends AppCompatActivity {
             badgeBg.setStroke(dp(1),Color.rgb(50,205,225));
             threeD.setBackground(badgeBg);
             stage.addView(threeD);
-            LockedScreenUi.position(threeD,stage,239,365,463,62);
+            LockedScreenUi.position(threeD,stage,152,335,295,57,SCREEN_W,SCREEN_H);
 
             // Deliberate CTA: the intro no longer advances from invisible hotspots.
             Button start=new Button(this);
@@ -78,7 +79,7 @@ public class SplashActivity extends AppCompatActivity {
                 continueFlow();
             });
             stage.addView(start);
-            LockedScreenUi.position(start,stage,171,1304,599,92);
+            LockedScreenUi.position(start,stage,109,1197,382,84,SCREEN_W,SCREEN_H);
         });
     }
 
