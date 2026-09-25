@@ -69,7 +69,12 @@ public final class Mesh3dView extends View {
     public int selectedVertex(){return first;}
     public void geometryChanged(){invalidate();}
     public boolean toggleWireframe(){wireframe=!wireframe;invalidate();return wireframe;}
-    public void resetCamera(){yaw=.65f;pitch=.32f;zoom=1f;invalidate();}
+    public void setWireframe(boolean enabled){wireframe=enabled;invalidate();}
+    public void setIsometricView(){yaw=.65f;pitch=.32f;zoom=1f;invalidate();}
+    public void setFrontView(){yaw=0f;pitch=0f;zoom=1f;invalidate();}
+    public void setTopView(){yaw=0f;pitch=-(float)Math.PI/2f;zoom=1f;invalidate();}
+    public void setRightView(){yaw=(float)Math.PI/2f;pitch=0f;zoom=1f;invalidate();}
+    public void resetCamera(){setIsometricView();}
     private void select(float x,float y){int at=-1;float best=36f*getResources().getDisplayMetrics().density;best*=best;
         for(int i=0;i<screen.length;i+=2){float dx=screen[i]-x,dy=screen[i+1]-y,dist=dx*dx+dy*dy;if(dist<best){best=dist;at=i/2;}}
         if(at<0)return;if(first<0||second>=0){first=at;second=-1;}else second=at;invalidate();
