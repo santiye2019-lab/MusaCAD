@@ -147,8 +147,8 @@ jobs:
           grep -q "MusaCAD License Generator" /tmp/license-generator-usage.txt
       - name: Test displayed device ID to offline license round trip
         run: |
-          grep -q 'LicenseManager.installationId(this)' app/src/main/java/com/musa/cad/LicenseActivity.java
-          grep -q 'Cihaz / Lisans Kimliği' app/src/main/java/com/musa/cad/LicenseActivity.java
+          grep -q 'LicenseManager.serialId(this)' app/src/main/java/com/musa/cad/LicenseActivity.java
+          grep -q 'serialLabel.setText("Serial")' app/src/main/java/com/musa/cad/LicenseActivity.java
           javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
           java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
       - name: Test 12-character Serial and license code
