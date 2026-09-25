@@ -51,9 +51,9 @@ public class AboutActivity extends AppCompatActivity {
     }
 
     private void openMusaCad(){
-        Intent next=LicenseManager.hasAccess(this)
-            ?new Intent(this,MainActivity.class)
-            :new Intent(this,LicenseActivity.class);
+        // Ekran akışı: 1) Splash -> 2) Tanıtım/3D -> 3) Lisans.
+        // Geçerli lisans/deneme varsa LicenseActivity kendi kontrolüyle ana uygulamaya devam eder.
+        Intent next=new Intent(this,LicenseActivity.class);
         next.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(next);
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
