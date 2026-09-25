@@ -78,6 +78,13 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test native first-paint color resolution
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_color_test.c -o /tmp/native-color-test
+          /tmp/native-color-test
+          grep -q 'musa_native_color_token' app/src/main/cpp/native_scene.c
+          grep -q 'entity->method' app/src/main/cpp/native_scene.c
+          grep -q 'value->method' app/src/main/cpp/native_scene.c
       - name: Test DXF text styles and font metadata
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextStyle.java tests/DxfTextStyleTest.java

@@ -79,3 +79,7 @@ GitHub Actions kalite kapısı native dönüştürücü smoke testini, Java yard
 ## Kurulum güvenlik notu
 
 Android, Play Store dışından elle yüklenen uygulamalarda kaynağa/cihaz politikasına bağlı olarak “bilinmeyen uygulama”, Play Protect veya benzeri bir yükleme uyarısı gösterebilir. Bu uyarı uygulama içi kodla güvenli biçimde kaldırılamaz. Kalıcı olarak uyarısız dağıtım için uygulamanın sabit bir release anahtarıyla imzalanması ve tercihen Google Play gibi güvenilen bir dağıtım kanalından yayınlanması gerekir.
+
+
+## DWG görüntü doğruluğu
+- İlk Native DWG karesinde LibreDWG ByLayer / ByBlock / ACI / TrueColor renk çözümleme; tam DXF modele geçişte renk sıçramasını önleme

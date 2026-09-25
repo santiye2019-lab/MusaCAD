@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "config.h"
+#include "native_color.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,8 +88,9 @@ static Dwg_Object_LAYER *entity_layer(Dwg_Object *obj){
 }
 static SceneColor color_value(Dwg_Color *value,SceneColor fallback){
     if(!value)return fallback;
-    if((value->flag&0x80)!=0)return scene_true((unsigned int)value->rgb);
-    int aci=(int)value->index;if(aci>=1&&aci<=255)return scene_aci(aci);
+    MusaNativeColorToken token=musa_native_color_token((unsigned int)value->method,(int)value->index,(unsigned int)value->rgb);
+    if(token.kind==MUSA_COLOR_RGB)return scene_true(token.rgb);
+    if(token.kind==MUSA_COLOR_ACI)return scene_aci(token.aci);
     return fallback;
 }
 static int layer_is_zero(Dwg_Object_LAYER *layer){return layer&&layer->name&&strcmp(layer->name,"0")==0;}
@@ -100,10 +102,10 @@ static SceneColor effective_layer_color(Dwg_Object *obj,SceneColor inheritedLaye
 static SceneColor entity_color(Dwg_Object *obj,SceneColor byBlock,SceneColor layerColor){
     if(!obj||!obj->tio.entity)return layerColor;
     Dwg_Color *entity=&obj->tio.entity->color;
-    if((entity->flag&0x80)!=0)return scene_true((unsigned int)entity->rgb);
-    int aci=(int)entity->index;
-    if(aci==0)return byBlock;
-    if(aci>=1&&aci<=255)return scene_aci(aci);
+    MusaNativeColorToken token=musa_native_color_token((unsigned int)entity->method,(int)entity->index,(unsigned int)entity->rgb);
+    if(token.kind==MUSA_COLOR_RGB)return scene_true(token.rgb);
+    if(token.kind==MUSA_COLOR_ACI)return scene_aci(token.aci);
+    if(token.kind==MUSA_COLOR_INHERIT_BLOCK)return byBlock;
     return layerColor;
 }
 static int emit_line(MusaNativeScene *s,SceneColor color,Affine2 m,double x1,double y1,double x2,double y2){
