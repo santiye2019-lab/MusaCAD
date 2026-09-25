@@ -175,8 +175,19 @@ public final class DxfBlocks {
         }
         if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
-        if(r.number(70,1)!=1||r.number(71,1)!=1||r.number(210,0)!=0||r.number(220,0)!=0||r.number(230,1)!=1||r.number(30,0)!=0||block.header.number(30,0)!=0||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
-        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}Transform local=Transform.insert(block.header.number(10,0),block.header.number(20,0),sx,sy,r.number(50,0),r.number(10,0),r.number(20,0));Transform transform=parent.thenLocal(local);stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);
+        double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+        boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
+        boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
+        // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
+        // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
+        if(r.number(70,1)!=1||r.number(71,1)!=1||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
+        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
+        // For OCS normal (0,0,-1), OCS X maps to -WCS X and rotation reverses.
+        Transform local=negativeZ
+            ?Transform.insert(bx,by,-sx,sy,-degrees,-ix,iy)
+            :Transform.insert(bx,by,sx,sy,degrees,ix,iy);
+        Transform transform=parent.thenLocal(local);stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);
     }
 
     private static String entityLayout(Record record,String inherited)throws IOException{

@@ -188,7 +188,8 @@ public final class NativeScene {
         void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){
             if(seen[index]==mark)return;seen[index]=mark;
             if(visible!=null&&!overlaps(bounds,index,visible,epsilon))return;
-            if(minWorldSpan>0f&&primitiveType(index)!=3&&tooSmall(bounds,index,minWorldSpan))return;
+            int type=primitiveType(index);
+            if(minWorldSpan>0f&&type!=3&&type!=6&&tooSmall(bounds,index,minWorldSpan))return;
             drawPrimitive(index,c,p,m,line,point,path,local,target);
         }
         int nextMark(){if(query==Integer.MAX_VALUE){Arrays.fill(seen,0);query=1;}return ++query;}

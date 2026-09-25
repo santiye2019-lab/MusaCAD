@@ -317,9 +317,15 @@ static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     Dwg_Object_BLOCK_HEADER *hdr=block->tio.object->tio.BLOCK_HEADER;
     BITCODE_3DPOINT ip;
     transform_OCS(&ip,ins->ins_pt,ins->extrusion);
-    double co=cos(ins->rotation),si=sin(ins->rotation);
+    double rotation=ins->rotation;
     double sx=isfinite(ins->scale.x)&&fabs(ins->scale.x)>1e-12?ins->scale.x:1.0;
     double sy=isfinite(ins->scale.y)&&fabs(ins->scale.y)>1e-12?ins->scale.y:1.0;
+    /* Plan blocks with extrusion (0,0,-1) use an OCS whose X axis is reversed.
+       Mirror X and reverse rotation so text/symbol blocks are not shown as mirror images. */
+    if(fabs(ins->extrusion.x)<1e-9&&fabs(ins->extrusion.y)<1e-9&&ins->extrusion.z<-.999999){
+        sx=-sx;rotation=-rotation;
+    }
+    double co=cos(rotation),si=sin(rotation);
     Affine2 local={co*sx,si*sx,-si*sy,co*sy,ip.x,ip.y};
     local.tx-=local.a*hdr->base_pt.x+local.c*hdr->base_pt.y;
     local.ty-=local.b*hdr->base_pt.x+local.d*hdr->base_pt.y;

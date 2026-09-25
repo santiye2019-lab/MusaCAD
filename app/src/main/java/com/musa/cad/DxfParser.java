@@ -235,6 +235,9 @@ public final class DxfParser {
                     if(part+1<parts.length){cursorX=0f;cursorY+=lineMax*1.3f;lineMax=height;}
                 }
             }
+            // Android glyph paths use screen-style +Y downward. Convert them once to
+            // AutoCAD/world +Y upward so the global world-to-screen Y flip does not mirror MTEXT.
+            Matrix glyphToWorld=new Matrix();glyphToWorld.setScale(1f,-1f);all.transform(glyphToWorld);
             RectF bounds=new RectF();all.computeBounds(bounds,true);
             if(attachment>=1&&attachment<=9&&!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(attachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);all.transform(anchor);}
             Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);all.transform(placement);return all;

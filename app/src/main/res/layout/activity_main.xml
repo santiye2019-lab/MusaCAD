@@ -9,7 +9,7 @@
     <LinearLayout
         android:id="@+id/editorTopHeader"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="48dp"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
@@ -17,17 +17,17 @@
 
         <ImageButton
             android:id="@+id/menuButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:src="@drawable/ic_menu"
             android:contentDescription="Ana menü"
             android:background="@drawable/top_action_bg"
-            android:padding="10dp" />
+            android:padding="8dp" />
 
         <ImageView
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="7dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="5dp"
             android:src="@drawable/ic_musacad_mark"
             android:scaleType="fitCenter"
             android:contentDescription="MusaCAD logo" />
@@ -71,42 +71,42 @@
 
         <ImageButton
             android:id="@+id/openButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginStart="4dp"
             android:src="@drawable/ic_open_file"
             android:contentDescription="Dosya aç"
             android:background="@drawable/top_action_bg"
-            android:padding="9dp" />
+            android:padding="7dp" />
 
         <ImageButton
             android:id="@+id/shareButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginStart="5dp"
             android:src="@drawable/ic_share_pro"
             android:contentDescription="Paylaş"
             android:background="@drawable/top_action_bg"
-            android:padding="9dp"
+            android:padding="7dp"
             android:enabled="false"
             android:alpha="0.45" />
 
         <ImageButton
             android:id="@+id/headerMoreButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_marginStart="5dp"
             android:src="@drawable/ic_more"
             android:contentDescription="Diğer menü"
             android:background="@drawable/top_action_bg"
-            android:padding="9dp" />
+            android:padding="7dp" />
     </LinearLayout>
 
     <!-- Reference file / rendering mode row -->
     <LinearLayout
         android:id="@+id/fileModeBar"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="36dp"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
@@ -115,7 +115,7 @@
         <TextView
             android:id="@+id/fileName"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="28dp"
             android:layout_weight="1"
             android:gravity="center_vertical"
             android:paddingStart="10dp"
@@ -135,7 +135,7 @@
         <ImageButton
             android:id="@+id/closeFileButton"
             android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_height="28dp"
             android:layout_marginStart="3dp"
             android:src="@drawable/ic_clear"
             android:contentDescription="Projeyi kapat"
@@ -145,7 +145,7 @@
         <TextView
             android:id="@+id/nativeModeChip"
             android:layout_width="86dp"
-            android:layout_height="34dp"
+            android:layout_height="28dp"
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:text="DWG Native ▾"
@@ -158,7 +158,7 @@
         <TextView
             android:id="@+id/sceneModeChip"
             android:layout_width="98dp"
-            android:layout_height="34dp"
+            android:layout_height="28dp"
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:text="Sahne görünümü ▾"
@@ -173,13 +173,13 @@
     <LinearLayout
         android:id="@+id/quickToolsBar"
         android:layout_width="match_parent"
-        android:layout_height="54dp"
+        android:layout_height="42dp"
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingStart="4dp"
         android:paddingEnd="4dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
         android:background="@color/editor_toolbar">
 
         <Button
@@ -187,7 +187,7 @@
             style="@style/TopQuickBlue"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:text=""
             android:drawableTop="@drawable/ic_layers"
             android:enabled="false" />
@@ -197,7 +197,7 @@
             style="@style/TopQuickPurple"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:text=""
             android:drawableTop="@drawable/ic_properties"
             android:enabled="false" />
@@ -207,7 +207,7 @@
             style="@style/TopQuickYellow"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:text=""
             android:drawableTop="@drawable/ic_color"
             android:enabled="false" />
@@ -217,7 +217,7 @@
             style="@style/TopQuickOrange"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:text=""
             android:drawableTop="@drawable/ic_line"
             android:enabled="false" />
@@ -227,7 +227,7 @@
             style="@style/TopQuickBlue"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:text=""
             android:drawableTop="@drawable/ic_point"
             android:enabled="false" />
@@ -235,9 +235,9 @@
         <CheckBox
             android:id="@+id/snapToggle"
             style="@style/TopQuickTeal"
-            android:layout_width="92dp"
+            android:layout_width="78dp"
             android:layout_weight="0"
-            android:layout_height="46dp"
+            android:layout_height="36dp"
             android:button="@null"
             android:text="Yakalama ▾"
             android:drawableTop="@drawable/ic_snap"
@@ -249,7 +249,7 @@
     <LinearLayout
         android:id="@+id/commandBar"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="38dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
@@ -258,8 +258,8 @@
 
         <TextView
             android:id="@+id/commandLabel"
-            android:layout_width="66dp"
-            android:layout_height="34dp"
+            android:layout_width="60dp"
+            android:layout_height="30dp"
             android:gravity="center"
             android:text="Komut:"
             android:textColor="@color/editor_cyan"
@@ -270,7 +270,7 @@
         <EditText
             android:id="@+id/commandInput"
             android:layout_width="0dp"
-            android:layout_height="34dp"
+            android:layout_height="30dp"
             android:layout_weight="1"
             android:layout_marginStart="5dp"
             android:singleLine="true"
@@ -294,8 +294,8 @@
 
         <TextView
             android:id="@+id/languageChip"
-            android:layout_width="50dp"
-            android:layout_height="34dp"
+            android:layout_width="44dp"
+            android:layout_height="30dp"
             android:layout_marginStart="6dp"
             android:gravity="center"
             android:text="TR ▾"
@@ -674,7 +674,7 @@
         <!-- Right-side reference toolbar -->
         <LinearLayout
             android:id="@+id/rightToolRail"
-            android:layout_width="48dp"
+            android:layout_width="44dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
             android:layout_marginEnd="6dp"
@@ -685,47 +685,47 @@
 
             <ImageButton
                 android:id="@+id/panButton"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
+                android:layout_width="36dp"
+                android:layout_height="34dp"
                 android:src="@drawable/ic_pan"
                 android:contentDescription="Kaydır"
                 android:background="@drawable/right_rail_button_bg"
-                android:padding="9dp" />
+                android:padding="8dp" />
 
             <ImageButton
                 android:id="@+id/rightFitButton"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
                 android:src="@drawable/ic_fit"
                 android:contentDescription="Ekrana sığdır"
                 android:background="@drawable/right_rail_button_bg"
-                android:padding="9dp" />
+                android:padding="8dp" />
 
             <ImageButton
                 android:id="@+id/rightZoomInButton"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
                 android:src="@drawable/ic_zoom_in"
                 android:contentDescription="Yakınlaştır"
                 android:background="@drawable/right_rail_button_bg"
-                android:padding="9dp" />
+                android:padding="8dp" />
 
             <ImageButton
                 android:id="@+id/rightZoomOutButton"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
                 android:src="@drawable/ic_zoom_out"
                 android:contentDescription="Uzaklaştır"
                 android:background="@drawable/right_rail_button_bg"
-                android:padding="9dp" />
+                android:padding="8dp" />
 
             <TextView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:text="2D"
                 android:textColor="#FFFFFF"
@@ -734,9 +734,9 @@
                 android:background="@drawable/right_rail_mode_selected_bg" />
 
             <TextView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:id="@+id/right3dButton"
                 android:text="3D"
@@ -747,13 +747,13 @@
 
             <ImageButton
                 android:id="@+id/rightLayersButton"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
-                android:layout_marginTop="5dp"
+                android:layout_width="36dp"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
                 android:src="@drawable/ic_layers"
                 android:contentDescription="Katmanlar"
                 android:background="@drawable/right_rail_button_bg"
-                android:padding="9dp"
+                android:padding="8dp"
                 android:enabled="false"
                 android:alpha="0.45" />
         </LinearLayout>
@@ -763,7 +763,7 @@
     <HorizontalScrollView
         android:id="@+id/categoryScroll"
         android:layout_width="match_parent"
-        android:layout_height="62dp"
+        android:layout_height="54dp"
         android:fillViewport="false"
         android:scrollbars="none"
         android:overScrollMode="never"
@@ -784,7 +784,7 @@
                 android:id="@+id/groupAnnotateToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="68dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Ek açıklama"
                 android:drawableTop="@drawable/ic_text" />
 
@@ -792,7 +792,7 @@
                 android:id="@+id/groupLineToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Çiz"
                 android:drawableTop="@drawable/ic_line" />
 
@@ -800,7 +800,7 @@
                 android:id="@+id/groupEditToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="66dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Düzenle"
                 android:drawableTop="@drawable/ic_move" />
 
@@ -808,7 +808,7 @@
                 android:id="@+id/groupLayerToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Katman"
                 android:drawableTop="@drawable/ic_layers" />
 
@@ -816,7 +816,7 @@
                 android:id="@+id/groupMeasureToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Ölçüm"
                 android:drawableTop="@drawable/ic_distance" />
 
@@ -824,7 +824,7 @@
                 android:id="@+id/groupDimensionToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Boyut"
                 android:drawableTop="@drawable/ic_scale" />
 
@@ -832,7 +832,7 @@
                 android:id="@+id/groupColorToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Renk"
                 android:drawableTop="@drawable/ic_color" />
 
@@ -840,7 +840,7 @@
                 android:id="@+id/groupMoreToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="62dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Alet"
                 android:drawableTop="@drawable/ic_more" />
 
@@ -848,7 +848,7 @@
                 android:id="@+id/groupLayoutToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="64dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Düzen"
                 android:drawableTop="@drawable/ic_rectangle" />
 
@@ -856,7 +856,7 @@
                 android:id="@+id/groupViewToolsButton"
                 style="@style/CategoryBarButton"
                 android:layout_width="72dp"
-                android:layout_height="58dp"
+                android:layout_height="50dp"
                 android:text="Görsel stil"
                 android:drawableTop="@drawable/ic_fit" />
         </LinearLayout>

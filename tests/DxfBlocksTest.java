@@ -32,7 +32,10 @@ public class DxfBlocksTest {
         point(read(b,insert("A",41,-1)),-2,2);
         String nested=b+block("B",insert("A",10,5,20,6));point(read(nested,insert("B",10,10,20,20)),16,26);
         DxfBlocks.Result inheritedLayer=read(b,insert("A",8,"BORU"));if(!inheritedLayer.placements.get(0).layer.equals("BORU"))throw new AssertionError("Layer inheritance");
-        skipped(read(b,insert("MISSING")));skipped(read(block("A",insert("A")),insert("A")));skipped(read(b,insert("A",70,2)));skipped(read(b,insert("A",230,-1)));
+        skipped(read(b,insert("MISSING")));skipped(read(block("A",insert("A")),insert("A")));skipped(read(b,insert("A",70,2)));
+        point(read(b,insert("A",10,10,20,20,30,6540.072947)),12,22);
+        point(read(b,insert("A",230,-1)),-2,2);
+        skipped(read(b,insert("A",210,1,220,0,230,0)));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");
 
         String layers=layer("BORU",62,3)+layer("TRUE",62,2,420,0x123456);
@@ -65,6 +68,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result paperInsert=read(block("P",line()),insert("P",67,1,410,"Sheet B"));layout(paperInsert,"Sheet B");
         DxfBlocks.Result mixed=read("",line()+line(67,1,410,"Sheet C"));if(!mixed.layoutNames.contains(DxfBlocks.MODEL_LAYOUT)||!mixed.layoutNames.contains("Sheet C")||mixed.placements.size()!=2)throw new AssertionError("mixed layouts");
 
-        System.out.println("34 block/color/source/style/dimension/layout expansion cases passed");
+        System.out.println("37 block/color/source/style/dimension/layout expansion cases passed");
     }
 }
