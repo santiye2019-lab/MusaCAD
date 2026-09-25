@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Google Play one-time MusaCAD Pro purchase/restore flow with mandatory backend verification. */
+/** Google Play yearly MusaCAD license renewal flow with mandatory backend verification. */
 public final class PlayBillingManager implements PurchasesUpdatedListener, BillingClientStateListener {
     public interface Listener {
         void onProductReady(boolean ready,String displayPrice);
@@ -65,6 +65,10 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
 
     public void launchPurchase(Activity activity){
         if(activity==null)return;
+        if(!LicenseManager.eligibleForPlayYearlyRenewal(context)){
+            notifyMessage("Google Play yalnızca mevcut yıllık MusaCAD lisansını yenilemek için kullanılabilir");
+            return;
+        }
         if(!secureVerificationConfigured()){
             notifyMessage("Google Play satın alma doğrulama sunucusu yapılandırılmadı");
             return;
@@ -128,7 +132,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
     }
 
     private void queryProduct(){
-        String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
+        String productId=BuildConfig.PLAY_YEARLY_PRODUCT_ID==null?"":BuildConfig.PLAY_YEARLY_PRODUCT_ID.trim();
         if(productId.isEmpty()||!secureVerificationConfigured()){
             notifyProductReady(false,"");
             return;
@@ -136,7 +140,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
         QueryProductDetailsParams.Product product=
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(productId)
-                .setProductType(BillingClient.ProductType.INAPP)
+                .setProductType(BillingClient.ProductType.SUBS)
                 .build();
         QueryProductDetailsParams params=QueryProductDetailsParams.newBuilder()
             .setProductList(Collections.singletonList(product))
@@ -152,23 +156,29 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                 return;
             }
             ProductDetails details=detailsResult.getProductDetailsList().get(0);
-            List<ProductDetails.OneTimePurchaseOfferDetails> offers=details.getOneTimePurchaseOfferDetailsList();
+            List<ProductDetails.SubscriptionOfferDetails> offers=details.getSubscriptionOfferDetails();
             if(offers==null||offers.isEmpty()){
                 productDetails=null;
                 offerToken=null;
                 notifyProductReady(false,"");
                 return;
             }
-            ProductDetails.OneTimePurchaseOfferDetails offer=offers.get(0);
+            ProductDetails.SubscriptionOfferDetails offer=offers.get(0);
             productDetails=details;
             offerToken=offer.getOfferToken();
-            notifyProductReady(true,offer.getFormattedPrice());
+            String price="";
+            if(offer.getPricingPhases()!=null
+                    && offer.getPricingPhases().getPricingPhaseList()!=null
+                    && !offer.getPricingPhases().getPricingPhaseList().isEmpty()){
+                price=offer.getPricingPhases().getPricingPhaseList().get(0).getFormattedPrice();
+            }
+            notifyProductReady(LicenseManager.eligibleForPlayYearlyRenewal(context),price);
         });
     }
 
     private void queryOwnedPurchases(){
         QueryPurchasesParams params=QueryPurchasesParams.newBuilder()
-            .setProductType(BillingClient.ProductType.INAPP)
+            .setProductType(BillingClient.ProductType.SUBS)
             .build();
         billingClient.queryPurchasesAsync(params,(result,purchases)->{
             if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK)return;
@@ -190,13 +200,13 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
 
     private boolean matchesProduct(Purchase purchase){
         if(purchase==null)return false;
-        String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
+        String productId=BuildConfig.PLAY_YEARLY_PRODUCT_ID==null?"":BuildConfig.PLAY_YEARLY_PRODUCT_ID.trim();
         return !productId.isEmpty()&&purchase.getProducts()!=null&&purchase.getProducts().contains(productId);
     }
 
     private void processPurchase(Purchase purchase){
         if(purchase.getPurchaseState()==Purchase.PurchaseState.PENDING){
-            notifyMessage("Ödeme beklemede. Google Play onayı tamamlandığında Pro açılacak.");
+            notifyMessage("Ödeme beklemede. Google Play yıllık lisans yenilemesi tamamlandığında erişim güncellenecek.");
             return;
         }
         if(purchase.getPurchaseState()!=Purchase.PurchaseState.PURCHASED)return;
@@ -222,10 +232,10 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
             case ACTIVE:
                 LicenseManager.setPlayEntitlement(context,true);
                 notifyEntitlement(true);
-                notifyMessage("Google Play satın alımı sunucuda doğrulandı");
+                notifyMessage("Google Play yıllık lisans yenilemesi doğrulandı");
                 break;
             case PENDING:
-                notifyMessage("Ödeme beklemede. Google Play işlemi tamamlanınca Pro açılacak.");
+                notifyMessage("Ödeme beklemede. Google Play yıllık lisans yenilemesi tamamlanınca erişim güncellenecek.");
                 break;
             case DENIED:
                 LicenseManager.setPlayEntitlement(context,false);

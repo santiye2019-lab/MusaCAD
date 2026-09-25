@@ -30,14 +30,19 @@ public class LicenseActivity extends AppCompatActivity {
         playBilling=new PlayBillingManager(this,new PlayBillingManager.Listener(){
             @Override public void onProductReady(boolean ready,String displayPrice){
                 if(playPurchaseButton==null)return;
-                playPurchaseButton.setEnabled(ready);
-                playPurchaseButton.setText(ready&&displayPrice!=null&&!displayPrice.isEmpty()
-                    ?"GOOGLE PLAY İLE SATIN AL • "+displayPrice
-                    :"GOOGLE PLAY İLE SATIN AL");
+                boolean eligible=LicenseManager.eligibleForPlayYearlyRenewal(LicenseActivity.this);
+                playPurchaseButton.setEnabled(ready&&eligible);
+                if(!eligible){
+                    playPurchaseButton.setText("YILLIK YENİLEME İÇİN MEVCUT LİSANS GEREKLİ");
+                }else{
+                    playPurchaseButton.setText(ready&&displayPrice!=null&&!displayPrice.isEmpty()
+                        ?"GOOGLE PLAY İLE YILLIK LİSANSI YENİLE • "+displayPrice
+                        :"GOOGLE PLAY İLE YILLIK LİSANSI YENİLE");
+                }
             }
             @Override public void onEntitlementChanged(boolean active){
                 if(active&&!stayOnLicense){
-                    Toast.makeText(LicenseActivity.this,"Google Play satın alımı doğrulandı",Toast.LENGTH_SHORT).show();
+                    Toast.makeText(LicenseActivity.this,"Yıllık lisans Google Play ile yenilendi",Toast.LENGTH_SHORT).show();
                     enterAfterLicense();
                 }
             }
@@ -94,13 +99,17 @@ public class LicenseActivity extends AppCompatActivity {
             LockedScreenUi.position(deviceId,stage,128,1015,676,105);
 
             playPurchaseButton=new Button(this);
-            playPurchaseButton.setText("GOOGLE PLAY İLE SATIN AL");
+            playPurchaseButton.setText("GOOGLE PLAY İLE YILLIK LİSANSI YENİLE");
             playPurchaseButton.setTextSize(13f);
             playPurchaseButton.setAllCaps(false);
             playPurchaseButton.setTextColor(0xFFFFFFFF);
             playPurchaseButton.setBackgroundColor(0xFF1263A8);
             playPurchaseButton.setEnabled(false);
             playPurchaseButton.setOnClickListener(v->{
+                if(!LicenseManager.eligibleForPlayYearlyRenewal(this)){
+                    Toast.makeText(this,"Google Play yalnızca mevcut yıllık MusaCAD lisansını yenilemek için kullanılabilir. İlk aktivasyon için lisans kodunu kullanın.",Toast.LENGTH_LONG).show();
+                    return;
+                }
                 if(!LicenseManager.termsAccepted(this)){
                     showTerms(false);
                     Toast.makeText(this,"Satın almadan önce lisans koşullarını kabul edin",Toast.LENGTH_LONG).show();

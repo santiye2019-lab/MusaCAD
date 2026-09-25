@@ -27,7 +27,7 @@ public final class PlayPurchaseVerifier {
             return new Result(Status.INVALID_RESPONSE,"Satın alma jetonu eksik");
 
         String endpoint=BuildConfig.PLAY_VERIFY_URL==null?"":BuildConfig.PLAY_VERIFY_URL.trim();
-        String productId=BuildConfig.PLAY_PRO_PRODUCT_ID==null?"":BuildConfig.PLAY_PRO_PRODUCT_ID.trim();
+        String productId=BuildConfig.PLAY_YEARLY_PRODUCT_ID==null?"":BuildConfig.PLAY_YEARLY_PRODUCT_ID.trim();
         if(endpoint.isEmpty()||productId.isEmpty())
             return new Result(Status.NOT_CONFIGURED,"Google Play doğrulama sunucusu yapılandırılmadı");
         if(!endpoint.startsWith("https://"))
@@ -51,6 +51,7 @@ public final class PlayPurchaseVerifier {
             request.put("packageName",context.getPackageName());
             request.put("productId",productId);
             request.put("purchaseToken",purchaseToken.trim());
+            request.put("purpose","annual_renewal");
             request.put("versionName",BuildConfig.VERSION_NAME);
             request.put("versionCode",BuildConfig.VERSION_CODE);
 

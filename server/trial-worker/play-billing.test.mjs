@@ -6,7 +6,7 @@ import worker from "./src/index.js";
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 const PACKAGE="com.musa.cad";
-const PRODUCT="musacad_pro";
+const PRODUCT="musacad_yearly_renewal";
 const DEVICE="MC-12345678-90ABCDEF-12345678";
 const OTHER_DEVICE="MC-ABCDEF12-34567890-ABCDEF12";
 const PURCHASE_TOKEN="purchase-token-1234567890";
@@ -79,6 +79,7 @@ async function verify(workerEnv,deviceId=DEVICE,token=PURCHASE_TOKEN){
       packageName:PACKAGE,
       productId:PRODUCT,
       purchaseToken:token,
+      purpose:"annual_renewal",
       versionName:"1.2.0",
       versionCode:15
     })
@@ -87,7 +88,7 @@ async function verify(workerEnv,deviceId=DEVICE,token=PURCHASE_TOKEN){
   return {response,body:await response.json()};
 }
 
-function googleMock({state="PURCHASED",accountId=DEVICE,acknowledged=false,productId=PRODUCT}={}){
+function googleMock({state="SUBSCRIPTION_STATE_ACTIVE",accountId=DEVICE,acknowledged=false,productId=PRODUCT,expiryMs=Date.now()+365*24*60*60*1000}={}){
   const calls=[];
   const fetcher=async(url,options={})=>{
     const value=String(url);
@@ -99,12 +100,15 @@ function googleMock({state="PURCHASED",accountId=DEVICE,acknowledged=false,produ
         status:200,headers:{"content-type":"application/json"}
       });
     }
-    if(value.includes("/purchases/productsv2/tokens/")){
+    if(value.includes("/purchases/subscriptionsv2/tokens/")){
       return new Response(JSON.stringify({
-        purchaseStateContext:{purchaseState:state},
-        productLineItem:[{productId}],
-        obfuscatedExternalAccountId:accountId,
-        orderId:"GPA.1234-5678-9012-34567",
+        subscriptionState:state,
+        lineItems:[{
+          productId,
+          expiryTime:new Date(expiryMs).toISOString(),
+          latestSuccessfulOrderId:"GPA.1234-5678-9012-34567"
+        }],
+        externalAccountIdentifiers:{obfuscatedExternalAccountId:accountId},
         acknowledgementState:acknowledged
           ?"ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"
           :"ACKNOWLEDGEMENT_STATE_PENDING"
@@ -119,7 +123,7 @@ function googleMock({state="PURCHASED",accountId=DEVICE,acknowledged=false,produ
   return {fetcher,calls};
 }
 
-test("verified purchased product is server-bound and acknowledged before entitlement",async()=>{
+test("verified yearly subscription renewal is server-bound and acknowledged before entitlement",async()=>{
   const db=new FakeD1();
   const mock=googleMock();
   const result=await verify(env(db,mock.fetcher));
@@ -132,9 +136,9 @@ test("verified purchased product is server-bound and acknowledged before entitle
   assert.equal(mock.calls.filter(c=>c.url.endsWith(":acknowledge")).length,1);
 });
 
-test("pending purchase never grants MusaCAD Pro",async()=>{
+test("pending yearly renewal never grants MusaCAD access",async()=>{
   const db=new FakeD1();
-  const mock=googleMock({state:"PENDING"});
+  const mock=googleMock({state:"SUBSCRIPTION_STATE_PENDING"});
   const result=await verify(env(db,mock.fetcher));
   assert.equal(result.response.status,202);
   assert.equal(result.body.status,"pending");
@@ -142,7 +146,7 @@ test("pending purchase never grants MusaCAD Pro",async()=>{
   assert.equal(mock.calls.filter(c=>c.url.endsWith(":acknowledge")).length,0);
 });
 
-test("purchase with another MusaCAD device binding is denied",async()=>{
+test("yearly renewal with another MusaCAD device binding is denied",async()=>{
   const db=new FakeD1();
   const mock=googleMock({accountId:OTHER_DEVICE});
   const result=await verify(env(db,mock.fetcher));
@@ -151,7 +155,7 @@ test("purchase with another MusaCAD device binding is denied",async()=>{
   assert.equal(db.playRows.size,0);
 });
 
-test("same purchase token cannot be rebound to another device",async()=>{
+test("same yearly renewal token cannot be rebound to another device",async()=>{
   const db=new FakeD1();
   const firstMock=googleMock({accountId:DEVICE,acknowledged:true});
   const first=await verify(env(db,firstMock.fetcher),DEVICE);
@@ -165,8 +169,8 @@ test("same purchase token cannot be rebound to another device",async()=>{
   assert.equal([...db.playRows.values()][0].device_id,DEVICE);
 });
 
-test("cancelled or wrong product purchases are denied",async()=>{
-  const cancelled=googleMock({state:"CANCELLED"});
+test("cancelled or wrong yearly renewal subscriptions are denied",async()=>{
+  const cancelled=googleMock({state:"SUBSCRIPTION_STATE_CANCELED"});
   const cancelledResult=await verify(env(new FakeD1(),cancelled.fetcher));
   assert.equal(cancelledResult.response.status,403);
   assert.equal(cancelledResult.body.status,"denied");

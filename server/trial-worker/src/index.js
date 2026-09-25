@@ -59,12 +59,14 @@ async function handlePlayVerify(request, env) {
   const packageName = String(body.packageName || "").trim();
   const productId = String(body.productId || "").trim();
   const purchaseToken = String(body.purchaseToken || "").trim();
+  const purpose = String(body.purpose || "").trim();
   const allowedPackage = env.MUSACAD_PACKAGE_NAME || "com.musa.cad";
-  const allowedProduct = env.MUSACAD_PLAY_PRODUCT_ID || "musacad_pro";
+  const allowedProduct = env.MUSACAD_PLAY_YEARLY_PRODUCT_ID || "musacad_yearly_renewal";
 
   if (!validDeviceId(deviceId)
       || packageName !== allowedPackage
       || productId !== allowedProduct
+      || purpose !== "annual_renewal"
       || purchaseToken.length < 10
       || purchaseToken.length > 4096) {
     return json({ status: "denied", message: "Invalid purchase binding" }, 403);
@@ -73,22 +75,25 @@ async function handlePlayVerify(request, env) {
   const fetcher = typeof env.__fetch === "function" ? env.__fetch : fetch;
   try {
     const accessToken = await googleAccessToken(env, fetcher);
-    const purchase = await fetchGooglePurchase(fetcher, accessToken, packageName, purchaseToken);
+    const purchase = await fetchGoogleSubscription(fetcher, accessToken, packageName, purchaseToken);
     if (purchase.errorStatus) {
       if (purchase.errorStatus >= 500) return json({ status: "server_error", message: "Google Play verification unavailable" }, 503);
-      return json({ status: "denied", message: "Google Play purchase was not found" }, 403);
+      return json({ status: "denied", message: "Google Play yearly renewal was not found" }, 403);
     }
 
     const data = purchase.data || {};
-    const state = data.purchaseStateContext && data.purchaseStateContext.purchaseState;
-    if (state === "PENDING") return json({ status: "pending", message: "Payment is still pending" }, 202);
-    if (state !== "PURCHASED") return json({ status: "denied", message: "Purchase is not active" }, 403);
+    const state = String(data.subscriptionState || "");
+    if (state.includes("PENDING")) return json({ status: "pending", message: "Payment is still pending" }, 202);
+    if (state !== "SUBSCRIPTION_STATE_ACTIVE" && state !== "SUBSCRIPTION_STATE_IN_GRACE_PERIOD")
+      return json({ status: "denied", message: "Yearly renewal is not active" }, 403);
 
-    const lineItems = Array.isArray(data.productLineItem) ? data.productLineItem : [];
+    const lineItems = Array.isArray(data.lineItems) ? data.lineItems : [];
     if (!lineItems.some(item => item && item.productId === productId))
-      return json({ status: "denied", message: "Purchased product does not match MusaCAD Pro" }, 403);
+      return json({ status: "denied", message: "Subscription product does not match MusaCAD yearly renewal" }, 403);
 
-    const accountId = String(data.obfuscatedExternalAccountId || "").trim().toUpperCase();
+    const accountId = String(
+      data.externalAccountIdentifiers && data.externalAccountIdentifiers.obfuscatedExternalAccountId || ""
+    ).trim().toUpperCase();
     const allowLegacyUnbound = String(env.MUSACAD_PLAY_ALLOW_LEGACY_UNBOUND || "").toLowerCase() === "true";
     if (accountId) {
       if (accountId !== deviceId) return json({ status: "denied", message: "Purchase belongs to another MusaCAD device" }, 409);
@@ -107,18 +112,26 @@ async function handlePlayVerify(request, env) {
     }
 
     const now = Date.now();
+    const expiryTimes = lineItems
+      .map(item => Date.parse(String(item && item.expiryTime || "")))
+      .filter(value => Number.isFinite(value));
+    const expiresAtMs = expiryTimes.length ? Math.max(...expiryTimes) : 0;
+    if (!expiresAtMs || expiresAtMs <= now)
+      return json({ status: "denied", message: "Yearly renewal has expired" }, 403);
+
+    const orderId = lineItems.map(item => item && item.latestSuccessfulOrderId).find(Boolean) || "";
     await env.DB.prepare(
       "INSERT OR IGNORE INTO play_purchases(token_hash,device_id,package_name,product_id,order_id,verified_at_ms) VALUES(?,?,?,?,?,?)"
-    ).bind(tokenHash, deviceId, packageName, productId, String(data.orderId || ""), now).run();
+    ).bind(tokenHash, deviceId, packageName, productId, String(orderId), now).run();
 
     if (data.acknowledgementState !== "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED") {
-      const acknowledged = await acknowledgeGooglePurchase(fetcher, accessToken, packageName, productId, purchaseToken);
+      const acknowledged = await acknowledgeGoogleSubscription(fetcher, accessToken, packageName, productId, purchaseToken);
       if (!acknowledged) {
-        const refreshed = await fetchGooglePurchase(fetcher, accessToken, packageName, purchaseToken);
+        const refreshed = await fetchGoogleSubscription(fetcher, accessToken, packageName, purchaseToken);
         if (refreshed.errorStatus
             || !refreshed.data
             || refreshed.data.acknowledgementState !== "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED") {
-          return json({ status: "server_error", message: "Purchase verified but acknowledgement failed" }, 503);
+          return json({ status: "server_error", message: "Yearly renewal verified but acknowledgement failed" }, 503);
         }
       }
     }
@@ -127,7 +140,7 @@ async function handlePlayVerify(request, env) {
       "UPDATE play_purchases SET verified_at_ms=?,acknowledged_at_ms=? WHERE token_hash=?"
     ).bind(now, now, tokenHash).run();
 
-    return json({ status: "active", productId, acknowledged: true }, 200);
+    return json({ status: "active", productId, purpose: "annual_renewal", expiresAtMs, acknowledged: true }, 200);
   } catch (_) {
     return json({ status: "server_error", message: "Google Play verification failed" }, 503);
   }
@@ -171,10 +184,10 @@ async function googleAccessToken(env, fetcher) {
   return String(body.access_token);
 }
 
-async function fetchGooglePurchase(fetcher, accessToken, packageName, purchaseToken) {
+async function fetchGoogleSubscription(fetcher, accessToken, packageName, purchaseToken) {
   const url = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
     + encodeURIComponent(packageName)
-    + "/purchases/productsv2/tokens/"
+    + "/purchases/subscriptionsv2/tokens/"
     + encodeURIComponent(purchaseToken);
   const response = await fetcher(url, {
     method: "GET",
@@ -184,10 +197,10 @@ async function fetchGooglePurchase(fetcher, accessToken, packageName, purchaseTo
   return { data: await response.json() };
 }
 
-async function acknowledgeGooglePurchase(fetcher, accessToken, packageName, productId, purchaseToken) {
+async function acknowledgeGoogleSubscription(fetcher, accessToken, packageName, productId, purchaseToken) {
   const url = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
     + encodeURIComponent(packageName)
-    + "/purchases/products/"
+    + "/purchases/subscriptions/"
     + encodeURIComponent(productId)
     + "/tokens/"
     + encodeURIComponent(purchaseToken)

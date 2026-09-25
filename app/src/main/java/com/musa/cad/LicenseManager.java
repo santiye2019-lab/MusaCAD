@@ -17,6 +17,7 @@ public final class LicenseManager {
     private static final String K_SERVER_TRIAL_USED="server_trial_used_v2";
     private static final String K_SIGNED_TRIAL_LAST_SEEN="signed_trial_last_seen_v2";
     private static final String K_PLAY_ENTITLED="play_entitled_v1";
+    private static final String K_EVER_PAID_LICENSE="ever_paid_license_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -27,8 +28,16 @@ public final class LicenseManager {
     public static State state(Context c){
         SharedPreferences p=prefs(c);
         String paid=p.getString(K_LICENSE_TOKEN,null);
-        if(paid!=null&&verifyStoredPaidToken(c,paid))return State.LICENSED;
-        if(p.getBoolean(K_PLAY_ENTITLED,false))return State.LICENSED;
+        if(paid!=null){
+            // Any stored paid token was accepted by activateCode() when it was written,
+            // so it is safe to remember that this device has had a paid MusaCAD license.
+            p.edit().putBoolean(K_EVER_PAID_LICENSE,true).apply();
+            if(verifyStoredPaidToken(c,paid))return State.LICENSED;
+        }
+        if(p.getBoolean(K_PLAY_ENTITLED,false)){
+            p.edit().putBoolean(K_EVER_PAID_LICENSE,true).apply();
+            return State.LICENSED;
+        }
 
         String signedTrial=p.getString(K_TRIAL_TOKEN,null);
         if(signedTrial!=null){
@@ -101,7 +110,17 @@ public final class LicenseManager {
 
     /** Cached Google Play ownership, refreshed from Play Billing when the app process starts. */
     public static void setPlayEntitlement(Context c,boolean active){
-        prefs(c).edit().putBoolean(K_PLAY_ENTITLED,active).apply();
+        SharedPreferences.Editor e=prefs(c).edit().putBoolean(K_PLAY_ENTITLED,active);
+        if(active)e.putBoolean(K_EVER_PAID_LICENSE,true);
+        e.apply();
+    }
+
+    /** Google Play is intentionally restricted to yearly renewal of a previously paid MusaCAD license. */
+    public static boolean eligibleForPlayYearlyRenewal(Context c){
+        SharedPreferences p=prefs(c);
+        return p.getBoolean(K_EVER_PAID_LICENSE,false)
+            || p.getBoolean(K_PLAY_ENTITLED,false)
+            || p.getString(K_LICENSE_TOKEN,null)!=null;
     }
 
     public static boolean hasPlayEntitlement(Context c){
@@ -110,7 +129,7 @@ public final class LicenseManager {
 
     public static ActivationResult activateCode(Context c,String code){
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
-        try{LicenseToken.Result r=verifyPaidToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).commit();return ActivationResult.ACTIVATED;}
+        try{LicenseToken.Result r=verifyPaidToken(c,code,System.currentTimeMillis());if(r==null||!r.valid)return ActivationResult.INVALID_CODE;prefs(c).edit().putString(K_LICENSE_TOKEN,code.trim()).putBoolean(K_EVER_PAID_LICENSE,true).commit();return ActivationResult.ACTIVATED;}
         catch(Exception e){return ActivationResult.INVALID_CODE;}
     }
 
