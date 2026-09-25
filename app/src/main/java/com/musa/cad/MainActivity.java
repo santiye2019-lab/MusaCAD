@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.closeFileButton).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)Toast.makeText(this,"Açık proje yok",Toast.LENGTH_SHORT).show();else requestCloseProject(currentProject);});
         findViewById(R.id.nativeModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)result.setText("DWG Native • Önce çizim açın");else if(currentProject.nativeScene!=null)result.setText("DWG Native • hızlı sahne etkin");else result.setText("Vektör görünüm • tam çizim modeli");});
         findViewById(R.id.sceneModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);showViewToolsSheet();});
-        findViewById(R.id.right3dButton).setOnClickListener(v->open3d());
+        findViewById(R.id.right3dButton).setOnClickListener(v->show3dToolsSheet());
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.propertiesButton).setOnClickListener(v->showSelectedProperties());
         findViewById(R.id.colorButton).setOnClickListener(v->showSelectedColor());
@@ -440,7 +440,7 @@ public class MainActivity extends AppCompatActivity {
                 result.setText("ZOOM EXTENTS • Çizim ekrana sığdırıldı");
                 break;
             case VIEW_3D:
-                open3d();
+                show3dToolsSheet();
                 break;
             case VIEW_2D:
                 cad.regenerate();result.setText("2D görünüm etkin");
@@ -889,6 +889,31 @@ public class MainActivity extends AppCompatActivity {
         Intent intent=new Intent(this,Mesh3dActivity.class);intent.putExtra(Mesh3dActivity.EXTRA_DXF,model.getAbsolutePath());startActivity(intent);
     }
 
+    private void show3dToolsSheet(){
+        showToolPanel("3D Araçları",
+            tool("3B Görünümü Aç",R.drawable.ic_fit,this::open3d),
+            tool("Orbit / Döndür",R.drawable.ic_rotate,this::open3d),
+            tool("3B Ölçüm",R.drawable.ic_distance,this::open3d),
+            tool("3B Düzenle",R.drawable.ic_move,this::open3d),
+            tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
+            tool("Model / Layout",R.drawable.ic_layers,this::showLayouts),
+            tool("2B Görünüme Dön",R.drawable.ic_fit,()->{
+                cad.regenerate();
+                result.setText("2B görünüm etkin");
+            }),
+            tool("3B Bilgi",R.drawable.ic_properties,this::show3dSupportInfo)
+        );
+        result.setText("3D araçları • Görünüm, orbit, ölçüm ve düzenleme araçlarından birini seçin");
+    }
+
+    private void show3dSupportInfo(){
+        new AlertDialog.Builder(this)
+            .setTitle("MusaCAD 3D desteği")
+            .setMessage("3B araçlar açıldı. Orbit, 3B ölçüm, yüzey/ağ görünümü ve köşe düzenleme 3B çalışma ekranında kullanılabilir. Mevcut sürüm gerçek 3DFACE ve polyface yüzeyleri işler. Yalnızca 2B çizgi içeren projeler kendiliğinden 3B modele dönüştürülmez.")
+            .setPositiveButton("TAMAM",null)
+            .show();
+    }
+
     private void showViewToolsSheet(){
         showToolPanel("Görsel stil",
             tool("Kaydır",R.drawable.ic_pan,()->selectMode(R.id.panButton,CadView.Mode.PAN)),
@@ -896,7 +921,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Yakınlaştır",R.drawable.ic_zoom_in,()->cad.zoomBy(1.35f)),
             tool("Uzaklaştır",R.drawable.ic_zoom_out,()->cad.zoomBy(1f/1.35f)),
             tool("2D",R.drawable.ic_fit,()->{cad.regenerate();result.setText("2D görünüm etkin");}),
-            tool("3D",R.drawable.ic_fit,this::open3d),
+            tool("3D Araçları",R.drawable.ic_fit,this::show3dToolsSheet),
             tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
             tool("Model/Layout",R.drawable.ic_layers,this::showLayouts)
         );
