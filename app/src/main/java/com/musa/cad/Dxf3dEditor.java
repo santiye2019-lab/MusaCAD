@@ -19,12 +19,14 @@ public final class Dxf3dEditor {
         if(original.length!=mesh.xyz.length)throw new IOException("3B düzenleme verisi eksik");
         Map<Long,Float> replacements=new HashMap<>();
         for(int i=0;i<original.length;i+=3){
-            if(mesh.sourceLines[i/3]<0)throw new IOException("3B kaynak kaydı bulunamadı");
             int slot=mesh.coordinateSlots[i/3],line=mesh.sourceLines[i/3];
             for(int axis=0;axis<3;axis++){
                 float value=mesh.xyz[i+axis];
                 if(!Float.isFinite(value))throw new IOException("Geçersiz 3B koordinat");
-                if(value!=original[i+axis])replacements.put(key(line,10+axis*10+slot),value);
+                if(value!=original[i+axis]){
+                    if(line<0)throw new IOException("Blok içindeki dönüştürülmüş 3B geometri doğrudan kaydedilemez");
+                    replacements.put(key(line,10+axis*10+slot),value);
+                }
             }
         }
         if(replacements.isEmpty())throw new IOException("Kaydedilecek 3B değişiklik yok");

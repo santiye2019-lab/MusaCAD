@@ -32,6 +32,7 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        testInsertedBlockLine();
     }
 
     private static void testLineAndPolyline() throws Exception {
@@ -51,6 +52,27 @@ public final class Dxf3dMeshTest {
             if(mesh.edges.length!=8)throw new AssertionError("LINE + closed 3D POLYLINE edges");
             if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
                 throw new AssertionError("3D line/polyline Z coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testInsertedBlockLine() throws Exception {
+        File file=File.createTempFile("mesh3d-block-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"
+                +"0\nBLOCK\n2\nPIPE3D\n10\n0\n20\n0\n30\n0\n"
+                +"0\nLINE\n10\n0\n20\n0\n30\n1\n11\n2\n21\n0\n31\n3\n"
+                +"0\nENDBLK\n0\nENDSEC\n"
+                +"0\nSECTION\n2\nENTITIES\n"
+                +"0\nINSERT\n2\nPIPE3D\n10\n10\n20\n20\n30\n0\n50\n90\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=6||mesh.edges.length!=2)throw new AssertionError("inserted block line geometry");
+            if(Math.abs(mesh.xyz[0]-10f)>1e-5||Math.abs(mesh.xyz[1]-20f)>1e-5||mesh.xyz[2]!=1f)
+                throw new AssertionError("insert transform start");
+            if(Math.abs(mesh.xyz[3]-10f)>1e-5||Math.abs(mesh.xyz[4]-22f)>1e-5||mesh.xyz[5]!=3f)
+                throw new AssertionError("insert transform end");
+            if(mesh.sourceLines[0]!=-1||mesh.sourceLines[1]!=-1)throw new AssertionError("inserted geometry must be read-only");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 

@@ -9,7 +9,8 @@ import java.util.HashSet;
 
 /**
  * Bounded XYZ geometry reader for MusaCAD 3D.
- * Supports 3DFACE/polyface surfaces plus LINE and ordinary/3D POLYLINE wire geometry.
+ * Expands ordinary INSERT blocks and supports:
+ * 3DFACE, polyface, LINE, ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
     private static final int MAX_VERTICES=2_000_000,MAX_TRIANGLES=4_000_000,MAX_EDGES=4_000_000;
@@ -38,108 +39,111 @@ public final class Dxf3dMesh {
         radius=Math.max(1e-6f,(float)Math.sqrt((maxX-minX)*(maxX-minX)+(maxY-minY)*(maxY-minY)+(maxZ-minZ)*(maxZ-minZ))*.5f);
     }
 
-    private static void edge(HashSet<Long> seen,IntBuffer out,int a,int b){
-        if(a==b)return;long key=((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL);
-        if(seen.add(key)){out.add(a);out.add(b);}
-    }
-    private static final class IntBuffer{int[] a=new int[1024];int n;void add(int v){if(n==a.length)a=Arrays.copyOf(a,a.length*2);a[n++]=v;}int[] toArray(){return Arrays.copyOf(a,n);}}
-    private static final class FloatBuffer{float[] a=new float[3072];int n;void add(float v){if(n==a.length)a=Arrays.copyOf(a,a.length*2);a[n++]=v;}float[] toArray(){return Arrays.copyOf(a,n);}}
-    private static final class Face{final int[] index;final int base;Face(int[] index,int base){this.index=index;this.base=base;}}
-
     public static Dxf3dMesh read(File file)throws IOException{
-        FloatBuffer points=new FloatBuffer();
-        IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
-        int solids=0;
-        String section="";
-        boolean polyface=false,polylinePath=false,polylineClosed=false;
-        int base=0,vertexCount=0,firstPathVertex=-1,previousPathVertex=-1;
-        ArrayList<Face> faces=new ArrayList<>();
+        Collector collector=new Collector();
+        DxfBlocks.expand(file,StandardCharsets.UTF_8,collector);
+        collector.finishGeometry();
+        if(collector.polyface)throw new IOException("3B polyface nesnesinin sonu bulunamadı");
+        if(collector.points.n==0||(collector.triangles.n==0&&collector.explicitEdges.n==0))
+            throw new IOException(collector.solids>0?"Katı 3B nesneler için geometri çözümleyici gerekli":"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
+        return new Dxf3dMesh(
+            collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
+            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids
+        );
+    }
 
-        try(DxfStream stream=new DxfStream(file,StandardCharsets.UTF_8)){
-            DxfBlocks.Record r;
-            while((r=stream.next())!=null){
-                if("EOF".equals(r.type))break;
-                if("SECTION".equals(r.type)){section=r.text(2,"");continue;}
-                if("ENDSEC".equals(r.type)){section="";continue;}
-                if(!"ENTITIES".equals(section))continue;
+    private static final class Collector implements DxfBlocks.Sink {
+        final FloatBuffer points=new FloatBuffer();
+        final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
+        final ArrayList<Face> faces=new ArrayList<>();
+        boolean polyface,polylinePath,polylineClosed;
+        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,solids;
 
-                if("POLYLINE".equals(r.type)){
+        @Override public void accept(DxfBlocks.Placement p)throws IOException{
+            if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(p.layout))return;
+            DxfBlocks.Record r=p.record;
+
+            if("POLYLINE".equals(r.type)){
+                finishGeometry();
+                int flags=(int)r.number(70,0);
+                polyface=(flags&64)!=0;
+                boolean polygonMesh=(flags&16)!=0;
+                polylinePath=!polyface&&!polygonMesh;
+                polylineClosed=(flags&1)!=0;
+                base=points.n/3;vertexCount=0;firstPathVertex=-1;previousPathVertex=-1;faces.clear();
+                return;
+            }
+
+            if("VERTEX".equals(r.type)&&(polyface||polylinePath)){
+                if(polyface){
                     int flags=(int)r.number(70,0);
-                    polyface=(flags&64)!=0;
-                    boolean polygonMesh=(flags&16)!=0;
-                    polylinePath=!polyface&&!polygonMesh;
-                    polylineClosed=(flags&1)!=0;
-                    base=points.n/3;vertexCount=0;firstPathVertex=-1;previousPathVertex=-1;faces.clear();
-                    continue;
-                }
-
-                if("VERTEX".equals(r.type)){
-                    if(polyface){
-                        int flags=(int)r.number(70,0);
-                        if((flags&64)!=0){
-                            addPoint(points,r,10,20,30);sourceLines.add(r.sourceStart);coordinateSlots.add(0);vertexCount++;
-                        }else if((flags&128)!=0){
-                            int[] indices=new int[4];for(int k=0;k<4;k++)indices[k]=Math.abs((int)r.number(71+k,0));
-                            faces.add(new Face(indices,base));
-                        }
-                        continue;
+                    if((flags&64)!=0){
+                        addPoint(points,p,10,20,30);addSource(p,0);vertexCount++;
+                    }else if((flags&128)!=0){
+                        int[] indices=new int[4];for(int k=0;k<4;k++)indices[k]=Math.abs((int)r.number(71+k,0));
+                        faces.add(new Face(indices,base));
                     }
-                    if(polylinePath){
-                        int index=points.n/3;
-                        addPoint(points,r,10,20,30);sourceLines.add(r.sourceStart);coordinateSlots.add(0);
-                        if(firstPathVertex<0)firstPathVertex=index;
-                        if(previousPathVertex>=0)appendEdge(explicitEdges,previousPathVertex,index);
-                        previousPathVertex=index;vertexCount++;
-                        continue;
-                    }
+                }else{
+                    int index=points.n/3;
+                    addPoint(points,p,10,20,30);addSource(p,0);
+                    if(firstPathVertex<0)firstPathVertex=index;
+                    if(previousPathVertex>=0)appendEdge(explicitEdges,previousPathVertex,index);
+                    previousPathVertex=index;vertexCount++;
                 }
+                return;
+            }
 
-                if("SEQEND".equals(r.type)){
-                    if(polyface){
-                        for(Face face:faces)appendFace(triangles,face.index,face.base,vertexCount);
-                    }else if(polylinePath&&polylineClosed&&firstPathVertex>=0&&previousPathVertex>=0&&firstPathVertex!=previousPathVertex){
-                        appendEdge(explicitEdges,previousPathVertex,firstPathVertex);
-                    }
-                    polyface=false;polylinePath=false;polylineClosed=false;faces.clear();firstPathVertex=-1;previousPathVertex=-1;
-                    continue;
-                }
+            // DxfBlocks intentionally drops SEQEND. Any next non-VERTEX entity closes the active path.
+            finishGeometry();
 
-                if("LINE".equals(r.type)){
-                    int start=points.n/3;
-                    addPoint(points,r,10,20,30);sourceLines.add(r.sourceStart);coordinateSlots.add(0);
-                    addPoint(points,r,11,21,31);sourceLines.add(r.sourceStart);coordinateSlots.add(1);
-                    appendEdge(explicitEdges,start,start+1);
-                    continue;
-                }
-
-                if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
-                    int start=points.n/3;
-                    for(int k=0;k<3;k++){
-                        addPoint(points,r,10+k,20+k,30+k);sourceLines.add(r.sourceStart);coordinateSlots.add(k);
-                    }
-                    if(r.has(13)&&r.has(23)){
-                        addPoint(points,r,13,23,33);sourceLines.add(r.sourceStart);coordinateSlots.add(3);
-                        appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);
-                    }else appendTriangle(triangles,start,start+1,start+2);
-                    continue;
-                }
-
-                if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type))solids++;
+            if("LINE".equals(r.type)){
+                int start=points.n/3;
+                addPoint(points,p,10,20,30);addSource(p,0);
+                addPoint(points,p,11,21,31);addSource(p,1);
+                appendEdge(explicitEdges,start,start+1);
+            }else if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
+                int start=points.n/3;
+                for(int k=0;k<3;k++){addPoint(points,p,10+k,20+k,30+k);addSource(p,k);}
+                if(r.has(13)&&r.has(23)){
+                    addPoint(points,p,13,23,33);addSource(p,3);
+                    appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);
+                }else appendTriangle(triangles,start,start+1,start+2);
+            }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type)){
+                solids++;
             }
         }
 
-        if(polyface)throw new IOException("3B polyface nesnesinin SEQEND kaydı eksik");
-        if(points.n==0||(triangles.n==0&&explicitEdges.n==0))
-            throw new IOException(solids>0?"Katı 3B nesneler için geometri çözümleyici gerekli":"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
+        @Override public void finish()throws IOException{ finishGeometry(); }
 
-        return new Dxf3dMesh(points.toArray(),triangles.toArray(),explicitEdges.toArray(),sourceLines.toArray(),coordinateSlots.toArray(),solids);
+        void finishGeometry()throws IOException{
+            if(polyface){
+                for(Face face:faces)appendFace(triangles,face.index,face.base,vertexCount);
+            }else if(polylinePath&&polylineClosed&&firstPathVertex>=0&&previousPathVertex>=0&&firstPathVertex!=previousPathVertex){
+                appendEdge(explicitEdges,previousPathVertex,firstPathVertex);
+            }
+            polyface=false;polylinePath=false;polylineClosed=false;faces.clear();
+            firstPathVertex=-1;previousPathVertex=-1;vertexCount=0;
+        }
+
+        private void addSource(DxfBlocks.Placement p,int slot){
+            boolean editable=p.directRoot&&p.transform.isIdentity();
+            sourceLines.add(editable?p.record.sourceStart:-1);
+            coordinateSlots.add(slot);
+        }
     }
 
-    private static void addPoint(FloatBuffer out,DxfBlocks.Record r,int x,int y,int z)throws IOException{
+    private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,int x,int y,int z)throws IOException{
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
-        double a=r.number(x,0),b=r.number(y,0),c=r.number(z,0);
+        DxfBlocks.Record r=p.record;
+        double[] xy=p.transform.point(r.number(x,0),r.number(y,0));
+        double c=r.number(z,0),a=xy[0],b=xy[1];
         if(Math.abs(a)>1e9||Math.abs(b)>1e9||Math.abs(c)>1e9)throw new IOException("3B koordinat sınırı aşıldı");
         out.add((float)a);out.add((float)b);out.add((float)c);
+    }
+
+    private static void edge(HashSet<Long> seen,IntBuffer out,int a,int b){
+        if(a==b)return;long key=((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL);
+        if(seen.add(key)){out.add(a);out.add(b);}
     }
     private static void appendFace(IntBuffer out,int[] face,int base,int count)throws IOException{
         int a=face[0],b=face[1],c=face[2],d=face[3];
@@ -155,4 +159,8 @@ public final class Dxf3dMesh {
         if(out.n/2>=MAX_EDGES)throw new IOException("3B çizgi sayısı sınırı aşıldı");
         if(a==b)return;out.add(a);out.add(b);
     }
+
+    private static final class IntBuffer{int[] a=new int[1024];int n;void add(int v){if(n==a.length)a=Arrays.copyOf(a,a.length*2);a[n++]=v;}int[] toArray(){return Arrays.copyOf(a,n);}}
+    private static final class FloatBuffer{float[] a=new float[3072];int n;void add(float v){if(n==a.length)a=Arrays.copyOf(a,a.length*2);a[n++]=v;}float[] toArray(){return Arrays.copyOf(a,n);}}
+    private static final class Face{final int[] index;final int base;Face(int[] index,int base){this.index=index;this.base=base;}}
 }
