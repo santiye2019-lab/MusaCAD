@@ -151,6 +151,10 @@ jobs:
           grep -q 'Cihaz / Lisans Kimliği' app/src/main/java/com/musa/cad/LicenseActivity.java
           javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
           java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
+      - name: Test legacy MusaCAD license TEST app compatibility
+        run: |
+          javac -d /tmp/musacad-debug-license app/src/main/java/com/musa/cad/DebugLicenseToken.java tests/DebugLicenseCompatibilityTest.java
+          java -cp /tmp/musacad-debug-license DebugLicenseCompatibilityTest
       - name: Test secure Google Play entitlement flow
         run: |
           grep -q 'setObfuscatedAccountId(LicenseManager.installationId(context))' app/src/main/java/com/musa/cad/PlayBillingManager.java

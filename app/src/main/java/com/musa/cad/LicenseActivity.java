@@ -98,11 +98,13 @@ public class LicenseActivity extends AppCompatActivity {
             TextView deviceId=new TextView(this);
             deviceId.setSingleLine(false);
             deviceId.setMaxLines(2);
-            deviceId.setText(deviceLicenseId);
+            deviceId.setText(formatDeviceIdForDisplay(deviceLicenseId));
             deviceId.setTextColor(0xFFE7F7FF);
-            deviceId.setTextSize(9.3f);
+            deviceId.setTextSize(8.8f);
             deviceId.setGravity(Gravity.CENTER);
-            deviceId.setPadding(dp(5),0,dp(5),0);
+            deviceId.setHorizontallyScrolling(false);
+            deviceId.setTextIsSelectable(true);
+            deviceId.setPadding(dp(4),0,dp(4),0);
             GradientDrawable idBg=new GradientDrawable();
             idBg.setColor(0xD30A223A);
             idBg.setCornerRadius(dp(8));
@@ -192,6 +194,15 @@ public class LicenseActivity extends AppCompatActivity {
             licenseCode.setText(text.toString().trim());
             licenseCode.setSelection(licenseCode.length());
         }
+    }
+
+    private String formatDeviceIdForDisplay(String value){
+        if(value==null)return "";
+        String[] parts=value.split("-");
+        if(parts.length==4&&"MC".equals(parts[0])){
+            return parts[0]+"-"+parts[1]+"-\n"+parts[2]+"-"+parts[3];
+        }
+        return value;
     }
 
     private void copyDeviceId(String value){
@@ -292,7 +303,11 @@ public class LicenseActivity extends AppCompatActivity {
             updateRenewalButton();
             enterAfterLicense();
         }else if(licenseCode!=null){
-            licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
+            if(BuildConfig.DEBUG&&code.startsWith("MCT1.")){
+                licenseCode.setError("TEST kodu bu cihaz kimliğiyle eşleşmiyor veya süresi dolmuş. Cihaz kimliğini kopyala düğmesiyle tam olarak alın.");
+            }else{
+                licenseCode.setError("Kod geçersiz, süresi dolmuş veya bu cihaza ait değil");
+            }
         }
     }
 
