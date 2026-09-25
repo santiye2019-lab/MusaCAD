@@ -200,6 +200,21 @@ jobs:
           grep -q 'İkinci kez geri tuşuna basarsanız proje' app/src/main/java/com/musa/cad/MainActivity.java
           grep -q 'lastAccessMs' app/src/main/java/com/musa/cad/RecentFileStore.java
           grep -q 'thumbnail' app/src/main/java/com/musa/cad/RecentFileStore.java
+      - name: Test DWG first-open critical path
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
+          start=src.index("// Recent-file thumbnail generation is deliberately off the critical DWG path.")
+          export=src.index("engine.exportDxf(converted)",start)
+          critical=src[start:export]
+          assert "scheduleRecentNativeRecord" in critical
+          assert ".thumbnail(360,240)" not in critical
+          assert "RecentFileStore.record(" not in critical
+          assert "THREAD_PRIORITY_BACKGROUND" in src
+          assert "recentExecutor.shutdownNow()" in src
+          print("DWG critical-path regression checks passed")
+          PY
       - name: Test large DXF streaming under bounded heap
         run: |
           javac -d /tmp/musacad-tests \

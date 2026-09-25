@@ -26,6 +26,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
+    private final ExecutorService recentExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-recents");
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
     private final android.os.Handler recoveryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long RECOVERY_INTERVAL_MS=15_000L;
     private LoadTask activeLoad;
@@ -1761,10 +1766,10 @@ public class MainActivity extends AppCompatActivity {
                         try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
                         if(!accepted.get())throw new InterruptedIOException("Dosya açma iptal edildi");
                         loaded.handedOff=true;
-                        Bitmap quickRecent=loaded.bitmap;boolean recycleQuick=false;
-                        if(loaded.nativeScene!=null){try{quickRecent=loaded.nativeScene.thumbnail(360,240);recycleQuick=true;}catch(Exception ignored){}}
-                        RecentFileStore.record(getApplicationContext(),uri,loaded.name,quickRecent);
-                        if(recycleQuick&&quickRecent!=null&&!quickRecent.isRecycled())quickRecent.recycle();
+                        // Recent-file thumbnail generation is deliberately off the critical DWG path.
+                        // Large native scenes can contain tens of thousands of primitives; rendering a
+                        // thumbnail here used to delay the full DXF export after first paint.
+                        scheduleRecentNativeRecord(uri,loaded.name,loaded.nativeScene);
                     }
 
                     FileTransfer.checkCancelled();
@@ -1779,8 +1784,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if(loaded.handedOff&&loaded.project!=null){
-                    ProjectSession project=loaded.project;DxfParser.Result parsed=loaded.parsed;File working=loaded.workingDxf;Bitmap recentPreview=parsed.bitmap;
-                    RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
+                    ProjectSession project=loaded.project;DxfParser.Result parsed=loaded.parsed;File working=loaded.workingDxf;
                     runOnUiThread(()->{
                         if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
@@ -1796,6 +1800,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                         if(oldPreview!=null&&oldPreview!=parsed.bitmap&&!oldPreview.isRecycled())oldPreview.recycle();
                         if(activeLoad==task)activeLoad=null;refreshProjectTabs();
+                        // Metadata/thumbnail persistence is secondary to showing the complete model.
+                        scheduleRecentMetadataRecord(uri,loaded.name);
                     });
                     return;
                 }
@@ -1820,6 +1826,35 @@ public class MainActivity extends AppCompatActivity {
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
                 }
             }
+        });
+    }
+
+    private void scheduleRecentNativeRecord(Uri uri,String name,NativeScene scene){
+        if(uri==null)return;
+        final android.content.Context app=getApplicationContext();
+        final String safeName=name==null?"Çizim":name;
+        final NativeScene nativeScene=scene;
+        recentExecutor.submit(()->{
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            Bitmap thumb=null;
+            try{
+                if(nativeScene!=null)thumb=nativeScene.thumbnail(360,240);
+                RecentFileStore.record(app,uri,safeName,thumb);
+            }catch(Throwable ignored){
+                try{RecentFileStore.record(app,uri,safeName,null);}catch(Throwable ignoredAgain){}
+            }finally{
+                if(thumb!=null&&!thumb.isRecycled())thumb.recycle();
+            }
+        });
+    }
+
+    private void scheduleRecentMetadataRecord(Uri uri,String name){
+        if(uri==null)return;
+        final android.content.Context app=getApplicationContext();
+        final String safeName=name==null?"Çizim":name;
+        recentExecutor.submit(()->{
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            try{RecentFileStore.record(app,uri,safeName,null);}catch(Throwable ignored){}
         });
     }
 
@@ -2102,7 +2137,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
