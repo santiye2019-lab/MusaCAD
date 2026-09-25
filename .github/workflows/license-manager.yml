@@ -1,0 +1,37 @@
+name: Build MusaCAD License Manager
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gandalf/license-manager-apk
+    paths:
+      - 'licensemanager/**'
+      - 'settings.gradle'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - '.github/workflows/license-manager.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build license manager APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :licensemanager:assembleDebug
+          cp licensemanager/build/outputs/apk/debug/licensemanager-debug.apk /tmp/MusaCAD-Lisans-Yonetici.apk
+          test -s /tmp/MusaCAD-Lisans-Yonetici.apk
+      - name: Upload license manager APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Lisans-Yonetici
+          path: /tmp/MusaCAD-Lisans-Yonetici.apk
+          if-no-files-found: error
