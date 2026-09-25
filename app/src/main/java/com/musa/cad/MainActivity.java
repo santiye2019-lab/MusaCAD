@@ -881,29 +881,41 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    private void open3d(){
+    private void open3d(){ open3d(Mesh3dActivity.MODE_ISO); }
+
+    private void open3d(String mode){
         File model=currentProject==null?null:currentProject.workingDxf;
         if(model==null||!model.isFile()){
-            Toast.makeText(this,currentProject!=null&&currentProject.preparingEditor?"3B görünüm için DWG dönüşümü hazırlanıyor":"Önce 3B yüzey içeren DWG/DXF açın",Toast.LENGTH_LONG).show();return;
+            Toast.makeText(this,currentProject!=null&&currentProject.preparingEditor
+                ?"3B görünüm için DWG dönüşümü hazırlanıyor"
+                :"Önce bir DWG/DXF açın",Toast.LENGTH_LONG).show();
+            return;
         }
-        Intent intent=new Intent(this,Mesh3dActivity.class);intent.putExtra(Mesh3dActivity.EXTRA_DXF,model.getAbsolutePath());startActivity(intent);
+        Intent intent=new Intent(this,Mesh3dActivity.class);
+        intent.putExtra(Mesh3dActivity.EXTRA_DXF,model.getAbsolutePath());
+        intent.putExtra(Mesh3dActivity.EXTRA_MODE,mode);
+        startActivity(intent);
     }
 
     private void show3dToolsSheet(){
         showToolPanel("3D Araçları",
-            tool("3B Görünümü Aç",R.drawable.ic_fit,this::open3d),
-            tool("Orbit / Döndür",R.drawable.ic_rotate,this::open3d),
-            tool("3B Ölçüm",R.drawable.ic_distance,this::open3d),
-            tool("3B Düzenle",R.drawable.ic_move,this::open3d),
+            tool("İzometrik",R.drawable.ic_fit,()->open3d(Mesh3dActivity.MODE_ISO)),
+            tool("Orbit / Döndür",R.drawable.ic_rotate,()->open3d(Mesh3dActivity.MODE_ORBIT)),
+            tool("Ön Görünüş",R.drawable.ic_fit,()->open3d(Mesh3dActivity.MODE_FRONT)),
+            tool("Üst Görünüş",R.drawable.ic_fit,()->open3d(Mesh3dActivity.MODE_TOP)),
+            tool("Sağ Görünüş",R.drawable.ic_fit,()->open3d(Mesh3dActivity.MODE_RIGHT)),
+            tool("Tel Kafes",R.drawable.ic_layers,()->open3d(Mesh3dActivity.MODE_WIREFRAME)),
+            tool("Yüzey",R.drawable.ic_layers,()->open3d(Mesh3dActivity.MODE_SURFACE)),
+            tool("3B Ölçüm",R.drawable.ic_distance,()->open3d(Mesh3dActivity.MODE_MEASURE)),
+            tool("3B Düzenle",R.drawable.ic_move,()->open3d(Mesh3dActivity.MODE_EDIT)),
             tool("Katmanlar",R.drawable.ic_layers,this::showLayers),
-            tool("Model / Layout",R.drawable.ic_layers,this::showLayouts),
             tool("2B Görünüme Dön",R.drawable.ic_fit,()->{
                 cad.regenerate();
                 result.setText("2B görünüm etkin");
             }),
             tool("3B Bilgi",R.drawable.ic_properties,this::show3dSupportInfo)
         );
-        result.setText("3D araçları • Görünüm, orbit, ölçüm ve düzenleme araçlarından birini seçin");
+        result.setText("3D araçları • İzometrik, görünüş, tel kafes, ölçüm ve düzenleme seçenekleri hazır");
     }
 
     private void show3dSupportInfo(){
