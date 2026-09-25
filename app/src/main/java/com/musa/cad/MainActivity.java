@@ -25,7 +25,17 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
+    private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
+    private final android.os.Handler recoveryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final long RECOVERY_INTERVAL_MS=15_000L;
     private LoadTask activeLoad;
+    private boolean recoveryPromptShown;
+    private final Runnable recoveryTicker=new Runnable(){
+        @Override public void run(){
+            queueRecoveryForCurrent(false);
+            recoveryHandler.postDelayed(this,RECOVERY_INTERVAL_MS);
+        }
+    };
 
     private static final class LoadTask {Future<?> future;AlertDialog dialog;TextView progress;}
     private static final class ToolAction {
@@ -45,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private static final class ProjectSession {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
+        String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
@@ -194,6 +205,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.homeLayoutCategory).setOnClickListener(v->openHomeCategory(R.id.groupLayoutToolsButton));
         findViewById(R.id.homeViewCategory).setOnClickListener(v->openHomeCategory(R.id.groupViewToolsButton));
         updateShareEnabled(false);updateEditorEnabled(false);showHomeUi();handleIncomingIntent(getIntent());
+        recoveryHandler.postDelayed(this::offerRecoveryIfIdle,650L);
     }
 
     private void executeCommand(){
@@ -1823,10 +1835,149 @@ public class MainActivity extends AppCompatActivity {
     }
     private boolean hasPreparingProject(){for(ProjectSession p:projects)if(p.preparingEditor)return true;return false;}
 
+    private File recoveryDir(){
+        File dir=new File(getFilesDir(),"recovery");
+        if(!dir.exists())dir.mkdirs();
+        return dir;
+    }
+
+    private String ensureRecoveryId(ProjectSession project){
+        if(project==null)return null;
+        if(project.recoveryId!=null&&!project.recoveryId.trim().isEmpty())return project.recoveryId;
+        String seed=project.sourceUri==null?"blank:"+(project.name==null?"cizim.dxf":project.name)+":"+project.lastAccessMs:project.sourceUri.toString();
+        project.recoveryId=RecoveryStore.idFor(seed);
+        return project.recoveryId;
+    }
+
+    private void queueRecoveryForCurrent(boolean force){
+        final ProjectSession project=currentProject;
+        final DxfParser.Result drawing=activeDxf;
+        final File base=editingBaseDxf;
+        if(project==null||drawing==null||base==null||!base.isFile()||activeLoad!=null||!project.baselineSet)return;
+
+        final long fingerprint=cad.editFingerprint();
+        project.dirty=fingerprint!=project.savedFingerprint;
+        if(!project.dirty){
+            clearRecovery(project);
+            project.recoveryFingerprint=fingerprint;
+            return;
+        }
+        if(!force&&project.recoveryFingerprint==fingerprint)return;
+
+        final String id=ensureRecoveryId(project);
+        final String displayName=project.name==null?"Kurtarılan çizim.dxf":project.name;
+        final String sourceUri=project.sourceUri==null?"":project.sourceUri.toString();
+        final String defaultLayer=project.defaultLayer==null?"0":project.defaultLayer;
+        final List<CadEdit> additions=new ArrayList<>(cad.getAddedEdits());
+        final List<SourceReplacement> replacements=new ArrayList<>(cad.getSourceReplacements());
+        final List<SourceRange> removals=new ArrayList<>(cad.getSourceRemovals());
+        final List<CadBlock.Definition> blocks=new ArrayList<>(cad.getUserBlocks());
+        project.recoveryFingerprint=fingerprint;
+
+        recoveryExecutor.submit(()->{
+            try{
+                RecoveryStore.write(recoveryDir(),id,displayName,sourceUri,fingerprint,System.currentTimeMillis(),
+                    out->DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer));
+                RecoveryStore.prune(recoveryDir(),MAX_OPEN_PROJECTS);
+            }catch(Exception e){
+                project.recoveryFingerprint=Long.MIN_VALUE;
+                android.util.Log.w("MusaCAD","Recovery snapshot failed",e);
+            }
+        });
+    }
+
+    private void clearRecovery(ProjectSession project){
+        if(project==null)return;
+        String id=project.recoveryId;
+        if(id!=null&&!id.trim().isEmpty())RecoveryStore.delete(recoveryDir(),id);
+        project.recoveryFingerprint=Long.MIN_VALUE;
+    }
+
+    private void offerRecoveryIfIdle(){
+        if(recoveryPromptShown||isFinishing()||isDestroyed())return;
+        if(activeLoad!=null||!projects.isEmpty()){
+            if(activeLoad!=null)recoveryHandler.postDelayed(this::offerRecoveryIfIdle,900L);
+            return;
+        }
+        List<RecoveryStore.Record> records=RecoveryStore.list(recoveryDir());
+        if(records.isEmpty())return;
+        final RecoveryStore.Record record=records.get(0);
+        recoveryPromptShown=true;
+        String when=android.text.format.DateFormat.format("dd.MM.yyyy HH:mm",new Date(record.savedAtMs)).toString();
+        new AlertDialog.Builder(this)
+            .setTitle("Otomatik kurtarma")
+            .setMessage(record.displayName+" için kaydedilmemiş bir çalışma bulundu.\n\nSon kurtarma: "+when)
+            .setPositiveButton("KURTAR",(d,w)->restoreRecoveryRecord(record))
+            .setNeutralButton("SİL",(d,w)->{
+                RecoveryStore.delete(recoveryDir(),record.id);
+                recoveryPromptShown=false;
+                recoveryHandler.post(this::offerRecoveryIfIdle);
+            })
+            .setNegativeButton("SONRA",null)
+            .show();
+    }
+
+    private void restoreRecoveryRecord(RecoveryStore.Record record){
+        if(record==null||record.dxfFile==null||!record.dxfFile.isFile()||activeLoad!=null)return;
+        cancelLoad();
+        LoadTask task=new LoadTask();activeLoad=task;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));
+        task.progress=new TextView(this);task.progress.setText("Kurtarma kopyası hazırlanıyor…");box.addView(task.progress);
+        task.dialog=new AlertDialog.Builder(this).setTitle("Çalışma kurtarılıyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
+
+        task.future=loader.submit(()->{
+            File temp=null;
+            try{
+                temp=File.createTempFile("MusaCAD_kurtarma_",".dxf",getCacheDir());
+                try(InputStream in=new FileInputStream(record.dxfFile);OutputStream out=new FileOutputStream(temp)){
+                    FileTransfer.copy(in,out,512L*1024*1024,null);
+                }
+                FileTransfer.checkCancelled();
+                DxfParser.Result parsed=DxfParser.render(temp);
+                if(parsed==null||parsed.bitmap==null)throw new IOException("Kurtarma kopyasında görüntülenebilir geometri bulunamadı");
+                final File recovered=temp;temp=null;
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();recovered.delete();return;}
+                    activeLoad=null;task.dialog.dismiss();
+                    ProjectSession project=new ProjectSession();
+                    project.sourceUri=record.sourceUri==null||record.sourceUri.trim().isEmpty()?null:Uri.parse(record.sourceUri);
+                    project.file=recovered;project.workingDxf=recovered;project.bitmap=parsed.bitmap;project.parsed=parsed;project.name=record.displayName;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
+                    project.recoveryId=record.id;project.recoveryFingerprint=record.fingerprint;
+                    projects.add(project);activateProject(project);
+                    project.savedFingerprint=Long.MIN_VALUE;project.baselineSet=true;project.dirty=true;
+                    refreshProjectTabs();
+                    result.setText("Kurtarılan çalışma • Kaydet / DXF dışa aktar ile kalıcı dosya oluşturun");
+                    Toast.makeText(this,"Kurtarma kopyası açıldı",Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception|OutOfMemoryError e){
+                if(temp!=null)temp.delete();
+                final Exception error=e instanceof Exception?(Exception)e:new IOException("Kurtarma için yeterli bellek yok");
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(error);
+                });
+            }
+        });
+    }
+
+    @Override protected void onResume(){
+        super.onResume();
+        recoveryHandler.removeCallbacks(recoveryTicker);
+        recoveryHandler.postDelayed(recoveryTicker,RECOVERY_INTERVAL_MS);
+    }
+
+    @Override protected void onPause(){
+        queueRecoveryForCurrent(true);
+        recoveryHandler.removeCallbacks(recoveryTicker);
+        super.onPause();
+    }
+
     private void captureCurrentProject(){
         if(currentProject==null)return;
         currentProject.file=currentFile;currentProject.workingDxf=editingBaseDxf;currentProject.parsed=activeDxf;currentProject.name=currentDisplayName;
         currentProject.viewState=cad.captureSessionState();currentProject.dirty=currentProject.baselineSet&&cad.editFingerprint()!=currentProject.savedFingerprint;currentProject.lastAccessMs=System.currentTimeMillis();
+        queueRecoveryForCurrent(false);
         // The vector preview bitmap is not used for zoom rendering; recycle it for inactive tabs to reduce RAM pressure.
         if(currentProject.parsed!=null&&currentProject.parsed.bitmap!=null&&!currentProject.parsed.bitmap.isRecycled())currentProject.parsed.bitmap.recycle();
     }
@@ -1896,6 +2047,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void closeProjectNow(ProjectSession project){
         if(project==null)return;
+        clearRecovery(project);
         boolean active=project==currentProject;
         projects.remove(project);
         if(active){
@@ -1916,7 +2068,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
@@ -1962,7 +2114,7 @@ public class MainActivity extends AppCompatActivity {
         if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();}
+                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
                     Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
                     if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});

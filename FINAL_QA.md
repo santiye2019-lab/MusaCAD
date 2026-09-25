@@ -51,6 +51,14 @@
 - [x] Dosya adı ve çizim durumu
 - [x] Haptik düğme geri bildirimi
 
+## Otomatik kurtarma
+- [x] Kaydedilmemiş düzenlemeyi atomik DXF kurtarma kopyasına yazma
+- [x] Aynı proje için yeni kurtarma kopyasının eskisini güvenli biçimde değiştirmesi
+- [x] Uygulama açılışında Kurtar / Sil / Sonra seçenekleri
+- [x] Kurtarılan çalışmayı kaydedilmemiş olarak işaretleme
+- [x] Normal DXF kaydı veya bilinçli proje kapatma sonrası kurtarma kaydını temizleme
+- [x] En fazla açık proje sayısı kadar son kurtarma kaydını tutma
+
 ## Teknik kalite kapısı
 - [x] LibreDWG native smoke test
 - [x] DXF text decoding test
