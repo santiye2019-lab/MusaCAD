@@ -20,6 +20,10 @@ import java.util.Arrays;
 /** Reads the converted DWG/DXF mesh off the UI thread and opens a real 3D orbit view. */
 public final class Mesh3dActivity extends Activity {
     public static final String EXTRA_DXF="com.musa.cad.DXF_3D_PATH";
+    public static final String EXTRA_MODE="com.musa.cad.DXF_3D_MODE";
+    public static final String MODE_ISO="iso",MODE_ORBIT="orbit",MODE_FRONT="front",MODE_TOP="top",
+        MODE_RIGHT="right",MODE_WIREFRAME="wireframe",MODE_SURFACE="surface",
+        MODE_MEASURE="measure",MODE_EDIT="edit";
     private static final int SAVE_DXF=3103;
     private volatile boolean closing;
     private boolean saving;
@@ -38,11 +42,57 @@ public final class Mesh3dActivity extends Activity {
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
                     TextView hint=new TextView(this);hint.setText("← Geri   •   Tek parmak: döndür   •   İki parmak: yakınlaştır   •   İki köşe: 3B ölçüm\n"+(mesh.triangles.length/3)+" üçgen  •  "+(mesh.xyz.length/3)+" köşe"+(mesh.unsupportedSolids>0?"  •  Katı modeller görüntülenemedi":""));
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
+                    addViewControls(root);
                     addEditControls(root);
                 });
             }catch(Exception e){runOnUiThread(()->{if(!closing)status.setText("3B görünüm açılamadı: "+e.getMessage());});}
         },"MusaCAD-3D-load").start();
     }
+    private void applyRequestedMode(){
+        if(meshView==null)return;
+        String mode=getIntent().getStringExtra(EXTRA_MODE);
+        if(mode==null)mode=MODE_ISO;
+        switch(mode){
+            case MODE_FRONT: meshView.setFrontView(); break;
+            case MODE_TOP: meshView.setTopView(); break;
+            case MODE_RIGHT: meshView.setRightView(); break;
+            case MODE_WIREFRAME: meshView.setWireframe(true); meshView.setIsometricView(); break;
+            case MODE_SURFACE: meshView.setWireframe(false); meshView.setIsometricView(); break;
+            case MODE_ORBIT: meshView.setIsometricView(); break;
+            case MODE_MEASURE: meshView.setIsometricView(); break;
+            case MODE_EDIT: meshView.setIsometricView(); break;
+            default: meshView.setIsometricView(); break;
+        }
+    }
+
+    private void addViewControls(FrameLayout root){
+        LinearLayout bar=new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setBackgroundColor(0xee07131d);
+        String[] names={"ISO","ÖN","ÜST","SAĞ","TEL","YÜZEY"};
+        for(String name:names){
+            Button b=new Button(this);
+            b.setText(name);
+            b.setTextSize(10f);
+            b.setMinWidth(0);b.setMinHeight(0);
+            bar.addView(b,new LinearLayout.LayoutParams(0,-2,1f));
+            b.setOnClickListener(v->{
+                if(meshView==null)return;
+                switch(name){
+                    case "ÖN": meshView.setFrontView(); break;
+                    case "ÜST": meshView.setTopView(); break;
+                    case "SAĞ": meshView.setRightView(); break;
+                    case "TEL": meshView.setWireframe(true); break;
+                    case "YÜZEY": meshView.setWireframe(false); break;
+                    default: meshView.setIsometricView(); break;
+                }
+            });
+        }
+        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);
+        lp.topMargin=(int)(64*getResources().getDisplayMetrics().density);
+        root.addView(bar,lp);
+    }
+
     private void addEditControls(FrameLayout root){
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
         LinearLayout views=new LinearLayout(this);panel.addView(views,new LinearLayout.LayoutParams(-1,-2));
