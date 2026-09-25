@@ -151,6 +151,10 @@ jobs:
           grep -q 'Cihaz / Lisans Kimliği' app/src/main/java/com/musa/cad/LicenseActivity.java
           javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
           java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
+      - name: Test 12-character Serial and license code
+        run: |
+          javac -d /tmp/musacad-short-license app/src/main/java/com/musa/cad/ShortLicenseCode.java tests/ShortLicenseCodeTest.java
+          java -cp /tmp/musacad-short-license ShortLicenseCodeTest
       - name: Test legacy MusaCAD license TEST app compatibility
         run: |
           javac -d /tmp/musacad-debug-license app/src/main/java/com/musa/cad/DebugLicenseToken.java tests/DebugLicenseCompatibilityTest.java
