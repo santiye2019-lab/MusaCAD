@@ -4,6 +4,17 @@ android {
     namespace 'com.musa.cad.licensemanager'
     compileSdkVersion 35
 
+    buildFeatures { buildConfig true }
+
+    signingConfigs {
+        musacadDebug {
+            storeFile rootProject.file("debug-signing/musacad-debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     defaultConfig {
         applicationId 'com.musa.cad.licensemanager'
         minSdkVersion 24
@@ -13,7 +24,10 @@ android {
     }
 
     buildTypes {
-        debug { debuggable true }
+        debug {
+            debuggable true
+            signingConfig signingConfigs.musacadDebug
+        }
         release {
             debuggable false
             minifyEnabled false
