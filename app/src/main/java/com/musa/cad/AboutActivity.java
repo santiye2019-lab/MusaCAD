@@ -6,7 +6,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Bundle;
-import android.os.SystemClock;
+import android.animation.ValueAnimator;
+import android.view.animation.LinearInterpolator;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -28,12 +29,12 @@ public class AboutActivity extends AppCompatActivity {
             art.setImageResource(R.drawable.musacad_screen_2);
             art.setContentDescription("MusaCAD ikinci ekran");
 
-            // Native vector animation: no GIF decoder, no pixelated overlay.
-            // It stays only over the 3D preview area and continuously rotates in perspective.
+            // Real native animation: driven by ValueAnimator so it keeps moving on-device.
+            // Keep it inside the right-hand 3D showcase area without covering the biography.
             Cad3dPreviewView preview=new Cad3dPreviewView(this);
             preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             stage.addView(preview);
-            LockedScreenUi.position(preview,stage,500,350,385,560);
+            LockedScreenUi.position(preview,stage,555,465,310,335);
 
             LockedScreenUi.hotspot(this,stage,35,1248,870,115,v->openMusaCad());
         });
@@ -59,7 +60,8 @@ public class AboutActivity extends AppCompatActivity {
         private final Paint glow=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint line=new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint accent=new Paint(Paint.ANTI_ALIAS_FLAG);
-        private long start;
+        private ValueAnimator animator;
+        private float angle;
 
         // 3D wireframe points: central valve body, branches, flanges and base.
         private static final float[][] SEGMENTS={
@@ -80,24 +82,46 @@ public class AboutActivity extends AppCompatActivity {
         Cad3dPreviewView(android.content.Context c){
             super(c);
             setLayerType(View.LAYER_TYPE_SOFTWARE,null);
-            glow.setStyle(Paint.Style.STROKE);glow.setStrokeWidth(7f);glow.setColor(0x8825B9FF);
-            glow.setMaskFilter(new BlurMaskFilter(10f,BlurMaskFilter.Blur.NORMAL));
-            line.setStyle(Paint.Style.STROKE);line.setStrokeWidth(2.2f);line.setColor(Color.rgb(190,238,255));
-            accent.setStyle(Paint.Style.STROKE);accent.setStrokeWidth(2.7f);accent.setColor(Color.rgb(30,188,255));
+            glow.setStyle(Paint.Style.STROKE);glow.setStrokeWidth(5f);glow.setColor(0x7725B9FF);
+            glow.setMaskFilter(new BlurMaskFilter(8f,BlurMaskFilter.Blur.NORMAL));
+            line.setStyle(Paint.Style.STROKE);line.setStrokeWidth(2.0f);line.setColor(Color.rgb(220,246,255));
+            accent.setStyle(Paint.Style.STROKE);accent.setStrokeWidth(2.5f);accent.setColor(Color.rgb(26,196,255));
+        }
+
+        @Override protected void onAttachedToWindow(){
+            super.onAttachedToWindow();
+            startAnimation();
+        }
+
+        @Override protected void onDetachedFromWindow(){
+            stopAnimation();
+            super.onDetachedFromWindow();
+        }
+
+        private void startAnimation(){
+            if(animator!=null&&animator.isRunning())return;
+            animator=ValueAnimator.ofFloat(0f,(float)(Math.PI*2.0));
+            animator.setDuration(6200L);
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.RESTART);
+            animator.setInterpolator(new LinearInterpolator());
+            animator.addUpdateListener(a->{angle=(Float)a.getAnimatedValue();invalidate();});
+            animator.start();
+        }
+
+        private void stopAnimation(){
+            if(animator!=null){animator.cancel();animator=null;}
         }
 
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
-            if(start==0L)start=SystemClock.uptimeMillis();
-            float t=((SystemClock.uptimeMillis()-start)%8000L)/8000f;
-            float angle=(float)(t*Math.PI*2.0);
-            float cx=getWidth()*0.50f,cy=getHeight()*0.55f;
-            float scale=Math.min(getWidth(),getHeight())*0.28f;
+            float cx=getWidth()*0.50f,cy=getHeight()*0.52f;
+            float scale=Math.min(getWidth(),getHeight())*0.31f;
 
             // Rotating holographic base rings.
             for(int i=0;i<3;i++){
                 float r=scale*(1.12f+i*0.12f);
-                float phase=angle+i*0.7f;
+                float phase=angle+i*0.65f;
                 float squash=0.24f+0.04f*(float)Math.sin(phase);
                 c.drawOval(cx-r,cy+scale*0.88f-r*squash,cx+r,cy+scale*0.88f+r*squash,glow);
                 c.drawOval(cx-r,cy+scale*0.88f-r*squash,cx+r,cy+scale*0.88f+r*squash,accent);
@@ -110,16 +134,15 @@ public class AboutActivity extends AppCompatActivity {
                 c.drawLine(a[0],a[1],b[0],b[1],line);
             }
 
-            // Central flange circles simulated as rotating ellipses.
+            // Central flange circles move with the rotation and make the motion obvious.
+            float pulse=0.92f+0.08f*(float)Math.sin(angle*2f);
             for(int k=0;k<4;k++){
                 float y=cy+scale*(-0.14f+k*0.15f);
-                float w=scale*(0.46f-k*0.035f);
-                float h=scale*0.10f;
+                float w=scale*(0.46f-k*0.035f)*pulse;
+                float h=scale*(0.09f+0.025f*Math.abs((float)Math.sin(angle+k*.4f)));
                 c.drawOval(cx-w,y-h,cx+w,y+h,glow);
                 c.drawOval(cx-w,y-h,cx+w,y+h,accent);
             }
-
-            postInvalidateOnAnimation();
         }
 
         private static float[] project(float x,float y,float z,float a,float cx,float cy,float s){
