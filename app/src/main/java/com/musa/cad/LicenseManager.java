@@ -113,6 +113,9 @@ public final class LicenseManager {
     /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
+    /** User-facing 12-character Serial derived from the full device identity. */
+    public static String serialId(Context c){return ShortLicenseCode.serialFromInstallationId(installationId(c));}
+
     /** Cached yearly Google Play entitlement with server-verified expiry. */
     public static void setPlayEntitlement(Context c,boolean active,long expiresAtMs){
         SharedPreferences.Editor e=prefs(c).edit().putBoolean(K_PLAY_ENTITLED,active);
@@ -146,6 +149,10 @@ public final class LicenseManager {
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
         try{
             long now=System.currentTimeMillis();
+            if(ShortLicenseCode.verify(code,serialId(c),now)){
+                prefs(c).edit().putString(K_LICENSE_TOKEN,ShortLicenseCode.normalizeCode(code)).putBoolean(K_EVER_PAID_LICENSE,true).commit();
+                return ActivationResult.ACTIVATED;
+            }
             // Compatibility with the MusaCAD Lisans TEST app previously delivered to the user.
             // Test tokens are deliberately accepted only by debug builds, never release builds.
             if(BuildConfig.DEBUG&&DebugLicenseToken.verify(code,installationId(c),now)){
@@ -161,6 +168,7 @@ public final class LicenseManager {
 
     private static boolean verifyStoredPaidToken(Context c,String token){
         long now=System.currentTimeMillis();
+        if(ShortLicenseCode.verify(token,serialId(c),now))return true;
         if(BuildConfig.DEBUG&&DebugLicenseToken.verify(token,installationId(c),now))return true;
         LicenseToken.Result r=verifyPaidToken(c,token,now);
         if(r!=null&&r.valid)return true;
