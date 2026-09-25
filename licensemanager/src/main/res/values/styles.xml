@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.MusaCADLicense" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#0B3B60</item>
+        <item name="colorPrimaryVariant">#072840</item>
+        <item name="colorSecondary">#19B5A5</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:navigationBarColor">#071015</item>
+        <item name="android:statusBarColor">#0C324D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

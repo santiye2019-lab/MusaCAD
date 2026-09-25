@@ -1,2 +1,3 @@
 rootProject.name = 'MusaCAD'
 include ':app'
+include ':licensemanager'
