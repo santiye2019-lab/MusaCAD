@@ -38,6 +38,16 @@ public class DxfBlocksTest {
         skipped(read(b,insert("A",210,1,220,0,230,0)));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");
 
+        String visibilityLayers=layer("ON",62,7,70,0)+layer("OFF",62,-7,70,0)+layer("FROZEN",62,3,70,1)+layer("LOCKED",62,4,70,4);
+        DxfBlocks.Result visibility=read(visibilityLayers,"",line(8,"ON")+line(8,"OFF")+line(8,"FROZEN")+line(8,"LOCKED"));
+        if(!visibility.layerInitiallyVisible("ON")||visibility.layerInitiallyVisible("OFF")||visibility.layerInitiallyVisible("FROZEN")||!visibility.layerInitiallyVisible("LOCKED"))throw new AssertionError("Layer table visibility state");
+        DxfBlocks.Result gated=read(layer("PARENT",62,2)+layer("CHILD",62,3),block("G",line(8,"CHILD")),insert("G",8,"PARENT"));
+        if(gated.placements.size()!=1)throw new AssertionError("visibility gate placement");
+        String[] gates=gated.placements.get(0).visibilityLayerKeys;
+        java.util.Set<String>both=new java.util.HashSet<>(java.util.Arrays.asList("PARENT","CHILD"));
+        java.util.Set<String>childOnly=new java.util.HashSet<>(java.util.Collections.singletonList("CHILD"));
+        if(!com.musa.cad.DxfLayerState.allVisible(gates,both)||com.musa.cad.DxfLayerState.allVisible(gates,childOnly))throw new AssertionError("Nested INSERT visibility chain");
+
         String layers=layer("BORU",62,3)+layer("TRUE",62,2,420,0x123456);
         DxfBlocks.Result direct=read(layers,"",line(8,"BORU"));color(direct,DxfColor.aciArgb(3));if(!direct.placements.get(0).directRoot)throw new AssertionError("Direct ENTITIES record must be editable root");
         color(read(layers,"",line(8,"BORU",62,1)),DxfColor.aciArgb(1));color(read(layers,"",line(8,"TRUE")),DxfColor.trueColorArgb(0x123456));color(read(layers,"",line(8,"BORU",420,0xABCDEF)),DxfColor.trueColorArgb(0xABCDEF));
@@ -68,6 +78,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result paperInsert=read(block("P",line()),insert("P",67,1,410,"Sheet B"));layout(paperInsert,"Sheet B");
         DxfBlocks.Result mixed=read("",line()+line(67,1,410,"Sheet C"));if(!mixed.layoutNames.contains(DxfBlocks.MODEL_LAYOUT)||!mixed.layoutNames.contains("Sheet C")||mixed.placements.size()!=2)throw new AssertionError("mixed layouts");
 
-        System.out.println("37 block/color/source/style/dimension/layout expansion cases passed");
+        System.out.println("41 block/color/source/style/dimension/layout/visibility expansion cases passed");
     }
 }
