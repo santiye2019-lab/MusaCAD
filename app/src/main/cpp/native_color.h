@@ -17,11 +17,12 @@ typedef struct {
 /*
  * Normalize LibreDWG CMC colors before the fast native first paint.
  *
- * R2004+ colors carry the method in Dwg_Color.method (or the high byte of rgb):
- *   c0 ByLayer, c1 ByBlock, c2 entity/default RGB, c3 TrueColor.
- * LibreDWG may return palette index 256 when an RGB value is not an exact ACI
- * entry. Treating that as ordinary ByLayer is what caused the first frame to
- * fall back to white/layer color until the later DXF renderer took over.
+ * LibreDWG DWG_COLOR_METHOD values are authoritative:
+ *   c0 ByLayer, c1 ByBlock, c2 ACI, c3 TrueColor.
+ *
+ * Keep ACI and TrueColor separate. A TrueColor can still carry a palette-like
+ * index, and treating that index as the display color makes the native first
+ * frame disagree with the complete DXF renderer.
  */
 static inline MusaNativeColorToken musa_native_color_token(unsigned int method,int index,unsigned int rgb){
     MusaNativeColorToken out;
@@ -29,6 +30,7 @@ static inline MusaNativeColorToken musa_native_color_token(unsigned int method,i
 
     unsigned int m=method&0xffu;
     if(!m&&(rgb&0xff000000u))m=(rgb>>24)&0xffu;
+    int aci=index<0?-index:index;
 
     if(m==0xc0u){
         out.kind=MUSA_COLOR_INHERIT_LAYER;return out;
@@ -36,12 +38,19 @@ static inline MusaNativeColorToken musa_native_color_token(unsigned int method,i
     if(m==0xc1u){
         out.kind=MUSA_COLOR_INHERIT_BLOCK;return out;
     }
-
-    int aci=index<0?-index:index;
-    if(m==0xc2u||m==0xc3u){
+    if(m==0xc2u){
+        if(index==0){
+            out.kind=MUSA_COLOR_INHERIT_BLOCK;return out;
+        }
+        if(aci==256){
+            out.kind=MUSA_COLOR_INHERIT_LAYER;return out;
+        }
         if(aci>=1&&aci<=255){
             out.kind=MUSA_COLOR_ACI;out.aci=aci;return out;
         }
+        return out;
+    }
+    if(m==0xc3u){
         out.kind=MUSA_COLOR_RGB;return out;
     }
 
