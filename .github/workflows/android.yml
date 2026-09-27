@@ -98,6 +98,17 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/PlaySalesLicenseModelTest.java
           java -cp /tmp/musacad-tests PlaySalesLicenseModelTest
+      - name: Test offline 12-character Serial license generator
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/ShortLicenseCode.java tools/license-generator/ShortLicenseGenerator.java tests/ShortLicenseGeneratorTest.java
+          java -cp /tmp/musacad-tests ShortLicenseGeneratorTest
+      - name: Test offline and institutional license model
+        run: |
+          javac -d /tmp/musacad-tests tests/OfflineLicenseModelTest.java
+          java -cp /tmp/musacad-tests OfflineLicenseModelTest
+      - name: Compile offline 12-character Serial license UI
+        run: |
+          javac -d /tmp/musacad-short-license-ui app/src/main/java/com/musa/cad/ShortLicenseCode.java tools/license-generator/ShortLicenseGeneratorApp.java
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
