@@ -72,24 +72,25 @@ public final class CadSpreadsheetLayout {
     /** Parses CSV/TSV/semicolon text into one bounded sheet, honoring quoted separators and quoted newlines. */
     public static List<Sheet> parseCsv(String text){
         if(text==null||text.trim().isEmpty())return Collections.emptyList();char delimiter=detectDelimiter(text);
-        MutableSheet sheet=new MutableSheet(1,"CSV");int row=1,col=1,cells=0;StringBuilder field=new StringBuilder();boolean quote=false;
-        for(int i=0;i<=text.length()&&row<=MAX_ROWS&&cells<MAX_CELLS;i++){
-            char ch=i<text.length()?text.charAt(i):'\n';
+        MutableSheet sheet=new MutableSheet(1,"CSV");int row=1,col=1,cells=0;StringBuilder field=new StringBuilder();boolean quote=false,rowTouched=false;
+        for(int i=0;i<text.length()&&row<=MAX_ROWS&&cells<MAX_CELLS;i++){
+            char ch=text.charAt(i);
             if(ch=='"'){
-                if(quote&&i+1<text.length()&&text.charAt(i+1)=='"'){if(field.length()<MAX_CELL_CHARS)field.append('"');i++;}
+                if(quote&&i+1<text.length()&&text.charAt(i+1)=='"'){if(field.length()<MAX_CELL_CHARS)field.append('"');i++;rowTouched=true;}
                 else quote=!quote;
                 continue;
             }
             if(!quote&&ch==delimiter){
-                sheet.put(row,col,field.toString());cells++;field.setLength(0);col++;if(col>MAX_COLS){while(i+1<text.length()&&text.charAt(i+1)!='\n'&&text.charAt(i+1)!='\r')i++;}
+                sheet.put(row,col,field.toString());cells++;field.setLength(0);rowTouched=true;col++;if(col>MAX_COLS){while(i+1<text.length()&&text.charAt(i+1)!='\n'&&text.charAt(i+1)!='\r')i++;}
                 continue;
             }
             if(!quote&&(ch=='\n'||ch=='\r')){
                 if(ch=='\r'&&i+1<text.length()&&text.charAt(i+1)=='\n')i++;
-                if(col<=MAX_COLS){sheet.put(row,col,field.toString());cells++;}field.setLength(0);row++;col=1;continue;
+                if(col<=MAX_COLS){sheet.put(row,col,field.toString());cells++;}field.setLength(0);row++;col=1;rowTouched=false;continue;
             }
-            if(field.length()<MAX_CELL_CHARS)field.append(ch);
+            if(field.length()<MAX_CELL_CHARS)field.append(ch);rowTouched=true;
         }
+        if(row<=MAX_ROWS&&cells<MAX_CELLS&&(rowTouched||field.length()>0||col>1)&&col<=MAX_COLS)sheet.put(row,col,field.toString());
         Sheet out=sheet.freeze();return out.isEmpty()?Collections.emptyList():Collections.singletonList(out);
     }
 
