@@ -14,12 +14,14 @@ public final class CadFontManager {
     private static final String KEY_HINT="default_hint";
     private static final String KEY_SHX="default_shx";
     private static final String DIR="cad_fonts";
-    private static final String[] SYSTEM_DIRS={"/system/fonts","/product/fonts","/system/product/fonts"};
+    private static final String[] SYSTEM_DIRS={"/system/fonts","/product/fonts","/system/product/fonts","/system_ext/fonts","/vendor/fonts"};
     private static final String[] BUILTIN={
         "sans-serif","sans-serif-condensed","sans-serif-medium","serif","monospace"
     };
     private static final String[] COMMON_SHX={
-        "simplex.shx","txt.shx","romans.shx","romand.shx","romanc.shx","iso.shx","isoct.shx","isocp.shx"
+        "simplex.shx","txt.shx","complex.shx","romans.shx","romand.shx","romant.shx","romanc.shx",
+        "script.shx","scripts.shx","scriptc.shx","gothicg.shx","gothice.shx","gothici.shx",
+        "iso.shx","isoct.shx","isocp.shx"
     };
     private static File importDir;
 
@@ -55,9 +57,8 @@ public final class CadFontManager {
         if(imported!=null){
             Arrays.sort(imported,Comparator.comparing(File::getName,String.CASE_INSENSITIVE_ORDER));
             for(File file:imported){
-                if(!file.isFile()||!isSupportedExtension(file.getName()))continue;
-                boolean shx=isShx(file.getName());
-                add(out,new Choice(stripExtension(file.getName())+" • Kullanıcı",file.getName(),shx,true));
+                if(!file.isFile()||!isTtfOrOtf(file.getName()))continue;
+                add(out,new Choice(stripExtension(file.getName())+" • Kullanıcı",file.getName(),false,true));
             }
         }
         return Collections.unmodifiableList(new ArrayList<>(out.values()));
@@ -88,7 +89,7 @@ public final class CadFontManager {
         if(context==null||uri==null)throw new IOException("Yazı tipi seçilmedi");
         init(context);
         String name=queryName(context,uri);
-        if(!isSupportedExtension(name))throw new IOException("Yalnız TTF, OTF veya SHX yazı tipi seçin");
+        if(!isTtfOrOtf(name))throw new IOException("Yalnız TTF veya OTF yazı tipi seçin");
         name=safeFileName(name);
         File target=uniqueTarget(importDir,name);
         try(InputStream in=context.getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(target)){
@@ -96,63 +97,52 @@ public final class CadFontManager {
             byte[] buf=new byte[64*1024];int n;long total=0;
             while((n=in.read(buf))!=-1){total+=n;if(total>32L*1024L*1024L)throw new IOException("Yazı tipi dosyası çok büyük");out.write(buf,0,n);}
         }catch(IOException e){target.delete();throw e;}
-        boolean shx=isShx(target.getName());
-        if(!shx){
-            try{Typeface.createFromFile(target);}catch(RuntimeException e){target.delete();throw new IOException("Geçerli bir TTF/OTF dosyası değil",e);}
-        }
-        Choice choice=new Choice(stripExtension(target.getName())+" • Kullanıcı",target.getName(),shx,true);
+        try{Typeface.createFromFile(target);}catch(RuntimeException e){target.delete();throw new IOException("Geçerli bir TTF/OTF dosyası değil",e);}
+        Choice choice=new Choice(stripExtension(target.getName())+" • Kullanıcı",target.getName(),false,true);
         setDefaultChoice(context,choice);
         return choice;
     }
 
     public static Typeface resolveTypeface(String hint,boolean shx,int style){
         String value=cleanName(hint);
-        File file=findFontFile(value);
-        if(file!=null&&!shx){
+        File file=shx?findSubstituteByBase(value):findFontFile(value);
+        if(file!=null){
             try{return Typeface.create(Typeface.createFromFile(file),style);}catch(RuntimeException ignored){}
         }
-        if(shx)return Typeface.create(shxFamily(value),style);
-        String family=DxfTextStyle.androidFamilyHint(value,false);
-        return Typeface.create(family,style);
+        if(shx)return Typeface.create(CadFontPolicy.shxFallbackFamily(value),style);
+        return Typeface.create(CadFontPolicy.androidFallbackFamily(value),style);
     }
 
     public static boolean isAvailable(String hint,boolean shx){
         String value=cleanName(hint);
         if(value.isEmpty())return true;
+        if(shx)return isCommonShx(value)||findSubstituteByBase(value)!=null;
         if(findFontFile(value)!=null)return true;
-        if(shx)return isCommonShx(value);
-        String compact=norm(stripExtension(value)).replace("-","").replace("_","").replace(" ","");
-        return compact.equals("sans")||compact.equals("sansserif")||compact.equals("sansserifcondensed")||
-            compact.equals("sansserifmedium")||compact.equals("serif")||compact.equals("monospace")||
-            compact.contains("arial")||compact.contains("helvetica")||compact.contains("roboto")||
-            compact.contains("noto")||compact.contains("droidsans")||compact.contains("droidserif")||
-            compact.contains("times")||compact.contains("courier");
+        String family=CadFontPolicy.androidFallbackFamily(value);
+        return "sans-serif".equals(family)||"sans-serif-condensed".equals(family)||
+            "serif".equals(family)||"monospace".equals(family);
     }
 
-    public static String styleNameFor(String hint,boolean shx){
-        String base=stripExtension(cleanName(hint)).toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]+","_");
-        if(base.isEmpty())base=shx?"SHX":"FONT";
-        if(base.length()>24)base=base.substring(0,24);
-        return "MUSACAD_"+base;
+    public static String styleNameFor(String hint,boolean shx){return CadFontPolicy.dxfStyleName(hint);}
+    public static String dxfFontFile(String hint,boolean shx){return CadFontPolicy.dxfFontFile(hint,shx);}
+
+    public static int userFontCount(Context context){
+        init(context);File[] files=importDir==null?null:importDir.listFiles();if(files==null)return 0;int count=0;
+        for(File file:files)if(file.isFile()&&isTtfOrOtf(file.getName()))count++;
+        return count;
     }
 
-    public static String dxfFontFile(String hint,boolean shx){
-        String value=cleanName(hint);
-        if(value.isEmpty())return shx?"simplex.shx":"arial.ttf";
-        String lower=value.toLowerCase(Locale.ROOT);
-        if(lower.endsWith(".ttf")||lower.endsWith(".otf")||lower.endsWith(".shx"))return new File(value).getName();
-        if(shx)return value+".shx";
-        String compact=norm(value).replace("-","").replace("_","").replace(" ","");
-        if(compact.equals("serif"))return "times.ttf";
-        if(compact.equals("monospace"))return "cour.ttf";
-        if(compact.startsWith("sansserif"))return "arial.ttf";
-        return value;
+    private static File findSubstituteByBase(String hint){
+        String wanted=CadFontPolicy.key(hint);if(wanted.isEmpty())return null;
+        if(importDir!=null){File found=findByBase(importDir,wanted);if(found!=null)return found;}
+        for(File dir:systemFontDirs()){File found=findByBase(dir,wanted);if(found!=null)return found;}
+        return null;
     }
 
-    private static String shxFamily(String hint){
-        String n=norm(stripExtension(hint));
-        if(n.contains("romanc")||n.contains("romand")||n.contains("romans"))return "serif";
-        return "monospace";
+    private static File findByBase(File dir,String wanted){
+        File[] files=dir==null?null:dir.listFiles();if(files==null)return null;
+        for(File f:files)if(f.isFile()&&isTtfOrOtf(f.getName())&&CadFontPolicy.key(f.getName()).equals(wanted))return f;
+        return null;
     }
 
     private static File findFontFile(String hint){
@@ -188,9 +178,7 @@ public final class CadFontManager {
         if(!out.containsKey(key))out.put(key,c);
     }
 
-    private static boolean isSupportedExtension(String name){return isTtfOrOtf(name)||isShx(name);}
-    private static boolean isTtfOrOtf(String name){String n=norm(name);return n.endsWith(".ttf")||n.endsWith(".otf");}
-    private static boolean isShx(String name){return norm(name).endsWith(".shx");}
+    private static boolean isTtfOrOtf(String name){return CadFontPolicy.isTtfOrOtf(name);}
     private static boolean isCommonShx(String name){
         String n=norm(new File(name).getName());
         for(String common:COMMON_SHX)if(n.equals(norm(common)))return true;
