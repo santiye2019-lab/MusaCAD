@@ -144,6 +144,42 @@ static void emit_infinite_line(MusaNativeScene *s,SceneColor color,Affine2 paren
     if(ray)emit_line(s,color,parent,x,y,x+dx*reach,y+dy*reach);
     else emit_line(s,color,parent,x-dx*reach,y-dy*reach,x+dx*reach,y+dy*reach);
 }
+static double clampd(double v,double lo,double hi){return v<lo?lo:(v>hi?hi:v);}
+static void emit_mline_element(MusaNativeScene *s,SceneColor color,Affine2 parent,
+                               dwg_mline_vertex *a,dwg_mline_vertex *b,int line_index){
+    if(!a||!b||!a->lines||line_index<0||line_index>=a->num_lines)return;
+    dwg_mline_line *al=(dwg_mline_line*)a->lines,*bl=b->lines?(dwg_mline_line*)b->lines:NULL;
+    dwg_mline_line *la=&al[line_index],*lb=(bl&&line_index<b->num_lines)?&bl[line_index]:NULL;
+    double ao=(la->segparms&&la->num_segparms>0)?la->segparms[0]:0.0;
+    double bo=(lb&&lb->segparms&&lb->num_segparms>0)?lb->segparms[0]:ao;
+    double ax=a->vertex.x+a->miter_direction.x*ao,ay=a->vertex.y+a->miter_direction.y*ao;
+    double bx=b->vertex.x+b->miter_direction.x*bo,by=b->vertex.y+b->miter_direction.y*bo;
+    double dx=a->vertex_direction.x,dy=a->vertex_direction.y,len=hypot(dx,dy);
+    if(!isfinite(len)||len<1e-12){dx=bx-ax;dy=by-ay;len=hypot(dx,dy);}
+    if(!isfinite(len)||len<1e-12)return;dx/=len;dy/=len;
+    double start_shift=(la->segparms&&la->num_segparms>1)?la->segparms[1]:0.0;
+    double sx=ax+dx*start_shift,sy=ay+dy*start_shift;
+    double total=(bx-sx)*dx+(by-sy)*dy;
+    if(!isfinite(total)||total<=1e-9){
+        dx=bx-sx;dy=by-sy;len=hypot(dx,dy);if(!isfinite(len)||len<1e-12)return;dx/=len;dy/=len;total=len;
+    }
+    if(!la->segparms||la->num_segparms<=2){emit_line(s,color,parent,sx,sy,sx+dx*total,sy+dy*total);return;}
+    double cursor=0.0;
+    for(int k=2;k<la->num_segparms;k+=2){
+        double cut_start=clampd(la->segparms[k],0.0,total);
+        if(cut_start>cursor+1e-9)emit_line(s,color,parent,sx+dx*cursor,sy+dy*cursor,sx+dx*cut_start,sy+dy*cut_start);
+        if(k+1<la->num_segparms)cursor=clampd(la->segparms[k+1],cut_start,total);else{cursor=cut_start;break;}
+    }
+    if(cursor<total-1e-9)emit_line(s,color,parent,sx+dx*cursor,sy+dy*cursor,sx+dx*total,sy+dy*total);
+}
+static void emit_mline(MusaNativeScene *s,SceneColor color,Affine2 parent,dwg_ent_mline *e){
+    if(!e||!e->verts||e->num_verts<2||e->num_lines<1||e->num_lines>128)return;
+    int n=(int)e->num_verts,closed=(e->flags&2)!=0,segments=closed?n:n-1;
+    for(int v=0;v<segments&&!s->truncated;v++){
+        dwg_mline_vertex *a=&e->verts[v],*b=&e->verts[(v+1)%n];
+        for(int line=0;line<(int)e->num_lines&&!s->truncated;line++)emit_mline_element(s,color,parent,a,b,line);
+    }
+}
 
 static int begin_fill_poly(MusaNativeScene *s,int n){
     SceneColor color=scene_aci(7);
@@ -384,6 +420,9 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         case DWG_TYPE_XLINE:{
             dwg_ent_xline *e=dwg_object_to_XLINE(obj);if(!e)break;
             emit_infinite_line(s,color,parent,obj->parent,e->point.x,e->point.y,e->vector.x,e->vector.y,0);break;
+        }
+        case DWG_TYPE_MLINE:{
+            dwg_ent_mline *e=dwg_object_to_MLINE(obj);if(e)emit_mline(s,color,parent,e);break;
         }
         case DWG_TYPE_TEXT:{
             Dwg_Entity_TEXT *e=obj->tio.entity->tio.TEXT;if(!e)break;
