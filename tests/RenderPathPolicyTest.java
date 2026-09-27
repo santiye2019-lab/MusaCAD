@@ -10,6 +10,10 @@ public class RenderPathPolicyTest {
         expect(false,RenderPathPolicy.useNativeFast(false,true,true,0),"truncated native scene");
         expect(false,RenderPathPolicy.useNativeFast(false,true,false,1),"edited drawing");
         expect(false,RenderPathPolicy.useNativeFast(false,false,false,0),"native scene missing");
-        System.out.println("Navigation render-path color stability cases passed");
+        expect(false,RenderPathPolicy.useBitmapNavigationPreview(true,true,0),"vector-ready text must not switch to bitmap on zoom");
+        expect(true,RenderPathPolicy.useBitmapNavigationPreview(false,true,0),"pre-vector preview may be used");
+        expect(false,RenderPathPolicy.useBitmapNavigationPreview(false,true,1),"edited drawing must not use stale bitmap preview");
+        expect(false,RenderPathPolicy.useBitmapNavigationPreview(false,false,0),"preview missing");
+        System.out.println("Navigation render-path color/text stability cases passed");
     }
 }

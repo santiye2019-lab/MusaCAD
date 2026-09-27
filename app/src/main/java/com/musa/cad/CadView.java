@@ -120,7 +120,7 @@ public class CadView extends View {
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseNativeFastScene(){return RenderPathPolicy.useNativeFast(vectorDrawing!=null,nativeDrawing!=null,nativeDrawing!=null&&nativeDrawing.truncated,sourceEdits.modifiedCount());}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
-    private boolean shouldUsePreviewForNavigation(){float base=Math.max(1e-6f,fitScale);return canUseFastVectorPreview()&&scale/base<=2.5f;}
+    private boolean shouldUsePreviewForNavigation(){return RenderPathPolicy.useBitmapNavigationPreview(vectorDrawing!=null,canUseFastVectorPreview(),sourceEdits.modifiedCount());}
     private float clampNavigationScale(float candidate){float base=Math.max(1e-6f,fitScale);float min=Math.max(1e-6f,base*MIN_RELATIVE_ZOOM);float max=Math.min(1_000_000f,Math.max(base,base*MAX_RELATIVE_ZOOM));return Math.max(min,Math.min(max,candidate));}
     private void beginFastNavigation(){
         if(!canUseNativeFastScene()&&!shouldUsePreviewForNavigation()){stopFastNavigation();return;}
