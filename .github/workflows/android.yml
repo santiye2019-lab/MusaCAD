@@ -113,6 +113,12 @@ jobs:
           grep -q 'DWG_TYPE_DIMENSION_ALIGNED' app/src/main/cpp/native_scene.c
           grep -q 'emit_dimension_block' app/src/main/cpp/native_scene.c
           grep -q 'clone_ins_pt' app/src/main/cpp/native_scene.c
+      - name: Guard native MINSERT first paint
+        run: |
+          grep -q 'DWG_TYPE_MINSERT' app/src/main/cpp/native_scene.c
+          grep -q 'emit_minsert' app/src/main/cpp/native_scene.c
+          grep -q 'num_cols' app/src/main/cpp/native_scene.c
+          grep -q 'col_spacing' app/src/main/cpp/native_scene.c
       - name: Test navigation renderer color stability
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
