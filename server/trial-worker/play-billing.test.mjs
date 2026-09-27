@@ -63,7 +63,7 @@ function env(db,fetcher){
   return {
     DB:db,
     MUSACAD_PACKAGE_NAME:PACKAGE,
-    MUSACAD_PLAY_PRODUCT_ID:PRODUCT,
+    MUSACAD_PLAY_YEARLY_PRODUCT_ID:PRODUCT,
     MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL:"musacad-play@test-project.iam.gserviceaccount.com",
     MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM:privateKeyPem(),
     __fetch:fetcher

@@ -163,15 +163,29 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
                 notifyProductReady(false,"");
                 return;
             }
-            ProductDetails.SubscriptionOfferDetails offer=offers.get(0);
+            ProductDetails.SubscriptionOfferDetails offer=null;
+            ProductDetails.PricingPhase yearlyPhase=null;
+            for(ProductDetails.SubscriptionOfferDetails candidate:offers){
+                if(candidate==null||candidate.getPricingPhases()==null
+                        ||candidate.getPricingPhases().getPricingPhaseList()==null)continue;
+                for(ProductDetails.PricingPhase phase:candidate.getPricingPhases().getPricingPhaseList()){
+                    if(phase!=null&&PlayBillingPolicy.isYearlyBillingPeriod(phase.getBillingPeriod())){
+                        offer=candidate;
+                        yearlyPhase=phase;
+                        break;
+                    }
+                }
+                if(offer!=null)break;
+            }
+            if(offer==null||yearlyPhase==null){
+                productDetails=null;
+                offerToken=null;
+                notifyProductReady(false,"");
+                return;
+            }
             productDetails=details;
             offerToken=offer.getOfferToken();
-            String price="";
-            if(offer.getPricingPhases()!=null
-                    && offer.getPricingPhases().getPricingPhaseList()!=null
-                    && !offer.getPricingPhases().getPricingPhaseList().isEmpty()){
-                price=offer.getPricingPhases().getPricingPhaseList().get(0).getFormattedPrice();
-            }
+            String price=yearlyPhase.getFormattedPrice();
             notifyProductReady(LicenseManager.eligibleForPlayYearlyRenewal(context),price);
         });
     }
