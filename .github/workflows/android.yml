@@ -93,6 +93,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfRay.java tests/DxfRayTest.java
           java -cp /tmp/musacad-tests DxfRayTest
+      - name: Test DXF MLINE geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfMLine.java tests/DxfMLineTest.java
+          java -cp /tmp/musacad-tests DxfMLineTest
       - name: Test DXF text styles and font metadata
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextStyle.java tests/DxfTextStyleTest.java
