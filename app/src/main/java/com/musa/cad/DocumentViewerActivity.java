@@ -20,10 +20,13 @@ import java.util.concurrent.*;
 /** In-app PDF and modern Office document reader for MusaCAD. */
 public final class DocumentViewerActivity extends AppCompatActivity {
     public static final String EXTRA_NAME="com.musa.cad.DOCUMENT_NAME";
+    public static final String EXTRA_IMPORT_TO_CAD="com.musa.cad.IMPORT_TO_CAD";
+    public static final String EXTRA_IMPORT_NAME="com.musa.cad.IMPORT_NAME";
+    public static final String EXTRA_IMPORT_URI="com.musa.cad.IMPORT_URI";
 
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private Uri uri;private String displayName,mime;
-    private LinearLayout root;private FrameLayout contentHost;private TextView status,pageLabel;
+    private LinearLayout root;private FrameLayout contentHost;private TextView status,pageLabel;private String extractedText="";
     private LinearLayout pdfNav;private Button prev,next;private ImageView pageImage;
     private ParcelFileDescriptor pdfFd;private PdfRenderer pdfRenderer;private File pdfTemp;private Bitmap pageBitmap;
     private int pageIndex,renderToken;
@@ -51,6 +54,7 @@ public final class DocumentViewerActivity extends AppCompatActivity {
         TextView title=new TextView(this);title.setText(displayName);title.setTextColor(Color.WHITE);title.setTextSize(15);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         TextView type=new TextView(this);type.setText(CadDocumentSupport.displayType(displayName,mime)+" • MusaCAD belge görüntüleyici");type.setTextColor(Color.rgb(151,190,205));type.setTextSize(10);
         titles.addView(title);titles.addView(type);header.addView(titles,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        Button importCad=new Button(this);importCad.setText("Çizime aktar");importCad.setAllCaps(false);importCad.setTextSize(10);importCad.setTextColor(Color.WHITE);importCad.setOnClickListener(v->importToCad());header.addView(importCad,new LinearLayout.LayoutParams(dp(92),dp(42)));
         Button external=new Button(this);external.setText("Dışarıda aç");external.setAllCaps(false);external.setTextSize(10);external.setTextColor(Color.WHITE);external.setOnClickListener(v->openExternal());header.addView(external,new LinearLayout.LayoutParams(dp(92),dp(42)));
         root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -123,7 +127,7 @@ public final class DocumentViewerActivity extends AppCompatActivity {
     }
 
     private void showText(String value){
-        if(isFinishing()||isDestroyed())return;ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.WHITE);
+        if(isFinishing()||isDestroyed())return;extractedText=value==null?"":value;ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(Color.WHITE);
         TextView text=new TextView(this);text.setText(value==null||value.isEmpty()?"[Belgede gösterilebilir metin bulunamadı.]":value);text.setTextColor(Color.rgb(20,25,28));text.setTextSize(14);text.setTextIsSelectable(true);text.setPadding(dp(18),dp(16),dp(18),dp(28));
         if(CadDocumentSupport.kind(displayName,mime)==CadDocumentSupport.Kind.XLSX||CadDocumentSupport.kind(displayName,mime)==CadDocumentSupport.Kind.CSV)text.setTypeface(Typeface.MONOSPACE);
         scroll.addView(text,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));contentHost.removeAllViews();contentHost.addView(scroll);
@@ -135,6 +139,26 @@ public final class DocumentViewerActivity extends AppCompatActivity {
         if(CadDocumentSupport.isLegacyOffice(displayName,mime))info.setText("Bu dosya eski ikili Office biçiminde ("+CadDocumentSupport.displayType(displayName,mime)+").\n\nMusaCAD, DOCX / XLSX / PPTX dosyalarını uygulama içinde çevrimdışı okur. Bu eski dosya için “Dışarıda aç” kullanılabilir.");
         else info.setText("Bu belge biçimi MusaCAD belge görüntüleyicisinde desteklenmiyor.");
         contentHost.removeAllViews();contentHost.addView(info);status.setText("Belge biçimi • sınırlı destek");
+    }
+
+    private void importToCad(){
+        Intent result=new Intent();result.putExtra(EXTRA_IMPORT_TO_CAD,true);result.putExtra(EXTRA_IMPORT_NAME,displayName);result.putExtra(EXTRA_IMPORT_URI,uri.toString());
+        if(CadDocumentSupport.kind(displayName,mime)==CadDocumentSupport.Kind.PDF){
+            if(pageBitmap==null||pageBitmap.isRecycled()){Toast.makeText(this,"Önce PDF sayfasının hazırlanmasını bekleyin",Toast.LENGTH_SHORT).show();return;}
+            try{
+                File file=new File(getCacheDir(),"MusaCAD_pdf_sayfa_"+(pageIndex+1)+"_"+System.nanoTime()+".png");
+                try(OutputStream out=new FileOutputStream(file)){if(!pageBitmap.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("Sayfa görüntüsü oluşturulamadı");}
+                result.putExtra(EXTRA_IMPORT_URI,androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".files",file).toString());
+                result.putExtra(EXTRA_IMPORT_NAME,displayName+" • Sayfa "+(pageIndex+1));
+                result.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }catch(Exception e){Toast.makeText(this,"PDF sayfası aktarılamadı: "+safeMessage(e),Toast.LENGTH_LONG).show();return;}
+        }else{
+            String text=extractedText==null?"":extractedText.trim();
+            if(text.isEmpty()){Toast.makeText(this,"Çizime aktarılabilecek metin bulunamadı",Toast.LENGTH_SHORT).show();return;}
+            if(text.length()>12000)text=text.substring(0,12000)+"\n[… devamı belge görüntüleyicide …]";
+            result.putExtra(Intent.EXTRA_TEXT,text);
+        }
+        setResult(RESULT_OK,result);finish();
     }
 
     private void openExternal(){
