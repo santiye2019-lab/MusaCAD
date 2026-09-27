@@ -348,6 +348,33 @@ public class CadView extends View {
         if(images!=null)for(CadImageOverlay image:images)if(image!=null&&image.bitmap!=null&&!image.bitmap.isRecycled())imageOverlays.add(image.copy());
         sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();
     }
+    /** Persist raster placement in CAD/drawing coordinates so reopening is stable even if drawing bounds change. */
+    public List<CadImageOverlay> getImageOverlaysDrawing(){
+        ArrayList<CadImageOverlay> out=new ArrayList<>();
+        for(CadImageOverlay image:imageOverlays){
+            if(image==null||image.bitmap==null||image.bitmap.isRecycled())continue;
+            if(vectorDrawing==null){out.add(image.copy());continue;}
+            PointF center=vectorDrawing.drawingPointFromContent(image.centerX(),image.centerY());
+            float width=(float)vectorDrawing.drawingDistanceFromContent(image.width());
+            float height=(float)vectorDrawing.drawingDistanceFromContent(image.height());
+            if(!Float.isFinite(width)||!Float.isFinite(height)||width<=0f||height<=0f)continue;
+            out.add(new CadImageOverlay(image.bitmap,image.name,image.uri,center.x,center.y,width,height,-image.rotationDegrees()));
+        }
+        return out;
+    }
+    public void restoreImageOverlaysDrawing(Collection<CadImageOverlay> images){
+        imageOverlays.clear();selectedImageIndex=-1;
+        if(images!=null)for(CadImageOverlay image:images){
+            if(image==null||image.bitmap==null||image.bitmap.isRecycled())continue;
+            if(vectorDrawing==null){imageOverlays.add(image.copy());continue;}
+            PointF center=vectorDrawing.contentPointFromDrawing(image.centerX(),image.centerY());
+            float width=vectorDrawing.contentLengthFromDrawing(image.width());
+            float height=vectorDrawing.contentLengthFromDrawing(image.height());
+            if(!Float.isFinite(width)||!Float.isFinite(height)||width<=0f||height<=0f)continue;
+            imageOverlays.add(new CadImageOverlay(image.bitmap,image.name,image.uri,center.x,center.y,width,height,-image.rotationDegrees()));
+        }
+        sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();
+    }
     public boolean hasEdits(){return !edits.isEmpty()||sourceEdits.modifiedCount()>0||!imageOverlays.isEmpty();}
 
     public List<CadEdit> getVisibleEdits(){
