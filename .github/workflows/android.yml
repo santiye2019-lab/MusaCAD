@@ -102,6 +102,11 @@ jobs:
           grep -q 'DWG_TYPE_RAY' app/src/main/cpp/native_scene.c
           grep -q 'DWG_TYPE_XLINE' app/src/main/cpp/native_scene.c
           grep -q 'emit_infinite_line' app/src/main/cpp/native_scene.c
+      - name: Guard native MLINE first paint
+        run: |
+          grep -q 'DWG_TYPE_MLINE' app/src/main/cpp/native_scene.c
+          grep -q 'emit_mline_element' app/src/main/cpp/native_scene.c
+          grep -q 'num_segparms' app/src/main/cpp/native_scene.c
       - name: Test navigation renderer color stability
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
