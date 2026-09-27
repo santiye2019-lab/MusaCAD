@@ -30,6 +30,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfAttributeVisibility.java tests/DxfAttributeVisibilityTest.java
           java -cp /tmp/musacad-tests DxfAttributeVisibilityTest
+      - name: Test DXF text OCS placement
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextOcs.java tests/DxfTextOcsTest.java
+          java -cp /tmp/musacad-tests DxfTextOcsTest
       - name: Test DXF text decoding
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfText.java tests/DxfTextTest.java
