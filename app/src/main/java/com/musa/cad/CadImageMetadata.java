@@ -51,7 +51,7 @@ public final class CadImageMetadata {
         if(out==null||images==null)return;
         for(CadImageOverlay image:images){
             if(image==null)continue;
-            out.write("999\r\n");out.write(encode(image));out.write("\r\n");
+            out.write("999");out.newLine();out.write(encode(image));out.newLine();
         }
     }
 
