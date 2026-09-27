@@ -342,6 +342,12 @@ public class CadView extends View {
     public int sourceModifiedCount(){return sourceEdits.modifiedCount();}
     public int editCount(){return edits.size()+sourceEdits.modifiedCount()+imageOverlays.size();}
     public int imageOverlayCount(){return imageOverlays.size();}
+    public List<CadImageOverlay> getImageOverlays(){ArrayList<CadImageOverlay> out=new ArrayList<>();for(CadImageOverlay image:imageOverlays)out.add(image.copy());return out;}
+    public void restoreImageOverlays(Collection<CadImageOverlay> images){
+        imageOverlays.clear();selectedImageIndex=-1;
+        if(images!=null)for(CadImageOverlay image:images)if(image!=null&&image.bitmap!=null&&!image.bitmap.isRecycled())imageOverlays.add(image.copy());
+        sourceEdits.clearSelection();moveSelectedArmed=false;notifyValue();invalidate();
+    }
     public boolean hasEdits(){return !edits.isEmpty()||sourceEdits.modifiedCount()>0||!imageOverlays.isEmpty();}
 
     public List<CadEdit> getVisibleEdits(){
