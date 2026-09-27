@@ -185,14 +185,26 @@ public final class DxfBlocks {
         boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
         // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
         // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
-        if(r.number(70,1)!=1||r.number(71,1)!=1||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
+        int columns=r.integer(70,1),rows=r.integer(71,1);
+        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
         double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
         double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
-        // For OCS normal (0,0,-1), OCS X maps to -WCS X and rotation reverses.
-        Transform local=negativeZ
-            ?Transform.insert(bx,by,-sx,sy,-degrees,-ix,iy)
-            :Transform.insert(bx,by,sx,sy,degrees,ix,iy);
-        Transform transform=parent.thenLocal(local);stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);
+        double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
+        // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
+        // the whole array; spacing is a drawing-unit distance and is not block-scaled.
+        stack.add(name);
+        try{
+            for(int row=0;row<rows;row++)for(int column=0;column<columns;column++){
+                double dx=column*columnSpacing,dy=row*rowSpacing;
+                double arrayX=ix+co*dx-si*dy,arrayY=iy+si*dx+co*dy;
+                // For OCS normal (0,0,-1), OCS X maps to -WCS X and rotation reverses.
+                Transform local=negativeZ
+                    ?Transform.insert(bx,by,-sx,sy,-degrees,-arrayX,arrayY)
+                    :Transform.insert(bx,by,sx,sy,degrees,arrayX,arrayY);
+                Transform transform=parent.thenLocal(local);
+                expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+            }
+        }finally{stack.remove(name);}
     }
 
     private static String entityLayout(Record record,String inherited)throws IOException{
