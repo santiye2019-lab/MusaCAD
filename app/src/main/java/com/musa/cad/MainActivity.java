@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     }
     private static final class Loaded {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
@@ -64,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
+        final ArrayList<CadImageOverlay> persistedImages=new ArrayList<>();
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
@@ -1765,7 +1767,7 @@ public class MainActivity extends AppCompatActivity {
         task.future=loader.submit(()->{
             Loaded loaded=new Loaded();loaded.sourceUri=uri;
             try{
-                FileTransfer.checkCancelled();loaded.name=nameOf(uri);loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
+                FileTransfer.checkCancelled();loaded.imageOverlays=CadImageOverlayStore.load(getApplicationContext(),uri.toString());loaded.name=nameOf(uri);loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){FileTransfer.copy(in,out,512L*1024*1024,bytes->runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));}));}
                 FileTransfer.checkCancelled();
 
@@ -1776,7 +1778,7 @@ public class MainActivity extends AppCompatActivity {
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
-                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                         loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
@@ -1791,7 +1793,7 @@ public class MainActivity extends AppCompatActivity {
                     if(fast==null){try{embeddedPreview=DwgPreview.read(loaded.file);}catch(Exception ignored){}}
                     if(fast!=null||embeddedPreview!=null){
                         loaded.nativeScene=fast;loaded.bitmap=embeddedPreview;
-                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.bitmap=embeddedPreview;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.bitmap=embeddedPreview;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                         loaded.project=project;
                         java.util.concurrent.CountDownLatch attached=new java.util.concurrent.CountDownLatch(1);
                         java.util.concurrent.atomic.AtomicBoolean accepted=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -1852,7 +1854,7 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap recentPreview=loaded.bitmap;
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
-                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();
+                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                     loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
@@ -2064,6 +2066,7 @@ public class MainActivity extends AppCompatActivity {
             else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
             else cad.restoreSessionState(null,project.bitmap,project.viewState);
         }else if(project.parsed!=null){if(project.nativeScene!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,null);else cad.setVectorDrawing(project.parsed);}else if(project.nativeScene!=null)cad.setNativeDrawing(project.nativeScene);else cad.setDrawing(project.bitmap);
+        if(project.viewState==null&&!project.persistedImages.isEmpty()){cad.restoreImageOverlays(project.persistedImages);project.persistedImages.clear();}
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
@@ -2276,18 +2279,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int rasterCount=cad.imageOverlayCount();final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){
-                        currentProject.viewState=cad.captureSessionState();
-                        if(rasterCount==0){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;clearRecovery(currentProject);}
-                        else currentProject.dirty=true;
-                    }
-                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" raster görüntü DXF içine gömülmedi; PDF/PNG görünümünde korunur",Toast.LENGTH_LONG).show();
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
+                    CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
+                    if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
+                    FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
+                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null&&rasterCount==0)closeProjectNow(close);
-                    else if(close!=null)result.setText("Görüntü katmanı yalnız proje görünümünde • kapatmadan önce PDF/PNG dışa aktarın veya görüntüyü silin");});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
     }
 
     private void showShare(){
