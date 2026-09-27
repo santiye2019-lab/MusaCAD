@@ -1064,10 +1064,16 @@ public class MainActivity extends AppCompatActivity {
         String name=data.getStringExtra(DocumentViewerActivity.EXTRA_IMPORT_NAME);if(name==null||name.trim().isEmpty())name="Belge";
         String text=data.getStringExtra(Intent.EXTRA_TEXT);
         if(text!=null&&!text.trim().isEmpty()){
+            CadDocumentSupport.Kind kind=CadDocumentSupport.kind(name,CadDocumentSupport.bestMime(name,null));
+            if(kind==CadDocumentSupport.Kind.XLSX||kind==CadDocumentSupport.Kind.CSV){
+                List<CadSpreadsheetLayout.Sheet> sheets=kind==CadDocumentSupport.Kind.XLSX?CadSpreadsheetLayout.parseExtractedXlsx(text):CadSpreadsheetLayout.parseCsv(text);
+                int cells=importSpreadsheetTables(sheets);
+                if(cells>0){result.setText("Excel / tablo • "+name+" • "+cells+" hücre düzenlenebilir CAD tablosu olarak aktarıldı");return;}
+            }
             PointF center=cad.visibleCenterContent();String[] lines=text.replace("\r\n","\n").replace('\r','\n').split("\n",-1);
-            int added=0;float y=center.y;float step=Math.max(16f,18f/getResources().getDisplayMetrics().density);
-            for(String line:lines){String value=line.trim();if(value.isEmpty()){y+=step;continue;}cad.addTextEdit(center.x,y,value);y+=step;added++;if(added>=500)break;}
-            result.setText("Belge • "+name+" • "+added+" metin satırı çizime aktarıldı");return;
+            ArrayList<CadEdit> imported=new ArrayList<>();float y=center.y,step=34f;
+            for(String line:lines){String value=line.trim();if(value.isEmpty()){y+=step;continue;}imported.add(CadEdit.styledText(center.x,y,value,0f,"STANDARD","sans-serif",false,22f,1f,0f,0));y+=step;if(imported.size()>=500)break;}
+            int added=cad.addImportedEdits(imported);result.setText("Belge • "+name+" • "+added+" metin satırı çizime aktarıldı");return;
         }
         String raw=data.getStringExtra(DocumentViewerActivity.EXTRA_IMPORT_URI);if(raw==null||raw.trim().isEmpty())return;
         Uri imageUri=Uri.parse(raw);final String finalName=name;result.setText("Belge sayfası • çizime aktarılıyor…");
@@ -1082,6 +1088,32 @@ public class MainActivity extends AppCompatActivity {
                 });
             }catch(Exception e){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();final String m=e.getMessage()==null?"Belge sayfası okunamadı":e.getMessage();runOnUiThread(()->Toast.makeText(this,m,Toast.LENGTH_LONG).show());}
         },"MusaCAD-document-import").start();
+    }
+
+    private int importSpreadsheetTables(List<CadSpreadsheetLayout.Sheet> sheets){
+        if(sheets==null||sheets.isEmpty()||activeDxf==null)return 0;
+        PointF center=cad.visibleCenterContent();ArrayList<CadEdit> imported=new ArrayList<>();int cellCount=0;float y=center.y;
+        for(CadSpreadsheetLayout.Sheet sheet:sheets){
+            if(sheet==null||sheet.isEmpty()||sheet.rows<1||sheet.columns<1)continue;
+            float[] widths=CadSpreadsheetLayout.columnWidths(sheet,70f,190f,8.5f);float rawWidth=0f;for(float width:widths)rawWidth+=width;
+            float maxWidth=Math.max(400f,activeDxf.contentWidth()*.82f),factor=rawWidth>maxWidth?Math.max(.35f,maxWidth/rawWidth):1f;
+            float tableWidth=rawWidth*factor,rowHeight=38f*factor,textHeight=Math.max(9f,19f*factor),padding=Math.max(2.5f,5f*factor);
+            float left=center.x-tableWidth*.5f,top=y+textHeight*1.6f,bottom=top+sheet.rows*rowHeight;
+            imported.add(CadEdit.styledText(left,y,sheet.title,0f,"STANDARD","sans-serif",false,Math.max(12f,22f*factor),1f,0f,0));
+            float x=left;imported.add(CadEdit.line(x,top,x,bottom));
+            for(float width:widths){x+=width*factor;imported.add(CadEdit.line(x,top,x,bottom));}
+            for(int row=0;row<=sheet.rows;row++){float yy=top+row*rowHeight;imported.add(CadEdit.line(left,yy,left+tableWidth,yy));}
+            float[] starts=new float[widths.length];x=left;for(int i=0;i<widths.length;i++){starts[i]=x;x+=widths[i]*factor;}
+            for(CadSpreadsheetLayout.Cell cell:sheet.cells){
+                if(cell.row<1||cell.row>sheet.rows||cell.col<1||cell.col>starts.length)continue;String value=cell.value==null?"":cell.value.trim();if(value.isEmpty())continue;
+                int maxChars=Math.max(4,(int)((widths[cell.col-1]*factor-padding*2f)/Math.max(4f,textHeight*.55f)));if(value.length()>maxChars)value=value.substring(0,Math.max(1,maxChars-1))+"…";
+                float tx=starts[cell.col-1]+padding,ty=top+(cell.row-1)*rowHeight+rowHeight*.68f;
+                imported.add(CadEdit.styledText(tx,ty,value,0f,"STANDARD","sans-serif",false,textHeight,1f,0f,0));cellCount++;
+            }
+            y=bottom+Math.max(45f,textHeight*3f);
+            if(imported.size()>12000)break;
+        }
+        return cad.addImportedEdits(imported)>0?cellCount:0;
     }
 
     private void handleMediaPicked(int request,Uri uri){
