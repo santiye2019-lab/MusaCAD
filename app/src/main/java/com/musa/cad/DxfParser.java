@@ -204,7 +204,7 @@ public final class DxfParser {
         Label(float x,float y,float h,float angle,String text,DxfTextStyle.Style style,float width,float oblique,int flags,float x2,float y2,boolean hasSecond,int horizontal,int vertical,int attachment){
             this.text=text;this.style=style==null?DxfTextStyle.defaultStyle():style;generationFlags=flags;mtextAttachment=attachment;rows=text.split("\n",-1);float baseWidth=Math.max(.01f,width),baseHeight=Math.max(.01f,h);Paint measure=new Paint(Paint.ANTI_ALIAS_FLAG);measure.setTypeface(typeface(this.style));measure.setTextSize(baseHeight);measure.setTextScaleX(baseWidth);measure.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));float measured=.0001f;for(String row:rows)measured=Math.max(measured,measure.measureText(row));DxfTextAlign.Result aligned=DxfTextAlign.resolve(x,y,x2,y2,hasSecond,horizontal,vertical,angle,measured,baseHeight);this.x=aligned.x;this.y=aligned.y;this.angle=aligned.angleDegrees;height=baseHeight*aligned.heightScale;widthFactor=Math.max(.01f,baseWidth*aligned.widthScale/aligned.heightScale);this.oblique=oblique;offsetX=aligned.localOffsetX;offsetY=aligned.localOffsetY;
         }
-        private static Typeface typeface(DxfTextStyle.Style style){return style.usesShx()?Typeface.MONOSPACE:Typeface.create(style.familyHint(),Typeface.NORMAL);}private Typeface typeface(){return typeface(style);}
+        private static Typeface typeface(DxfTextStyle.Style style){return Typeface.create(style.androidFamilyHint(),Typeface.NORMAL);}private Typeface typeface(){return typeface(style);}
         private float[] baseline(){float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f,lx=offsetX*sx,ly=offsetY*sy;double r=Math.toRadians(angle),co=Math.cos(r),si=Math.sin(r);return new float[]{(float)(x+lx*co-ly*si),(float)(y+lx*si+ly*co)};}
         private Path shape(){Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(typeface());tp.setTextSize(height);tp.setTextScaleX(widthFactor);tp.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();tp.getTextPath(rows[i],0,rows[i].length(),offsetX,offsetY+i*height*1.3f,line);shape.addPath(line);}float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f;Matrix mirror=new Matrix();mirror.setScale(sx,sy);shape.transform(mirror);if(mtextAttachment>=1&&mtextAttachment<=9){RectF bounds=new RectF();shape.computeBounds(bounds,true);if(!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(mtextAttachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);shape.transform(anchor);}}Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);shape.transform(placement);return shape;}public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);}
     }
@@ -217,10 +217,9 @@ public final class DxfParser {
         }
         private Typeface face(DxfMText.Run run){
             String f=run.font==null?"":run.font.trim();
-            if(f.isEmpty())return Label.typeface(style);
-            if(run.usesShxFont())return Typeface.MONOSPACE;
-            f=f.replace('\\','/');int slash=f.lastIndexOf('/');if(slash>=0)f=f.substring(slash+1);int dot=f.lastIndexOf('.');if(dot>0)f=f.substring(0,dot);f=f.replace('_',' ').replace('-',' ').trim();
-            return Typeface.create(f.isEmpty()?style.familyHint():f,Typeface.NORMAL);
+            String family=f.isEmpty()?style.androidFamilyHint():DxfTextStyle.androidFamilyHint(f,run.usesShxFont());
+            int faceStyle=(run.bold?Typeface.BOLD:0)|(run.italic?Typeface.ITALIC:0);
+            return Typeface.create(family,faceStyle);
         }
         private Path shape(){
             Path all=new Path();float cursorX=0f,cursorY=0f,lineMax=height;
@@ -359,7 +358,7 @@ public final class DxfParser {
         if(entity instanceof Marker&&"POINT".equals(type)){Marker p=(Marker)entity;return CadEdit.point(p.x,p.y);}
         if(entity instanceof EllipseCurve&&"ELLIPSE".equals(type)){EllipseCurve e=(EllipseCurve)entity;return CadEdit.ellipse(e.cx,e.cy,e.cx+e.mx,e.cy+e.my,e.cx-e.my*e.ratio,e.cy+e.mx*e.ratio);}
         if(entity instanceof XLine&&"XLINE".equals(type)){XLine x=(XLine)entity;return CadEdit.xline(x.x,x.y,x.x+x.dx,x.y+x.dy);}
-        if(entity instanceof Label&&"TEXT".equals(type)){Label l=(Label)entity;float[]base=l.baseline();return CadEdit.styledText(base[0],base[1],l.text,l.angle,l.style.name,l.style.familyHint(),l.style.usesShx(),l.height,l.widthFactor,l.oblique,l.generationFlags);}
+        if(entity instanceof Label&&"TEXT".equals(type)){Label l=(Label)entity;float[]base=l.baseline();return CadEdit.styledText(base[0],base[1],l.text,l.angle,l.style.name,l.style.androidFamilyHint(),l.style.usesShx(),l.height,l.widthFactor,l.oblique,l.generationFlags);}
         return null;
     }
     private static CadEdit mapEditToContent(CadEdit world,Matrix view){float[]xy=world.xy.clone();view.mapPoints(xy);switch(world.type){case LINE:return CadEdit.line(xy[0],xy[1],xy[2],xy[3]);case CIRCLE:return CadEdit.circle(xy[0],xy[1],xy[2],xy[3]);case ARC:return xy.length>=8?CadEdit.arc(xy[0],xy[1],xy[2],xy[3],xy[4],xy[5]):world.copy();case ELLIPSE:return xy.length>=6?CadEdit.ellipse(xy[0],xy[1],xy[2],xy[3],xy[4],xy[5]):world.copy();case POINT:return CadEdit.point(xy[0],xy[1]);case XLINE:return xy.length>=4?CadEdit.xline(xy[0],xy[1],xy[2],xy[3]):world.copy();case POLYLINE:return CadEdit.polyline(xy,world.closed);case TEXT:{float h=world.hasTextStyle()?world.textHeight*matrixScale(view):0f;return CadEdit.styledText(xy[0],xy[1],world.text,-world.rotationDegrees,world.textStyleName,world.textFamilyHint,world.textShx,h,world.textWidthFactor,world.textOblique,world.textGenerationFlags);}case RECTANGLE:return CadEdit.rectangle(xy[0],xy[1],xy[2],xy[3]);default:return world.copy();}}
