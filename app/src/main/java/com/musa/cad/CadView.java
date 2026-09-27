@@ -295,6 +295,26 @@ public class CadView extends View {
         return new PointF(p[0],p[1]);
     }
 
+    /** Visible viewport expressed in drawing-content coordinates for DISPLAY printing. */
+    public RectF visibleContentBounds(){
+        if(!hasDrawing()||getWidth()<=0||getHeight()<=0)return null;
+        RectF screen=new RectF(0f,0f,getWidth(),getHeight());Matrix inv=new Matrix();
+        if(!imageMatrix.invert(inv))return null;inv.mapRect(screen);
+        RectF content=new RectF(0f,0f,contentWidth(),contentHeight());
+        if(!screen.intersect(content))return null;
+        return new RectF(screen);
+    }
+
+    /** Last drag-selection expressed in drawing-content coordinates for WINDOW printing. */
+    public RectF selectedAreaContentBounds(){
+        SelectionBounds bounds=selectionBounds();if(bounds==null)return null;
+        RectF area=new RectF(bounds.left,bounds.top,bounds.left+bounds.width,bounds.top+bounds.height);Matrix inv=new Matrix();
+        if(!imageMatrix.invert(inv))return null;inv.mapRect(area);
+        RectF content=new RectF(0f,0f,contentWidth(),contentHeight());
+        if(!area.intersect(content))return null;
+        return new RectF(area);
+    }
+
     public void fitToScreen(){if(hasDrawing()){fit();invalidate();notifyValue();}}
     public boolean fitContentRect(RectF content){
         if(!hasDrawing()||content==null||content.width()<=0f||content.height()<=0f||getWidth()<=0||getHeight()<=0)return false;
