@@ -17,6 +17,7 @@ public final class Dxf3dMesh {
     public final float[] xyz;
     public final int[] triangles,edges,sourceLines,coordinateSlots;
     public final float cx,cy,cz,radius;
+    public final boolean planar;
     public final int unsupportedSolids;
 
     private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int unsupportedSolids){
@@ -37,6 +38,7 @@ public final class Dxf3dMesh {
         }
         cx=(minX+maxX)*.5f;cy=(minY+maxY)*.5f;cz=(minZ+maxZ)*.5f;
         radius=Math.max(1e-6f,(float)Math.sqrt((maxX-minX)*(maxX-minX)+(maxY-minY)*(maxY-minY)+(maxZ-minZ)*(maxZ-minZ))*.5f);
+        planar=(maxZ-minZ)<=Math.max(1e-5f,radius*1e-5f);
     }
 
     public static Dxf3dMesh read(File file)throws IOException{
@@ -45,7 +47,9 @@ public final class Dxf3dMesh {
         collector.finishGeometry();
         if(collector.polyface)throw new IOException("3B polyface nesnesinin sonu bulunamadı");
         if(collector.points.n==0||(collector.triangles.n==0&&collector.explicitEdges.n==0))
-            throw new IOException(collector.solids>0?"Katı 3B nesneler için geometri çözümleyici gerekli":"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
+            throw new IOException(collector.solids>0
+                ?"Bu proje 3DSOLID/BODY/REGION ACIS katı geometri içeriyor; güvenilir yüzey verisi çözümlenemedi"
+                :"Bu çizimde desteklenen 3B veya düzlemsel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
             collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids
@@ -106,6 +110,29 @@ public final class Dxf3dMesh {
                 addPoint(points,p,10,20,30);addSource(p,0);
                 addPoint(points,p,11,21,31);addSource(p,1);
                 appendEdge(explicitEdges,start,start+1);
+            }else if("LWPOLYLINE".equals(r.type)){
+                double[] xs=r.numbers(10),ys=r.numbers(20);int count=Math.min(xs.length,ys.length);
+                if(count>=2){
+                    int start=points.n/3;double z=r.number(38,0);
+                    for(int i=0;i<count;i++)addReadonlyPoint(p,xs[i],ys[i],z);
+                    for(int i=1;i<count;i++)appendEdge(explicitEdges,start+i-1,start+i);
+                    if((((int)r.number(70,0))&1)!=0)appendEdge(explicitEdges,start+count-1,start);
+                }
+            }else if("CIRCLE".equals(r.type)){
+                double radius=r.number(40,0);
+                if(radius>0&&Double.isFinite(radius)){
+                    int segments=64,start=points.n/3;double cx=r.number(10,0),cy=r.number(20,0),cz=r.number(30,0);
+                    for(int i=0;i<segments;i++){double a=Math.PI*2d*i/segments;addReadonlyPoint(p,cx+radius*Math.cos(a),cy+radius*Math.sin(a),cz);}
+                    for(int i=0;i<segments;i++)appendEdge(explicitEdges,start+i,start+(i+1)%segments);
+                }
+            }else if("ARC".equals(r.type)){
+                double radius=r.number(40,0);
+                if(radius>0&&Double.isFinite(radius)){
+                    double startDeg=r.number(50,0),endDeg=r.number(51,360),sweep=endDeg-startDeg;while(sweep<=0)sweep+=360d;while(sweep>360d)sweep-=360d;
+                    int segments=Math.max(8,Math.min(72,(int)Math.ceil(sweep/7.5d))),start=points.n/3;double cx=r.number(10,0),cy=r.number(20,0),cz=r.number(30,0);
+                    for(int i=0;i<=segments;i++){double a=Math.toRadians(startDeg+sweep*i/segments);addReadonlyPoint(p,cx+radius*Math.cos(a),cy+radius*Math.sin(a),cz);}
+                    for(int i=1;i<=segments;i++)appendEdge(explicitEdges,start+i-1,start+i);
+                }
             }else if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
                 int start=points.n/3;
                 for(int k=0;k<3;k++){addPoint(points,p,10+k,20+k,30+k);addSource(p,k);}
@@ -136,6 +163,13 @@ public final class Dxf3dMesh {
             boolean editable=p.directRoot&&p.transform.isIdentity();
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
+        }
+        private void addReadonlyPoint(DxfBlocks.Placement p,double x,double y,double z)throws IOException{
+            if(points.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
+            double[] xy=p.transform.point(x,y);
+            if(Math.abs(xy[0])>1e9||Math.abs(xy[1])>1e9||Math.abs(z)>1e9||!Double.isFinite(z))throw new IOException("3B koordinat sınırı aşıldı");
+            points.add((float)xy[0]);points.add((float)xy[1]);points.add((float)z);
+            sourceLines.add(-1);coordinateSlots.add(0);
         }
     }
 
