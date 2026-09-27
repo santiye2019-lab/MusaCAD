@@ -104,7 +104,7 @@ public final class DxfParser {
         public void drawVector(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){
             Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(imageMatrix,view);
             drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayerKeys,false,false,globalLineTypeScale);
-            Rect clip=canvas.getClipBounds();RectF visibleWorld=new RectF(clip);Matrix inverse=new Matrix();if(!combined.invert(inverse))visibleWorld=null;else {inverse.mapRect(visibleWorld);if(clip.width()>0&&clip.height()>0){float worldPerPixel=Math.max(visibleWorld.width()/clip.width(),visibleWorld.height()/clip.height());float pad=worldPerPixel*10f;visibleWorld.inset(-pad,-pad);}}
+            Rect clip=canvas.getClipBounds();RectF visibleWorld=new RectF(clip);Matrix inverse=new Matrix();if(!combined.invert(inverse))visibleWorld=null;else {inverse.mapRect(visibleWorld);if(clip.width()>0&&clip.height()>0){float worldPerPixel=Math.max(visibleWorld.width()/clip.width(),visibleWorld.height()/clip.height());float pad=worldPerPixel*24f;visibleWorld.inset(-pad,-pad);}}
             spatialIndex.draw(canvas,paint,combined,visibleWorld,hiddenIds,globalLineTypeScale);
         }
         public void drawPreview(Canvas canvas,Matrix contentToScreen,Paint paint){
