@@ -133,6 +133,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
           java -cp /tmp/musacad-tests RenderPathPolicyTest
+      - name: Test CAD navigation zoom and culling policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java tests/CadNavigationPolicyTest.java
+          java -cp /tmp/musacad-tests CadNavigationPolicyTest
       - name: Test DXF RAY geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfRay.java tests/DxfRayTest.java
