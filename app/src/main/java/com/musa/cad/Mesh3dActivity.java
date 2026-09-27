@@ -68,11 +68,11 @@ public final class Mesh3dActivity extends Activity {
         if(mesh.solidProxy){
             text.append("\n")
                 .append(mesh.unsupportedSolids)
-                .append(" adet 3DSOLID/BODY/REGION bulundu. ACIS yüzeyi doğrudan çözülemediği için DWG/DXF sınır kutusu tel-kafes önizleme olarak gösteriliyor.");
+                .append(" adet 3DSOLID/BODY/REGION için kullanılabilir ACIS B-Rep verisi bulunamadı; yalnız bu durumda sınır kutusu tel-kafes fallback gösteriliyor.");
         }else if(mesh.unsupportedSolids>0){
             text.append("\n")
                 .append(mesh.unsupportedSolids)
-                .append(" adet ACIS katı nesne ayrıca bulundu; desteklenen yüzey ve çizgiler korunarak gösteriliyor.");
+                .append(" adet ACIS katının gerçek B-Rep kenarları gösterildi; tam tessellate edilemeyen eğrisel/spline yüzeyler tel-kafes bırakıldı.");
         }
         return text.toString();
     }
