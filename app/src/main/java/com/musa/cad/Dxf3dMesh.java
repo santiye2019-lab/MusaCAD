@@ -1,7 +1,10 @@
 package com.musa.cad;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,11 +19,12 @@ public final class Dxf3dMesh {
     private static final int MAX_VERTICES=2_000_000,MAX_TRIANGLES=4_000_000,MAX_EDGES=4_000_000;
     public final float[] xyz;
     public final int[] triangles,edges,sourceLines,coordinateSlots;
-    public final float cx,cy,cz,radius;
+    public final float cx,cy,cz,radius,minZ,maxZ;
     public final int unsupportedSolids;
+    public final boolean flatPlan,solidProxy;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int unsupportedSolids){
-        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.unsupportedSolids=unsupportedSolids;
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int unsupportedSolids,boolean solidProxy){
+        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.unsupportedSolids=unsupportedSolids;this.solidProxy=solidProxy;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i+1<explicitEdges.length;i+=2)edge(seen,lines,explicitEdges[i],explicitEdges[i+1]);
         for(int i=0;i+2<triangles.length;i+=3){
@@ -35,8 +39,10 @@ public final class Dxf3dMesh {
             minY=Math.min(minY,xyz[i+1]);maxY=Math.max(maxY,xyz[i+1]);
             minZ=Math.min(minZ,xyz[i+2]);maxZ=Math.max(maxZ,xyz[i+2]);
         }
+        this.minZ=minZ;this.maxZ=maxZ;
         cx=(minX+maxX)*.5f;cy=(minY+maxY)*.5f;cz=(minZ+maxZ)*.5f;
         radius=Math.max(1e-6f,(float)Math.sqrt((maxX-minX)*(maxX-minX)+(maxY-minY)*(maxY-minY)+(maxZ-minZ)*(maxZ-minZ))*.5f);
+        flatPlan=Math.abs(maxZ-minZ)<=Math.max(1e-5f,radius*1e-6f);
     }
 
     public static Dxf3dMesh read(File file)throws IOException{
@@ -44,11 +50,20 @@ public final class Dxf3dMesh {
         DxfBlocks.expand(file,StandardCharsets.UTF_8,collector);
         collector.finishGeometry();
         if(collector.polyface)throw new IOException("3B polyface nesnesinin sonu bulunamadı");
+        if(collector.solids>0&&(collector.points.n==0||(collector.triangles.n==0&&collector.explicitEdges.n==0))){
+            Extents ext=readHeaderExtents(file);
+            if(ext!=null){
+                addExtentProxy(collector,ext);
+                collector.solidProxy=true;
+            }
+        }
         if(collector.points.n==0||(collector.triangles.n==0&&collector.explicitEdges.n==0))
-            throw new IOException(collector.solids>0?"Katı 3B nesneler için geometri çözümleyici gerekli":"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
+            throw new IOException(collector.solids>0
+                ?collector.solids+" adet 3DSOLID/BODY/REGION bulundu; bu dosyada güvenilir sınır kutusu veya yüzey verisi çıkarılamadı"
+                :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids
+            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,collector.solidProxy
         );
     }
 
@@ -56,7 +71,7 @@ public final class Dxf3dMesh {
         final FloatBuffer points=new FloatBuffer();
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
         final ArrayList<Face> faces=new ArrayList<>();
-        boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN;
+        boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
         int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
@@ -137,6 +152,63 @@ public final class Dxf3dMesh {
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
+    }
+
+    private static Extents readHeaderExtents(File file){
+        double[] min={Double.NaN,Double.NaN,0d},max={Double.NaN,Double.NaN,0d};
+        String target="";
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(file),StandardCharsets.ISO_8859_1))){
+            String codeLine,valueLine;
+            while((codeLine=reader.readLine())!=null&&(valueLine=reader.readLine())!=null){
+                int code;
+                try{code=Integer.parseInt(codeLine.trim());}catch(NumberFormatException ignored){continue;}
+                String value=valueLine.trim();
+                if(code==9){
+                    target=("$EXTMIN".equalsIgnoreCase(value)||"$EXTMAX".equalsIgnoreCase(value))?value.toUpperCase():"";
+                    continue;
+                }
+                if(code==0&&"ENDSEC".equalsIgnoreCase(value)&&(!Double.isNaN(min[0])||!Double.isNaN(max[0])))break;
+                if(target.isEmpty())continue;
+                int axis=code==10?0:code==20?1:code==30?2:-1;
+                if(axis<0)continue;
+                try{
+                    double parsed=Double.parseDouble(value);
+                    if(!Double.isFinite(parsed)||Math.abs(parsed)>1e9)continue;
+                    if("$EXTMIN".equals(target))min[axis]=parsed;else max[axis]=parsed;
+                }catch(NumberFormatException ignored){}
+            }
+        }catch(IOException ignored){return null;}
+        if(Double.isNaN(min[0])||Double.isNaN(min[1])||Double.isNaN(max[0])||Double.isNaN(max[1]))return null;
+        if(Double.isNaN(min[2]))min[2]=0d;if(Double.isNaN(max[2]))max[2]=0d;
+        if(max[0]<min[0]||max[1]<min[1]||max[2]<min[2])return null;
+        if(max[0]-min[0]<1e-9&&max[1]-min[1]<1e-9&&max[2]-min[2]<1e-9)return null;
+        return new Extents(min,max);
+    }
+
+    private static void addExtentProxy(Collector c,Extents e)throws IOException{
+        int base=c.points.n/3;
+        double x0=e.min[0],y0=e.min[1],z0=e.min[2],x1=e.max[0],y1=e.max[1],z1=e.max[2];
+        if(Math.abs(z1-z0)<=1e-9){
+            addRawPoint(c,x0,y0,z0);addRawPoint(c,x1,y0,z0);addRawPoint(c,x1,y1,z0);addRawPoint(c,x0,y1,z0);
+            appendEdge(c.explicitEdges,base,base+1);appendEdge(c.explicitEdges,base+1,base+2);
+            appendEdge(c.explicitEdges,base+2,base+3);appendEdge(c.explicitEdges,base+3,base);
+            return;
+        }
+        addRawPoint(c,x0,y0,z0);addRawPoint(c,x1,y0,z0);addRawPoint(c,x1,y1,z0);addRawPoint(c,x0,y1,z0);
+        addRawPoint(c,x0,y0,z1);addRawPoint(c,x1,y0,z1);addRawPoint(c,x1,y1,z1);addRawPoint(c,x0,y1,z1);
+        int[][] edgePairs={{0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7}};
+        for(int[] pair:edgePairs)appendEdge(c.explicitEdges,base+pair[0],base+pair[1]);
+    }
+
+    private static void addRawPoint(Collector c,double x,double y,double z)throws IOException{
+        if(c.points.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
+        c.points.add((float)x);c.points.add((float)y);c.points.add((float)z);
+        c.sourceLines.add(-1);c.coordinateSlots.add(-1);
+    }
+
+    private static final class Extents{
+        final double[] min,max;
+        Extents(double[] min,double[] max){this.min=min;this.max=max;}
     }
 
     private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,int x,int y,int z)throws IOException{

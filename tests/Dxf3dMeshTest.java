@@ -34,6 +34,8 @@ public final class Dxf3dMeshTest {
         testLineAndPolyline();
         testPolygonMesh();
         testInsertedBlockLine();
+        testFlat2dPlanMetadata();
+        testAcisSolidBoundsProxy();
     }
 
     private static void testLineAndPolyline() throws Exception {
@@ -90,6 +92,41 @@ public final class Dxf3dMeshTest {
             if(Math.abs(mesh.xyz[3]-10f)>1e-5||Math.abs(mesh.xyz[4]-22f)>1e-5||mesh.xyz[5]!=3f)
                 throw new AssertionError("insert transform end");
             if(mesh.sourceLines[0]!=-1||mesh.sourceLines[1]!=-1)throw new AssertionError("inserted geometry must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testFlat2dPlanMetadata() throws Exception {
+        File file=File.createTempFile("mesh3d-flat-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\nLINE\n10\n0\n20\n0\n30\n0\n11\n10\n21\n5\n31\n0\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(!mesh.flatPlan)throw new AssertionError("flat 2D plan must be detected");
+            if(mesh.minZ!=0f||mesh.maxZ!=0f)throw new AssertionError("flat 2D Z range");
+            if(mesh.solidProxy)throw new AssertionError("ordinary 2D plan must not be marked as solid proxy");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testAcisSolidBoundsProxy() throws Exception {
+        File file=File.createTempFile("mesh3d-solid-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nHEADER\n"
+                +"9\n$EXTMIN\n10\n1\n20\n2\n30\n3\n"
+                +"9\n$EXTMAX\n10\n11\n20\n22\n30\n33\n"
+                +"0\nENDSEC\n"
+                +"0\nSECTION\n2\nENTITIES\n"
+                +"0\n3DSOLID\n70\n1\n1\nACIS_PLACEHOLDER\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(!mesh.solidProxy)throw new AssertionError("ACIS solid must use bounds proxy when no tessellation is available");
+            if(mesh.unsupportedSolids!=1)throw new AssertionError("ACIS solid count");
+            if(mesh.xyz.length!=24||mesh.triangles.length!=0||mesh.edges.length!=24)
+                throw new AssertionError("solid proxy must be an 8-corner, 12-edge wire box");
+            if(mesh.minZ!=3f||mesh.maxZ!=33f||mesh.flatPlan)throw new AssertionError("solid proxy Z bounds");
+            for(int v:mesh.sourceLines)if(v!=-1)throw new AssertionError("solid proxy geometry must be read-only");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 

@@ -40,7 +40,7 @@ public final class Mesh3dActivity extends Activity {
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
-                    TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+(mesh.triangles.length/3)+" üçgen  •  "+(mesh.edges.length/2)+" kenar  •  "+(mesh.xyz.length/3)+" köşe"+(mesh.unsupportedSolids>0?"  •  Bazı katı modeller henüz desteklenmiyor":""));
+                    TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+modelHint());
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
                     addViewControls(root);
                     if(MODE_EDIT.equals(requestedMode()))addEditControls(root);
@@ -51,6 +51,30 @@ public final class Mesh3dActivity extends Activity {
     private String requestedMode(){
         String mode=getIntent().getStringExtra(EXTRA_MODE);
         return mode==null?MODE_ISO:mode;
+    }
+
+    private String modelHint(){
+        StringBuilder text=new StringBuilder();
+        text.append(mesh.triangles.length/3).append(" üçgen  •  ")
+            .append(mesh.edges.length/2).append(" kenar  •  ")
+            .append(mesh.xyz.length/3).append(" köşe");
+        if(mesh.flatPlan){
+            text.append("\n2B plan algılandı: Z aralığı ")
+                .append(String.format(java.util.Locale.getDefault(),"%.3f",mesh.minZ))
+                .append(" … ")
+                .append(String.format(java.util.Locale.getDefault(),"%.3f",mesh.maxZ))
+                .append(". Üst görünüş otomatik açıldı; ISO ile eğik görünüşe geçebilirsiniz.");
+        }
+        if(mesh.solidProxy){
+            text.append("\n")
+                .append(mesh.unsupportedSolids)
+                .append(" adet 3DSOLID/BODY/REGION bulundu. ACIS yüzeyi doğrudan çözülemediği için DWG/DXF sınır kutusu tel-kafes önizleme olarak gösteriliyor.");
+        }else if(mesh.unsupportedSolids>0){
+            text.append("\n")
+                .append(mesh.unsupportedSolids)
+                .append(" adet ACIS katı nesne ayrıca bulundu; desteklenen yüzey ve çizgiler korunarak gösteriliyor.");
+        }
+        return text.toString();
     }
 
     private String modeHint(){
@@ -69,7 +93,15 @@ public final class Mesh3dActivity extends Activity {
     private void applyRequestedMode(){
         if(meshView==null)return;
         String mode=requestedMode();
-        meshView.setInteractionMode(MODE_MEASURE.equals(mode)?Mesh3dView.InteractionMode.MEASURE:MODE_EDIT.equals(mode)?Mesh3dView.InteractionMode.EDIT:Mesh3dView.InteractionMode.ORBIT);
+        meshView.setInteractionMode(MODE_MEASURE.equals(mode)?Mesh3dView.InteractionMode.MEASURE:MODE_EDIT.equals(mode)&&!mesh.solidProxy?Mesh3dView.InteractionMode.EDIT:Mesh3dView.InteractionMode.ORBIT);
+        if(mesh.solidProxy){
+            meshView.setWireframe(true);
+        }
+        if(mesh.flatPlan&&(MODE_ISO.equals(mode)||MODE_ORBIT.equals(mode))){
+            meshView.setWireframe(true);
+            meshView.setTopView();
+            return;
+        }
         switch(mode){
             case MODE_FRONT: meshView.setFrontView(); break;
             case MODE_TOP: meshView.setTopView(); break;
@@ -109,6 +141,7 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void addEditControls(FrameLayout root){
+        if(mesh==null||mesh.solidProxy)return;
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
         LinearLayout views=new LinearLayout(this);panel.addView(views,new LinearLayout.LayoutParams(-1,-2));
         Button style=new Button(this);style.setText("Ağ çizgileri");views.addView(style,new LinearLayout.LayoutParams(0,-2,1));
