@@ -86,6 +86,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/ReferenceRenderParityTest.java
           java -cp /tmp/musacad-tests ReferenceRenderParityTest
+      - name: Test final release readiness chain
+        run: |
+          javac -d /tmp/musacad-tests tests/FinalReleaseReadinessTest.java
+          java -cp /tmp/musacad-tests FinalReleaseReadinessTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
