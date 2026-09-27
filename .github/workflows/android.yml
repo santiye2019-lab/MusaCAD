@@ -356,6 +356,26 @@ jobs:
           cmake --build /tmp/musa-native --parallel 2
           /tmp/musa-native/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musa-smoke.dxf
           test -s /tmp/musa-smoke.dxf
+          # Real DWG -> DXF OLE regression: preserve the embedded OLE2FRAME payload
+          # so MusaCAD can render an Excel/Word/PowerPoint/PDF presentation preview.
+          /tmp/musa-native/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musa-ole.dxf
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path("/tmp/musa-ole.dxf").read_text(errors="ignore")
+          pairs=[line.strip() for line in text.replace("\r","").split("\n")]
+          ole=False
+          payload=False
+          for i in range(0,len(pairs)-1,2):
+              code,value=pairs[i],pairs[i+1]
+              if code=="0":
+                  ole=value.upper()=="OLE2FRAME"
+              elif ole and code=="310" and value.strip():
+                  payload=True
+                  break
+          assert "OLE2FRAME" in text, "Converted DWG lost OLE2FRAME entity"
+          assert payload, "Converted DWG lost OLE2FRAME group-310 embedded payload"
+          print("Native DWG OLE payload preservation passed")
+          PY
           mkdir -p app/src/main/assets
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
       - name: Build approved installable MusaCAD APK
