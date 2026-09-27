@@ -42,6 +42,13 @@ public class DxfBlocksTest {
         skipped(read(b,insert("A",210,1,220,0,230,0)));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");
 
+        String tableBlock=block("*T1",LINE);
+        DxfBlocks.Result table=read(tableBlock,tags(0,"ACAD_TABLE",2,"*T1",10,100,20,200,11,1,21,0));
+        point(table,102,202);if(table.placements.get(0).directRoot)throw new AssertionError("ACAD_TABLE contents must come from anonymous block");
+        DxfBlocks.Result rotatedTable=read(tableBlock,tags(0,"ACAD_TABLE",2,"*T1",10,100,20,200,11,0,21,1));
+        point(rotatedTable,98,202);
+        skipped(read("",tags(0,"ACAD_TABLE",2,"*T_MISSING",10,0,20,0,11,1,21,0)));
+
         String visibilityLayers=layer("ON",62,7,70,0)+layer("OFF",62,-7,70,0)+layer("FROZEN",62,3,70,1)+layer("LOCKED",62,4,70,4);
         DxfBlocks.Result visibility=read(visibilityLayers,"",line(8,"ON")+line(8,"OFF")+line(8,"FROZEN")+line(8,"LOCKED"));
         if(!visibility.layerInitiallyVisible("ON")||visibility.layerInitiallyVisible("OFF")||visibility.layerInitiallyVisible("FROZEN")||!visibility.layerInitiallyVisible("LOCKED"))throw new AssertionError("Layer table visibility state");
@@ -82,6 +89,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result paperInsert=read(block("P",line()),insert("P",67,1,410,"Sheet B"));layout(paperInsert,"Sheet B");
         DxfBlocks.Result mixed=read("",line()+line(67,1,410,"Sheet C"));if(!mixed.layoutNames.contains(DxfBlocks.MODEL_LAYOUT)||!mixed.layoutNames.contains("Sheet C")||mixed.placements.size()!=2)throw new AssertionError("mixed layouts");
 
-        System.out.println("44 block/color/source/style/dimension/layout/visibility/array expansion cases passed");
+        System.out.println("47 block/table/color/source/style/dimension/layout/visibility/array expansion cases passed");
     }
 }

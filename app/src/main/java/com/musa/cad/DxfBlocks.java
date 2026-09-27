@@ -4,7 +4,7 @@ import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
 
-/** Expands ordinary 2D INSERTs/dimension picture blocks and resolves DXF display properties. */
+/** Expands ordinary 2D INSERTs, ACAD_TABLE anonymous blocks and dimension picture blocks, and resolves DXF display properties. */
 public final class DxfBlocks {
     public static final String MODEL_LAYOUT="Model";
     public static final String PAPER_LAYOUT="Paper Space";
@@ -177,6 +177,25 @@ public final class DxfBlocks {
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
             if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+        }
+        if(r.type.equals("ACAD_TABLE")){
+            String name=key(r.text(2,""));Block block=blocks.get(name);
+            if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
+            double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+            boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
+            boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
+            if(!positiveZ&&!negativeZ){result.skipped++;return;}
+            double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
+            if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
+            double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
+            double bx=block.header.number(10,0),by=block.header.number(20,0),ix=r.number(10,0),iy=r.number(20,0);
+            Transform local=negativeZ
+                ?Transform.insert(bx,by,-1,1,-degrees,-ix,iy)
+                :Transform.insert(bx,by,1,1,degrees,ix,iy);
+            stack.add(name);
+            try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
+            finally{stack.remove(name);}
+            return;
         }
         if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
