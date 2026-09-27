@@ -164,7 +164,7 @@ public final class DxfMText {
         String value=raw==null?"":raw.trim();int bar=value.indexOf('|');
         String name=(bar>=0?value.substring(0,bar):value).trim();s.font=name;
         String lower=name.toLowerCase(Locale.ROOT);
-        s.fontShx=lower.endsWith(".shx")||(shxCommand&&bar<0&&!name.isEmpty());
+        s.fontShx=lower.endsWith(".shx")||(shxCommand&&bar<0&&!name.isEmpty()&&!looksLikeCommonTtfFamily(name));
         if(bar<0)return;
         String[] options=value.substring(bar+1).split("\\|");
         for(String option:options){
@@ -172,6 +172,14 @@ public final class DxfMText {
             if(v.charAt(0)=='b'&&(v.charAt(1)=='0'||v.charAt(1)=='1'))s.bold=v.charAt(1)=='1';
             else if(v.charAt(0)=='i'&&(v.charAt(1)=='0'||v.charAt(1)=='1'))s.italic=v.charAt(1)=='1';
         }
+    }
+
+    private static boolean looksLikeCommonTtfFamily(String name){
+        String v=name==null?"":name.toLowerCase(Locale.ROOT).replace(" ","").replace("-","").replace("_","");
+        return v.contains("arial")||v.contains("helvetica")||v.contains("calibri")||v.contains("cambria")
+            ||v.contains("segoeui")||v.contains("tahoma")||v.contains("verdana")||v.contains("timesnewroman")
+            ||v.equals("times")||v.contains("georgia")||v.contains("palatino")||v.contains("courier")
+            ||v.contains("consolas")||v.contains("lucidaconsole")||v.contains("centurygothic");
     }
 
     private static void applyHeight(State s,String raw){
