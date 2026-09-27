@@ -20,6 +20,7 @@ public class DxfBlocksTest {
         return DxfBlocks.expand(Arrays.asList(text.split("\n")));
     }
     private static void point(DxfBlocks.Result r,double x,double y){if(r.placements.size()!=1||r.skipped!=0)throw new AssertionError("Unexpected expansion count");double[] actual=r.placements.get(0).transform.point(3,4);if(Math.abs(actual[0]-x)>1e-6||Math.abs(actual[1]-y)>1e-6)throw new AssertionError(Arrays.toString(actual));}
+    private static void points(DxfBlocks.Result r,double... expected){if(r.skipped!=0||r.placements.size()*2!=expected.length)throw new AssertionError("Unexpected array expansion count "+r.placements.size()+"/"+r.skipped);for(int i=0;i<r.placements.size();i++){double[] actual=r.placements.get(i).transform.point(3,4);if(Math.abs(actual[0]-expected[i*2])>1e-6||Math.abs(actual[1]-expected[i*2+1])>1e-6)throw new AssertionError("Array point "+i+" "+Arrays.toString(actual));}}
     private static void color(DxfBlocks.Result r,int expected){if(r.placements.size()!=1||r.placements.get(0).color!=expected)throw new AssertionError("Color expected "+Integer.toHexString(expected)+" got "+(r.placements.isEmpty()?"none":Integer.toHexString(r.placements.get(0).color)));}
     private static void style(DxfBlocks.Result r,String type,int weight,double scale){if(r.placements.size()!=1)throw new AssertionError("style placement count");DxfBlocks.Placement p=r.placements.get(0);if(!type.equals(p.lineType))throw new AssertionError("linetype "+p.lineType+" != "+type);if(p.lineWeight!=weight)throw new AssertionError("lineweight "+p.lineWeight+" != "+weight);if(Math.abs(p.lineTypeScale-scale)>1e-6)throw new AssertionError("linetype scale "+p.lineTypeScale+" != "+scale);}
     private static void layout(DxfBlocks.Result r,String expected){if(r.placements.size()!=1||!expected.equals(r.placements.get(0).layout))throw new AssertionError("layout "+(r.placements.isEmpty()?"none":r.placements.get(0).layout)+" != "+expected);if(!r.layoutNames.contains(expected))throw new AssertionError("layout list missing "+expected);}
@@ -30,9 +31,12 @@ public class DxfBlocksTest {
         point(read(b,insert("A",10,10,20,20)),12,22);
         point(read(b,insert("a",10,10,20,20,50,90,41,2,42,3)),4,24);
         point(read(b,insert("A",41,-1)),-2,2);
+        points(read(b,insert("A",10,10,20,20,70,2,71,2,44,5,45,7)),12,22,17,22,12,29,17,29);
+        points(read(b,insert("A",10,10,20,20,50,90,70,2,71,2,44,5,45,7)),8,22,8,27,1,22,1,27);
+        points(read(b,insert("A",10,10,20,20,41,2,70,2,44,5)),14,22,19,22);
         String nested=b+block("B",insert("A",10,5,20,6));point(read(nested,insert("B",10,10,20,20)),16,26);
         DxfBlocks.Result inheritedLayer=read(b,insert("A",8,"BORU"));if(!inheritedLayer.placements.get(0).layer.equals("BORU"))throw new AssertionError("Layer inheritance");
-        skipped(read(b,insert("MISSING")));skipped(read(block("A",insert("A")),insert("A")));skipped(read(b,insert("A",70,2)));
+        skipped(read(b,insert("MISSING")));skipped(read(block("A",insert("A")),insert("A")));skipped(read(b,insert("A",70,0)));
         point(read(b,insert("A",10,10,20,20,30,6540.072947)),12,22);
         point(read(b,insert("A",230,-1)),-2,2);
         skipped(read(b,insert("A",210,1,220,0,230,0)));
@@ -78,6 +82,6 @@ public class DxfBlocksTest {
         DxfBlocks.Result paperInsert=read(block("P",line()),insert("P",67,1,410,"Sheet B"));layout(paperInsert,"Sheet B");
         DxfBlocks.Result mixed=read("",line()+line(67,1,410,"Sheet C"));if(!mixed.layoutNames.contains(DxfBlocks.MODEL_LAYOUT)||!mixed.layoutNames.contains("Sheet C")||mixed.placements.size()!=2)throw new AssertionError("mixed layouts");
 
-        System.out.println("41 block/color/source/style/dimension/layout/visibility expansion cases passed");
+        System.out.println("44 block/color/source/style/dimension/layout/visibility/array expansion cases passed");
     }
 }
