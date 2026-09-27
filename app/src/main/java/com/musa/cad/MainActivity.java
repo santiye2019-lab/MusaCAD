@@ -1007,7 +1007,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Geri Al",R.drawable.ic_undo,()->cad.undo()),
             tool("Yinele",R.drawable.ic_rotate,()->{if(!cad.redo())result.setText("Yinele • İşlem yok");}),
             tool("Temizle",R.drawable.ic_clear,()->cad.clearMeasurement()),
-            tool("Blok kütüphanesi",R.drawable.ic_open_file,this::showBlockLibrary),
+            tool("Blok ekle",R.drawable.ic_open_file,this::showBlockLibrary),
             tool("Çizgi Tipi",R.drawable.ic_line,this::showSelectedLineType),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
             tool("Bulmak",R.drawable.ic_select,()->showEntitySearch(false)),
