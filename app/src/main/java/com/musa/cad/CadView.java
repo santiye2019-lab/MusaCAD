@@ -377,6 +377,11 @@ public class CadView extends View {
         if(vectorDrawing==null||edit==null)return false;
         addRegularEdit(edit.copy());lastActionRegular=true;notifyValue();invalidate();return true;
     }
+    public int addImportedEdits(Collection<CadEdit> imported){
+        if(vectorDrawing==null||imported==null||imported.isEmpty())return 0;ArrayList<CadEdit> copy=new ArrayList<>();
+        for(CadEdit edit:imported)if(edit!=null)copy.add(edit.copy());if(copy.isEmpty())return 0;
+        addRegularEdits(copy);lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();return copy.size();
+    }
 
     public boolean armTrimSelected(){
         CadEdit selected=sourceEdits.currentSelected();
