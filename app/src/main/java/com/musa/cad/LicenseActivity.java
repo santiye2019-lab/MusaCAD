@@ -232,6 +232,7 @@ public class LicenseActivity extends AppCompatActivity {
                .append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(playExpiry)));
         }
         msg.append("\n\nSerial: ").append(LicenseManager.serialId(this));
+        msg.append("\nOffline / kurumsal aktivasyon: Bu Serial için üretilen lisans kodu internet veya Google Play gerektirmeden etkinleştirilebilir.");
         String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
         if(stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
             long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
