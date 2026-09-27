@@ -180,6 +180,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadFontPolicy.java tests/CadFontPolicyTest.java
           java -cp /tmp/musacad-tests CadFontPolicyTest
+      - name: Test complete font manager model
+        run: |
+          javac -d /tmp/musacad-tests tests/FontSystemModelTest.java
+          java -cp /tmp/musacad-tests FontSystemModelTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
