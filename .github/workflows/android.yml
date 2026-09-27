@@ -184,6 +184,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FontSystemModelTest.java
           java -cp /tmp/musacad-tests FontSystemModelTest
+      - name: Test in-app document type policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadDocumentSupport.java tests/CadDocumentSupportTest.java
+          java -cp /tmp/musacad-tests CadDocumentSupportTest
+      - name: Test offline Office document extraction
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/OfficeTextExtractor.java tests/OfficeTextExtractorTest.java
+          java -cp /tmp/musacad-tests OfficeTextExtractorTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
