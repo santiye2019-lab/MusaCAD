@@ -625,6 +625,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSelectedProperties(){
         if(!ensureSelectedForQuickTool("Özellik"))return;
+        if(cad.selectedIsImage()){
+            TextView imageInfo=new TextView(this);int ip=dp(16);imageInfo.setPadding(ip,ip/2,ip,ip);imageInfo.setText(cad.selectedEntityInfo());imageInfo.setTextIsSelectable(true);
+            new AlertDialog.Builder(this).setTitle("Özellik • Görüntü").setView(imageInfo).setPositiveButton("TAMAM",null).show();
+            result.setText("Görüntü • Taşı / Döndür / Ölçek / Sil araçları kullanılabilir");return;
+        }
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
         TextView info=new TextView(this);info.setText(cad.selectedEntityInfo());info.setTextIsSelectable(true);box.addView(info);
 
