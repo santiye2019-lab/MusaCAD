@@ -184,6 +184,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FontSystemModelTest.java
           java -cp /tmp/musacad-tests FontSystemModelTest
+      - name: Test raster DXF placement metadata
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadImagePlacement.java app/src/main/java/com/musa/cad/CadImageMetadata.java tests/CadImageMetadataTest.java
+          java -cp /tmp/musacad-tests CadImageMetadataTest
+      - name: Test raster save reopen persistence model
+        run: |
+          javac -d /tmp/musacad-tests tests/ImagePersistenceModelTest.java
+          java -cp /tmp/musacad-tests ImagePersistenceModelTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
