@@ -149,7 +149,14 @@ public class RecentFilesActivity extends AppCompatActivity {
     private void browse(){
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/x-dxf","image/vnd.dxf","application/octet-stream"});
+        i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{
+            "application/acad","application/x-autocad","application/dwg","image/vnd.dwg","application/dxf","application/x-dxf","image/vnd.dxf","application/octet-stream",
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/msword",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation","application/vnd.ms-powerpoint",
+            "text/plain","text/csv"
+        });
         startActivityForResult(i,PICK_FILE);
     }
 
