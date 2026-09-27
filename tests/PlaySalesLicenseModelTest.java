@@ -10,7 +10,7 @@ public final class PlaySalesLicenseModelTest {
         if(!source.contains(needle))throw new AssertionError("Play sales/license model regression in "+area+": missing "+needle);
     }
     public static void main(String[]args)throws Exception{
-        String billing=read("app/src/main/java/com/musa/cad/PlayBillingManager.java");
+        String billing=read("app/src/play/java/com/musa/cad/PlayBillingManager.java");
         String license=read("app/src/main/java/com/musa/cad/LicenseManager.java");
         String screen=read("app/src/main/java/com/musa/cad/LicenseActivity.java");
         String verifier=read("app/src/main/java/com/musa/cad/PlayPurchaseVerifier.java");
@@ -33,6 +33,8 @@ public final class PlaySalesLicenseModelTest {
         require(worker,"purchases/subscriptionsv2/tokens","server-side Google Play verification");
         require(worker,":acknowledge","server-side acknowledgement");
         require(gradle,"musacad_yearly_renewal","yearly Play product id");
+        require(gradle,"playImplementation 'com.android.billingclient:billing:9.1.0'","Billing dependency is Play-only");
+        require(gradle,"buildConfigField \"boolean\", \"PLAY_DISTRIBUTION\", \"true\"","Play distribution flag");
 
         System.out.println("Play sales/license model OK: free install + one-day trial + manual first activation + Play yearly renewal is locked.");
     }
