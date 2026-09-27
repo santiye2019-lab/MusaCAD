@@ -49,6 +49,7 @@ public final class ReferenceRenderParityTest {
             "Test DXF color palette",
             "Test native first-paint color resolution",
             "Test navigation renderer color stability",
+            "Test CAD navigation zoom and culling policy",
             "Test DXF text styles and font metadata",
             "Test DXF layer visibility rules",
             "Test DXF block expansion, colors, styles and source origins",
