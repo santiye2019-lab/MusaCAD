@@ -26,6 +26,10 @@ public final class CadSpreadsheetLayoutTest {
         List<CadSpreadsheetLayout.Sheet> quoted=CadSpreadsheetLayout.parseCsv("A,B\n1,\"iki\nsatır\"");
         require(quoted.size()==1,"quoted newline sheet");
         eq("iki satır",quoted.get(0).valueAt(2,2),"quoted newline normalized");
+
+        List<CadSpreadsheetLayout.Sheet> trailing=CadSpreadsheetLayout.parseCsv("A;B\n1;2\n");
+        require(trailing.size()==1,"trailing newline sheet");
+        require(trailing.get(0).rows==2,"trailing newline must not add an empty third row");
         System.out.println("CadSpreadsheetLayoutTest OK");
     }
 }
