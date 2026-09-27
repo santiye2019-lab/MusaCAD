@@ -17,6 +17,9 @@ public final class DxfWriter {
         write(baseDxf,target,drawing,additions,replacements,removedSources,blocks,"0");
     }
     public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources,List<CadBlock.Definition> blocks,String defaultLayer)throws IOException{
+        write(baseDxf,target,drawing,additions,replacements,removedSources,blocks,defaultLayer,Collections.emptyList());
+    }
+    public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources,List<CadBlock.Definition> blocks,String defaultLayer,List<CadImagePlacement> imagePlacements)throws IOException{
         if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
         Matrix contentToWorld=contentToWorldMatrix(drawing);
         Charset cs=charset(baseDxf);
@@ -60,12 +63,14 @@ public final class DxfWriter {
                 if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){
                     String layer=defaultLayer==null||defaultLayer.trim().isEmpty()?"0":defaultLayer.trim();
                     writeEdits(out,contentToWorld,additions,layer,null,null,null,null,drawing.activeLayout);
-                    writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;
+                    writeReplacements(out,contentToWorld,replacements,drawing);
+                    CadImageMetadata.writeComments(out,imagePlacements);inserted=true;
                 }
 
                 boolean removed=isRemoved(lineIndex,removals);
-                if(!removed){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
-                if(!removed){
+                boolean staleImageMetadata=code==999&&CadImageMetadata.isMetadata(value);
+                if(!removed&&!staleImageMetadata){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
+                if(!removed&&!staleImageMetadata){
                     if(code==0&&"SECTION".equals(value)){sectionPending=true;lineIndex+=2;continue;}
                     if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;lineIndex+=2;continue;}
                     if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;tablePending=false;inStyleTable=false;stylePending=false;}
