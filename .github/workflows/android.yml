@@ -119,6 +119,12 @@ jobs:
           grep -q 'emit_minsert' app/src/main/cpp/native_scene.c
           grep -q 'num_cols' app/src/main/cpp/native_scene.c
           grep -q 'col_spacing' app/src/main/cpp/native_scene.c
+      - name: Guard native IMAGE and OLE frame fallback
+        run: |
+          grep -q 'DWG_TYPE_IMAGE' app/src/main/cpp/native_scene.c
+          grep -q 'DWG_TYPE_OLE2FRAME' app/src/main/cpp/native_scene.c
+          grep -q 'emit_image_frame' app/src/main/cpp/native_scene.c
+          grep -q 'emit_ole_frame' app/src/main/cpp/native_scene.c
       - name: Test navigation renderer color stability
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
@@ -171,6 +177,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfWipeout.java tests/DxfWipeoutTest.java
           java -cp /tmp/musacad-tests DxfWipeoutTest
+      - name: Test DXF OLE frame geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfOleFrame.java tests/DxfOleFrameTest.java
+          java -cp /tmp/musacad-tests DxfOleFrameTest
       - name: Test DXF paper-space viewport geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java

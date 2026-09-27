@@ -186,6 +186,29 @@ static int begin_fill_poly(MusaNativeScene *s,int n){
     if(n<3||!reserve_scene(s,1u+color_words(color)+(size_t)n*2u))return 0;
     push_code(s,5,color);pushf(s,(float)(-n));return 1;
 }
+static void emit_image_frame(MusaNativeScene *s,SceneColor color,Affine2 parent,dwg_ent_image *e){
+    if(!e)return;BITCODE_BL n=(e->clipping&&e->clip_verts&&e->num_clip_verts>=3)?e->num_clip_verts:4;
+    if(n<3||n>100000||!begin_poly(s,color,1,(int)n))return;
+    if(e->clipping&&e->clip_verts&&e->num_clip_verts>=3){
+        for(BITCODE_BL i=0;i<n;i++){
+            double px=e->clip_verts[i].x+.5,py=e->clip_verts[i].y+.5;
+            emit_poly_point(s,parent,e->pt0.x+e->uvec.x*px+e->vvec.x*py,e->pt0.y+e->uvec.y*px+e->vvec.y*py);
+        }
+    }else{
+        double width=fabs(e->image_size.x),height=fabs(e->image_size.y);if(!isfinite(width)||width<1.0)width=1.0;if(!isfinite(height)||height<1.0)height=1.0;
+        emit_poly_point(s,parent,e->pt0.x,e->pt0.y);
+        emit_poly_point(s,parent,e->pt0.x+e->uvec.x*width,e->pt0.y+e->uvec.y*width);
+        emit_poly_point(s,parent,e->pt0.x+e->uvec.x*width+e->vvec.x*height,e->pt0.y+e->uvec.y*width+e->vvec.y*height);
+        emit_poly_point(s,parent,e->pt0.x+e->vvec.x*height,e->pt0.y+e->vvec.y*height);
+    }
+    finish_poly(s);
+}
+static void emit_ole_frame(MusaNativeScene *s,SceneColor color,Affine2 parent,dwg_ent_ole2frame *e){
+    if(!e||!finite2(e->pt1.x,e->pt1.y)||!finite2(e->pt2.x,e->pt2.y))return;
+    if(fabs(e->pt2.x-e->pt1.x)+fabs(e->pt2.y-e->pt1.y)<1e-9||!begin_poly(s,color,1,4))return;
+    emit_poly_point(s,parent,e->pt1.x,e->pt1.y);emit_poly_point(s,parent,e->pt2.x,e->pt1.y);
+    emit_poly_point(s,parent,e->pt2.x,e->pt2.y);emit_poly_point(s,parent,e->pt1.x,e->pt2.y);finish_poly(s);
+}
 static void emit_wipeout(MusaNativeScene *s,Affine2 parent,Dwg_Entity_WIPEOUT *e){
     if(!e)return;
     BITCODE_BL n=(e->clip_verts&&e->num_clip_verts>=3)?e->num_clip_verts:4;
@@ -586,6 +609,12 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                 emit_text_basis(s,textColor,ax,ay,px-ax,py-ay,qx-ax,qy-ay,hAlign,2,label);
             }
             break;
+        }
+        case DWG_TYPE_IMAGE:{
+            dwg_ent_image *e=dwg_object_to_IMAGE(obj);if(e)emit_image_frame(s,color,parent,e);break;
+        }
+        case DWG_TYPE_OLE2FRAME:{
+            dwg_ent_ole2frame *e=dwg_object_to_OLE2FRAME(obj);if(e)emit_ole_frame(s,color,parent,e);break;
         }
         case DWG_TYPE_WIPEOUT:{
             Dwg_Entity_WIPEOUT *e=obj->tio.entity->tio.WIPEOUT;
