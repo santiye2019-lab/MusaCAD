@@ -387,6 +387,16 @@ static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     Dwg_Object *child=get_first_owned_entity(block);
     while(child&&!s->truncated){emit_object(child,s,combined,depth+1,insertColor,insertLayer);child=get_next_owned_entity(block,child);}
 }
+static void emit_dimension_block(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor dimColor,SceneColor dimLayer){
+    if(depth>=MUSA_MAX_BLOCK_DEPTH||!obj)return;
+    dwg_ent_dim *dim=dwg_object_to_DIMENSION(obj);if(!dim||!dim->block)return;
+    Dwg_Object *block=dim->block->obj;if(!block)block=dwg_ref_object_silent(obj->parent,dim->block);
+    if(!block||block->fixedtype!=DWG_TYPE_BLOCK_HEADER||!block->tio.object||!block->tio.object->tio.BLOCK_HEADER)return;
+    Affine2 local=identity2();local.tx=dim->clone_ins_pt.x;local.ty=dim->clone_ins_pt.y;
+    Affine2 combined=multiply2(parent,local);
+    Dwg_Object *child=get_first_owned_entity(block);
+    while(child&&!s->truncated){emit_object(child,s,combined,depth+1,dimColor,dimLayer);child=get_next_owned_entity(block,child);}
+}
 
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer){
     if(!obj||s->truncated||obj->supertype!=DWG_SUPERTYPE_ENTITY||layer_invisible(obj))return;
@@ -394,6 +404,16 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     SceneColor color=entity_color(obj,byBlock,layerColor);
     switch(obj->fixedtype){
         case DWG_TYPE_INSERT: emit_insert(obj,s,parent,depth,color,layerColor); break;
+        case DWG_TYPE_DIMENSION_ORDINATE:
+        case DWG_TYPE_DIMENSION_LINEAR:
+        case DWG_TYPE_DIMENSION_ALIGNED:
+        case DWG_TYPE_DIMENSION_ANG3PT:
+        case DWG_TYPE_DIMENSION_ANG2LN:
+        case DWG_TYPE_DIMENSION_RADIUS:
+        case DWG_TYPE_DIMENSION_DIAMETER:
+        case DWG_TYPE_ARC_DIMENSION:
+        case DWG_TYPE_LARGE_RADIAL_DIMENSION:
+            emit_dimension_block(obj,s,parent,depth,color,layerColor);break;
         case DWG_TYPE_LINE:{
             Dwg_Entity_LINE *e=obj->tio.entity->tio.LINE;BITCODE_3DPOINT a,b;
             if(!e)break;transform_OCS(&a,e->start,e->extrusion);transform_OCS(&b,e->end,e->extrusion);
