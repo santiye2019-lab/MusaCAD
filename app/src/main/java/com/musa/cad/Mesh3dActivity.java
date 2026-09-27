@@ -65,6 +65,7 @@ public final class Mesh3dActivity extends Activity {
                 .append(String.format(java.util.Locale.getDefault(),"%.3f",mesh.maxZ))
                 .append(". Üst görünüş otomatik açıldı; ISO ile eğik görünüşe geçebilirsiniz.");
         }
+        if(mesh.acisSolids>0&&!mesh.solidProxy)text.append("\nACIS B-Rep görünümü salt-okunurdur; 3B ölçüm kullanılabilir, tessellated ACIS köşeleri DXF koordinatı gibi kaydedilmez.");
         if(mesh.solidProxy){
             text.append("\n")
                 .append(mesh.unsupportedSolids)
@@ -93,7 +94,7 @@ public final class Mesh3dActivity extends Activity {
     private void applyRequestedMode(){
         if(meshView==null)return;
         String mode=requestedMode();
-        meshView.setInteractionMode(MODE_MEASURE.equals(mode)?Mesh3dView.InteractionMode.MEASURE:MODE_EDIT.equals(mode)&&!mesh.solidProxy?Mesh3dView.InteractionMode.EDIT:Mesh3dView.InteractionMode.ORBIT);
+        meshView.setInteractionMode(MODE_MEASURE.equals(mode)?Mesh3dView.InteractionMode.MEASURE:MODE_EDIT.equals(mode)&&!mesh.solidProxy&&mesh.acisSolids==0?Mesh3dView.InteractionMode.EDIT:Mesh3dView.InteractionMode.ORBIT);
         if(mesh.solidProxy){
             meshView.setWireframe(true);
         }
@@ -141,7 +142,7 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void addEditControls(FrameLayout root){
-        if(mesh==null||mesh.solidProxy)return;
+        if(mesh==null||mesh.solidProxy||mesh.acisSolids>0)return;
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
         LinearLayout views=new LinearLayout(this);panel.addView(views,new LinearLayout.LayoutParams(-1,-2));
         Button style=new Button(this);style.setText("Ağ çizgileri");views.addView(style,new LinearLayout.LayoutParams(0,-2,1));
