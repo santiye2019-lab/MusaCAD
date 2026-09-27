@@ -21,11 +21,11 @@ public final class Dxf3dMesh {
     public final float[] xyz;
     public final int[] triangles,edges,sourceLines,coordinateSlots;
     public final float cx,cy,cz,radius,minZ,maxZ;
-    public final int unsupportedSolids;
+    public final int acisSolids,unsupportedSolids;
     public final boolean flatPlan,solidProxy;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int unsupportedSolids,boolean solidProxy){
-        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.unsupportedSolids=unsupportedSolids;this.solidProxy=solidProxy;
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,boolean solidProxy){
+        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.acisSolids=acisSolids;this.unsupportedSolids=unsupportedSolids;this.solidProxy=solidProxy;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i+1<explicitEdges.length;i+=2)edge(seen,lines,explicitEdges[i],explicitEdges[i+1]);
         for(int i=0;i+2<triangles.length;i+=3){
@@ -64,7 +64,7 @@ public final class Dxf3dMesh {
                 :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),Math.max(0,collector.solids-collector.resolvedSolids),collector.solidProxy
+            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),collector.solidProxy
         );
     }
 
