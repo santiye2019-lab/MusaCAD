@@ -133,6 +133,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf.toString(),StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.solidProxy)throw new AssertionError("valid ACIS SAT must not fall back to bounds proxy");
+            if(mesh.acisSolids!=1)throw new AssertionError("ACIS solid must be marked read-only");
             if(mesh.unsupportedSolids!=0)throw new AssertionError("planar ACIS solid must resolve completely");
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
                 throw new AssertionError("ACIS triangle must become real tessellated geometry");
@@ -153,6 +154,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(!mesh.solidProxy)throw new AssertionError("ACIS solid must use bounds proxy when no tessellation is available");
+            if(mesh.acisSolids!=1)throw new AssertionError("fallback ACIS solid count");
             if(mesh.unsupportedSolids!=1)throw new AssertionError("ACIS solid count");
             if(mesh.xyz.length!=24||mesh.triangles.length!=0||mesh.edges.length!=24)
                 throw new AssertionError("solid proxy must be an 8-corner, 12-edge wire box");
