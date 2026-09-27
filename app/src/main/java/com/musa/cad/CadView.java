@@ -570,6 +570,10 @@ public class CadView extends View {
         addRegularEdit(CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,30f,1f,0f,0));
         lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
     }
+    public void addTextEdit(float x,float y,String text,CadFontManager.Choice font){
+        if(font==null){addTextEdit(x,y,text);return;}
+        addTextEdit(x,y,text,font.styleName(),font.hint,font.shx);
+    }
 
     public void undo(){
         lastSnapped=false;freehandPoints.clear();
