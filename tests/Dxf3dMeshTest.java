@@ -32,6 +32,7 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        testPolygonMesh();
         testInsertedBlockLine();
     }
 
@@ -52,6 +53,22 @@ public final class Dxf3dMeshTest {
             if(mesh.edges.length!=8)throw new AssertionError("LINE + closed 3D POLYLINE edges");
             if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
                 throw new AssertionError("3D line/polyline Z coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testPolygonMesh() throws Exception {
+        File file=File.createTempFile("mesh3d-polygon-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\nPOLYLINE\n70\n16\n71\n2\n72\n2\n"
+                +meshVertex(0,0,0)+meshVertex(4,0,0)+meshVertex(0,3,1)+meshVertex(4,3,2)
+                +"0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=12)throw new AssertionError("polygon mesh vertex count");
+            if(mesh.triangles.length!=6)throw new AssertionError("polygon mesh must create two triangles");
+            if(mesh.edges.length!=10)throw new AssertionError("polygon mesh edge count");
+            if(mesh.xyz[8]!=1f||mesh.xyz[11]!=2f)throw new AssertionError("polygon mesh Z coordinates");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
@@ -77,4 +94,5 @@ public final class Dxf3dMeshTest {
     }
 
     private static String vertex(int x,int y,int z){return "0\nVERTEX\n70\n192\n10\n"+x+"\n20\n"+y+"\n30\n"+z+"\n";}
+    private static String meshVertex(int x,int y,int z){return "0\nVERTEX\n70\n64\n10\n"+x+"\n20\n"+y+"\n30\n"+z+"\n";}
 }

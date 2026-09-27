@@ -10,7 +10,7 @@ import java.util.HashSet;
 /**
  * Bounded XYZ geometry reader for MusaCAD 3D.
  * Expands ordinary INSERT blocks and supports:
- * 3DFACE, polyface, LINE, ordinary/3D POLYLINE, TRACE and SOLID geometry.
+ * 3DFACE, polyface/polygon mesh, LINE, ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
     private static final int MAX_VERTICES=2_000_000,MAX_TRIANGLES=4_000_000,MAX_EDGES=4_000_000;
@@ -56,8 +56,8 @@ public final class Dxf3dMesh {
         final FloatBuffer points=new FloatBuffer();
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
         final ArrayList<Face> faces=new ArrayList<>();
-        boolean polyface,polylinePath,polylineClosed;
-        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,solids;
+        boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN;
+        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
             if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(p.layout))return;
@@ -67,14 +67,17 @@ public final class Dxf3dMesh {
                 finishGeometry();
                 int flags=(int)r.number(70,0);
                 polyface=(flags&64)!=0;
-                boolean polygonMesh=(flags&16)!=0;
+                polygonMesh=!polyface&&(flags&16)!=0;
                 polylinePath=!polyface&&!polygonMesh;
                 polylineClosed=(flags&1)!=0;
+                meshClosedM=polygonMesh&&(flags&1)!=0;meshClosedN=polygonMesh&&(flags&32)!=0;
+                meshM=polygonMesh?(int)r.number(71,0):0;meshN=polygonMesh?(int)r.number(72,0):0;
+                if(polygonMesh&&(meshM<2||meshN<2||(long)meshM*meshN>MAX_VERTICES))throw new IOException("3B polygon mesh boyutları geçersiz veya sınırı aşıyor");
                 base=points.n/3;vertexCount=0;firstPathVertex=-1;previousPathVertex=-1;faces.clear();
                 return;
             }
 
-            if("VERTEX".equals(r.type)&&(polyface||polylinePath)){
+            if("VERTEX".equals(r.type)&&(polyface||polygonMesh||polylinePath)){
                 if(polyface){
                     int flags=(int)r.number(70,0);
                     if((flags&64)!=0){
@@ -83,6 +86,8 @@ public final class Dxf3dMesh {
                         int[] indices=new int[4];for(int k=0;k<4;k++)indices[k]=Math.abs((int)r.number(71+k,0));
                         faces.add(new Face(indices,base));
                     }
+                }else if(polygonMesh){
+                    addPoint(points,p,10,20,30);addSource(p,0);vertexCount++;
                 }else{
                     int index=points.n/3;
                     addPoint(points,p,10,20,30);addSource(p,0);
@@ -118,11 +123,13 @@ public final class Dxf3dMesh {
         void finishGeometry()throws IOException{
             if(polyface){
                 for(Face face:faces)appendFace(triangles,face.index,face.base,vertexCount);
+            }else if(polygonMesh){
+                appendPolygonMesh(triangles,base,vertexCount,meshM,meshN,meshClosedM,meshClosedN);
             }else if(polylinePath&&polylineClosed&&firstPathVertex>=0&&previousPathVertex>=0&&firstPathVertex!=previousPathVertex){
                 appendEdge(explicitEdges,previousPathVertex,firstPathVertex);
             }
-            polyface=false;polylinePath=false;polylineClosed=false;faces.clear();
-            firstPathVertex=-1;previousPathVertex=-1;vertexCount=0;
+            polyface=false;polygonMesh=false;polylinePath=false;polylineClosed=false;meshClosedM=false;meshClosedN=false;faces.clear();
+            firstPathVertex=-1;previousPathVertex=-1;vertexCount=0;meshM=meshN=0;
         }
 
         private void addSource(DxfBlocks.Placement p,int slot){
@@ -150,6 +157,19 @@ public final class Dxf3dMesh {
         if(a<1||b<1||c<1||a>count||b>count||c>count)return;
         appendTriangle(out,base+a-1,base+b-1,base+c-1);
         if(d>=1&&d<=count&&d!=a&&d!=b&&d!=c)appendTriangle(out,base+a-1,base+c-1,base+d-1);
+    }
+    private static void appendPolygonMesh(IntBuffer out,int base,int vertexCount,int m,int n,boolean closedM,boolean closedN)throws IOException{
+        if(m<2||n<2||vertexCount<m*n)return;
+        boolean wrapM=closedM&&m>2,wrapN=closedN&&n>2;
+        int mCells=wrapM?m:m-1,nCells=wrapN?n:n-1;
+        for(int row=0;row<nCells;row++){
+            int nextRow=(row+1)%n;
+            for(int column=0;column<mCells;column++){
+                int nextColumn=(column+1)%m;
+                int a=base+row*m+column,b=base+row*m+nextColumn,c=base+nextRow*m+nextColumn,d=base+nextRow*m+column;
+                appendTriangle(out,a,b,c);appendTriangle(out,a,c,d);
+            }
+        }
     }
     private static void appendTriangle(IntBuffer out,int a,int b,int c)throws IOException{
         if(out.n/3>=MAX_TRIANGLES)throw new IOException("3B yüzey sayısı sınırı aşıldı");
