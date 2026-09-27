@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     }
     private static final class Loaded {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        final ArrayList<CadImageOverlay> imageOverlaysDrawing=new ArrayList<>();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
@@ -64,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
+        final ArrayList<CadImageOverlay> imageOverlaysDrawing=new ArrayList<>();
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
@@ -1019,12 +1021,25 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleMediaPicked(int request,Uri uri){
         if(uri==null||currentProject==null)return;
-        String kind=request==PICK_AUDIO?"Ses":request==PICK_IMAGE?"Görüntü":"Video";
-        String mime=request==PICK_AUDIO?"audio/*":request==PICK_IMAGE?"image/*":"video/*";
         try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        if(request==PICK_IMAGE){
+            final ProjectSession target=currentProject;final PointF center=cad.visibleCenterContent();
+            new Thread(()->{
+                try{
+                    CadImageStore.Imported imported=CadImageStore.importImage(getApplicationContext(),uri);
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||target!=currentProject||!projects.contains(target)){Toast.makeText(this,"Görüntü yüklendi; eklemek için aktif projede yeniden seçin",Toast.LENGTH_LONG).show();return;}
+                        if(cad.addImageOverlay(imported,center.x,center.y)){markModeSelected(R.id.selectEntityButton);result.setText("Görüntü • "+imported.name+" eklendi • Taşı / Döndür / Ölçek / Sil araçlarıyla düzenlenebilir");}
+                        else result.setText("Görüntü eklenemedi • Tam vektör model gerekli");
+                    });
+                }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"Görüntü yüklenemedi: "+e.getMessage(),Toast.LENGTH_LONG).show());}
+            },"MusaCAD-image-import").start();
+            return;
+        }
+        String kind=request==PICK_AUDIO?"Ses":"Video";
+        String mime=request==PICK_AUDIO?"audio/*":"video/*";
         String name=nameOf(uri);if(name==null||name.trim().isEmpty())name=kind+" eki";
-        PointF center=cad.visibleCenterContent();
-        cad.addTextEdit(center.x,center.y,kind+" • "+name);
+        PointF center=cad.visibleCenterContent();cad.addTextEdit(center.x,center.y,kind+" • "+name);
         currentProject.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
         result.setText(kind+" • "+name+" eklendi • görünüm merkezine bağlantı notu yerleştirildi");
     }
@@ -1732,12 +1747,13 @@ public class MainActivity extends AppCompatActivity {
 
                 if(loaded.dxf){
                     runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Vektör çizim hazırlanıyor…");});
+                    loaded.imageOverlaysDrawing.addAll(CadImageMetadata.read(loaded.file));
                     loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
                     if(loaded.bitmap==null)throw new IOException("Desteklenen DXF geometrisi bulunamadı");
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
-                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
+                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.imageOverlaysDrawing.addAll(loaded.imageOverlaysDrawing);project.lastAccessMs=System.currentTimeMillis();
                         loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
@@ -2024,7 +2040,10 @@ public class MainActivity extends AppCompatActivity {
             if(project.parsed!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,project.viewState);
             else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
             else cad.restoreSessionState(null,project.bitmap,project.viewState);
-        }else if(project.parsed!=null){if(project.nativeScene!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,null);else cad.setVectorDrawing(project.parsed);}else if(project.nativeScene!=null)cad.setNativeDrawing(project.nativeScene);else cad.setDrawing(project.bitmap);
+        }else if(project.parsed!=null){
+            if(project.nativeScene!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,null);else cad.setVectorDrawing(project.parsed);
+            if(!project.imageOverlaysDrawing.isEmpty())cad.setImageOverlaysDrawing(project.imageOverlaysDrawing);
+        }else if(project.nativeScene!=null)cad.setNativeDrawing(project.nativeScene);else cad.setDrawing(project.bitmap);
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
@@ -2237,10 +2256,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> images=cad.getImageOverlaysDrawing();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int total=additions.size()+removals.size()+blocks.size()+images.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer,images);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();currentProject.imageOverlaysDrawing.clear();for(CadImageOverlay image:images)currentProject.imageOverlaysDrawing.add(image.copy());clearRecovery(currentProject);}
                     Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
                     if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
