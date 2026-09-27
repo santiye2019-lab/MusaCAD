@@ -27,6 +27,12 @@ MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düze
 - Arka planda dosya okuma/dönüştürme ve iptal desteği
 - Kaydedilmemiş DXF düzenlemeleri için otomatik kurtarma kopyası; beklenmedik kapanma sonrası Kurtar / Sil / Sonra akışı
 
+## ACIS 3B katılar
+
+DXF içindeki kullanılabilir ACIS SAT verisi doğrudan B-Rep topolojisi olarak okunur. `3DSOLID`, `BODY` ve `REGION` için gerçek `face/loop/coedge/edge/vertex/point` zinciri korunur; düzlemsel yüzeyler ve yaygın konik/silindirik yan yüzeyler üçgen ağa dönüştürülür. Düz ve eliptik ACIS kenarları gerçek geometri üzerinden örneklenir. Henüz tessellate edilemeyen spline/özel eğrisel yüzeylerde uydurma dolgu yapılmaz; gerçek B-Rep sınırları tel-kafes olarak gösterilir.
+
+ACIS gövdesi kaynak DWG→DXF dönüşümünde erişilebilir değilse MusaCAD geometri uydurmaz. Özellikle bazı yeni DWG sürümlerinde katı verisi ayrı AcDs/SAB deposunda bulunabildiğinden, native dönüştürücünün sağlayamadığı gövdelerde yalnız son çare olarak çizim extents tel-kafes fallback'i kullanılır.
+
 ## Desteklenen 2B geometri
 
 DXF tarafında temel olarak LINE, LWPOLYLINE, POLYLINE/VERTEX, CIRCLE, ARC, ELLIPSE, TEXT, MTEXT, ATTRIB/ATTDEF, SPLINE, LEADER, HATCH, SOLID, TRACE, 3DFACE ve sınırlı DIMENSION gösterimi işlenir. BLOCK/INSERT yerleşimlerinde taşıma, döndürme, ölçek, aynalama ve iç içe blokların önemli bir bölümü desteklenir.
