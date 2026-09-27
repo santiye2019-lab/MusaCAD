@@ -39,6 +39,7 @@ public final class DxfTextStyle {
             f=f.replace('_',' ').replace('-',' ').trim();
             return f.isEmpty()?"sans":f;
         }
+        public String androidFamilyHint(){return androidFamilyHint(familyHint(),usesShx());}
 
         public float textHeight(float entityHeight){return (float)(fixedHeight>0d?fixedHeight:Math.max(.01d,entityHeight));}
         public float width(float entityScale){return (float)(widthFactor*finitePositive(entityScale,1d));}
@@ -90,6 +91,22 @@ public final class DxfTextStyle {
     }
 
     public static Style defaultStyle(){return new Style(STANDARD,"","",0d,1d,0d,0,0);}
+    /** Stable Android fallback family while preserving the original CAD font metadata. */
+    public static String androidFamilyHint(String family,boolean shx){
+        if(shx)return "monospace";
+        String f=clean(family).replace('\\','/');
+        int slash=f.lastIndexOf('/');if(slash>=0)f=f.substring(slash+1);
+        int dot=f.lastIndexOf('.');if(dot>0)f=f.substring(0,dot);
+        f=f.replace('_',' ').replace('-',' ').trim();
+        if(f.isEmpty())return "sans-serif";
+        String compact=f.toLowerCase(Locale.ROOT).replace(" ","");
+        if(compact.equals("sans")||compact.equals("sansserif"))return "sans-serif";
+        if(compact.contains("arialnarrow")||compact.contains("helveticacondensed")||compact.contains("robotocondensed"))return "sans-serif-condensed";
+        if(compact.contains("courier")||compact.contains("consolas")||compact.contains("lucidaconsole")||compact.equals("monaco"))return "monospace";
+        if(compact.contains("timesnewroman")||compact.equals("times")||compact.contains("cambria")||compact.contains("georgia")||compact.contains("palatino")||compact.contains("baskerville")||compact.contains("goudy"))return "serif";
+        if(compact.contains("calibri")||compact.contains("segoeui")||compact.contains("centurygothic")||compact.contains("frutiger")||compact.equals("arial")||compact.equals("helvetica")||compact.equals("tahoma")||compact.equals("verdana"))return "sans-serif";
+        return f;
+    }
     public static String normalize(String name){
         String s=name==null?"":name.trim();
         return s.isEmpty()?STANDARD:s.toUpperCase(Locale.ROOT);
