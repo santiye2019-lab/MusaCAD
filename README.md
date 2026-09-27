@@ -65,6 +65,15 @@ Eski 32 MB açma sınırı kaldırılmış, dosya kopyalama ve dönüştürülm�
 
 DWG dönüştürme motoru LibreDWG kullanır. Uygulama içinde LibreDWG lisans metni gösterilir ve karşılık gelen kaynak paketinin CI çıktısına dahil edilmesi sağlanır. Ayrıntılar `NATIVE_BUILD.md`, `LICENSE` ve uygulamadaki `MusaCAD hakkında` ekranındadır.
 
+## Dağıtım modelleri
+
+MusaCAD iki ayrı Android dağıtım varyantına ayrılmıştır:
+
+- `play`: Google Play dağıtımı. 1 günlük deneme ve mevcut/önceden etkinleştirilmiş ücretli lisans için yıllık Google Play yenilemesi bulunur. İlk ücretli aktivasyon lisans koduyla yapılır.
+- `direct`: Doğrudan APK / kurumsal dağıtım. Telefona özel 12 karakterlik Serial + 12 haneli lisans kodu veya kurumsal RSA lisansı kullanılır. Bu varyant Google Play Billing kitaplığını içermez ve satın alma ekranı açmaz.
+
+Release derleme hedefleri: `assemblePlayRelease` ve `assembleDirectRelease`. Kullanıcıya elle kurulacak final APK, aksi özellikle istenmedikçe `direct` varyantından üretilir.
+
 ## Derleme
 
 - compileSdk: 35
