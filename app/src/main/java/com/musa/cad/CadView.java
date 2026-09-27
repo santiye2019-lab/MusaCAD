@@ -440,6 +440,7 @@ public class CadView extends View {
         if(e.type==CadEdit.Type.LINE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nUzunluk: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
         if(e.type==CadEdit.Type.CIRCLE&&e.xy.length>=4)b.append(String.format(Locale.getDefault(),"\nYarıçap: %.3f",Math.hypot(e.xy[2]-e.xy[0],e.xy[3]-e.xy[1])));
         if(e.type==CadEdit.Type.POLYLINE)b.append("\nKapalı: ").append(e.closed?"Evet":"Hayır");
+        if(e.type==CadEdit.Type.TEXT)b.append("\nYazı tipi: ").append(e.textFamilyHint).append(e.textShx?" (SHX)":"");
         return b.toString();
     }
     public String selectedLayer(){return sourceEdits.hasSelection()?sourceEdits.selectedLayer():null;}
@@ -447,6 +448,17 @@ public class CadView extends View {
     public String selectedLineType(){return sourceEdits.hasSelection()?sourceEdits.selectedLineType():null;}
     public double selectedLineTypeScale(){return sourceEdits.selectedLineTypeScale();}
     public int selectedLineWeight(){return sourceEdits.selectedLineWeight();}
+    public boolean selectedIsText(){CadEdit e=sourceEdits.currentSelected();return mode==Mode.SELECT_ENTITY&&e!=null&&e.type==CadEdit.Type.TEXT;}
+    public String selectedTextFamilyHint(){CadEdit e=sourceEdits.currentSelected();return e!=null&&e.type==CadEdit.Type.TEXT?e.textFamilyHint:null;}
+    public boolean selectedTextShx(){CadEdit e=sourceEdits.currentSelected();return e!=null&&e.type==CadEdit.Type.TEXT&&e.textShx;}
+    public boolean updateSelectedTextFont(String styleName,String familyHint,boolean shx){
+        if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
+        CadEdit selected=sourceEdits.currentSelected();if(selected==null||selected.type!=CadEdit.Type.TEXT)return false;
+        float height=selected.textHeight>0f?selected.textHeight:30f;
+        boolean changed=sourceEdits.replaceSelected(selected.withTextStyle(styleName,familyHint,shx,height));
+        if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
+        return changed;
+    }
     public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
         boolean changed=sourceEdits.updateSelectedStyle(layer,color,lineType,lineTypeScale,lineWeight);
@@ -535,7 +547,12 @@ public class CadView extends View {
     }
 
     public void addTextEdit(float x,float y,String text){
-        if(vectorDrawing==null||text==null||text.trim().isEmpty())return;addRegularEdit(CadEdit.text(x,y,text.trim()));lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
+        addTextEdit(x,y,text,"STANDARD","sans-serif",false);
+    }
+    public void addTextEdit(float x,float y,String text,String styleName,String familyHint,boolean shx){
+        if(vectorDrawing==null||text==null||text.trim().isEmpty())return;
+        addRegularEdit(CadEdit.styledText(x,y,text.trim(),0f,styleName,familyHint,shx,30f,1f,0f,0));
+        lastActionRegular=true;lastSnapped=false;notifyValue();invalidate();
     }
 
     public void undo(){
@@ -617,7 +634,7 @@ public class CadView extends View {
             case TEXT:{
                 float[] v=map(edit.xy);paint.setStyle(Paint.Style.FILL);int save=c.save();c.rotate(edit.rotationDegrees,v[0],v[1]);
                 if(edit.hasTextStyle()){
-                    paint.setTypeface(edit.textShx?Typeface.MONOSPACE:Typeface.create(edit.textFamilyHint,Typeface.NORMAL));
+                    paint.setTypeface(CadFontManager.resolveTypeface(edit.textFamilyHint,edit.textShx,Typeface.NORMAL));
                     paint.setTextSize(Math.max(1f,edit.textHeight*scale));paint.setTextScaleX(edit.textWidthFactor);paint.setTextSkewX((float)-Math.tan(Math.toRadians(edit.textOblique)));
                     c.scale((edit.textGenerationFlags&2)!=0?-1f:1f,(edit.textGenerationFlags&4)!=0?-1f:1f,v[0],v[1]);
                 }else paint.setTextSize(Math.max(14f*getResources().getDisplayMetrics().scaledDensity,30f*scale));
