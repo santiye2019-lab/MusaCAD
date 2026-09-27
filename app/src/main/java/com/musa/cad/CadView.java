@@ -342,6 +342,28 @@ public class CadView extends View {
     public int sourceModifiedCount(){return sourceEdits.modifiedCount();}
     public int editCount(){return edits.size()+sourceEdits.modifiedCount()+imageOverlays.size();}
     public int imageOverlayCount(){return imageOverlays.size();}
+    public List<CadImagePlacement> getImagePlacementsDrawing(){
+        ArrayList<CadImagePlacement> out=new ArrayList<>();
+        for(CadImageOverlay image:imageOverlays){
+            if(image==null||image.bitmap==null||image.bitmap.isRecycled()||image.uri==null||image.uri.trim().isEmpty())continue;
+            if(vectorDrawing==null){
+                out.add(new CadImagePlacement(image.uri,image.name,image.centerX(),image.centerY(),image.width(),image.height(),image.rotationDegrees()));
+            }else{
+                PointF center=vectorDrawing.drawingPointFromContent(image.centerX(),image.centerY());
+                float width=(float)vectorDrawing.drawingDistanceFromContent(image.width()),height=(float)vectorDrawing.drawingDistanceFromContent(image.height());
+                out.add(new CadImagePlacement(image.uri,image.name,center.x,center.y,width,height,-image.rotationDegrees()));
+            }
+        }
+        return out;
+    }
+    public boolean restoreImagePlacement(Bitmap bitmap,CadImagePlacement placement){
+        if(vectorDrawing==null||bitmap==null||bitmap.isRecycled()||placement==null)return false;
+        PointF center=vectorDrawing.contentPointFromDrawing(placement.centerX,placement.centerY);
+        float width=vectorDrawing.contentLengthFromDrawing(placement.width),height=vectorDrawing.contentLengthFromDrawing(placement.height);
+        if(!Float.isFinite(width)||!Float.isFinite(height)||width<=0f||height<=0f)return false;
+        imageOverlays.add(new CadImageOverlay(bitmap,placement.name,placement.uri,center.x,center.y,width,height,-placement.rotationDegrees));
+        selectedImageIndex=-1;invalidate();notifyValue();return true;
+    }
     public boolean hasEdits(){return !edits.isEmpty()||sourceEdits.modifiedCount()>0||!imageOverlays.isEmpty();}
 
     public List<CadEdit> getVisibleEdits(){
