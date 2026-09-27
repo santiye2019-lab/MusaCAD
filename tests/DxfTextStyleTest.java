@@ -22,7 +22,7 @@ public class DxfTextStyleTest {
         Map<String,DxfTextStyle.Style> styles=DxfTextStyle.parse(Arrays.asList(dxf.split("\n")));
 
         DxfTextStyle.Style romans=DxfTextStyle.resolve(styles,"romans");
-        if(!romans.usesShx()||!"monospace".equals(romans.familyHint()))throw new AssertionError("SHX fallback");
+        if(!romans.usesShx()||!"monospace".equals(romans.familyHint())||!"monospace".equals(romans.androidFamilyHint()))throw new AssertionError("SHX fallback");
         near(romans.width(2f),1.6f,"width");
         near(romans.oblique(0f),12f,"oblique");
         if(romans.generation(4)!=6)throw new AssertionError("generation flags");
@@ -31,7 +31,7 @@ public class DxfTextStyleTest {
         if(!extensionlessShx.usesShx()||!"monospace".equals(extensionlessShx.familyHint()))throw new AssertionError("extensionless SHX");
 
         DxfTextStyle.Style arial=DxfTextStyle.resolve(styles,"ARIAL");
-        if(arial.usesShx()||!"arial".equals(arial.familyHint()))throw new AssertionError("TTF family");
+        if(arial.usesShx()||!"arial".equals(arial.familyHint())||!"sans-serif".equals(arial.androidFamilyHint()))throw new AssertionError("TTF family");
         near(arial.textHeight(8f),2.5f,"fixed height");
         near(arial.width(1f),1.1f,"style width");
 
@@ -42,7 +42,12 @@ public class DxfTextStyleTest {
         if(!xdataShx.usesShx()||!"monospace".equals(xdataShx.familyHint()))throw new AssertionError("extended SHX file");
 
         if(!"STANDARD".equals(DxfTextStyle.resolve(styles,"missing").name))throw new AssertionError("standard fallback");
-        System.out.println("DXF text style cases passed");
+        if(!"serif".equals(DxfTextStyle.androidFamilyHint("Cambria",false)))throw new AssertionError("Cambria serif fallback");
+        if(!"sans-serif".equals(DxfTextStyle.androidFamilyHint("Calibri",false)))throw new AssertionError("Calibri sans fallback");
+        if(!"monospace".equals(DxfTextStyle.androidFamilyHint("Consolas",false)))throw new AssertionError("Consolas mono fallback");
+        if(!"sans-serif-condensed".equals(DxfTextStyle.androidFamilyHint("Arial Narrow",false)))throw new AssertionError("narrow fallback");
+        if(!"My CAD Font".equals(DxfTextStyle.androidFamilyHint("My CAD Font",false)))throw new AssertionError("custom installed family preserved");
+        System.out.println("DXF text style/font fallback cases passed");
     }
 
     private static void near(float actual,float expected,String name){
