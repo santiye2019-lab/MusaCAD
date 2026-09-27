@@ -17,15 +17,91 @@ public final class DxfWriter {
         write(baseDxf,target,drawing,additions,replacements,removedSources,blocks,"0");
     }
     public static void write(File baseDxf,OutputStream target,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,List<SourceRange> removedSources,List<CadBlock.Definition> blocks,String defaultLayer)throws IOException{
-        if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");Matrix contentToWorld=contentToWorldMatrix(drawing);Charset cs=charset(baseDxf);boolean inserted=false,blocksInserted=blocks==null||blocks.isEmpty();String section="";boolean sectionPending=false;int lineIndex=0;List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
-        try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(baseDxf),cs),128*1024);BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,cs),128*1024)){
-            while(true){FileTransfer.checkCancelled();String codeLine=in.readLine();if(codeLine==null)break;String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}String value=valueLine.trim();
-                if(code==0&&"ENDSEC".equals(value)&&"BLOCKS".equals(section)&&!blocksInserted){writeBlocks(out,contentToWorld,blocks);blocksInserted=true;}
-                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){String layer=defaultLayer==null||defaultLayer.trim().isEmpty()?"0":defaultLayer.trim();writeEdits(out,contentToWorld,additions,layer,null,null,null,null,drawing.activeLayout);writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;}
-                boolean removed=isRemoved(lineIndex,removals);if(!removed){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
-                if(!removed){if(code==0&&"SECTION".equals(value)){sectionPending=true;lineIndex+=2;continue;}if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;lineIndex+=2;continue;}if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;}}lineIndex+=2;
+        if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
+        Matrix contentToWorld=contentToWorldMatrix(drawing);
+        Charset cs=charset(baseDxf);
+        boolean inserted=false,blocksInserted=blocks==null||blocks.isEmpty();
+        String section="";
+        boolean sectionPending=false,tablePending=false,inStyleTable=false,stylePending=false,styleTableSeen=false;
+        int lineIndex=0;
+        List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
+        LinkedHashMap<String,String> requiredStyles=collectTextStyles(additions,replacements,blocks);
+        LinkedHashSet<String> existingStyles=new LinkedHashSet<>();
+        try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(baseDxf),cs),128*1024);
+            BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,cs),128*1024)){
+            while(true){
+                FileTransfer.checkCancelled();
+                String codeLine=in.readLine();if(codeLine==null)break;
+                String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");
+                int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}
+                String value=valueLine.trim();
+
+                if("TABLES".equals(section)){
+                    if(code==0&&"TABLE".equals(value)){tablePending=true;stylePending=false;}
+                    else if(tablePending&&code==2){
+                        inStyleTable="STYLE".equalsIgnoreCase(value);
+                        if(inStyleTable)styleTableSeen=true;
+                        tablePending=false;
+                    }else if(inStyleTable&&code==0&&"STYLE".equals(value))stylePending=true;
+                    else if(inStyleTable&&stylePending&&code==2){existingStyles.add(DxfTextStyle.normalize(value));stylePending=false;}
+                    if(inStyleTable&&code==0&&"ENDTAB".equals(value)){
+                        writeMissingTextStyles(out,requiredStyles,existingStyles);
+                        inStyleTable=false;stylePending=false;
+                    }
+                    if(code==0&&"ENDSEC".equals(value)&&!styleTableSeen&&!requiredStyles.isEmpty()){
+                        writeTextStyleTable(out,requiredStyles,existingStyles);
+                        styleTableSeen=true;
+                    }
+                }
+
+                if(code==0&&"ENDSEC".equals(value)&&"BLOCKS".equals(section)&&!blocksInserted){
+                    writeBlocks(out,contentToWorld,blocks);blocksInserted=true;
+                }
+                if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){
+                    String layer=defaultLayer==null||defaultLayer.trim().isEmpty()?"0":defaultLayer.trim();
+                    writeEdits(out,contentToWorld,additions,layer,null,null,null,null,drawing.activeLayout);
+                    writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;
+                }
+
+                boolean removed=isRemoved(lineIndex,removals);
+                if(!removed){out.write(codeLine);out.newLine();out.write(valueLine);out.newLine();}
+                if(!removed){
+                    if(code==0&&"SECTION".equals(value)){sectionPending=true;lineIndex+=2;continue;}
+                    if(sectionPending&&code==2){section=value.toUpperCase(Locale.ROOT);sectionPending=false;lineIndex+=2;continue;}
+                    if(code==0&&"ENDSEC".equals(value)){section="";sectionPending=false;tablePending=false;inStyleTable=false;stylePending=false;}
+                }
+                lineIndex+=2;
             }
-            if(!inserted)throw new IOException("DXF ENTITIES bölümü bulunamadı");if(!blocksInserted)throw new IOException("DXF BLOCKS bölümü bulunamadı");out.flush();
+            if(!inserted)throw new IOException("DXF ENTITIES bölümü bulunamadı");
+            if(!blocksInserted)throw new IOException("DXF BLOCKS bölümü bulunamadı");
+            out.flush();
+        }
+    }
+
+    private static LinkedHashMap<String,String> collectTextStyles(List<CadEdit> additions,List<SourceReplacement> replacements,List<CadBlock.Definition> blocks){
+        LinkedHashMap<String,String> out=new LinkedHashMap<>();
+        collectTextStyles(out,additions);
+        if(replacements!=null)for(SourceReplacement replacement:replacements)if(replacement!=null)collectTextStyle(out,replacement.edit);
+        if(blocks!=null)for(CadBlock.Definition block:blocks)if(block!=null)collectTextStyles(out,block.members);
+        return out;
+    }
+    private static void collectTextStyles(Map<String,String> out,List<CadEdit> edits){if(edits!=null)for(CadEdit edit:edits)collectTextStyle(out,edit);}
+    private static void collectTextStyle(Map<String,String> out,CadEdit edit){
+        if(edit==null||edit.type!=CadEdit.Type.TEXT||!edit.hasTextStyle())return;
+        String name=DxfTextStyle.normalize(edit.textStyleName);
+        if(name.isEmpty()||DxfTextStyle.STANDARD.equals(name))return;
+        out.put(name,CadFontPolicy.dxfFontFile(edit.textFamilyHint,edit.textShx));
+    }
+    private static void writeTextStyleTable(BufferedWriter out,Map<String,String> required,Set<String> existing)throws IOException{
+        entity(out,"TABLE");tag(out,2,"STYLE");i(out,70,required.size());
+        writeMissingTextStyles(out,required,existing);
+        entity(out,"ENDTAB");
+    }
+    private static void writeMissingTextStyles(BufferedWriter out,Map<String,String> required,Set<String> existing)throws IOException{
+        for(Map.Entry<String,String> entry:required.entrySet()){
+            String name=DxfTextStyle.normalize(entry.getKey());if(existing.contains(name))continue;
+            entity(out,"STYLE");tag(out,2,name);i(out,70,0);n(out,40,0);n(out,41,1);n(out,50,0);i(out,71,0);n(out,42,2.5);
+            tag(out,3,entry.getValue()==null?"":entry.getValue());tag(out,4,"");existing.add(name);
         }
     }
 
