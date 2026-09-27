@@ -465,6 +465,22 @@ public class CadView extends View {
         if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
         return changed;
     }
+    public boolean updateSelectedTextFont(CadFontManager.Choice font){
+        if(mode!=Mode.SELECT_ENTITY||font==null||!sourceEdits.hasSelection())return false;
+        CadEdit selected=sourceEdits.currentSelected();
+        if(selected==null||selected.type!=CadEdit.Type.TEXT)return false;
+        float height=selected.hasTextStyle()?selected.textHeight:30f;
+        CadEdit replacement=CadEdit.styledText(selected.xy[0],selected.xy[1],selected.text,selected.rotationDegrees,
+            font.styleName(),font.hint,font.shx,height,selected.textWidthFactor,selected.textOblique,selected.textGenerationFlags);
+        boolean changed=sourceEdits.replaceSelected(replacement);
+        if(changed){redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;notifyValue();invalidate();}
+        return changed;
+    }
+    public String selectedTextFontHint(){
+        CadEdit selected=sourceEdits.currentSelected();
+        return selected!=null&&selected.type==CadEdit.Type.TEXT?selected.textFamilyHint:null;
+    }
+
     public boolean updateSelectedColorMode(int mode){
         if(this.mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
         boolean changed=sourceEdits.updateSelectedColorMode(mode);
