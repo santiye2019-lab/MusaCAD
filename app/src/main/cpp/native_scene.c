@@ -387,6 +387,32 @@ static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     Dwg_Object *child=get_first_owned_entity(block);
     while(child&&!s->truncated){emit_object(child,s,combined,depth+1,insertColor,insertLayer);child=get_next_owned_entity(block,child);}
 }
+static void emit_minsert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor insertColor,SceneColor insertLayer){
+    if(depth>=MUSA_MAX_BLOCK_DEPTH||!obj||!obj->tio.entity||!obj->tio.entity->tio.MINSERT)return;
+    Dwg_Entity_MINSERT *ins=obj->tio.entity->tio.MINSERT;if(!ins->block_header)return;
+    int cols=ins->num_cols>0?(int)ins->num_cols:1,rows=ins->num_rows>0?(int)ins->num_rows:1;
+    if(cols<1||rows<1||(long long)cols*rows>100000LL)return;
+    Dwg_Object *block=ins->block_header->obj;if(!block)block=dwg_ref_object_silent(obj->parent,ins->block_header);
+    if(!block||block->fixedtype!=DWG_TYPE_BLOCK_HEADER||!block->tio.object||!block->tio.object->tio.BLOCK_HEADER)return;
+    Dwg_Object_BLOCK_HEADER *hdr=block->tio.object->tio.BLOCK_HEADER;
+    double rawRotation=isfinite(ins->rotation)?ins->rotation:0.0,spacingCo=cos(rawRotation),spacingSi=sin(rawRotation);
+    double colSpacing=isfinite(ins->col_spacing)?ins->col_spacing:0.0,rowSpacing=isfinite(ins->row_spacing)?ins->row_spacing:0.0;
+    double rotation=rawRotation,sx=isfinite(ins->scale.x)&&fabs(ins->scale.x)>1e-12?ins->scale.x:1.0;
+    double sy=isfinite(ins->scale.y)&&fabs(ins->scale.y)>1e-12?ins->scale.y:1.0;
+    if(fabs(ins->extrusion.x)<1e-9&&fabs(ins->extrusion.y)<1e-9&&ins->extrusion.z<-.999999){sx=-sx;rotation=-rotation;}
+    double co=cos(rotation),si=sin(rotation);
+    for(int row=0;row<rows&&!s->truncated;row++)for(int col=0;col<cols&&!s->truncated;col++){
+        double dx=col*colSpacing,dy=row*rowSpacing;
+        BITCODE_3DPOINT raw=ins->ins_pt,ip;raw.x+=spacingCo*dx-spacingSi*dy;raw.y+=spacingSi*dx+spacingCo*dy;
+        transform_OCS(&ip,raw,ins->extrusion);
+        Affine2 local={co*sx,si*sx,-si*sy,co*sy,ip.x,ip.y};
+        local.tx-=local.a*hdr->base_pt.x+local.c*hdr->base_pt.y;
+        local.ty-=local.b*hdr->base_pt.x+local.d*hdr->base_pt.y;
+        Affine2 combined=multiply2(parent,local);
+        Dwg_Object *child=get_first_owned_entity(block);
+        while(child&&!s->truncated){emit_object(child,s,combined,depth+1,insertColor,insertLayer);child=get_next_owned_entity(block,child);}
+    }
+}
 static void emit_dimension_block(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor dimColor,SceneColor dimLayer){
     if(depth>=MUSA_MAX_BLOCK_DEPTH||!obj)return;
     dwg_ent_dim *dim=dwg_object_to_DIMENSION(obj);if(!dim||!dim->block)return;
@@ -404,6 +430,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     SceneColor color=entity_color(obj,byBlock,layerColor);
     switch(obj->fixedtype){
         case DWG_TYPE_INSERT: emit_insert(obj,s,parent,depth,color,layerColor); break;
+        case DWG_TYPE_MINSERT: emit_minsert(obj,s,parent,depth,color,layerColor); break;
         case DWG_TYPE_DIMENSION_ORDINATE:
         case DWG_TYPE_DIMENSION_LINEAR:
         case DWG_TYPE_DIMENSION_ALIGNED:
