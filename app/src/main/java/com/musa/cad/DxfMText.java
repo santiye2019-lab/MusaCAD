@@ -8,7 +8,7 @@ public final class DxfMText {
         public final String text,font;
         public final double heightScale,widthScale,absoluteHeight,obliqueDegrees,tracking;
         public final int aci,trueColor;
-        public final boolean underline,overline,strike;
+        public final boolean underline,overline,strike,bold,italic,fontShx;
 
         Run(String text,State s){
             this.text=text;
@@ -23,10 +23,13 @@ public final class DxfMText {
             this.underline=s.underline;
             this.overline=s.overline;
             this.strike=s.strike;
+            this.bold=s.bold;
+            this.italic=s.italic;
+            this.fontShx=s.fontShx;
         }
 
         public boolean hasAbsoluteHeight(){return Double.isFinite(absoluteHeight)&&absoluteHeight>0d;}
-        public boolean usesShxFont(){return font!=null&&font.trim().toLowerCase(Locale.ROOT).endsWith(".shx");}
+        public boolean usesShxFont(){return fontShx||(font!=null&&font.trim().toLowerCase(Locale.ROOT).endsWith(".shx"));}
     }
 
     public static final class Result {
@@ -43,12 +46,12 @@ public final class DxfMText {
         String font="";
         double heightScale=1d,widthScale=1d,absoluteHeight=Double.NaN,obliqueDegrees=0d,tracking=1d;
         int aci=-1,trueColor=-1;
-        boolean underline,overline,strike;
+        boolean underline,overline,strike,bold,italic,fontShx;
         State copy(){
             State s=new State();
             s.font=font;s.heightScale=heightScale;s.widthScale=widthScale;s.absoluteHeight=absoluteHeight;
             s.obliqueDegrees=obliqueDegrees;s.tracking=tracking;s.aci=aci;s.trueColor=trueColor;
-            s.underline=underline;s.overline=overline;s.strike=strike;
+            s.underline=underline;s.overline=overline;s.strike=strike;s.bold=bold;s.italic=italic;s.fontShx=fontShx;
             return s;
         }
     }
@@ -137,7 +140,7 @@ public final class DxfMText {
                 case 'c':
                     state.trueColor=integer(arg,state.trueColor);state.aci=-1;break;
                 case 'F': case 'f':
-                    int bar=arg.indexOf('|');state.font=(bar>=0?arg.substring(0,bar):arg).trim();break;
+                    applyFont(state,arg,cmd=='F');break;
                 case 'S':
                     text.append(stackText(arg));break;
                 case 'A': case 'a':
@@ -155,6 +158,28 @@ public final class DxfMText {
         }
         flush(out,text,state);
         return new Result(merge(out));
+    }
+
+    private static void applyFont(State s,String raw,boolean shxCommand){
+        String value=raw==null?"":raw.trim();int bar=value.indexOf('|');
+        String name=(bar>=0?value.substring(0,bar):value).trim();s.font=name;
+        String lower=name.toLowerCase(Locale.ROOT);
+        s.fontShx=lower.endsWith(".shx")||(shxCommand&&bar<0&&!name.isEmpty()&&!looksLikeCommonTtfFamily(name));
+        if(bar<0)return;
+        String[] options=value.substring(bar+1).split("\\|");
+        for(String option:options){
+            String v=option==null?"":option.trim().toLowerCase(Locale.ROOT);if(v.length()<2)continue;
+            if(v.charAt(0)=='b'&&(v.charAt(1)=='0'||v.charAt(1)=='1'))s.bold=v.charAt(1)=='1';
+            else if(v.charAt(0)=='i'&&(v.charAt(1)=='0'||v.charAt(1)=='1'))s.italic=v.charAt(1)=='1';
+        }
+    }
+
+    private static boolean looksLikeCommonTtfFamily(String name){
+        String v=name==null?"":name.toLowerCase(Locale.ROOT).replace(" ","").replace("-","").replace("_","");
+        return v.contains("arial")||v.contains("helvetica")||v.contains("calibri")||v.contains("cambria")
+            ||v.contains("segoeui")||v.contains("tahoma")||v.contains("verdana")||v.contains("timesnewroman")
+            ||v.equals("times")||v.contains("georgia")||v.contains("palatino")||v.contains("courier")
+            ||v.contains("consolas")||v.contains("lucidaconsole")||v.contains("centurygothic");
     }
 
     private static void applyHeight(State s,String raw){
@@ -202,13 +227,14 @@ public final class DxfMText {
     private static State stateOf(Run r){
         State s=new State();s.font=r.font;s.heightScale=r.heightScale;s.widthScale=r.widthScale;s.absoluteHeight=r.absoluteHeight;
         s.obliqueDegrees=r.obliqueDegrees;s.tracking=r.tracking;s.aci=r.aci;s.trueColor=r.trueColor;
-        s.underline=r.underline;s.overline=r.overline;s.strike=r.strike;return s;
+        s.underline=r.underline;s.overline=r.overline;s.strike=r.strike;s.bold=r.bold;s.italic=r.italic;s.fontShx=r.fontShx;return s;
     }
 
     private static boolean same(Run a,Run b){
         return Objects.equals(a.font,b.font)&&eq(a.heightScale,b.heightScale)&&eq(a.widthScale,b.widthScale)
             &&eqNaN(a.absoluteHeight,b.absoluteHeight)&&eq(a.obliqueDegrees,b.obliqueDegrees)&&eq(a.tracking,b.tracking)
-            &&a.aci==b.aci&&a.trueColor==b.trueColor&&a.underline==b.underline&&a.overline==b.overline&&a.strike==b.strike;
+            &&a.aci==b.aci&&a.trueColor==b.trueColor&&a.underline==b.underline&&a.overline==b.overline&&a.strike==b.strike
+            &&a.bold==b.bold&&a.italic==b.italic&&a.fontShx==b.fontShx;
     }
     private static boolean eq(double a,double b){return Math.abs(a-b)<1e-9;}
     private static boolean eqNaN(double a,double b){return (Double.isNaN(a)&&Double.isNaN(b))||eq(a,b);}
