@@ -128,6 +128,22 @@ static void emit_poly_point(MusaNativeScene *s,Affine2 m,double x,double y){
     pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);
 }
 static void finish_poly(MusaNativeScene *s){s->primitives++;}
+static double infinite_reach(Dwg_Data *dwg){
+    if(dwg){
+        double x0=dwg_model_x_min(dwg),y0=dwg_model_y_min(dwg),x1=dwg_model_x_max(dwg),y1=dwg_model_y_max(dwg);
+        if(isfinite(x0)&&isfinite(y0)&&isfinite(x1)&&isfinite(y1)&&x1>x0&&y1>y0){
+            double span=hypot(x1-x0,y1-y0);if(isfinite(span)&&span>1e-9)return fmax(span*4.0,1.0);
+        }
+    }
+    return 1000000.0;
+}
+static void emit_infinite_line(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Data *dwg,
+                               double x,double y,double dx,double dy,int ray){
+    double len=hypot(dx,dy);if(!isfinite(len)||len<1e-12||!finite2(x,y))return;
+    dx/=len;dy/=len;double reach=infinite_reach(dwg);
+    if(ray)emit_line(s,color,parent,x,y,x+dx*reach,y+dy*reach);
+    else emit_line(s,color,parent,x-dx*reach,y-dy*reach,x+dx*reach,y+dy*reach);
+}
 
 static int begin_fill_poly(MusaNativeScene *s,int n){
     SceneColor color=scene_aci(7);
@@ -360,6 +376,14 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         case DWG_TYPE_POINT:{
             Dwg_Entity_POINT *e=obj->tio.entity->tio.POINT;BITCODE_3DPOINT in={e->x,e->y,e->z},p;
             if(!e)break;transform_OCS(&p,in,e->extrusion);emit_point(s,color,parent,p.x,p.y);break;
+        }
+        case DWG_TYPE_RAY:{
+            dwg_ent_ray *e=dwg_object_to_RAY(obj);if(!e)break;
+            emit_infinite_line(s,color,parent,obj->parent,e->point.x,e->point.y,e->vector.x,e->vector.y,1);break;
+        }
+        case DWG_TYPE_XLINE:{
+            dwg_ent_xline *e=dwg_object_to_XLINE(obj);if(!e)break;
+            emit_infinite_line(s,color,parent,obj->parent,e->point.x,e->point.y,e->vector.x,e->vector.y,0);break;
         }
         case DWG_TYPE_TEXT:{
             Dwg_Entity_TEXT *e=obj->tio.entity->tio.TEXT;if(!e)break;
