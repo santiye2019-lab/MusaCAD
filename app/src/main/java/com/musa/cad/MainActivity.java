@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
@@ -980,6 +980,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Ses",R.drawable.ic_more,()->pickMedia(PICK_AUDIO,"audio/*")),
             tool("Görüntü",R.drawable.ic_open_file,()->pickMedia(PICK_IMAGE,"image/*")),
             tool("Video",R.drawable.ic_more,()->pickMedia(PICK_VIDEO,"video/*")),
+            tool("Belge",R.drawable.ic_open_file,this::pickDocument),
             tool("Kılavuz",R.drawable.ic_text,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_XLINE);markModeSelected(0);result.setText("Kılavuz • Sonsuz yardımcı doğru için iki nokta seçin");}}),
             tool("Çizgi",R.drawable.ic_line,()->selectEditMode(R.id.lineButton,CadView.Mode.DRAW_LINE)),
             tool("Dikdörtgen",R.drawable.ic_rectangle,()->selectEditMode(R.id.rectangleButton,CadView.Mode.DRAW_RECTANGLE)),
@@ -1026,6 +1027,35 @@ public class MainActivity extends AppCompatActivity {
         if(!canEdit()||currentProject==null){result.setText("Medya • Düzenlenebilir bir çizim açın");return;}
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType(mime);
         startActivityForResult(intent,request);
+    }
+
+    private void pickDocument(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/msword",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation","application/vnd.ms-powerpoint",
+            "text/plain","text/csv"
+        });
+        startActivityForResult(intent,PICK_DOCUMENT);
+    }
+
+    private void openDocumentViewer(Uri uri,String name){
+        if(uri==null)return;Intent view=new Intent(this,DocumentViewerActivity.class);view.setData(uri);view.putExtra(DocumentViewerActivity.EXTRA_NAME,name);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(view);
+    }
+
+    private void handleDocumentPicked(Uri uri){
+        if(uri==null)return;
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        String name=nameOf(uri);String mime=getContentResolver().getType(uri);if(mime==null)mime=CadDocumentSupport.bestMime(name,null);
+        if(currentProject!=null&&canEdit()){
+            PointF center=cad.visibleCenterContent();cad.addTextEdit(center.x,center.y,"Belge • "+name);
+            currentProject.mediaAttachments.add(new MediaAttachment("Belge",name,mime,uri));
+            result.setText("Belge • "+name+" eklendi ve MusaCAD görüntüleyicide açıldı");
+        }
+        openDocumentViewer(uri,name);
     }
 
     private void handleMediaPicked(int request,Uri uri){
@@ -1075,9 +1105,10 @@ public class MainActivity extends AppCompatActivity {
         String[] labels=new String[currentProject.mediaAttachments.size()];
         for(int i=0;i<labels.length;i++){MediaAttachment m=currentProject.mediaAttachments.get(i);labels[i]=m.kind+" • "+m.name;}
         new AlertDialog.Builder(this).setTitle("Medya Ekleri").setItems(labels,(d,which)->{
-            MediaAttachment m=currentProject.mediaAttachments.get(which);
+            MediaAttachment m=currentProject.mediaAttachments.get(which);Uri target=Uri.parse(m.uri);
+            if("Belge".equals(m.kind)||CadDocumentSupport.isDocument(m.name,m.mime)){openDocumentViewer(target,m.name);return;}
             try{
-                Intent view=new Intent(Intent.ACTION_VIEW,Uri.parse(m.uri));view.setType(m.mime);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(view);
+                Intent view=new Intent(Intent.ACTION_VIEW,target);view.setType(m.mime);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(view);
             }catch(Exception e){Toast.makeText(this,"Bu medya için açılabilir uygulama bulunamadı",Toast.LENGTH_LONG).show();}
         }).setNegativeButton("KAPAT",null).show();
     }
@@ -1736,6 +1767,7 @@ public class MainActivity extends AppCompatActivity {
         if(c!=RESULT_OK||data==null||data.getData()==null)return;
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
+        if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
@@ -1756,6 +1788,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void startLoad(Uri uri){
         if(uri==null)return;
+        String candidateName=nameOf(uri);String candidateMime=getContentResolver().getType(uri);
+        if(CadDocumentSupport.isDocument(candidateName,candidateMime)){pendingHomeCategory=0;openDocumentViewer(uri,candidateName);return;}
         ProjectSession existing=findProject(uri);
         if(existing!=null){activateProject(existing);return;}
         if(hasPreparingProject()){Toast.makeText(this,"Açık DWG'nin tam düzenleme modeli hazırlanıyor; yeni dosya bundan sonra açılabilir",Toast.LENGTH_SHORT).show();return;}
