@@ -314,6 +314,15 @@ public class CadView extends View {
     public List<CadEdit> getAddedEdits(){ArrayList<CadEdit> copy=new ArrayList<>();for(CadEdit e:edits)copy.add(e.copy());return copy;}
     public List<CadBlock.Definition> getUserBlocks(){ArrayList<CadBlock.Definition> out=new ArrayList<>();for(CadBlock.Definition d:userBlocks.values())out.add(new CadBlock.Definition(d.name,d.members));return out;}
     public List<String> userBlockNames(){return new ArrayList<>(userBlocks.keySet());}
+    public boolean registerBlockDefinition(CadBlock.Definition definition){
+        if(definition==null)return false;
+        String name=CadBlock.normalizeName(definition.name);if(name.isEmpty()||definition.members==null||definition.members.isEmpty())return false;
+        userBlocks.put(name.toUpperCase(Locale.ROOT),new CadBlock.Definition(name,definition.members));
+        invalidate();return true;
+    }
+    public boolean hasBlockDefinition(String rawName){
+        String key=CadBlock.normalizeName(rawName).toUpperCase(Locale.ROOT);return !key.isEmpty()&&userBlocks.containsKey(key);
+    }
     public boolean defineBlockFromSelected(String rawName){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
         CadEdit selected=sourceEdits.currentSelected();if(selected==null||selected.type==CadEdit.Type.INSERT)return false;

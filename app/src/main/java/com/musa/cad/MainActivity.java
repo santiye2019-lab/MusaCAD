@@ -1007,7 +1007,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Geri Al",R.drawable.ic_undo,()->cad.undo()),
             tool("Yinele",R.drawable.ic_rotate,()->{if(!cad.redo())result.setText("Yinele • İşlem yok");}),
             tool("Temizle",R.drawable.ic_clear,()->cad.clearMeasurement()),
-            tool("Blok ekle",R.drawable.ic_open_file,this::runInsertCommand),
+            tool("Blok ekle",R.drawable.ic_open_file,this::showBlockLibrary),
             tool("Çizgi Tipi",R.drawable.ic_line,this::showSelectedLineType),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
             tool("Bulmak",R.drawable.ic_select,()->showEntitySearch(false)),
@@ -1487,6 +1487,120 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private Set<String> favoriteBlockIds(){
+        Set<String> stored=getSharedPreferences("musacad_block_library",MODE_PRIVATE).getStringSet("favorites",Collections.emptySet());
+        return new LinkedHashSet<>(stored==null?Collections.emptySet():stored);
+    }
+
+    private boolean isFavoriteBlock(String id){return id!=null&&favoriteBlockIds().contains(id);}
+
+    private void toggleFavoriteBlock(String id){
+        if(id==null||id.trim().isEmpty())return;
+        Set<String> favorites=favoriteBlockIds();
+        if(!favorites.add(id))favorites.remove(id);
+        getSharedPreferences("musacad_block_library",MODE_PRIVATE).edit().putStringSet("favorites",favorites).apply();
+    }
+
+    private void showBlockLibrary(){
+        if(currentProject==null||!canEdit()){result.setText("Blok kütüphanesi • Düzenlenebilir bir çizim açın");return;}
+
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(12);box.setPadding(p,p/2,p,p/2);
+        EditText search=new EditText(this);search.setSingleLine(true);search.setHint("Blok ara: pompa, priz, sprinkler…");box.addView(search,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        ArrayList<String> categories=new ArrayList<>();categories.add("Tümü");categories.add("★ Favoriler");categories.addAll(CadBlockLibrary.categories());categories.add("Kullanıcı");
+        Spinner category=new Spinner(this);category.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,categories));box.addView(category,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView help=new TextView(this);help.setText("Dokun: yerleştir • Uzun bas: favoriye ekle / çıkar");help.setTextSize(11);help.setPadding(2,dp(4),2,dp(4));box.addView(help);
+
+        ListView list=new ListView(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new ArrayList<>());list.setAdapter(adapter);box.addView(list,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(360)));
+
+        ArrayList<String> keys=new ArrayList<>();
+        final Runnable[] refresh=new Runnable[1];
+        refresh[0]=()->{
+            String selected=String.valueOf(category.getSelectedItem());
+            String query=search.getText()==null?"":search.getText().toString().trim();
+            String normalizedQuery=query.toLowerCase(new Locale("tr","TR"));
+            Set<String> favorites=favoriteBlockIds();
+            adapter.clear();keys.clear();
+
+            boolean favoritesOnly="★ Favoriler".equals(selected);
+            boolean usersOnly="Kullanıcı".equals(selected);
+            if(!usersOnly){
+                String builtInCategory=("Tümü".equals(selected)||favoritesOnly)?null:selected;
+                for(CadBlockLibrary.Entry entry:CadBlockLibrary.filter(builtInCategory,query)){
+                    if(favoritesOnly&&!favorites.contains(entry.id))continue;
+                    boolean fav=favorites.contains(entry.id);
+                    adapter.add((fav?"★ ":"☆ ")+entry.name+"  •  "+entry.category);
+                    keys.add("B:"+entry.id);
+                }
+            }
+
+            if(!favoritesOnly&&("Tümü".equals(selected)||usersOnly)){
+                for(String name:cad.userBlockNames()){
+                    if(name==null||name.startsWith("LIB_"))continue;
+                    if(!normalizedQuery.isEmpty()&&!name.toLowerCase(new Locale("tr","TR")).contains(normalizedQuery))continue;
+                    adapter.add("◼ "+name+"  •  Kullanıcı");
+                    keys.add("U:"+name);
+                }
+            }
+            adapter.notifyDataSetChanged();
+            if(keys.isEmpty())help.setText("Bu filtrede blok bulunamadı.");
+            else help.setText(keys.size()+" blok • Dokun: yerleştir • Uzun bas: favori");
+        };
+
+        search.addTextChangedListener(new android.text.TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            public void onTextChanged(CharSequence s,int start,int before,int count){}
+            public void afterTextChanged(android.text.Editable s){refresh[0].run();}
+        });
+        category.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+            public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){refresh[0].run();}
+            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+        });
+
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("CAD Blok Kütüphanesi").setView(box).setNegativeButton("KAPAT",null).create();
+        list.setOnItemClickListener((parent,view,position,id)->{
+            if(position<0||position>=keys.size())return;String key=keys.get(position);
+            if(key.startsWith("U:")){dialog.dismiss();showInsertOptions(key.substring(2));return;}
+            CadBlockLibrary.Entry entry=CadBlockLibrary.findById(key.substring(2));if(entry==null)return;
+            dialog.dismiss();prepareLibraryInsert(entry);
+        });
+        list.setOnItemLongClickListener((parent,view,position,id)->{
+            if(position<0||position>=keys.size())return true;String key=keys.get(position);
+            if(!key.startsWith("B:")){Toast.makeText(this,"Kullanıcı blokları zaten proje içinde saklanır",Toast.LENGTH_SHORT).show();return true;}
+            String blockId=key.substring(2);CadBlockLibrary.Entry entry=CadBlockLibrary.findById(blockId);if(entry==null)return true;
+            boolean was=isFavoriteBlock(blockId);toggleFavoriteBlock(blockId);refresh[0].run();
+            Toast.makeText(this,was?"Favorilerden çıkarıldı":"Favorilere eklendi",Toast.LENGTH_SHORT).show();return true;
+        });
+        dialog.setOnShowListener(d->refresh[0].run());dialog.show();
+    }
+
+    private void prepareLibraryInsert(CadBlockLibrary.Entry entry){
+        if(entry==null)return;
+        if(entry.attributeDefaults.isEmpty()){armLibraryBlock(entry,Collections.emptyMap());return;}
+
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(14);box.setPadding(p,p/2,p,p/2);
+        LinkedHashMap<String,EditText> fields=new LinkedHashMap<>();
+        for(Map.Entry<String,String> attr:entry.attributeDefaults.entrySet()){
+            TextView label=new TextView(this);label.setText(attr.getKey());label.setTextSize(11);box.addView(label);
+            EditText input=new EditText(this);input.setSingleLine(true);input.setText(attr.getValue());input.setSelectAllOnFocus(true);box.addView(input);fields.put(attr.getKey(),input);
+        }
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(entry.name+" • Özellikler").setMessage("Blok etiketi / attribute değerlerini düzenleyin.").setView(box).setPositiveButton("DEVAM",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            LinkedHashMap<String,String> values=new LinkedHashMap<>();
+            for(Map.Entry<String,EditText> field:fields.entrySet()){String value=field.getValue().getText().toString().trim();if(value.isEmpty()){field.getValue().setError("Boş bırakılamaz");return;}values.put(field.getKey(),value);}
+            dialog.dismiss();armLibraryBlock(entry,values);
+        }));dialog.show();
+    }
+
+    private void armLibraryBlock(CadBlockLibrary.Entry entry,Map<String,String> attributes){
+        try{
+            CadBlock.Definition definition=entry.definition(attributes);
+            if(!cad.registerBlockDefinition(definition)){result.setText("Blok kütüphanesi • Tanım yüklenemedi");return;}
+            showInsertOptions(definition.name,entry.name);
+        }catch(Exception e){Toast.makeText(this,"Blok hazırlanamadı: "+e.getMessage(),Toast.LENGTH_LONG).show();}
+    }
+
     private void runBlockCommand(){
         if(!ensureTransformSelection("BLOCK"))return;
         EditText input=new EditText(this);
@@ -1521,12 +1635,14 @@ public class MainActivity extends AppCompatActivity {
             .show();
     }
 
-    private void showInsertOptions(String name){
+    private void showInsertOptions(String name){showInsertOptions(name,name);}
+
+    private void showInsertOptions(String name,String displayName){
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
         EditText scale=new EditText(this);scale.setHint("Ölçek");scale.setText("1");scale.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);box.addView(scale);
         EditText rotation=new EditText(this);rotation.setHint("Döndürme açısı (°)");rotation.setText("0");rotation.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);box.addView(rotation);
         AlertDialog dialog=new AlertDialog.Builder(this)
-            .setTitle("INSERT • "+name)
+            .setTitle("INSERT • "+displayName)
             .setMessage("Ölçek ve açıyı belirleyin; ardından çizimde yerleştirme noktasına dokunun.")
             .setView(box)
             .setPositiveButton("YERLEŞTİR",null)
@@ -1539,7 +1655,7 @@ public class MainActivity extends AppCompatActivity {
                 if(!Float.isFinite(sc)||sc<=0f){scale.setError("Sıfırdan büyük bir ölçek girin");return;}
                 if(!Float.isFinite(ro)){rotation.setError("Geçerli bir açı girin");return;}
                 if(!cad.armInsertBlock(name,sc,ro)){dialog.dismiss();result.setText("INSERT • Blok yerleştirme başlatılamadı");return;}
-                dialog.dismiss();result.setText("INSERT • "+name+" • Yerleştirme noktasına dokunun");
+                dialog.dismiss();result.setText("INSERT • "+displayName+" • Yerleştirme noktasına dokunun");
             }catch(Exception e){scale.setError("Geçerli ölçek ve açı değerleri girin");}
         }));
         dialog.show();
