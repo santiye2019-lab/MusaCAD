@@ -54,6 +54,36 @@ public final class DxfParser {
         public void draw(Canvas c,Paint p,Matrix m){Path boundary=path(m);RectF bounds=new RectF();boundary.computeBounds(bounds,true);if(bounds.isEmpty())return;p.setPathEffect(null);Paint.Style old=p.getStyle();if(hatch.solid){p.setStyle(Paint.Style.FILL);c.drawPath(boundary,p);p.setStyle(old);return;}if(hatch.patternLines.isEmpty()){p.setStyle(Paint.Style.STROKE);c.drawPath(boundary,p);p.setStyle(old);return;}int save=c.save();c.clipPath(boundary);p.setStyle(Paint.Style.STROKE);double hatchAngle=Math.toRadians(hatch.patternAngleDegrees),co=Math.cos(hatchAngle),si=Math.sin(hatchAngle),scale=hatch.patternScale;float diag=(float)Math.hypot(bounds.width(),bounds.height())+64f;for(DxfHatch.PatternLine line:hatch.patternLines){double bx=(line.baseX*co-line.baseY*si)*scale,by=(line.baseX*si+line.baseY*co)*scale;double ox=(line.offsetX*co-line.offsetY*si)*scale,oy=(line.offsetX*si+line.offsetY*co)*scale;double angle=Math.toRadians(line.angleDegrees+hatch.patternAngleDegrees);float[]base={(float)bx,(float)by};m.mapPoints(base);float[]offset={(float)ox,(float)oy};m.mapVectors(offset);float step=(float)Math.hypot(offset[0],offset[1]);if(step<.5f||!Float.isFinite(step))continue;float[]dir={(float)Math.cos(angle),(float)Math.sin(angle)};m.mapVectors(dir);float length=(float)Math.hypot(dir[0],dir[1]);if(length<1e-6f)continue;dir[0]/=length;dir[1]/=length;DxfLineStyle.Pattern dp=new DxfLineStyle.Pattern("HATCH",line.dashes,false);DxfLineStyle.Dash dash=dp.dash(matrixScale(m),1d,scale,1d);p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));int count=Math.min(1600,(int)Math.ceil(diag/step)+6);for(int n=-count;n<=count;n++){float ax=base[0]+offset[0]*n,ay=base[1]+offset[1]*n;c.drawLine(ax-dir[0]*diag*2,ay-dir[1]*diag*2,ax+dir[0]*diag*2,ay+dir[1]*diag*2,p);}}p.setPathEffect(null);c.restoreToCount(save);p.setStyle(old);}
     }
 
+    private static final class OleFrameEntity implements Entity{
+        final float left,bottom,right,top;final String objectType;final Bitmap preview;
+        OleFrameEntity(DxfOleFrame.Result ole){
+            left=(float)Math.min(ole.x1,ole.x2);right=(float)Math.max(ole.x1,ole.x2);bottom=(float)Math.min(ole.y1,ole.y2);top=(float)Math.max(ole.y1,ole.y2);
+            objectType=ole.objectType==null?"OLE":ole.objectType;
+            byte[] image=DxfOleFrame.rasterPreview(ole.payload);Bitmap decoded=null;
+            if(image!=null&&image.length>0)try{decoded=BitmapFactory.decodeByteArray(image,0,image.length);}catch(Throwable ignored){}
+            preview=decoded;
+        }
+        public void bounds(RectF b){add(b,left,bottom);add(b,right,top);}
+        public void draw(Canvas c,Paint p,Matrix m){
+            float[] target={left,top,right,top,right,bottom,left,bottom};m.mapPoints(target);
+            if(preview!=null&&!preview.isRecycled()){
+                float[] src={0,0,preview.getWidth(),0,preview.getWidth(),preview.getHeight(),0,preview.getHeight()};
+                Matrix bitmapMatrix=new Matrix();if(bitmapMatrix.setPolyToPoly(src,0,target,0,4)){
+                    Paint bitmapPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);c.drawBitmap(preview,bitmapMatrix,bitmapPaint);
+                }
+            }
+            Path frame=new Path();frame.moveTo(target[0],target[1]);frame.lineTo(target[2],target[3]);frame.lineTo(target[4],target[5]);frame.lineTo(target[6],target[7]);frame.close();
+            Paint.Style oldStyle=p.getStyle();float oldWidth=p.getStrokeWidth();int oldColor=p.getColor();p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1.2f,oldWidth));c.drawPath(frame,p);
+            if(preview==null){
+                float minX=Math.min(Math.min(target[0],target[2]),Math.min(target[4],target[6])),maxX=Math.max(Math.max(target[0],target[2]),Math.max(target[4],target[6]));
+                float minY=Math.min(Math.min(target[1],target[3]),Math.min(target[5],target[7])),maxY=Math.max(Math.max(target[1],target[3]),Math.max(target[5],target[7]));
+                String label="OLE • "+objectType+" • önizleme yok";float size=Math.max(10f,Math.min(18f,(maxY-minY)*.12f));p.setStyle(Paint.Style.FILL);p.setTextSize(size);p.setTextAlign(Paint.Align.CENTER);
+                c.drawText(label,(minX+maxX)*.5f,(minY+maxY)*.5f,p);p.setTextAlign(Paint.Align.LEFT);
+            }
+            p.setColor(oldColor);p.setStrokeWidth(oldWidth);p.setStyle(oldStyle);
+        }
+    }
+
     private static final class WipeoutEntity implements Entity{
         final ArrayList<PointF>pts;WipeoutEntity(ArrayList<PointF>pts){this.pts=pts;}
         public void bounds(RectF b){for(PointF q:pts)add(b,q.x,q.y);}
@@ -419,7 +449,7 @@ public final class DxfParser {
                 parts.add(new MTextLabel((float)ml.textX,(float)ml.textY,(float)Math.max(.01d,ml.textHeight),(float)ml.rotationDegrees,rich,style,1f,0f,1));
             }
             return parts.isEmpty()?null:(parts.size()==1?parts.get(0):new EntityGroup(parts));
-        }if("IMAGE".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new Poly(p,true);}if("OLE2FRAME".equals(type)){DxfOleFrame.Result o=DxfOleFrame.parse(a,from,to);if(!o.valid())return null;ArrayList<PointF>p=new ArrayList<>(4);p.add(new PointF((float)o.x1,(float)o.y1));p.add(new PointF((float)o.x2,(float)o.y1));p.add(new PointF((float)o.x2,(float)o.y2));p.add(new PointF((float)o.x1,(float)o.y2));return new Poly(p,true);}if("WIPEOUT".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new WipeoutEntity(p);}if("HATCH".equals(type)){try{DxfHatch.Result h=DxfHatch.parse(a,from,to);return h.loops.isEmpty()?null:new HatchEntity(h);}catch(IOException ignored){return null;}}if("VIEWPORT".equals(type)){DxfViewport.View vp=DxfViewport.parse(a,from,to);return vp.id>1&&vp.paperWidth>0&&vp.paperHeight>0?new ViewportEntity(vp):null;}if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);}if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
+        }if("IMAGE".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new Poly(p,true);}if("OLE2FRAME".equals(type)){DxfOleFrame.Result o=DxfOleFrame.parse(a,from,to);return o.valid()?new OleFrameEntity(o):null;}if("WIPEOUT".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new WipeoutEntity(p);}if("HATCH".equals(type)){try{DxfHatch.Result h=DxfHatch.parse(a,from,to);return h.loops.isEmpty()?null:new HatchEntity(h);}catch(IOException ignored){return null;}}if("VIEWPORT".equals(type)){DxfViewport.View vp=DxfViewport.parse(a,from,to);return vp.id>1&&vp.paperWidth>0&&vp.paperHeight>0?new ViewportEntity(vp):null;}if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);}if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
     }
 
     private static Poly splinePoly(DxfSpline.Result spline){if(spline==null||spline.points.size()<2)return null;ArrayList<PointF>draw=new ArrayList<>(spline.points.size());for(DxfSpline.Point p:spline.points)draw.add(new PointF((float)p.x,(float)p.y));List<DxfSpline.Point>source=!spline.fitPoints.isEmpty()?spline.fitPoints:spline.controlPoints;ArrayList<PointF>snap=new ArrayList<>(source.size());for(DxfSpline.Point p:source)snap.add(new PointF((float)p.x,(float)p.y));if(snap.isEmpty())snap.addAll(draw);return new Poly(draw,spline.closed(),snap);}
