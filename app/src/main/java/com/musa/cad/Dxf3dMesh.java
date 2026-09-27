@@ -63,7 +63,7 @@ public final class Dxf3dMesh {
                 :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,collector.solidProxy
+            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),Math.max(0,collector.solids-collector.resolvedSolids),collector.solidProxy
         );
     }
 
@@ -72,7 +72,7 @@ public final class Dxf3dMesh {
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
         final ArrayList<Face> faces=new ArrayList<>();
         boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
-        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids;
+        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
             if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(p.layout))return;
@@ -130,6 +130,18 @@ public final class Dxf3dMesh {
                 }else appendTriangle(triangles,start,start+1,start+2);
             }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type)){
                 solids++;
+                ArrayList<String> chunks=new ArrayList<>();
+                List<String> tags=r.tags();
+                for(int i=r.from;i+1<r.to;i+=2){
+                    int code;
+                    try{code=Integer.parseInt(tags.get(i).trim());}catch(NumberFormatException ignored){continue;}
+                    if(code==1||code==3)chunks.add(tags.get(i+1));
+                }
+                AcisSatMesh.Result acis=AcisSatMesh.parseDxfChunks(chunks);
+                if(acis.hasGeometry()){
+                    appendAcis(this,p,acis);
+                    if(acis.complete)resolvedSolids++;
+                }
             }
         }
 
@@ -152,6 +164,24 @@ public final class Dxf3dMesh {
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
+    }
+
+    private static void appendAcis(Collector c,DxfBlocks.Placement p,AcisSatMesh.Result mesh)throws IOException{
+        int base=c.points.n/3;
+        for(int i=0;i+2<mesh.xyz.length;i+=3){
+            if(c.points.n/3>=MAX_VERTICES)throw new IOException("ACIS 3B köşe sayısı sınırı aşıldı");
+            double[] xy=p.transform.point(mesh.xyz[i],mesh.xyz[i+1]);
+            double z=mesh.xyz[i+2];
+            if(!Double.isFinite(xy[0])||!Double.isFinite(xy[1])||!Double.isFinite(z)||
+                Math.abs(xy[0])>1e9||Math.abs(xy[1])>1e9||Math.abs(z)>1e9)
+                throw new IOException("ACIS 3B koordinat sınırı aşıldı");
+            c.points.add((float)xy[0]);c.points.add((float)xy[1]);c.points.add((float)z);
+            c.sourceLines.add(-1);c.coordinateSlots.add(-1);
+        }
+        for(int i=0;i+2<mesh.triangles.length;i+=3)
+            appendTriangle(c.triangles,base+mesh.triangles[i],base+mesh.triangles[i+1],base+mesh.triangles[i+2]);
+        for(int i=0;i+1<mesh.edges.length;i+=2)
+            appendEdge(c.explicitEdges,base+mesh.edges[i],base+mesh.edges[i+1]);
     }
 
     private static Extents readHeaderExtents(File file){
