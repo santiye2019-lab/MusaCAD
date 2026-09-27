@@ -381,6 +381,7 @@ public final class DxfParser {
 
     private static Entity parse(String type,List<String>a,int from,int to,Map<String,DxfTextStyle.Style>styles){
         if("TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)){
+            if(DxfAttributeVisibility.isInvisible(type,a,from,to))return null;
             StringBuilder text=new StringBuilder();for(int i=from;i+1<to;i+=2){int code=intOf(a.get(i));if(code==1||("MTEXT".equals(type)&&code==3))text.append(a.get(i+1));}
             boolean mtext="MTEXT".equals(type);DxfMText.Result rich=mtext?DxfMText.parse(text.toString()):null;String plain=mtext?rich.plainText():DxfText.plain(text.toString());if(plain.trim().isEmpty())return null;
             DxfTextStyle.Style style=DxfTextStyle.resolve(styles,str(a,from,to,7,DxfTextStyle.STANDARD));float angle=f(a,from,to,50);if(mtext){angle=(float)Math.toDegrees(angle);if(!str(a,from,to,11,"").isEmpty())angle=(float)Math.toDegrees(Math.atan2(f(a,from,to,21),f(a,from,to,11)));}
