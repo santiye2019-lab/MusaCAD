@@ -131,25 +131,41 @@ public class LicenseActivity extends AppCompatActivity {
             LockedScreenUi.position(deviceId,stage,168,810,300,54,SCREEN_W,SCREEN_H);
             LockedScreenUi.hotspot(this,stage,458,817,65,50,SCREEN_W,SCREEN_H,v->copySerial(serial));
 
-            // 4) Google Play: yalnızca yıllık lisans yenileme
-            LockedScreenUi.hotspot(this,stage,60,930,482,139,SCREEN_W,SCREEN_H,v->launchYearlyRenewal());
+            // 4) Dağıtım modeline göre Google Play yenileme veya doğrudan APK bilgisi.
+            if(BuildConfig.PLAY_DISTRIBUTION){
+                LockedScreenUi.hotspot(this,stage,60,930,482,139,SCREEN_W,SCREEN_H,v->launchYearlyRenewal());
 
-            playPurchaseButton=new Button(this);
-            playPurchaseButton.setAllCaps(false);
-            playPurchaseButton.setTextSize(10.5f);
-            playPurchaseButton.setTextColor(Color.WHITE);
-            playPurchaseButton.setGravity(Gravity.CENTER);
-            playPurchaseButton.setPadding(dp(4),0,dp(4),0);
-            playPurchaseButton.setStateListAnimator(null);
-            GradientDrawable renewBg=new GradientDrawable();
-            renewBg.setColor(0xD20D6D4A);
-            renewBg.setCornerRadius(dp(10));
-            renewBg.setStroke(dp(1),0xFF20E39A);
-            playPurchaseButton.setBackground(renewBg);
-            playPurchaseButton.setOnClickListener(v->launchYearlyRenewal());
-            stage.addView(playPurchaseButton);
-            LockedScreenUi.position(playPurchaseButton,stage,179,1024,276,39,SCREEN_W,SCREEN_H);
-            updateRenewalButton();
+                playPurchaseButton=new Button(this);
+                playPurchaseButton.setAllCaps(false);
+                playPurchaseButton.setTextSize(10.5f);
+                playPurchaseButton.setTextColor(Color.WHITE);
+                playPurchaseButton.setGravity(Gravity.CENTER);
+                playPurchaseButton.setPadding(dp(4),0,dp(4),0);
+                playPurchaseButton.setStateListAnimator(null);
+                GradientDrawable renewBg=new GradientDrawable();
+                renewBg.setColor(0xD20D6D4A);
+                renewBg.setCornerRadius(dp(10));
+                renewBg.setStroke(dp(1),0xFF20E39A);
+                playPurchaseButton.setBackground(renewBg);
+                playPurchaseButton.setOnClickListener(v->launchYearlyRenewal());
+                stage.addView(playPurchaseButton);
+                LockedScreenUi.position(playPurchaseButton,stage,179,1024,276,39,SCREEN_W,SCREEN_H);
+                updateRenewalButton();
+            }else{
+                TextView directModel=new TextView(this);
+                directModel.setText("DOĞRUDAN APK / KURUMSAL\nSerial + 12 haneli lisans kodu\nGoogle Play satın alma bu sürümde kapalıdır.");
+                directModel.setTextColor(Color.WHITE);
+                directModel.setTextSize(11f);
+                directModel.setGravity(Gravity.CENTER);
+                directModel.setPadding(dp(12),dp(6),dp(12),dp(6));
+                GradientDrawable directBg=new GradientDrawable();
+                directBg.setColor(0xEE0A223A);
+                directBg.setCornerRadius(dp(12));
+                directBg.setStroke(dp(1),0xFF3AAAF0);
+                directModel.setBackground(directBg);
+                stage.addView(directModel);
+                LockedScreenUi.position(directModel,stage,60,930,482,139,SCREEN_W,SCREEN_H);
+            }
 
             // 5) Lisans bilgisi ve sözleşme
             LockedScreenUi.hotspot(this,stage,60,1080,482,146,SCREEN_W,SCREEN_H,v->showLicenseInfo());
@@ -185,6 +201,12 @@ public class LicenseActivity extends AppCompatActivity {
     }
 
     private void launchYearlyRenewal(){
+        if(!BuildConfig.PLAY_DISTRIBUTION){
+            Toast.makeText(this,
+                "Bu doğrudan APK / kurumsal MusaCAD sürümünde Google Play yenilemesi yoktur. Serial + 12 haneli lisans kodunu kullanın.",
+                Toast.LENGTH_LONG).show();
+            return;
+        }
         if(!LicenseManager.eligibleForPlayYearlyRenewal(this)){
             Toast.makeText(this,
                 "Google Play yalnızca mevcut veya daha önce etkinleştirilmiş yıllık MusaCAD lisansını yenilemek içindir. İlk aktivasyon için lisans kodunu kullanın.",
@@ -223,11 +245,14 @@ public class LicenseActivity extends AppCompatActivity {
         LicenseManager.State state=LicenseManager.state(this);
         StringBuilder msg=new StringBuilder();
         msg.append("Durum: ").append(stateLabel(state));
+        msg.append("\nDağıtım: ").append(BuildConfig.PLAY_DISTRIBUTION
+            ?"Google Play"
+            :"Doğrudan APK / Kurumsal");
         if(state==LicenseManager.State.TRIAL_ACTIVE){
             msg.append("\n").append(LicenseManager.remainingLabel(this));
         }
         long playExpiry=LicenseManager.playExpiryAtMs(this);
-        if(playExpiry>System.currentTimeMillis()){
+        if(BuildConfig.PLAY_DISTRIBUTION&&playExpiry>System.currentTimeMillis()){
             msg.append("\nGoogle Play yıllık lisans bitişi: ")
                .append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(playExpiry)));
         }
