@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
@@ -779,7 +779,8 @@ public class MainActivity extends AppCompatActivity {
             tool("Stretch",R.drawable.ic_move,()->{if(ensureTransformSelection("STRETCH")){if(cad.armStretchSelected())result.setText("Stretch • Köşe/vertex seçin");}}),
             tool("Array",R.drawable.ic_copy,this::runArrayCommand),
             tool("Patlat",R.drawable.ic_more,()->{if(ensureTransformSelection("EXPLODE")){if(cad.explodeSelectedEntity())result.setText("Patlat • Nesne parçalara ayrıldı");else result.setText("Patlat • Bu nesne desteklenmiyor");}}),
-            tool("Birleştir",R.drawable.ic_polyline,()->{if(ensureTransformSelection("JOIN")){if(cad.armJoinSelected())result.setText("Birleştir • İkinci nesneye dokunun");else result.setText("Birleştir • Uygun nesne seçin");}})
+            tool("Birleştir",R.drawable.ic_polyline,()->{if(ensureTransformSelection("JOIN")){if(cad.armJoinSelected())result.setText("Birleştir • İkinci nesneye dokunun");else result.setText("Birleştir • Uygun nesne seçin");}}),
+            tool("Font",R.drawable.ic_text,this::showFontManager)
         );
     }
 
@@ -963,6 +964,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Taslak kroki",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.FREEHAND);markModeSelected(0);result.setText("Taslak kroki • Serbest çizim etkin");}}),
             tool("Ok",R.drawable.ic_line,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_ARROW);markModeSelected(0);result.setText("Ok • Önce ok ucunu, sonra kuyruk noktasını seçin");}}),
             tool("Metin",R.drawable.ic_text,()->selectEditMode(R.id.textButton,CadView.Mode.DRAW_TEXT)),
+            tool("Font Yöneticisi",R.drawable.ic_text,this::showFontManager),
             tool("Revcloud",R.drawable.ic_polyline,()->{if(canEdit()){cad.setMode(CadView.Mode.DRAW_REVCLOUD);markModeSelected(0);result.setText("Revcloud • Bulut alanının iki karşı köşesini seçin");}}),
             tool("Ses",R.drawable.ic_more,()->pickMedia(PICK_AUDIO,"audio/*")),
             tool("Görüntü",R.drawable.ic_open_file,()->pickMedia(PICK_IMAGE,"image/*")),
@@ -1589,7 +1591,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDrawingInfo(){
-        if(activeDxf==null)return;String shx=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"SHX metin fallback: "+shx+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
+        if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }
 
@@ -1692,6 +1694,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
         if(c!=RESULT_OK||data==null||data.getData()==null)return;
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
+        if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
@@ -2034,7 +2037,7 @@ public class MainActivity extends AppCompatActivity {
         String mode=currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
         fileName.setText(currentDisplayName+mode+editable);
         if(activeDxf!=null){
-            String fallback=(activeDxf.fontFallbacks.isEmpty()&&!activeDxf.externalShapeFallback)?"":"  •  SHX fallback";
+            String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);
         }else if(currentProject.nativeScene!=null){
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
@@ -2171,7 +2174,61 @@ public class MainActivity extends AppCompatActivity {
     private String nameOf(Uri u){try(android.database.Cursor c=getContentResolver().query(u,null,null,null,null)){if(c!=null&&c.moveToFirst()){int i=c.getColumnIndex(OpenableColumns.DISPLAY_NAME);if(i>=0)return c.getString(i);}}String last=u.getLastPathSegment();return last==null||last.trim().isEmpty()?"cizim.dwg":last;}
 
     private void showTextEditor(float x,float y){
-        EditText input=new EditText(this);input.setHint("Çizime eklenecek yazı");input.setSingleLine(false);input.setMaxLines(3);int p=dp(16);input.setPadding(p,p/2,p,p/2);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Yazı ekle").setView(input).setPositiveButton("EKLE",null).setNegativeButton("İPTAL",null).create();dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String text=input.getText().toString().trim();if(text.isEmpty()){input.setError("Bir yazı girin");return;}cad.addTextEdit(x,y,text);dialog.dismiss();}));dialog.show();
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        EditText input=new EditText(this);input.setHint("Çizime eklenecek yazı");input.setSingleLine(false);input.setMaxLines(3);box.addView(input);
+        TextView fontLabel=new TextView(this);fontLabel.setText("Yazı tipi");fontLabel.setPadding(0,p/2,0,0);box.addView(fontLabel);
+        List<CadFontManager.Choice> fonts=CadFontManager.choices(this);
+        Spinner spinner=new Spinner(this);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,fonts));box.addView(spinner);
+        CadFontManager.Choice preferred=CadFontManager.defaultChoice(this);int selected=0;
+        for(int i=0;i<fonts.size();i++)if(fonts.get(i).hint.equalsIgnoreCase(preferred.hint)&&fonts.get(i).shx==preferred.shx){selected=i;break;}
+        spinner.setSelection(selected);
+        TextView preview=new TextView(this);preview.setText("MusaCAD • AaBbÇçĞğİıÖöŞşÜü 0123");preview.setTextSize(20f);preview.setPadding(0,p/2,0,p/2);box.addView(preview);
+        android.widget.AdapterView.OnItemSelectedListener listener=new android.widget.AdapterView.OnItemSelectedListener(){
+            public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){CadFontManager.Choice c=fonts.get(position);preview.setTypeface(CadFontManager.resolveTypeface(c.hint,c.shx,Typeface.NORMAL));}
+            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+        };spinner.setOnItemSelectedListener(listener);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Yazı ekle").setView(box).setPositiveButton("EKLE",null).setNeutralButton("FONT YÖNETİCİSİ",null).setNegativeButton("İPTAL",null).create();
+        dialog.setOnShowListener(d->{
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String text=input.getText().toString().trim();if(text.isEmpty()){input.setError("Bir yazı girin");return;}CadFontManager.Choice choice=fonts.get(Math.max(0,spinner.getSelectedItemPosition()));CadFontManager.setDefaultChoice(this,choice);cad.addTextEdit(x,y,text,choice);dialog.dismiss();});
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{dialog.dismiss();showFontManager();});
+        });dialog.show();
+    }
+
+    private void showFontManager(){
+        List<CadFontManager.Choice> fonts=CadFontManager.choices(this);
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
+        TextView info=new TextView(this);
+        String missing=activeDxf==null||activeDxf.fontFallbacks.isEmpty()?"Eksik font: yok":"Eksik / fallback: "+android.text.TextUtils.join(", ",activeDxf.fontFallbacks);
+        info.setText("Sistem + kullanıcı TTF/OTF fontları ve yaygın SHX eşlemeleri\n"+missing+"\nKullanıcı fontları: "+CadFontManager.userFontCount(this));box.addView(info);
+        Spinner spinner=new Spinner(this);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,fonts));box.addView(spinner);
+        String selectedHint=cad.selectedTextFontHint();CadFontManager.Choice preferred=selectedHint==null?CadFontManager.defaultChoice(this):CadFontManager.findChoice(this,selectedHint,CadFontPolicy.isShx(selectedHint));
+        int selected=0;for(int i=0;i<fonts.size();i++)if(fonts.get(i).hint.equalsIgnoreCase(preferred.hint)&&fonts.get(i).shx==preferred.shx){selected=i;break;}spinner.setSelection(selected);
+        TextView preview=new TextView(this);preview.setText("Önizleme • MusaCAD 0123456789");preview.setTextSize(22f);preview.setPadding(0,p/2,0,p/2);box.addView(preview);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+            public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){CadFontManager.Choice c=fonts.get(position);preview.setTypeface(CadFontManager.resolveTypeface(c.hint,c.shx,Typeface.NORMAL));}
+            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+        });
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Font Yöneticisi").setView(box).setPositiveButton("UYGULA / VARSAYILAN",null).setNeutralButton("TTF/OTF YÜKLE",null).setNegativeButton("KAPAT",null).create();
+        dialog.setOnShowListener(d->{
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{CadFontManager.Choice choice=fonts.get(Math.max(0,spinner.getSelectedItemPosition()));CadFontManager.setDefaultChoice(this,choice);boolean applied=cad.updateSelectedTextFont(choice);result.setText(applied?"Font • seçili metne uygulandı • "+choice.displayName:"Font • yeni metinler için varsayılan • "+choice.displayName);dialog.dismiss();});
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{dialog.dismiss();pickFontFile();});
+        });dialog.show();
+    }
+
+    private void pickFontFile(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"font/ttf","font/otf","application/x-font-ttf","application/x-font-opentype","application/octet-stream"});
+        startActivityForResult(intent,PICK_FONT);
+    }
+
+    private void handleFontPicked(Uri uri){
+        if(uri==null)return;
+        new Thread(()->{
+            try{
+                CadFontManager.Choice choice=CadFontManager.importFont(this,uri);
+                runOnUiThread(()->{result.setText("Font yüklendi • "+choice.displayName);showFontManager();});
+            }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"Font yüklenemedi: "+e.getMessage(),Toast.LENGTH_LONG).show());}
+        },"MusaCAD-font-import").start();
     }
 
     private void requestEditedDxfSave(){

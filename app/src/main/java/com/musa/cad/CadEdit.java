@@ -114,6 +114,7 @@ public final class CadEdit {
         }
     }
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit withTextStyle(String styleName,String familyHint,boolean shx,float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,styleName,familyHint,shx,height,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit withClosed(boolean value){return new CadEdit(type,xy.clone(),text,strokeWidth,value,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public int stretchVertexCount(){
         if(type==Type.LINE&&xy.length>=4)return 2;

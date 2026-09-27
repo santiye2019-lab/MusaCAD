@@ -16,7 +16,9 @@ public class MusaCadApp extends Application implements Application.ActivityLifec
 
     @Override public void onCreate(){
         super.onCreate();
+        CadFontManager.init(this);
         registerActivityLifecycleCallbacks(this);
+        CadFontManager.init(this);
         playBilling=new PlayBillingManager(this,new PlayBillingManager.Listener(){
             @Override public void onProductReady(boolean ready,String displayPrice){}
             @Override public void onEntitlementChanged(boolean active){
