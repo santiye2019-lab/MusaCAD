@@ -1689,7 +1689,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDrawingInfo(){
-        if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
+        if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String oleTypes=activeDxf.oleTypes.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.oleTypes);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"OLE / gömülü belge: "+activeDxf.oleObjectCount+" ("+oleTypes+")\n"+"OLE gerçek önizleme: "+activeDxf.olePreviewCount+"\n"+"OLE önizlemesi bulunamayan: "+activeDxf.oleMissingPreviewCount+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }
 
@@ -2142,7 +2142,8 @@ public class MainActivity extends AppCompatActivity {
         fileName.setText(currentDisplayName+mode+editable);
         if(activeDxf!=null){
             String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
-            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+fallback);
+            String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
+            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
         }else if(currentProject.nativeScene!=null){
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
             else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
