@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
@@ -1043,7 +1043,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openDocumentViewer(Uri uri,String name){
-        if(uri==null)return;Intent view=new Intent(this,DocumentViewerActivity.class);view.setData(uri);view.putExtra(DocumentViewerActivity.EXTRA_NAME,name);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(view);
+        if(uri==null)return;Intent view=new Intent(this,DocumentViewerActivity.class);view.setData(uri);view.putExtra(DocumentViewerActivity.EXTRA_NAME,name);view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(view,VIEW_DOCUMENT);
     }
 
     private void handleDocumentPicked(Uri uri){
@@ -1056,6 +1056,32 @@ public class MainActivity extends AppCompatActivity {
             result.setText("Belge • "+name+" eklendi ve MusaCAD görüntüleyicide açıldı");
         }
         openDocumentViewer(uri,name);
+    }
+
+    private void handleDocumentImport(Intent data){
+        if(data==null||!data.getBooleanExtra(DocumentViewerActivity.EXTRA_IMPORT_TO_CAD,false))return;
+        if(currentProject==null||!canEdit()){Toast.makeText(this,"Belgeyi çizime aktarmak için düzenlenebilir bir çizim açın",Toast.LENGTH_LONG).show();return;}
+        String name=data.getStringExtra(DocumentViewerActivity.EXTRA_IMPORT_NAME);if(name==null||name.trim().isEmpty())name="Belge";
+        String text=data.getStringExtra(Intent.EXTRA_TEXT);
+        if(text!=null&&!text.trim().isEmpty()){
+            PointF center=cad.visibleCenterContent();String[] lines=text.replace("\r\n","\n").replace('\r','\n').split("\n",-1);
+            int added=0;float y=center.y;float step=Math.max(16f,18f/getResources().getDisplayMetrics().density);
+            for(String line:lines){String value=line.trim();if(value.isEmpty()){y+=step;continue;}cad.addTextEdit(center.x,y,value);y+=step;added++;if(added>=500)break;}
+            result.setText("Belge • "+name+" • "+added+" metin satırı çizime aktarıldı");return;
+        }
+        String raw=data.getStringExtra(DocumentViewerActivity.EXTRA_IMPORT_URI);if(raw==null||raw.trim().isEmpty())return;
+        Uri imageUri=Uri.parse(raw);final String finalName=name;result.setText("Belge sayfası • çizime aktarılıyor…");
+        new Thread(()->{
+            Bitmap bitmap=null;
+            try{
+                bitmap=decodeCadImage(imageUri);final Bitmap ready=bitmap;
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed()){if(!ready.isRecycled())ready.recycle();return;}
+                    if(!cad.addImageOverlay(ready,finalName,imageUri.toString())){if(!ready.isRecycled())ready.recycle();result.setText("Belge sayfası • çizime aktarılamadı");return;}
+                    result.setText("Belge sayfası • "+finalName+" çizime görüntü olarak aktarıldı");
+                });
+            }catch(Exception e){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();final String m=e.getMessage()==null?"Belge sayfası okunamadı":e.getMessage();runOnUiThread(()->Toast.makeText(this,m,Toast.LENGTH_LONG).show());}
+        },"MusaCAD-document-import").start();
     }
 
     private void handleMediaPicked(int request,Uri uri){
@@ -1764,7 +1790,9 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
         if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
-        if(c!=RESULT_OK||data==null||data.getData()==null)return;
+        if(c!=RESULT_OK||data==null)return;
+        if(r==VIEW_DOCUMENT){handleDocumentImport(data);return;}
+        if(data.getData()==null)return;
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
