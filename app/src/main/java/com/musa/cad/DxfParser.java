@@ -153,7 +153,7 @@ public final class DxfParser {
         public Matrix printMatrix(RectF target,int denominator,RectF requestedSource){
             Matrix matrix=new Matrix();if(target==null||target.width()<=0||target.height()<=0)return matrix;
             RectF source=requestedSource==null?new RectF(contentBounds):new RectF(requestedSource);
-            if(source.width()<=0f||source.height()<=0f||!source.intersect(contentBounds))source.set(contentBounds);
+            if(!Float.isFinite(source.left)||!Float.isFinite(source.top)||!Float.isFinite(source.right)||!Float.isFinite(source.bottom)||source.width()<=0f||source.height()<=0f)source.set(contentBounds);
             double points=CadPrintMath.pointsPerDrawingUnit(millimetersPerUnit,denominator);
             if(denominator>0&&Double.isFinite(points)&&worldToContentScale>0){
                 float scale=(float)(points/worldToContentScale);matrix.setScale(scale,scale);
