@@ -17,10 +17,36 @@ public final class AcisSatMeshTest {
         if(mesh.triangles.length!=36)throw new AssertionError("cube must produce 12 triangles");
         if(mesh.edges.length!=24)throw new AssertionError("cube must preserve 12 real B-Rep edges");
 
+        testCylinderSide();
+
         AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of("ACIS_PLACEHOLDER"));
         if(bad.hasGeometry())throw new AssertionError("invalid ACIS payload must not invent geometry");
 
-        System.out.println("ACIS SAT B-Rep cases passed: encrypted payload, planar 3DSOLID tessellation and safe fallback.");
+        System.out.println("ACIS SAT B-Rep cases passed: encrypted payload, planar solids, cylindrical/conic loft and safe fallback.");
+    }
+
+    private static void testCylinderSide(){
+        String sat="700 0 1 0\nMusaCAD cylinder\n1 1e-06 1e-10\n"
+            +"-0 point $-1 1 0 0 #\n"
+            +"-1 point $-1 1 0 2 #\n"
+            +"-10 vertex $-1 $30 $0 #\n"
+            +"-11 vertex $-1 $31 $1 #\n"
+            +"-20 ellipse-curve $-1 0 0 0 0 0 1 1 0 0 1 I I #\n"
+            +"-21 ellipse-curve $-1 0 0 2 0 0 1 1 0 0 1 I I #\n"
+            +"-30 edge $-1 $10 0 $10 6.283185307179586 $40 $20 forward 7 unknown #\n"
+            +"-31 edge $-1 $11 0 $11 6.283185307179586 $41 $21 forward 7 unknown #\n"
+            +"-40 coedge $-1 $40 $40 $-1 $30 forward $50 $-1 #\n"
+            +"-41 coedge $-1 $41 $41 $-1 $31 forward $51 $-1 #\n"
+            +"-50 loop $-1 $-1 $40 $60 #\n"
+            +"-51 loop $-1 $-1 $41 $60 #\n"
+            +"-70 cone-surface $-1 0 0 0 0 0 1 1 0 0 1 I I 0 1 1 forward_v I I I I #\n"
+            +"-60 face $-1 $-1 $50 $-1 $-1 $70 forward single #\n"
+            +"End-of-ACIS-data\n";
+        AcisSatMesh.Result mesh=AcisSatMesh.parseDxfChunks(List.of(sat));
+        if(!mesh.hasGeometry()||!mesh.complete||mesh.faces!=1||mesh.tessellatedFaces!=1)
+            throw new AssertionError("cylindrical ACIS side must tessellate completely");
+        if(mesh.triangles.length<180)throw new AssertionError("cylinder side must be a real curved triangle strip");
+        if(mesh.xyz.length<180)throw new AssertionError("ellipse boundaries must be sampled as real 3D rings");
     }
 
     private static String cubeSat(){
