@@ -90,6 +90,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FinalReleaseReadinessTest.java
           java -cp /tmp/musacad-tests FinalReleaseReadinessTest
+      - name: Test Google Play yearly renewal policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/PlayBillingPolicy.java tests/PlayBillingPolicyTest.java
+          java -cp /tmp/musacad-tests PlayBillingPolicyTest
+      - name: Test Google Play sales and license model
+        run: |
+          javac -d /tmp/musacad-tests tests/PlaySalesLicenseModelTest.java
+          java -cp /tmp/musacad-tests PlaySalesLicenseModelTest
       - name: Test DXF color palette
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
