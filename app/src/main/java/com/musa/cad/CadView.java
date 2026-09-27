@@ -392,6 +392,7 @@ public class CadView extends View {
     }
 
     public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&(selectedImageOverlay()!=null||sourceEdits.hasSelection());}
+    public boolean selectedIsImage(){return mode==Mode.SELECT_ENTITY&&selectedImageOverlay()!=null;}
     public CadEdit selectedEntityCopy(){if(selectedImageOverlay()!=null)return null;CadEdit selected=sourceEdits.currentSelected();return selected==null?null:selected.copy();}
     public boolean addImportedEdit(CadEdit edit){
         if(vectorDrawing==null||edit==null)return false;
