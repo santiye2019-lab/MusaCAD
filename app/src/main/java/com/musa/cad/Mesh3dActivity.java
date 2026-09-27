@@ -43,7 +43,7 @@ public final class Mesh3dActivity extends Activity {
                     TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+modelHint());
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
                     addViewControls(root);
-                    if(MODE_EDIT.equals(requestedMode())&&!mesh.solidProxy)addEditControls(root);
+                    if(MODE_EDIT.equals(requestedMode()))addEditControls(root);
                 });
             }catch(Exception e){runOnUiThread(()->{if(!closing)status.setText("3B görünüm açılamadı: "+e.getMessage());});}
         },"MusaCAD-3D-load").start();
@@ -141,6 +141,7 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void addEditControls(FrameLayout root){
+        if(mesh==null||mesh.solidProxy)return;
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
         LinearLayout views=new LinearLayout(this);panel.addView(views,new LinearLayout.LayoutParams(-1,-2));
         Button style=new Button(this);style.setText("Ağ çizgileri");views.addView(style,new LinearLayout.LayoutParams(0,-2,1));
