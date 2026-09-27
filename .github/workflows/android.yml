@@ -184,6 +184,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FontSystemModelTest.java
           java -cp /tmp/musacad-tests FontSystemModelTest
+      - name: Test raster drawing-coordinate persistence
+        run: |
+          javac -d /tmp/musacad-tests tests/ImageOverlayCoordinatePersistenceTest.java
+          java -cp /tmp/musacad-tests ImageOverlayCoordinatePersistenceTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
