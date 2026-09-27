@@ -51,5 +51,13 @@ public final class CadPrintMath {
         return millimetersPerUnit*72.0/(25.4*denominator);
     }
 
+    /** Accepts "100" or "1:100" custom engineering scales. Returns 0 when invalid. */
+    public static int parseScaleDenominator(String text){
+        if(text==null)return 0;String value=text.trim();if(value.isEmpty())return 0;
+        int colon=value.indexOf(':');if(colon>=0)value=value.substring(colon+1).trim();
+        value=value.replace(" ","");
+        try{int denominator=Integer.parseInt(value);return denominator>0&&denominator<=1_000_000?denominator:0;}catch(NumberFormatException e){return 0;}
+    }
+
     private CadPrintMath(){}
 }
