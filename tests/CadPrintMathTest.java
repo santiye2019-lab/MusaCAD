@@ -12,6 +12,10 @@ public class CadPrintMathTest {
         near(CadPrintMath.pointsPerDrawingUnit(1.0,100),72.0/2540.0);
         near(CadPrintMath.pointsPerDrawingUnit(1000.0,100),72.0/2.54);
         if(!Double.isNaN(CadPrintMath.pointsPerDrawingUnit(Double.NaN,50)))throw new AssertionError("unknown scale");
+        if(CadPrintMath.parseScaleDenominator("125")!=125)throw new AssertionError("custom 125");
+        if(CadPrintMath.parseScaleDenominator("1:75")!=75)throw new AssertionError("custom 1:75");
+        if(CadPrintMath.parseScaleDenominator("0")!=0)throw new AssertionError("zero scale must fail");
+        if(CadPrintMath.parseScaleDenominator("abc")!=0)throw new AssertionError("invalid scale must fail");
         System.out.println("DXF physical print scale cases passed");
     }
 }

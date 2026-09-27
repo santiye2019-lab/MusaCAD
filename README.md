@@ -21,6 +21,7 @@ MusaCAD, telefonda DWG/DXF çizimlerini açmak, incelemek, ölçmek, temel düze
 - Orijinal DWG/DXF dosyasını paylaşma
 - Görünümü PNG olarak paylaşma
 - Tam görünümü doğrudan PDF çizim yüzeyine aktararak paylaşma
+- Gelişmiş yazdırma / PDF: A4–A0, yatay/dikey, Extents/Display/Window, Sayfaya Sığdır, 1:1–1:200 ve özel ölçek, renkli/siyah-beyaz, WYSIWYG Print Preview
 - Ekranda alan seçip seçili alanı PNG veya PDF olarak paylaşma
 - Büyük dosya açma yolu için 512 MB üst sınır
 - Arka planda dosya okuma/dönüştürme ve iptal desteği
@@ -47,6 +48,8 @@ MusaCAD ölçümleri saha ve kontrol amaçlı yardımcı ölçümlerdir; resmi m
 Vektörel olarak açılan DWG önce geçici DXF çalışma kopyasına dönüştürülür. Çizgi, çoklu çizgi, dikdörtgen, daire ve yazı düzenlemeleri ekranda tutulur ve `DXF Kaydet` ile kaynak/çalışma DXF'inin ENTITIES bölümüne eklenerek yeni bir dosyaya yazılır. Orijinal dosya değiştirilmez.
 
 ## Paylaşım ve çıktı
+
+Yazdır menüsü fiziksel yazıcı ve Android'in “PDF olarak kaydet” hedeflerini aynı vektörel çıktı motoruyla kullanır. Extents tüm çizimi, Display ekranda görünen alanı, Window ise kullanıcı tarafından sürüklenerek seçilen alanı basar. Print Preview ile gerçek baskı/PDF aynı render yolunu kullandığı için desteklenen çizgi, katman, renk, font, tablo, blok, tarama, resim, ölçü ve açıklamalar aynı içerikle üretilir.
 
 Paylaş menüsünde:
 

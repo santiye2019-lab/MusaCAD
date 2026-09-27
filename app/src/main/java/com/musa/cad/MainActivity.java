@@ -99,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="";
     private int pendingHomeCategory;
+    private boolean pendingPrintWindowSelection;
     private Uri homeFeaturedUri;
 
     @Override protected void onCreate(Bundle b){
@@ -117,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
         cad.setListener(new CadView.Listener(){
             public void onMeasurement(String v){result.setText(v);recordMeasurement(v);}
             public void onCalibrationRequested(double px){showCalibration();}
-            public void onSelectionReady(){previewSelection();}
+            public void onSelectionReady(){if(pendingPrintWindowSelection){pendingPrintWindowSelection=false;printDrawing(true);}else previewSelection();}
             public void onTextRequested(float x,float y){showTextEditor(x,y);}
         });
 
@@ -1808,6 +1809,7 @@ public class MainActivity extends AppCompatActivity {
     private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir nesne seçin",Toast.LENGTH_SHORT).show();}
 
     private void handleBackNavigation(){
+        if(pendingPrintWindowSelection){pendingPrintWindowSelection=false;cad.cancelSelection();result.setText("Window yazdırma alanı seçimi iptal edildi");return;}
         if(activeLoad!=null){cancelLoad();Toast.makeText(this,"Devam eden işlem iptal edildi",Toast.LENGTH_SHORT).show();return;}
         if(currentProject!=null){
             requestCloseProject(currentProject);
@@ -2521,9 +2523,20 @@ public class MainActivity extends AppCompatActivity {
         }catch(Exception e){if(copy!=null)copy.delete();error(e);}
     }
 
-    private void printDrawing(){
+    private void printDrawing(){printDrawing(false);}
+
+    private void printDrawing(boolean preferWindow){
         if(currentFile==null||!currentFile.exists()){Toast.makeText(this,"Yazdırmak için önce bir DWG veya DXF dosyası açın",Toast.LENGTH_SHORT).show();return;}Bitmap preview=null;
-        try{if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)preview=cad.snapshot();}CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),cad.getUserBlocks(),preview,currentDisplayName);}catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
+        try{
+            RectF displayBounds=cad.visibleContentBounds(),windowBounds=cad.selectedAreaContentBounds();
+            if(activeDxf==null){preview=DwgPreview.read(currentFile);if(preview==null)preview=cad.snapshot();}
+            CadPrint.show(this,activeDxf,cad.getAddedEdits(),cad.getSourceReplacements(),cad.getHiddenSourceIds(),cad.getUserBlocks(),cad.getImageOverlays(),
+                preview,currentDisplayName,displayBounds,windowBounds,preferWindow,()->{
+                    pendingPrintWindowSelection=true;
+                    if(!cad.beginSelection()){pendingPrintWindowSelection=false;Toast.makeText(this,"Window için çizim alanı seçilemedi",Toast.LENGTH_LONG).show();return;}
+                    result.setText("Window • Yazdırılacak alanın iki köşesini sürükleyerek seçin");
+                });
+        }catch(Exception e){if(preview!=null&&!preview.isRecycled())preview.recycle();error(e);}
     }
 
     private void previewSelection(){

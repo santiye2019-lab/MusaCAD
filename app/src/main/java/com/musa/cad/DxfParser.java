@@ -148,7 +148,20 @@ public final class DxfParser {
         public void drawVectorForPrint(Canvas canvas,Matrix contentToPage,boolean monochrome){drawVectorForPrint(canvas,contentToPage,monochrome,Collections.emptySet());}
         public void drawVectorForPrint(Canvas canvas,Matrix contentToPage,boolean monochrome,Set<Integer>hiddenIds){Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(contentToPage,view);drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayerKeys,true,monochrome,globalLineTypeScale);Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||hidden.contains(layer.sourceId))continue;layer.drawStyled(canvas,paint,combined,true,monochrome,globalLineTypeScale);}}
         public void drawSourceReplacement(Canvas canvas,Matrix contentToTarget,SourceReplacement r,boolean print,boolean mono){if(canvas==null||contentToTarget==null||r==null||!isSourceVisible(r.sourceId))return;Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setColor(mono?Color.BLACK:(print?paperColor(r.color):r.color));paint.setStrokeWidth(print?DxfLineStyle.printStrokePoints(r.lineWeight):DxfLineStyle.screenStroke(r.lineWeight));DxfLineStyle.Pattern pattern=lineTypes.get(DxfLineStyle.normalizeName(r.lineType));if(pattern==null)pattern=lineTypes.get(DxfLineStyle.CONTINUOUS);double pixels=matrixScale(contentToTarget)*worldToContentScale;DxfLineStyle.Dash dash=pattern==null?null:pattern.dash(pixels,globalLineTypeScale,r.lineTypeScale,1d);paint.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));drawContentEdit(canvas,paint,contentToTarget,r.edit);paint.setPathEffect(null);}
-        public Matrix printMatrix(RectF target,int denominator){Matrix matrix=new Matrix();if(target==null||target.width()<=0||target.height()<=0)return matrix;double points=CadPrintMath.pointsPerDrawingUnit(millimetersPerUnit,denominator);if(denominator>0&&Double.isFinite(points)&&worldToContentScale>0){float scale=(float)(points/worldToContentScale);matrix.setScale(scale,scale);RectF mapped=new RectF(contentBounds);matrix.mapRect(mapped);matrix.postTranslate(target.centerX()-mapped.centerX(),target.centerY()-mapped.centerY());}else matrix.setRectToRect(contentBounds,target,Matrix.ScaleToFit.CENTER);return matrix;}
+        public RectF printableContentBounds(){return new RectF(contentBounds);}
+        public Matrix printMatrix(RectF target,int denominator){return printMatrix(target,denominator,contentBounds);}
+        public Matrix printMatrix(RectF target,int denominator,RectF requestedSource){
+            Matrix matrix=new Matrix();if(target==null||target.width()<=0||target.height()<=0)return matrix;
+            RectF source=requestedSource==null?new RectF(contentBounds):new RectF(requestedSource);
+            if(!Float.isFinite(source.left)||!Float.isFinite(source.top)||!Float.isFinite(source.right)||!Float.isFinite(source.bottom)||source.width()<=0f||source.height()<=0f)source.set(contentBounds);
+            double points=CadPrintMath.pointsPerDrawingUnit(millimetersPerUnit,denominator);
+            if(denominator>0&&Double.isFinite(points)&&worldToContentScale>0){
+                float scale=(float)(points/worldToContentScale);matrix.setScale(scale,scale);
+                RectF mapped=new RectF(source);matrix.mapRect(mapped);
+                matrix.postTranslate(target.centerX()-mapped.centerX(),target.centerY()-mapped.centerY());
+            }else matrix.setRectToRect(source,target,Matrix.ScaleToFit.CENTER);
+            return matrix;
+        }
         public List<DxfViewport.View> viewports(){
             ArrayList<DxfViewport.View> out=new ArrayList<>();
             for(Entity wrapped:document){
