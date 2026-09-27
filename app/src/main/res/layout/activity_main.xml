@@ -686,7 +686,7 @@
             <ImageButton
                 android:id="@+id/panButton"
                 android:layout_width="32dp"
-                android:layout_height="30dp
+                android:layout_height="30dp"
                 android:src="@drawable/ic_pan"
                 android:contentDescription="Kaydır"
                 android:background="@drawable/right_rail_button_bg"
@@ -695,7 +695,7 @@
             <ImageButton
                 android:id="@+id/rightFitButton"
                 android:layout_width="32dp"
-                android:layout_height="30dp
+                android:layout_height="30dp"
                 android:layout_marginTop="3dp"
                 android:src="@drawable/ic_fit"
                 android:contentDescription="Ekrana sığdır"
@@ -705,7 +705,7 @@
             <ImageButton
                 android:id="@+id/rightZoomInButton"
                 android:layout_width="32dp"
-                android:layout_height="30dp
+                android:layout_height="30dp"
                 android:layout_marginTop="3dp"
                 android:src="@drawable/ic_zoom_in"
                 android:contentDescription="Yakınlaştır"
@@ -715,7 +715,7 @@
             <ImageButton
                 android:id="@+id/rightZoomOutButton"
                 android:layout_width="32dp"
-                android:layout_height="30dp
+                android:layout_height="30dp"
                 android:layout_marginTop="3dp"
                 android:src="@drawable/ic_zoom_out"
                 android:contentDescription="Uzaklaştır"
@@ -748,7 +748,7 @@
             <ImageButton
                 android:id="@+id/rightLayersButton"
                 android:layout_width="32dp"
-                android:layout_height="30dp
+                android:layout_height="30dp"
                 android:layout_marginTop="3dp"
                 android:src="@drawable/ic_layers"
                 android:contentDescription="Katmanlar"
