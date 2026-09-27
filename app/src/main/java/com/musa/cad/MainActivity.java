@@ -51,10 +51,15 @@ public class MainActivity extends AppCompatActivity {
         final String kind,name,mime,uri;
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
+    private static final class RestoredRaster {
+        final CadImagePlacement placement;final Bitmap bitmap;
+        RestoredRaster(CadImagePlacement placement,Bitmap bitmap){this.placement=placement;this.bitmap=bitmap;}
+    }
     private static final class Loaded {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        final ArrayList<RestoredRaster> restoredRasters=new ArrayList<>();
         ProjectSession project;
-        void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
+        void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();for(RestoredRaster r:restoredRasters)if(r.bitmap!=null&&!r.bitmap.isRecycled())r.bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
@@ -64,11 +69,13 @@ public class MainActivity extends AppCompatActivity {
         final Set<String> previousVisibleLayers=new HashSet<>();
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
+        final ArrayList<Bitmap> rasterBitmaps=new ArrayList<>();
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
             Bitmap owned=parsed!=null?parsed.bitmap:bitmap;
             if(owned!=null&&!owned.isRecycled())owned.recycle();
+            for(Bitmap raster:rasterBitmaps)if(raster!=null&&!raster.isRecycled())raster.recycle();rasterBitmaps.clear();
             if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();
             if(file!=null)file.delete();
             file=null;workingDxf=null;bitmap=null;parsed=null;viewState=null;
@@ -1041,7 +1048,7 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(()->{
                         if(isFinishing()||isDestroyed()||currentProject!=target){if(!ready.isRecycled())ready.recycle();return;}
                         if(!cad.addImageOverlay(ready,name,uri.toString())){if(!ready.isRecycled())ready.recycle();result.setText("Görüntü • çizime yerleştirilemedi");return;}
-                        target.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
+                        target.rasterBitmaps.add(ready);target.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
                         result.setText("Görüntü • "+name+" çizime yerleştirildi • Seç ile taşı / döndür / ölçekle / sil");
                     });
                 }catch(Exception e){
@@ -1066,6 +1073,29 @@ public class MainActivity extends AppCompatActivity {
         while(bounds.outWidth/sample>4096||bounds.outHeight/sample>4096||pixels/((long)sample*sample)>12_000_000L)sample*=2;
         BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=sample;options.inPreferredConfig=Bitmap.Config.ARGB_8888;
         try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("Dosya açılamadı");Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);if(bitmap==null)throw new IOException("Görüntü çözümlenemedi");return bitmap;}
+    }
+
+    private ArrayList<RestoredRaster> readRasterPlacements(File dxf){
+        ArrayList<RestoredRaster> out=new ArrayList<>();if(dxf==null||!dxf.isFile())return out;
+        try{
+            for(CadImagePlacement placement:CadImageMetadata.read(dxf)){
+                try{
+                    Uri uri=Uri.parse(placement.uri);Bitmap bitmap=decodeCadImage(uri);
+                    out.add(new RestoredRaster(placement,bitmap));
+                }catch(Exception e){android.util.Log.w("MusaCAD","Saved raster could not be restored: "+placement.name,e);}
+            }
+        }catch(Exception e){android.util.Log.w("MusaCAD","Raster metadata could not be read",e);}
+        return out;
+    }
+    private void attachRestoredRasters(ProjectSession project,List<RestoredRaster> rasters){
+        if(project==null||rasters==null||rasters.isEmpty())return;
+        for(RestoredRaster restored:rasters){
+            if(restored==null||restored.bitmap==null||restored.bitmap.isRecycled())continue;
+            if(cad.restoreImagePlacement(restored.bitmap,restored.placement)){
+                project.rasterBitmaps.add(restored.bitmap);
+                try{project.mediaAttachments.add(new MediaAttachment("Görüntü",restored.placement.name,"image/*",Uri.parse(restored.placement.uri)));}catch(Exception ignored){}
+            }else if(!restored.bitmap.isRecycled())restored.bitmap.recycle();
+        }
     }
 
     private void showMediaAttachments(){
@@ -1771,13 +1801,14 @@ public class MainActivity extends AppCompatActivity {
 
                 if(loaded.dxf){
                     runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Vektör çizim hazırlanıyor…");});
+                    loaded.restoredRasters.addAll(readRasterPlacements(loaded.file));
                     loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
                     if(loaded.bitmap==null)throw new IOException("Desteklenen DXF geometrisi bulunamadı");
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
-                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);attachRestoredRasters(project,loaded.restoredRasters);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -1944,12 +1975,13 @@ public class MainActivity extends AppCompatActivity {
         final List<SourceReplacement> replacements=new ArrayList<>(cad.getSourceReplacements());
         final List<SourceRange> removals=new ArrayList<>(cad.getSourceRemovals());
         final List<CadBlock.Definition> blocks=new ArrayList<>(cad.getUserBlocks());
+        final List<CadImagePlacement> imagePlacements=new ArrayList<>(cad.getImagePlacementsDrawing());
         project.recoveryFingerprint=fingerprint;
 
         recoveryExecutor.submit(()->{
             try{
                 RecoveryStore.write(recoveryDir(),id,displayName,sourceUri,fingerprint,System.currentTimeMillis(),
-                    out->DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer));
+                    out->DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer,imagePlacements));
                 RecoveryStore.prune(recoveryDir(),MAX_OPEN_PROJECTS);
             }catch(Exception e){
                 project.recoveryFingerprint=Long.MIN_VALUE;
@@ -2008,6 +2040,7 @@ public class MainActivity extends AppCompatActivity {
                 FileTransfer.checkCancelled();
                 DxfParser.Result parsed=DxfParser.render(temp);
                 if(parsed==null||parsed.bitmap==null)throw new IOException("Kurtarma kopyasında görüntülenebilir geometri bulunamadı");
+                final ArrayList<RestoredRaster> recoveredRasters=readRasterPlacements(temp);
                 final File recovered=temp;temp=null;
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();recovered.delete();return;}
@@ -2016,7 +2049,7 @@ public class MainActivity extends AppCompatActivity {
                     project.sourceUri=record.sourceUri==null||record.sourceUri.trim().isEmpty()?null:Uri.parse(record.sourceUri);
                     project.file=recovered;project.workingDxf=recovered;project.bitmap=parsed.bitmap;project.parsed=parsed;project.name=record.displayName;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
                     project.recoveryId=record.id;project.recoveryFingerprint=record.fingerprint;
-                    projects.add(project);activateProject(project);
+                    projects.add(project);activateProject(project);attachRestoredRasters(project,recoveredRasters);
                     project.savedFingerprint=Long.MIN_VALUE;project.baselineSet=true;project.dirty=true;
                     refreshProjectTabs();
                     result.setText("Kurtarılan çalışma • Kaydet / DXF dışa aktar ile kalıcı dosya oluşturun");
@@ -2276,18 +2309,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int rasterCount=cad.imageOverlayCount();final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImagePlacement> imagePlacements=cad.getImagePlacementsDrawing();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int rasterCount=imagePlacements.size();final int total=additions.size()+removals.size()+blocks.size()+rasterCount;
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){
-                        currentProject.viewState=cad.captureSessionState();
-                        if(rasterCount==0){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;clearRecovery(currentProject);}
-                        else currentProject.dirty=true;
-                    }
-                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" raster görüntü DXF içine gömülmedi; PDF/PNG görünümünde korunur",Toast.LENGTH_LONG).show();
+        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer,imagePlacements);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){currentProject.viewState=cad.captureSessionState();currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;clearRecovery(currentProject);}
+                    Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme"+(rasterCount>0?" • "+rasterCount+" görüntü yerleşimi korundu":""),Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null&&rasterCount==0)closeProjectNow(close);
-                    else if(close!=null)result.setText("Görüntü katmanı yalnız proje görünümünde • kapatmadan önce PDF/PNG dışa aktarın veya görüntüyü silin");});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
     }
 
     private void showShare(){
