@@ -37,6 +37,17 @@ public final class ReferenceToolParityTest {
         String[] required3d={"İzometrik","Orbit / Döndür","Ön Görünüş","Üst Görünüş","Sağ Görünüş","Tel Kafes","Yüzey","3B Ölçüm","3B Düzenle"};
         for(String label:required3d)require(source.contains("tool(\""+label+"\""),"Missing 3D tool: "+label);
         require(source.contains("right3dButton).setOnClickListener(v->show3dToolsSheet())"),"3D rail button must open the 3D tool palette");
-        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; expanded 3D tools enabled.");
+
+        String activity=Files.readString(Path.of("app/src/main/java/com/musa/cad/Mesh3dActivity.java"),StandardCharsets.UTF_8);
+        String view=Files.readString(Path.of("app/src/main/java/com/musa/cad/Mesh3dView.java"),StandardCharsets.UTF_8);
+        String[] modes={"MODE_ISO","MODE_ORBIT","MODE_FRONT","MODE_TOP","MODE_RIGHT","MODE_WIREFRAME","MODE_SURFACE","MODE_MEASURE","MODE_EDIT"};
+        for(String mode:modes)require(source.contains("Mesh3dActivity."+mode),"3D tool is not routed: "+mode);
+        require(view.contains("enum InteractionMode { ORBIT, MEASURE, EDIT }"),"3D interaction modes missing");
+        require(activity.contains("Mesh3dView.InteractionMode.MEASURE"),"3D measure mode not activated");
+        require(activity.contains("Mesh3dView.InteractionMode.EDIT"),"3D edit mode not activated");
+        require(activity.contains("if(MODE_EDIT.equals(requestedMode()))addEditControls(root)"),"3D edit controls must only appear in edit mode");
+        require(view.contains("interactionMode==InteractionMode.MEASURE")&&view.contains("selectMeasurement"),"3D measurement touch path missing");
+        require(view.contains("interactionMode==InteractionMode.EDIT")&&view.contains("selectEditVertex"),"3D edit touch path missing");
+        System.out.println("ReferenceToolParityTest OK: "+required.length+" reference tool groups wired; functional 3D modes enabled.");
     }
 }

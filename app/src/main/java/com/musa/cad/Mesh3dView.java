@@ -12,6 +12,7 @@ import java.util.Locale;
 
 /** Orbitable XYZ surface and wireframe. Measurements use actual drawing coordinates. */
 public final class Mesh3dView extends View {
+    public enum InteractionMode { ORBIT, MEASURE, EDIT }
     private final Dxf3dMesh model;
     private final Paint lines=new Paint(Paint.ANTI_ALIAS_FLAG),surface=new Paint(Paint.ANTI_ALIAS_FLAG),marker=new Paint(Paint.ANTI_ALIAS_FLAG),caption=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path facePath=new Path();
@@ -21,6 +22,7 @@ public final class Mesh3dView extends View {
     private float yaw=.65f,pitch=.32f,zoom=1f,lastX,lastY,pinchDistance;
     private int first=-1,second=-1;
     private boolean moved,wireframe;
+    private InteractionMode interactionMode=InteractionMode.ORBIT;
 
     public Mesh3dView(Context context,Dxf3dMesh model){
         super(context);this.model=model;screen=new float[model.xyz.length/3*2];depth=new float[model.xyz.length/3];faceOrder=new long[model.triangles.length/3];segments=new float[model.edges.length*2];
@@ -41,8 +43,9 @@ public final class Mesh3dView extends View {
         }
         if(wireframe||model.triangles.length==0)drawEdges(canvas);
         else{drawSurfaces(canvas);drawEdges(canvas);}
-        if(first>=0){int i=first*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);}
-        if(second>=0){int i=second*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);float value=distance(first,second);canvas.drawText(String.format(Locale.getDefault(),"3B mesafe: %.3f çizim birimi",value),18f,105f*getResources().getDisplayMetrics().density,caption);}
+        if(first>=0&&interactionMode!=InteractionMode.ORBIT){int i=first*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);}
+        if(interactionMode==InteractionMode.MEASURE&&second>=0){int i=second*2;canvas.drawCircle(screen[i],screen[i+1],7f,marker);float value=distance(first,second);canvas.drawText(String.format(Locale.getDefault(),"3B mesafe: %.3f çizim birimi",value),18f,105f*getResources().getDisplayMetrics().density,caption);}
+        else if(interactionMode==InteractionMode.EDIT&&first>=0)canvas.drawText("Seçili köşe: "+(first+1),18f,105f*getResources().getDisplayMetrics().density,caption);
     }
     private void drawEdges(Canvas canvas){
         int count=0;
@@ -75,27 +78,33 @@ public final class Mesh3dView extends View {
         }
     }
     private float distance(int a,int b){int i=a*3,j=b*3;float x=model.xyz[i]-model.xyz[j],y=model.xyz[i+1]-model.xyz[j+1],z=model.xyz[i+2]-model.xyz[j+2];return (float)Math.sqrt(x*x+y*y+z*z);}
-    public int selectedVertex(){return first;}
-    public void geometryChanged(){invalidate();}
-    public boolean toggleWireframe(){wireframe=!wireframe;invalidate();return wireframe;}
-    public void setWireframe(boolean enabled){wireframe=enabled;invalidate();}
-    public void setIsometricView(){yaw=.65f;pitch=.32f;zoom=1f;invalidate();}
-    public void setFrontView(){yaw=0f;pitch=0f;zoom=1f;invalidate();}
-    public void setTopView(){yaw=0f;pitch=-(float)Math.PI/2f;zoom=1f;invalidate();}
-    public void setRightView(){yaw=(float)Math.PI/2f;pitch=0f;zoom=1f;invalidate();}
+    public int selectedVertex(){return interactionMode==InteractionMode.EDIT?first:-1;}
+    public InteractionMode interactionMode(){return interactionMode;}
+    public void setInteractionMode(InteractionMode mode){interactionMode=mode==null?InteractionMode.ORBIT:mode;first=second=-1;postInvalidateOnAnimation();}
+    public void geometryChanged(){postInvalidateOnAnimation();}
+    public boolean toggleWireframe(){wireframe=!wireframe;postInvalidateOnAnimation();return wireframe;}
+    public void setWireframe(boolean enabled){wireframe=enabled;postInvalidateOnAnimation();}
+    public void setIsometricView(){yaw=.65f;pitch=.32f;zoom=1f;postInvalidateOnAnimation();}
+    public void setFrontView(){yaw=0f;pitch=0f;zoom=1f;postInvalidateOnAnimation();}
+    public void setTopView(){yaw=0f;pitch=-(float)Math.PI/2f;zoom=1f;postInvalidateOnAnimation();}
+    public void setRightView(){yaw=(float)Math.PI/2f;pitch=0f;zoom=1f;postInvalidateOnAnimation();}
     public void resetCamera(){setIsometricView();}
-    private void select(float x,float y){int at=-1;float best=36f*getResources().getDisplayMetrics().density;best*=best;
+    private int nearestVertex(float x,float y){int at=-1;float best=36f*getResources().getDisplayMetrics().density;best*=best;
         for(int i=0;i<screen.length;i+=2){float dx=screen[i]-x,dy=screen[i+1]-y,dist=dx*dx+dy*dy;if(dist<best){best=dist;at=i/2;}}
-        if(at<0)return;if(first<0||second>=0){first=at;second=-1;}else second=at;invalidate();
+        return at;
     }
+    private void selectMeasurement(float x,float y){int at=nearestVertex(x,y);if(at<0)return;if(first<0||second>=0){first=at;second=-1;}else second=at;postInvalidateOnAnimation();}
+    private void selectEditVertex(float x,float y){int at=nearestVertex(x,y);if(at<0)return;first=at;second=-1;postInvalidateOnAnimation();}
     @Override public boolean onTouchEvent(MotionEvent e){
         switch(e.getActionMasked()){
             case MotionEvent.ACTION_DOWN:lastX=e.getX();lastY=e.getY();moved=false;return true;
             case MotionEvent.ACTION_POINTER_DOWN:if(e.getPointerCount()>=2)pinchDistance=spacing(e);return true;
             case MotionEvent.ACTION_MOVE:
-                if(e.getPointerCount()>=2){float next=spacing(e);if(pinchDistance>4f)zoom=Math.max(.15f,Math.min(25f,zoom*next/pinchDistance));pinchDistance=next;moved=true;invalidate();}
-                else{float dx=e.getX()-lastX,dy=e.getY()-lastY;if(Math.abs(dx)+Math.abs(dy)>2f)moved=true;yaw+=dx*.008f;pitch=Math.max(-1.5f,Math.min(1.5f,pitch+dy*.008f));lastX=e.getX();lastY=e.getY();invalidate();}return true;
-            case MotionEvent.ACTION_UP:if(!moved)select(e.getX(),e.getY());performClick();return true;
+                if(e.getPointerCount()>=2){float next=spacing(e);if(pinchDistance>4f)zoom=Math.max(.15f,Math.min(25f,zoom*next/pinchDistance));pinchDistance=next;moved=true;postInvalidateOnAnimation();}
+                else{float dx=e.getX()-lastX,dy=e.getY()-lastY;if(Math.abs(dx)+Math.abs(dy)>2f)moved=true;yaw+=dx*.008f;pitch=Math.max(-1.5f,Math.min(1.5f,pitch+dy*.008f));lastX=e.getX();lastY=e.getY();postInvalidateOnAnimation();}return true;
+            case MotionEvent.ACTION_UP:
+                if(!moved){if(interactionMode==InteractionMode.MEASURE)selectMeasurement(e.getX(),e.getY());else if(interactionMode==InteractionMode.EDIT)selectEditVertex(e.getX(),e.getY());}
+                performClick();return true;
             case MotionEvent.ACTION_CANCEL:return true;
             default:return true;
         }
