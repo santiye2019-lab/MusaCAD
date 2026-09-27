@@ -85,6 +85,10 @@ jobs:
           grep -q 'musa_native_color_token' app/src/main/cpp/native_scene.c
           grep -q 'entity->method' app/src/main/cpp/native_scene.c
           grep -q 'value->method' app/src/main/cpp/native_scene.c
+      - name: Test navigation renderer color stability
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
+          java -cp /tmp/musacad-tests RenderPathPolicyTest
       - name: Test DXF text styles and font metadata
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextStyle.java tests/DxfTextStyleTest.java
