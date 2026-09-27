@@ -93,6 +93,10 @@ jobs:
           grep -q 'musa_native_color_token' app/src/main/cpp/native_scene.c
           grep -q 'entity->method' app/src/main/cpp/native_scene.c
           grep -q 'value->method' app/src/main/cpp/native_scene.c
+      - name: Guard native 3D polyline first paint
+        run: |
+          grep -q 'DWG_TYPE_POLYLINE_3D' app/src/main/cpp/native_scene.c
+          grep -q 'dwg_object_polyline_3d_get_points' app/src/main/cpp/native_scene.c
       - name: Test navigation renderer color stability
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java

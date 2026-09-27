@@ -399,6 +399,11 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             dwg_point_2d *pts=dwg_object_polyline_2d_get_points(obj,&error);if(error||!pts)break;
             if(begin_poly(s,color,(e->flag&1)!=0,(int)n)){for(BITCODE_RL i=0;i<n;i++){BITCODE_2DPOINT in={pts[i].x,pts[i].y},p;transform_OCS_2d(&p,in,e->extrusion);emit_poly_point(s,parent,p.x,p.y);}finish_poly(s);}free(pts);break;
         }
+        case DWG_TYPE_POLYLINE_3D:{
+            dwg_ent_polyline_3d *e=dwg_object_to_POLYLINE_3D(obj);if(!e)break;int error=0;BITCODE_BL n=dwg_object_polyline_3d_get_numpoints(obj,&error);if(error||n<2)break;
+            dwg_point_3d *pts=dwg_object_polyline_3d_get_points(obj,&error);if(error||!pts)break;
+            if(begin_poly(s,color,(e->flag&1)!=0,(int)n)){for(BITCODE_BL i=0;i<n;i++)emit_poly_point(s,parent,pts[i].x,pts[i].y);finish_poly(s);}free(pts);break;
+        }
         case DWG_TYPE_SPLINE:{
             Dwg_Entity_SPLINE *e=obj->tio.entity->tio.SPLINE;if(!e)break;
             if(e->num_fit_pts>=2&&e->fit_pts){int n=(int)e->num_fit_pts;if(begin_poly(s,color,e->closed_b,n)){for(int i=0;i<n;i++)emit_poly_point(s,parent,e->fit_pts[i].x,e->fit_pts[i].y);finish_poly(s);}}
