@@ -39,7 +39,7 @@ public final class DxfTextStyle {
             f=f.replace('_',' ').replace('-',' ').trim();
             return f.isEmpty()?"sans":f;
         }
-        public String androidFamilyHint(){return androidFamilyHint(familyHint(),usesShx());}
+        public String androidFamilyHint(){return DxfTextStyle.androidFamilyHint(familyHint(),usesShx());}
 
         public float textHeight(float entityHeight){return (float)(fixedHeight>0d?fixedHeight:Math.max(.01d,entityHeight));}
         public float width(float entityScale){return (float)(widthFactor*finitePositive(entityScale,1d));}
