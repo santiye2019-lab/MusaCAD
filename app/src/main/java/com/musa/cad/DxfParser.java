@@ -218,7 +218,7 @@ public final class DxfParser {
         private Typeface face(DxfMText.Run run){
             String f=run.font==null?"":run.font.trim();
             String family=f.isEmpty()?style.androidFamilyHint():DxfTextStyle.androidFamilyHint(f,run.usesShxFont());
-            int faceStyle=(run.bold?Typeface.BOLD:0)|(run.italic?Typeface.ITALIC:0);
+            int faceStyle=run.bold?(run.italic?Typeface.BOLD_ITALIC:Typeface.BOLD):(run.italic?Typeface.ITALIC:Typeface.NORMAL);
             return Typeface.create(family,faceStyle);
         }
         private Path shape(){
