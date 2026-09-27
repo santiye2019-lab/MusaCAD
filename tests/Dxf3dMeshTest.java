@@ -35,6 +35,7 @@ public final class Dxf3dMeshTest {
         testPolygonMesh();
         testInsertedBlockLine();
         testFlat2dPlanMetadata();
+        testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
     }
 
@@ -106,6 +107,36 @@ public final class Dxf3dMeshTest {
             if(!mesh.flatPlan)throw new AssertionError("flat 2D plan must be detected");
             if(mesh.minZ!=0f||mesh.maxZ!=0f)throw new AssertionError("flat 2D Z range");
             if(mesh.solidProxy)throw new AssertionError("ordinary 2D plan must not be marked as solid proxy");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testAcisSatSolidMesh() throws Exception {
+        File file=File.createTempFile("mesh3d-acis-", ".dxf");
+        try{
+            String[] records={
+                "-0 point $-1 0 0 0 #","-1 point $-1 10 0 0 #","-2 point $-1 0 10 0 #",
+                "-10 vertex $-1 $-1 $0 #","-11 vertex $-1 $-1 $1 #","-12 vertex $-1 $-1 $2 #",
+                "-20 straight-curve $-1 0 0 0 1 0 0 I I #","-21 straight-curve $-1 10 0 0 -1 1 0 I I #","-22 straight-curve $-1 0 10 0 0 -1 0 I I #",
+                "-30 edge $-1 $10 0 $11 10 $40 $20 forward 7 unknown #",
+                "-31 edge $-1 $11 0 $12 10 $41 $21 forward 7 unknown #",
+                "-32 edge $-1 $12 0 $10 10 $42 $22 forward 7 unknown #",
+                "-40 coedge $-1 $41 $42 $-1 $30 forward $50 $-1 #",
+                "-41 coedge $-1 $42 $40 $-1 $31 forward $50 $-1 #",
+                "-42 coedge $-1 $40 $41 $-1 $32 forward $50 $-1 #",
+                "-50 loop $-1 $-1 $40 $60 #",
+                "-70 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #",
+                "-60 face $-1 $-1 $50 $-1 $-1 $70 forward single #"
+            };
+            StringBuilder dxf=new StringBuilder("0\nSECTION\n2\nENTITIES\n0\n3DSOLID\n70\n1\n");
+            for(int i=0;i<records.length;i++)dxf.append(i==0?"1\n":"3\n").append(records[i]).append("\n");
+            dxf.append("0\nENDSEC\n0\nEOF\n");
+            Files.writeString(file.toPath(),dxf.toString(),StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.solidProxy)throw new AssertionError("valid ACIS SAT must not fall back to bounds proxy");
+            if(mesh.unsupportedSolids!=0)throw new AssertionError("planar ACIS solid must resolve completely");
+            if(mesh.triangles.length!=3||mesh.xyz.length!=9)
+                throw new AssertionError("ACIS triangle must become real tessellated geometry");
+            for(int line:mesh.sourceLines)if(line!=-1)throw new AssertionError("tessellated ACIS vertices are read-only");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
