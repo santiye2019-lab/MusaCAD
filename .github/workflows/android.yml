@@ -184,6 +184,18 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FontSystemModelTest.java
           java -cp /tmp/musacad-tests FontSystemModelTest
+      - name: Test raster image overlay geometry
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadImageOverlay.java tests/CadImageOverlayTest.java
+          java -cp /tmp/musacad-tests CadImageOverlayTest
+      - name: Test DXF image placement metadata
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadImageOverlay.java app/src/main/java/com/musa/cad/CadImageMetadata.java tests/CadImageMetadataTest.java
+          java -cp /tmp/musacad-tests CadImageMetadataTest
+      - name: Test complete image overlay model
+        run: |
+          javac -d /tmp/musacad-tests tests/ImageOverlayModelTest.java
+          java -cp /tmp/musacad-tests ImageOverlayModelTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
