@@ -97,6 +97,11 @@ jobs:
         run: |
           grep -q 'DWG_TYPE_POLYLINE_3D' app/src/main/cpp/native_scene.c
           grep -q 'dwg_object_polyline_3d_get_points' app/src/main/cpp/native_scene.c
+      - name: Guard native RAY and XLINE first paint
+        run: |
+          grep -q 'DWG_TYPE_RAY' app/src/main/cpp/native_scene.c
+          grep -q 'DWG_TYPE_XLINE' app/src/main/cpp/native_scene.c
+          grep -q 'emit_infinite_line' app/src/main/cpp/native_scene.c
       - name: Test navigation renderer color stability
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
