@@ -623,6 +623,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSelectedProperties(){
         if(!ensureSelectedForQuickTool("Özellik"))return;
+        if(cad.selectedIsImage()){
+            new AlertDialog.Builder(this).setTitle("Görüntü Özellikleri").setMessage(cad.selectedEntityInfo())
+                .setPositiveButton("TAMAM",null)
+                .setNeutralButton("90° DÖNDÜR",(d,w)->{if(cad.rotateSelectedEntity())result.setText("Görüntü • 90° döndürüldü");})
+                .show();
+            return;
+        }
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
         TextView info=new TextView(this);info.setText(cad.selectedEntityInfo());info.setTextIsSelectable(true);box.addView(info);
 
@@ -649,6 +656,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSelectedColor(){
         if(!ensureSelectedForQuickTool("Renk"))return;
+        if(cad.selectedIsImage()){result.setText("Görüntü • renk ayarı raster görsele uygulanmaz");return;}
         final String[] labels={"Kırmızı","Sarı","Yeşil","Camgöbeği","Mavi","Mor","Beyaz","Özel RGB…"};
         final int[] colors={Color.RED,Color.YELLOW,Color.GREEN,Color.CYAN,Color.BLUE,Color.MAGENTA,Color.WHITE};
         new AlertDialog.Builder(this).setTitle(String.format(Locale.US,"Renk • Mevcut #%06X",cad.selectedColor()&0xFFFFFF))
@@ -671,6 +679,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSelectedLineType(){
         if(!ensureSelectedForQuickTool("Çizgi Tipi"))return;
+        if(cad.selectedIsImage()){result.setText("Görüntü • çizgi tipi raster görsele uygulanmaz");return;}
         ArrayList<String> names=new ArrayList<>(activeDxf.lineTypeNames());if(names.isEmpty())names.add("CONTINUOUS");String current=cad.selectedLineType();boolean hasCurrent=false;for(String n:names)if(n.equalsIgnoreCase(current)){hasCurrent=true;break;}if(!hasCurrent&&current!=null&&!current.trim().isEmpty())names.add(0,current);
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int p=dp(16);box.setPadding(p,p/2,p,p/2);
         Spinner spinner=new Spinner(this);spinner.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));
@@ -1022,11 +1031,41 @@ public class MainActivity extends AppCompatActivity {
         String kind=request==PICK_AUDIO?"Ses":request==PICK_IMAGE?"Görüntü":"Video";
         String mime=request==PICK_AUDIO?"audio/*":request==PICK_IMAGE?"image/*":"video/*";
         try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
-        String name=nameOf(uri);if(name==null||name.trim().isEmpty())name=kind+" eki";
+        String found=nameOf(uri);final String name=found==null||found.trim().isEmpty()?kind+" eki":found;
+        if(request==PICK_IMAGE){
+            final ProjectSession target=currentProject;result.setText("Görüntü • hazırlanıyor…");
+            new Thread(()->{
+                Bitmap bitmap=null;
+                try{
+                    bitmap=decodeCadImage(uri);final Bitmap ready=bitmap;
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||currentProject!=target){if(!ready.isRecycled())ready.recycle();return;}
+                        if(!cad.addImageOverlay(ready,name,uri.toString())){if(!ready.isRecycled())ready.recycle();result.setText("Görüntü • çizime yerleştirilemedi");return;}
+                        target.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
+                        result.setText("Görüntü • "+name+" çizime yerleştirildi • Seç ile taşı / döndür / ölçekle / sil");
+                    });
+                }catch(Exception e){
+                    final String message=e.getMessage()==null?"Görüntü okunamadı":e.getMessage();
+                    if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();
+                    runOnUiThread(()->Toast.makeText(this,"Görüntü eklenemedi: "+message,Toast.LENGTH_LONG).show());
+                }
+            },"MusaCAD-image-import").start();
+            return;
+        }
         PointF center=cad.visibleCenterContent();
         cad.addTextEdit(center.x,center.y,kind+" • "+name);
         currentProject.mediaAttachments.add(new MediaAttachment(kind,name,mime,uri));
         result.setText(kind+" • "+name+" eklendi • görünüm merkezine bağlantı notu yerleştirildi");
+    }
+
+    private Bitmap decodeCadImage(Uri uri)throws IOException{
+        BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+        try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("Dosya açılamadı");BitmapFactory.decodeStream(in,null,bounds);}
+        if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("Geçerli JPG, PNG veya WebP görüntüsü değil");
+        int sample=1;long pixels=(long)bounds.outWidth*bounds.outHeight;
+        while(bounds.outWidth/sample>4096||bounds.outHeight/sample>4096||pixels/((long)sample*sample)>12_000_000L)sample*=2;
+        BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=sample;options.inPreferredConfig=Bitmap.Config.ARGB_8888;
+        try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("Dosya açılamadı");Bitmap bitmap=BitmapFactory.decodeStream(in,null,options);if(bitmap==null)throw new IOException("Görüntü çözümlenemedi");return bitmap;}
     }
 
     private void showMediaAttachments(){
@@ -1559,7 +1598,7 @@ public class MainActivity extends AppCompatActivity {
             .show();
     }
 
-    private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir kaynak nesne seçin",Toast.LENGTH_SHORT).show();}
+    private void noSourceSelection(){Toast.makeText(this,"Önce Seç ile düzenlenebilir bir nesne seçin",Toast.LENGTH_SHORT).show();}
 
     private void handleBackNavigation(){
         if(activeLoad!=null){cancelLoad();Toast.makeText(this,"Devam eden işlem iptal edildi",Toast.LENGTH_SHORT).show();return;}
@@ -2237,13 +2276,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final int rasterCount=cad.imageOverlayCount();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
-                    Toast.makeText(this,"DXF kaydedildi • "+total+" düzenleme",Toast.LENGTH_LONG).show();
+                    if(currentProject!=null){
+                        currentProject.viewState=cad.captureSessionState();
+                        if(rasterCount==0){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;clearRecovery(currentProject);}
+                        else currentProject.dirty=true;
+                    }
+                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" raster görüntü DXF içine gömülmedi; PDF/PNG görünümünde korunur",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null&&rasterCount==0)closeProjectNow(close);
+                    else if(close!=null)result.setText("Görüntü katmanı yalnız proje görünümünde • kapatmadan önce PDF/PNG dışa aktarın veya görüntüyü silin");});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
     }
 
     private void showShare(){
