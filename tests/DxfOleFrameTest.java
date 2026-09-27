@@ -12,6 +12,18 @@ public final class DxfOleFrameTest {
         require(Math.abs(r.x1-30.13602472538446)<1e-12,"x1");
         require(Math.abs(r.y2+22.39344715050545)<1e-12,"y2");
         require(!DxfOleFrame.parse(Arrays.asList("10","1","20","2"),0,4).valid(),"incomplete frame must be rejected");
-        System.out.println("DXF OLE2FRAME boundary cases passed");
+
+        DxfOleFrame.Result excel=DxfOleFrame.parse(Arrays.asList(
+            "10","0","20","0","11","100","21","40",
+            "3","Excel.Sheet.12",
+            "310","89504E470D0A1A0A0000000D49484452"
+        ),0,12);
+        require(excel.valid(),"embedded Excel OLE frame must be valid");
+        require("EXCEL".equals(excel.objectType),"Excel OLE type must be detected");
+        require(excel.hasPayload(),"OLE binary payload must be collected");
+        byte[] raster=DxfOleFrame.rasterPreview(excel.payload);
+        require(raster!=null&&raster.length>=8,"embedded PNG preview must be found");
+        require((raster[0]&255)==0x89&&raster[1]==0x50,"PNG signature must be preserved");
+        System.out.println("DXF OLE2FRAME boundary and preview cases passed");
     }
 }
