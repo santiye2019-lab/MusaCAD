@@ -1835,7 +1835,7 @@ public class MainActivity extends AppCompatActivity {
                         Bitmap oldPreview=project.bitmap;
                         project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
                         if(currentProject==project){
-                            editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
+                            editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);if(!project.persistedImages.isEmpty()){cad.restoreImageOverlaysDrawing(project.persistedImages);project.persistedImages.clear();}snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
                             if(pendingHomeCategory!=0)cad.post(this::showPendingHomeCategory);
                         }else{
@@ -2066,7 +2066,7 @@ public class MainActivity extends AppCompatActivity {
             else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
             else cad.restoreSessionState(null,project.bitmap,project.viewState);
         }else if(project.parsed!=null){if(project.nativeScene!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,null);else cad.setVectorDrawing(project.parsed);}else if(project.nativeScene!=null)cad.setNativeDrawing(project.nativeScene);else cad.setDrawing(project.bitmap);
-        if(project.viewState==null&&!project.persistedImages.isEmpty()){cad.restoreImageOverlays(project.persistedImages);project.persistedImages.clear();}
+        if(project.viewState==null&&project.parsed!=null&&!project.persistedImages.isEmpty()){cad.restoreImageOverlaysDrawing(project.persistedImages);project.persistedImages.clear();}
         hideWelcomePanel();markModeSelected(R.id.panButton);
         snapToggle.setEnabled(project.parsed!=null&&project.parsed.snapPoints.length>0);snapToggle.setChecked(true);if(project.parsed!=null)cad.setSnapPoints(project.parsed.snapPoints);
         updateShareEnabled(true);updateEditorEnabled(canEdit());updateLayerButtons(activeDxf!=null);renderCurrentProjectStatus();refreshProjectTabs();
@@ -2279,7 +2279,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
+        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlaysDrawing();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
                     CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
