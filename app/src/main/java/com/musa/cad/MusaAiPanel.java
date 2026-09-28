@@ -82,7 +82,7 @@ public final class MusaAiPanel {
         root.addView(messagesScroll,messagesLp);
 
         appendBubble(activity,messages,false,
-            "Merhaba. Ben MusaCAD AI. Bu panel üzerinden çizime soru sorma, doğal dille CAD komutu verme, metraj, proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabileceksiniz.");
+            "Merhaba. Ben MusaCAD AI. Bu panel üzerinden çizime soru sorma, doğal dille CAD komutu verme, metraj, mekanik tesisat proje kontrolü, genel proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabileceksiniz.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);
@@ -130,6 +130,7 @@ public final class MusaAiPanel {
             {"Çizime sor","Bu çizimde neler var?"},
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
+            {"Mekanik","AI_MEKANIK_KONTROL"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
