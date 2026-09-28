@@ -22,13 +22,3 @@ CREATE TABLE IF NOT EXISTS play_purchases (
 CREATE INDEX IF NOT EXISTS idx_play_purchases_device_id ON play_purchases(device_id);
 CREATE INDEX IF NOT EXISTS idx_play_purchases_order_id ON play_purchases(order_id);
 
-
-CREATE TABLE IF NOT EXISTS ai_entitlements (
-  device_id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL,
-  expires_at_ms INTEGER NOT NULL,
-  updated_at_ms INTEGER NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_ai_entitlements_expires_at ON ai_entitlements(expires_at_ms);
