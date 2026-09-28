@@ -97,6 +97,8 @@ public final class MusaAiCommandRouter {
         // Drawing: specific multi-segment phrases must be checked before generic "line".
         if(any(q,"polyline ciz","poliline ciz","coklu cizgi ciz"))
             return m("PLINE","Polyline çiz");
+        if(any(q,"sonsuz cizgi","xline ciz"))
+            return m("XLINE","XLine çiz");
         if(any(q,"cizgi ciz","line ciz","duz cizgi"))
             return m("LINE","Çizgi çiz");
         if(any(q,"daire ciz","cember ciz"))
@@ -107,8 +109,6 @@ public final class MusaAiCommandRouter {
             return m("ELLIPSE","Elips çiz");
         if(any(q,"nokta koy","nokta ciz","point ekle"))
             return m("POINT","Nokta ekle");
-        if(any(q,"sonsuz cizgi","xline ciz"))
-            return m("XLINE","XLine çiz");
         if(any(q,"dikdortgen ciz","rectangle ciz"))
             return m("RECTANG","Dikdörtgen çiz");
         if(any(q,"yazi ekle","metin ekle","text ekle"))
