@@ -1020,6 +1020,8 @@ public class MainActivity extends AppCompatActivity {
             }else reply.send(currentDisplayName+" açık. Çizim modeli hazırlanıyor.");
             return;
         }
+        if(tryGandalfCloud(raw,reply))return;
+
         if(q.contains("metraj")){
             reply.send("Metraj isteğini aldım. Metraj/sayım motoru MusaCAD AI'nın sonraki modüllerinden biri olarak bu panelde çalışacak.");
             return;
@@ -1031,6 +1033,51 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
+    }
+
+    private boolean tryGandalfCloud(String prompt,MusaAiPanel.Reply reply){
+        MusaAiAccessPolicy.Decision access=MusaAiCloudAccess.decision(this);
+        if(!access.cloud()||activeDxf==null)return false;
+
+        MusaAiProjectPacket packet=MusaAiProjectPacket.build(currentAiDrawingIndex(),currentDisplayName);
+        MusaAiGatewayClient.analyze(prompt,packet,new MusaAiGatewayClient.Callback(){
+            @Override public void onSuccess(MusaAiGatewayClient.Response response){
+                runOnUiThread(()->{
+                    StringBuilder answer=new StringBuilder();
+                    if(response.reply!=null&&!response.reply.trim().isEmpty())answer.append(response.reply.trim());
+                    if(!response.actions.isEmpty()){
+                        if(answer.length()>0)answer.append("\n\n");
+                        answer.append("Gandalf • ").append(response.actions.size()).append(" CAD işlem önerisi hazırladı.");
+                        offerGandalfActions(response.actions);
+                    }
+                    reply.send(answer.length()==0?"Gandalf yanıt oluşturamadı.":answer.toString());
+                });
+            }
+            @Override public void onError(String message){
+                runOnUiThread(()->reply.send(message+"\nYerel MusaCAD AI kullanılmaya devam ediyor."));
+            }
+        });
+        return true;
+    }
+
+    private void offerGandalfActions(java.util.List<MusaAiGatewayClient.SuggestedAction>actions){
+        if(actions==null||actions.isEmpty())return;
+        int count=Math.min(12,actions.size());
+        String[]labels=new String[count];
+        for(int i=0;i<count;i++){
+            MusaAiGatewayClient.SuggestedAction a=actions.get(i);
+            String desc=a.description==null?"":a.description.trim();
+            labels[i]=(i+1)+". "+(desc.isEmpty()?a.command:desc+" • "+a.command);
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Gandalf • CAD işlem önerileri")
+            .setMessage("Bir işlemi seçtiğinizde önce güvenlik denetiminden geçer. Çizimi değiştiren işlemler ayrıca UYGULA onayı ister.")
+            .setItems(labels,(d,which)->{
+                MusaAiGatewayClient.SuggestedAction a=actions.get(which);
+                runGandalfSuggestedCadCommand(a.command,a.description);
+            })
+            .setNegativeButton("KAPAT",null)
+            .show();
     }
 
     private MusaAiAutoReport.Result buildCurrentAiReport(){
