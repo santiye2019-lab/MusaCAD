@@ -1056,7 +1056,10 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             pendingAiActions=cloud.actions;
-            StringBuilder out=new StringBuilder(cloud.text);
+            StringBuilder out=new StringBuilder();
+            if(MusaAiSessionService.developerCached())
+                out.append("Gandalf Developer • Yönetici modu aktif\n\n");
+            out.append(cloud.text);
             if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
             if(!cloud.sources.isEmpty()){
                 out.append("\n\nKaynaklar:");
