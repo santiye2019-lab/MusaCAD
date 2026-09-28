@@ -23,7 +23,7 @@ import java.util.concurrent.*;
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36;
     private static final int MAX_OPEN_PROJECTS=4;
-    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1";
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
@@ -1227,7 +1227,8 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
-        if(prefs.getBoolean(K_CLOUD_CONSENT,false)){
+        String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:K_CLOUD_CONSENT;
+        if(prefs.getBoolean(consentKey,false)){
             runMusaAiCloud(raw,reply);
             return;
         }
@@ -1241,7 +1242,7 @@ public class MainActivity extends AppCompatActivity {
             .setTitle(packageMode?"Gandalf • Proje Paketi":"Gandalf Cloud AI")
             .setMessage(scope+" Ham DWG/DXF dosyaları gönderilmez. Katman adları, çizim metinleri, nesne türleri ve ölçü bilgileri bulut AI tarafından işlenebilir."+edit+" Devam edilsin mi?")
             .setPositiveButton("DEVAM",(d,w)->{
-                prefs.edit().putBoolean(K_CLOUD_CONSENT,true).apply();
+                prefs.edit().putBoolean(consentKey,true).apply();
                 runMusaAiCloud(raw,reply);
             })
             .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf Cloud AI isteği iptal edildi. Yerel MusaCAD AI çevrimdışı kullanılmaya devam edebilir."))
