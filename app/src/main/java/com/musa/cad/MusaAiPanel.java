@@ -135,6 +135,7 @@ public final class MusaAiPanel {
             {"Çizime sor","Bu çizimde neler var?"},
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
+            {"Keşif","Keşif yükle"},
             {"Mekanik","AI_MEKANIK_KONTROL"},
             {"MEKAI","MEKAI_FULL"},
             {"Gandalf","Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla"},

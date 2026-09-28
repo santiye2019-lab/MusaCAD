@@ -308,6 +308,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java tests/CadSpreadsheetLayoutTest.java
           java -cp /tmp/musacad-tests CadSpreadsheetLayoutTest
+      - name: Test AI BOQ import and comparison core
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java tests/MusaAiBoqTest.java
+          java -cp /tmp/musacad-tests MusaAiBoqTest
+      - name: Test AI BOQ integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiBoqContractTest.java
+          java -cp /tmp/musacad-tests MusaAiBoqContractTest
       - name: Test DXF TEXT alignment modes
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfTextAlign.java tests/DxfTextAlignTest.java
