@@ -101,6 +101,18 @@ public final class MusaAiPanel {
         input.setImeOptions(EditorInfo.IME_ACTION_SEND);
         composer.addView(input,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
+        Button voice=new Button(activity);
+        voice.setText("Ses");
+        voice.setAllCaps(false);
+        voice.setTextColor(0xFFEAFBFF);
+        voice.setTextSize(11f);
+        voice.setMinHeight(dp(activity,48));
+        voice.setPadding(dp(activity,6),0,dp(activity,6),0);
+        voice.setBackground(round(activity,0xFF12384C,12,0xFF246C88));
+        LinearLayout.LayoutParams voiceLp=new LinearLayout.LayoutParams(dp(activity,64),ViewGroup.LayoutParams.WRAP_CONTENT);
+        voiceLp.setMarginStart(dp(activity,8));
+        composer.addView(voice,voiceLp);
+
         Button send=new Button(activity);
         send.setText("Gönder");
         send.setAllCaps(false);
@@ -147,6 +159,29 @@ public final class MusaAiPanel {
                 scrollBottom(messagesScroll);
             }));
         };
+        MusaAiVoiceInput.Callback voiceCallback=new MusaAiVoiceInput.Callback(){
+            @Override public void onText(String text){
+                activity.runOnUiThread(()->{
+                    input.setText(text);
+                    input.setSelection(input.length());
+                    appendBubble(activity,messages,false,"Ses algılandı • "+text);
+                    scrollBottom(messagesScroll);
+                    submit.run();
+                });
+            }
+            @Override public void onStatus(String text){
+                activity.runOnUiThread(()->{
+                    appendBubble(activity,messages,false,text);
+                    scrollBottom(messagesScroll);
+                });
+            }
+        };
+        voice.setOnClickListener(v->{
+            appendBubble(activity,messages,false,
+                "Sesli giriş • Android konuşma tanıma hizmeti açılıyor. MusaCAD ses kaydı saklamaz.");
+            scrollBottom(messagesScroll);
+            MusaAiVoiceInput.launch(activity,voiceCallback);
+        });
         send.setOnClickListener(v->submit.run());
         input.setOnEditorActionListener((v,actionId,event)->{
             if(actionId==EditorInfo.IME_ACTION_SEND){submit.run();return true;}
@@ -165,6 +200,7 @@ public final class MusaAiPanel {
             }
             if(sheet.getWindow()!=null)sheet.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         });
+        sheet.setOnDismissListener(d->MusaAiVoiceInput.clear(voiceCallback));
         sheet.show();
     }
 

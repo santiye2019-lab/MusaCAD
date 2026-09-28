@@ -2180,6 +2180,7 @@ public class MainActivity extends AppCompatActivity {
     }
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
+        if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
         if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
         if(c!=RESULT_OK||data==null)return;
