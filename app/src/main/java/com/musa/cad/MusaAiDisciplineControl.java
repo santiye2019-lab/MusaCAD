@@ -164,6 +164,11 @@ public final class MusaAiDisciplineControl {
             "\n\nDoğal dil de kullanılabilir: “Statik projeyi kontrol et”, “Tüm disiplinleri kontrol et” gibi.";
     }
 
+    public static Set<Discipline> requestedDisciplines(String raw){
+        EnumSet<Discipline>value=selected(MusaAiDrawingIndex.normalize(raw));
+        return value==null?Collections.emptySet():Collections.unmodifiableSet(EnumSet.copyOf(value));
+    }
+
     /** Exposed for BOQ/report grouping without duplicating discipline keywords elsewhere. */
     public static Set<Discipline> classifyText(String raw){
         return Collections.unmodifiableSet(classify(MusaAiDrawingIndex.normalize(raw)));
