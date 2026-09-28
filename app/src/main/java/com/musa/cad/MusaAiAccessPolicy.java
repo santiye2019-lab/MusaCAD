@@ -21,14 +21,14 @@ public final class MusaAiAccessPolicy {
     }
 
     public static Decision decide(boolean gatewayConfigured,
-                                  boolean chatGptIdentityLinked,
+                                  boolean accountLinked,
                                   boolean cloudEntitlementVerified,
                                   boolean sessionValid){
         if(!gatewayConfigured){
             return local("Yerel • Kısıtlı","Çevrimiçi Gandalf ağ geçidi yapılandırılmamış.");
         }
-        if(!chatGptIdentityLinked){
-            return local("Yerel • Kısıtlı","ChatGPT hesabı bağlı değil.");
+        if(!accountLinked){
+            return local("Yerel • Kısıtlı","Doğrulanmış Gandalf hesabı/oturumu bağlı değil.");
         }
         if(!cloudEntitlementVerified){
             return local("Yerel • Kısıtlı","Çevrimiçi AI yetkisi doğrulanmadı.");
