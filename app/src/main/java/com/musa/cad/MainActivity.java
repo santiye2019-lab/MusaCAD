@@ -746,6 +746,7 @@ public class MainActivity extends AppCompatActivity {
         hideToolPanel();
         MusaAiPanel.show(this,new MusaAiPanel.Host(){
             @Override public String contextLabel(){return musaAiContextLabel();}
+            @Override public String statusLabel(){return MusaAiCloudAccess.decision(MainActivity.this).badge;}
             @Override public void onPrompt(String prompt,MusaAiPanel.Reply reply){handleMusaAiPrompt(prompt,reply);}
         });
     }
