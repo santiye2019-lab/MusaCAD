@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
 
     private View buildUi(){
         ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(20),dp(18),dp(28));
@@ -61,20 +62,16 @@ public class MainActivity extends AppCompatActivity {
         keyStatus=text("",12,Color.rgb(175,205,215),false);
         keyStatus.setTextIsSelectable(true);keyStatus.setPadding(0,0,0,dp(7));root.addView(keyStatus,matchWrap());
 
-        LinearLayout keyRow1=new LinearLayout(this);keyRow1.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout keyRow1=new LinearLayout(this);
         Button createKey=button("YENİ ANAHTAR");createKey.setOnClickListener(v->confirmNewKey());
         Button backupKey=button("YEDEKLE");backupKey.setOnClickListener(v->backupExistingKey());
-        keyRow1.addView(createKey,new LinearLayout.LayoutParams(0,dp(48),1f));
-        keyRow1.addView(space(8),new LinearLayout.LayoutParams(dp(8),1));
-        keyRow1.addView(backupKey,new LinearLayout.LayoutParams(0,dp(48),1f));
+        addResponsivePair(keyRow1,createKey,backupKey);
         root.addView(keyRow1,matchWrap());
 
-        LinearLayout keyRow2=new LinearLayout(this);keyRow2.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout keyRow2=new LinearLayout(this);
         Button restoreKey=button("YEDEKTEN DÖN");restoreKey.setOnClickListener(v->openBackupForRestore());
         Button publicKey=button("PUBLIC KEY");publicKey.setOnClickListener(v->sharePublicKey());
-        keyRow2.addView(restoreKey,new LinearLayout.LayoutParams(0,dp(48),1f));
-        keyRow2.addView(space(8),new LinearLayout.LayoutParams(dp(8),1));
-        keyRow2.addView(publicKey,new LinearLayout.LayoutParams(0,dp(48),1f));
+        addResponsivePair(keyRow2,restoreKey,publicKey);
         LinearLayout.LayoutParams kr2=matchWrap();kr2.topMargin=dp(7);root.addView(keyRow2,kr2);
 
         TextView keyNote=text("Yeni anahtar oluştururken önce parola korumalı .mlk yedeği kaydedilir; dosya başarıyla yazılmadan anahtar etkinleşmez. Public key, MusaCAD release içindeki MUSACAD-LICENSE-PUBLIC.pem ile aynı olmalıdır.",11,Color.rgb(133,156,169),false);
@@ -120,10 +117,10 @@ public class MainActivity extends AppCompatActivity {
         tokenView.setPadding(dp(12),dp(18),dp(12),dp(18));tokenView.setBackground(round(Color.rgb(15,28,35),10));
         root.addView(tokenView,matchWrap());
 
-        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout actions=new LinearLayout(this);
         Button copy=button("KOPYALA");copy.setOnClickListener(v->copyToken());
         Button share=button("PAYLAŞ");share.setOnClickListener(v->shareToken());
-        actions.addView(copy,new LinearLayout.LayoutParams(0,dp(50),1f));actions.addView(space(8),new LinearLayout.LayoutParams(dp(8),1));actions.addView(share,new LinearLayout.LayoutParams(0,dp(50),1f));
+        addResponsivePair(actions,copy,share);
         LinearLayout.LayoutParams ap=matchWrap();ap.topMargin=dp(8);root.addView(actions,ap);
 
         section(root,"Son işlemler");
@@ -346,6 +343,19 @@ public class MainActivity extends AppCompatActivity {
         float capped=Math.min(Math.max(fontScale,0.85f),1.15f);
         float px=sp*getResources().getDisplayMetrics().density*capped;
         view.setTextSize(TypedValue.COMPLEX_UNIT_PX,px);
+    }
+    private void addResponsivePair(LinearLayout row,Button first,Button second){
+        boolean compact=getResources().getConfiguration().screenWidthDp<360;
+        row.setOrientation(compact?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+        if(compact){
+            row.addView(first,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+            Space gap=space(7);row.addView(gap,new LinearLayout.LayoutParams(1,dp(7)));
+            row.addView(second,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        }else{
+            row.addView(first,rowButtonParams());
+            row.addView(space(8),new LinearLayout.LayoutParams(dp(8),1));
+            row.addView(second,rowButtonParams());
+        }
     }
     private Space space(int dp){return new Space(this);}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
