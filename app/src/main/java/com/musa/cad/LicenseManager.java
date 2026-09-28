@@ -149,7 +149,7 @@ public final class LicenseManager {
         if(code==null||code.trim().isEmpty())return ActivationResult.INVALID_CODE;
         try{
             long now=System.currentTimeMillis();
-            if(ShortLicenseCode.verify(code,serialId(c),now)){
+            if(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE&&ShortLicenseCode.verify(code,serialId(c),now)){
                 prefs(c).edit().putString(K_LICENSE_TOKEN,ShortLicenseCode.normalizeCode(code)).putBoolean(K_EVER_PAID_LICENSE,true).commit();
                 return ActivationResult.ACTIVATED;
             }
@@ -168,7 +168,7 @@ public final class LicenseManager {
 
     private static boolean verifyStoredPaidToken(Context c,String token){
         long now=System.currentTimeMillis();
-        if(ShortLicenseCode.verify(token,serialId(c),now))return true;
+        if(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE&&ShortLicenseCode.verify(token,serialId(c),now))return true;
         if(BuildConfig.DEBUG&&DebugLicenseToken.verify(token,installationId(c),now))return true;
         LicenseToken.Result r=verifyPaidToken(c,token,now);
         if(r!=null&&r.valid)return true;
