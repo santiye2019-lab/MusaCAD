@@ -13,7 +13,7 @@ public final class MusaAiAutoReportContractTest {
         require(main,"shareAiReport","report TXT sharing");
         require(main,"setAiHighlightedSources(report.sourceIds)","report finding highlights");
         require(panel,"{\"Rapor\",\"Proje raporu oluştur\"}","AI report quick action");
-        require(engine,"MusaAiQuantityTakeoff.answer","takeoff section");
+        require(engine,"MusaAiQuantityTakeoff.answer","takeoff section");\n        require(engine,"MusaAiMechanical.reportSection","mechanical-installation section");
         require(engine,"MusaAiProjectControl.analyze","CAD quality section");
         require(engine,"MusaAiRevisionCompare.compare","revision section");
         require(engine,"MusaAiTableOleAnalysis.answer","embedded document section");
