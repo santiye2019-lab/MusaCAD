@@ -9,6 +9,22 @@ def managerProductionRelease = ((project.findProperty('musacadManagerProductionR
     ?: System.getenv('MUSACAD_MANAGER_PRODUCTION_RELEASE')
     ?: 'false').toString()).equalsIgnoreCase('true')
 
+def expectedPaidPublicKeyFile = rootProject.file('app/src/main/assets/MUSACAD-LICENSE-PUBLIC.pem')
+def expectedPaidKeyFingerprint = ''
+if(expectedPaidPublicKeyFile.isFile()){
+    def pem = expectedPaidPublicKeyFile.text
+        .replace('-----BEGIN PUBLIC KEY-----','')
+        .replace('-----END PUBLIC KEY-----','')
+        .replaceAll('\\s','')
+    if(pem){
+        def der = java.util.Base64.decoder.decode(pem)
+        def digest = java.security.MessageDigest.getInstance('SHA-256').digest(der)
+        def parts=[]
+        for(int i=0;i<12;i++) parts << String.format('%02X',digest[i] & 0xff)
+        expectedPaidKeyFingerprint = parts[0..3].join('')+'-'+parts[4..7].join('')+'-'+parts[8..11].join('')
+    }
+}
+
 tasks.register('verifyManagerProductionReleaseConfig') {
     group='verification'
     doLast {
@@ -54,6 +70,7 @@ android {
         targetSdkVersion 35
         versionCode 2
         versionName '1.1'
+        buildConfigField "String", "EXPECTED_LICENSE_KEY_FINGERPRINT", groovy.json.JsonOutput.toJson(expectedPaidKeyFingerprint)
     }
 
     buildTypes {
