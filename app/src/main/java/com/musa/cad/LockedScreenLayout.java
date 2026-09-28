@@ -17,5 +17,11 @@ public final class LockedScreenLayout {
         return new Size(Math.min(rootW,width),Math.min(rootH,height));
     }
 
+    /** Converts a reference-art pixel measurement to the fitted stage size. */
+    public static int scalePx(int stagePixels,float artPixels,float referencePixels){
+        if(stagePixels<=0||!Float.isFinite(artPixels)||artPixels<=0f||!Float.isFinite(referencePixels)||referencePixels<=0f)return 1;
+        return Math.max(1,Math.round(stagePixels*referencePixels/artPixels));
+    }
+
     private LockedScreenLayout(){}
 }
