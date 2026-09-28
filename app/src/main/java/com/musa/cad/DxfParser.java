@@ -185,9 +185,11 @@ public final class DxfParser {
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
                 CadEdit measure=layer.sourceEditWorld;
+                boolean topologyKnown=measure!=null&&measure.type==CadEdit.Type.POLYLINE;
                 items.add(new MusaAiDrawingIndex.Item(
                     layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity),
-                    aiLength(measure),aiArea(measure)));
+                    aiLength(measure),aiArea(measure),topologyKnown,topologyKnown&&measure.closed,
+                    aiGeometryKey(measure,layer.sourceType)));
             }
             return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items,drawingUnitName);
         }
@@ -220,6 +222,34 @@ public final class DxfParser {
         return "";
     }
 
+
+    private static String aiGeometryKey(CadEdit e,String sourceType){
+        if(e==null||e.xy==null||e.xy.length<2)return "";
+        String type=sourceType==null||sourceType.trim().isEmpty()?e.type.name():sourceType.trim().toUpperCase(Locale.ROOT);
+        StringBuilder b=new StringBuilder(type).append('|');
+        float[]p=e.xy;
+        if(e.type==CadEdit.Type.LINE&&p.length>=4){
+            long x1=aiQuant(p[0]),y1=aiQuant(p[1]),x2=aiQuant(p[2]),y2=aiQuant(p[3]);
+            boolean swap=x1>x2||(x1==x2&&y1>y2);
+            if(swap){long tx=x1,ty=y1;x1=x2;y1=y2;x2=tx;y2=ty;}
+            b.append(x1).append(',').append(y1).append(';').append(x2).append(',').append(y2);
+        }else{
+            for(int i=0;i+1<p.length;i+=2){
+                if(i>0)b.append(';');
+                b.append(aiQuant(p[i])).append(',').append(aiQuant(p[i+1]));
+            }
+        }
+        b.append("|c=").append(e.closed?'1':'0');
+        if(e.type==CadEdit.Type.TEXT||e.type==CadEdit.Type.INSERT){
+            b.append("|t=").append(MusaAiDrawingIndex.normalize(e.text));
+            b.append("|r=").append(aiQuant(e.rotationDegrees));
+        }
+        return b.toString();
+    }
+    private static long aiQuant(double value){
+        if(!Double.isFinite(value))return 0L;
+        return Math.round(value*100000d);
+    }
 
     private static double aiLength(CadEdit e){
         if(e==null||e.xy==null)return Double.NaN;
