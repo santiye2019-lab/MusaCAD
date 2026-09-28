@@ -751,6 +751,31 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void runGandalfSuggestedCadCommand(String command,String description){
+        MusaAiToolActionPolicy.Decision action=MusaAiToolActionPolicy.evaluate(command);
+        if(!action.allowed){
+            result.setText("Gandalf • Komut engellendi: "+action.reason);
+            return;
+        }
+        Runnable execute=()->{
+            commandInput.setText(action.command);
+            executeCommand();
+        };
+        if(!action.requiresConfirmation){
+            execute.run();
+            return;
+        }
+        String detail=(description==null||description.trim().isEmpty()?"Çizimde değişiklik önerildi.":description.trim())+
+            "\n\nCAD komutu: "+action.command+
+            "\n\nBu işlem çizimi veya dosya durumunu değiştirebilir. Yalnızca onayınızla uygulanır.";
+        new AlertDialog.Builder(this)
+            .setTitle("Gandalf • İşlem onayı")
+            .setMessage(detail)
+            .setPositiveButton("UYGULA",(d,w)->execute.run())
+            .setNegativeButton("İPTAL",(d,w)->result.setText("Gandalf • Önerilen işlem uygulanmadı"))
+            .show();
+    }
+
     private String musaAiContextLabel(){
         if(currentProject==null)return "Bağlam • Henüz proje açık değil";
         if(activeDxf!=null){
