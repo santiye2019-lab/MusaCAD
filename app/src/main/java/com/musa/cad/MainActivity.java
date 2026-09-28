@@ -810,6 +810,15 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(MusaAiCloudPolicy.shouldUseCloud(raw)){
+            if(currentProject==null){
+                reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
+                return;
+            }
+            handleMusaAiCloudPrompt(raw,reply);
+            return;
+        }
+
         MusaAiCommandRouter.Match command=MusaAiCommandRouter.route(raw);
         if(command.matched){
             if(currentProject==null){
@@ -826,11 +835,6 @@ public class MainActivity extends AppCompatActivity {
 
         if(currentProject==null){
             reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
-            return;
-        }
-
-        if(MusaAiCloudPolicy.shouldUseCloud(raw)){
-            handleMusaAiCloudPrompt(raw,reply);
             return;
         }
 
