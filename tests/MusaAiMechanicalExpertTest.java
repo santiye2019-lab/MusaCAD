@@ -33,6 +33,8 @@ public final class MusaAiMechanicalExpertTest {
     }
 
     public static void main(String[]args){
+        if(!MusaAiMechanicalExpert.isHelpCommand("MEKAI_HELP"))throw new AssertionError("MEKAI help");
+        has(MusaAiMechanicalExpert.commandHelp(),"GMEKAI_*");
         if(MusaAiMechanicalExpert.detect("MEKAI_FIRE")!=MusaAiMechanicalExpert.Profile.FIRE)
             throw new AssertionError("MEKAI_FIRE profile");
         if(MusaAiMechanicalExpert.detect("GMEKAI_VRF projeyi incele")!=MusaAiMechanicalExpert.Profile.COOLING)
