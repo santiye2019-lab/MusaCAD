@@ -761,6 +761,21 @@ public class MainActivity extends AppCompatActivity {
             reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
             return;
         }
+
+        MusaAiCommandRouter.Match command=MusaAiCommandRouter.route(raw);
+        if(command.matched){
+            if(currentProject==null){
+                reply.send("“"+command.description+"” komutunu çalıştırmak için önce bir DWG veya DXF projesi açın.");
+                return;
+            }
+            commandInput.setText(command.command);
+            executeCommand();
+            CharSequence cadStatus=result==null?null:result.getText();
+            String status=cadStatus==null?"":cadStatus.toString().trim();
+            reply.send("Komut çalıştırıldı • "+command.description+(status.isEmpty()?"":"\n"+status));
+            return;
+        }
+
         if(currentProject==null){
             reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
             return;
