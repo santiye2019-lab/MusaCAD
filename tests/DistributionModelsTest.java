@@ -23,12 +23,12 @@ public final class DistributionModelsTest {
 
         require(screen,"BuildConfig.PLAY_DISTRIBUTION","runtime distribution UI gate");
         require(screen,"DOĞRUDAN APK / KURUMSAL","direct distribution UI");
-        require(screen,"Serial + 12 haneli lisans kodu","direct activation guidance");
+        require(screen,"Güvenli Lisans Kimliği + MC1 lisansı","direct activation guidance");
 
         require(play,"com.android.billingclient.api.BillingClient","real Play Billing implementation");
         if(direct.contains("com.android.billingclient"))
             throw new AssertionError("Direct APK flavor must not compile or package Google Play Billing client classes");
-        require(direct,"Serial + 12 haneli lisans kodunu kullanın","direct no-Play guidance");
+        require(direct,"Güvenli Lisans Kimliği için üretilmiş MC1 lisansını kullanın","direct no-Play guidance");
 
         if(Files.exists(Path.of("app/src/main/java/com/musa/cad/PlayBillingManager.java")))
             throw new AssertionError("PlayBillingManager must be distribution-specific, not shared from main");
