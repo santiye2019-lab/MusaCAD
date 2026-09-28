@@ -98,6 +98,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCadJson.java tests/MusaAiCadJsonTest.java
           java -cp /tmp/musacad-tests MusaAiCadJsonTest
+      - name: Test MusaCAD bounded multi-drawing CAD package JSON
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiCadJson.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java app/src/main/java/com/musa/cad/MusaAiCadPackageJson.java tests/MusaAiCadPackageJsonTest.java
+          java -cp /tmp/musacad-tests MusaAiCadPackageJsonTest
       - name: Test MusaCAD explicit cloud-AI routing policy
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiDisciplineExpert.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
@@ -106,6 +110,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCloudIntegrationContractTest.java
           java -cp /tmp/musacad-tests MusaAiCloudIntegrationContractTest
+      - name: Test MusaCAD Gandalf project-package integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiCloudPackageContractTest.java
+          java -cp /tmp/musacad-tests MusaAiCloudPackageContractTest
       - name: Test MusaCAD AI smart selection
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiSmartSelection.java tests/MusaAiSmartSelectionTest.java
