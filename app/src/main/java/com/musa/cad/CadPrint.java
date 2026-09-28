@@ -11,6 +11,7 @@ import android.view.*;
 import android.widget.*;
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * Advanced one-page CAD printing.
@@ -71,16 +72,25 @@ final class CadPrint {
         final RectF display=validBounds(displayBounds)?new RectF(displayBounds):extents==null?null:new RectF(extents);
         final RectF window=validBounds(windowBounds)?new RectF(windowBounds):null;
         final boolean physicalScale=drawing!=null&&drawing.hasPhysicalUnits();
-        final boolean[] handedOff={false};
+        final boolean[] handedOff={false},closed={false};
         final Bitmap[] previewBitmap={null};
+        final Handler mainHandler=new Handler(Looper.getMainLooper());
+        final ExecutorService previewExecutor=Executors.newSingleThreadExecutor(r->{
+            Thread t=new Thread(r,"MusaCAD-print-preview");
+            t.setDaemon(true);
+            t.setPriority(Math.max(Thread.MIN_PRIORITY,Thread.NORM_PRIORITY-1));
+            return t;
+        });
+        final int[] previewGeneration={0};
+        final Runnable[] pendingPreview={null};
 
         int pad=Math.round(14*activity.getResources().getDisplayMetrics().density);
         LinearLayout box=new LinearLayout(activity);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(pad,pad/2,pad,pad/2);
-        ScrollView scroll=new ScrollView(activity);scroll.setFillViewport(true);scroll.addView(box,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        ScrollView scroll=new ScrollView(activity);scroll.setFillViewport(false);scroll.addView(box,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView targetInfo=new TextView(activity);
-        targetInfo.setText("Hedef • Sonraki Android ekranından fiziksel yazıcı veya “PDF olarak kaydet” seçilir.");
-        targetInfo.setTextSize(11);targetInfo.setPadding(0,0,0,pad/2);box.addView(targetInfo);
+        targetInfo.setText("Hedef: FİZİKSEL YAZICI veya PDF\nYAZDIR'a basınca Android yazdırma ekranından fiziksel/ağ yazıcısı veya “PDF olarak kaydet” seçebilirsiniz.");
+        targetInfo.setTextColor(Color.WHITE);targetInfo.setTextSize(11);targetInfo.setPadding(0,0,0,pad/2);box.addView(targetInfo);
 
         Spinner area=spinner(activity,box,"Yazdırma alanı",new String[]{"Extents • Tüm çizim","Display • Ekrandaki görünüm","Window • Seçili alan"});
         if(preferWindow&&window!=null)area.setSelection(2);
@@ -98,10 +108,16 @@ final class CadPrint {
         TextView info=new TextView(activity);info.setTextSize(11);info.setPadding(0,pad/2,0,pad/2);box.addView(info);
 
         ImageView preview=new ImageView(activity);preview.setAdjustViewBounds(true);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);preview.setBackgroundColor(Color.rgb(48,52,55));
-        box.addView(preview,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(activity,300)));
+        int screenHeight=activity.getResources().getDisplayMetrics().heightPixels;
+        int previewHeight=Math.max(dp(activity,140),Math.min(dp(activity,240),screenHeight/4));
+        box.addView(preview,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,previewHeight));
 
         final Runnable[] refresh={null};
         refresh[0]=()->{
+            if(closed[0])return;
+            if(pendingPreview[0]!=null){mainHandler.removeCallbacks(pendingPreview[0]);pendingPreview[0]=null;}
+            final int generation=++previewGeneration[0];
+
             boolean custom=physicalScale&&scale.getSelectedItemPosition()==SCALE_VALUES.length-1;
             customScale.setVisibility(custom?View.VISIBLE:View.GONE);
             int denominator=readDenominator(scale,customScale,physicalScale);
@@ -113,7 +129,7 @@ final class CadPrint {
             String scaleText=denominator>0?"1:"+denominator:"Sayfaya sığdır";
             String unit=drawing!=null&&drawing.hasPhysicalUnits()?drawing.drawingUnitName():"birimsiz / raster";
             if(mode==AreaMode.WINDOW&&source==null){
-                info.setText("Window • Önce “YAZDIR / PDF” düğmesine basıp çizim üzerinde alan seçin. • Ölçek: "+scaleText);
+                info.setText("Window • Önce YAZDIR düğmesine basıp çizim üzerinde alan seçin. • Ölçek: "+scaleText);
                 replacePreview(preview,previewBitmap,placeholderPreview(activity,media,"WINDOW","Çizim üzerinde alan seçin"));
                 return;
             }
@@ -122,16 +138,33 @@ final class CadPrint {
                 replacePreview(preview,previewBitmap,placeholderPreview(activity,media,"ÖZEL ÖLÇEK","Geçerli ölçek girin"));
                 return;
             }
-            Spec spec=new Spec(mode,source,denominator,mono,media);
+
+            final Spec spec=new Spec(mode,source,denominator,mono,media);
             info.setText(areaLabel(mode)+" • "+PAPER_LABELS[Math.max(0,Math.min(PAPER_LABELS.length-1,paper.getSelectedItemPosition()))]+" • "+
-                (orientation.getSelectedItemPosition()==0?"Yatay":"Dikey")+" • "+scaleText+" • Birim: "+unit);
-            try{
-                Bitmap next=renderPreview(activity,drawing,editCopy,replacementCopy,hiddenCopy,blockCopy,imageCopy,bitmap,spec,520,720);
-                replacePreview(preview,previewBitmap,next);
-            }catch(Exception e){
-                replacePreview(preview,previewBitmap,placeholderPreview(activity,media,"ÖNİZLEME","Hazırlanamadı"));
-                info.setText("Print Preview hazırlanamadı: "+safeMessage(e));
-            }
+                (orientation.getSelectedItemPosition()==0?"Yatay":"Dikey")+" • "+scaleText+" • Birim: "+unit+" • Önizleme hazırlanıyor…");
+            replacePreview(preview,previewBitmap,placeholderPreview(activity,media,"ÖNİZLEME","Hazırlanıyor…"));
+
+            Runnable kickoff=()->previewExecutor.submit(()->{
+                if(closed[0]||generation!=previewGeneration[0])return;
+                Bitmap rendered=null;String problem=null;
+                try{rendered=renderPreview(activity,drawing,editCopy,replacementCopy,hiddenCopy,blockCopy,imageCopy,bitmap,spec,420,560);}
+                catch(Exception e){problem=safeMessage(e);}
+                final Bitmap page=rendered;final String error=problem;
+                mainHandler.post(()->{
+                    if(closed[0]||generation!=previewGeneration[0]){
+                        if(page!=null&&!page.isRecycled())page.recycle();
+                        return;
+                    }
+                    if(page!=null)replacePreview(preview,previewBitmap,page);
+                    else replacePreview(preview,previewBitmap,placeholderPreview(activity,spec.media,"ÖNİZLEME","Hazırlanamadı"));
+                    if(error!=null)info.setText("Print Preview hazırlanamadı: "+error);
+                    else info.setText(areaLabel(spec.areaMode)+" • "+
+                        PAPER_LABELS[Math.max(0,Math.min(PAPER_LABELS.length-1,paper.getSelectedItemPosition()))]+" • "+
+                        (orientation.getSelectedItemPosition()==0?"Yatay":"Dikey")+" • "+scaleText+" • Birim: "+unit);
+                });
+            });
+            pendingPreview[0]=kickoff;
+            mainHandler.postDelayed(kickoff,100L);
         };
 
         AdapterView.OnItemSelectedListener changed=new AdapterView.OnItemSelectedListener(){
@@ -146,15 +179,18 @@ final class CadPrint {
         });
 
         AlertDialog dialog=new AlertDialog.Builder(activity)
-            .setTitle("Gelişmiş Yazdırma / PDF")
+            .setTitle("Gelişmiş Yazdırma")
             .setView(scroll)
-            .setPositiveButton("YAZDIR / PDF",null)
-            .setNeutralButton("PRINT PREVIEW",null)
+            .setPositiveButton("YAZDIR",null)
+            .setNeutralButton("ÖNİZLEME",null)
             .setNegativeButton("İPTAL",null)
             .create();
 
         dialog.setOnShowListener(d->{
+            fitDialogToPhone(activity,dialog);
+            styleDialogButtons(activity,dialog);
             refresh[0].run();
+
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
                 AreaMode mode=areaMode(area.getSelectedItemPosition());
                 if(mode==AreaMode.WINDOW&&window==null){
@@ -178,34 +214,79 @@ final class CadPrint {
                 manager.print("MusaCAD - "+base,new Adapter(activity,drawing,editCopy,replacementCopy,hiddenCopy,blockCopy,imageCopy,bitmap,base,spec),attributes);
                 dialog.dismiss();
             });
+
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{
                 AreaMode mode=areaMode(area.getSelectedItemPosition());RectF source=sourceFor(mode,extents,display,window);
-                if(mode==AreaMode.WINDOW&&source==null){Toast.makeText(activity,"Print Preview için önce Window alanını seçin",Toast.LENGTH_SHORT).show();return;}
+                if(mode==AreaMode.WINDOW&&source==null){Toast.makeText(activity,"Önizleme için önce Window alanını seçin",Toast.LENGTH_SHORT).show();return;}
                 int denominator=readDenominator(scale,customScale,physicalScale);boolean custom=physicalScale&&scale.getSelectedItemPosition()==SCALE_VALUES.length-1;
                 if(custom&&denominator<=0){customScale.setError("Pozitif bir ölçek paydası girin");return;}
                 Spec spec=new Spec(mode,source,denominator,color.getSelectedItemPosition()==1,mediaFor(paper.getSelectedItemPosition(),orientation.getSelectedItemPosition()));
-                showLargePreview(activity,drawing,editCopy,replacementCopy,hiddenCopy,blockCopy,imageCopy,bitmap,spec);
+                if(pendingPreview[0]!=null){mainHandler.removeCallbacks(pendingPreview[0]);pendingPreview[0]=null;}
+                final int generation=++previewGeneration[0];
+                Button previewButton=dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+                previewButton.setEnabled(false);previewButton.setText("HAZIRLANIYOR…");
+                previewExecutor.submit(()->{
+                    Bitmap page=null;String problem=null;
+                    try{page=renderPreview(activity,drawing,editCopy,replacementCopy,hiddenCopy,blockCopy,imageCopy,bitmap,spec,900,1200);}
+                    catch(Exception e){problem=safeMessage(e);}
+                    final Bitmap rendered=page;final String error=problem;
+                    mainHandler.post(()->{
+                        if(closed[0]||generation!=previewGeneration[0]){
+                            if(rendered!=null&&!rendered.isRecycled())rendered.recycle();
+                            return;
+                        }
+                        previewButton.setEnabled(true);previewButton.setText("ÖNİZLEME");
+                        if(rendered!=null)showLargePreview(activity,rendered,spec);
+                        else Toast.makeText(activity,"Print Preview hazırlanamadı: "+(error==null?"Bilinmeyen hata":error),Toast.LENGTH_LONG).show();
+                    });
+                });
             });
         });
 
         dialog.setOnDismissListener(d->{
+            closed[0]=true;++previewGeneration[0];
+            if(pendingPreview[0]!=null)mainHandler.removeCallbacks(pendingPreview[0]);
             preview.setImageDrawable(null);
             if(previewBitmap[0]!=null&&!previewBitmap[0].isRecycled())previewBitmap[0].recycle();
             previewBitmap[0]=null;
-            if(!handedOff[0]&&bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();
+            if(!handedOff[0]&&bitmap!=null&&!bitmap.isRecycled()){
+                try{previewExecutor.submit(()->{if(!bitmap.isRecycled())bitmap.recycle();});}catch(RejectedExecutionException ignored){}
+            }
+            previewExecutor.shutdown();
         });
         dialog.show();
     }
 
-    private static void showLargePreview(Activity activity,DxfParser.Result drawing,List<CadEdit> additions,List<SourceReplacement> replacements,
-                                         Set<Integer> hidden,Map<String,CadBlock.Definition> blocks,List<CadImageOverlay> images,Bitmap bitmap,Spec spec){
-        try{
-            Bitmap page=renderPreview(activity,drawing,additions,replacements,hidden,blocks,images,bitmap,spec,900,1200);
-            ImageView image=new ImageView(activity);image.setImageBitmap(page);image.setAdjustViewBounds(true);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setBackgroundColor(Color.rgb(45,48,50));
-            ScrollView scroll=new ScrollView(activity);scroll.addView(image,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-            AlertDialog dialog=new AlertDialog.Builder(activity).setTitle("Print Preview • "+areaLabel(spec.areaMode)).setView(scroll).setPositiveButton("KAPAT",null).create();
-            dialog.setOnDismissListener(d->{image.setImageDrawable(null);if(!page.isRecycled())page.recycle();});dialog.show();
-        }catch(Exception e){Toast.makeText(activity,"Print Preview hazırlanamadı: "+safeMessage(e),Toast.LENGTH_LONG).show();}
+    private static void showLargePreview(Activity activity,Bitmap page,Spec spec){
+        if(page==null||page.isRecycled())return;
+        ImageView image=new ImageView(activity);image.setImageBitmap(page);image.setAdjustViewBounds(true);image.setScaleType(ImageView.ScaleType.FIT_CENTER);image.setBackgroundColor(Color.rgb(45,48,50));
+        ScrollView scroll=new ScrollView(activity);scroll.addView(image,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle("Print Preview • "+areaLabel(spec.areaMode)).setView(scroll).setPositiveButton("KAPAT",null).create();
+        dialog.setOnShowListener(d->{fitDialogToPhone(activity,dialog);styleDialogButtons(activity,dialog);});
+        dialog.setOnDismissListener(d->{image.setImageDrawable(null);if(!page.isRecycled())page.recycle();});dialog.show();
+    }
+
+    private static void styleDialogButtons(Activity activity,AlertDialog dialog){
+        if(dialog==null)return;
+        int[] ids={AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEUTRAL,AlertDialog.BUTTON_NEGATIVE};
+        for(int id:ids){
+            Button button=dialog.getButton(id);
+            if(button==null)continue;
+            button.setTextColor(Color.WHITE);
+            button.setTextSize(12f);
+            button.setMinHeight(dp(activity,48));
+            button.setSingleLine(false);
+            button.setMaxLines(2);
+            button.setEllipsize(null);
+        }
+    }
+
+    private static void fitDialogToPhone(Activity activity,AlertDialog dialog){
+        Window window=dialog==null?null:dialog.getWindow();if(window==null)return;
+        android.util.DisplayMetrics dm=activity.getResources().getDisplayMetrics();
+        int width=Math.max(dp(activity,280),dm.widthPixels-dp(activity,16));
+        int height=Math.max(dp(activity,360),Math.min(dm.heightPixels-dp(activity,24),Math.round(dm.heightPixels*.92f)));
+        window.setLayout(width,height);
     }
 
     private static PrintAttributes attributesFor(Spec spec){
