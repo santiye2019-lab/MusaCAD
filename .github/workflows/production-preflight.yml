@@ -1,0 +1,189 @@
+name: Production release preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      distribution:
+        description: "Release distribution model"
+        required: true
+        default: direct
+        type: choice
+        options:
+          - direct
+          - play
+      check_license_manager:
+        description: "Validate License Manager release signing too"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    env:
+      MUSACAD_PRODUCTION_RELEASE: "true"
+      MUSACAD_KEYSTORE_FILE: /tmp/musacad-release.jks
+      MUSACAD_RELEASE_KEYSTORE_B64: ${{ secrets.MUSACAD_RELEASE_KEYSTORE_B64 }}
+      MUSACAD_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_KEYSTORE_PASSWORD }}
+      MUSACAD_KEY_ALIAS: ${{ secrets.MUSACAD_KEY_ALIAS }}
+      MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+      MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_PLAY_VERIFY_URL: ${{ secrets.MUSACAD_PLAY_VERIFY_URL }}
+      MUSACAD_PLAY_YEARLY_PRODUCT_ID: ${{ vars.MUSACAD_PLAY_YEARLY_PRODUCT_ID }}
+      MUSACAD_MANAGER_PRODUCTION_RELEASE: "true"
+      MUSACAD_MANAGER_KEYSTORE_FILE: /tmp/musacad-manager-release.jks
+      MUSACAD_MANAGER_KEYSTORE_B64: ${{ secrets.MUSACAD_MANAGER_KEYSTORE_B64 }}
+      MUSACAD_MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_MANAGER_KEYSTORE_PASSWORD }}
+      MUSACAD_MANAGER_KEY_ALIAS: ${{ secrets.MUSACAD_MANAGER_KEY_ALIAS }}
+      MUSACAD_MANAGER_KEY_PASSWORD: ${{ secrets.MUSACAD_MANAGER_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate production secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          need() {
+            local name="$1" value="$2"
+            if [ -z "$value" ]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              missing=1
+            fi
+          }
+
+          need MUSACAD_RELEASE_KEYSTORE_B64 "$MUSACAD_RELEASE_KEYSTORE_B64"
+          need MUSACAD_KEYSTORE_PASSWORD "$MUSACAD_KEYSTORE_PASSWORD"
+          need MUSACAD_KEY_ALIAS "$MUSACAD_KEY_ALIAS"
+          need MUSACAD_KEY_PASSWORD "$MUSACAD_KEY_PASSWORD"
+          need MUSACAD_TRIAL_API_URL "$MUSACAD_TRIAL_API_URL"
+          need MUSACAD_TRIAL_PUBLIC_KEY_PEM "$MUSACAD_TRIAL_PUBLIC_KEY_PEM"
+
+          if [ "${{ inputs.distribution }}" = "play" ]; then
+            need MUSACAD_PLAY_VERIFY_URL "$MUSACAD_PLAY_VERIFY_URL"
+          fi
+
+          if [ "${{ inputs.check_license_manager }}" = "true" ]; then
+            need MUSACAD_MANAGER_KEYSTORE_B64 "$MUSACAD_MANAGER_KEYSTORE_B64"
+            need MUSACAD_MANAGER_KEYSTORE_PASSWORD "$MUSACAD_MANAGER_KEYSTORE_PASSWORD"
+            need MUSACAD_MANAGER_KEY_ALIAS "$MUSACAD_MANAGER_KEY_ALIAS"
+            need MUSACAD_MANAGER_KEY_PASSWORD "$MUSACAD_MANAGER_KEY_PASSWORD"
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Production preflight stopped before any build. Add the missing repository secrets and run again."
+            exit 1
+          fi
+
+      - name: Prepare signing material
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MUSACAD_RELEASE_KEYSTORE_B64" | base64 -d > "$MUSACAD_KEYSTORE_FILE"
+          chmod 600 "$MUSACAD_KEYSTORE_FILE"
+
+          if [ "${{ inputs.check_license_manager }}" = "true" ]; then
+            printf '%s' "$MUSACAD_MANAGER_KEYSTORE_B64" | base64 -d > "$MUSACAD_MANAGER_KEYSTORE_FILE"
+            chmod 600 "$MUSACAD_MANAGER_KEYSTORE_FILE"
+          fi
+
+          python3 - <<'PY'
+          import os
+          pem=os.environ["MUSACAD_TRIAL_PUBLIC_KEY_PEM"].replace("\\n","\n").strip()+"\n"
+          with open("/tmp/musacad-trial-public.pem","w",encoding="utf-8") as f:
+              f.write(pem)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as f:
+              f.write("MUSACAD_TRIAL_PUBLIC_KEY_PEM<<__MUSACAD_TRIAL_PEM__\n")
+              f.write(pem)
+              f.write("__MUSACAD_TRIAL_PEM__\n")
+          PY
+
+      - name: Validate signing material
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -list             -keystore "$MUSACAD_KEYSTORE_FILE"             -storepass "$MUSACAD_KEYSTORE_PASSWORD"             -alias "$MUSACAD_KEY_ALIAS" >/dev/null
+
+          openssl pkey -pubin -in /tmp/musacad-trial-public.pem -noout >/dev/null
+
+          if [ "${{ inputs.check_license_manager }}" = "true" ]; then
+            keytool -list               -keystore "$MUSACAD_MANAGER_KEYSTORE_FILE"               -storepass "$MUSACAD_MANAGER_KEYSTORE_PASSWORD"               -alias "$MUSACAD_MANAGER_KEY_ALIAS" >/dev/null
+          fi
+
+      - name: Probe production trial backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MUSACAD_TRIAL_API_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_TRIAL_API_URL must be HTTPS"; exit 1 ;;
+          esac
+
+          status=$(curl --silent --show-error --max-time 20             --output /tmp/musacad-trial-probe.json             --write-out '%{http_code}'             --request POST             --header 'content-type: application/json'             --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","versionName":"preflight","versionCode":1}'             "$MUSACAD_TRIAL_API_URL")
+
+          if [ "$status" != "403" ] && [ "$status" != "400" ]; then
+            echo "::error::Trial backend probe returned HTTP $status; expected a controlled client rejection (400/403)."
+            cat /tmp/musacad-trial-probe.json || true
+            exit 1
+          fi
+
+      - name: Probe production Play backend
+        if: inputs.distribution == 'play'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MUSACAD_PLAY_VERIFY_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_PLAY_VERIFY_URL must be HTTPS"; exit 1 ;;
+          esac
+
+          status=$(curl --silent --show-error --max-time 20             --output /tmp/musacad-play-probe.json             --write-out '%{http_code}'             --request POST             --header 'content-type: application/json'             --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","productId":"'${MUSACAD_PLAY_YEARLY_PRODUCT_ID:-musacad_yearly_renewal}'","purchaseToken":"invalid-preflight-token","purpose":"annual_renewal","versionName":"preflight","versionCode":1}'             "$MUSACAD_PLAY_VERIFY_URL")
+
+          if [ "$status" != "403" ] && [ "$status" != "400" ] && [ "$status" != "503" ]; then
+            echo "::error::Play backend probe returned HTTP $status; expected controlled rejection/unavailable (400/403/503)."
+            cat /tmp/musacad-play-probe.json || true
+            exit 1
+          fi
+
+      - name: Run Gradle production config gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          if [ "${{ inputs.distribution }}" = "play" ]; then
+            ./gradlew --no-daemon verifyPlayProductionReleaseConfig
+          else
+            ./gradlew --no-daemon verifyDirectProductionReleaseConfig
+          fi
+          if [ "${{ inputs.check_license_manager }}" = "true" ]; then
+            ./gradlew --no-daemon :licensemanager:verifyManagerProductionReleaseConfig
+          fi
+
+      - name: Preflight summary
+        shell: bash
+        run: |
+          {
+            echo "## MusaCAD production preflight"
+            echo "- Distribution: ${{ inputs.distribution }}"
+            echo "- Main signing keystore: validated"
+            echo "- Trial public key: parsed"
+            echo "- Trial backend: reachable with controlled rejection"
+            if [ "${{ inputs.distribution }}" = "play" ]; then
+              echo "- Play backend: endpoint probe completed"
+            fi
+            if [ "${{ inputs.check_license_manager }}" = "true" ]; then
+              echo "- License Manager signing keystore: validated"
+            fi
+            echo "- Production Gradle configuration gate: passed"
+            echo "- APK/AAB build: NOT started by this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"

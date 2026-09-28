@@ -272,6 +272,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-production-security tests/ProductionReleaseSecurityTest.java
           java -cp /tmp/musacad-production-security ProductionReleaseSecurityTest
+      - name: Test production preflight tooling contract
+        run: |
+          javac -d /tmp/musacad-production-preflight tests/ProductionPreflightContractTest.java
+          java -cp /tmp/musacad-production-preflight ProductionPreflightContractTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
       - name: Compile offline license generator
@@ -417,7 +421,7 @@ jobs:
           if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md PRODUCTION_SETUP.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:
