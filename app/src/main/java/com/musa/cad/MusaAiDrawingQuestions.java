@@ -34,7 +34,10 @@ public final class MusaAiDrawingQuestions {
 
         String type=askedType(q);
         if(type!=null&&asksCount(q)){
-            int n="TEXT_ANY".equals(type)?index.textEntityCount():index.countType(type);
+            int n;
+            if("TEXT_ANY".equals(type))n=index.textEntityCount();
+            else if("POLYLINE_ANY".equals(type))n=index.countType("LWPOLYLINE")+index.countType("POLYLINE");
+            else n=index.countType(type);
             return Answer.of(typeLabel(type)+" adedi: "+n+" • aktif layout: "+index.layout);
         }
 
@@ -83,7 +86,7 @@ public final class MusaAiDrawingQuestions {
 
     private static String askedType(String q){
         if(containsAny(q,"yazi","metin","text","mtext"))return "TEXT_ANY";
-        if(containsAny(q,"polyline","poliline","coklu cizgi"))return "LWPOLYLINE";
+        if(containsAny(q,"polyline","poliline","coklu cizgi"))return "POLYLINE_ANY";
         if(containsAny(q,"daire","cember","circle"))return "CIRCLE";
         if(containsAny(q,"yay","arc"))return "ARC";
         if(containsAny(q,"elips","ellipse"))return "ELLIPSE";
@@ -100,7 +103,7 @@ public final class MusaAiDrawingQuestions {
         switch(type){
             case "TEXT_ANY":return "Metin";
             case "LINE":return "Çizgi";
-            case "LWPOLYLINE":return "Polyline";
+            case "POLYLINE_ANY":return "Polyline";
             case "CIRCLE":return "Daire";
             case "ARC":return "Yay";
             case "ELLIPSE":return "Elips";
