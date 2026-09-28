@@ -94,11 +94,11 @@ public final class MusaAiCommandRouter {
         if(any(q,"oklu aciklama","multileader","leader ekle"))
             return m("MLEADER","Multileader ekle");
 
-        // Drawing
-        if(any(q,"cizgi ciz","line ciz","duz cizgi"))
-            return m("LINE","Çizgi çiz");
+        // Drawing: specific multi-segment phrases must be checked before generic "line".
         if(any(q,"polyline ciz","poliline ciz","coklu cizgi ciz"))
             return m("PLINE","Polyline çiz");
+        if(any(q,"cizgi ciz","line ciz","duz cizgi"))
+            return m("LINE","Çizgi çiz");
         if(any(q,"daire ciz","cember ciz"))
             return m("CIRCLE","Daire çiz");
         if(any(q,"yay ciz","arc ciz"))
