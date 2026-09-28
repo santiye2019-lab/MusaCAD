@@ -49,6 +49,7 @@ async function handleAnalyze(request, env) {
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
+    "For cad_change_layer, cad_add_line and cad_add_text, use an exact existing layer name visible in the supplied CAD-JSON; never invent a new layer name. " +
     "Never state that a proposed edit has already been applied. " +
     "Prefer sourceId-based edits for existing entities. Use web search only when it materially helps the user's request, and identify external sources in the answer.";
 
