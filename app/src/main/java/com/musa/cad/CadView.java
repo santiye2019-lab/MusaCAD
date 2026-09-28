@@ -499,6 +499,56 @@ public class CadView extends View {
         return addImportedEdit(content.withLayerOverride(layer));
     }
 
+    public boolean applyAiAddPolyline(double[] xy,boolean closed,String layer){
+        if(vectorDrawing==null||xy==null||xy.length<4||xy.length%2!=0||!aiLayerExists(layer)||!finite(xy))return false;
+        float[] points=new float[xy.length];for(int i=0;i<xy.length;i++)points[i]=(float)xy[i];
+        CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.polyline(points,closed));
+        if(content==null)return false;
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
+    public boolean applyAiOffsetSource(int sourceId,double distance,String layer){
+        if(!Double.isFinite(distance)||Math.abs(distance)<1e-9d||!selectAiSource(sourceId))return false;
+        CadEdit offset=sourceEdits.offsetSelected((float)distance);if(offset==null)return false;
+        String target=layer==null?"":layer.trim();
+        if(!target.isEmpty()){if(!aiLayerExists(target))return false;offset=offset.withLayerOverride(target);}
+        addRegularEdit(offset);lastActionRegular=true;notifyValue();invalidate();return true;
+    }
+
+    public boolean applyAiTrimExtendSource(int sourceId,int boundarySourceId,boolean trim,boolean keepStart){
+        if(sourceId==boundarySourceId||!selectAiSource(sourceId))return false;
+        CadEdit target=sourceEdits.currentSelected();
+        DxfParser.SourceEntity boundary=vectorDrawing==null?null:vectorDrawing.sourceById(boundarySourceId);
+        if(target==null||boundary==null||!vectorDrawing.isSourceVisible(boundarySourceId)||
+            target.type!=CadEdit.Type.LINE||target.xy.length<4)return false;
+        CadEdit edge=sourceEdits.currentFor(boundary.sourceId);if(edge==null)edge=boundary.prototype();
+        if(edge==null||edge.type!=CadEdit.Type.LINE||edge.xy.length<4)return false;
+        float[] hit=lineIntersection(target.xy[0],target.xy[1],target.xy[2],target.xy[3],edge.xy[0],edge.xy[1],edge.xy[2],edge.xy[3]);
+        if(hit==null)return false;
+        float ix=hit[0],iy=hit[1],t=hit[2],u=hit[3];
+        CadEdit result;
+        if(trim){
+            if(t<=1e-4f||t>=.9999f||u<-.0001f||u>1.0001f)return false;
+            result=keepStart?CadEdit.line(target.xy[0],target.xy[1],ix,iy):CadEdit.line(ix,iy,target.xy[2],target.xy[3]);
+        }else{
+            if(u<-.0001f||u>1.0001f)return false;
+            if(t<0f)result=CadEdit.line(ix,iy,target.xy[2],target.xy[3]);
+            else if(t>1f)result=CadEdit.line(target.xy[0],target.xy[1],ix,iy);
+            else return false;
+        }
+        if(!sourceEdits.replaceSelected(result))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiInsertBlock(String blockName,double x,double y,double blockScale,double rotation,String layer){
+        String name=CadBlock.normalizeName(blockName);
+        if(vectorDrawing==null||name.isEmpty()||!hasBlockDefinition(name)||!aiLayerExists(layer)||
+            !finite(x,y,blockScale,rotation)||blockScale<=0d)return false;
+        CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.insert(name,(float)x,(float)y,(float)blockScale,(float)rotation));
+        if(content==null)return false;
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
     private static boolean finite(double...values){
         if(values==null)return false;
         for(double value:values)if(!Double.isFinite(value)||Math.abs(value)>1e12d)return false;
