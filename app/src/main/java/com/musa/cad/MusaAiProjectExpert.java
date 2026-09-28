@@ -159,9 +159,11 @@ public final class MusaAiProjectExpert {
         for(MusaAiDrawingIndex.Item item:index.items()){
             if(item==null)continue;
             String h=MusaAiDrawingIndex.normalize(item.layer+" "+item.text);
-            boolean architectural=has(h,"mimari","architect","duvar","wall","kapi","door","pencere","window","mahal","room",
+            boolean structuralContext=has(h,"statik","struct","kolon","column","kiris","beam","perde","shear wall","temel","foundation","rebar","donati");
+            boolean architectural=has(h,"mimari","architect","kapi","door","pencere","window","mahal","room",
                 "merdiven","stair","rampa","ramp","saft","shaft","wc","banyo","bath","mutfak","kitchen","asma tavan","ceiling",
-                "doseme","floor finish","mobilya","furniture");
+                "floor finish","mobilya","furniture")||
+                (has(h,"duvar","wall")&&!structuralContext);
             if(!architectural)continue;
             s.items++;append(s.corpus,h);
             if(has(h,"duvar","wall"))s.walls++;
@@ -196,7 +198,7 @@ public final class MusaAiProjectExpert {
             if(has(h,"doseme","slab"))s.slabs++;
             if(has(h,"temel","foundation","radye","raft"))s.foundations++;
             if(has(h,"aks","axis","grid"))s.axes++;
-            if(has(h,"donati","rebar","etriye","stirrup","ø","phi"))s.rebar++;
+            if(has(h,"donati","rebar","etriye","stirrup","phi")||rebarMarker(item.text))s.rebar++;
             if(sizeMarker(item.text)||sizeMarker(item.layer))s.sizeLabels++;
             if(has(h,"kot","level","elevation","+0.00","0.00"))s.levels++;
             if(reviewMarker(item.text)){s.review++;add(s.issueIds,item);}
@@ -258,7 +260,8 @@ public final class MusaAiProjectExpert {
             String h=MusaAiDrawingIndex.normalize(item.layer+" "+item.text);
             boolean st=has(h,"statik","struct","kolon","column","kiris","beam","perde","shear wall","doseme","slab","temel","foundation");
             boolean me=has(h,"pis su","atik su","temiz su","yangin","sprinkler","havalandirma","duct","vrf","dogalgaz","heating","pompa","mekanik");
-            boolean ar=has(h,"mimari","architect","duvar","wall","kapi","door","mahal","room","saft","shaft");
+            boolean ar=has(h,"mimari","architect","kapi","door","mahal","room","saft","shaft")||
+                (has(h,"duvar","wall")&&!st);
             c.structural|=st;c.mechanical|=me;c.openingOrShaft|=has(h,"saft","shaft","rezervasyon","opening","delik","bosluk","boşluk");
             if(item.geometryKey.isEmpty())continue;
             if(st)structByGeometry.putIfAbsent(item.geometryKey,item);
@@ -306,6 +309,14 @@ public final class MusaAiProjectExpert {
     private static boolean reviewMarker(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         return has(q,"todo","tbd","fixme","eksik","revize","revizyon","duzelt","kontrol et");
+    }
+
+    private static boolean rebarMarker(String raw){
+        if(raw==null||raw.trim().isEmpty())return false;
+        String u=raw.toUpperCase(Locale.ROOT).replace('Φ','Ø');
+        return u.matches(".*Ø\\s*\\d+.*")||
+            u.matches(".*\\b\\d+\\s*Ø\\s*\\d+.*")||
+            u.matches(".*\\bQ\\s*\\d+.*");
     }
 
     private static boolean sizeMarker(String raw){
