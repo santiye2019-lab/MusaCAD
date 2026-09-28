@@ -181,7 +181,13 @@ public final class MusaAiDisciplineControl {
         if(has(q,"mimari","architectural","architecture"))return EnumSet.of(Discipline.ARCHITECTURE);
         if(has(q,"statik","tasiyici","structural","betonarme","celik proje"))return EnumSet.of(Discipline.STRUCTURAL);
         if(has(q,"elektrik","electrical","kuvvetli akim","zayif akim"))return EnumSet.of(Discipline.ELECTRICAL);
-        if(has(q,"yangin","fire","can guvenligi"))return EnumSet.of(Discipline.FIRE);
+        if(has(q,"yangin","fire","can guvenligi")){
+            boolean broad=q.equals("ai yangin kontrol")||q.contains("yangin projes")||q.contains("yangin disipl")||
+                q.contains("can guvenligi")||q.contains("fire discipline");
+            boolean mechanical=has(q,"mekanik","sprinkler","hidrant","yangin tesisati","sulu sondurme");
+            if(broad||!mechanical)return EnumSet.of(Discipline.FIRE);
+            return null;
+        }
         if(has(q,"altyapi","infrastructure","saha altyapi"))return EnumSet.of(Discipline.INFRASTRUCTURE);
         if(has(q,"peyzaj","landscape"))return EnumSet.of(Discipline.LANDSCAPE);
         if(has(q,"asansor","elevator","lift"))return EnumSet.of(Discipline.ELEVATOR);
@@ -216,9 +222,11 @@ public final class MusaAiDisciplineControl {
         if(has(hay,"peyzaj","landscape","agac","tree","bitki","plant","cim","grass","sulama","irrigation",
             "sert zemin","hardscape","bordur","curb","bank","oturma"))
             out.add(Discipline.LANDSCAPE);
-        if(has(hay,"asansor","elevator","lift","kuyu","shaft","kabin","car","pit","makine dairesi",
-            "machine room","asansor kapisi","lift door","durak","kat kapisi"))
-            out.add(Discipline.ELEVATOR);
+        boolean elevatorNamed=has(hay,"asansor","elevator","lift");
+        boolean elevatorCluster=(has(hay,"kabin","car")&&has(hay,"kuyu","shaft"))||
+            (has(hay,"pit","kuyu dibi")&&has(hay,"kat kapisi","lift door","elevator door"))||
+            (has(hay,"durak","kat kapisi")&&has(hay,"kuyu","shaft"));
+        if(elevatorNamed||elevatorCluster)out.add(Discipline.ELEVATOR);
         return out;
     }
 
