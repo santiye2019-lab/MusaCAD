@@ -22,9 +22,11 @@ public final class MusaAiGatewayClient {
 
     public static final class SuggestedAction {
         public final String command,description;
-        SuggestedAction(String command,String description){
+        public final List<Integer> sourceIds;
+        SuggestedAction(String command,String description,Collection<Integer>sourceIds){
             this.command=command==null?"":command.trim();
             this.description=description==null?"":description.trim();
+            this.sourceIds=Collections.unmodifiableList(new ArrayList<>(sourceIds==null?Collections.emptyList():sourceIds));
         }
     }
 
@@ -84,7 +86,12 @@ public final class MusaAiGatewayClient {
                         JSONObject a=arr.optJSONObject(i);if(a==null)continue;
                         String command=a.optString("command","").trim();
                         String description=a.optString("description","").trim();
-                        if(!command.isEmpty())actions.add(new SuggestedAction(command,description));
+                        ArrayList<Integer>sourceIds=new ArrayList<>();
+                        JSONArray ids=a.optJSONArray("source_ids");
+                        if(ids!=null)for(int j=0;j<ids.length()&&j<8;j++){
+                            int id=ids.optInt(j,-1);if(id>=0)sourceIds.add(id);
+                        }
+                        if(!command.isEmpty())actions.add(new SuggestedAction(command,description,sourceIds));
                     }
                 }
                 if(reply.trim().isEmpty()&&actions.isEmpty())throw new IOException("Gandalf yanıtı boş.");
