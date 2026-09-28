@@ -267,7 +267,7 @@ public class LicenseActivity extends AppCompatActivity {
         final String secureLicenseId=LicenseManager.installationId(this);
         msg.append("\n\nSerial: ").append(LicenseManager.serialId(this));
         msg.append("\nGüvenli Lisans Kimliği: ").append(secureLicenseId);
-        msg.append("\nOffline / kurumsal aktivasyon: 12 haneli kısa kod geriye dönük uyumluluk içindir. Ticari kullanımda güvenli Lisans Kimliği için RSA imzalı MC1 lisansı tercih edilir.");
+        msg.append("\nOffline / kurumsal aktivasyon: RSA imzalı MC1 lisansı internet veya Google Play gerektirmeden etkinleştirilebilir. 12 haneli kısa kod geriye dönük uyumluluk içindir.");
         String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
         if(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE&&stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
             long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
