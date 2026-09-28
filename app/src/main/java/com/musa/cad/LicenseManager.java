@@ -110,6 +110,20 @@ public final class LicenseManager {
         return hours>0?String.format(Locale.getDefault(),"Deneme: %d sa %d dk kaldı",hours,mins):String.format(Locale.getDefault(),"Deneme: %d dk kaldı",mins);
     }
 
+    /**
+     * Signed entitlement proof for short-lived cloud AI session exchange.
+     * Never returns Google Play purchase tokens or private material.
+     * Production accepts MC1 paid tokens and server-issued MT1 trial tokens.
+     */
+    public static String cloudEntitlementProof(Context c){
+        SharedPreferences p=prefs(c);
+        String paid=p.getString(K_LICENSE_TOKEN,null);
+        if(paid!=null&&paid.trim().startsWith(LicenseToken.PREFIX+"."))return paid.trim();
+        String trial=p.getString(K_TRIAL_TOKEN,null);
+        if(trial!=null&&trial.trim().startsWith(TrialToken.PREFIX+"."))return trial.trim();
+        return "";
+    }
+
     /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
