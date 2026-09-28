@@ -832,6 +832,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(activeDxf!=null){
+            MusaAiTableOleAnalysis.Answer tableOle=MusaAiTableOleAnalysis.answer(currentAiDrawingIndex(),raw);
+            if(tableOle.matched){
+                int shown=tableOle.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(tableOle.sourceIds);
+                if(tableOle.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• İlgili çizim metni vurgulandı: "+shown+
+                    (tableOle.sourceIds.size()>shown?" / "+tableOle.sourceIds.size():""):"";
+                reply.send(tableOle.text+highlight);
+                return;
+            }
+        }
+
+        if(activeDxf!=null){
             MusaAiQuantityTakeoff.Answer takeoff=MusaAiQuantityTakeoff.answer(currentAiDrawingIndex(),raw);
             if(takeoff.matched){
                 reply.send(takeoff.text);

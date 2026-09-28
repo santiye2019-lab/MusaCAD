@@ -55,11 +55,12 @@ public final class DxfParser {
     }
 
     private static final class OleFrameEntity implements Entity{
-        final float left,bottom,right,top;final String objectType;final Bitmap preview;
+        final float left,bottom,right,top;final String objectType;final Bitmap preview;final DxfOleTextExtractor.Result oleText;
         OleFrameEntity(DxfOleFrame.Result ole){
             left=(float)Math.min(ole.x1,ole.x2);right=(float)Math.max(ole.x1,ole.x2);bottom=(float)Math.min(ole.y1,ole.y2);top=(float)Math.max(ole.y1,ole.y2);
             objectType=ole.objectType==null?"OLE":ole.objectType;
             preview=decodeEmbeddedRaster(DxfOleFrame.rasterPreview(ole.payload));
+            oleText=DxfOleTextExtractor.extract(ole.payload,objectType);
         }
         public void bounds(RectF b){add(b,left,bottom);add(b,right,top);}
         public void draw(Canvas c,Paint p,Matrix m){
@@ -181,6 +182,7 @@ public final class DxfParser {
         public Set<String> lineTypeNames(){return Collections.unmodifiableSet(new TreeSet<>(lineTypes.keySet()));}
         public MusaAiDrawingIndex aiDrawingIndex(){
             ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>();
+            ArrayList<MusaAiDrawingIndex.OleItem> oles=new ArrayList<>();
             for(Entity wrapped:document){
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
@@ -190,8 +192,16 @@ public final class DxfParser {
                     layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity),
                     aiLength(measure),aiArea(measure),topologyKnown,topologyKnown&&measure.closed,
                     aiGeometryKey(measure,layer.sourceType)));
+                Entity raw=layer.entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
+                if(raw instanceof OleFrameEntity){
+                    OleFrameEntity ole=(OleFrameEntity)raw;
+                    oles.add(new MusaAiDrawingIndex.OleItem(
+                        ole.objectType,ole.preview!=null&&!ole.preview.isRecycled(),
+                        ole.oleText.structured,ole.oleText.mode,ole.oleText.text,
+                        ole.oleText.sheetCount,ole.oleText.cellCount));
+                }
             }
-            return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items,drawingUnitName);
+            return new MusaAiDrawingIndex(activeLayout,entityCount,oles.size(),layerNames,visibleLayers,items,drawingUnitName,oles);
         }
         public double drawingDistanceFromContent(double contentDistance){return worldToContentScale>0d?contentDistance/worldToContentScale:contentDistance;}
         public float contentLengthFromDrawing(double drawingLength){return worldToContentScale>0d?(float)(drawingLength*worldToContentScale):(float)drawingLength;}
