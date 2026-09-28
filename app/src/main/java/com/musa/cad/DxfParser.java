@@ -179,6 +179,15 @@ public final class DxfParser {
             return new RectF(Math.min(p[0],p[2]),Math.min(p[1],p[3]),Math.max(p[0],p[2]),Math.max(p[1],p[3]));
         }
         public Set<String> lineTypeNames(){return Collections.unmodifiableSet(new TreeSet<>(lineTypes.keySet()));}
+        public MusaAiDrawingIndex aiDrawingIndex(){
+            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>();
+            for(Entity wrapped:document){
+                LayerEntity layer=(LayerEntity)wrapped;
+                if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
+                items.add(new MusaAiDrawingIndex.Item(layer.sourceType,layer.layer,analysisText(layer.entity)));
+            }
+            return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items);
+        }
         public double drawingDistanceFromContent(double contentDistance){return worldToContentScale>0d?contentDistance/worldToContentScale:contentDistance;}
         public float contentLengthFromDrawing(double drawingLength){return worldToContentScale>0d?(float)(drawingLength*worldToContentScale):(float)drawingLength;}
         public float drawingToContentScale(){return Math.max(1e-9f,worldToContentScale);}
@@ -188,6 +197,24 @@ public final class DxfParser {
         public CadEdit drawingEditFromContent(CadEdit content){if(content==null)return null;Matrix inv=new Matrix();if(!view.invert(inv))return content.copy();return mapEditToContent(content,inv);}
         public CadEdit contentEditFromDrawing(CadEdit drawing){return drawing==null?null:mapEditToContent(drawing,view);}
         public boolean hasPhysicalUnits(){return Double.isFinite(millimetersPerUnit)&&millimetersPerUnit>0;}public String drawingUnitName(){return drawingUnitName;}public float drawingAspectRatio(){return contentBounds.height()>0?contentBounds.width()/contentBounds.height():1f;}public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
+    }
+
+    private static String analysisText(Entity entity){
+        if(entity==null)return "";
+        while(entity instanceof Transformed)entity=((Transformed)entity).entity;
+        if(entity instanceof Label)return ((Label)entity).text;
+        if(entity instanceof MTextLabel)return ((MTextLabel)entity).rich.plainText();
+        if(entity instanceof EntityGroup){
+            StringBuilder out=new StringBuilder();
+            for(Entity child:((EntityGroup)entity).children){
+                String one=analysisText(child);
+                if(one.isEmpty())continue;
+                if(out.length()>0)out.append("\n");
+                out.append(one);
+            }
+            return out.toString();
+        }
+        return "";
     }
 
     private static final class LayerEntity implements Entity{
