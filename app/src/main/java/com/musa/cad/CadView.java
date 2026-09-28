@@ -239,9 +239,14 @@ public class CadView extends View {
 
     public void setNumberingStart(int start){numberingNext=Math.max(1,start);setMode(Mode.DRAW_NUMBER);}
     public void setMode(Mode m){
+        boolean visualOverlay=lastSnapped||selecting||draggingSelection||moveSelectedArmed||sourceEdits.hasSelection()||selectedImageIndex>=0||
+            !points.isEmpty()||!freehandPoints.isEmpty()||pairCommand!=PairCommand.NONE||breakArmed||stretchArmed;
         lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;
         if(m!=Mode.SELECT_ENTITY){sourceEdits.clearSelection();selectedImageIndex=-1;}
-        mode=m;points.clear();freehandPoints.clear();notifyValue();invalidate();
+        mode=m;points.clear();freehandPoints.clear();notifyValue();
+        // Changing a command with no on-canvas overlay must not force a costly full
+        // vector redraw. This keeps toolbar/command response immediate on large DWGs.
+        if(visualOverlay)invalidate();
     }
 
     public void setDrawing(Bitmap b){
