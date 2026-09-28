@@ -272,6 +272,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-production-security tests/ProductionReleaseSecurityTest.java
           java -cp /tmp/musacad-production-security ProductionReleaseSecurityTest
+      - name: Test production preflight tooling contract
+        run: |
+          javac -d /tmp/musacad-production-preflight tests/ProductionPreflightContractTest.java
+          java -cp /tmp/musacad-production-preflight ProductionPreflightContractTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
       - name: Compile offline license generator
