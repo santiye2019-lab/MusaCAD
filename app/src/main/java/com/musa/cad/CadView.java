@@ -418,6 +418,84 @@ public class CadView extends View {
     }
     public void clearAiHighlights(){if(aiHighlightedSourceIds.isEmpty())return;aiHighlightedSourceIds.clear();invalidate();}
     public int aiHighlightedCount(){return aiHighlightedSourceIds.size();}
+
+    /** Restores a state captured immediately before a Gandalf batch if validation/application fails. */
+    public void restoreCapturedSessionState(SessionState state){
+        if(state==null)return;
+        Bitmap bitmap=vectorDrawing==null&&nativeDrawing==null?drawing:null;
+        restoreSessionState(vectorDrawing,nativeDrawing,bitmap,state);
+    }
+
+    private boolean selectAiSource(int sourceId){
+        if(vectorDrawing==null||sourceId<0)return false;
+        DxfParser.SourceEntity source=vectorDrawing.sourceById(sourceId);
+        if(source==null||!vectorDrawing.isSourceVisible(sourceId))return false;
+        sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
+        if(!sourceEdits.hasSelection())return false;
+        selectedImageIndex=-1;mode=Mode.SELECT_ENTITY;moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;
+        return true;
+    }
+
+    private void finishAiSourceMutation(){
+        redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;lastSnapped=false;notifyValue();invalidate();
+    }
+
+    public boolean applyAiMoveSource(int sourceId,double dx,double dy){
+        if(!Double.isFinite(dx)||!Double.isFinite(dy)||!selectAiSource(sourceId))return false;
+        CadEdit current=sourceEdits.currentSelected();if(current==null)return false;
+        CadEdit drawingEdit=vectorDrawing.drawingEditFromContent(current);
+        if(drawingEdit==null)return false;
+        CadEdit moved=drawingEdit.translated((float)dx,(float)dy);
+        CadEdit content=vectorDrawing.contentEditFromDrawing(moved);
+        if(content==null||!sourceEdits.replaceSelected(content))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiDeleteSource(int sourceId){
+        if(!selectAiSource(sourceId)||!sourceEdits.deleteSelected())return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiChangeLayer(int sourceId,String layer){
+        String target=layer==null?"":layer.trim();
+        if(target.isEmpty()||!selectAiSource(sourceId))return false;
+        if(!sourceEdits.updateSelectedStyle(target,null,null,null,null))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiReplaceTextSource(int sourceId,String value){
+        if(value==null||!selectAiSource(sourceId))return false;
+        CadEdit current=sourceEdits.currentSelected();
+        if(current==null||current.type!=CadEdit.Type.TEXT||current.xy.length<2)return false;
+        float height=current.hasTextStyle()?current.textHeight:0f;
+        CadEdit replacement=CadEdit.styledText(
+            current.xy[0],current.xy[1],value,current.rotationDegrees,
+            current.textStyleName,current.textFamilyHint,current.textShx,
+            height,current.textWidthFactor,current.textOblique,current.textGenerationFlags
+        );
+        if(!sourceEdits.replaceSelected(replacement))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiAddLine(double x1,double y1,double x2,double y2,String layer){
+        if(vectorDrawing==null||!finite(x1,y1,x2,y2))return false;
+        CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.line((float)x1,(float)y1,(float)x2,(float)y2));
+        if(content==null)return false;
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
+    public boolean applyAiAddText(double x,double y,String value,String layer){
+        if(vectorDrawing==null||value==null||!finite(x,y))return false;
+        CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.text((float)x,(float)y,value));
+        if(content==null)return false;
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
+    private static boolean finite(double...values){
+        if(values==null)return false;
+        for(double value:values)if(!Double.isFinite(value)||Math.abs(value)>1e12d)return false;
+        return true;
+    }
     public boolean selectedIsImage(){return mode==Mode.SELECT_ENTITY&&selectedImageIndex>=0&&selectedImageIndex<imageOverlays.size();}
     public CadEdit selectedEntityCopy(){CadEdit selected=sourceEdits.currentSelected();return selected==null?null:selected.copy();}
     public boolean addImageOverlay(Bitmap bitmap,String name,String uri){
