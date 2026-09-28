@@ -421,7 +421,7 @@ jobs:
           if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md PRODUCTION_SETUP.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:
