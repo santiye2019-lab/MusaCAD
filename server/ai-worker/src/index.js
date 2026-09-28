@@ -46,8 +46,9 @@ async function handleAnalyze(request, env) {
     (accessMode === "developer"
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
-    "Analyze the supplied bounded CAD-JSON, especially mechanical/plumbing/HVAC/fire/gas systems when present. " +
+    "Analyze the supplied bounded CAD-JSON across architectural, structural, mechanical, electrical, landscape, infrastructure, elevator and fire-safety systems when present. " +
     mechanicalExpertInstructions(expertProfile) +
+    disciplineExpertInstructions(expertProfile) +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
@@ -124,7 +125,14 @@ async function handleAnalyze(request, env) {
 function normalizeExpertProfile(value) {
   const known = new Set([
     "mechanical_full","waste","rain","water","heating",
-    "cooling","ventilation","fire","gas","equipment"
+    "cooling","ventilation","fire","gas","equipment",
+    "arch_full","arch_access","arch_escape","arch_space","arch_envelope",
+    "structural_full","structural_frame","structural_foundation","structural_openings","structural_stairs",
+    "electrical_full","electrical_power","electrical_lighting","electrical_weak","electrical_grounding","electrical_emergency",
+    "landscape_full","landscape_hard","landscape_soft","landscape_irrigation","landscape_drainage",
+    "infrastructure_full","infrastructure_waste","infrastructure_rain","infrastructure_water","infrastructure_utilities","infrastructure_levels",
+    "elevator_full","elevator_shaft","elevator_door","elevator_machine","elevator_electrical","elevator_fire",
+    "fire_safety_full","fire_escape","fire_sprinkler","fire_hydrant","fire_detection","fire_smoke","fire_pump"
   ]);
   const key = String(value || "").trim().toLowerCase();
   return known.has(key) ? key : "";
@@ -160,6 +168,59 @@ function mechanicalExpertInstructions(profile) {
     default:
       return common;
   }
+}
+
+function disciplineExpertInstructions(profile) {
+  if (!profile || ["mechanical_full","waste","rain","water","heating","cooling","ventilation","fire","gas","equipment"].includes(profile)) return "";
+  const common =
+    "For this MusaCAD discipline-expert request, structure the response as: Uzman Özeti, Tespitler, Eksik/Doğrulanamayan Veriler, Proje–Keşif Etkisi, and Önerilen Düzeltmeler. " +
+    "For each concrete finding identify sourceId and layer when available. Separate directly observed CAD facts from engineering inference. " +
+    "Do not certify structural safety, electrical safety, fire-code compliance, elevator conformity, accessibility compliance or statutory approval from bounded CAD metadata alone. " +
+    "Only propose CAD edits when sourceId or drawing coordinates are unambiguous. ";
+  const map = {
+    arch_full:"MIMAI architectural full profile: review rooms/spaces, doors and clear passages, circulation, accessibility references, escape interfaces, shafts, levels/dimensions, façade and roof coordination, and cross-discipline clashes.",
+    arch_access:"MIMAI accessibility profile: review visible ramps, accessible routes, door/clear-passage references, level transitions, accessible WC/parking references and continuity. Do not infer compliant slopes or dimensions when absent.",
+    arch_escape:"MIMAI escape/circulation profile: review visible exits, corridors, stairs, fire doors, travel-path continuity and interfaces with fire-safety drawings. Treat legal egress compliance as unverified unless all required inputs and current authoritative sources are available.",
+    arch_space:"MIMAI room/door profile: review room tags, door references, clear openings, shafts and function-to-space consistency candidates.",
+    arch_envelope:"MIMAI envelope profile: review façade/roof references, openings, insulation/waterproofing notes, drainage interfaces and structural/mechanical penetrations.",
+    structural_full:"STATIKAI structural full profile: review columns, beams, walls, slabs, foundations, stairs/shafts, continuity, openings/reservations and coordination with architectural/MEP drawings. Never conclude structural adequacy without calculation model/report and design inputs.",
+    structural_frame:"STATIKAI frame profile: focus on columns, beams, walls, slabs, axis/tag consistency, continuity and suspicious missing/duplicate elements.",
+    structural_foundation:"STATIKAI foundation profile: focus on raft/footing/pile references, foundation beams, pits/shafts and utility penetration coordination. Do not infer soil capacity.",
+    structural_openings:"STATIKAI opening/reservation profile: focus on holes, sleeves, shafts and penetrations near structural elements. Flag uncoordinated penetrations and never recommend field drilling without structural approval.",
+    structural_stairs:"STATIKAI stair/elevator profile: focus on stairs, landings, elevator shafts/pits, openings and architectural coordination.",
+    electrical_full:"ELKAI electrical full profile: review power, panels, cable routes/trays, lighting, receptacles, weak-current systems, grounding/lightning protection, generator/UPS/emergency power and MEP equipment feeds.",
+    electrical_power:"ELKAI power profile: focus on panels, feeders, cable/tray/busbar routes, equipment feeds and visible load/circuit labels. Do not infer cable sizing or protection coordination without calculations.",
+    electrical_lighting:"ELKAI lighting profile: focus on luminaire layout/tags, switching/control references, emergency lighting interfaces and room coordination. Do not infer lux compliance without photometric inputs.",
+    electrical_weak:"ELKAI weak-current profile: focus on data, CCTV, access control, telephone, fire-alarm interfaces and route/room coordination.",
+    electrical_grounding:"ELKAI grounding/lightning profile: focus on grounding, bonding, earth electrodes, lightning protection and equipment bonding references. Do not certify electrical safety.",
+    electrical_emergency:"ELKAI emergency-power profile: focus on generator, UPS, ATS/emergency panels, critical loads and fire/life-safety equipment feeds.",
+    landscape_full:"PEYAI landscape full profile: review hardscape, softscape, planting, irrigation, drainage, lighting/accessibility references and underground-utility coordination.",
+    landscape_hard:"PEYAI hardscape profile: focus on paving, curbs, pedestrian routes, ramps, levels and drainage interfaces.",
+    landscape_soft:"PEYAI softscape profile: focus on trees/plants/lawns, planting zones and conflicts with utilities, structures and maintenance access.",
+    landscape_irrigation:"PEYAI irrigation profile: focus on irrigation lines/zones/valves and conflicts with planting, hardscape and utilities. Do not infer hydraulic adequacy without inputs.",
+    landscape_drainage:"PEYAI drainage profile: focus on surface drainage, gullies, slopes/levels and connections to stormwater infrastructure.",
+    infrastructure_full:"ALTYAPIAI infrastructure full profile: review wastewater, stormwater, water, gas/energy/telecom utilities, manholes, levels/slopes, crossings and authority connection points.",
+    infrastructure_waste:"ALTYAPIAI wastewater profile: focus on sewers, manholes, slopes/invert-level references, connections and crossings. Do not infer invert levels when absent.",
+    infrastructure_rain:"ALTYAPIAI stormwater profile: focus on storm drains, manholes/inlets, slopes/levels, discharge points and landscape/roof drainage interfaces.",
+    infrastructure_water:"ALTYAPIAI water profile: focus on mains, branches, valves, chambers/meters and authority connection references. Do not certify pressure/flow adequacy without calculations.",
+    infrastructure_utilities:"ALTYAPIAI utilities profile: focus on electrical, telecom and gas utility corridors, crossings, separation candidates and authority connection points.",
+    infrastructure_levels:"ALTYAPIAI level profile: focus on visible levels, slopes, manholes, start/end elevations and crossing coordination.",
+    elevator_full:"ASNAI elevator full profile: review shaft, pit, overhead, doors, machine/drive references, electrical/control interfaces, ventilation and fire scenario coordination. Do not certify EN/TS or statutory conformity from CAD metadata alone.",
+    elevator_shaft:"ASNAI shaft profile: focus on shaft dimensions/references, pit, overhead, structural openings and architectural alignment.",
+    elevator_door:"ASNAI door/access profile: focus on landing doors, clear openings, access and architectural/fire-door coordination.",
+    elevator_machine:"ASNAI machine/drive profile: focus on machine/drive/control-room references, maintenance access and structural/electrical interfaces.",
+    elevator_electrical:"ASNAI electrical profile: focus on supply, control panel, grounding, emergency/backup references and fire-safety interfaces.",
+    elevator_fire:"ASNAI fire profile: focus on fire recall/firefighter operation references, lobby/door interfaces and emergency-power coordination.",
+    fire_safety_full:"YANGAI fire/life-safety full profile: review escape, fire doors, sprinkler/hydrant/fire-cabinet systems, detection/alarm, smoke control/pressurization, pumps/tanks and fire-department access/connection. Treat code compliance as unverified without complete inputs and current authoritative sources.",
+    fire_escape:"YANGAI escape profile: focus on exits, corridors, stairs, fire doors and continuity between architectural and fire-safety drawings.",
+    fire_sprinkler:"YANGAI sprinkler profile: focus on sprinkler references, piping/zone/test-drain interfaces and coordination with ceilings/structure. Do not infer hydraulic adequacy.",
+    fire_hydrant:"YANGAI hydrant profile: focus on hydrants, fire cabinets, fire-department connection and visible routing/zone interfaces.",
+    fire_detection:"YANGAI detection profile: focus on detectors, manual call points, sounders, panels, loops/zones and electrical/architectural coordination.",
+    fire_smoke:"YANGAI smoke-control profile: focus on smoke exhaust, pressurization, dampers, fans and architectural/mechanical interfaces. Do not infer smoke-control performance without calculations.",
+    fire_pump:"YANGAI pump/tank profile: focus on fire pumps, jockey pump, tank, test/drain and electrical/emergency-power interfaces."
+  };
+  const specific = map[profile];
+  return specific ? common + specific + " " : common;
 }
 
 function cadProposalTools() {
