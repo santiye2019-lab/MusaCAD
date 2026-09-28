@@ -166,6 +166,7 @@ async function handleAiSession(request, env) {
 
   const now = Date.now();
   let entitled = false;
+  const developer = isDeveloperDevice(deviceId, env.MUSACAD_DEVELOPER_DEVICE_IDS);
 
   if (proof.startsWith("MT1.")) {
     entitled = await verifyCompactProof(proof, "MT1", deviceId, now, env.MUSACAD_TRIAL_PUBLIC_KEY_PEM, false);
@@ -175,11 +176,47 @@ async function handleAiSession(request, env) {
     entitled = await verifyCompactProof(proof, "MP1", deviceId, now, env.MUSACAD_TRIAL_PUBLIC_KEY_PEM, false);
   }
 
-  if (!entitled) return json({ status: "denied", message: "Active cloud-AI entitlement not found" }, 403);
+  if (!entitled && !developer)
+    return json({ status: "denied", message: "Active cloud-AI entitlement not found" }, 403);
 
   const expiresAtMs = now + AI_SESSION_MS;
-  const token = await signPurposeToken("MAI1", deviceId, expiresAtMs, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM);
-  return json({ status: "active", token, expiresAtMs }, 200);
+  const accessMode = developer ? "developer" : "licensed";
+  const token = developer
+    ? await signAiSessionTokenV2(deviceId, expiresAtMs, accessMode, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM)
+    : await signPurposeToken("MAI1", deviceId, expiresAtMs, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM);
+  return json({
+    status: "active",
+    token,
+    expiresAtMs,
+    accessMode,
+    developer,
+    unlimited: developer
+  }, 200);
+}
+
+function isDeveloperDevice(deviceId, configuredIds) {
+  const wanted = String(deviceId || "").trim().toUpperCase();
+  if (!wanted) return false;
+  return String(configuredIds || "")
+    .split(",")
+    .map(value => value.trim().toUpperCase())
+    .filter(Boolean)
+    .includes(wanted);
+}
+
+async function signAiSessionTokenV2(deviceId, expiresAtMs, accessMode, privateKeyPem) {
+  const mode = accessMode === "developer" ? "developer" : "licensed";
+  const payload = `MAI2|${deviceId}|${expiresAtMs}|${mode}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemBytes(privateKeyPem, "PRIVATE KEY"),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const payloadBytes = new TextEncoder().encode(payload);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, payloadBytes);
+  return `MAI2.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
 }
 
 async function verifyCompactProof(token, prefix, expectedDeviceId, nowMs, publicKeyPem, perpetualAllowed) {

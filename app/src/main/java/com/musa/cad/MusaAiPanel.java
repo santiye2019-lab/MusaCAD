@@ -51,10 +51,11 @@ public final class MusaAiPanel {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView title=text(activity,"MusaCAD AI",20f,Color.WHITE,true);
+        boolean developer=MusaAiSessionService.developerCached();
+        TextView title=text(activity,developer?"MusaCAD AI • Gandalf Developer":"MusaCAD AI",20f,Color.WHITE,true);
         header.addView(title,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
-        TextView state=text(activity,"AI",10f,0xFFBFFAF4,true);
+        TextView state=text(activity,developer?"DEV":"AI",10f,0xFFBFFAF4,true);
         state.setGravity(Gravity.CENTER);
         state.setPadding(dp(activity,10),dp(activity,5),dp(activity,10),dp(activity,5));
         state.setBackground(round(activity,0xFF0C594F,16,0xFF16B8A6));
@@ -84,7 +85,9 @@ public final class MusaAiPanel {
         root.addView(messagesScroll,messagesLp);
 
         appendBubble(activity,messages,false,
-            "Merhaba. Ben MusaCAD AI. Yerel mod çevrimdışı çizim soruları, metraj ve proje kontrolünü yapar. Gandalf Cloud AI ise kullanıcı onayıyla sınırlı CAD-JSON bağlamını kullanarak daha derin mühendislik analizi ve güncel kaynak araştırması yapabilir.");
+            developer
+                ?"Gandalf Developer modu aktif. Yerel MusaCAD AI özelliklerinin yanında tam bulut analiz yüzeyi kullanılabilir. Çizim değişiklikleri yine önizleme ve açık kullanıcı onayı olmadan uygulanmaz."
+                :"Merhaba. Ben MusaCAD AI. Yerel mod çevrimdışı çizim soruları, metraj ve proje kontrolünü yapar. Gandalf Cloud AI ise kullanıcı onayıyla sınırlı CAD-JSON bağlamını kullanarak daha derin mühendislik analizi ve güncel kaynak araştırması yapabilir.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);

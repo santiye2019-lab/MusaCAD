@@ -113,6 +113,9 @@ public class MainActivity extends AppCompatActivity {
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="",lastAiReport="";
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
+    private CadView.SessionState lastGandalfBatchState;
+    private ProjectSession lastGandalfBatchProject;
+    private long lastGandalfBatchFingerprint=Long.MIN_VALUE;
     private int pendingHomeCategory;
     private boolean pendingPrintWindowSelection;
     private Uri homeFeaturedUri;
@@ -810,6 +813,26 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        String aiControl=MusaAiDrawingIndex.normalize(raw);
+        if(isGandalfUndoCommand(aiControl)){
+            undoLastGandalfBatch(reply);
+            return;
+        }
+        if(isGandalfClearCommand(aiControl)){
+            pendingAiActions=Collections.emptyList();
+            cad.clearAiHighlights();
+            reply.send("Bekleyen Gandalf çizim önerileri temizlendi.");
+            return;
+        }
+        if(isGandalfApplyCommand(aiControl)){
+            showPendingGandalfActions(reply,true);
+            return;
+        }
+        if(isGandalfPreviewCommand(aiControl)){
+            showPendingGandalfActions(reply,false);
+            return;
+        }
+
         if(MusaAiCloudPolicy.shouldUseCloud(raw)){
             if(currentProject==null){
                 reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
@@ -1056,7 +1079,10 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             pendingAiActions=cloud.actions;
-            StringBuilder out=new StringBuilder(cloud.text);
+            StringBuilder out=new StringBuilder();
+            if(MusaAiSessionService.developerCached())
+                out.append("Gandalf Developer • Yönetici modu aktif\n\n");
+            out.append(cloud.text);
             if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
             if(!cloud.sources.isEmpty()){
                 out.append("\n\nKaynaklar:");
@@ -1076,10 +1102,116 @@ public class MainActivity extends AppCompatActivity {
                     out.append("\n• ").append(action.name);
                     if(!action.reason.isEmpty())out.append(" — ").append(action.reason);
                 }
-                out.append("\n\nBu işlemler bir sonraki güvenli uygulama katmanında önizleme + kullanıcı onayı + Undo ile çalıştırılacak.");
+                if(MusaAiSessionService.developerCached())
+                    out.append("\n\nGandalf Developer: “Önerileri önizle” veya “Önerileri uygula” diyebilirsiniz. Hiçbir değişiklik açık onay olmadan çizime işlenmez.");
+                else
+                    out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
             }
             reply.send(out.toString());
+            if(!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
+                runOnUiThread(()->showPendingGandalfActions(reply,false));
         });
+    }
+
+    private static boolean isGandalfPreviewCommand(String q){
+        return q.equals("onerileri onizle")||q.equals("gandalf onerilerini onizle")||
+            q.equals("ai onerilerini onizle")||q.equals("duzeltmeleri onizle");
+    }
+
+    private static boolean isGandalfApplyCommand(String q){
+        return q.equals("onerileri uygula")||q.equals("gandalf onerilerini uygula")||
+            q.equals("ai onerilerini uygula")||q.equals("duzeltmeleri uygula")||
+            q.equals("gandalf uygula");
+    }
+
+    private static boolean isGandalfClearCommand(String q){
+        return q.equals("onerileri temizle")||q.equals("gandalf onerilerini temizle")||
+            q.equals("ai onerilerini temizle");
+    }
+
+    private static boolean isGandalfUndoCommand(String q){
+        return q.equals("gandalf geri al")||q.equals("gandalf degisikliklerini geri al")||
+            q.equals("ai degisikliklerini geri al")||q.equals("gandalf duzeltmelerini geri al");
+    }
+
+    private void showPendingGandalfActions(MusaAiPanel.Reply reply,boolean applyRequested){
+        List<MusaAiCloudService.Action> actions=pendingAiActions;
+        if(actions==null||actions.isEmpty()){
+            reply.send("Bekleyen Gandalf çizim önerisi yok.");
+            return;
+        }
+        MusaAiActionExecutor.Preview preview=MusaAiActionExecutor.preview(actions);
+        if(!MusaAiSessionService.developerCached()){
+            reply.send("Gandalf öneri önizlemesi:\n"+preview.text+
+                "\n\nÇizime uygulama için Gandalf Developer yetkisi gerekir.");
+            return;
+        }
+        StringBuilder message=new StringBuilder();
+        message.append("Önerilen işlemler:\n").append(preview.text);
+        message.append("\n\nÇizim değişikliği: ").append(preview.mutationCount);
+        if(preview.deleteCount>0)message.append("\nSİLME işlemi: ").append(preview.deleteCount);
+        if(preview.unsupportedCount>0)message.append("\nDesteklenmeyen öneri: ").append(preview.unsupportedCount);
+        message.append("\n\nUYGULA seçilmeden çizimde hiçbir değişiklik yapılmaz. Paket uygulanırken bir işlem başarısız olursa tamamı geri alınır.");
+
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Gandalf Developer • Önizleme")
+            .setMessage(message.toString())
+            .setNegativeButton("KAPAT",(d,w)->{
+                if(!applyRequested)reply.send("Gandalf önerileri önizlendi. Çizimde değişiklik yapılmadı.");
+            })
+            .setPositiveButton("UYGULA",(d,w)->applyPendingGandalfActions(reply))
+            .create();
+        dialog.setOnShowListener(d->{
+            if(preview.mutationCount==0&&preview.highlightCount==0)
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        });
+        dialog.show();
+    }
+
+    private void applyPendingGandalfActions(MusaAiPanel.Reply reply){
+        if(!MusaAiSessionService.developerCached()){
+            reply.send("Gandalf çizim uygulama yetkisi aktif değil.");
+            return;
+        }
+        List<MusaAiCloudService.Action> actions=pendingAiActions;
+        if(actions==null||actions.isEmpty()){
+            reply.send("Bekleyen Gandalf çizim önerisi yok.");
+            return;
+        }
+        CadView.SessionState before=cad.captureSessionState();
+        ProjectSession project=currentProject;
+        MusaAiActionExecutor.ApplyResult applied=MusaAiActionExecutor.apply(cad,actions);
+        if(!applied.success){
+            reply.send(applied.message);
+            return;
+        }
+        pendingAiActions=Collections.emptyList();
+        lastGandalfBatchState=before;
+        lastGandalfBatchProject=project;
+        lastGandalfBatchFingerprint=cad.editFingerprint();
+        markCurrentProjectDirty();
+        reply.send(applied.message+"\n\nToplu geri almak için “Gandalf geri al” yazabilirsiniz.");
+    }
+
+    private void undoLastGandalfBatch(MusaAiPanel.Reply reply){
+        if(lastGandalfBatchState==null||lastGandalfBatchProject==null||currentProject!=lastGandalfBatchProject){
+            reply.send("Bu açık proje için geri alınabilecek son Gandalf paketi yok.");
+            return;
+        }
+        if(cad.editFingerprint()!=lastGandalfBatchFingerprint){
+            reply.send("Gandalf paketinden sonra çizimde başka değişiklikler yapılmış. Sonraki çalışmaların kaybolmaması için toplu geri alma engellendi; normal Undo ile adım adım geri alabilirsiniz.");
+            return;
+        }
+        cad.restoreCapturedSessionState(lastGandalfBatchState);
+        lastGandalfBatchState=null;lastGandalfBatchProject=null;lastGandalfBatchFingerprint=Long.MIN_VALUE;
+        markCurrentProjectDirty();
+        reply.send("Son Gandalf çizim paketi toplu olarak geri alındı.");
+    }
+
+    private void markCurrentProjectDirty(){
+        if(currentProject==null)return;
+        currentProject.viewState=cad.captureSessionState();
+        currentProject.dirty=currentProject.baselineSet&&cad.editFingerprint()!=currentProject.savedFingerprint;
     }
 
     private MusaAiAutoReport.Result buildCurrentAiReport(){

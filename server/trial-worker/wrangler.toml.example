@@ -20,3 +20,6 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 # - MUSACAD_TRIAL_PUBLIC_KEY_PEM
 # - MUSACAD_LICENSE_PUBLIC_KEY_PEM
 # - MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM
+# - MUSACAD_DEVELOPER_DEVICE_IDS
+#   Comma-separated trusted administrator device IDs. Treat this allowlist as a secret;
+#   never commit real device IDs to Git.

@@ -25,6 +25,12 @@ function sessionToken(privateKey,expiresAtMs){
   return `MAI1.${base64url(payload)}.${base64url(signature)}`;
 }
 
+function developerSessionToken(privateKey,expiresAtMs){
+  const payload=Buffer.from(`MAI2|${DEVICE}|${expiresAtMs}|developer`,"utf8");
+  const signature=sign("RSA-SHA256",payload,privateKey);
+  return `MAI2.${base64url(payload)}.${base64url(signature)}`;
+}
+
 test("OpenAI output parser keeps answer, web usage and CAD proposals",()=>{
   const parsed=parseOpenAiOutput({
     output:[
@@ -125,4 +131,46 @@ test("valid signed session reaches Responses API and returns proposed actions",a
   assert.equal(upstreamBody.store,false);
   assert.deepEqual(upstreamBody.include,["web_search_call.action.sources"]);
   assert.equal(upstreamBody.instructions.includes("PROPOSALS ONLY"),true);
+});
+
+
+test("MAI2 developer session is accepted and reported as developer mode",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Geliştirici analizi hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Projeyi derin analiz et",
+      allowWeb:false,
+      allowEditProposals:true,
+      cad:{
+        schema:"musacad-cad-json/v1",
+        fileName:"mekanik.dwg",
+        cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true},
+        items:[]
+      }
+    })
+  });
+
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.status,"ok");
+  assert.equal(body.accessMode,"developer");
+  assert.equal(upstreamBody.instructions.includes("Current access mode: developer"),true);
+  assert.equal(upstreamBody.instructions.includes("explicit user approval"),true);
 });

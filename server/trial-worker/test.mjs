@@ -154,3 +154,31 @@ test("active signed trial exchanges for a short-lived AI session",async()=>{
     Date.now=originalNow;
   }
 });
+
+
+test("trusted developer device receives MAI2 developer session without a paid entitlement proof",async()=>{
+  const originalNow=Date.now;
+  const t0=1_800_200_000_000;
+  const keys=keyPairPem();
+  const env={
+    DB:new FakeD1(),
+    MUSACAD_TRIAL_PRIVATE_KEY_PEM:keys.privatePem,
+    MUSACAD_TRIAL_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_PACKAGE_NAME:PACKAGE,
+    MUSACAD_DEVELOPER_DEVICE_IDS:DEVICE
+  };
+
+  try{
+    Date.now=()=>t0;
+    const session=await aiSession(env,"");
+    assert.equal(session.response.status,200);
+    assert.equal(session.body.status,"active");
+    assert.equal(session.body.accessMode,"developer");
+    assert.equal(session.body.developer,true);
+    assert.equal(session.body.unlimited,true);
+    assert.match(session.body.token,/^MAI2\./);
+    assert.equal(session.body.expiresAtMs,t0+15*60*1000);
+  }finally{
+    Date.now=originalNow;
+  }
+});

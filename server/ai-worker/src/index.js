@@ -38,12 +38,18 @@ async function handleAnalyze(request, env) {
   if (allowWeb) tools.push({ type: "web_search" });
   if (allowEditProposals) tools.push(...cadProposalTools());
 
+  const accessMode = session.mode === "developer" ? "developer" : "licensed";
   const instructions =
     "You are Gandalf AI inside MusaCAD, an engineering CAD assistant. " +
+    "Current access mode: " + accessMode + ". " +
+    (accessMode === "developer"
+      ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
+      : "") +
     "Analyze the supplied bounded CAD-JSON, especially mechanical/plumbing/HVAC/fire/gas systems when present. " +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
+    "For cad_change_layer, cad_add_line and cad_add_text, use an exact existing layer name visible in the supplied CAD-JSON; never invent a new layer name. " +
     "Never state that a proposed edit has already been applied. " +
     "Prefer sourceId-based edits for existing entities. Use web search only when it materially helps the user's request, and identify external sources in the answer.";
 
@@ -105,7 +111,8 @@ async function handleAnalyze(request, env) {
     actions: parsedOutput.actions,
     sources: parsedOutput.sources,
     webUsed: parsedOutput.webUsed,
-    sessionExpiresAtMs: session.expiresAtMs
+    sessionExpiresAtMs: session.expiresAtMs,
+    accessMode
   });
 }
 
@@ -266,13 +273,23 @@ async function verifySession(authHeader, publicKeyPem) {
     if (!match) return { ok: false, message: "Missing AI session" };
     const token = match[1].trim();
     const parts = token.split(".");
-    if (parts.length !== 3 || parts[0] !== "MAI1") return { ok: false, message: "Invalid AI session" };
+    if (parts.length !== 3 || (parts[0] !== "MAI1" && parts[0] !== "MAI2"))
+      return { ok: false, message: "Invalid AI session" };
 
     const payloadBytes = decodeBase64url(parts[1]);
     const signatureBytes = decodeBase64url(parts[2]);
     const payload = new TextDecoder().decode(payloadBytes);
     const fields = payload.split("|");
-    if (fields.length !== 3 || fields[0] !== "MAI1") return { ok: false, message: "Invalid AI session payload" };
+
+    let mode = "licensed";
+    if (parts[0] === "MAI1") {
+      if (fields.length !== 3 || fields[0] !== "MAI1")
+        return { ok: false, message: "Invalid AI session payload" };
+    } else {
+      if (fields.length !== 4 || fields[0] !== "MAI2")
+        return { ok: false, message: "Invalid AI session payload" };
+      mode = fields[3] === "developer" ? "developer" : "licensed";
+    }
 
     const deviceId = fields[1];
     const expiresAtMs = Number(fields[2]);
@@ -287,7 +304,7 @@ async function verifySession(authHeader, publicKeyPem) {
       ["verify"]
     );
     const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signatureBytes, payloadBytes);
-    return valid ? { ok: true, deviceId, expiresAtMs } : { ok: false, message: "Invalid AI session signature" };
+    return valid ? { ok: true, deviceId, expiresAtMs, mode } : { ok: false, message: "Invalid AI session signature" };
   } catch (_) {
     return { ok: false, message: "Invalid AI session" };
   }

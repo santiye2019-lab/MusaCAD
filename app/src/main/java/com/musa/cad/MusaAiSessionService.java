@@ -12,26 +12,37 @@ public final class MusaAiSessionService {
     private static final int TIMEOUT_MS=12000,MAX_RESPONSE_BYTES=32768;
     private static volatile String cachedToken="";
     private static volatile long cachedExpiresAtMs=0L;
+    private static volatile String cachedAccessMode="licensed";
 
     public enum Status { ACTIVE, NOT_CONFIGURED, ACCESS_REQUIRED, NETWORK_ERROR, DENIED, INVALID_RESPONSE }
     public static final class Result {
         public final Status status;
-        public final String token,message;
+        public final String token,message,accessMode;
         public final long expiresAtMs;
         Result(Status status,String token,long expiresAtMs,String message){
-            this.status=status;this.token=token==null?"":token;this.expiresAtMs=expiresAtMs;this.message=message==null?"":message;
+            this(status,token,expiresAtMs,message,"licensed");
+        }
+        Result(Status status,String token,long expiresAtMs,String message,String accessMode){
+            this.status=status;
+            this.token=token==null?"":token;
+            this.expiresAtMs=expiresAtMs;
+            this.message=message==null?"":message;
+            this.accessMode="developer".equalsIgnoreCase(accessMode)?"developer":"licensed";
         }
         public boolean active(){return status==Status.ACTIVE&&!token.isEmpty()&&expiresAtMs>System.currentTimeMillis();}
+        public boolean developer(){return active()&&"developer".equals(accessMode);}
     }
 
     public static Result get(Context context){
         if(context==null)return new Result(Status.INVALID_RESPONSE,"",0,"context");
         long now=System.currentTimeMillis();
         String token=cachedToken;long exp=cachedExpiresAtMs;
-        if(!token.isEmpty()&&exp-now>60_000L)return new Result(Status.ACTIVE,token,exp,"");
+        if(!token.isEmpty()&&exp-now>60_000L)
+            return new Result(Status.ACTIVE,token,exp,"",cachedAccessMode);
 
-        if(!LicenseManager.hasAccess(context))
-            return new Result(Status.ACCESS_REQUIRED,"",0,"Bulut AI için aktif MusaCAD lisansı veya deneme erişimi gerekir");
+        // Do not short-circuit only on local license state: the server can grant a
+        // trusted administrator device a signed Gandalf Developer session. Normal
+        // unlicensed devices are still rejected by the server.
 
         String endpoint=BuildConfig.AI_SESSION_URL==null?"":BuildConfig.AI_SESSION_URL.trim();
         if(endpoint.isEmpty())return new Result(Status.NOT_CONFIGURED,"",0,"Bulut AI oturum sunucusu yapılandırılmadı");
@@ -66,8 +77,10 @@ public final class MusaAiSessionService {
             if(!"active".equalsIgnoreCase(status))return new Result(Status.INVALID_RESPONSE,"",0,json.optString("message","Bulut AI oturumu açılamadı"));
             token=json.optString("token","").trim();exp=json.optLong("expiresAtMs",0L);
             if(token.isEmpty()||exp<=now)return new Result(Status.INVALID_RESPONSE,"",0,"Geçersiz bulut AI oturum yanıtı");
-            cachedToken=token;cachedExpiresAtMs=exp;
-            return new Result(Status.ACTIVE,token,exp,"");
+            String accessMode=json.optString("accessMode","licensed").trim();
+            if(!"developer".equalsIgnoreCase(accessMode))accessMode="licensed";
+            cachedToken=token;cachedExpiresAtMs=exp;cachedAccessMode=accessMode;
+            return new Result(Status.ACTIVE,token,exp,"",accessMode);
         }catch(IOException e){
             return new Result(Status.NETWORK_ERROR,"",0,"Bulut AI oturumu için internet bağlantısını kontrol edin");
         }catch(Exception e){
@@ -75,7 +88,15 @@ public final class MusaAiSessionService {
         }finally{if(connection!=null)connection.disconnect();}
     }
 
-    static void clearCache(){cachedToken="";cachedExpiresAtMs=0L;}
+    public static boolean developerCached(){
+        return cachedExpiresAtMs>System.currentTimeMillis()&&"developer".equals(cachedAccessMode);
+    }
+
+    public static String cachedAccessMode(){
+        return developerCached()?"developer":"licensed";
+    }
+
+    static void clearCache(){cachedToken="";cachedExpiresAtMs=0L;cachedAccessMode="licensed";}
 
     private static String readLimited(InputStream in)throws IOException{
         if(in==null)return "";

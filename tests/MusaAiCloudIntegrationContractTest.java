@@ -14,6 +14,8 @@ public final class MusaAiCloudIntegrationContractTest {
         String session=read("app/src/main/java/com/musa/cad/MusaAiSessionService.java");
         String license=read("app/src/main/java/com/musa/cad/LicenseManager.java");
         String cadJson=read("app/src/main/java/com/musa/cad/MusaAiCadJson.java");
+        String executor=read("app/src/main/java/com/musa/cad/MusaAiActionExecutor.java");
+        String cadView=read("app/src/main/java/com/musa/cad/CadView.java");
 
         require(gradle,"MUSACAD_AI_API_URL","cloud endpoint env");
         require(gradle,"MUSACAD_AI_SESSION_URL","session endpoint env");
@@ -29,6 +31,17 @@ public final class MusaAiCloudIntegrationContractTest {
         require(cadJson,"rawDrawingIncluded","no raw drawing policy");
         require(cadJson,"automaticEditsAllowed","no automatic edits policy");
         require(cadJson,"editActionsRequireUserApproval","user approval policy");
+        require(main,"MusaAiSessionService.developerCached()","developer-only edit application gate");
+        require(main,"Gandalf Developer • Önizleme","explicit Gandalf preview dialog");
+        require(main,"setPositiveButton(\"UYGULA\"","explicit user approval button");
+        require(main,"undoLastGandalfBatch","protected Gandalf batch undo");
+        require(executor,"MAX_ACTIONS=50","bounded proposal batch");
+        require(executor,"cad.restoreCapturedSessionState(before)","atomic rollback");
+        require(executor,"case \"cad_delete_entity\"","allowlisted destructive action");
+        require(executor,"case \"cad_add_line\"","allowlisted drawing action");
+        require(cadView,"applyAiMoveSource","sourceId move bridge");
+        require(cadView,"applyAiReplaceTextSource","sourceId text bridge");
+        require(cadView,"aiLayerExists","existing-layer guard");
 
         forbid(cloud,"OPENAI_API_KEY","OpenAI secret in Android client");
         forbid(gradle,"sk-proj-","hardcoded API key");

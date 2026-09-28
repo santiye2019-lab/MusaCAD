@@ -16,12 +16,19 @@ public final class CadEdit {
     public final boolean textShx;
     public final float textHeight,textWidthFactor,textOblique;
     public final int textGenerationFlags;
+    /** Optional per-entity layer override used by AI/imported additions; null uses the project default layer. */
+    public final String layerOverride;
 
     private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees){this(type,xy,text,strokeWidth,closed,rotationDegrees,"STANDARD","sans",false,0f,1f,0f,0);}
     private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees,String textStyleName,String textFamilyHint,boolean textShx,float textHeight,float textWidthFactor,float textOblique,int textGenerationFlags){
+        this(type,xy,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,null);
+    }
+    private CadEdit(Type type,float[] xy,String text,float strokeWidth,boolean closed,float rotationDegrees,String textStyleName,String textFamilyHint,boolean textShx,float textHeight,float textWidthFactor,float textOblique,int textGenerationFlags,String layerOverride){
         this.type=type;this.xy=xy;this.text=text;this.strokeWidth=Math.max(1f,strokeWidth);this.closed=closed;this.rotationDegrees=normalize(rotationDegrees);
         this.textStyleName=textStyleName==null||textStyleName.trim().isEmpty()?"STANDARD":textStyleName.trim();this.textFamilyHint=textFamilyHint==null||textFamilyHint.trim().isEmpty()?"sans":textFamilyHint.trim();this.textShx=textShx;
         this.textHeight=Float.isFinite(textHeight)&&textHeight>0f?textHeight:0f;this.textWidthFactor=Float.isFinite(textWidthFactor)&&textWidthFactor>0f?textWidthFactor:1f;this.textOblique=Float.isFinite(textOblique)?textOblique:0f;this.textGenerationFlags=textGenerationFlags;
+        String cleanLayer=layerOverride==null?"":layerOverride.trim();
+        this.layerOverride=cleanLayer.isEmpty()?null:cleanLayer;
     }
 
     public static CadEdit line(float x1,float y1,float x2,float y2){return new CadEdit(Type.LINE,new float[]{x1,y1,x2,y2},null,3f,false,0f);}
@@ -70,7 +77,8 @@ public final class CadEdit {
     public float insertScale(){return type==Type.INSERT&&textHeight>0f?textHeight:1f;}
     public boolean hasTextStyle(){return type==Type.TEXT&&textHeight>0f;}
 
-    public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
+    public CadEdit copy(){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerOverride);}
+    public CadEdit withLayerOverride(String layer){return new CadEdit(type,Arrays.copyOf(xy,xy.length),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layer);}
     public CadEdit translated(float dx,float dy){float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){out[i]+=dx;out[i+1]+=dy;}return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit rotated(float degrees,float pivotX,float pivotY){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);float[] out=xy.clone();for(int i=0;i+1<out.length;i+=2){double x=out[i]-pivotX,y=out[i+1]-pivotY;out[i]=(float)(pivotX+x*co-y*si);out[i+1]=(float)(pivotY+x*si+y*co);}float textRotation=(type==Type.TEXT||type==Type.INSERT)?rotationDegrees+degrees:rotationDegrees;return new CadEdit(type,out,text,strokeWidth,closed,textRotation,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags);}
     public CadEdit scaled(float factor,float pivotX,float pivotY){
