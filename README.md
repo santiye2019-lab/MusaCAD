@@ -94,6 +94,14 @@ Release derleme hedefleri: `assemblePlayRelease` ve `assembleDirectRelease`. Kul
 
 GitHub Actions kalite kapısı native dönüştürücü smoke testini, Java yardımcı sınıf testlerini, Android lint ve unit testlerini, debug ve release varyantlarının derlenmesini çalıştırır.
 
+## Production release güvenliği
+
+Ticari release için `MUSACAD_PRODUCTION_RELEASE=true` kullanılır. Bu mod release imzası, HTTPS trial servisi, trial public key'i ve offline paid-license public key'i eksikse build'i durdurur. Play varyantında server-side Play doğrulama endpoint'i de zorunludur.
+
+Production build'de 12 haneli legacy kısa kod aktivasyonu kapalıdır. Ticari offline lisanslama, cihazın **Güvenli Lisans Kimliği** için RSA imzalı `MC1` token kullanır. Ayrı `licensemanager` modülü MC1 özel anahtarını Android Keystore ile cihazda sarar ve parola korumalı AES-GCM `.mlk` yedeği ile yeni telefona kurtarabilir. Aktif License Manager anahtar fingerprint'i ana MusaCAD public key'iyle eşleşmiyorsa MC1 üretimi engellenir.
+
+Ayrıntılar: `RELEASE_SIGNING.md`, `LICENSE_MANAGER.md` ve gerçek cihaz final kontrolü için `DEVICE_FINAL_QA.md`.
+
 ## Kurulum güvenlik notu
 
 Android, Play Store dışından elle yüklenen uygulamalarda kaynağa/cihaz politikasına bağlı olarak “bilinmeyen uygulama”, Play Protect veya benzeri bir yükleme uyarısı gösterebilir. Bu uyarı uygulama içi kodla güvenli biçimde kaldırılamaz. Kalıcı olarak uyarısız dağıtım için uygulamanın sabit bir release anahtarıyla imzalanması ve tercihen Google Play gibi güvenilen bir dağıtım kanalından yayınlanması gerekir.
