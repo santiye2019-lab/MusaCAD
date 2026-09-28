@@ -26,7 +26,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"K_CLOUD_CONSENT","cloud privacy consent");
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
-        require(panel,"{\"Gandalf\",\"Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla\"}","Gandalf quick prompt");
+        require(panel,"{\"Gandalf\",\"GPROJAI_FULL projeyi tüm disiplinler açısından derin analiz et ve raporla\"}","Gandalf multidisciplinary quick prompt");
         require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
