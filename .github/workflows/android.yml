@@ -182,6 +182,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiDetailedReport.java tests/MusaAiDetailedReportTest.java
           java -cp /tmp/musacad-tests MusaAiDetailedReportTest
+      - name: Test MusaCAD multi-file project package audit
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java tests/MusaAiProjectPackageTest.java
+          java -cp /tmp/musacad-tests MusaAiProjectPackageTest
+      - name: Test MusaCAD project package integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiProjectPackageContractTest.java
+          java -cp /tmp/musacad-tests MusaAiProjectPackageContractTest
       - name: Test MusaCAD Word PDF report export integration contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiReportExportContractTest.java
