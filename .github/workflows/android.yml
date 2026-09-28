@@ -344,6 +344,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/LockedScreenLayout.java tests/LockedScreenLayoutTest.java
           java -cp /tmp/musacad-tests LockedScreenLayoutTest
+      - name: Test responsive entry and license screens
+        run: |
+          javac -d /tmp/musacad-tests tests/ResponsiveEntryLicenseContractTest.java
+          java -cp /tmp/musacad-tests ResponsiveEntryLicenseContractTest
           grep -q 'ValueAnimator.ofFloat' app/src/main/java/com/musa/cad/AboutActivity.java
           grep -q 'ValueAnimator.INFINITE' app/src/main/java/com/musa/cad/AboutActivity.java
           grep -q 'LicenseManager.hasAccess(this)' app/src/main/java/com/musa/cad/AboutActivity.java
