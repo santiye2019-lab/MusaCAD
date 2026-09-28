@@ -776,6 +776,36 @@ public class MainActivity extends AppCompatActivity {
             .show();
     }
 
+    private void showGandalfConnectDialog(MusaAiPanel.Reply reply){
+        if(BuildConfig.AI_GATEWAY_URL==null||BuildConfig.AI_GATEWAY_URL.trim().isEmpty()){
+            reply.send("Gandalf bağlantısı için MUSACAD_AI_GATEWAY_URL yapılandırılmamış.");
+            return;
+        }
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Gandalf eşleştirme kodu");
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new AlertDialog.Builder(this)
+            .setTitle("Gandalf • Bağlan")
+            .setMessage("Geliştirme/test eşleştirme kodunu girin. Bu işlem ChatGPT Plus/Pro aboneliğini doğruladığı anlamına gelmez.")
+            .setView(input)
+            .setPositiveButton("BAĞLAN",(d,w)->{
+                String code=input.getText().toString().trim();
+                if(code.isEmpty()){reply.send("Eşleştirme kodu girilmedi.");return;}
+                reply.send("Gandalf bağlantısı doğrulanıyor…");
+                MusaAiGatewaySessionClient.connect(this,code,new MusaAiGatewaySessionClient.Callback(){
+                    @Override public void onConnected(String source,long expiresAtMs){
+                        runOnUiThread(()->reply.send("Gandalf • Çevrimiçi oturum aktif.\n• Kaynak: "+source+"\n• Oturum geçici olarak yalnızca uygulama belleğinde tutuluyor."));
+                    }
+                    @Override public void onError(String message){
+                        runOnUiThread(()->reply.send(message+"\nYerel MusaCAD AI kullanılmaya devam ediyor."));
+                    }
+                });
+            })
+            .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf bağlantısı iptal edildi."))
+            .show();
+    }
+
     private String musaAiContextLabel(){
         if(currentProject==null)return "Bağlam • Henüz proje açık değil";
         if(activeDxf!=null){
@@ -824,8 +854,25 @@ public class MainActivity extends AppCompatActivity {
         String raw=prompt==null?"":prompt.trim();
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
+        String globalAiQ=MusaAiDrawingIndex.normalize(raw);
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
             reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Mekanik tesisat AI analizi\n• Proje/hata kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            return;
+        }
+
+        if(globalAiQ.contains("gandalf baglanti durumu")||globalAiQ.equals("gandalf durumu")){
+            MusaAiAccessPolicy.Decision access=MusaAiCloudAccess.decision(this);
+            reply.send(access.badge+"\n• "+access.reason+
+                "\n• ChatGPT Plus/Pro aboneliği Android uygulaması tarafından doğrudan okunup API yetkisi olarak kullanılamaz.");
+            return;
+        }
+        if(globalAiQ.equals("gandalf bagla")||globalAiQ.contains("gandalf baglanti kur")){
+            showGandalfConnectDialog(reply);
+            return;
+        }
+        if(globalAiQ.contains("gandalf baglantisini kes")||globalAiQ.equals("gandalf cikis")){
+            MusaAiCloudAccess.clear(this);
+            reply.send("Gandalf çevrimiçi oturumu kapatıldı. Yerel MusaCAD AI aktif.");
             return;
         }
 
@@ -848,7 +895,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        String aiq=MusaAiDrawingIndex.normalize(raw);
+        String aiq=globalAiQ;
         if(isRevisionBaselineClearCommand(aiq)){
             aiRevisionBaseline=null;aiRevisionBaselineName="";
             cad.clearAiHighlights();
