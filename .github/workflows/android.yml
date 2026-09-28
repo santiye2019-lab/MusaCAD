@@ -122,6 +122,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiTableOleContractTest.java
           java -cp /tmp/musacad-tests MusaAiTableOleContractTest
+      - name: Test MusaCAD AI revision comparison
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiRevisionCompare.java tests/MusaAiRevisionCompareTest.java
+          java -cp /tmp/musacad-tests MusaAiRevisionCompareTest
+      - name: Test MusaCAD AI revision integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiRevisionCompareContractTest.java
+          java -cp /tmp/musacad-tests MusaAiRevisionCompareContractTest
       - name: Test source entity edit session
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java app/src/main/java/com/musa/cad/SourceReplacement.java app/src/main/java/com/musa/cad/SourceEditSession.java tests/SourceEditSessionTest.java

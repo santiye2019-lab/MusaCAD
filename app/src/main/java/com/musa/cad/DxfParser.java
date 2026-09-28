@@ -191,7 +191,8 @@ public final class DxfParser {
                 items.add(new MusaAiDrawingIndex.Item(
                     layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity),
                     aiLength(measure),aiArea(measure),topologyKnown,topologyKnown&&measure.closed,
-                    aiGeometryKey(measure,layer.sourceType)));
+                    aiGeometryKey(measure,layer.sourceType),
+                    measure==null?Double.NaN:measure.centerX(),measure==null?Double.NaN:measure.centerY()));
                 Entity raw=layer.entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
                 if(raw instanceof OleFrameEntity){
                     OleFrameEntity ole=(OleFrameEntity)raw;
