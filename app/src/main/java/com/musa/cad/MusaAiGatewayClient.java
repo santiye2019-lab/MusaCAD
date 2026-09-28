@@ -55,7 +55,7 @@ public final class MusaAiGatewayClient {
                 body.put("prompt",prompt==null?"":prompt.trim());
                 body.put("project",new JSONObject(packet==null?"{}":packet.json));
                 body.put("client_capabilities",new JSONArray(Arrays.asList(
-                    "project_analysis","technical_report","cad_action_suggestions"
+                    "project_analysis","technical_report","cad_action_suggestions","source_targeted_actions"
                 )));
 
                 URL url=new URL(endpoint);
