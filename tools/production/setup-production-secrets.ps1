@@ -1,5 +1,7 @@
 param(
-    [string]$OutputDir = "$PSScriptRoot\..\..\local-release-secrets"
+    [string]$OutputDir = "$PSScriptRoot\..\..\local-release-secrets",
+    [string]$GitHubRepo = "santiye2019-lab/MusaCAD",
+    [switch]$SetGitHubSecrets
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,8 +27,9 @@ function Read-NewPassword([string]$Label) {
     }
 }
 
-function Convert-ToBase64([string]$Path) {
-    return [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
+function Set-GhSecret([string]$Name,[string]$Value) {
+    $Value | & gh secret set $Name --repo $GitHubRepo
+    if ($LASTEXITCODE -ne 0) { throw "GitHub secret ayarlanamadı: $Name" }
 }
 
 $keytool = (Get-Command keytool -ErrorAction Stop).Source
@@ -36,7 +39,10 @@ $mainStore = Join-Path $OutputDir "musacad-release.jks"
 $managerStore = Join-Path $OutputDir "musacad-manager-release.jks"
 $trialPrivate = Join-Path $OutputDir "musacad-trial-private.pem"
 $trialPublic = Join-Path $OutputDir "musacad-trial-public.pem"
-$envFile = Join-Path $OutputDir "github-secrets-template.txt"
+$checklist = Join-Path $OutputDir "github-secret-names.txt"
+
+if (Test-Path $mainStore) { throw "Dosya zaten var: $mainStore. Release keystore sessizce üzerine yazılmaz." }
+if (Test-Path $managerStore) { throw "Dosya zaten var: $managerStore. Manager keystore sessizce üzerine yazılmaz." }
 
 $mainStorePass = Read-NewPassword "MusaCAD ana APK keystore parolası"
 $mainKeyPass = Read-NewPassword "MusaCAD ana APK key parolası"
@@ -46,13 +52,10 @@ $managerKeyPass = Read-NewPassword "License Manager key parolası"
 $mainAlias = "musacad-release"
 $managerAlias = "musacad-manager-release"
 
-if (Test-Path $mainStore) { throw "Dosya zaten var: $mainStore. Mevcut release keystore'u asla sessizce üzerine yazılmaz." }
-if (Test-Path $managerStore) { throw "Dosya zaten var: $managerStore. Mevcut manager keystore'u asla sessizce üzerine yazılmaz." }
-
-& $keytool -genkeypair -v -keystore $mainStore -storepass $mainStorePass -keypass $mainKeyPass -alias $mainAlias -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=MusaCAD Release, OU=MusaCAD, O=MusaCAD, C=TR"
+& $keytool -genkeypair -v -storetype JKS -keystore $mainStore -storepass $mainStorePass -keypass $mainKeyPass -alias $mainAlias -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=MusaCAD Release, OU=MusaCAD, O=MusaCAD, C=TR"
 if ($LASTEXITCODE -ne 0) { throw "Ana release keystore oluşturulamadı." }
 
-& $keytool -genkeypair -v -keystore $managerStore -storepass $managerStorePass -keypass $managerKeyPass -alias $managerAlias -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=MusaCAD License Manager, OU=MusaCAD, O=MusaCAD, C=TR"
+& $keytool -genkeypair -v -storetype JKS -keystore $managerStore -storepass $managerStorePass -keypass $managerKeyPass -alias $managerAlias -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=MusaCAD License Manager, OU=MusaCAD, O=MusaCAD, C=TR"
 if ($LASTEXITCODE -ne 0) { throw "License Manager keystore oluşturulamadı." }
 
 if ($openssl) {
@@ -61,39 +64,61 @@ if ($openssl) {
     & $openssl.Source pkey -in $trialPrivate -pubout -out $trialPublic
     if ($LASTEXITCODE -ne 0) { throw "Trial public key oluşturulamadı." }
 } else {
-    Write-Host "OpenSSL bulunamadı. Trial RSA keypair otomatik oluşturulmadı." -ForegroundColor Yellow
-    Write-Host "OpenSSL kurduktan sonra scripti tekrar çalıştırabilir veya trial keypair'i ayrı güvenli ortamda oluşturabilirsiniz." -ForegroundColor Yellow
+    Write-Host "OpenSSL bulunamadı; trial keypair atlandı." -ForegroundColor Yellow
 }
 
-$lines = @()
-$lines += "# BU DOSYAYI GITHUB'A COMMIT ETMEYİN."
-$lines += "# GitHub > Settings > Secrets and variables > Actions alanına değerleri ayrı ayrı girin."
-$lines += ""
-$lines += "MUSACAD_RELEASE_KEYSTORE_B64=$(Convert-ToBase64 $mainStore)"
-$lines += "MUSACAD_KEYSTORE_PASSWORD=<MAIN_STORE_PASSWORD>"
-$lines += "MUSACAD_KEY_ALIAS=$mainAlias"
-$lines += "MUSACAD_KEY_PASSWORD=<MAIN_KEY_PASSWORD>"
-$lines += ""
-$lines += "MUSACAD_MANAGER_KEYSTORE_B64=$(Convert-ToBase64 $managerStore)"
-$lines += "MUSACAD_MANAGER_KEYSTORE_PASSWORD=<MANAGER_STORE_PASSWORD>"
-$lines += "MUSACAD_MANAGER_KEY_ALIAS=$managerAlias"
-$lines += "MUSACAD_MANAGER_KEY_PASSWORD=<MANAGER_KEY_PASSWORD>"
-$lines += ""
-if (Test-Path $trialPublic) {
-    $lines += "MUSACAD_TRIAL_PUBLIC_KEY_PEM=<contents of musacad-trial-public.pem>"
+@(
+  "MUSACAD_RELEASE_KEYSTORE_B64",
+  "MUSACAD_KEYSTORE_PASSWORD",
+  "MUSACAD_KEY_ALIAS",
+  "MUSACAD_KEY_PASSWORD",
+  "MUSACAD_TRIAL_API_URL",
+  "MUSACAD_TRIAL_PUBLIC_KEY_PEM",
+  "MUSACAD_PLAY_VERIFY_URL",
+  "MUSACAD_MANAGER_KEYSTORE_B64",
+  "MUSACAD_MANAGER_KEYSTORE_PASSWORD",
+  "MUSACAD_MANAGER_KEY_ALIAS",
+  "MUSACAD_MANAGER_KEY_PASSWORD",
+  "Repository variable: MUSACAD_PLAY_YEARLY_PRODUCT_ID=musacad_yearly_renewal"
+) | Set-Content -Encoding UTF8 $checklist
+
+if ($SetGitHubSecrets) {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        throw "GitHub CLI (gh) bulunamadı. -SetGitHubSecrets kullanmak için gh kurup 'gh auth login' çalıştırın."
+    }
+
+    $mainB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($mainStore))
+    $managerB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($managerStore))
+    try {
+        Set-GhSecret "MUSACAD_RELEASE_KEYSTORE_B64" $mainB64
+        Set-GhSecret "MUSACAD_KEYSTORE_PASSWORD" $mainStorePass
+        Set-GhSecret "MUSACAD_KEY_ALIAS" $mainAlias
+        Set-GhSecret "MUSACAD_KEY_PASSWORD" $mainKeyPass
+
+        Set-GhSecret "MUSACAD_MANAGER_KEYSTORE_B64" $managerB64
+        Set-GhSecret "MUSACAD_MANAGER_KEYSTORE_PASSWORD" $managerStorePass
+        Set-GhSecret "MUSACAD_MANAGER_KEY_ALIAS" $managerAlias
+        Set-GhSecret "MUSACAD_MANAGER_KEY_PASSWORD" $managerKeyPass
+
+        if (Test-Path $trialPublic) {
+            Set-GhSecret "MUSACAD_TRIAL_PUBLIC_KEY_PEM" ([IO.File]::ReadAllText($trialPublic))
+        }
+        "musacad_yearly_renewal" | & gh variable set MUSACAD_PLAY_YEARLY_PRODUCT_ID --repo $GitHubRepo
+        if ($LASTEXITCODE -ne 0) { throw "GitHub repository variable ayarlanamadı." }
+        Write-Host "Signing secret'ları GitHub'a doğrudan aktarıldı. Base64 keystore değeri diske yazılmadı." -ForegroundColor Green
+    } finally {
+        $mainB64 = $null
+        $managerB64 = $null
+    }
 }
-$lines += "MUSACAD_TRIAL_API_URL=https://<your-worker>/v1/trial/start"
-$lines += "MUSACAD_PLAY_VERIFY_URL=https://<your-worker>/v1/play/verify"
-$lines += "MUSACAD_PLAY_YEARLY_PRODUCT_ID=musacad_yearly_renewal"
-$lines | Set-Content -Encoding UTF8 $envFile
 
 Write-Host ""
-Write-Host "Yerel production materyali oluşturuldu:" -ForegroundColor Green
+Write-Host "Production materyali yerel olarak oluşturuldu:" -ForegroundColor Green
 Write-Host "  $mainStore"
 Write-Host "  $managerStore"
 if (Test-Path $trialPrivate) { Write-Host "  $trialPrivate  <-- PRIVATE / ÇOK GİZLİ" -ForegroundColor Yellow }
 if (Test-Path $trialPublic) { Write-Host "  $trialPublic" }
-Write-Host "  $envFile"
+Write-Host "  $checklist"
 Write-Host ""
-Write-Host "ÖNEMLİ: Parolalar bu template dosyasına yazılmadı. Onları parola yöneticinizde saklayın." -ForegroundColor Yellow
-Write-Host "Private key ve JKS dosyalarını GitHub'a commit etmeyin." -ForegroundColor Yellow
+Write-Host "Parolalar ve Base64 keystore değerleri hiçbir template dosyasına yazılmadı." -ForegroundColor Green
+Write-Host "JKS/private key dosyalarını iki ayrı şifreli offline konumda yedekleyin." -ForegroundColor Yellow
