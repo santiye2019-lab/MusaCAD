@@ -7,6 +7,9 @@ MUSACAD_PACKAGE_NAME = "com.musa.cad"
 MUSACAD_PLAY_YEARLY_PRODUCT_ID = "musacad_yearly_renewal"
 MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL = "REPLACE_WITH_SERVICE_ACCOUNT_EMAIL"
 MUSACAD_PLAY_ALLOW_LEGACY_UNBOUND = "false"
+# Comma-separated MusaCAD device IDs that receive server-signed Gandalf Developer sessions.
+# Keep empty in normal deployments and configure only trusted administrator devices.
+MUSACAD_DEVELOPER_DEVICE_IDS = ""
 
 # Create a D1 database, then replace these placeholders in a local wrangler.toml.
 [[d1_databases]]
