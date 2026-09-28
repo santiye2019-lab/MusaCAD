@@ -1,0 +1,11 @@
+name = "musacad-ai"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+OPENAI_MODEL = "<set-supported-model>"
+OPENAI_MAX_OUTPUT_TOKENS = "3200"
+
+# Add with:
+# wrangler secret put OPENAI_API_KEY
+# wrangler secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM
