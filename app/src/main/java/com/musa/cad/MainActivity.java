@@ -814,12 +814,16 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve tam proje denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve tam proje denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
         }
 
         if(MusaAiMechanicalExpert.isHelpCommand(raw)){
             reply.send(MusaAiMechanicalExpert.commandHelp());
+            return;
+        }
+        if(MusaAiDisciplineExpert.isHelpCommand(raw)){
+            reply.send(MusaAiDisciplineExpert.commandHelp());
             return;
         }
 
@@ -1047,6 +1051,19 @@ public class MainActivity extends AppCompatActivity {
             cad.clearAiHighlights();
             reply.send("AI çoklu vurgulaması temizlendi.");
             return;
+        }
+
+        if(activeDxf!=null){
+            MusaAiDisciplineExpert.Result disciplineExpert=MusaAiDisciplineExpert.analyze(currentAiDrawingIndex(),raw);
+            if(disciplineExpert.matched){
+                int shown=disciplineExpert.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(disciplineExpert.sourceIds);
+                if(disciplineExpert.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• Disiplin uzman taramasında vurgulanan: "+shown+
+                    (disciplineExpert.sourceIds.size()>shown?" / "+disciplineExpert.sourceIds.size():""):"";
+                reply.send(disciplineExpert.text+highlight+
+                    "\n\nGandalf derin analizi için aynı komutun başına G ekleyin.");
+                return;
+            }
         }
 
         if(activeDxf!=null){
