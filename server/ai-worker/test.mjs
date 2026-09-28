@@ -227,6 +227,79 @@ test("MEKAI expert profile adds trusted mechanical instructions",async()=>{
   assert.equal(upstreamBody.instructions.includes("fire-department connection"),true);
 });
 
+test("multi-discipline expert profile adds trusted structural instructions",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Statik rezervasyon raporu hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"GSTATIKAI_OPENINGS taşıyıcı sistem rezervasyonlarını incele",
+      expertProfile:"structural_openings",
+      allowWeb:false,
+      allowEditProposals:true,
+      cad:{
+        schema:"musacad-cad-json/v1",
+        fileName:"statik.dwg",
+        cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true},
+        items:[]
+      }
+    })
+  });
+
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.expertProfile,"structural_openings");
+  assert.equal(upstreamBody.instructions.includes("STATIKAI opening/reservation profile"),true);
+  assert.equal(upstreamBody.instructions.includes("Never conclude structural adequacy"),false);
+  assert.equal(upstreamBody.instructions.includes("never recommend field drilling without structural approval"),true);
+});
+
+test("multi-discipline expert profile adds trusted electrical instructions",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Elektrik raporu hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"GELKAI_POWER kontrol et",
+      expertProfile:"electrical_power",
+      cad:{schema:"musacad-cad-json/v1",cloudPolicy:{rawDrawingIncluded:false},items:[]}
+    })
+  });
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(body.expertProfile,"electrical_power");
+  assert.equal(upstreamBody.instructions.includes("ELKAI power profile"),true);
+  assert.equal(upstreamBody.instructions.includes("Do not infer cable sizing"),true);
+});
+
 test("unknown expert profile is ignored instead of becoming prompt instructions",async()=>{
   const keys=sessionPair();
   const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
