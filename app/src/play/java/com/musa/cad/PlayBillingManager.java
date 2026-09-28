@@ -245,6 +245,7 @@ public final class PlayBillingManager implements PurchasesUpdatedListener, Billi
         switch(verification.status){
             case ACTIVE:
                 LicenseManager.setPlayEntitlement(context,true,verification.expiresAtMs);
+                LicenseManager.setPlayCloudProof(context,verification.cloudProof);
                 notifyEntitlement(true);
                 notifyMessage("Google Play yıllık lisans yenilemesi doğrulandı");
                 break;

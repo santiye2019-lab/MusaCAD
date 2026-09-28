@@ -45,7 +45,7 @@ class FakeD1 {
                 row.verified_at_ms=verifiedAt;
                 row.acknowledged_at_ms=acknowledgedAt;
               }
-            }
+            }            
             return {success:true};
           }
         };
@@ -59,15 +59,41 @@ function privateKeyPem(){
   return privateKey.export({type:"pkcs8",format:"pem"}).toString();
 }
 
-function env(db,fetcher){
+function trialKeyPairPem(){
+  const {privateKey,publicKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  return {
+    privatePem:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    publicPem:publicKey.export({type:"spki",format:"pem"}).toString()
+  };
+}
+
+function env(db,fetcher,trialKeys=trialKeyPairPem()){
   return {
     DB:db,
     MUSACAD_PACKAGE_NAME:PACKAGE,
     MUSACAD_PLAY_YEARLY_PRODUCT_ID:PRODUCT,
     MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL:"musacad-play@test-project.iam.gserviceaccount.com",
     MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM:privateKeyPem(),
+    MUSACAD_TRIAL_PRIVATE_KEY_PEM:trialKeys.privatePem,
+    MUSACAD_TRIAL_PUBLIC_KEY_PEM:trialKeys.publicPem,
     __fetch:fetcher
   };
+}
+
+async function aiSession(workerEnv,proof,deviceId=DEVICE){
+  const request=new Request("https://license.musacad.test/v1/ai/session",{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({
+      deviceId,
+      packageName:PACKAGE,
+      entitlementProof:proof,
+      versionName:"1.2.0",
+      versionCode:15
+    })
+  });
+  const response=await worker.fetch(request,workerEnv);
+  return {response,body:await response.json()};
 }
 
 async function verify(workerEnv,deviceId=DEVICE,token=PURCHASE_TOKEN){
@@ -126,13 +152,20 @@ function googleMock({state="SUBSCRIPTION_STATE_ACTIVE",accountId=DEVICE,acknowle
 test("verified yearly subscription renewal is server-bound and acknowledged before entitlement",async()=>{
   const db=new FakeD1();
   const mock=googleMock();
-  const result=await verify(env(db,mock.fetcher));
+  const trialKeys=trialKeyPairPem();
+  const workerEnv=env(db,mock.fetcher,trialKeys);
+  const result=await verify(workerEnv);
   assert.equal(result.response.status,200);
   assert.equal(result.body.status,"active");
   assert.equal(result.body.productId,PRODUCT);
   assert.equal(result.body.acknowledged,true);
   assert.equal(db.playRows.size,1);
   assert.equal([...db.playRows.values()][0].device_id,DEVICE);
+  assert.match(result.body.cloudProof,/^MP1\./);
+  const ai=await aiSession(workerEnv,result.body.cloudProof);
+  assert.equal(ai.response.status,200);
+  assert.equal(ai.body.status,"active");
+  assert.match(ai.body.token,/^MAI1\./);
   assert.equal(mock.calls.filter(c=>c.url.endsWith(":acknowledge")).length,1);
 });
 

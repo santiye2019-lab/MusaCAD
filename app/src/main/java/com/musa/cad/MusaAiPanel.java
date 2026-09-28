@@ -9,6 +9,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.text.util.Linkify;
+import android.text.method.LinkMovementMethod;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -82,7 +84,7 @@ public final class MusaAiPanel {
         root.addView(messagesScroll,messagesLp);
 
         appendBubble(activity,messages,false,
-            "Merhaba. Ben MusaCAD AI. Bu panel üzerinden çizime soru sorma, doğal dille CAD komutu verme, metraj, mekanik tesisat proje kontrolü, genel proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabileceksiniz.");
+            "Merhaba. Ben MusaCAD AI. Yerel mod çevrimdışı çizim soruları, metraj ve proje kontrolünü yapar. Gandalf Cloud AI ise kullanıcı onayıyla sınırlı CAD-JSON bağlamını kullanarak daha derin mühendislik analizi ve güncel kaynak araştırması yapabilir.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);
@@ -131,6 +133,7 @@ public final class MusaAiPanel {
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
             {"Mekanik","AI_MEKANIK_KONTROL"},
+            {"Gandalf","Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
@@ -158,6 +161,9 @@ public final class MusaAiPanel {
             scrollBottom(messagesScroll);
             host.onPrompt(prompt,text->activity.runOnUiThread(()->{
                 pending.setText(text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim());
+                Linkify.addLinks(pending,Linkify.WEB_URLS);
+                pending.setMovementMethod(LinkMovementMethod.getInstance());
+                pending.setLinksClickable(true);
                 scrollBottom(messagesScroll);
             }));
         };
@@ -209,6 +215,9 @@ public final class MusaAiPanel {
     private static TextView appendBubble(Activity activity,LinearLayout messages,boolean user,String value){
         TextView bubble=text(activity,value,12.5f,user?Color.WHITE:0xFFE6F4FA,false);
         bubble.setTextIsSelectable(true);
+        Linkify.addLinks(bubble,Linkify.WEB_URLS);
+        bubble.setMovementMethod(LinkMovementMethod.getInstance());
+        bubble.setLinksClickable(true);
         bubble.setPadding(dp(activity,12),dp(activity,9),dp(activity,12),dp(activity,9));
         bubble.setBackground(round(activity,user?0xFF0D716B:0xFF102B3C,12,user?0xFF20B8AA:0xFF245D79));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(

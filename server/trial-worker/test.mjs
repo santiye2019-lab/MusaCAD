@@ -48,6 +48,30 @@ function privateKeyPem(){
   return privateKey.export({type:"pkcs8",format:"pem"}).toString();
 }
 
+function keyPairPem(){
+  const {privateKey,publicKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  return {
+    privatePem:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    publicPem:publicKey.export({type:"spki",format:"pem"}).toString()
+  };
+}
+
+async function aiSession(env,proof,deviceId=DEVICE){
+  const request=new Request("https://trial.musacad.test/v1/ai/session",{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({
+      deviceId,
+      packageName:PACKAGE,
+      entitlementProof:proof,
+      versionName:"1.2.0",
+      versionCode:15
+    })
+  });
+  const response=await worker.fetch(request,env);
+  return {response,body:await response.json()};
+}
+
 async function start(env,deviceId=DEVICE){
   const request=new Request("https://trial.musacad.test/v1/trial/start",{
     method:"POST",
@@ -94,6 +118,38 @@ test("reinstall does not reset the one-day trial for the same device",async()=>{
     const other=await start(env,"MC-ABCDEF12-34567890-ABCDEF12");
     assert.equal(other.response.status,200);
     assert.equal(other.body.status,"active");
+  }finally{
+    Date.now=originalNow;
+  }
+});
+
+
+test("active signed trial exchanges for a short-lived AI session",async()=>{
+  const originalNow=Date.now;
+  const t0=1_800_100_000_000;
+  const keys=keyPairPem();
+  const env={
+    DB:new FakeD1(),
+    MUSACAD_TRIAL_PRIVATE_KEY_PEM:keys.privatePem,
+    MUSACAD_TRIAL_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_PACKAGE_NAME:PACKAGE
+  };
+
+  try{
+    Date.now=()=>t0;
+    const trial=await start(env);
+    assert.equal(trial.response.status,200);
+    assert.match(trial.body.token,/^MT1\./);
+
+    const session=await aiSession(env,trial.body.token);
+    assert.equal(session.response.status,200);
+    assert.equal(session.body.status,"active");
+    assert.match(session.body.token,/^MAI1\./);
+    assert.equal(session.body.expiresAtMs,t0+15*60*1000);
+
+    const wrongDevice=await aiSession(env,trial.body.token,"MC-ABCDEF12-34567890-ABCDEF12");
+    assert.equal(wrongDevice.response.status,403);
+    assert.equal(wrongDevice.body.status,"denied");
   }finally{
     Date.now=originalNow;
   }

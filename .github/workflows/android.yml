@@ -90,6 +90,18 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiDrawingIntegrationContractTest.java
           java -cp /tmp/musacad-tests MusaAiDrawingIntegrationContractTest
+      - name: Test MusaCAD AI CAD-JSON cloud projection
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCadJson.java tests/MusaAiCadJsonTest.java
+          java -cp /tmp/musacad-tests MusaAiCadJsonTest
+      - name: Test MusaCAD explicit cloud-AI routing policy
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
+          java -cp /tmp/musacad-tests MusaAiCloudPolicyTest
+      - name: Test MusaCAD cloud-AI security integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiCloudIntegrationContractTest.java
+          java -cp /tmp/musacad-tests MusaAiCloudIntegrationContractTest
       - name: Test MusaCAD AI smart selection
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiSmartSelection.java tests/MusaAiSmartSelectionTest.java
@@ -370,6 +382,11 @@ jobs:
           java -cp /tmp/musacad-production-preflight ProductionPreflightContractTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
+      - name: Check and test Gandalf AI worker
+        run: |
+          node --check server/ai-worker/src/index.js
+          cd server/ai-worker
+          npm test
       - name: Compile offline license generator
         run: |
           javac -d /tmp/musacad-license-tool app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tools/license-generator/LicenseGeneratorApp.java

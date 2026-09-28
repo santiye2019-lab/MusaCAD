@@ -23,9 +23,15 @@ import java.util.concurrent.*;
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35;
     private static final int MAX_OPEN_PROJECTS=4;
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
+    private final ExecutorService aiExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-cloud-ai");
+        t.setPriority(Thread.NORM_PRIORITY-1);
+        return t;
+    });
     private final ExecutorService recentExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-recents");
         t.setPriority(Thread.MIN_PRIORITY);
@@ -106,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="",lastAiReport="";
+    private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
     private int pendingHomeCategory;
     private boolean pendingPrintWindowSelection;
     private Uri homeFeaturedUri;
@@ -799,7 +806,16 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            return;
+        }
+
+        if(MusaAiCloudPolicy.shouldUseCloud(raw)){
+            if(currentProject==null){
+                reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
+                return;
+            }
+            handleMusaAiCloudPrompt(raw,reply);
             return;
         }
 
@@ -1005,6 +1021,65 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
+    }
+
+    private void handleMusaAiCloudPrompt(String raw,MusaAiPanel.Reply reply){
+        if(activeDxf==null){
+            reply.send("Gandalf AI için tam vektör DWG/DXF çiziminin hazırlanması gerekiyor.");
+            return;
+        }
+        SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
+        if(prefs.getBoolean(K_CLOUD_CONSENT,false)){
+            runMusaAiCloud(raw,reply);
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Gandalf Cloud AI")
+            .setMessage("Derin analiz için aktif çizimin sınırlı CAD-JSON özeti güvenli MusaCAD sunucusuna gönderilir. Ham DWG/DXF dosyası varsayılan olarak gönderilmez. Katman adları, çizim metinleri, nesne türleri ve ölçü bilgileri bulut AI tarafından işlenebilir. Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz. Devam edilsin mi?")
+            .setPositiveButton("DEVAM",(d,w)->{
+                prefs.edit().putBoolean(K_CLOUD_CONSENT,true).apply();
+                runMusaAiCloud(raw,reply);
+            })
+            .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf Cloud AI isteği iptal edildi. Yerel MusaCAD AI çevrimdışı kullanılmaya devam edebilir."))
+            .setOnCancelListener(d->reply.send("Gandalf Cloud AI isteği iptal edildi."))
+            .show();
+    }
+
+    private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply){
+        final MusaAiDrawingIndex snapshot=currentAiDrawingIndex();
+        final String displayName=currentDisplayName;
+        if(snapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
+        aiExecutor.submit(()->{
+            MusaAiCloudService.Result cloud=MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+            if(!cloud.ok()){
+                reply.send(cloud.message.isEmpty()?"Gandalf AI isteği tamamlanamadı.":cloud.message);
+                return;
+            }
+            pendingAiActions=cloud.actions;
+            StringBuilder out=new StringBuilder(cloud.text);
+            if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
+            if(!cloud.sources.isEmpty()){
+                out.append("\n\nKaynaklar:");
+                int sourceCount=0;
+                for(MusaAiCloudService.Source source:cloud.sources){
+                    if(sourceCount++>=8){out.append("\n• … +").append(cloud.sources.size()-8).append(" kaynak");break;}
+                    out.append("\n• ");
+                    if(!source.title.isEmpty())out.append(source.title).append(" — ");
+                    out.append(source.url);
+                }
+            }
+            if(!cloud.actions.isEmpty()){
+                out.append("\n\nÖnerilen çizim işlemleri (henüz uygulanmadı):");
+                int shown=0;
+                for(MusaAiCloudService.Action action:cloud.actions){
+                    if(shown++>=8){out.append("\n• … +").append(cloud.actions.size()-8).append(" işlem");break;}
+                    out.append("\n• ").append(action.name);
+                    if(!action.reason.isEmpty())out.append(" — ").append(action.reason);
+                }
+                out.append("\n\nBu işlemler bir sonraki güvenli uygulama katmanında önizleme + kullanıcı onayı + Undo ile çalıştırılacak.");
+            }
+            reply.send(out.toString());
+        });
     }
 
     private MusaAiAutoReport.Result buildCurrentAiReport(){
@@ -2714,7 +2789,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}

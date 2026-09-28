@@ -8,6 +8,8 @@ def musaTrialApiUrl = System.getenv('MUSACAD_TRIAL_API_URL') ?: ''
 def musaTrialPublicKeyPem = System.getenv('MUSACAD_TRIAL_PUBLIC_KEY_PEM') ?: ''
 def musaPlayProductId = System.getenv('MUSACAD_PLAY_YEARLY_PRODUCT_ID') ?: 'musacad_yearly_renewal'
 def musaPlayVerifyUrl = System.getenv('MUSACAD_PLAY_VERIFY_URL') ?: ''
+def musaAiApiUrl = System.getenv('MUSACAD_AI_API_URL') ?: ''
+def musaAiSessionUrl = System.getenv('MUSACAD_AI_SESSION_URL') ?: ''
 def hasReleaseSigning = musaKeystore && musaStorePassword && musaKeyAlias && musaKeyPassword
 def productionRelease = ((project.findProperty('musacadProductionRelease')
     ?: System.getenv('MUSACAD_PRODUCTION_RELEASE')
@@ -24,6 +26,12 @@ def verifyCommonProductionRelease = {
     }
     if (!musaTrialPublicKeyPem.contains('-----BEGIN PUBLIC KEY-----') || !musaTrialPublicKeyPem.contains('-----END PUBLIC KEY-----')) {
         throw new GradleException('Production MusaCAD release requires MUSACAD_TRIAL_PUBLIC_KEY_PEM')
+    }
+    if ((musaAiApiUrl && !musaAiSessionUrl) || (!musaAiApiUrl && musaAiSessionUrl)) {
+        throw new GradleException('MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL must be configured together')
+    }
+    if (musaAiApiUrl && (!musaAiApiUrl.startsWith('https://') || !musaAiSessionUrl.startsWith('https://'))) {
+        throw new GradleException('MusaCAD AI endpoints must use HTTPS')
     }
     File paidPublicKey = file('src/main/assets/MUSACAD-LICENSE-PUBLIC.pem')
     if (!paidPublicKey.isFile() || !paidPublicKey.text.contains('-----BEGIN PUBLIC KEY-----')) {
@@ -100,6 +108,8 @@ android {
         buildConfigField "String", "TRIAL_PUBLIC_KEY_PEM", groovy.json.JsonOutput.toJson(musaTrialPublicKeyPem)
         buildConfigField "String", "PLAY_YEARLY_PRODUCT_ID", groovy.json.JsonOutput.toJson(musaPlayProductId)
         buildConfigField "String", "PLAY_VERIFY_URL", groovy.json.JsonOutput.toJson(musaPlayVerifyUrl)
+        buildConfigField "String", "AI_API_URL", groovy.json.JsonOutput.toJson(musaAiApiUrl)
+        buildConfigField "String", "AI_SESSION_URL", groovy.json.JsonOutput.toJson(musaAiSessionUrl)
         buildConfigField "boolean", "ALLOW_LEGACY_SHORT_LICENSE", productionRelease ? "false" : "true"
     }
 

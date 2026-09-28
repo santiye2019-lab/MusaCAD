@@ -19,6 +19,7 @@ public final class LicenseManager {
     private static final String K_PLAY_ENTITLED="play_entitled_v1";
     private static final String K_EVER_PAID_LICENSE="ever_paid_license_v1";
     private static final String K_PLAY_EXPIRES_AT_MS="play_expires_at_ms_v1";
+    private static final String K_PLAY_CLOUD_PROOF="play_cloud_proof_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -110,6 +111,33 @@ public final class LicenseManager {
         return hours>0?String.format(Locale.getDefault(),"Deneme: %d sa %d dk kaldı",hours,mins):String.format(Locale.getDefault(),"Deneme: %d dk kaldı",mins);
     }
 
+    /**
+     * Signed entitlement proof for short-lived cloud AI session exchange.
+     * Never returns Google Play purchase tokens or private material.
+     * Production accepts MC1 paid tokens and server-issued MT1 trial tokens.
+     */
+    public static String cloudEntitlementProof(Context c){
+        SharedPreferences p=prefs(c);
+        long now=System.currentTimeMillis();
+
+        String play=p.getString(K_PLAY_CLOUD_PROOF,null);
+        if(play!=null&&play.trim().startsWith("MP1.")&&
+           p.getBoolean(K_PLAY_ENTITLED,false)&&p.getLong(K_PLAY_EXPIRES_AT_MS,0L)>now)
+            return play.trim();
+
+        String paid=p.getString(K_LICENSE_TOKEN,null);
+        if(paid!=null&&paid.trim().startsWith(LicenseToken.PREFIX+".")&&verifyStoredPaidToken(c,paid))
+            return paid.trim();
+
+        String trial=p.getString(K_TRIAL_TOKEN,null);
+        if(trial!=null&&trial.trim().startsWith(TrialToken.PREFIX+".")){
+            TrialToken.Result verified=verifyTrialToken(c,trial,now);
+            if(verified!=null&&SignedTrialPolicy.validWindow(verified.valid,verified.expiresAtMs,now))
+                return trial.trim();
+        }
+        return "";
+    }
+
     /** Stable on normal reinstall when Android supplies the same app-scoped ANDROID_ID. */
     public static String installationId(Context c){return DeviceIdentity.licenseId(c);}
 
@@ -122,8 +150,15 @@ public final class LicenseManager {
         if(active&&expiresAtMs>System.currentTimeMillis()){
             e.putBoolean(K_EVER_PAID_LICENSE,true).putLong(K_PLAY_EXPIRES_AT_MS,expiresAtMs);
         }else{
-            e.putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS);
+            e.putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS).remove(K_PLAY_CLOUD_PROOF);
         }
+        e.apply();
+    }
+
+    public static void setPlayCloudProof(Context c,String proof){
+        SharedPreferences.Editor e=prefs(c).edit();
+        if(proof!=null&&proof.trim().startsWith("MP1."))e.putString(K_PLAY_CLOUD_PROOF,proof.trim());
+        else e.remove(K_PLAY_CLOUD_PROOF);
         e.apply();
     }
 

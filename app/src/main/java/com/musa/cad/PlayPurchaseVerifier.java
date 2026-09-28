@@ -20,11 +20,14 @@ public final class PlayPurchaseVerifier {
         public final Status status;
         public final String message;
         public final long expiresAtMs;
-        Result(Status status,String message){this(status,message,0L);}
-        Result(Status status,String message,long expiresAtMs){
+        public final String cloudProof;
+        Result(Status status,String message){this(status,message,0L,"");}
+        Result(Status status,String message,long expiresAtMs){this(status,message,expiresAtMs,"");}
+        Result(Status status,String message,long expiresAtMs,String cloudProof){
             this.status=status;
             this.message=message;
             this.expiresAtMs=expiresAtMs;
+            this.cloudProof=cloudProof==null?"":cloudProof;
         }
     }
 
@@ -78,7 +81,10 @@ public final class PlayPurchaseVerifier {
                 long expiresAtMs=json.optLong("expiresAtMs",0L);
                 if(expiresAtMs<=System.currentTimeMillis())
                     return new Result(Status.DENIED,"Yıllık lisans süresi geçersiz veya sona ermiş");
-                return new Result(Status.ACTIVE,message,expiresAtMs);
+                String cloudProof=json.optString("cloudProof","").trim();
+                if(!cloudProof.startsWith("MP1."))
+                    return new Result(Status.INVALID_RESPONSE,"Google Play bulut yetki belgesi eksik");
+                return new Result(Status.ACTIVE,message,expiresAtMs,cloudProof);
             }
             if("pending".equals(status)||code==202)
                 return new Result(Status.PENDING,message.isEmpty()?"Ödeme beklemede":message);

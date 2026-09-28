@@ -21,3 +21,4 @@ CREATE TABLE IF NOT EXISTS play_purchases (
 
 CREATE INDEX IF NOT EXISTS idx_play_purchases_device_id ON play_purchases(device_id);
 CREATE INDEX IF NOT EXISTS idx_play_purchases_order_id ON play_purchases(order_id);
+

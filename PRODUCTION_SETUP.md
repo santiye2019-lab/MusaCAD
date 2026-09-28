@@ -31,8 +31,10 @@ Repo içindeki:
 
 kullanılır.
 
-Production Worker'da secret olarak:
+Production lisans Worker'ında secret olarak:
 - `MUSACAD_TRIAL_PRIVATE_KEY_PEM`
+- `MUSACAD_TRIAL_PUBLIC_KEY_PEM`
+- `MUSACAD_LICENSE_PUBLIC_KEY_PEM`
 - `MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM`
 
 tanımlanır.
@@ -100,3 +102,22 @@ doğrular.
 - JKS/private key/parolaları sohbete, issue'ya, commit'e veya README'ye yazma.
 - Trial private key ile MC1 lisans private key aynı değildir.
 - APK signing key, License Manager signing key, MC1 private key, trial private key ve Google service-account private key ayrı tutulur.
+
+
+## 6. Gandalf Cloud AI
+
+Gandalf AI için ayrı `server/ai-worker` Worker'ı kullanılır.
+
+AI Worker secrets:
+- `OPENAI_API_KEY`
+- `MUSACAD_AI_SESSION_PUBLIC_KEY_PEM`
+
+AI Worker variables:
+- `OPENAI_MODEL=<Responses API üzerinde desteklenen model>`
+- `OPENAI_MAX_OUTPUT_TOKENS=3200`
+
+Android production build ortamı:
+- `MUSACAD_AI_SESSION_URL=https://<license-worker>/v1/ai/session`
+- `MUSACAD_AI_API_URL=https://<ai-worker>/v1/analyze`
+
+OpenAI API anahtarı hiçbir zaman APK'ya, GitHub repository dosyasına, issue'ya veya istemci BuildConfig alanına yazılmaz. Bulut AI opsiyoneldir; iki AI URL'si de boş bırakılırsa yerel MusaCAD AI çalışmaya devam eder. Bir URL yapılandırılırsa ikisi birlikte ve HTTPS olarak verilmelidir.
