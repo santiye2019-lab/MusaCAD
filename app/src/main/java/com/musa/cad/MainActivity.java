@@ -105,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
-    private String lastCommandRaw="";
+    private String lastCommandRaw="",lastAiReport="";
     private int pendingHomeCategory;
     private boolean pendingPrintWindowSelection;
     private Uri homeFeaturedUri;
@@ -843,6 +843,40 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(aiq.contains("raporu paylas")||aiq.contains("rapor paylas")||
+           aiq.contains("raporu disa aktar")||aiq.contains("rapor disa aktar")){
+            if(activeDxf==null){
+                reply.send("AI raporu paylaşmak için tam vektör DWG/DXF çiziminin hazır olması gerekiyor.");
+                return;
+            }
+            MusaAiAutoReport.Result report=buildCurrentAiReport();
+            if(!report.matched){reply.send("AI proje raporu oluşturulamadı.");return;}
+            lastAiReport=report.text;
+            int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
+            if(report.sourceIds.isEmpty())cad.clearAiHighlights();
+            shareAiReport(lastAiReport);
+            reply.send("AI proje raporu oluşturuldu ve TXT paylaşım ekranı açıldı."+
+                (shown>0?"\n• Çizimde vurgulanan bulgu/değişiklik: "+shown:""));
+            return;
+        }
+
+        if(MusaAiAutoReport.asksReport(raw)){
+            if(activeDxf==null){
+                reply.send("AI proje raporu için tam vektör DWG/DXF çiziminin hazır olması gerekiyor.");
+                return;
+            }
+            MusaAiAutoReport.Result report=buildCurrentAiReport();
+            if(report.matched){
+                lastAiReport=report.text;
+                int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
+                if(report.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n\n• Çizimde vurgulanan bulgu/değişiklik: "+shown+
+                    (report.sourceIds.size()>shown?" / "+report.sourceIds.size():""):"";
+                reply.send(report.text+highlight+"\n\n“Raporu paylaş” diyerek TXT olarak paylaşabilirsiniz.");
+                return;
+            }
+        }
+
         if(MusaAiRevisionCompare.asksComparison(raw)){
             if(activeDxf==null){
                 reply.send("Revizyon karşılaştırması için güncel çizimin tam vektör modeli hazır olmalı.");
@@ -959,6 +993,35 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
+    }
+
+    private MusaAiAutoReport.Result buildCurrentAiReport(){
+        if(activeDxf==null)return MusaAiAutoReport.Result.none();
+        MusaAiDrawingIndex baseline=aiRevisionBaseline;
+        String baselineName=aiRevisionBaselineName;
+        if(baseline==null){
+            RevisionCandidate candidate=findOtherRevisionCandidate();
+            if(candidate!=null){baseline=candidate.index;baselineName=candidate.name;}
+        }
+        return MusaAiAutoReport.generate(currentAiDrawingIndex(),currentDisplayName,baseline,baselineName);
+    }
+
+    private void shareAiReport(String report){
+        if(report==null||report.trim().isEmpty()){
+            Toast.makeText(this,"Önce AI proje raporu oluşturun",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        File file=null;
+        try{
+            file=File.createTempFile("MusaCAD_AI_Rapor_",".txt",exportDir());
+            try(OutputStream out=new FileOutputStream(file)){
+                out.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            shareFile(file,"text/plain");
+        }catch(Exception e){
+            if(file!=null)file.delete();
+            error(e);
+        }
     }
 
     private void showToolSheet(String title,ToolAction...tools){

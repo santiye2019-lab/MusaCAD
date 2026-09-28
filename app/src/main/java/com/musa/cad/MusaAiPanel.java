@@ -130,7 +130,8 @@ public final class MusaAiPanel {
             {"Çizime sor","Bu çizimde neler var?"},
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
-            {"Kontrol","Projeyi kontrol et"}
+            {"Kontrol","Projeyi kontrol et"},
+            {"Rapor","Proje raporu oluştur"}
         };
         for(String[] item:prompts){
             Button chip=new Button(activity);
