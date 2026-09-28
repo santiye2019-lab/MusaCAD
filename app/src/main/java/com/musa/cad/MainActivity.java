@@ -1209,7 +1209,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void markCurrentProjectDirty(){
-        if(currentProject!=null)currentProject.sessionState=cad.captureSessionState();
+        if(currentProject==null)return;
+        currentProject.viewState=cad.captureSessionState();
+        currentProject.dirty=currentProject.baselineSet&&cad.editFingerprint()!=currentProject.savedFingerprint;
     }
 
     private MusaAiAutoReport.Result buildCurrentAiReport(){
