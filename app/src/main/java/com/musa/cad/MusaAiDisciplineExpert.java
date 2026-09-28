@@ -128,8 +128,8 @@ public final class MusaAiDisciplineExpert {
             case ARCH:
                 if(has(q,"erisilebilir","engelli","access"))return Profile.ARCH_ACCESS;
                 if(has(q,"kacis","dol asim","dolasim","escape","sirkulasyon"))return Profile.ARCH_ESCAPE;
-                if(has(q,"mahal","kapi","gecis","door","room"))return Profile.ARCH_SPACE;
-                if(has(q,"cephe","cati","facade","roof"))return Profile.ARCH_ENVELOPE;
+                if(has(q,"mahal","kapi","gecis","door","room","space"))return Profile.ARCH_SPACE;
+                if(has(q,"cephe","cati","facade","roof","envelope"))return Profile.ARCH_ENVELOPE;
                 return Profile.ARCH_FULL;
             case STRUCT:
                 if(has(q,"temel","radye","kazik","foundation"))return Profile.STRUCT_FOUNDATION;
@@ -147,8 +147,8 @@ public final class MusaAiDisciplineExpert {
             case LAND:
                 if(has(q,"sulama","irrigation"))return Profile.LAND_IRRIGATION;
                 if(has(q,"drenaj","drain"))return Profile.LAND_DRAINAGE;
-                if(has(q,"bitki","agac","cim","soft","plant"))return Profile.LAND_SOFT;
-                if(has(q,"sert","yol","bordur","paving","hardscape"))return Profile.LAND_HARD;
+                if(has(q,"bitki","agac","cim","soft","plant","softscape"))return Profile.LAND_SOFT;
+                if(has(q,"sert","yol","bordur","paving","hardscape","hard"))return Profile.LAND_HARD;
                 return Profile.LAND_FULL;
             case INFRA:
                 if(has(q,"atik","pis su","kanalizasyon","waste","sewer"))return Profile.INFRA_WASTE;
@@ -159,7 +159,7 @@ public final class MusaAiDisciplineExpert {
                 return Profile.INFRA_FULL;
             case ELEV:
                 if(has(q,"yangin","fire"))return Profile.ELEV_FIRE;
-                if(has(q,"elektrik","kumanda","pano","control"))return Profile.ELEV_ELECTRICAL;
+                if(has(q,"elektrik","electrical","kumanda","pano","control"))return Profile.ELEV_ELECTRICAL;
                 if(has(q,"makine","motor","tahrik","machine","drive"))return Profile.ELEV_MACHINE;
                 if(has(q,"kapi","door","eris"))return Profile.ELEV_DOOR;
                 if(has(q,"kuyu","pit","ust bosluk","overhead","shaft"))return Profile.ELEV_SHAFT;
@@ -167,7 +167,7 @@ public final class MusaAiDisciplineExpert {
             case FIRE:
                 if(has(q,"sprinkler"))return Profile.FIRE_SPRINKLER;
                 if(has(q,"hidrant","dolap","itfaiye","fdc"))return Profile.FIRE_HYDRANT;
-                if(has(q,"algilama","ihbar","dedektor","detector","alarm"))return Profile.FIRE_DETECTION;
+                if(has(q,"algilama","ihbar","dedektor","detector","detection","alarm"))return Profile.FIRE_DETECTION;
                 if(has(q,"duman","basinclandirma","smoke","pressur"))return Profile.FIRE_SMOKE;
                 if(has(q,"pompa","jokey","depo","pump","tank"))return Profile.FIRE_PUMP;
                 if(has(q,"kacis","yangin kapisi","escape","exit"))return Profile.FIRE_ESCAPE;
