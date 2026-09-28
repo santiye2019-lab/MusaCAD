@@ -8,6 +8,9 @@ public final class MusaAiCloudPolicyTest {
         yes(MusaAiCloudPolicy.shouldUseCloud("Bu projeyi güncel kaynaklarla derin analiz et"),"deep cloud intent");
         yes(MusaAiCloudPolicy.shouldUseCloud("GMEKAI_FIRE"),"GMEKAI cloud expert route");
         yes(MusaAiCloudPolicy.allowEditProposals("GMEKAI_VRF"),"GMEKAI exposes proposal tools");
+        yes(MusaAiCloudPolicy.shouldUseCloud("GSTATIKAI_OPENINGS"),"GSTATIKAI cloud expert route");
+        yes(MusaAiCloudPolicy.shouldUseCloud("GELKAI_POWER"),"GELKAI cloud expert route");
+        yes(MusaAiCloudPolicy.allowEditProposals("GYANGAI_SMOKE"),"GYANGAI exposes proposal tools");
         no(MusaAiCloudPolicy.shouldUseCloud("Projeyi kontrol et"),"local control should stay local");
         yes(MusaAiCloudPolicy.allowWeb("Gandalf, güncel yönetmeliğe göre webden kontrol et"),"web intent");
         no(MusaAiCloudPolicy.allowWeb("Gandalf, çizimi analiz et"),"web should be explicit");
