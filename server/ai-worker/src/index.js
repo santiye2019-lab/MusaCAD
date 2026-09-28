@@ -26,6 +26,7 @@ async function handleAnalyze(request, env) {
   const cad = body.cad;
   const allowWeb = body.allowWeb === true;
   const allowEditProposals = body.allowEditProposals === true;
+  const expertProfile = normalizeExpertProfile(body.expertProfile);
 
   if (!prompt || prompt.length > MAX_PROMPT_CHARS)
     return json({ status: "denied", message: "Prompt is empty or too large" }, 400);
@@ -46,6 +47,7 @@ async function handleAnalyze(request, env) {
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
     "Analyze the supplied bounded CAD-JSON, especially mechanical/plumbing/HVAC/fire/gas systems when present. " +
+    mechanicalExpertInstructions(expertProfile) +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
@@ -112,8 +114,50 @@ async function handleAnalyze(request, env) {
     sources: parsedOutput.sources,
     webUsed: parsedOutput.webUsed,
     sessionExpiresAtMs: session.expiresAtMs,
-    accessMode
+    accessMode,
+    expertProfile
   });
+}
+
+function normalizeExpertProfile(value) {
+  const known = new Set([
+    "mechanical_full","waste","rain","water","heating",
+    "cooling","ventilation","fire","gas","equipment"
+  ]);
+  const key = String(value || "").trim().toLowerCase();
+  return known.has(key) ? key : "";
+}
+
+function mechanicalExpertInstructions(profile) {
+  if (!profile) return "";
+  const common =
+    "For this MEKAI expert request, structure the response as: Uzman Özeti, Tespitler, Eksik/Doğrulanamayan Veriler, and Önerilen Düzeltmeler. " +
+    "For each concrete finding, identify sourceId and layer when available. Distinguish a directly observed CAD fact from an engineering inference. " +
+    "Only propose a CAD tool action when the target sourceId or drawing coordinates are unambiguous in the supplied CAD-JSON. ";
+  switch (profile) {
+    case "mechanical_full":
+      return common + "MEKAI expert profile: review all visible mechanical systems separately: waste, rainwater, domestic water, heating, cooling/VRF, ventilation, fire protection, natural gas, and mechanical equipment. Check system identification, labels, topology, cross-system coordination candidates, equipment references and missing design metadata. ";
+    case "waste":
+      return common + "MEKAI waste-water expert profile: focus on gravity/pumped waste distinction, visible pipe diameters, slopes, vents, cleanouts/manholes, fixture/branch continuity and suspicious open or degenerate runs. Do not infer slope or invert levels that are not present. ";
+    case "rain":
+      return common + "MEKAI rainwater expert profile: focus on roof drains, gutters, downpipes, pipe diameters, drainage continuity, overflow/emergency drainage references and visible slope/level information. ";
+    case "water":
+      return common + "MEKAI domestic-water expert profile: focus on cold/hot/return separation, diameters, isolation/control valves, meters, pressure reducing devices, tank/hydrofor/pump references and branch continuity. ";
+    case "heating":
+      return common + "MEKAI heating expert profile: focus on supply/return separation, diameters, pumps, collectors, heat source/exchanger references, balancing/control valves and zoning. Do not perform heat-load or pump sizing unless the required inputs are explicitly supplied. ";
+    case "cooling":
+      return common + "MEKAI cooling/VRF expert profile: focus on VRF/VRV/chiller/fan-coil system identification, indoor/outdoor units, refrigerant piping/branch/refnet references, condensate drainage, equipment capacities and visible connection continuity. ";
+    case "ventilation":
+      return common + "MEKAI ventilation expert profile: focus on duct dimensions, airflow labels, supply/return/exhaust/fresh-air identification, grilles/diffusers, fans/AHUs, dampers and fire/smoke damper candidates at relevant transitions. Do not infer airflow or pressure losses when absent. ";
+    case "fire":
+      return common + "MEKAI fire-protection expert profile: focus on sprinkler/hydrant/fire-cabinet systems, visible pipe diameters, pumps/jockey/tank, zone/alarm valves, test-and-drain references and fire-department connection. Treat code compliance as unverified unless current authoritative sources and all required project inputs are available. ";
+    case "gas":
+      return common + "MEKAI natural-gas expert profile: focus on visible pipe diameters, meter/regulator, shutoff/solenoid valves, detector references and appliance connections. Do not certify gas safety or code compliance from CAD metadata alone. ";
+    case "equipment":
+      return common + "MEKAI mechanical-equipment expert profile: focus on equipment tags, capacities, flow/pressure/power values, duty/standby references and visible piping/duct connections. Service clearances and maintainability require geometry/detail verification. ";
+    default:
+      return common;
+  }
 }
 
 function cadProposalTools() {

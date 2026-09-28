@@ -136,24 +136,14 @@ public final class MusaAiPanel {
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
             {"Mekanik","AI_MEKANIK_KONTROL"},
+            {"MEKAI","MEKAI_FULL"},
             {"Gandalf","Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
-        for(String[] item:prompts){
-            Button chip=new Button(activity);
-            chip.setText(item[0]);
-            chip.setAllCaps(false);
-            chip.setTextColor(0xFFEAFBFF);
-            chip.setTextSize(10f);
-            chip.setMinHeight(dp(activity,36));
-            chip.setPadding(dp(activity,12),0,dp(activity,12),0);
-            chip.setBackground(round(activity,0xFF12384C,18,0xFF246C88));
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp(activity,36));
-            lp.setMarginEnd(dp(activity,7));
-            quickRow.addView(chip,lp);
-            chip.setOnClickListener(v->{input.setText(item[1]);input.setSelection(input.length());input.requestFocus();});
-        }
+        for(String[] item:prompts)addQuickPrompt(activity,quickRow,input,item[0],item[1]);
+        addQuickPrompt(activity,quickRow,input,"G-MEKAI",
+            "GMEKAI_FULL projeyi derin analiz et, hata raporu hazırla ve gerekli düzeltmeleri öner");
 
         Runnable submit=()->{
             String prompt=input.getText().toString().trim();
@@ -213,6 +203,21 @@ public final class MusaAiPanel {
         });
         sheet.setOnDismissListener(d->MusaAiVoiceInput.clear(voiceCallback));
         sheet.show();
+    }
+
+    private static void addQuickPrompt(Activity activity,LinearLayout row,EditText input,String label,String prompt){
+        Button chip=new Button(activity);
+        chip.setText(label);
+        chip.setAllCaps(false);
+        chip.setTextColor(0xFFEAFBFF);
+        chip.setTextSize(10f);
+        chip.setMinHeight(dp(activity,36));
+        chip.setPadding(dp(activity,12),0,dp(activity,12),0);
+        chip.setBackground(round(activity,0xFF12384C,18,0xFF246C88));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp(activity,36));
+        lp.setMarginEnd(dp(activity,7));
+        row.addView(chip,lp);
+        chip.setOnClickListener(v->{input.setText(prompt);input.setSelection(input.length());input.requestFocus();});
     }
 
     private static TextView appendBubble(Activity activity,LinearLayout messages,boolean user,String value){

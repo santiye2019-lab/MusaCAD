@@ -91,6 +91,8 @@ public final class MusaAiCloudService {
             body.put("prompt",prompt);
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
+            String expertProfile=MusaAiMechanicalExpert.cloudProfile(rawPrompt);
+            if(!expertProfile.isEmpty())body.put("expertProfile",expertProfile);
             body.put("cad",new JSONObject(MusaAiCadJson.build(index,fileName)));
             JSONObject client=new JSONObject();
             client.put("app","MusaCAD");
