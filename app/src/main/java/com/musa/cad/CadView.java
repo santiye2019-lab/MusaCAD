@@ -456,9 +456,17 @@ public class CadView extends View {
         finishAiSourceMutation();return true;
     }
 
+    public boolean aiLayerExists(String layer){
+        String target=layer==null?"":layer.trim();
+        if(vectorDrawing==null||target.isEmpty())return false;
+        if("0".equals(target))return true;
+        for(String name:vectorDrawing.layerNames)if(name!=null&&name.equalsIgnoreCase(target))return true;
+        return false;
+    }
+
     public boolean applyAiChangeLayer(int sourceId,String layer){
         String target=layer==null?"":layer.trim();
-        if(target.isEmpty()||!selectAiSource(sourceId))return false;
+        if(!aiLayerExists(target)||!selectAiSource(sourceId))return false;
         if(!sourceEdits.updateSelectedStyle(target,null,null,null,null))return false;
         finishAiSourceMutation();return true;
     }
@@ -478,14 +486,14 @@ public class CadView extends View {
     }
 
     public boolean applyAiAddLine(double x1,double y1,double x2,double y2,String layer){
-        if(vectorDrawing==null||!finite(x1,y1,x2,y2))return false;
+        if(vectorDrawing==null||!aiLayerExists(layer)||!finite(x1,y1,x2,y2))return false;
         CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.line((float)x1,(float)y1,(float)x2,(float)y2));
         if(content==null)return false;
         return addImportedEdit(content.withLayerOverride(layer));
     }
 
     public boolean applyAiAddText(double x,double y,String value,String layer){
-        if(vectorDrawing==null||value==null||!finite(x,y))return false;
+        if(vectorDrawing==null||value==null||!aiLayerExists(layer)||!finite(x,y))return false;
         CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.text((float)x,(float)y,value));
         if(content==null)return false;
         return addImportedEdit(content.withLayerOverride(layer));
