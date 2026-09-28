@@ -751,13 +751,19 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void runGandalfSuggestedCadCommand(String command,String description){
+    private void runGandalfSuggestedCadCommand(String command,String description,java.util.List<Integer>sourceIds){
         MusaAiToolActionPolicy.Decision action=MusaAiToolActionPolicy.evaluate(command);
         if(!action.allowed){
             result.setText("Gandalf • Komut engellendi: "+action.reason);
             return;
         }
+        java.util.List<Integer>targets=sourceIds==null?java.util.Collections.emptyList():sourceIds;
+        if(!targets.isEmpty())cad.setAiHighlightedSources(targets);
         Runnable execute=()->{
+            if(!targets.isEmpty()&&!cad.selectSourceById(targets.get(0))){
+                result.setText("Gandalf • Hedef nesne artık seçilebilir değil: #"+targets.get(0));
+                return;
+            }
             commandInput.setText(action.command);
             executeCommand();
         };
@@ -767,6 +773,7 @@ public class MainActivity extends AppCompatActivity {
         }
         String detail=(description==null||description.trim().isEmpty()?"Çizimde değişiklik önerildi.":description.trim())+
             "\n\nCAD komutu: "+action.command+
+            (targets.isEmpty()?"":"\nHedef kaynak ID: "+targets)+
             "\n\nBu işlem çizimi veya dosya durumunu değiştirebilir. Yalnızca onayınızla uygulanır.";
         new AlertDialog.Builder(this)
             .setTitle("Gandalf • İşlem onayı")
@@ -1121,7 +1128,7 @@ public class MainActivity extends AppCompatActivity {
             .setMessage("Bir işlemi seçtiğinizde önce güvenlik denetiminden geçer. Çizimi değiştiren işlemler ayrıca UYGULA onayı ister.")
             .setItems(labels,(d,which)->{
                 MusaAiGatewayClient.SuggestedAction a=actions.get(which);
-                runGandalfSuggestedCadCommand(a.command,a.description);
+                runGandalfSuggestedCadCommand(a.command,a.description,a.sourceIds);
             })
             .setNegativeButton("KAPAT",null)
             .show();
