@@ -71,6 +71,7 @@ android {
         versionCode 2
         versionName '1.1'
         buildConfigField "String", "EXPECTED_LICENSE_KEY_FINGERPRINT", groovy.json.JsonOutput.toJson(expectedPaidKeyFingerprint)
+        buildConfigField "boolean", "ALLOW_LEGACY_SHORT_LICENSE", managerProductionRelease ? "false" : "true"
     }
 
     buildTypes {

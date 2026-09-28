@@ -30,7 +30,7 @@ public final class PlayBillingManager {
 
     public void launchPurchase(Activity activity){
         if(listener!=null)listener.onBillingMessage(
-            "Bu MusaCAD sürümü doğrudan APK / kurumsal dağıtımdır. Lisans için Serial + 12 haneli lisans kodunu kullanın."
+            "Bu MusaCAD sürümü doğrudan APK / kurumsal dağıtımdır. Güvenli Lisans Kimliği için üretilmiş MC1 lisansını kullanın."
         );
     }
 

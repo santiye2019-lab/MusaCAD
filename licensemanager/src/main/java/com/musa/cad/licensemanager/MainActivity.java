@@ -50,7 +50,9 @@ public class MainActivity extends AppCompatActivity {
         scroll.addView(root,new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         root.addView(text("MusaCAD Lisans Yönetici",24,Color.WHITE,true));
-        TextView sub=text("Ticari kullanım için RSA imzalı MC1 lisansı üret. 12 haneli kısa kod yalnız geriye dönük uyumluluk içindir.",13,Color.rgb(161,183,196),false);
+        TextView sub=text(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE
+            ?"Ticari kullanım için RSA imzalı MC1 lisansı üret. 12 haneli kısa kod yalnız geliştirme/uyumluluk içindir."
+            :"Production modu: yalnız RSA imzalı MC1 lisansı üretir.",13,Color.rgb(161,183,196),false);
         sub.setPadding(0,dp(4),0,dp(12));root.addView(sub);
 
         section(root,"Güvenli imza anahtarı");
@@ -81,8 +83,10 @@ public class MainActivity extends AppCompatActivity {
 
         section(root,"Lisans türü");
         mode=new Spinner(this);
-        mode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,
-            new String[]{"Güvenli MC1 • Önerilen","12 haneli kısa kod • Uyumluluk"}));
+        String[] modes=BuildConfig.ALLOW_LEGACY_SHORT_LICENSE
+            ?new String[]{"Güvenli MC1 • Önerilen","12 haneli kısa kod • Uyumluluk"}
+            :new String[]{"Güvenli MC1 • Production"};
+        mode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,modes));
         root.addView(mode,matchWrap());
 
         section(root,"Cihaz kimliği");
@@ -133,7 +137,10 @@ public class MainActivity extends AppCompatActivity {
                 if(!LicenseKeyStore.hasKey(this))throw new IllegalStateException("Önce güvenli RSA imza anahtarı oluşturun veya yedekten geri yükleyin");
                 if(!productionKeyMatches())throw new IllegalStateException("Aktif RSA anahtarı MusaCAD release public key'i ile eşleşmiyor. PUBLIC KEY'i ana uygulamaya aktarın ve License Manager'ı yeniden derleyin.");
                 pendingIdentity=LicenseIssuer.normalize(raw);
-            }else pendingIdentity=ShortLicenseCode.normalizeSerial(raw);
+            }else{
+                if(!BuildConfig.ALLOW_LEGACY_SHORT_LICENSE)throw new IllegalStateException("Production License Manager yalnız MC1 lisansı üretir");
+                pendingIdentity=ShortLicenseCode.normalizeSerial(raw);
+            }
         }catch(Exception e){identityField.setError(e.getMessage());return;}
 
         int pos=duration.getSelectedItemPosition();int[] days={30,90,365,0};
@@ -151,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
     private void issueNow(){
         try{
             boolean secure=mode.getSelectedItemPosition()==0;
+            if(!secure&&!BuildConfig.ALLOW_LEGACY_SHORT_LICENSE)throw new IllegalStateException("Production License Manager yalnız MC1 lisansı üretir");
             String token=secure?LicenseIssuer.issue(this,pendingIdentity,pendingDays):ShortLicenseCode.issue(pendingIdentity,pendingDays,System.currentTimeMillis());
             tokenView.setText(token);tokenView.setTextSize(secure?11f:24f);
             LicenseHistory.add(this,pendingCustomer,pendingIdentity,pendingLabel,secure?"MC1":"Kısa kod",token);
@@ -246,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshKeyStatus(){
-        if(!LicenseKeyStore.hasKey(this)){keyStatus.setText("Durum: Güvenli MC1 imza anahtarı YOK\nMusaCAD beklenen fingerprint: "+BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);return;}
+        if(!LicenseKeyStore.hasKey(this)){keyStatus.setText("Durum: Güvenli MC1 imza anahtarı YOK\nİlk kurulum: YENİ ANAHTAR ile .mlk yedeği oluşturun, PUBLIC KEY'i MusaCAD'e aktarın ve iki uygulamayı yeniden production derleyin.\nMusaCAD beklenen fingerprint: "+BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);return;}
         try{
             String current=LicenseKeyStore.fingerprint(this);
             boolean match=current.equalsIgnoreCase(BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);
