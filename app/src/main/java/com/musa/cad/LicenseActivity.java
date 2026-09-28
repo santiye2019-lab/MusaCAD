@@ -85,7 +85,7 @@ public class LicenseActivity extends AppCompatActivity {
             licenseCode=new EditText(this);
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(Color.WHITE);
-            licenseCode.setTextSize(16f);
+            licenseCode.setTextSize(11.5f);
             licenseCode.setHint(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE?"12 haneli kod veya MC1 lisansı":"Güvenli MC1 lisansı");
             licenseCode.setHintTextColor(0xFF7890A8);
             licenseCode.setPadding(dp(12),0,dp(12),0);
@@ -101,22 +101,23 @@ public class LicenseActivity extends AppCompatActivity {
             LockedScreenUi.hotspot(this,stage,458,597,64,58,SCREEN_W,SCREEN_H,v->pasteLicenseCode());
             LockedScreenUi.hotspot(this,stage,78,663,445,67,SCREEN_W,SCREEN_H,v->activate());
 
-            // 3) Telefona özel 12 karakterlik Serial
-            final String serial=LicenseManager.serialId(this);
+            // 3) MC1 için gerçek cihaz-bağlı Güvenli Lisans Kimliği
+            final String secureLicenseId=LicenseManager.installationId(this);
 
             TextView serialLabel=new TextView(this);
-            serialLabel.setText("Serial");
+            serialLabel.setText("Güvenli Lisans Kimliği");
             serialLabel.setTextColor(0xFF9CDFFF);
-            serialLabel.setTextSize(10.5f);
+            serialLabel.setTextSize(9f);
             serialLabel.setGravity(Gravity.CENTER);
             stage.addView(serialLabel);
             LockedScreenUi.position(serialLabel,stage,168,778,300,28,SCREEN_W,SCREEN_H);
 
             TextView deviceId=new TextView(this);
-            deviceId.setSingleLine(true);
-            deviceId.setText(serial);
+            deviceId.setSingleLine(false);
+            deviceId.setMaxLines(2);
+            deviceId.setText(secureLicenseId);
             deviceId.setTextColor(0xFFE7F7FF);
-            deviceId.setTextSize(15f);
+            deviceId.setTextSize(10.5f);
             deviceId.setGravity(Gravity.CENTER);
             deviceId.setTextIsSelectable(true);
             deviceId.setPadding(dp(4),0,dp(4),0);
@@ -125,11 +126,11 @@ public class LicenseActivity extends AppCompatActivity {
             idBg.setCornerRadius(dp(8));
             idBg.setStroke(dp(1),0xFF2E9EE8);
             deviceId.setBackground(idBg);
-            deviceId.setContentDescription("MusaCAD Serial. Dokunarak kopyala.");
-            deviceId.setOnClickListener(v->copySerial(serial));
+            deviceId.setContentDescription("MusaCAD Güvenli Lisans Kimliği. Dokunarak kopyala.");
+            deviceId.setOnClickListener(v->copySecureLicenseId(secureLicenseId));
             stage.addView(deviceId);
-            LockedScreenUi.position(deviceId,stage,168,810,300,54,SCREEN_W,SCREEN_H);
-            LockedScreenUi.hotspot(this,stage,458,817,65,50,SCREEN_W,SCREEN_H,v->copySerial(serial));
+            LockedScreenUi.position(deviceId,stage,126,806,342,62,SCREEN_W,SCREEN_H);
+            LockedScreenUi.hotspot(this,stage,468,806,54,62,SCREEN_W,SCREEN_H,v->copySecureLicenseId(secureLicenseId));
 
             // 4) Dağıtım modeline göre Google Play yenileme veya doğrudan APK bilgisi.
             if(BuildConfig.PLAY_DISTRIBUTION){
@@ -153,7 +154,7 @@ public class LicenseActivity extends AppCompatActivity {
                 updateRenewalButton();
             }else{
                 TextView directModel=new TextView(this);
-                directModel.setText("DOĞRUDAN APK / KURUMSAL\nSerial + 12 haneli lisans kodu\nGoogle Play satın alma bu sürümde kapalıdır.");
+                directModel.setText("DOĞRUDAN APK / KURUMSAL\nGüvenli Lisans Kimliği + MC1 lisansı\nGoogle Play satın alma bu sürümde kapalıdır.");
                 directModel.setTextColor(Color.WHITE);
                 directModel.setTextSize(11f);
                 directModel.setGravity(Gravity.CENTER);
@@ -203,7 +204,7 @@ public class LicenseActivity extends AppCompatActivity {
     private void launchYearlyRenewal(){
         if(!BuildConfig.PLAY_DISTRIBUTION){
             Toast.makeText(this,
-                "Bu doğrudan APK / kurumsal MusaCAD sürümünde Google Play yenilemesi yoktur. Serial + 12 haneli lisans kodunu kullanın.",
+                "Bu doğrudan APK / kurumsal MusaCAD sürümünde Google Play yenilemesi yoktur. Güvenli Lisans Kimliği için üretilmiş MC1 lisansını kullanın.",
                 Toast.LENGTH_LONG).show();
             return;
         }
@@ -267,7 +268,7 @@ public class LicenseActivity extends AppCompatActivity {
         final String secureLicenseId=LicenseManager.installationId(this);
         msg.append("\n\nSerial: ").append(LicenseManager.serialId(this));
         msg.append("\nGüvenli Lisans Kimliği: ").append(secureLicenseId);
-        msg.append("\nOffline / kurumsal aktivasyon: RSA imzalı MC1 lisansı internet veya Google Play gerektirmeden etkinleştirilebilir. 12 haneli kısa kod geriye dönük uyumluluk içindir.");
+        msg.append("\nOffline / kurumsal aktivasyon: Güvenli Lisans Kimliği için RSA imzalı MC1 lisansı kullanılır. Production sürümünde 12 haneli kısa kod kabul edilmez.");
         String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
         if(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE&&stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
             long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
@@ -353,7 +354,9 @@ public class LicenseActivity extends AppCompatActivity {
             enterAfterLicense();
         }else if(licenseCode!=null){
             if(ShortLicenseCode.looksLikeShortCode(code)){
-                licenseCode.setError("12 haneli lisans kodu bu Serial ile eşleşmiyor veya süresi dolmuş");
+                licenseCode.setError(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE
+                    ?"12 haneli uyumluluk kodu bu Serial ile eşleşmiyor veya süresi dolmuş"
+                    :"Production sürümünde 12 haneli kısa kod kabul edilmez; MC1 lisansı kullanın.");
             }else if(BuildConfig.DEBUG&&code.startsWith("MCT1.")){
                 licenseCode.setError("TEST kodu bu cihaza ait değil veya süresi dolmuş");
             }else{
