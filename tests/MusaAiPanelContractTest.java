@@ -33,7 +33,8 @@ public final class MusaAiPanelContractTest {
         require(panel,"Metraj","takeoff quick prompt");
         require(panel,"{\"Mimari\",\"ARKAI_FULL\"}","architecture quick prompt");
         require(panel,"{\"Statik\",\"STATIKAI_FULL\"}","structural quick prompt");
-        require(panel,"{\"Mekanik\",\"MEKAI_FULL\"}","mechanical expert quick prompt");
+        require(panel,"{\"Mekanik\",\"AI_MEKANIK_KONTROL\"}","legacy mechanical quick prompt");
+        require(panel,"{\"MEKAI\",\"MEKAI_FULL\"}","mechanical expert quick prompt");
         require(panel,"{\"ProjAI\",\"PROJAI_FULL\"}","multidisciplinary quick prompt");
         require(panel,"\"G-MEKAI\"","developer mechanical expert quick prompt");
         require(panel,"\"G-ProjAI\"","developer multidisciplinary quick prompt");
