@@ -45,6 +45,7 @@ public final class MusaAiMechanicalExpert {
         int items,linear,degenerate,openRuns;
         boolean diameter,slope,flow,size,capacity;
         final LinkedHashSet<Integer> ids=new LinkedHashSet<>();
+        final LinkedHashSet<Integer> issueIds=new LinkedHashSet<>();
         final StringBuilder corpus=new StringBuilder();
     }
 
@@ -152,9 +153,9 @@ public final class MusaAiMechanicalExpert {
                 st.items++;
                 if(item.hasLength()){
                     st.linear++;
-                    if(item.length<=1e-9d)st.degenerate++;
+                    if(item.length<=1e-9d){st.degenerate++;if(item.sourceId>=0)st.issueIds.add(item.sourceId);}
                 }
-                if(isPolyline(item.type)&&item.closedKnown&&!item.closed)st.openRuns++;
+                if(isPolyline(item.type)&&item.closedKnown&&!item.closed){st.openRuns++;if(item.sourceId>=0)st.issueIds.add(item.sourceId);}
                 st.diameter|=diameter(item.layer)||diameter(item.text);
                 st.slope|=slope(item.layer)||slope(item.text);
                 st.flow|=flow(item.layer)||flow(item.text);
@@ -276,7 +277,8 @@ public final class MusaAiMechanicalExpert {
 
     private static EnumSet<Profile>classify(String hay){
         EnumSet<Profile>out=EnumSet.noneOf(Profile.class);
-        if(has(hay,"pis su","atik su","kanalizasyon","waste","sewer","foul","soil","drenaj","drain"))out.add(Profile.WASTE);
+        if(has(hay,"pis su","atik su","kanalizasyon","waste","sewer","foul","soil")||
+            ((has(hay,"drenaj","drain"))&&!has(hay,"kondens","condensate","roof drain","yagmur")))out.add(Profile.WASTE);
         if(has(hay,"yagmur","rain","storm","roof drain","oluk"))out.add(Profile.RAIN);
         if(has(hay,"temiz su","kullanma suyu","sicak su","soguk su","potable","domestic water","cold water","hot water","hidrofor"))out.add(Profile.WATER);
         if(has(hay,"isitma","kalorifer","radyator","yerden isitma","heating","kazan","esanj","kollektor","kollektör"))out.add(Profile.HEATING);
@@ -298,10 +300,11 @@ public final class MusaAiMechanicalExpert {
     private static boolean diameter(String raw){
         if(raw==null||raw.trim().isEmpty())return false;
         String upper=raw.toUpperCase(Locale.ROOT).replace('Ø','D');
-        return upper.matches(".*\\bDN\\s*[-:]?\\s*\\d+.*")||
+        if(upper.matches(".*\\bDN\\s*[-:]?\\s*\\d+.*")||
             upper.matches(".*\\bD\\s*[-:]?\\s*\\d+.*")||
-            upper.matches(".*\\b\\d+(?:[.,]\\d+)?\\s*MM\\b.*")||
-            has(MusaAiDrawingIndex.normalize(raw),"cap ","diameter ","diam ");
+            upper.matches(".*\\b\\d+(?:[.,]\\d+)?\\s*MM\\b.*"))return true;
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return q.matches(".*\\b(cap|diameter|diam)\\b.*");
     }
 
     private static boolean slope(String raw){
