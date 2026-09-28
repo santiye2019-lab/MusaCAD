@@ -9,6 +9,8 @@ public final class MusaAiCloudPackageContractTest {
         String policy=read("app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java");
         String worker=read("server/ai-worker/src/index.js");
         has(main,"MusaAiCloudPolicy.shouldUseProjectPackage");
+        has(main,"K_CLOUD_PACKAGE_CONSENT");
+        has(main,"packageMode?K_CLOUD_PACKAGE_CONSENT:K_CLOUD_CONSENT");
         has(main,"MusaAiCloudService.analyzePackage");
         has(main,"Gandalf Proje Paketi");
         has(service,"MusaAiCadPackageJson.build");
