@@ -31,6 +31,7 @@ public class LicenseActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         LockedScreenUi.enableImmersive(this);
         setContentView(R.layout.activity_license);
 
