@@ -813,12 +813,18 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Çok disiplinli proje kontrolü: mimari, statik, mekanik, elektrik, yangın, altyapı, peyzaj, asansör\n• Disiplin bazlı proje–keşif uyum özeti\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
             return;
         }
 
         if(MusaAiMechanicalExpert.isHelpCommand(raw)){
             reply.send(MusaAiMechanicalExpert.commandHelp());
+            return;
+        }
+        String disciplineHelpKey=MusaAiDrawingIndex.normalize(raw);
+        if(disciplineHelpKey.equals("ai disiplin help")||disciplineHelpKey.equals("ai disiplin yardim")||
+           disciplineHelpKey.equals("disiplin komutlari")){
+            reply.send(MusaAiDisciplineControl.help());
             return;
         }
 
@@ -1004,6 +1010,27 @@ public class MainActivity extends AppCompatActivity {
             cad.clearAiHighlights();
             reply.send("AI çoklu vurgulaması temizlendi.");
             return;
+        }
+
+        if(activeDxf!=null){
+            MusaAiDisciplineControl.Result discipline=MusaAiDisciplineControl.analyze(currentAiDrawingIndex(),raw);
+            if(discipline.matched){
+                int shown=discipline.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(discipline.sourceIds);
+                if(discipline.sourceIds.isEmpty())cad.clearAiHighlights();
+                StringBuilder answer=new StringBuilder(discipline.text);
+                if(shown>0)answer.append("\n\n• Disiplin kontrolünde çizimde vurgulanan: ").append(shown)
+                    .append(discipline.sourceIds.size()>shown?" / "+discipline.sourceIds.size():"");
+                Set<MusaAiDisciplineControl.Discipline>requested=MusaAiDisciplineControl.requestedDisciplines(raw);
+                if(currentProject!=null&&currentProject.boqModel!=null&&!currentProject.boqModel.isEmpty()&&!requested.isEmpty()){
+                    MusaAiBoq.Model projectBoq=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
+                    String compatibility=MusaAiBoq.disciplineCompatibility(currentProject.boqModel,projectBoq,requested);
+                    if(!compatibility.isEmpty())answer.append("\n\n").append(compatibility);
+                }else if(currentProject!=null&&(currentProject.boqModel==null||currentProject.boqModel.isEmpty())){
+                    answer.append("\n\n• Keşif uyumu: Bu projeye keşif yüklenmedi. “Keşif yükle” ile XLSX/CSV yüklenirse aynı kontrolde disiplin bazlı uyum özeti eklenir.");
+                }
+                reply.send(answer.toString());
+                return;
+            }
         }
 
         if(activeDxf!=null){
