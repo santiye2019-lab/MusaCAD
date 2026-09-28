@@ -29,12 +29,14 @@ test("OpenAI output parser keeps answer, web usage and CAD proposals",()=>{
   const parsed=parseOpenAiOutput({
     output:[
       {type:"message",content:[{type:"output_text",text:"Pis su hattında iki kontrol adayı var."}]},
-      {type:"web_search_call",id:"ws_1"},
+      {type:"web_search_call",id:"ws_1",action:{sources:[{title:"Kaynak A",url:"https://example.com/a"}]}},
       {type:"function_call",name:"cad_change_layer",arguments:JSON.stringify({sourceId:12,layer:"PIS_SU",reason:"Yanlış katman"})}
     ]
   });
   assert.equal(parsed.reply,"Pis su hattında iki kontrol adayı var.");
   assert.equal(parsed.webUsed,true);
+  assert.equal(parsed.sources.length,1);
+  assert.equal(parsed.sources[0].url,"https://example.com/a");
   assert.equal(parsed.actions.length,1);
   assert.equal(parsed.actions[0].name,"cad_change_layer");
   assert.equal(parsed.actions[0].arguments.sourceId,12);
@@ -120,5 +122,7 @@ test("valid signed session reaches Responses API and returns proposed actions",a
   assert.equal(body.actions[0].name,"cad_add_text");
   assert.ok(upstreamBody.tools.some(t=>t.type==="web_search"));
   assert.ok(upstreamBody.tools.some(t=>t.name==="cad_add_text"));
+  assert.equal(upstreamBody.store,false);
+  assert.deepEqual(upstreamBody.include,["web_search_call.action.sources"]);
   assert.equal(upstreamBody.instructions.includes("PROPOSALS ONLY"),true);
 });
