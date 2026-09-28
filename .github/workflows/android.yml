@@ -294,7 +294,7 @@ jobs:
       - name: Test displayed secure MC1 ID to offline license round trip
         run: |
           grep -q 'LicenseManager.installationId(this)' app/src/main/java/com/musa/cad/LicenseActivity.java
-          grep -q 'serialLabel.setText("Güvenli Lisans Kimliği")' app/src/main/java/com/musa/cad/LicenseActivity.java
+          grep -q 'textView("Güvenli Lisans Kimliği"' app/src/main/java/com/musa/cad/LicenseActivity.java
           javac -d /tmp/musacad-license-roundtrip app/src/main/java/com/musa/cad/LicenseToken.java tools/license-generator/LicenseGenerator.java tests/LicenseGeneratorRoundTripTest.java
           java -cp /tmp/musacad-license-roundtrip LicenseGeneratorRoundTripTest
       - name: Test 12-character Serial and license code
@@ -354,6 +354,10 @@ jobs:
           grep -q 'İkinci kez geri tuşuna basarsanız proje' app/src/main/java/com/musa/cad/MainActivity.java
           grep -q 'lastAccessMs' app/src/main/java/com/musa/cad/RecentFileStore.java
           grep -q 'thumbnail' app/src/main/java/com/musa/cad/RecentFileStore.java
+      - name: Test responsive entry and license screens
+        run: |
+          javac -d /tmp/musacad-tests tests/ResponsiveEntryLicenseUiContractTest.java
+          java -cp /tmp/musacad-tests ResponsiveEntryLicenseUiContractTest
       - name: Test DWG first-open critical path
         run: |
           python3 - <<'PY'

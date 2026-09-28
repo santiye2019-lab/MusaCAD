@@ -3,38 +3,36 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#031321">
-    <FrameLayout
-        android:id="@+id/artworkStage"
+
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_gravity="center">
-        <ImageView
-            android:id="@+id/lockedArtwork"
+        android:scaleType="centerCrop"
+        android:src="@drawable/musacad_screen_3_v2"
+        android:alpha="0.22"
+        android:contentDescription="@null" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B8031321" />
+
+    <ScrollView
+        android:id="@+id/licenseScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:id="@+id/licenseContent"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/splash_scene_reference"
-            android:contentDescription="MusaCAD kilitli lisans tasarımı" />
-        <EditText
-            android:id="@+id/licenseCode"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:singleLine="true"
-            android:inputType="textVisiblePassword"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:paddingStart="18dp"
+            android:paddingTop="26dp"
             android:paddingEnd="18dp"
-            android:background="#D9082036"
-            android:hint="Lisans Kodunu Girin"
-            android:textColorHint="#8EA8BD" />
-        <TextView android:id="@+id/licenseStatus" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/licenseMessage" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/installationId" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <CheckBox android:id="@+id/termsCheck" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <Button android:id="@+id/trialButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <Button android:id="@+id/termsButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <Button android:id="@+id/copyInstallationIdButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <Button android:id="@+id/activateButton" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-    </FrameLayout>
+            android:paddingBottom="42dp" />
+    </ScrollView>
 </FrameLayout>

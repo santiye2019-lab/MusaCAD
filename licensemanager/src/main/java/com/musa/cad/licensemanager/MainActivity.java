@@ -11,12 +11,14 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.widget.TextViewCompat;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
 
     private View buildUi(){
         ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(20),dp(18),dp(28));
@@ -56,8 +60,8 @@ public class MainActivity extends AppCompatActivity {
         sub.setPadding(0,dp(4),0,dp(12));root.addView(sub);
 
         section(root,"Güvenli imza anahtarı");
-        keyStatus=text("",12,Color.rgb(175,205,215),false);
-        keyStatus.setTextIsSelectable(true);keyStatus.setPadding(0,0,0,dp(7));root.addView(keyStatus,matchWrap());
+        keyStatus=text("",11,Color.rgb(175,205,215),false);
+        keyStatus.setTextIsSelectable(true);keyStatus.setLineSpacing(dp(2),1f);keyStatus.setPadding(0,0,0,dp(9));root.addView(keyStatus,matchWrap());
 
         LinearLayout keyRow1=new LinearLayout(this);keyRow1.setOrientation(LinearLayout.HORIZONTAL);
         Button createKey=button("YENİ ANAHTAR");createKey.setOnClickListener(v->confirmNewKey());
@@ -90,13 +94,19 @@ public class MainActivity extends AppCompatActivity {
         root.addView(mode,matchWrap());
 
         section(root,"Cihaz kimliği");
-        identityField=input("MusaCAD Güvenli Lisans Kimliği");
-        identityField.setSingleLine(true);identityField.setTextSize(15f);
+        TextView identityHelp=text("MusaCAD > Lisans Bilgisi ekranındaki Güvenli Lisans Kimliğini buraya yapıştırın.",11,Color.rgb(150,174,187),false);
+        identityHelp.setPadding(0,0,0,dp(6));root.addView(identityHelp,matchWrap());
+        identityField=input("Güvenli Lisans Kimliğini yapıştır");
+        identityField.setSingleLine(true);identityField.setTextSize(13f);
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(identityField,10,13,1,TypedValue.COMPLEX_UNIT_SP);
         root.addView(identityField,matchWrap());
         mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
                 boolean secure=position==0;
-                identityField.setHint(secure?"MusaCAD > Lisans Bilgisi > Güvenli Lisans Kimliği":"MusaCAD'deki 12 haneli Serial");
+                identityHelp.setText(secure
+                    ?"MusaCAD > Lisans Bilgisi ekranındaki Güvenli Lisans Kimliğini buraya yapıştırın."
+                    :"MusaCAD'deki 12 haneli Serial bilgisini buraya girin.");
+                identityField.setHint(secure?"Güvenli Lisans Kimliğini yapıştır":"12 haneli Serial");
                 tokenView.setTextSize(secure?11f:24f);
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
@@ -115,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
         section(root,"Lisans");
         tokenView=text("Henüz üretilmedi",11,Color.WHITE,true);
         tokenView.setGravity(Gravity.CENTER);tokenView.setTextIsSelectable(true);
+        tokenView.setSingleLine(false);tokenView.setMaxLines(8);
         tokenView.setPadding(dp(12),dp(18),dp(12),dp(18));tokenView.setBackground(round(Color.rgb(15,28,35),10));
         root.addView(tokenView,matchWrap());
 
@@ -169,11 +180,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void confirmNewKey(){
         String extra=LicenseKeyStore.hasKey(this)?"\n\nMevcut anahtar değişirse MusaCAD release public key'i de yeni anahtarla güncellenmelidir. Eski anahtar yedeğini kaybetmeyin.":"";
-        new AlertDialog.Builder(this).setTitle("Yeni RSA imza anahtarı")
+        AlertDialog d=new AlertDialog.Builder(this).setTitle("Yeni RSA imza anahtarı")
             .setMessage("Yeni anahtar yalnız parola korumalı yedek dosyası başarıyla kaydedilirse etkinleşir."+extra)
             .setNegativeButton("İPTAL",null)
-            .setPositiveButton("DEVAM",(d,w)->askBackupPassword(true))
-            .show();
+            .setPositiveButton("DEVAM",(dialog,w)->askBackupPassword(true))
+            .create();
+        d.setOnShowListener(x->styleDialogButtons(d));d.show();
     }
 
     private void backupExistingKey(){
@@ -188,15 +200,18 @@ public class MainActivity extends AppCompatActivity {
             .setTitle(newKey?"Yeni anahtar yedek parolası":"Anahtar yedek parolası")
             .setMessage("En az 12 karakter kullanın. Bu parola kurtarma için zorunludur ve MusaCAD tarafından geri alınamaz.")
             .setView(box).setNegativeButton("İPTAL",null).setPositiveButton("KAYDET",null).create();
-        dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            String a=p1.getText().toString(),b=p2.getText().toString();
-            if(a.length()<12){p1.setError("En az 12 karakter");return;}
-            if(!a.equals(b)){p2.setError("Parolalar eşleşmiyor");return;}
-            clearPendingPassword();pendingBackupPassword=a.toCharArray();pendingNewKey=newKey;pendingExistingBackup=!newKey;
-            Intent create=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
-            create.putExtra(Intent.EXTRA_TITLE,"MusaCAD-Lisans-Anahtari-"+System.currentTimeMillis()+".mlk");
-            startActivityForResult(create,CREATE_BACKUP);dialog.dismiss();
-        }));
+        dialog.setOnShowListener(x->{
+            styleDialogButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                String a=p1.getText().toString(),b=p2.getText().toString();
+                if(a.length()<12){p1.setError("En az 12 karakter");return;}
+                if(!a.equals(b)){p2.setError("Parolalar eşleşmiyor");return;}
+                clearPendingPassword();pendingBackupPassword=a.toCharArray();pendingNewKey=newKey;pendingExistingBackup=!newKey;
+                Intent create=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
+                create.putExtra(Intent.EXTRA_TITLE,"MusaCAD-Lisans-Anahtari-"+System.currentTimeMillis()+".mlk");
+                startActivityForResult(create,CREATE_BACKUP);dialog.dismiss();
+            });
+        });
         dialog.show();
     }
 
@@ -210,14 +225,18 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Anahtar yedeğini geri yükle")
             .setMessage("Yedeği oluştururken kullandığınız parolayı girin.")
             .setView(box).setNegativeButton("İPTAL",null).setPositiveButton("GERİ YÜKLE",null).create();
-        dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            char[] password=p.getText().toString().toCharArray();
-            try{
-                LicenseKeyStore.restore(this,backup,password);refreshKeyStatus();
-                Toast.makeText(this,"Güvenli lisans anahtarı geri yüklendi",Toast.LENGTH_LONG).show();dialog.dismiss();
-            }catch(Exception e){p.setError("Yedek açılamadı: "+e.getMessage());}
-            finally{Arrays.fill(password,'\0');}
-        }));dialog.show();
+        dialog.setOnShowListener(x->{
+            styleDialogButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                char[] password=p.getText().toString().toCharArray();
+                try{
+                    LicenseKeyStore.restore(this,backup,password);refreshKeyStatus();
+                    Toast.makeText(this,"Güvenli lisans anahtarı geri yüklendi",Toast.LENGTH_LONG).show();dialog.dismiss();
+                }catch(Exception e){p.setError("Yedek açılamadı: "+e.getMessage());}
+                finally{Arrays.fill(password,'\0');}
+            });
+        });
+        dialog.show();
     }
 
     private void sharePublicKey(){
@@ -324,14 +343,30 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onDestroy(){clearBackupOperation();super.onDestroy();}
 
-    private void section(LinearLayout root,String label){TextView v=text(label,15,Color.WHITE,true);v.setPadding(0,dp(20),0,dp(7));root.addView(v);}
-    private EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(115,142,157));e.setInputType(InputType.TYPE_CLASS_TEXT);e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(25,181,165)));return e;}
-    private Button button(String label){Button b=new Button(this);b.setText(label);b.setTextColor(Color.WHITE);b.setTextSize(11);b.setAllCaps(false);b.setBackground(round(Color.rgb(11,59,96),12));return b;}
-    private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setIncludeFontPadding(false);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private void section(LinearLayout root,String label){TextView v=text(label,15,Color.WHITE,true);v.setPadding(0,dp(18),0,dp(7));root.addView(v);}
+    private EditText input(String hint){
+        EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(128,151,164));
+        e.setTextSize(13f);e.setInputType(InputType.TYPE_CLASS_TEXT);e.setSingleLine(true);
+        e.setMinHeight(dp(50));e.setPadding(dp(12),0,dp(12),0);
+        GradientDrawable bg=round(Color.rgb(12,31,40),10);bg.setStroke(dp(1),Color.rgb(25,181,165));e.setBackground(bg);
+        return e;
+    }
+    private Button button(String label){
+        Button b=new Button(this);b.setText(label);b.setTextColor(Color.WHITE);b.setTextSize(11);b.setAllCaps(false);
+        b.setMinHeight(dp(48));b.setSingleLine(false);b.setMaxLines(2);b.setPadding(dp(6),dp(3),dp(6),dp(3));
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(b,9,12,1,TypedValue.COMPLEX_UNIT_SP);
+        b.setBackground(round(Color.rgb(11,59,96),12));return b;
+    }
+    private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setIncludeFontPadding(false);t.setLineSpacing(dp(2),1f);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private Space space(int dp){return new Space(this);}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private LinearLayout.LayoutParams matchWrap(){return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);}
     private LinearLayout.LayoutParams buttonParams(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52));p.topMargin=dp(8);return p;}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
-    private void showError(String message){new AlertDialog.Builder(this).setTitle("MusaCAD Lisans Yönetici").setMessage(message).setPositiveButton("TAMAM",null).show();}
+    private void showError(String message){AlertDialog d=new AlertDialog.Builder(this).setTitle("MusaCAD Lisans Yönetici").setMessage(message).setPositiveButton("TAMAM",null).create();d.setOnShowListener(x->styleDialogButtons(d));d.show();}
+    private void styleDialogButtons(AlertDialog d){
+        if(d==null)return;
+        int[] ids={AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEGATIVE,AlertDialog.BUTTON_NEUTRAL};
+        for(int id:ids){Button b=d.getButton(id);if(b==null)continue;b.setTextColor(Color.WHITE);b.setMinHeight(dp(48));b.setSingleLine(false);b.setMaxLines(2);TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(b,9,12,1,TypedValue.COMPLEX_UNIT_SP);}
+    }
 }

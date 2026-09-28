@@ -7,11 +7,13 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.util.TypedValue;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.widget.TextViewCompat;
 
 public class SplashActivity extends AppCompatActivity {
     private static final float SCREEN_W=600f,SCREEN_H=1535f;
@@ -34,9 +36,8 @@ public class SplashActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.splashRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fillStage(this,root,stage,SCREEN_W,SCREEN_H,()->{
+        LockedScreenUi.fillStageFromDrawable(this,root,stage,R.drawable.musacad_screen_1,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
-            art.setImageResource(R.drawable.musacad_screen_1);
             art.setContentDescription("MusaCAD açılış ekranı");
 
             // 3D capability is now explicitly visible on the first screen.
@@ -44,6 +45,7 @@ public class SplashActivity extends AppCompatActivity {
             threeD.setText("2D + 3D CAD DESTEĞİ");
             threeD.setTextColor(Color.WHITE);
             threeD.setTextSize(13f);
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(threeD,9,13,1,TypedValue.COMPLEX_UNIT_SP);
             threeD.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
             threeD.setGravity(Gravity.CENTER);
             threeD.setLetterSpacing(.05f);
@@ -62,6 +64,7 @@ public class SplashActivity extends AppCompatActivity {
             start.setAllCaps(false);
             start.setTextColor(Color.WHITE);
             start.setTextSize(17f);
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(start,12,17,1,TypedValue.COMPLEX_UNIT_SP);
             start.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
             start.setGravity(Gravity.CENTER);
             start.setPadding(dp(12),0,dp(12),0);

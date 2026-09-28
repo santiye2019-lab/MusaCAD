@@ -25,9 +25,8 @@ public class AboutActivity extends AppCompatActivity {
         FrameLayout root=findViewById(R.id.aboutRoot);
         FrameLayout stage=findViewById(R.id.artworkStage);
 
-        LockedScreenUi.fillStage(this,root,stage,SCREEN_W,SCREEN_H,()->{
+        LockedScreenUi.fillStageFromDrawable(this,root,stage,R.drawable.musacad_screen_2,()->{
             ImageView art=stage.findViewById(R.id.lockedArtwork);
-            art.setImageResource(R.drawable.musacad_screen_2);
             art.setContentDescription("MusaCAD ikinci ekran");
 
             // Real native animation: driven by ValueAnimator so it keeps moving on-device.

@@ -2,6 +2,7 @@ package com.musa.cad;
 
 import android.app.Activity;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
@@ -35,6 +36,24 @@ final class LockedScreenUi {
 
     static void fillStage(Activity a, FrameLayout root, FrameLayout stage, Runnable ready){
         fillStage(a,root,stage,ART_W,ART_H,ready);
+    }
+
+    /**
+     * Fit a locked artwork using the drawable's real intrinsic aspect ratio.
+     * Overlay coordinates can still use their design/reference coordinate system;
+     * only the physical stage ratio comes from the actual PNG so text/graphics
+     * are never stretched on different phone aspect ratios.
+     */
+    static void fillStageFromDrawable(Activity a,FrameLayout root,FrameLayout stage,int drawableRes,Runnable ready){
+        Drawable d=null;
+        try{d=a.getResources().getDrawable(drawableRes,a.getTheme());}catch(Exception ignored){}
+        float w=d!=null&&d.getIntrinsicWidth()>0?d.getIntrinsicWidth():ART_W;
+        float h=d!=null&&d.getIntrinsicHeight()>0?d.getIntrinsicHeight():ART_H;
+        fillStage(a,root,stage,w,h,()->{
+            ImageView art=stage.findViewById(R.id.lockedArtwork);
+            if(art!=null)art.setImageResource(drawableRes);
+            if(ready!=null)ready.run();
+        });
     }
 
     static void fillStage(Activity a, FrameLayout root, FrameLayout stage, float artW,float artH,Runnable ready){
