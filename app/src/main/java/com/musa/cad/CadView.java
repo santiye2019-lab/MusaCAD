@@ -209,7 +209,7 @@ public class CadView extends View {
         if(e==null)return mix(h,0);
         h=mix(h,e.type.ordinal());h=mix(h,e.closed?1:0);h=mix(h,Float.floatToIntBits(e.strokeWidth));h=mix(h,Float.floatToIntBits(e.rotationDegrees));
         h=mix(h,e.text==null?0:e.text.hashCode());h=mix(h,e.textStyleName==null?0:e.textStyleName.hashCode());h=mix(h,e.textFamilyHint==null?0:e.textFamilyHint.hashCode());
-        h=mix(h,e.textShx?1:0);h=mix(h,Float.floatToIntBits(e.textHeight));h=mix(h,Float.floatToIntBits(e.textWidthFactor));h=mix(h,Float.floatToIntBits(e.textOblique));h=mix(h,e.textGenerationFlags);
+        h=mix(h,e.textShx?1:0);h=mix(h,Float.floatToIntBits(e.textHeight));h=mix(h,Float.floatToIntBits(e.textWidthFactor));h=mix(h,Float.floatToIntBits(e.textOblique));h=mix(h,e.textGenerationFlags);h=mix(h,e.layerOverride==null?0:e.layerOverride.hashCode());
         if(e.xy!=null)for(float v:e.xy)h=mix(h,Float.floatToIntBits(v));
         return h;
     }
