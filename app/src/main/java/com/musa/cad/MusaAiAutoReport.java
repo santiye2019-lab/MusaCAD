@@ -50,24 +50,27 @@ public final class MusaAiAutoReport {
             out.append("\n\n1. METRAJ ÖZETİ\n").append(stripAdvice(takeoff.text));
         }
 
+        String mechanical=MusaAiMechanical.reportSection(current);
+        out.append("\n\n2. MEKANİK TESİSAT AI ÖZETİ\n").append(mechanical);
+
         MusaAiProjectControl.Result control=MusaAiProjectControl.analyze(current,"Projeyi kontrol et");
         int findingCount=0;
         if(control.matched){
             findingCount=control.findingCount;
             highlight.addAll(control.sourceIds);
-            out.append("\n\n2. CAD KALİTE KONTROLÜ\n").append(stripFinalNote(control.text));
+            out.append("\n\n3. CAD KALİTE KONTROLÜ\n").append(stripFinalNote(control.text));
         }
 
         if(current.oleObjectCount>0){
             MusaAiTableOleAnalysis.Answer ole=MusaAiTableOleAnalysis.answer(current,"OLE nesnelerini özetle");
             if(ole.matched&&!ole.text.isEmpty()){
-                out.append("\n\n3. GÖMÜLÜ BELGE / OLE\n").append(limitLines(ole.text,18));
+                out.append("\n\n4. GÖMÜLÜ BELGE / OLE\n").append(limitLines(ole.text,18));
             }
         }else{
-            out.append("\n\n3. GÖMÜLÜ BELGE / OLE\n• Görünür OLE2FRAME nesnesi yok.");
+            out.append("\n\n4. GÖMÜLÜ BELGE / OLE\n• Görünür OLE2FRAME nesnesi yok.");
         }
 
-        out.append("\n\n4. REVİZYON DURUMU");
+        out.append("\n\n5. REVİZYON DURUMU");
         if(baseline!=null){
             MusaAiRevisionCompare.Result revision=MusaAiRevisionCompare.compare(
                 baseline,current,"Revizyonları karşılaştır",
@@ -80,7 +83,7 @@ public final class MusaAiAutoReport {
             out.append("\n• Referans revizyon tanımlı değil. Bu bölüm karşılaştırma yapılmadan üretildi.");
         }
 
-        out.append("\n\n5. RAPOR SONUCU");
+        out.append("\n\n6. RAPOR SONUCU");
         out.append("\n• Otomatik CAD kalite bulgusu/inceleme adayı: ").append(findingCount);
         out.append("\n• Çizimde vurgulanabilir bulgu/değişiklik: ").append(highlight.size());
         out.append("\n• Rapor MusaCAD içindeki vektör çizim verisi ve gömülü metadata üzerinden çevrimdışı oluşturuldu.");

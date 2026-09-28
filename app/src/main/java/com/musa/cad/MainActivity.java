@@ -799,7 +799,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Mekanik tesisat AI analizi\n• Proje/hata kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
             return;
         }
 
@@ -929,6 +929,18 @@ public class MainActivity extends AppCompatActivity {
                     :"\nVurgulanan: "+shown;
                 if(shown==0&&selection.totalMatches>0)note+="\nEşleşmeler blok içi veya doğrudan düzenlenemeyen öğeler olabilir.";
                 reply.send(selection.description+note);
+                return;
+            }
+        }
+
+        if(activeDxf!=null){
+            MusaAiMechanical.Result mechanical=MusaAiMechanical.analyze(currentAiDrawingIndex(),raw);
+            if(mechanical.matched){
+                int shown=mechanical.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(mechanical.sourceIds);
+                if(mechanical.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• Mekanik çizimde vurgulanan: "+shown+
+                    (mechanical.sourceIds.size()>shown?" / "+mechanical.sourceIds.size():""):"";
+                reply.send(mechanical.text+highlight);
                 return;
             }
         }
