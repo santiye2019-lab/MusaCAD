@@ -32,17 +32,14 @@ final class LicenseKeyStore {
         return !p.getString(K_PRIVATE,"").isEmpty()&&!p.getString(K_NONCE,"").isEmpty()&&!p.getString(K_PUBLIC,"").isEmpty();
     }
 
-    /** Generates a recoverable RSA key and immediately returns its password-encrypted backup package. */
-    static String generateNew(Context c,char[] backupPassword)throws Exception{
+    /** Creates a password-encrypted backup for a new RSA key without activating it on the device. */
+    static String generateBackup(char[] backupPassword)throws Exception{
         KeyPairGenerator g=KeyPairGenerator.getInstance("RSA");
         g.initialize(2048);
         KeyPair pair=g.generateKeyPair();
         byte[] priv=pair.getPrivate().getEncoded(),pub=pair.getPublic().getEncoded();
-        try{
-            String backup=LicenseBackupCrypto.encrypt(priv,pub,backupPassword);
-            storeOperational(c,priv,pub);
-            return backup;
-        }finally{Arrays.fill(priv,(byte)0);}
+        try{return LicenseBackupCrypto.encrypt(priv,pub,backupPassword);}
+        finally{Arrays.fill(priv,(byte)0);}
     }
 
     static String backup(Context c,char[] backupPassword)throws Exception{
