@@ -241,6 +241,14 @@ public class LicenseActivity extends AppCompatActivity {
         }
     }
 
+    private void copySecureLicenseId(String value){
+        ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        if(clipboard!=null){
+            clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Güvenli Lisans Kimliği",value));
+            Toast.makeText(this,"Güvenli lisans kimliği kopyalandı",Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void showLicenseInfo(){
         LicenseManager.State state=LicenseManager.state(this);
         StringBuilder msg=new StringBuilder();
@@ -256,8 +264,10 @@ public class LicenseActivity extends AppCompatActivity {
             msg.append("\nGoogle Play yıllık lisans bitişi: ")
                .append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(playExpiry)));
         }
+        final String secureLicenseId=LicenseManager.installationId(this);
         msg.append("\n\nSerial: ").append(LicenseManager.serialId(this));
-        msg.append("\nOffline / kurumsal aktivasyon: Bu Serial için üretilen lisans kodu internet veya Google Play gerektirmeden etkinleştirilebilir.");
+        msg.append("\nGüvenli Lisans Kimliği: ").append(secureLicenseId);
+        msg.append("\nOffline / kurumsal aktivasyon: 12 haneli kısa kod geriye dönük uyumluluk içindir. Ticari kullanımda güvenli Lisans Kimliği için RSA imzalı MC1 lisansı tercih edilir.");
         String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
         if(stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
             long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
@@ -267,6 +277,7 @@ public class LicenseActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle("MusaCAD Lisans Bilgisi")
             .setMessage(msg.toString())
+            .setNeutralButton("GÜVENLİ KİMLİĞİ KOPYALA",(dialog,which)->copySecureLicenseId(secureLicenseId))
             .setPositiveButton("TAMAM",null)
             .show();
     }
