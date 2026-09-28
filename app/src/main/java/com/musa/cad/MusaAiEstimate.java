@@ -81,7 +81,8 @@ public final class MusaAiEstimate {
             String layer=clean(item.layer);if(layer.isEmpty())layer="0";
             MusaAiDiscipline d=MusaAiDiscipline.classify(layer+" "+item.text);
             String key=d.name()+"|"+layer;
-            Accumulator a=groups.computeIfAbsent(key,k->new Accumulator(d,layer,index.unitName));
+            Accumulator a=groups.get(key);
+            if(a==null){a=new Accumulator(d,layer,index.unitName);groups.put(key,a);}
             a.add(item);
         }
         ArrayList<Item>out=new ArrayList<>();
