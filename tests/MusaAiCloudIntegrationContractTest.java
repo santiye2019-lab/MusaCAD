@@ -14,6 +14,8 @@ public final class MusaAiCloudIntegrationContractTest {
         String session=read("app/src/main/java/com/musa/cad/MusaAiSessionService.java");
         String license=read("app/src/main/java/com/musa/cad/LicenseManager.java");
         String cadJson=read("app/src/main/java/com/musa/cad/MusaAiCadJson.java");
+        String expert=read("app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java");
+        String worker=read("server/ai-worker/src/index.js");
         String executor=read("app/src/main/java/com/musa/cad/MusaAiActionExecutor.java");
         String cadView=read("app/src/main/java/com/musa/cad/CadView.java");
 
@@ -31,6 +33,11 @@ public final class MusaAiCloudIntegrationContractTest {
         require(cadJson,"rawDrawingIncluded","no raw drawing policy");
         require(cadJson,"automaticEditsAllowed","no automatic edits policy");
         require(cadJson,"editActionsRequireUserApproval","user approval policy");
+        require(main,"MusaAiMechanicalExpert.analyze","local MEKAI expert routing");
+        require(cloud,"body.put(\"expertProfile\",expertProfile)","trusted MEKAI profile request");
+        require(expert,"GMEKAI","GMEKAI command surface");
+        require(worker,"normalizeExpertProfile","server expert-profile allowlist");
+        require(worker,"mechanicalExpertInstructions","server mechanical expert instructions");
         require(main,"MusaAiSessionService.developerCached()","developer-only edit application gate");
         require(main,"Gandalf Developer • Önizleme","explicit Gandalf preview dialog");
         require(main,"setPositiveButton(\"UYGULA\"","explicit user approval button");
