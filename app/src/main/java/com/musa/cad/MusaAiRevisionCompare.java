@@ -151,7 +151,7 @@ public final class MusaAiRevisionCompare {
         }else center=.35d;
 
         double metric=metricDifference(a,b);
-        if(!textIdentity&&metric>.35d)return Double.POSITIVE_INFINITY;
+        if(!textIdentity&&metric>.45d)return Double.POSITIVE_INFINITY;
         if(textIdentity&&metric>.9d)return Double.POSITIVE_INFINITY;
         double layerPenalty=sameLayer?0d:.20d;
         return center*.58d+Math.min(1d,metric)*.32d+layerPenalty;
