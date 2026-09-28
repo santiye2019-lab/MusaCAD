@@ -77,10 +77,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private static final class RevisionCandidate {
+        final MusaAiDrawingIndex index;final String name;
+        RevisionCandidate(MusaAiDrawingIndex index,String name){this.index=index;this.name=name==null?"Referans":name;}
+    }
+
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
     private DxfParser.Result aiIndexedDxf;
-    private MusaAiDrawingIndex aiDrawingIndex;
+    private MusaAiDrawingIndex aiDrawingIndex,aiRevisionBaseline;
+    private String aiRevisionBaselineName="";
     private CadView cad;
     private TextView fileName,result,editStatusText,tabFileName;
     private LinearLayout projectTabsBox;
@@ -764,6 +770,30 @@ public class MainActivity extends AppCompatActivity {
         return aiDrawingIndex;
     }
 
+    private RevisionCandidate findOtherRevisionCandidate(){
+        RevisionCandidate found=null;
+        for(ProjectSession p:projects){
+            if(p==null||p==currentProject||p.parsed==null)continue;
+            if(found!=null)return null;
+            found=new RevisionCandidate(p.parsed.aiDrawingIndex(),p.name);
+        }
+        return found;
+    }
+
+    private boolean isRevisionBaselineSetCommand(String q){
+        return q.contains("bu cizimi referans revizyon yap")||
+            q.contains("bu cizimi revizyon referansi yap")||
+            q.contains("bu cizimi referans al")||
+            q.contains("bu cizimi baz al")||
+            q.contains("revizyon referansi kaydet")||
+            q.contains("revizyon bazini kaydet");
+    }
+
+    private boolean isRevisionBaselineClearCommand(String q){
+        return (q.contains("revizyon")||q.contains("referans"))&&
+            (q.contains("temizle")||q.contains("sil")||q.contains("sifirla"));
+    }
+
     private void handleMusaAiPrompt(String prompt,MusaAiPanel.Reply reply){
         String raw=prompt==null?"":prompt.trim();
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
@@ -790,6 +820,56 @@ public class MainActivity extends AppCompatActivity {
         if(currentProject==null){
             reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
             return;
+        }
+
+        String aiq=MusaAiDrawingIndex.normalize(raw);
+        if(isRevisionBaselineClearCommand(aiq)){
+            aiRevisionBaseline=null;aiRevisionBaselineName="";
+            cad.clearAiHighlights();
+            reply.send("Revizyon referansı temizlendi.");
+            return;
+        }
+
+        if(isRevisionBaselineSetCommand(aiq)){
+            if(activeDxf==null){
+                reply.send("Referans revizyon kaydetmek için tam vektör DWG/DXF çiziminin hazır olması gerekiyor.");
+                return;
+            }
+            aiRevisionBaseline=currentAiDrawingIndex();
+            aiRevisionBaselineName=currentDisplayName;
+            cad.clearAiHighlights();
+            reply.send("Revizyon referansı kaydedildi • "+aiRevisionBaselineName+
+                "\nŞimdi diğer DWG/DXF revizyonunu açıp “Revizyonları karşılaştır” diyebilirsiniz.");
+            return;
+        }
+
+        if(MusaAiRevisionCompare.asksComparison(raw)){
+            if(activeDxf==null){
+                reply.send("Revizyon karşılaştırması için güncel çizimin tam vektör modeli hazır olmalı.");
+                return;
+            }
+            MusaAiDrawingIndex baseline=aiRevisionBaseline;
+            String baselineName=aiRevisionBaselineName;
+            boolean automatic=false;
+            if(baseline==null){
+                RevisionCandidate candidate=findOtherRevisionCandidate();
+                if(candidate!=null){baseline=candidate.index;baselineName=candidate.name;automatic=true;}
+            }
+            if(baseline==null){
+                reply.send("Karşılaştırılacak referans belirlenmedi. Referans çizimi açıp “Bu çizimi referans revizyon yap” deyin; ardından diğer revizyonu açıp karşılaştırın. İki vektör proje açık olduğunda diğer tek proje de otomatik referans olarak kullanılabilir.");
+                return;
+            }
+            MusaAiRevisionCompare.Result revision=MusaAiRevisionCompare.compare(
+                baseline,currentAiDrawingIndex(),raw,baselineName,currentDisplayName);
+            if(revision.matched){
+                int shown=revision.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(revision.sourceIds);
+                if(revision.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• Güncel çizimde eklenen/değişen vurgulandı: "+shown+
+                    (revision.sourceIds.size()>shown?" / "+revision.sourceIds.size():""):"";
+                String auto=automatic?"\n• Referans otomatik seçildi: "+baselineName:"";
+                reply.send(revision.text+highlight+auto);
+                return;
+            }
         }
 
         if(q.contains("ai seçimini temizle")||q.contains("ai secimini temizle")||q.contains("vurgulamayı temizle")||q.contains("vurgulamayi temizle")){
