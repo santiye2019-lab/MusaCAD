@@ -62,8 +62,10 @@ async function handleAnalyze(request, env) {
     input,
     tools,
     parallel_tool_calls: true,
+    store: false,
     max_output_tokens: positiveInt(env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000)
   };
+  if (allowWeb) requestBody.include = ["web_search_call.action.sources"];
 
   const fetcher = typeof env.__fetch === "function" ? env.__fetch : fetch;
   let upstream;
@@ -101,6 +103,7 @@ async function handleAnalyze(request, env) {
     status: "ok",
     reply,
     actions: parsedOutput.actions,
+    sources: parsedOutput.sources,
     webUsed: parsedOutput.webUsed,
     sessionExpiresAtMs: session.expiresAtMs
   });
@@ -200,12 +203,22 @@ function functionTool(name, description, properties, required) {
 function parseOpenAiOutput(data) {
   const texts = [];
   const actions = [];
+  const sourceMap = new Map();
   let webUsed = false;
   const output = data && Array.isArray(data.output) ? data.output : [];
 
   for (const item of output) {
     if (!item || typeof item !== "object") continue;
-    if (item.type === "web_search_call") webUsed = true;
+    if (item.type === "web_search_call") {
+      webUsed = true;
+      const sources = item.action && Array.isArray(item.action.sources) ? item.action.sources : [];
+      for (const source of sources) {
+        const url = String(source && source.url || "").trim();
+        if (!/^https?:\/\//i.test(url)) continue;
+        const title = String(source && source.title || "").trim();
+        sourceMap.set(url, { title, url });
+      }
+    }
 
     if (item.type === "function_call") {
       const name = String(item.name || "").trim();
@@ -222,13 +235,29 @@ function parseOpenAiOutput(data) {
 
     if (item.type === "message" && Array.isArray(item.content)) {
       for (const part of item.content) {
-        if (part && part.type === "output_text" && typeof part.text === "string" && part.text.trim())
+        if (part && part.type === "output_text" && typeof part.text === "string" && part.text.trim()) {
           texts.push(part.text.trim());
+          const annotations = Array.isArray(part.annotations) ? part.annotations : [];
+          for (const annotation of annotations) {
+            if (!annotation || annotation.type !== "url_citation") continue;
+            const citation = annotation.url_citation && typeof annotation.url_citation === "object"
+              ? annotation.url_citation : annotation;
+            const url = String(citation.url || "").trim();
+            if (!/^https?:\/\//i.test(url)) continue;
+            const title = String(citation.title || "").trim();
+            sourceMap.set(url, { title, url });
+          }
+        }
       }
     }
   }
 
-  return { reply: texts.join("\n\n").trim(), actions, webUsed };
+  return {
+    reply: texts.join("\n\n").trim(),
+    actions,
+    sources: Array.from(sourceMap.values()).slice(0, 20),
+    webUsed
+  };
 }
 
 async function verifySession(authHeader, publicKeyPem) {
