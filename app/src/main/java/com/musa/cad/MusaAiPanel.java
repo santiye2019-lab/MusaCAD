@@ -32,6 +32,7 @@ public final class MusaAiPanel {
 
     public interface Host {
         String contextLabel();
+        default String statusLabel(){return "Yerel • Kısıtlı";}
         void onPrompt(String prompt,Reply reply);
     }
 
@@ -52,7 +53,7 @@ public final class MusaAiPanel {
         TextView title=text(activity,"MusaCAD AI",20f,Color.WHITE,true);
         header.addView(title,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
-        TextView state=text(activity,"AI",10f,0xFFBFFAF4,true);
+        TextView state=text(activity,host.statusLabel(),10f,0xFFBFFAF4,true);
         state.setGravity(Gravity.CENTER);
         state.setPadding(dp(activity,10),dp(activity,5),dp(activity,10),dp(activity,5));
         state.setBackground(round(activity,0xFF0C594F,16,0xFF16B8A6));
@@ -82,7 +83,7 @@ public final class MusaAiPanel {
         root.addView(messagesScroll,messagesLp);
 
         appendBubble(activity,messages,false,
-            "Merhaba. Ben MusaCAD AI. Bu panel üzerinden çizime soru sorma, doğal dille CAD komutu verme, metraj, proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabileceksiniz.");
+            "Merhaba. Ben MusaCAD AI. "+host.statusLabel()+" modundayım. Çizime soru sorma, doğal dille CAD komutu verme, metraj, mekanik tesisat analizi, proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabilirsiniz.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);
