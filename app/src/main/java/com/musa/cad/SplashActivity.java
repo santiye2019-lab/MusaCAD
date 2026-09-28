@@ -43,15 +43,16 @@ public class SplashActivity extends AppCompatActivity {
             TextView threeD=new TextView(this);
             threeD.setText("2D + 3D CAD DESTEĞİ");
             threeD.setTextColor(Color.WHITE);
-            threeD.setTextSize(13f);
+            LockedScreenUi.textPx(threeD,stage,25f,SCREEN_W);
+            threeD.setIncludeFontPadding(false);
             threeD.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
             threeD.setGravity(Gravity.CENTER);
             threeD.setLetterSpacing(.05f);
             threeD.setContentDescription("MusaCAD iki boyutlu ve üç boyutlu CAD desteği");
             GradientDrawable badgeBg=new GradientDrawable();
             badgeBg.setColor(Color.argb(220,5,35,51));
-            badgeBg.setCornerRadius(dp(18));
-            badgeBg.setStroke(dp(1),Color.rgb(50,205,225));
+            badgeBg.setCornerRadius(LockedScreenUi.px(stage,18f,SCREEN_W));
+            badgeBg.setStroke(Math.max(1,LockedScreenUi.px(stage,1f,SCREEN_W)),Color.rgb(50,205,225));
             threeD.setBackground(badgeBg);
             stage.addView(threeD);
             LockedScreenUi.position(threeD,stage,152,335,295,57,SCREEN_W,SCREEN_H);
@@ -61,18 +62,19 @@ public class SplashActivity extends AppCompatActivity {
             start.setText("Hadi Başlayalım");
             start.setAllCaps(false);
             start.setTextColor(Color.WHITE);
-            start.setTextSize(17f);
+            LockedScreenUi.textPx(start,stage,33f,SCREEN_W);
+            start.setIncludeFontPadding(false);
             start.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
             start.setGravity(Gravity.CENTER);
-            start.setPadding(dp(12),0,dp(12),0);
+            LockedScreenUi.padding(stage,start,12f,0f,12f,0f,SCREEN_W);
             start.setStateListAnimator(null);
             start.setContentDescription("Hadi başlayalım, MusaCAD'e devam et");
             GradientDrawable buttonBg=new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.rgb(0,151,178),Color.rgb(0,201,211)}
             );
-            buttonBg.setCornerRadius(dp(24));
-            buttonBg.setStroke(dp(1),Color.argb(210,255,255,255));
+            buttonBg.setCornerRadius(LockedScreenUi.px(stage,24f,SCREEN_W));
+            buttonBg.setStroke(Math.max(1,LockedScreenUi.px(stage,1f,SCREEN_W)),Color.argb(210,255,255,255));
             start.setBackground(buttonBg);
             start.setOnClickListener(v->{
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
