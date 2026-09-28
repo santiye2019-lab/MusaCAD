@@ -118,12 +118,23 @@ public final class LicenseManager {
      */
     public static String cloudEntitlementProof(Context c){
         SharedPreferences p=prefs(c);
-        String paid=p.getString(K_LICENSE_TOKEN,null);
-        if(paid!=null&&paid.trim().startsWith(LicenseToken.PREFIX+"."))return paid.trim();
-        String trial=p.getString(K_TRIAL_TOKEN,null);
-        if(trial!=null&&trial.trim().startsWith(TrialToken.PREFIX+"."))return trial.trim();
+        long now=System.currentTimeMillis();
+
         String play=p.getString(K_PLAY_CLOUD_PROOF,null);
-        if(play!=null&&play.trim().startsWith("MP1."))return play.trim();
+        if(play!=null&&play.trim().startsWith("MP1.")&&
+           p.getBoolean(K_PLAY_ENTITLED,false)&&p.getLong(K_PLAY_EXPIRES_AT_MS,0L)>now)
+            return play.trim();
+
+        String paid=p.getString(K_LICENSE_TOKEN,null);
+        if(paid!=null&&paid.trim().startsWith(LicenseToken.PREFIX+".")&&verifyStoredPaidToken(c,paid))
+            return paid.trim();
+
+        String trial=p.getString(K_TRIAL_TOKEN,null);
+        if(trial!=null&&trial.trim().startsWith(TrialToken.PREFIX+".")){
+            TrialToken.Result verified=verifyTrialToken(c,trial,now);
+            if(verified!=null&&SignedTrialPolicy.validWindow(verified.valid,verified.expiresAtMs,now))
+                return trial.trim();
+        }
         return "";
     }
 
