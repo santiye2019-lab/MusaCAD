@@ -142,7 +142,7 @@ public final class MusaAiPanel {
             {"Rapor","Proje raporu oluştur"}
         };
         for(String[] item:prompts)addQuickPrompt(activity,quickRow,input,item[0],item[1]);
-        if(developer)addQuickPrompt(activity,quickRow,input,"G-MEKAI",
+        addQuickPrompt(activity,quickRow,input,"G-MEKAI",
             "GMEKAI_FULL projeyi derin analiz et, hata raporu hazırla ve gerekli düzeltmeleri öner");
 
         Runnable submit=()->{
