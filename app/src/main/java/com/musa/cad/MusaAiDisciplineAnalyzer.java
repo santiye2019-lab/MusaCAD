@@ -178,6 +178,9 @@ public final class MusaAiDisciplineAnalyzer {
     private static boolean crossBelongs(MusaAiDiscipline d,String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(d==MusaAiDiscipline.FIRE_SAFETY)return contains(q,"yangin","sprink","hidrant","duman","itfaiye");
+        if(d==MusaAiDiscipline.ELECTRICAL)return contains(q,"besleme","pano","kablo","tava","priz","aydinlatma","topraklama","jenerator","ups","data","cctv");
+        if(d==MusaAiDiscipline.STRUCTURAL)return contains(q,"rezervasyon","tasiyici","kolon","kiris","perde","doseme","temel");
+        if(d==MusaAiDiscipline.INFRASTRUCTURE)return contains(q,"rogar","baglanti","kanalizasyon","altyapi");
         return false;
     }
     private static int count(List<MusaAiDrawingIndex.Item>items,String...terms){return filter(items,terms).size();}
