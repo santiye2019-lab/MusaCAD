@@ -9,6 +9,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.text.util.Linkify;
+import android.text.method.LinkMovementMethod;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -210,6 +212,9 @@ public final class MusaAiPanel {
     private static TextView appendBubble(Activity activity,LinearLayout messages,boolean user,String value){
         TextView bubble=text(activity,value,12.5f,user?Color.WHITE:0xFFE6F4FA,false);
         bubble.setTextIsSelectable(true);
+        Linkify.addLinks(bubble,Linkify.WEB_URLS);
+        bubble.setMovementMethod(LinkMovementMethod.getInstance());
+        bubble.setLinksClickable(true);
         bubble.setPadding(dp(activity,12),dp(activity,9),dp(activity,12),dp(activity,9));
         bubble.setBackground(round(activity,user?0xFF0D716B:0xFF102B3C,12,user?0xFF20B8AA:0xFF245D79));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(
