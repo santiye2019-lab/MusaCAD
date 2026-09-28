@@ -26,7 +26,7 @@ public final class MusaAiGatewaySessionClient {
         if(!analyze.startsWith("https://")){callback.onError("Gandalf ağ geçidi HTTPS olmalı.");return;}
         if(code.isEmpty()){callback.onError("Eşleştirme kodu boş olamaz.");return;}
 
-        final String endpoint=sessionEndpoint(analyze);
+        final String endpoint=MusaAiGatewayEndpoint.session(analyze);
         new Thread(()->{
             HttpURLConnection connection=null;
             try{
@@ -69,14 +69,6 @@ public final class MusaAiGatewaySessionClient {
                 if(connection!=null)connection.disconnect();
             }
         },"MusaCAD-Gandalf-Session").start();
-    }
-
-    static String sessionEndpoint(String analyzeUrl){
-        String s=analyzeUrl==null?"":analyzeUrl.trim();
-        int query=s.indexOf('?');if(query>=0)s=s.substring(0,query);
-        if(s.endsWith("/analyze"))return s.substring(0,s.length()-"/analyze".length())+"/session";
-        int slash=s.lastIndexOf('/');
-        return slash>="https://".length()?s.substring(0,slash)+"/session":s+"/session";
     }
 
     private static String read(InputStream in)throws IOException{
