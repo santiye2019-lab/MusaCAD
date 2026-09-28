@@ -57,22 +57,17 @@ public final class MusaAiQuantityTakeoff {
         if(length){
             if(s.matched==0)return Answer.of(filter.label()+" için eşleşen nesne bulunamadı.");
             if(s.lengthCount==0)return Answer.of(filter.label()+" için doğrudan ölçülebilir uzunluk bulunamadı.");
-            return Answer.of(filter.label()+"
-Toplam uzunluk: "+number(s.length)+" "+unit(index)+
-                "
-Ölçülebilen nesne: "+s.lengthCount+(s.matched>s.lengthCount?" • Eşleşen toplam: "+s.matched:""));
+            return Answer.of(filter.label()+"\nToplam uzunluk: "+number(s.length)+" "+unit(index)+
+                "\nÖlçülebilen nesne: "+s.lengthCount+(s.matched>s.lengthCount?" • Eşleşen toplam: "+s.matched:""));
         }
         if(area){
             if(s.matched==0)return Answer.of(filter.label()+" için eşleşen nesne bulunamadı.");
             if(s.areaCount==0)return Answer.of(filter.label()+" için kapalı/ölçülebilir alan bulunamadı.");
-            return Answer.of(filter.label()+"
-Toplam alan: "+number(s.area)+" "+areaUnit(index)+
-                "
-Alanı hesaplanan nesne: "+s.areaCount+(s.matched>s.areaCount?" • Eşleşen toplam: "+s.matched:""));
+            return Answer.of(filter.label()+"\nToplam alan: "+number(s.area)+" "+areaUnit(index)+
+                "\nAlanı hesaplanan nesne: "+s.areaCount+(s.matched>s.areaCount?" • Eşleşen toplam: "+s.matched:""));
         }
         if(count){
-            return Answer.of(filter.label()+"
-Adet: "+s.matched+" • aktif layout: "+index.layout);
+            return Answer.of(filter.label()+"\nAdet: "+s.matched+" • aktif layout: "+index.layout);
         }
         return Answer.none();
     }
@@ -80,14 +75,10 @@ Adet: "+s.matched+" • aktif layout: "+index.layout);
     private static String summary(MusaAiDrawingIndex index){
         Filter all=new Filter();Stats s=stats(index,all);
         return "Metraj özeti • "+index.layout+
-            "
-• Görünür indekslenen nesne: "+index.items().size()+
-            "
-• Çizgisel ölçüsü alınabilen: "+s.lengthCount+" • toplam "+number(s.length)+" "+unit(index)+
-            "
-• Kapalı alanı hesaplanabilen: "+s.areaCount+" • toplam "+number(s.area)+" "+areaUnit(index)+
-            "
-Belirli bir katman/tür için “PIS_SU katmanının toplam uzunluğu” veya “kapalı polylinelerin alanı” diye sorabilirsiniz.";
+            "\n• Görünür indekslenen nesne: "+index.items().size()+
+            "\n• Çizgisel ölçüsü alınabilen: "+s.lengthCount+" • toplam "+number(s.length)+" "+unit(index)+
+            "\n• Kapalı alanı hesaplanabilen: "+s.areaCount+" • toplam "+number(s.area)+" "+areaUnit(index)+
+            "\nBelirli bir katman/tür için “PIS_SU katmanının toplam uzunluğu” veya “kapalı polylinelerin alanı” diye sorabilirsiniz.";
     }
 
     private static Stats stats(MusaAiDrawingIndex index,Filter filter){
