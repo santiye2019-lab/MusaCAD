@@ -2,12 +2,18 @@ package com.musa.cad;
 
 import android.content.*;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.InputType;
+import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.widget.TextViewCompat;
 import java.io.*;
 import java.text.DateFormat;
 import java.util.Date;
@@ -17,7 +23,6 @@ import java.util.concurrent.Executors;
 public class LicenseActivity extends AppCompatActivity {
     public static final String EXTRA_PENDING_INTENT="com.musa.cad.PENDING_INTENT";
     public static final String EXTRA_STAY_ON_LICENSE="com.musa.cad.STAY_ON_LICENSE";
-    private static final float SCREEN_W=600f,SCREEN_H=1535f;
 
     private final ExecutorService trialExecutor=Executors.newSingleThreadExecutor();
     private EditText licenseCode;
@@ -62,119 +67,152 @@ public class LicenseActivity extends AppCompatActivity {
             pendingIntent=legacy;
         }
 
-        FrameLayout root=findViewById(R.id.licenseRoot);
-        FrameLayout stage=findViewById(R.id.artworkStage);
-
-        LockedScreenUi.fillStage(this,root,stage,SCREEN_W,SCREEN_H,()->{
-            ImageView art=stage.findViewById(R.id.lockedArtwork);
-            art.setImageResource(R.drawable.musacad_screen_3_v2);
-            art.setContentDescription("MusaCAD lisans ve aktivasyon ekranı");
-
-            // 1) Ücretsiz deneme
-            LockedScreenUi.hotspot(this,stage,60,344,482,132,SCREEN_W,SCREEN_H,v->startTrial());
-
-            // 2) Lisans kodu
-            TextView codeLabel=new TextView(this);
-            codeLabel.setText("Lisans Kodu / MC1");
-            codeLabel.setTextColor(0xFF9CDFFF);
-            codeLabel.setTextSize(10.5f);
-            codeLabel.setGravity(Gravity.CENTER_VERTICAL);
-            stage.addView(codeLabel);
-            LockedScreenUi.position(codeLabel,stage,83,565,369,28,SCREEN_W,SCREEN_H);
-
-            licenseCode=new EditText(this);
-            licenseCode.setSingleLine(true);
-            licenseCode.setTextColor(Color.WHITE);
-            licenseCode.setTextSize(11.5f);
-            licenseCode.setHint(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE?"12 haneli kod veya MC1 lisansı":"Güvenli MC1 lisansı");
-            licenseCode.setHintTextColor(0xFF7890A8);
-            licenseCode.setPadding(dp(12),0,dp(12),0);
-            GradientDrawable codeBg=new GradientDrawable();
-            codeBg.setColor(0xD20A223A);
-            codeBg.setCornerRadius(dp(10));
-            codeBg.setStroke(dp(1),0xFF3AAAF0);
-            licenseCode.setBackground(codeBg);
-            stage.addView(licenseCode);
-            LockedScreenUi.position(licenseCode,stage,83,598,369,56,SCREEN_W,SCREEN_H);
-
-            // Lisans kodu yanındaki pano simgesi: panodan yapıştır.
-            LockedScreenUi.hotspot(this,stage,458,597,64,58,SCREEN_W,SCREEN_H,v->pasteLicenseCode());
-            LockedScreenUi.hotspot(this,stage,78,663,445,67,SCREEN_W,SCREEN_H,v->activate());
-
-            // 3) MC1 için gerçek cihaz-bağlı Güvenli Lisans Kimliği
-            final String secureLicenseId=LicenseManager.installationId(this);
-
-            TextView serialLabel=new TextView(this);
-            serialLabel.setText("Güvenli Lisans Kimliği");
-            serialLabel.setTextColor(0xFF9CDFFF);
-            serialLabel.setTextSize(9f);
-            serialLabel.setGravity(Gravity.CENTER);
-            stage.addView(serialLabel);
-            LockedScreenUi.position(serialLabel,stage,168,778,300,28,SCREEN_W,SCREEN_H);
-
-            TextView deviceId=new TextView(this);
-            deviceId.setSingleLine(false);
-            deviceId.setMaxLines(2);
-            deviceId.setText(secureLicenseId);
-            deviceId.setTextColor(0xFFE7F7FF);
-            deviceId.setTextSize(10.5f);
-            deviceId.setGravity(Gravity.CENTER);
-            deviceId.setTextIsSelectable(true);
-            deviceId.setPadding(dp(4),0,dp(4),0);
-            GradientDrawable idBg=new GradientDrawable();
-            idBg.setColor(0xEC0A223A);
-            idBg.setCornerRadius(dp(8));
-            idBg.setStroke(dp(1),0xFF2E9EE8);
-            deviceId.setBackground(idBg);
-            deviceId.setContentDescription("MusaCAD Güvenli Lisans Kimliği. Dokunarak kopyala.");
-            deviceId.setOnClickListener(v->copySecureLicenseId(secureLicenseId));
-            stage.addView(deviceId);
-            LockedScreenUi.position(deviceId,stage,126,806,342,62,SCREEN_W,SCREEN_H);
-            LockedScreenUi.hotspot(this,stage,468,806,54,62,SCREEN_W,SCREEN_H,v->copySecureLicenseId(secureLicenseId));
-
-            // 4) Dağıtım modeline göre Google Play yenileme veya doğrudan APK bilgisi.
-            if(BuildConfig.PLAY_DISTRIBUTION){
-                LockedScreenUi.hotspot(this,stage,60,930,482,139,SCREEN_W,SCREEN_H,v->launchYearlyRenewal());
-
-                playPurchaseButton=new Button(this);
-                playPurchaseButton.setAllCaps(false);
-                playPurchaseButton.setTextSize(10.5f);
-                playPurchaseButton.setTextColor(Color.WHITE);
-                playPurchaseButton.setGravity(Gravity.CENTER);
-                playPurchaseButton.setPadding(dp(4),0,dp(4),0);
-                playPurchaseButton.setStateListAnimator(null);
-                GradientDrawable renewBg=new GradientDrawable();
-                renewBg.setColor(0xD20D6D4A);
-                renewBg.setCornerRadius(dp(10));
-                renewBg.setStroke(dp(1),0xFF20E39A);
-                playPurchaseButton.setBackground(renewBg);
-                playPurchaseButton.setOnClickListener(v->launchYearlyRenewal());
-                stage.addView(playPurchaseButton);
-                LockedScreenUi.position(playPurchaseButton,stage,179,1024,276,39,SCREEN_W,SCREEN_H);
-                updateRenewalButton();
-            }else{
-                TextView directModel=new TextView(this);
-                directModel.setText("DOĞRUDAN APK / KURUMSAL\nGüvenli Lisans Kimliği + MC1 lisansı\nGoogle Play satın alma bu sürümde kapalıdır.");
-                directModel.setTextColor(Color.WHITE);
-                directModel.setTextSize(11f);
-                directModel.setGravity(Gravity.CENTER);
-                directModel.setPadding(dp(12),dp(6),dp(12),dp(6));
-                GradientDrawable directBg=new GradientDrawable();
-                directBg.setColor(0xEE0A223A);
-                directBg.setCornerRadius(dp(12));
-                directBg.setStroke(dp(1),0xFF3AAAF0);
-                directModel.setBackground(directBg);
-                stage.addView(directModel);
-                LockedScreenUi.position(directModel,stage,60,930,482,139,SCREEN_W,SCREEN_H);
-            }
-
-            // 5) Lisans bilgisi ve sözleşme
-            LockedScreenUi.hotspot(this,stage,60,1080,482,146,SCREEN_W,SCREEN_H,v->showLicenseInfo());
-            LockedScreenUi.hotspot(this,stage,60,1236,482,62,SCREEN_W,SCREEN_H,v->showTerms(false));
-        });
+        buildResponsiveLicenseUi();
 
         refresh();
         playBilling.start();
+    }
+
+    private void buildResponsiveLicenseUi(){
+        LinearLayout content=findViewById(R.id.licenseContent);
+        if(content==null)return;
+        content.removeAllViews();
+
+        TextView title=textView("MusaCAD\nLisans ve Aktivasyon",28f,Color.WHITE,true);
+        title.setLineSpacing(0f,.92f);
+        content.addView(title,matchWrap());
+
+        TextView intro=textView("Güvenli aktivasyon • 1 günlük deneme • cihaz bağlı MC1 lisansı",12f,0xFFB8D0DE,false);
+        intro.setPadding(0,dp(4),0,dp(14));
+        content.addView(intro,matchWrap());
+
+        LinearLayout trialCard=card();
+        trialCard.addView(textView("1 Günlük Ücretsiz Deneme",18f,Color.WHITE,true),matchWrap());
+        TextView trialInfo=textView("MusaCAD'i lisans kodu girmeden 24 saat tam özellikli deneyin. Bu hak aynı cihazda yalnız bir kez kullanılabilir.",12f,0xFFC7D7E0,false);
+        trialInfo.setPadding(0,dp(6),0,dp(10));trialCard.addView(trialInfo,matchWrap());
+        Button trial=actionButton("1 Günlük Ücretsiz Denemeyi Başlat",0xFF118B81);
+        trial.setOnClickListener(v->startTrial());trialCard.addView(trial,buttonLp());
+        content.addView(trialCard,cardLp());
+
+        LinearLayout activationCard=card();
+        activationCard.addView(textView(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE?"Lisans Kodu / MC1":"Güvenli MC1 Lisansı",18f,Color.WHITE,true),matchWrap());
+        TextView activationInfo=textView(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE
+            ?"MC1 lisansınızı veya uyumluluk lisans kodunu girin."
+            :"Bu cihaz için üretilmiş RSA imzalı MC1 lisansını girin.",12f,0xFFC7D7E0,false);
+        activationInfo.setPadding(0,dp(6),0,dp(8));activationCard.addView(activationInfo,matchWrap());
+
+        LinearLayout codeRow=new LinearLayout(this);codeRow.setOrientation(LinearLayout.HORIZONTAL);codeRow.setGravity(Gravity.CENTER_VERTICAL);
+        licenseCode=new EditText(this);
+        licenseCode.setSingleLine(true);
+        licenseCode.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        licenseCode.setTextColor(Color.WHITE);licenseCode.setTextSize(14f);
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(licenseCode,11,14,1,TypedValue.COMPLEX_UNIT_SP);
+        licenseCode.setHint(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE?"12 haneli kod veya MC1 lisansı":"Güvenli MC1 lisansı");
+        licenseCode.setHintTextColor(0xFF8EA8BD);
+        licenseCode.setPadding(dp(12),0,dp(12),0);
+        GradientDrawable codeBg=round(0xE60A223A,10,0xFF3AAAF0);
+        licenseCode.setBackground(codeBg);
+        codeRow.addView(licenseCode,new LinearLayout.LayoutParams(0,dp(54),1f));
+
+        Button paste=actionButton("YAPIŞTIR",0xFF164E73);
+        paste.setTextSize(10f);paste.setMinWidth(dp(82));paste.setOnClickListener(v->pasteLicenseCode());
+        LinearLayout.LayoutParams pasteLp=new LinearLayout.LayoutParams(dp(88),dp(54));pasteLp.setMarginStart(dp(8));codeRow.addView(paste,pasteLp);
+        activationCard.addView(codeRow,matchWrap());
+
+        Button activate=actionButton("ETKİNLEŞTİR",0xFF0E6B9A);
+        LinearLayout.LayoutParams activateLp=buttonLp();activateLp.topMargin=dp(10);activationCard.addView(activate,activateLp);
+        activate.setOnClickListener(v->activate());
+        content.addView(activationCard,cardLp());
+
+        final String secureLicenseId=LicenseManager.installationId(this);
+        LinearLayout identityCard=card();
+        identityCard.addView(textView("Güvenli Lisans Kimliği",18f,Color.WHITE,true),matchWrap());
+        TextView idInfo=textView("MC1 lisansı oluşturulurken kullanılacak cihaz kimliğidir. Dokunarak veya KOPYALA ile panoya alın.",12f,0xFFC7D7E0,false);
+        idInfo.setPadding(0,dp(6),0,dp(8));identityCard.addView(idInfo,matchWrap());
+        TextView deviceId=textView(secureLicenseId,12f,0xFFE7F7FF,true);
+        deviceId.setGravity(Gravity.CENTER);deviceId.setTextIsSelectable(true);deviceId.setPadding(dp(10),dp(12),dp(10),dp(12));
+        deviceId.setBackground(round(0xED0A223A,9,0xFF2E9EE8));
+        deviceId.setContentDescription("MusaCAD Güvenli Lisans Kimliği. Dokunarak kopyala.");
+        deviceId.setOnClickListener(v->copySecureLicenseId(secureLicenseId));
+        identityCard.addView(deviceId,matchWrap());
+        Button copyId=actionButton("GÜVENLİ KİMLİĞİ KOPYALA",0xFF164E73);
+        LinearLayout.LayoutParams copyLp=buttonLp();copyLp.topMargin=dp(8);identityCard.addView(copyId,copyLp);
+        copyId.setOnClickListener(v->copySecureLicenseId(secureLicenseId));
+        content.addView(identityCard,cardLp());
+
+        LinearLayout distributionCard=card();
+        if(BuildConfig.PLAY_DISTRIBUTION){
+            distributionCard.addView(textView("Google Play Lisans Yenileme",18f,Color.WHITE,true),matchWrap());
+            TextView playInfo=textView("Mevcut veya daha önce etkinleştirilmiş yıllık MusaCAD lisansınızı Google Play üzerinden yenileyebilirsiniz.",12f,0xFFC7D7E0,false);
+            playInfo.setPadding(0,dp(6),0,dp(8));distributionCard.addView(playInfo,matchWrap());
+            playPurchaseButton=actionButton("Google Play yıllık yenileme hazırlanıyor",0xFF147A55);
+            playPurchaseButton.setOnClickListener(v->launchYearlyRenewal());
+            distributionCard.addView(playPurchaseButton,buttonLp());
+            updateRenewalButton();
+        }else{
+            distributionCard.addView(textView("Doğrudan APK / Kurumsal",18f,Color.WHITE,true),matchWrap());
+            TextView direct=textView("Güvenli Lisans Kimliği + MC1 lisansı kullanılır. Google Play satın alma bu sürümde kapalıdır.",12f,0xFFC7D7E0,false);
+            direct.setPadding(0,dp(6),0,0);distributionCard.addView(direct,matchWrap());
+        }
+        content.addView(distributionCard,cardLp());
+
+        Button info=actionButton("LİSANS BİLGİSİ",0xFF164E73);info.setOnClickListener(v->showLicenseInfo());
+        content.addView(info,buttonLpWithTop(10));
+        Button terms=actionButton("LİSANS KOŞULLARI VE GİZLİLİK",0xFF164E73);terms.setOnClickListener(v->showTerms(false));
+        content.addView(terms,buttonLpWithTop(8));
+    }
+
+    private LinearLayout card(){
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16),dp(14),dp(16),dp(14));
+        card.setBackground(round(0xE6122638,14,0xFF245D79));
+        return card;
+    }
+
+    private TextView textView(String value,float size,int color,boolean bold){
+        TextView t=new TextView(this);t.setText(value);t.setTextColor(color);t.setTextSize(size);
+        t.setIncludeFontPadding(false);t.setLineSpacing(dp(2),1f);
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        return t;
+    }
+
+    private Button actionButton(String label,int color){
+        Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.WHITE);b.setTextSize(12.5f);
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(b,10,13,1,TypedValue.COMPLEX_UNIT_SP);
+        b.setGravity(Gravity.CENTER);b.setMinHeight(dp(48));b.setPadding(dp(10),dp(4),dp(10),dp(4));
+        b.setStateListAnimator(null);b.setBackground(round(color,11,0x5538B9E8));
+        return b;
+    }
+
+    private GradientDrawable round(int fill,int radius,int stroke){
+        GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));
+        if(stroke!=0)d.setStroke(dp(1),stroke);return d;
+    }
+
+    private LinearLayout.LayoutParams matchWrap(){
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private LinearLayout.LayoutParams cardLp(){
+        LinearLayout.LayoutParams lp=matchWrap();lp.bottomMargin=dp(10);return lp;
+    }
+
+    private LinearLayout.LayoutParams buttonLp(){
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52));
+    }
+
+    private LinearLayout.LayoutParams buttonLpWithTop(int top){
+        LinearLayout.LayoutParams lp=buttonLp();lp.topMargin=dp(top);return lp;
+    }
+
+    private void styleDialogButtons(AlertDialog dialog){
+        if(dialog==null)return;
+        int[] ids={AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEUTRAL,AlertDialog.BUTTON_NEGATIVE};
+        for(int id:ids){
+            Button b=dialog.getButton(id);if(b==null)continue;
+            b.setTextColor(Color.WHITE);b.setMinHeight(dp(48));b.setSingleLine(false);b.setMaxLines(2);
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(b,9,12,1,TypedValue.COMPLEX_UNIT_SP);
+        }
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
@@ -275,12 +313,14 @@ public class LicenseActivity extends AppCompatActivity {
             if(shortExpiry==0L)msg.append("\nKısa lisans: Süresiz");
             else msg.append("\nKısa lisans bitişi: ").append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(shortExpiry)));
         }
-        new AlertDialog.Builder(this)
+        AlertDialog dialog=new AlertDialog.Builder(this)
             .setTitle("MusaCAD Lisans Bilgisi")
             .setMessage(msg.toString())
-            .setNeutralButton("GÜVENLİ KİMLİĞİ KOPYALA",(dialog,which)->copySecureLicenseId(secureLicenseId))
+            .setNeutralButton("GÜVENLİ KİMLİĞİ KOPYALA",(d,which)->copySecureLicenseId(secureLicenseId))
             .setPositiveButton("TAMAM",null)
-            .show();
+            .create();
+        dialog.setOnShowListener(d->styleDialogButtons(dialog));
+        dialog.show();
     }
 
     private String stateLabel(LicenseManager.State state){
@@ -376,7 +416,7 @@ public class LicenseActivity extends AppCompatActivity {
         ScrollView scroll=new ScrollView(this);
         scroll.addView(text);
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog=new AlertDialog.Builder(this)
             .setTitle("MusaCAD lisans koşulları")
             .setView(scroll)
             .setPositiveButton("KABUL EDİYORUM",(d,w)->{
@@ -384,7 +424,9 @@ public class LicenseActivity extends AppCompatActivity {
                 if(startAfterAccept)startTrial();
             })
             .setNegativeButton("KAPAT",null)
-            .show();
+            .create();
+        dialog.setOnShowListener(d->styleDialogButtons(dialog));
+        dialog.show();
     }
 
     private String readAsset(String name){
