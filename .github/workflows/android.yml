@@ -310,8 +310,16 @@ jobs:
           java -cp /tmp/musacad-tests CadSpreadsheetLayoutTest
       - name: Test AI BOQ import and comparison core
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java tests/MusaAiBoqTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDisciplineControl.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java tests/MusaAiBoqTest.java
           java -cp /tmp/musacad-tests MusaAiBoqTest
+      - name: Test multi-discipline AI project control
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDisciplineControl.java tests/MusaAiDisciplineControlTest.java
+          java -cp /tmp/musacad-tests MusaAiDisciplineControlTest
+      - name: Test multi-discipline AI integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiDisciplineControlContractTest.java
+          java -cp /tmp/musacad-tests MusaAiDisciplineControlContractTest
       - name: Test AI BOQ integration contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiBoqContractTest.java
