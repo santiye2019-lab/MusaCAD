@@ -131,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
         try{
             if(secure){
                 if(!LicenseKeyStore.hasKey(this))throw new IllegalStateException("Önce güvenli RSA imza anahtarı oluşturun veya yedekten geri yükleyin");
+                if(!productionKeyMatches())throw new IllegalStateException("Aktif RSA anahtarı MusaCAD release public key'i ile eşleşmiyor. PUBLIC KEY'i ana uygulamaya aktarın ve License Manager'ı yeniden derleyin.");
                 pendingIdentity=LicenseIssuer.normalize(raw);
             }else pendingIdentity=ShortLicenseCode.normalizeSerial(raw);
         }catch(Exception e){identityField.setError(e.getMessage());return;}
@@ -245,9 +246,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshKeyStatus(){
-        if(!LicenseKeyStore.hasKey(this)){keyStatus.setText("Durum: Güvenli MC1 imza anahtarı YOK");return;}
-        try{keyStatus.setText("Durum: MC1 anahtarı hazır\nFingerprint: "+LicenseKeyStore.fingerprint(this));}
-        catch(Exception e){keyStatus.setText("Durum: Anahtar okunamadı • "+e.getMessage());}
+        if(!LicenseKeyStore.hasKey(this)){keyStatus.setText("Durum: Güvenli MC1 imza anahtarı YOK\nMusaCAD beklenen fingerprint: "+BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);return;}
+        try{
+            String current=LicenseKeyStore.fingerprint(this);
+            boolean match=current.equalsIgnoreCase(BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);
+            keyStatus.setText("Durum: MC1 anahtarı "+(match?"HAZIR / EŞLEŞTİ":"VAR / PUBLIC KEY UYUMSUZ")+
+                "\nAktif: "+current+"\nMusaCAD: "+BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT);
+        }catch(Exception e){keyStatus.setText("Durum: Anahtar okunamadı • "+e.getMessage());}
+    }
+
+    private boolean productionKeyMatches(){
+        try{
+            String expected=BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT==null?"":BuildConfig.EXPECTED_LICENSE_KEY_FINGERPRINT.trim();
+            return !expected.isEmpty()&&LicenseKeyStore.fingerprint(this).equalsIgnoreCase(expected);
+        }catch(Exception e){return false;}
     }
 
     private void copyToken(){
