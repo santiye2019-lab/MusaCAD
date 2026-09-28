@@ -29,16 +29,29 @@ public final class MusaAiCloudService {
         }
     }
 
+    public static final class Source {
+        public final String title,url;
+        Source(String title,String url){
+            this.title=title==null?"":title;
+            this.url=url==null?"":url;
+        }
+    }
+
     public static final class Result {
         public final Status status;
         public final String text,message;
         public final List<Action> actions;
+        public final List<Source> sources;
         public final boolean webUsed;
         Result(Status status,String text,String message,Collection<Action>actions,boolean webUsed){
+            this(status,text,message,actions,null,webUsed);
+        }
+        Result(Status status,String text,String message,Collection<Action>actions,Collection<Source>sources,boolean webUsed){
             this.status=status;
             this.text=text==null?"":text;
             this.message=message==null?"":message;
             this.actions=Collections.unmodifiableList(new ArrayList<>(actions==null?Collections.emptyList():actions));
+            this.sources=Collections.unmodifiableList(new ArrayList<>(sources==null?Collections.emptyList():sources));
             this.webUsed=webUsed;
         }
         public boolean ok(){return status==Status.OK;}
@@ -114,10 +127,18 @@ public final class MusaAiCloudService {
                 String arguments=args instanceof JSONObject||args instanceof JSONArray?args.toString():String.valueOf(args==null?"{}":args);
                 actions.add(new Action(name,arguments,a.optString("reason","")));
             }
+            ArrayList<Source>sources=new ArrayList<>();
+            JSONArray sourceList=json.optJSONArray("sources");
+            if(sourceList!=null)for(int i=0;i<sourceList.length()&&sources.size()<20;i++){
+                JSONObject s=sourceList.optJSONObject(i);if(s==null)continue;
+                String url=s.optString("url","").trim();
+                if(!(url.startsWith("https://")||url.startsWith("http://")))continue;
+                sources.add(new Source(s.optString("title","").trim(),url));
+            }
             boolean webUsed=json.optBoolean("webUsed",false);
             if(text.isEmpty()&&!actions.isEmpty())text="Gandalf AI "+actions.size()+" adet çizim işlemi önerdi.";
-            if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,webUsed);
-            return new Result(Status.OK,text,"",actions,webUsed);
+            if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
+            return new Result(Status.OK,text,"",actions,sources,webUsed);
         }catch(IOException e){
             return new Result(Status.NETWORK_ERROR,"","Gandalf AI için internet bağlantısını kontrol edin",null,false);
         }catch(Exception e){
