@@ -184,9 +184,12 @@ public final class DxfParser {
             for(Entity wrapped:document){
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
-                items.add(new MusaAiDrawingIndex.Item(layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity)));
+                CadEdit measure=layer.sourceEditWorld;
+                items.add(new MusaAiDrawingIndex.Item(
+                    layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity),
+                    aiLength(measure),aiArea(measure)));
             }
-            return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items);
+            return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items,drawingUnitName);
         }
         public double drawingDistanceFromContent(double contentDistance){return worldToContentScale>0d?contentDistance/worldToContentScale:contentDistance;}
         public float contentLengthFromDrawing(double drawingLength){return worldToContentScale>0d?(float)(drawingLength*worldToContentScale):(float)drawingLength;}
@@ -215,6 +218,69 @@ public final class DxfParser {
             return out.toString();
         }
         return "";
+    }
+
+
+    private static double aiLength(CadEdit e){
+        if(e==null||e.xy==null)return Double.NaN;
+        float[]p=e.xy;
+        switch(e.type){
+            case LINE:
+                return p.length>=4?Math.hypot(p[2]-p[0],p[3]-p[1]):Double.NaN;
+            case RECTANGLE:
+                return p.length>=4?2d*(Math.abs(p[2]-p[0])+Math.abs(p[3]-p[1])):Double.NaN;
+            case POLYLINE:{
+                if(p.length<4)return Double.NaN;double total=0d;
+                for(int i=2;i+1<p.length;i+=2)total+=Math.hypot(p[i]-p[i-2],p[i+1]-p[i-1]);
+                if(e.closed&&p.length>=6)total+=Math.hypot(p[0]-p[p.length-2],p[1]-p[p.length-1]);
+                return total;
+            }
+            case CIRCLE:{
+                if(p.length<4)return Double.NaN;double r=Math.hypot(p[2]-p[0],p[3]-p[1]);return 2d*Math.PI*r;
+            }
+            case ARC:{
+                if(p.length<8)return Double.NaN;double r=Math.hypot(p[0]-p[6],p[1]-p[7]);
+                double s=aiAngle(p[0]-p[6],p[1]-p[7]),m=aiAngle(p[2]-p[6],p[3]-p[7]),x=aiAngle(p[4]-p[6],p[5]-p[7]);
+                return r*Math.toRadians(Math.abs(aiArcSweep(s,m,x)));
+            }
+            case ELLIPSE:{
+                if(p.length<6)return Double.NaN;double a=Math.hypot(p[2]-p[0],p[3]-p[1]),b=Math.hypot(p[4]-p[0],p[5]-p[1]);
+                if(a<=0d||b<=0d)return Double.NaN;double h=Math.pow(a-b,2d)/Math.pow(a+b,2d);
+                return Math.PI*(a+b)*(1d+(3d*h)/(10d+Math.sqrt(4d-3d*h)));
+            }
+            default:return Double.NaN;
+        }
+    }
+
+    private static double aiArea(CadEdit e){
+        if(e==null||e.xy==null)return Double.NaN;float[]p=e.xy;
+        switch(e.type){
+            case RECTANGLE:
+                return p.length>=4?Math.abs((double)(p[2]-p[0])*(p[3]-p[1])):Double.NaN;
+            case CIRCLE:{
+                if(p.length<4)return Double.NaN;double r=Math.hypot(p[2]-p[0],p[3]-p[1]);return Math.PI*r*r;
+            }
+            case ELLIPSE:{
+                if(p.length<6)return Double.NaN;double a=Math.hypot(p[2]-p[0],p[3]-p[1]),b=Math.hypot(p[4]-p[0],p[5]-p[1]);return Math.PI*a*b;
+            }
+            case POLYLINE:
+                return e.closed?aiPolygonArea(p):Double.NaN;
+            case HATCH:
+                return aiPolygonArea(p);
+            default:return Double.NaN;
+        }
+    }
+
+    private static double aiPolygonArea(float[]p){
+        if(p==null||p.length<6||p.length%2!=0)return Double.NaN;double sum=0d;int n=p.length/2;
+        for(int i=0;i<n;i++){int j=(i+1)%n;sum+=(double)p[i*2]*p[j*2+1]-(double)p[j*2]*p[i*2+1];}
+        return Math.abs(sum)*.5d;
+    }
+    private static double aiAngle(double x,double y){double a=Math.toDegrees(Math.atan2(y,x));return a<0d?a+360d:a;}
+    private static double aiNorm(double a){a%=360d;if(a<0d)a+=360d;return a;}
+    private static double aiArcSweep(double start,double mid,double end){
+        double ccw=aiNorm(end-start),toMid=aiNorm(mid-start);
+        return toMid<=ccw+1e-6?ccw:-(360d-ccw);
     }
 
     private static final class LayerEntity implements Entity{
