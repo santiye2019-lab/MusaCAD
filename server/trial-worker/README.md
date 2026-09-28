@@ -32,7 +32,7 @@ This Cloudflare Worker provides three security services for MusaCAD Android:
 - `POST /v1/ai/session` exchanges an active signed MusaCAD entitlement for a 15-minute `MAI1` bearer token.
 - Trial access is proven with the signed `MT1` token.
 - Direct paid access is proven with the signed `MC1` token.
-- Google Play access is accepted only after the server has verified the renewal and written an active `ai_entitlements` row.
+- Google Play access is proven with the signed `MP1` proof returned only after the server has verified and acknowledged the renewal.
 - The OpenAI API key is never stored in this worker or Android; it belongs only to the separate `server/ai-worker`.
 
 ## Deploy outline
@@ -110,7 +110,8 @@ Verified and acknowledged yearly renewal:
   "productId": "musacad_yearly_renewal",
   "purpose": "annual_renewal",
   "expiresAtMs": 1810000000000,
-  "acknowledged": true
+  "acknowledged": true,
+  "cloudProof": "MP1...."
 }
 ```
 
@@ -155,7 +156,7 @@ Request:
 {
   "deviceId": "MC-12345678-90ABCDEF-12345678",
   "packageName": "com.musa.cad",
-  "entitlementProof": "MT1... or MC1..."
+  "entitlementProof": "MT1... or MC1... or MP1..."
 }
 ```
 
