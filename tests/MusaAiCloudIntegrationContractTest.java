@@ -49,6 +49,17 @@ public final class MusaAiCloudIntegrationContractTest {
         require(cadView,"applyAiMoveSource","sourceId move bridge");
         require(cadView,"applyAiReplaceTextSource","sourceId text bridge");
         require(cadView,"aiLayerExists","existing-layer guard");
+        require(cadView,"applyAiAddPolyline","approved polyline bridge");
+        require(cadView,"applyAiOffsetSource","approved offset bridge");
+        require(cadView,"applyAiTrimLine","deterministic TRIM bridge");
+        require(cadView,"applyAiExtendLine","deterministic EXTEND bridge");
+        require(cadView,"applyAiContinuePath","approved path continuation bridge");
+        require(cadView,"applyAiInsertLibraryBlock","approved mechanical block bridge");
+        require(executor,"case \"cad_add_polyline\"","polyline proposal executor");
+        require(executor,"case \"cad_trim_line\"","TRIM proposal executor");
+        require(executor,"case \"cad_insert_mechanical_block\"","mechanical block proposal executor");
+        require(worker,"\"cad_continue_path\"","advanced path tool");
+        require(worker,"\"cad_add_pipe_note\"","mechanical note tool");
 
         forbid(cloud,"OPENAI_API_KEY","OpenAI secret in Android client");
         forbid(gradle,"sk-proj-","hardcoded API key");
