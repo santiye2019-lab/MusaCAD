@@ -114,6 +114,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiProjectControlContractTest.java
           java -cp /tmp/musacad-tests MusaAiProjectControlContractTest
+      - name: Test MusaCAD AI mechanical control
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalControl.java tests/MusaAiMechanicalControlTest.java
+          java -cp /tmp/musacad-tests MusaAiMechanicalControlTest
+      - name: Test MusaCAD AI mechanical-control integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiMechanicalControlContractTest.java
+          java -cp /tmp/musacad-tests MusaAiMechanicalControlContractTest
       - name: Test MusaCAD AI table legend and OLE analysis
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiTableOleAnalysis.java tests/MusaAiTableOleAnalysisTest.java
