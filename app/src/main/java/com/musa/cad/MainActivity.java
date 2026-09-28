@@ -79,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
 
     private CheckBox snapToggle;
     private DxfParser.Result activeDxf;
+    private DxfParser.Result aiIndexedDxf;
+    private MusaAiDrawingIndex aiDrawingIndex;
     private CadView cad;
     private TextView fileName,result,editStatusText,tabFileName;
     private LinearLayout projectTabsBox;
@@ -753,6 +755,15 @@ public class MainActivity extends AppCompatActivity {
         return "Bağlam • "+currentDisplayName+" • çizim açık";
     }
 
+    private MusaAiDrawingIndex currentAiDrawingIndex(){
+        if(activeDxf==null)return null;
+        if(aiIndexedDxf!=activeDxf||aiDrawingIndex==null){
+            aiDrawingIndex=activeDxf.aiDrawingIndex();
+            aiIndexedDxf=activeDxf;
+        }
+        return aiDrawingIndex;
+    }
+
     private void handleMusaAiPrompt(String prompt,MusaAiPanel.Reply reply){
         String raw=prompt==null?"":prompt.trim();
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
@@ -780,6 +791,15 @@ public class MainActivity extends AppCompatActivity {
             reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
             return;
         }
+
+        if(activeDxf!=null){
+            MusaAiDrawingQuestions.Answer drawingAnswer=MusaAiDrawingQuestions.answer(currentAiDrawingIndex(),raw);
+            if(drawingAnswer.matched){
+                reply.send(drawingAnswer.text);
+                return;
+            }
+        }
+
         if(q.contains("çizimde neler")||q.contains("çizim özeti")||q.contains("proje özeti")||q.contains("bu proje")){
             if(activeDxf!=null){
                 String extra=activeDxf.oleObjectCount>0?" • OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount:"";
@@ -797,7 +817,7 @@ public class MainActivity extends AppCompatActivity {
             reply.send("Proje kontrol isteğini aldım. Bağlantısız hat, çap/etiket tutarsızlığı, eksik sembol ve benzeri kontrolleri sıradaki AI analiz modüllerinde bu panelden çalıştıracağız.");
             return;
         }
-        reply.send("Mesaj alındı. MusaCAD AI paneli ve proje bağlamı hazır. Sıradaki adımda doğal dil komut motorunu mevcut CAD komutlarına bağlayacağım.");
+        reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
     }
 
     private void showToolSheet(String title,ToolAction...tools){
