@@ -98,7 +98,7 @@ public class CadView extends View {
     private int dimPrecision=2;
 
     private static final long NAVIGATION_SETTLE_MS=160L;
-    private boolean selecting,draggingSelection,exporting,fastNavigation,authoritativeVectorFramePending;
+    private boolean selecting,draggingSelection,exporting,reportEvidenceExporting,fastNavigation,authoritativeVectorFramePending;
     private final Runnable endFastNavigation=()->{fastNavigation=false;requestNavigationFrame();};
     private float selectionX,selectionY,selectionEndX,selectionEndY;
     private final ScaleGestureDetector scaleDetector;
@@ -916,7 +916,7 @@ public class CadView extends View {
 
         if(lastSnapped&&!screen.isEmpty()&&!exporting){PointF point=screen.get(screen.size()-1);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.WHITE);paint.setStrokeWidth(2);c.drawRect(point.x-12,point.y-12,point.x+12,point.y+12,paint);paint.setStyle(Paint.Style.FILL);}
         if(selecting&&draggingSelection&&!exporting){paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.YELLOW);paint.setStrokeWidth(3);c.drawRect(Math.min(selectionX,selectionEndX),Math.min(selectionY,selectionEndY),Math.max(selectionX,selectionEndX),Math.max(selectionY,selectionEndY),paint);paint.setStyle(Paint.Style.FILL);}
-        if(!exporting&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
+        if((!exporting||reportEvidenceExporting)&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}
         if(stylusHover&&!exporting)drawStylusCursor(c);
     }
@@ -1550,6 +1550,64 @@ public class CadView extends View {
     }
 
     private double distance(PointF a,PointF b){return Math.hypot(a.x-b.x,a.y-b.y);}
+
+    public Bitmap aiEvidenceSnapshot(Collection<Integer> sourceIds){
+        if(!hasDrawing()||vectorDrawing==null||sourceIds==null||sourceIds.isEmpty())return null;
+        LinkedHashSet<Integer> beforeIds=new LinkedHashSet<>(aiHighlightedSourceIds);
+        Matrix beforeMatrix=new Matrix(imageMatrix);float beforeScale=scale;
+        RectF bounds=null;LinkedHashSet<Integer> valid=new LinkedHashSet<>();
+        Set<Integer>hidden=sourceEdits.hiddenSourceIds();
+        for(Integer id:sourceIds){
+            if(id==null||id<0||hidden.contains(id))continue;
+            DxfParser.SourceEntity source=vectorDrawing.sourceById(id);
+            if(source==null||!vectorDrawing.isSourceVisible(id))continue;
+            CadEdit edit=sourceEdits.currentFor(id);if(edit==null)edit=source.prototype();if(edit==null)continue;
+            RectF box=aiEvidenceContentBounds(edit);
+            if(box==null)continue;
+            if(bounds==null)bounds=new RectF(box);else bounds.union(box);
+            valid.add(id);if(valid.size()>=120)break;
+        }
+        if(bounds==null||valid.isEmpty())return null;
+        float span=Math.max(bounds.width(),bounds.height());
+        float pad=Math.max(6f,span*.12f);
+        if(bounds.width()<1f){float c=bounds.centerX();bounds.left=c-pad;bounds.right=c+pad;}
+        else{bounds.left-=pad;bounds.right+=pad;}
+        if(bounds.height()<1f){float c=bounds.centerY();bounds.top=c-pad;bounds.bottom=c+pad;}
+        else{bounds.top-=pad;bounds.bottom+=pad;}
+        float aspect=Math.max(.45f,Math.min(2.2f,bounds.width()/Math.max(1f,bounds.height())));
+        int w=1200,h=Math.max(540,Math.min(900,Math.round(w/aspect)));
+        float outer=42f,fit=Math.min((w-outer*2)/Math.max(1f,bounds.width()),(h-outer*2)/Math.max(1f,bounds.height()));
+        aiHighlightedSourceIds.clear();aiHighlightedSourceIds.addAll(valid);
+        imageMatrix.reset();imageMatrix.setScale(fit,fit);
+        imageMatrix.postTranslate(w*.5f-bounds.centerX()*fit,h*.5f-bounds.centerY()*fit);
+        scale=fit;
+        Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+        exporting=true;reportEvidenceExporting=true;
+        try{draw(new Canvas(bitmap));}
+        finally{
+            reportEvidenceExporting=false;exporting=false;
+            imageMatrix.set(beforeMatrix);scale=beforeScale;
+            aiHighlightedSourceIds.clear();aiHighlightedSourceIds.addAll(beforeIds);
+        }
+        return bitmap;
+    }
+
+    private RectF aiEvidenceContentBounds(CadEdit edit){
+        if(edit==null||edit.xy==null||edit.xy.length<2)return null;
+        float[]v=edit.xy;float left=Float.POSITIVE_INFINITY,top=Float.POSITIVE_INFINITY,right=Float.NEGATIVE_INFINITY,bottom=Float.NEGATIVE_INFINITY;
+        if(edit.type==CadEdit.Type.CIRCLE&&v.length>=4){
+            float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;
+        }else if(edit.type==CadEdit.Type.ARC&&v.length>=8){
+            float r=(float)Math.hypot(v[0]-v[6],v[1]-v[7]);left=v[6]-r;right=v[6]+r;top=v[7]-r;bottom=v[7]+r;
+        }else if(edit.type==CadEdit.Type.ELLIPSE&&v.length>=6){
+            float a=(float)Math.hypot(v[2]-v[0],v[3]-v[1]),b=(float)Math.hypot(v[4]-v[0],v[5]-v[1]),r=Math.max(a,b);
+            left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;
+        }else{
+            for(int i=0;i+1<v.length;i+=2){left=Math.min(left,v[i]);right=Math.max(right,v[i]);top=Math.min(top,v[i+1]);bottom=Math.max(bottom,v[i+1]);}
+        }
+        if(!Float.isFinite(left)||!Float.isFinite(top)||!Float.isFinite(right)||!Float.isFinite(bottom))return null;
+        return new RectF(left,top,right,bottom);
+    }
 
     public Bitmap snapshot(){
         if(!hasDrawing())throw new IllegalStateException("Önce çizim açın");Bitmap b=Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);exporting=true;try{draw(new Canvas(b));}finally{exporting=false;}return b;
