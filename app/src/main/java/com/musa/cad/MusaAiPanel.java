@@ -133,6 +133,7 @@ public final class MusaAiPanel {
             {"Metraj","Bu projede metraj çıkar"},
             {"Kontrol","Projeyi kontrol et"},
             {"Mekanik","Mekanik tesisat özeti"},
+            {"Gandalf","Gandalf bağlantı durumu"},
             {"Rapor","Proje raporu oluştur"}
         };
         for(String[] item:prompts){
