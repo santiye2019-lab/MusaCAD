@@ -232,6 +232,62 @@ function cadProposalTools() {
         reason: { type: "string" }
       },
       ["sourceId", "text", "reason"]
+    ),
+    functionTool(
+      "cad_add_polyline",
+      "Propose adding an open or closed polyline. Points are active drawing coordinates.",
+      {
+        points: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 400 },
+        closed: { type: "boolean" },
+        layer: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["points", "closed", "layer", "reason"]
+    ),
+    functionTool(
+      "cad_offset_entity",
+      "Propose a parallel offset copy of an existing LINE/POLYLINE using drawing-unit distance. Positive/negative selects side.",
+      {
+        sourceId: { type: "integer" },
+        distance: { type: "number" },
+        layer: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["sourceId", "distance", "layer", "reason"]
+    ),
+    functionTool(
+      "cad_trim_entity",
+      "Propose trimming a LINE at its intersection with another LINE. keepStart selects which original endpoint remains.",
+      {
+        sourceId: { type: "integer" },
+        boundarySourceId: { type: "integer" },
+        keepStart: { type: "boolean" },
+        reason: { type: "string" }
+      },
+      ["sourceId", "boundarySourceId", "keepStart", "reason"]
+    ),
+    functionTool(
+      "cad_extend_entity",
+      "Propose extending a LINE until it intersects another LINE.",
+      {
+        sourceId: { type: "integer" },
+        boundarySourceId: { type: "integer" },
+        reason: { type: "string" }
+      },
+      ["sourceId", "boundarySourceId", "reason"]
+    ),
+    functionTool(
+      "cad_insert_block",
+      "Propose inserting an existing MusaCAD block definition such as a valve, sprinkler, diffuser or equipment symbol.",
+      {
+        blockName: { type: "string" },
+        x: { type: "number" }, y: { type: "number" },
+        scale: { type: "number" },
+        rotation: { type: "number" },
+        layer: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["blockName", "x", "y", "scale", "rotation", "layer", "reason"]
     )
   ];
 }

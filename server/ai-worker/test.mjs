@@ -55,6 +55,11 @@ test("CAD proposal tools are strict and proposal-only surface is bounded",()=>{
   assert.ok(names.has("cad_move_entity"));
   assert.ok(names.has("cad_add_line"));
   assert.ok(names.has("cad_replace_text"));
+  assert.ok(names.has("cad_add_polyline"));
+  assert.ok(names.has("cad_offset_entity"));
+  assert.ok(names.has("cad_trim_entity"));
+  assert.ok(names.has("cad_extend_entity"));
+  assert.ok(names.has("cad_insert_block"));
   for(const tool of tools){
     assert.equal(tool.type,"function");
     assert.equal(tool.strict,true);
