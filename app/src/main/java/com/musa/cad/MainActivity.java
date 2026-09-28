@@ -768,7 +768,9 @@ public class MainActivity extends AppCompatActivity {
     private String musaAiContextLabel(){
         if(currentProject==null)return "Bağlam • Henüz proje açık değil";
         if(activeDxf!=null){
-            return "Bağlam • "+currentDisplayName+" • "+activeDxf.entityCount+" nesne • "+activeDxf.layerCount+" katman • "+activeDxf.activeLayout;
+            int vectorCount=openVectorProjectCount();
+            return "Bağlam • "+currentDisplayName+" • "+activeDxf.entityCount+" nesne • "+activeDxf.layerCount+" katman • "+activeDxf.activeLayout+
+                (vectorCount>1?" • "+vectorCount+" açık vektör proje":"");
         }
         if(currentProject.nativeScene!=null){
             return "Bağlam • "+currentDisplayName+" • DWG Native • "+currentProject.nativeScene.primitiveCount+" geometri";
@@ -783,6 +785,32 @@ public class MainActivity extends AppCompatActivity {
             aiIndexedDxf=activeDxf;
         }
         return aiDrawingIndex;
+    }
+
+    private int openVectorProjectCount(){
+        int count=0;
+        for(ProjectSession p:projects){
+            if(p==null)continue;
+            DxfParser.Result parsed=(p==currentProject&&activeDxf!=null)?activeDxf:p.parsed;
+            if(parsed!=null)count++;
+        }
+        return count;
+    }
+
+    private List<MusaAiProjectPackage.Drawing> currentAiProjectPackageDrawings(){
+        ArrayList<MusaAiProjectPackage.Drawing> out=new ArrayList<>();
+        for(ProjectSession p:projects){
+            if(p==null)continue;
+            DxfParser.Result parsed=(p==currentProject&&activeDxf!=null)?activeDxf:p.parsed;
+            if(parsed==null)continue;
+            String name=p==currentProject?currentDisplayName:p.name;
+            out.add(new MusaAiProjectPackage.Drawing(
+                name==null?"cizim.dwg":name,
+                parsed.aiDrawingIndex(),
+                p.boqModel
+            ));
+        }
+        return out;
     }
 
     private RevisionCandidate findOtherRevisionCandidate(){
@@ -814,7 +842,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve tam proje denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve açık tüm disiplin dosyalarını birlikte inceleyen Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
         }
 
@@ -900,6 +928,25 @@ public class MainActivity extends AppCompatActivity {
         if(isAiReportPdfCommand(aiControl)){
             exportLastAiReport(false,reply);
             return;
+        }
+        if(MusaAiProjectPackage.asksPackageReview(raw)){
+            List<MusaAiProjectPackage.Drawing> packageDrawings=currentAiProjectPackageDrawings();
+            if(packageDrawings.isEmpty()){
+                reply.send("Proje Paketi denetimi için en az bir tam vektör DWG/DXF çizimi açık olmalı.");
+                return;
+            }
+            MusaAiProjectPackage.Result packageReport=MusaAiProjectPackage.generate(packageDrawings,raw);
+            if(packageReport.matched){
+                lastAiReport=packageReport.text;
+                lastAiReportTitle=packageReport.title;
+                lastAiReportSourceIds=Collections.emptyList();
+                cad.clearAiHighlights();
+                reply.send(packageReport.text+
+                    "\n\n• Paket denetiminde açık vektör çizim: "+packageReport.drawingCount+
+                    "\n• Algılanan disiplin türü: "+packageReport.detectedDisciplineCount+
+                    "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
+                return;
+            }
         }
         if(MusaAiDetailedReport.asksDetailedReport(raw)){
             if(activeDxf==null){
