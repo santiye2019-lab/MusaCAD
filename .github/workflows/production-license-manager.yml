@@ -1,0 +1,87 @@
+name: Production signed License Manager APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build-manager-apk]') }}
+    runs-on: ubuntu-latest
+    env:
+      MUSACAD_MANAGER_PRODUCTION_RELEASE: "true"
+      MUSACAD_MANAGER_KEYSTORE_FILE: /tmp/musacad-manager-release.jks
+      MUSACAD_MANAGER_KEYSTORE_B64: ${{ secrets.MUSACAD_MANAGER_KEYSTORE_B64 }}
+      MUSACAD_MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_MANAGER_KEYSTORE_PASSWORD }}
+      MUSACAD_MANAGER_KEY_ALIAS: ${{ secrets.MUSACAD_MANAGER_KEY_ALIAS }}
+      MUSACAD_MANAGER_KEY_PASSWORD: ${{ secrets.MUSACAD_MANAGER_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate License Manager production signing inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in             MUSACAD_MANAGER_KEYSTORE_B64             MUSACAD_MANAGER_KEYSTORE_PASSWORD             MUSACAD_MANAGER_KEY_ALIAS             MUSACAD_MANAGER_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required production secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Prepare License Manager signing keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MUSACAD_MANAGER_KEYSTORE_B64" | base64 -d > "$MUSACAD_MANAGER_KEYSTORE_FILE"
+          chmod 600 "$MUSACAD_MANAGER_KEYSTORE_FILE"
+          keytool -list             -keystore "$MUSACAD_MANAGER_KEYSTORE_FILE"             -storepass "$MUSACAD_MANAGER_KEYSTORE_PASSWORD"             -alias "$MUSACAD_MANAGER_KEY_ALIAS" >/dev/null
+
+      - name: Build production License Manager APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :licensemanager:assembleRelease
+
+          apk="licensemanager/build/outputs/apk/release/licensemanager-release.apk"
+          test -s "$apk"
+
+          apksigner="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -n "$apksigner" ]; then
+            "$apksigner" verify --verbose --print-certs "$apk"
+          else
+            jarsigner -verify "$apk"
+          fi
+
+          cp "$apk" /tmp/MusaCAD-License-Manager-v1.1-production.apk
+          sha256sum /tmp/MusaCAD-License-Manager-v1.1-production.apk | tee /tmp/MusaCAD-License-Manager-v1.1-production.sha256
+
+          {
+            echo "## MusaCAD License Manager production APK"
+            echo "- Version: 1.1 (2)"
+            echo "- Production enforcement: enabled"
+            echo "- Debuggable: false"
+            echo "- Signing: dedicated License Manager production keystore"
+            echo "- Expected MC1 fingerprint: derived from app/src/main/assets/MUSACAD-LICENSE-PUBLIC.pem"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload License Manager production APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-License-Manager-production-v1.1
+          path: |
+            /tmp/MusaCAD-License-Manager-v1.1-production.apk
+            /tmp/MusaCAD-License-Manager-v1.1-production.sha256
+          if-no-files-found: error
+          retention-days: 14
