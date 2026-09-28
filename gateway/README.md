@@ -72,14 +72,19 @@ Response:
   "actions": [
     {
       "command": "ZE",
-      "description": "Çizimi ekrana sığdır"
+      "description": "Çizimi ekrana sığdır",
+      "source_ids": []
     }
   ]
 }
 ```
 
+When a drawing entity can be identified safely, `source_ids` contains the
+stable MusaCAD source ID(s). The app highlights these targets before execution.
+
 The Android app does **not** blindly execute `actions`. It applies its own
-command allowlist and asks the user before any drawing/file mutation.
+command allowlist and asks the user before any drawing/file mutation. For
+targeted edits, the first valid source ID is selected only after approval.
 
 ## Android build setting
 
