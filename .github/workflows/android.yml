@@ -170,6 +170,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiCloudSession.java tests/MusaAiCloudSessionTest.java
           java -cp /tmp/musacad-tests MusaAiCloudSessionTest
+      - name: Test Gandalf gateway URL helper
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiGatewayEndpoint.java tests/MusaAiGatewaySessionEndpointTest.java
+          java -cp /tmp/musacad-tests MusaAiGatewaySessionEndpointTest
       - name: Check Gandalf gateway syntax
         run: |
           node --check gateway/server.mjs
