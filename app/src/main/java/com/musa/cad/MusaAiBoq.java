@@ -252,10 +252,10 @@ public final class MusaAiBoq {
     }
 
     private static Metric metricFromUnit(String unit){
-        String u=MusaAiDrawingIndex.normalize(unit).replace(" ","");
+        String u=unitKey(unit);
         if(u.isEmpty())return Metric.UNKNOWN;
-        if(contains(u,"adet","ad","pcs","piece","ea"))return Metric.COUNT;
-        if(u.contains("m2")||u.contains("m²")||u.contains("cm2")||u.contains("mm2"))return Metric.AREA;
+        if(u.equals("adet")||u.equals("ad")||u.equals("pcs")||u.equals("piece")||u.equals("ea"))return Metric.COUNT;
+        if(u.equals("m2")||u.equals("cm2")||u.equals("mm2")||u.equals("metrekare"))return Metric.AREA;
         if(u.equals("m")||u.equals("metre")||u.equals("cm")||u.equals("mm"))return Metric.LENGTH;
         return Metric.UNKNOWN;
     }
@@ -270,7 +270,7 @@ public final class MusaAiBoq {
     }
 
     private static double factorToBase(String unit,Metric metric){
-        String u=MusaAiDrawingIndex.normalize(unit).replace(" ","");
+        String u=unitKey(unit);
         if(metric==Metric.LENGTH){
             if(u.equals("mm"))return 0.001d;if(u.equals("cm"))return 0.01d;return 1d;
         }
@@ -278,6 +278,12 @@ public final class MusaAiBoq {
             if(u.startsWith("mm"))return 0.000001d;if(u.startsWith("cm"))return 0.0001d;return 1d;
         }
         return 1d;
+    }
+
+    private static String unitKey(String unit){
+        String raw=clean(unit).toLowerCase(Locale.ROOT)
+            .replace("㎡","m2").replace("²","2").replace("^2","2").replace(" ","");
+        return MusaAiDrawingIndex.normalize(raw).replace(" ","");
     }
 
     private static Double parseNumber(String raw){
