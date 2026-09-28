@@ -1,9 +1,10 @@
 # MusaCAD license backend
 
-This Cloudflare Worker provides two security services for MusaCAD Android:
+This Cloudflare Worker provides three security services for MusaCAD Android:
 
 - one-time 24-hour trial activation that survives uninstall/reinstall;
-- server-side Google Play yearly subscription renewal verification before renewed MusaCAD access is granted.
+- server-side Google Play yearly subscription renewal verification before renewed MusaCAD access is granted;
+- short-lived, device-bound AI session tokens for the separate Gandalf AI worker.
 
 ## Security model
 
@@ -26,18 +27,27 @@ This Cloudflare Worker provides two security services for MusaCAD Android:
 - The Worker acknowledges a verified yearly subscription renewal with `purchases.subscriptions.acknowledge`.
 - By default, purchases without a MusaCAD device binding are rejected. Set `MUSACAD_PLAY_ALLOW_LEGACY_UNBOUND=true` only for an intentional migration of older purchases.
 
+### Gandalf AI session
+
+- `POST /v1/ai/session` exchanges an active signed MusaCAD entitlement for a 15-minute `MAI1` bearer token.
+- Trial access is proven with the signed `MT1` token.
+- Direct paid access is proven with the signed `MC1` token.
+- Google Play access is accepted only after the server has verified the renewal and written an active `ai_entitlements` row.
+- The OpenAI API key is never stored in this worker or Android; it belongs only to the separate `server/ai-worker`.
+
 ## Deploy outline
 
 1. Create or reuse the Cloudflare Worker and D1 database.
 2. Copy `wrangler.toml.example` to a local `wrangler.toml`; fill in the D1 database ID and non-secret variables.
 3. Apply `schema.sql` to D1. It creates both the trial table and the verified Play purchase table.
-4. Generate a dedicated RSA keypair for trial signing and store the PKCS#8 private key as the encrypted Worker secret `MUSACAD_TRIAL_PRIVATE_KEY_PEM`.
-5. In Google Cloud / Play Console, create a service account authorized to use the Google Play Android Publisher API for the MusaCAD app.
-6. Put the service account email in `MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL`.
-7. Store the service account PKCS#8 private key only as the encrypted Worker secret `MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM`.
-8. Set `MUSACAD_PACKAGE_NAME=com.musa.cad` and `MUSACAD_PLAY_YEARLY_PRODUCT_ID=musacad_yearly_renewal`.
-9. Deploy the Worker.
-10. Build the Android release with:
+4. Generate a dedicated RSA keypair for trial/AI-session signing. Store the PKCS#8 private key as `MUSACAD_TRIAL_PRIVATE_KEY_PEM` and the matching public key as `MUSACAD_TRIAL_PUBLIC_KEY_PEM`.
+5. Store the MusaCAD offline paid-license public key as `MUSACAD_LICENSE_PUBLIC_KEY_PEM` so `MC1` proofs can be checked server-side.
+6. In Google Cloud / Play Console, create a service account authorized to use the Google Play Android Publisher API for the MusaCAD app.
+7. Put the service account email in `MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL`.
+8. Store the service account PKCS#8 private key only as the encrypted Worker secret `MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM`.
+9. Set `MUSACAD_PACKAGE_NAME=com.musa.cad` and `MUSACAD_PLAY_YEARLY_PRODUCT_ID=musacad_yearly_renewal`.
+10. Deploy the Worker.
+11. Build the Android release with:
    - `MUSACAD_TRIAL_API_URL=https://<worker>/v1/trial/start`
    - `MUSACAD_TRIAL_PUBLIC_KEY_PEM=<matching trial public key>`
    - `MUSACAD_PLAY_VERIFY_URL=https://<worker>/v1/play/verify`
@@ -135,3 +145,28 @@ Play Integrity can be added later as another backend signal. The current design 
 - Back up the trial and offline paid-license private keys securely and separately.
 - Keep the Android release signing key stable; changing it can change the app-scoped Android ID used by MusaCAD licensing.
 - For refunds and revocations, add Google Play RTDN/Voided Purchases synchronization before large-scale public sales.
+
+
+### `POST /v1/ai/session`
+
+Request:
+
+```json
+{
+  "deviceId": "MC-12345678-90ABCDEF-12345678",
+  "packageName": "com.musa.cad",
+  "entitlementProof": "MT1... or MC1..."
+}
+```
+
+Active entitlement:
+
+```json
+{
+  "status": "active",
+  "token": "MAI1....",
+  "expiresAtMs": 1810000900000
+}
+```
+
+The `MAI1` token is accepted only by the separate MusaCAD AI worker and expires after 15 minutes.
