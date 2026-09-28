@@ -317,7 +317,10 @@ public final class MusaAiProjectExpert {
     private static void add(Set<Integer>out,MusaAiDrawingIndex.Item item){if(item!=null&&item.sourceId>=0)out.add(item.sourceId);}
     private static boolean has(String q,String...terms){
         if(q==null)return false;
-        for(String term:terms)if(q.contains(MusaAiDrawingIndex.normalize(term)))return true;
+        for(String term:terms){
+            String wanted=MusaAiDrawingIndex.normalize(term);
+            if(!wanted.isEmpty()&&q.contains(wanted))return true;
+        }
         return false;
     }
     private static Collection<Integer>limit(Collection<Integer>ids,int max){
