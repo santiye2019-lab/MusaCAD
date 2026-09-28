@@ -813,6 +813,11 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(MusaAiMechanicalExpert.isHelpCommand(raw)){
+            reply.send(MusaAiMechanicalExpert.commandHelp());
+            return;
+        }
+
         String aiControl=MusaAiDrawingIndex.normalize(raw);
         if(isGandalfUndoCommand(aiControl)){
             undoLastGandalfBatch(reply);
