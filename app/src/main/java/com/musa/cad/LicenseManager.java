@@ -19,6 +19,7 @@ public final class LicenseManager {
     private static final String K_PLAY_ENTITLED="play_entitled_v1";
     private static final String K_EVER_PAID_LICENSE="ever_paid_license_v1";
     private static final String K_PLAY_EXPIRES_AT_MS="play_expires_at_ms_v1";
+    private static final String K_PLAY_CLOUD_PROOF="play_cloud_proof_v1";
     public static final int TERMS_VERSION=1;
 
     public enum State { TRIAL_AVAILABLE, TRIAL_ACTIVE, TRIAL_EXPIRED, LICENSED, CLOCK_ERROR }
@@ -121,6 +122,8 @@ public final class LicenseManager {
         if(paid!=null&&paid.trim().startsWith(LicenseToken.PREFIX+"."))return paid.trim();
         String trial=p.getString(K_TRIAL_TOKEN,null);
         if(trial!=null&&trial.trim().startsWith(TrialToken.PREFIX+"."))return trial.trim();
+        String play=p.getString(K_PLAY_CLOUD_PROOF,null);
+        if(play!=null&&play.trim().startsWith("MP1."))return play.trim();
         return "";
     }
 
@@ -136,8 +139,15 @@ public final class LicenseManager {
         if(active&&expiresAtMs>System.currentTimeMillis()){
             e.putBoolean(K_EVER_PAID_LICENSE,true).putLong(K_PLAY_EXPIRES_AT_MS,expiresAtMs);
         }else{
-            e.putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS);
+            e.putBoolean(K_PLAY_ENTITLED,false).remove(K_PLAY_EXPIRES_AT_MS).remove(K_PLAY_CLOUD_PROOF);
         }
+        e.apply();
+    }
+
+    public static void setPlayCloudProof(Context c,String proof){
+        SharedPreferences.Editor e=prefs(c).edit();
+        if(proof!=null&&proof.trim().startsWith("MP1."))e.putString(K_PLAY_CLOUD_PROOF,proof.trim());
+        else e.remove(K_PLAY_CLOUD_PROOF);
         e.apply();
     }
 
