@@ -88,6 +88,14 @@ public final class MusaAiSessionService {
         }finally{if(connection!=null)connection.disconnect();}
     }
 
+    public static boolean developerCached(){
+        return cachedExpiresAtMs>System.currentTimeMillis()&&"developer".equals(cachedAccessMode);
+    }
+
+    public static String cachedAccessMode(){
+        return developerCached()?"developer":"licensed";
+    }
+
     static void clearCache(){cachedToken="";cachedExpiresAtMs=0L;cachedAccessMode="licensed";}
 
     private static String readLimited(InputStream in)throws IOException{
