@@ -107,6 +107,9 @@ public final class CadBlockLibrary {
         out.add(entry("mec_fan","Fan",CATEGORY_MECHANICAL,"fan havalandırma ventilation",a->fan()));
         out.add(entry("mec_radiator","Radyatör",CATEGORY_MECHANICAL,"radyatör radiator ısıtma heating",a->radiator()));
         out.add(entry("mec_sprinkler","Sprinkler",CATEGORY_MECHANICAL,"sprinkler yangın fire söndürme",a->sprinkler()));
+        out.add(entry("mec_diffuser","Difüzör",CATEGORY_MECHANICAL,"difüzör diffuser menfez havalandırma supply air",a->diffuser()));
+        out.add(entry("mec_grille","Menfez",CATEGORY_MECHANICAL,"menfez grille return exhaust havalandırma",a->grille()));
+        out.add(entry("mec_fire_cabinet","Yangın Dolabı",CATEGORY_MECHANICAL,"yangın dolabı fire cabinet hose reel",a->fireCabinet()));
         out.add(entry("mec_equipment_tag","Mekanik Ekipman Etiketi",CATEGORY_MECHANICAL,"ekipman tag mekanik cihaz",defaults("TAG","AHU-01"),a->equipmentTag(value(a,"TAG","AHU-01"))));
 
         out.add(entry("elec_socket","Priz",CATEGORY_ELECTRICAL,"priz socket outlet elektrik",a->socket()));
@@ -191,6 +194,32 @@ public final class CadBlockLibrary {
         ArrayList<CadEdit> out=new ArrayList<>();out.add(CadEdit.circle(0,0,9,0));
         for(int i=0;i<8;i++){double r=Math.toRadians(i*45d);out.add(CadEdit.line((float)(Math.cos(r)*12),(float)(Math.sin(r)*12),(float)(Math.cos(r)*34),(float)(Math.sin(r)*34)));}
         return out;
+    }
+
+    private static List<CadEdit> diffuser(){
+        return list(
+            CadEdit.rectangle(-32,-32,32,32),
+            CadEdit.line(-32,-32,32,32),
+            CadEdit.line(-32,32,32,-32),
+            CadEdit.line(-32,0,32,0),
+            CadEdit.line(0,-32,0,32)
+        );
+    }
+
+    private static List<CadEdit> grille(){
+        ArrayList<CadEdit> out=new ArrayList<>();out.add(CadEdit.rectangle(-46,-24,46,24));
+        for(int x=-30;x<=30;x+=15)out.add(CadEdit.line(x,-20,x,20));
+        return out;
+    }
+
+    private static List<CadEdit> fireCabinet(){
+        return list(
+            CadEdit.rectangle(-34,-44,34,44),
+            CadEdit.circle(0,4,22,4),
+            CadEdit.line(-18,4,18,4),
+            CadEdit.line(0,-14,0,22),
+            CadEdit.styledText(-18,-28,"YD",0,"STANDARD","sans-serif",false,14,1,0,0)
+        );
     }
 
     private static List<CadEdit> equipmentTag(String tag){
