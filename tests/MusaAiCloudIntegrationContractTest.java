@@ -46,7 +46,21 @@ public final class MusaAiCloudIntegrationContractTest {
         require(executor,"cad.restoreCapturedSessionState(before)","atomic rollback");
         require(executor,"case \"cad_delete_entity\"","allowlisted destructive action");
         require(executor,"case \"cad_add_line\"","allowlisted drawing action");
+        require(executor,"case \"cad_add_polyline\"","allowlisted polyline action");
+        require(executor,"case \"cad_offset_entity\"","allowlisted offset action");
+        require(executor,"case \"cad_trim_entity\"","allowlisted trim action");
+        require(executor,"case \"cad_extend_entity\"","allowlisted extend action");
+        require(executor,"case \"cad_insert_block\"","allowlisted block action");
+        require(worker,"\"cad_add_polyline\"","cloud polyline proposal tool");
+        require(worker,"\"cad_offset_entity\"","cloud offset proposal tool");
+        require(worker,"\"cad_trim_entity\"","cloud trim proposal tool");
+        require(worker,"\"cad_extend_entity\"","cloud extend proposal tool");
+        require(worker,"\"cad_insert_block\"","cloud mechanical block proposal tool");
         require(cadView,"applyAiMoveSource","sourceId move bridge");
+        require(cadView,"applyAiAddPolyline","polyline bridge");
+        require(cadView,"applyAiOffsetSource","offset bridge");
+        require(cadView,"applyAiTrimExtendSource","trim/extend bridge");
+        require(cadView,"applyAiInsertBlock","block insert bridge");
         require(cadView,"applyAiReplaceTextSource","sourceId text bridge");
         require(cadView,"aiLayerExists","existing-layer guard");
 
