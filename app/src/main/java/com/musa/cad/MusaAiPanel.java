@@ -82,7 +82,7 @@ public final class MusaAiPanel {
         root.addView(messagesScroll,messagesLp);
 
         appendBubble(activity,messages,false,
-            "Merhaba. Ben MusaCAD AI. Bu panel üzerinden çizime soru sorma, doğal dille CAD komutu verme, metraj, mekanik tesisat proje kontrolü, genel proje kontrolü, revizyon karşılaştırma ve raporlama özelliklerini kullanabileceksiniz.");
+            "Merhaba. Ben MusaCAD AI. Yerel mod çevrimdışı çizim soruları, metraj ve proje kontrolünü yapar. Gandalf Cloud AI ise kullanıcı onayıyla sınırlı CAD-JSON bağlamını kullanarak daha derin mühendislik analizi ve güncel kaynak araştırması yapabilir.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);
@@ -131,6 +131,7 @@ public final class MusaAiPanel {
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
             {"Mekanik","AI_MEKANIK_KONTROL"},
+            {"Gandalf","Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
