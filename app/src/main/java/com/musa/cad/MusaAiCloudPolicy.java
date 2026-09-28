@@ -13,6 +13,15 @@ public final class MusaAiCloudPolicy {
             q.contains("webden kontrol")||q.contains("guncel kaynaklarla");
     }
 
+    public static boolean shouldUseProjectPackage(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return q.contains("proje paketi")||
+            q.contains("tum disiplin")||
+            q.contains("tum acik proje")||
+            q.contains("tum acik cizim")||
+            q.contains("disiplinler arasi");
+    }
+
     public static String promptForCloud(String raw){
         if(raw==null)return "";
         String s=raw.trim();
