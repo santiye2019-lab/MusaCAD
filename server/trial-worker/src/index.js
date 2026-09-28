@@ -50,8 +50,8 @@ async function handleTrial(request, env) {
 
 async function handlePlayVerify(request, env) {
   if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
-  if (!env.DB || !env.MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL || !env.MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM)
-    return json({ status: "server_error", message: "Google Play server credentials are not configured" }, 503);
+  if (!env.DB || !env.MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL || !env.MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM || !env.MUSACAD_TRIAL_PRIVATE_KEY_PEM)
+    return json({ status: "server_error", message: "Google Play server credentials or cloud-proof signing key are not configured" }, 503);
 
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
