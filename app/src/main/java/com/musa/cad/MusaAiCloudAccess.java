@@ -22,7 +22,7 @@ public final class MusaAiCloudAccess {
         boolean linked=p.getBoolean(K_LINKED,false);
         boolean verified=p.getBoolean(K_VERIFIED,false);
         long expires=p.getLong(K_EXPIRES,0L);
-        boolean valid=verified&&expires>System.currentTimeMillis();
+        boolean valid=verified&&expires>System.currentTimeMillis()&&MusaAiCloudSession.isValid();
         boolean gateway=BuildConfig.AI_GATEWAY_URL!=null&&!BuildConfig.AI_GATEWAY_URL.trim().isEmpty();
         return MusaAiAccessPolicy.decide(gateway,linked,verified,valid);
     }
