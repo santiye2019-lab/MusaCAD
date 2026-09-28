@@ -32,7 +32,7 @@ public final class Mc1ProductionContractTest {
         need(managerUi,"YENİ ANAHTAR ile .mlk yedeği oluşturun", "first-run MC1 bootstrap guidance");
 
         need(issuer,"SHA256withRSA", "MC1 RSA signature");
-        need(issuer,"MC1|", "MC1 payload");
+        need(issuer,"String payload=PREFIX+\"|\"+id+\"|\"+expires", "MC1 payload");
         need(verifier,"constantEquals(installationId,expectedInstallationId)", "device binding");
         need(verifier,"nowMs>expiresAt", "expiry enforcement");
 
