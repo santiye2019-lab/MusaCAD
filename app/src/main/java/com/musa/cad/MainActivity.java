@@ -113,7 +113,8 @@ public class MainActivity extends AppCompatActivity {
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
-    private String lastCommandRaw="",lastAiReport="";
+    private String lastCommandRaw="",lastAiReport="",lastAiReportTitle="MusaCAD AI Raporu";
+    private List<Integer> lastAiReportSourceIds=Collections.emptyList();
     private MusaAiPanel.Reply pendingBoqReply;
     private ProjectSession pendingBoqProject;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
@@ -813,7 +814,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve tam proje denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
         }
 
@@ -888,6 +889,46 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(isAiReportWordCommand(aiControl)){
+            exportLastAiReport(true,reply);
+            return;
+        }
+        if(isAiReportPdfCommand(aiControl)){
+            exportLastAiReport(false,reply);
+            return;
+        }
+        if(MusaAiDetailedReport.asksDetailedReport(raw)){
+            if(activeDxf==null){
+                reply.send("Detaylı disiplin raporu için tam vektör DWG/DXF çizimi hazır olmalı.");
+                return;
+            }
+            MusaAiDetailedReport.Result detailed=MusaAiDetailedReport.generate(
+                currentAiDrawingIndex(),currentDisplayName,raw,currentProject==null?null:currentProject.boqModel);
+            if(detailed.matched){
+                lastAiReport=detailed.text;lastAiReportTitle=detailed.title;
+                lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(detailed.sourceIds));
+                int shown=detailed.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(detailed.sourceIds);
+                if(detailed.sourceIds.isEmpty())cad.clearAiHighlights();
+                reply.send(detailed.text+
+                    (shown>0?"\n\n• Çizimde vurgulanan bulgu: "+shown:"")+
+                    "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
+                return;
+            }
+        }
+        if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
+            MusaAiDiscipline requested=MusaAiDiscipline.fromQuery(raw);
+            boolean full=aiControl.contains("tam proje")||aiControl.contains("tum disiplin")||aiControl.contains("disiplinler arasi");
+            if(activeDxf!=null&&(full||requested!=MusaAiDiscipline.MECHANICAL)){
+                MusaAiDisciplineAnalyzer.Result multi=MusaAiDisciplineAnalyzer.analyze(currentAiDrawingIndex(),raw);
+                if(multi.matched){
+                    int shown=multi.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(multi.sourceIds);
+                    if(multi.sourceIds.isEmpty())cad.clearAiHighlights();
+                    reply.send(multi.text+(shown>0?"\n• Çizimde vurgulanan: "+shown:""));
+                    return;
+                }
+            }
+        }
+
         if(MusaAiCloudPolicy.shouldUseCloud(raw)){
             if(currentProject==null){
                 reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
@@ -945,7 +986,8 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiAutoReport.Result report=buildCurrentAiReport();
             if(!report.matched){reply.send("AI proje raporu oluşturulamadı.");return;}
-            lastAiReport=report.text;
+            lastAiReport=report.text;lastAiReportTitle="Otomatik Proje Raporu";
+            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
             int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
             if(report.sourceIds.isEmpty())cad.clearAiHighlights();
             shareAiReport(lastAiReport);
@@ -961,12 +1003,13 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiAutoReport.Result report=buildCurrentAiReport();
             if(report.matched){
-                lastAiReport=report.text;
+                lastAiReport=report.text;lastAiReportTitle="Otomatik Proje Raporu";
+                lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
                 int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
                 if(report.sourceIds.isEmpty())cad.clearAiHighlights();
                 String highlight=shown>0?"\n\n• Çizimde vurgulanan bulgu/değişiklik: "+shown+
                     (report.sourceIds.size()>shown?" / "+report.sourceIds.size():""):"";
-                reply.send(report.text+highlight+"\n\n“Raporu paylaş” diyerek TXT olarak paylaşabilirsiniz.");
+                reply.send(report.text+highlight+"\n\n“Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar” diyebilirsiniz.");
                 return;
             }
         }
@@ -1312,6 +1355,46 @@ public class MainActivity extends AppCompatActivity {
             if(candidate!=null){baseline=candidate.index;baselineName=candidate.name;}
         }
         return MusaAiAutoReport.generate(currentAiDrawingIndex(),currentDisplayName,baseline,baselineName);
+    }
+
+    private static boolean isAiReportWordCommand(String q){
+        return (q.contains("rapor")&&q.contains("word"))||q.contains("docx olarak")||q.contains("word olarak cikar");
+    }
+
+    private static boolean isAiReportPdfCommand(String q){
+        return (q.contains("rapor")&&q.contains("pdf"))||q.contains("pdf olarak cikar");
+    }
+
+    private void exportLastAiReport(boolean word,MusaAiPanel.Reply reply){
+        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()){
+            runOnUiThread(()->exportLastAiReport(word,reply));
+            return;
+        }
+        if(lastAiReport==null||lastAiReport.trim().isEmpty()){
+            reply.send("Önce bir proje/disiplin raporu oluşturun.");
+            return;
+        }
+        final String report=lastAiReport,title=lastAiReportTitle;
+        Bitmap captured=null;
+        try{
+            if(cad!=null&&lastAiReportSourceIds!=null&&!lastAiReportSourceIds.isEmpty())
+                captured=cad.aiEvidenceSnapshot(lastAiReportSourceIds);
+        }catch(Exception ignored){}
+        final Bitmap evidence=captured;
+        aiExecutor.submit(()->{
+            try{
+                File file=word?MusaAiReportExport.docx(getApplicationContext(),title,report,evidence)
+                              :MusaAiReportExport.pdf(getApplicationContext(),title,report,evidence);
+                String mime=word?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/pdf";
+                runOnUiThread(()->shareFile(file,mime));
+                reply.send((word?"Word (.docx)":"PDF")+" raporu oluşturuldu • "+title+
+                    (evidence!=null?"\n• İşaretli proje bölgesinin kanıt görüntüsü rapora eklendi.":""));
+            }catch(Exception e){
+                reply.send("Rapor çıktısı oluşturulamadı: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage()));
+            }finally{
+                if(evidence!=null&&!evidence.isRecycled())evidence.recycle();
+            }
+        });
     }
 
     private void shareAiReport(String report){
