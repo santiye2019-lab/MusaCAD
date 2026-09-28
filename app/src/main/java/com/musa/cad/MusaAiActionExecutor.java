@@ -113,6 +113,35 @@ public final class MusaAiActionExecutor {
                         if(!cad.applyAiReplaceTextSource(id,value))throw new IllegalStateException("Metin değiştirilemedi • sourceId "+id);
                         applied++;break;
                     }
+                    case "cad_add_polyline":{
+                        String layer=requiredLayer(a);double[] points=requiredPoints(a);
+                        boolean closed=a.optBoolean("closed",false);
+                        if(!cad.applyAiAddPolyline(points,closed,layer))throw new IllegalStateException("Polyline eklenemedi • katman "+layer);
+                        applied++;break;
+                    }
+                    case "cad_offset_entity":{
+                        int id=requiredSourceId(a);double distance=requiredFinite(a,"distance");String layer=requiredLayer(a);
+                        if(Math.abs(distance)<1e-9d||!cad.applyAiOffsetSource(id,distance,layer))throw new IllegalStateException("OFFSET uygulanamadı • sourceId "+id);
+                        applied++;break;
+                    }
+                    case "cad_trim_entity":{
+                        int id=requiredSourceId(a),boundary=requiredOtherSourceId(a,"boundarySourceId",id);
+                        boolean keepStart=requiredBoolean(a,"keepStart");
+                        if(!cad.applyAiTrimExtendSource(id,boundary,true,keepStart))throw new IllegalStateException("TRIM uygulanamadı • sourceId "+id);
+                        applied++;break;
+                    }
+                    case "cad_extend_entity":{
+                        int id=requiredSourceId(a),boundary=requiredOtherSourceId(a,"boundarySourceId",id);
+                        if(!cad.applyAiTrimExtendSource(id,boundary,false,true))throw new IllegalStateException("EXTEND uygulanamadı • sourceId "+id);
+                        applied++;break;
+                    }
+                    case "cad_insert_block":{
+                        String layer=requiredLayer(a),block=requiredText(a,"blockName").trim();
+                        double x=requiredFinite(a,"x"),y=requiredFinite(a,"y"),scale=requiredFinite(a,"scale"),rotation=requiredFinite(a,"rotation");
+                        if(block.isEmpty()||scale<=0d||!cad.applyAiInsertBlock(block,x,y,scale,rotation,layer))
+                            throw new IllegalStateException("Blok eklenemedi • "+block);
+                        applied++;break;
+                    }
                     default:skipped++;break;
                 }
             }
@@ -129,7 +158,9 @@ public final class MusaAiActionExecutor {
 
     private static boolean isMutation(String name){
         return "cad_move_entity".equals(name)||"cad_delete_entity".equals(name)||"cad_change_layer".equals(name)||
-            "cad_add_line".equals(name)||"cad_add_text".equals(name)||"cad_replace_text".equals(name);
+            "cad_add_line".equals(name)||"cad_add_text".equals(name)||"cad_replace_text".equals(name)||
+            "cad_add_polyline".equals(name)||"cad_offset_entity".equals(name)||"cad_trim_entity".equals(name)||
+            "cad_extend_entity".equals(name)||"cad_insert_block".equals(name);
     }
 
     private static String label(String name){
@@ -140,6 +171,11 @@ public final class MusaAiActionExecutor {
         if("cad_add_line".equals(name))return "Çizgi ekle";
         if("cad_add_text".equals(name))return "Metin/not ekle";
         if("cad_replace_text".equals(name))return "Metni değiştir";
+        if("cad_add_polyline".equals(name))return "Polyline/hat ekle";
+        if("cad_offset_entity".equals(name))return "OFFSET kopyası oluştur";
+        if("cad_trim_entity".equals(name))return "TRIM uygula";
+        if("cad_extend_entity".equals(name))return "EXTEND uygula";
+        if("cad_insert_block".equals(name))return "Mekanik blok yerleştir";
         return "Desteklenmeyen öneri: "+String.valueOf(name);
     }
 
@@ -160,6 +196,29 @@ public final class MusaAiActionExecutor {
         double value=a.getDouble(key);
         if(!Double.isFinite(value)||Math.abs(value)>1e12d)throw new IllegalArgumentException("Geçersiz "+key);
         return value;
+    }
+
+    private static int requiredOtherSourceId(JSONObject a,String key,int first)throws Exception{
+        if(a==null||!a.has(key))throw new IllegalArgumentException(key+" eksik");
+        int id=a.getInt(key);if(id<0||id==first)throw new IllegalArgumentException("Geçersiz "+key);
+        return id;
+    }
+
+    private static boolean requiredBoolean(JSONObject a,String key)throws Exception{
+        if(a==null||!a.has(key)||!(a.get(key) instanceof Boolean))throw new IllegalArgumentException(key+" boolean olmalıdır");
+        return a.getBoolean(key);
+    }
+
+    private static double[] requiredPoints(JSONObject a)throws Exception{
+        JSONArray points=a==null?null:a.optJSONArray("points");
+        if(points==null||points.length()<4||points.length()>400||points.length()%2!=0)
+            throw new IllegalArgumentException("Polyline noktaları geçersiz");
+        double[] out=new double[points.length()];
+        for(int i=0;i<out.length;i++){
+            out[i]=points.getDouble(i);
+            if(!Double.isFinite(out[i])||Math.abs(out[i])>1e12d)throw new IllegalArgumentException("Geçersiz polyline koordinatı");
+        }
+        return out;
     }
 
     private static String requiredLayer(JSONObject a)throws Exception{
