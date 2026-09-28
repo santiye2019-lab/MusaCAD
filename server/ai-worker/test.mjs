@@ -300,6 +300,89 @@ test("multi-discipline expert profile adds trusted electrical instructions",asyn
   assert.equal(upstreamBody.instructions.includes("Do not infer cable sizing"),true);
 });
 
+test("project package is read-only and sent as multi-drawing context",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Çok disiplinli paket analizi hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+  const one=(name,layer)=>({
+    fileName:name,
+    detectedDiscipline:layer==="S_KIRIS"?"STRUCTURAL":"MECHANICAL",
+    cad:{
+      schema:"musacad-cad-json/v1",
+      fileName:name,
+      layers:[layer],
+      items:[],
+      cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true}
+    }
+  });
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Tüm disiplinleri birlikte analiz et",
+      allowWeb:false,
+      allowEditProposals:true,
+      cad:one("statik.dwg","S_KIRIS").cad,
+      cadPackage:{
+        schema:"musacad-cad-package/v1",
+        drawingCount:2,
+        drawings:[one("statik.dwg","S_KIRIS"),one("mekanik.dwg","MEK_BORU")],
+        cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true,packageEditToolsAllowed:false}
+      }
+    })
+  });
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.packageMode,true);
+  assert.equal(upstreamBody.tools.length,0);
+  assert.equal(upstreamBody.instructions.includes("Package mode is read-only"),true);
+  assert.equal(upstreamBody.instructions.includes("compare disciplines explicitly"),true);
+  assert.equal(upstreamBody.input[0].content.includes("MUSACAD CAD-PACKAGE"),true);
+  assert.equal(upstreamBody.input[0].content.includes("mekanik.dwg"),true);
+});
+
+test("project package rejects nested raw-drawing policy",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let called=false;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"paketi incele",
+      cad:{schema:"musacad-cad-json/v1",cloudPolicy:{rawDrawingIncluded:false}},
+      cadPackage:{
+        schema:"musacad-cad-package/v1",
+        drawings:[{
+          fileName:"unsafe.dwg",
+          cad:{schema:"musacad-cad-json/v1",cloudPolicy:{rawDrawingIncluded:true}}
+        }],
+        cloudPolicy:{rawDrawingIncluded:false,packageEditToolsAllowed:false}
+      }
+    })
+  });
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{called=true;throw new Error("must not call")}
+  });
+  assert.equal(response.status,400);
+  assert.equal(called,false);
+});
+
 test("unknown expert profile is ignored instead of becoming prompt instructions",async()=>{
   const keys=sessionPair();
   const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
