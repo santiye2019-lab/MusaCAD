@@ -8,16 +8,22 @@ public final class MusaAiDrawingIndex {
     public static final class Item {
         public final int sourceId;
         public final String type,layer,text;
-        public Item(String type,String layer,String text){this(-1,type,layer,text);}
-        public Item(int sourceId,String type,String layer,String text){
+        public final double length,area;
+        public Item(String type,String layer,String text){this(-1,type,layer,text,Double.NaN,Double.NaN);}
+        public Item(int sourceId,String type,String layer,String text){this(sourceId,type,layer,text,Double.NaN,Double.NaN);}
+        public Item(int sourceId,String type,String layer,String text,double length,double area){
             this.sourceId=sourceId;
             this.type=clean(type).toUpperCase(Locale.ROOT);
             this.layer=clean(layer);
             this.text=clean(text);
+            this.length=Double.isFinite(length)&&length>=0d?length:Double.NaN;
+            this.area=Double.isFinite(area)&&area>=0d?area:Double.NaN;
         }
+        public boolean hasLength(){return Double.isFinite(length);}
+        public boolean hasArea(){return Double.isFinite(area);}
     }
 
-    public final String layout;
+    public final String layout,unitName;
     public final int entityCount,oleObjectCount;
     public final Set<String> allLayers,visibleLayers;
     private final List<Item> items;
@@ -26,7 +32,14 @@ public final class MusaAiDrawingIndex {
     public MusaAiDrawingIndex(String layout,int entityCount,int oleObjectCount,
                               Collection<String>allLayers,Collection<String>visibleLayers,
                               Collection<Item>items){
+        this(layout,entityCount,oleObjectCount,allLayers,visibleLayers,items,"");
+    }
+
+    public MusaAiDrawingIndex(String layout,int entityCount,int oleObjectCount,
+                              Collection<String>allLayers,Collection<String>visibleLayers,
+                              Collection<Item>items,String unitName){
         this.layout=clean(layout);
+        this.unitName=clean(unitName);
         this.entityCount=Math.max(0,entityCount);
         this.oleObjectCount=Math.max(0,oleObjectCount);
         this.allLayers=immutableSet(allLayers);
