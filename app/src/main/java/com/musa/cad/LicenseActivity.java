@@ -75,7 +75,7 @@ public class LicenseActivity extends AppCompatActivity {
 
             // 2) Lisans kodu
             TextView codeLabel=new TextView(this);
-            codeLabel.setText("Lisans Kodu");
+            codeLabel.setText("Lisans Kodu / MC1");
             codeLabel.setTextColor(0xFF9CDFFF);
             codeLabel.setTextSize(10.5f);
             codeLabel.setGravity(Gravity.CENTER_VERTICAL);
@@ -86,7 +86,7 @@ public class LicenseActivity extends AppCompatActivity {
             licenseCode.setSingleLine(true);
             licenseCode.setTextColor(Color.WHITE);
             licenseCode.setTextSize(16f);
-            licenseCode.setHint("12 haneli lisans kodu");
+            licenseCode.setHint(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE?"12 haneli kod veya MC1 lisansı":"Güvenli MC1 lisansı");
             licenseCode.setHintTextColor(0xFF7890A8);
             licenseCode.setPadding(dp(12),0,dp(12),0);
             GradientDrawable codeBg=new GradientDrawable();
@@ -269,7 +269,7 @@ public class LicenseActivity extends AppCompatActivity {
         msg.append("\nGüvenli Lisans Kimliği: ").append(secureLicenseId);
         msg.append("\nOffline / kurumsal aktivasyon: 12 haneli kısa kod geriye dönük uyumluluk içindir. Ticari kullanımda güvenli Lisans Kimliği için RSA imzalı MC1 lisansı tercih edilir.");
         String stored=getSharedPreferences("musacad_license_state",MODE_PRIVATE).getString("license_token_v1",null);
-        if(stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
+        if(BuildConfig.ALLOW_LEGACY_SHORT_LICENSE&&stored!=null&&ShortLicenseCode.looksLikeShortCode(stored)){
             long shortExpiry=ShortLicenseCode.expiryAtMs(stored);
             if(shortExpiry==0L)msg.append("\nKısa lisans: Süresiz");
             else msg.append("\nKısa lisans bitişi: ").append(DateFormat.getDateInstance(DateFormat.MEDIUM).format(new Date(shortExpiry)));
