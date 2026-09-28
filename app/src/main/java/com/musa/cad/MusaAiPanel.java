@@ -161,6 +161,9 @@ public final class MusaAiPanel {
             scrollBottom(messagesScroll);
             host.onPrompt(prompt,text->activity.runOnUiThread(()->{
                 pending.setText(text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim());
+                Linkify.addLinks(pending,Linkify.WEB_URLS);
+                pending.setMovementMethod(LinkMovementMethod.getInstance());
+                pending.setLinksClickable(true);
                 scrollBottom(messagesScroll);
             }));
         };
