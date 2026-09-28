@@ -22,7 +22,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
         require(panel,"{\"Gandalf\",\"Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla\"}","Gandalf quick prompt");
-        require(cloud,"Authorization\",\"Bearer \"+session.token","short-lived bearer auth");
+        require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
         require(license,"cloudEntitlementProof","signed entitlement proof");
