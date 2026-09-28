@@ -1,9 +1,13 @@
 import http from "node:http";
+import { randomBytes } from "node:crypto";
 
 const PORT = Number(process.env.PORT || 8787);
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
 const MODEL = (process.env.OPENAI_MODEL || "gpt-5.6-sol").trim();
 const CLIENT_BEARER = (process.env.MUSACAD_GATEWAY_BEARER_TOKEN || "").trim();
+const PAIRING_CODE = (process.env.MUSACAD_PAIRING_CODE || "").trim();
+const SESSION_TTL_MS = Math.max(15 * 60_000, Number(process.env.MUSACAD_SESSION_TTL_MS || 2 * 60 * 60_000));
+const SESSIONS = new Map();
 
 const ALLOWED_VERBS = new Set([
   "ZE","ZOOM","PAN","3D","2D","LA","PR","DI","AA","ANG","ID","ARCLEN","HELP","LIST",
@@ -74,9 +78,25 @@ function json(res, status, body) {
 }
 
 function authorized(req) {
-  if (!CLIENT_BEARER) return false;
   const header = String(req.headers.authorization || "");
-  return header === `Bearer ${CLIENT_BEARER}`;
+  if (!header.startsWith("Bearer ")) return false;
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return false;
+  if (CLIENT_BEARER && token === CLIENT_BEARER) return true;
+  const expires = SESSIONS.get(token);
+  if (!expires) return false;
+  if (expires <= Date.now()) {
+    SESSIONS.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function createSession() {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  SESSIONS.set(token, expiresAt);
+  return { token, expiresAt };
 }
 
 async function readJson(req) {
@@ -172,7 +192,24 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         service: "musacad-gandalf-gateway",
         model: MODEL,
-        openai_configured: Boolean(OPENAI_API_KEY)
+        openai_configured: Boolean(OPENAI_API_KEY),
+        pairing_configured: Boolean(PAIRING_CODE)
+      });
+    }
+
+    if (req.method === "POST" && req.url === "/session") {
+      if (!PAIRING_CODE) return json(res, 503, { error: "pairing_not_configured" });
+      const body = await readJson(req);
+      const supplied = String(body?.pairing_code || "").trim();
+      if (!supplied || supplied !== PAIRING_CODE) {
+        return json(res, 401, { error: "invalid_pairing_code" });
+      }
+      const session = createSession();
+      return json(res, 200, {
+        token: session.token,
+        expires_at_ms: session.expiresAt,
+        entitlement_verified: true,
+        source: "gateway_pairing_dev"
       });
     }
 
