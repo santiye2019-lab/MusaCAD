@@ -100,7 +100,7 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiCadJsonTest
       - name: Test MusaCAD explicit cloud-AI routing policy
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiDisciplineExpert.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
           java -cp /tmp/musacad-tests MusaAiCloudPolicyTest
       - name: Test MusaCAD cloud-AI security integration contract
         run: |
