@@ -184,7 +184,7 @@ public final class DxfParser {
             for(Entity wrapped:document){
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
-                items.add(new MusaAiDrawingIndex.Item(layer.sourceType,layer.layer,analysisText(layer.entity)));
+                items.add(new MusaAiDrawingIndex.Item(layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity)));
             }
             return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,layerNames,visibleLayers,items);
         }
