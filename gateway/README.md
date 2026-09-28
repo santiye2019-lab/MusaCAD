@@ -19,15 +19,32 @@ This small service sits between the Android app and the OpenAI API.
 
 - `OPENAI_API_KEY` — server-side OpenAI API key.
 - `OPENAI_MODEL` — optional; defaults to `gpt-5.6-sol`.
-- `MUSACAD_GATEWAY_BEARER_TOKEN` — development/app-to-gateway bearer token.
-  For production, replace this static token with short-lived per-user sessions.
+- `MUSACAD_GATEWAY_BEARER_TOKEN` — optional static development bearer token.
+- `MUSACAD_PAIRING_CODE` — development/test pairing code. The Android app
+  exchanges this for a random short-lived in-memory session token.
+- `MUSACAD_SESSION_TTL_MS` — optional session lifetime; defaults to 2 hours
+  and is clamped to at least 15 minutes.
 - `PORT` — optional, defaults to 8787.
+
+The pairing flow is intentionally a development/test bridge. A commercial
+deployment should replace it with a real account/entitlement service. It does
+not claim to detect a ChatGPT Plus/Pro plan.
 
 ## Endpoints
 
 ### GET /health
 
 Returns gateway health and selected model. It never returns secrets.
+
+### POST /session
+
+Development/test session exchange:
+
+```json
+{ "pairing_code": "one-time-or-admin-provided-code" }
+```
+
+Returns a short-lived bearer token held only in Android process memory.
 
 ### POST /analyze
 
