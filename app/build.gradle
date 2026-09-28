@@ -9,6 +9,57 @@ def musaTrialPublicKeyPem = System.getenv('MUSACAD_TRIAL_PUBLIC_KEY_PEM') ?: ''
 def musaPlayProductId = System.getenv('MUSACAD_PLAY_YEARLY_PRODUCT_ID') ?: 'musacad_yearly_renewal'
 def musaPlayVerifyUrl = System.getenv('MUSACAD_PLAY_VERIFY_URL') ?: ''
 def hasReleaseSigning = musaKeystore && musaStorePassword && musaKeyAlias && musaKeyPassword
+def productionRelease = ((project.findProperty('musacadProductionRelease')
+    ?: System.getenv('MUSACAD_PRODUCTION_RELEASE')
+    ?: 'false').toString()).equalsIgnoreCase('true')
+
+def verifyCommonProductionRelease = {
+    if (!hasReleaseSigning) {
+        throw new GradleException('Production MusaCAD release requires MUSACAD_KEYSTORE_FILE, MUSACAD_KEYSTORE_PASSWORD, MUSACAD_KEY_ALIAS and MUSACAD_KEY_PASSWORD')
+    }
+    File ks = file(musaKeystore)
+    if (!ks.isFile()) throw new GradleException('MUSACAD_KEYSTORE_FILE does not exist: ' + ks)
+    if (!musaTrialApiUrl.startsWith('https://')) {
+        throw new GradleException('Production MusaCAD release requires an HTTPS MUSACAD_TRIAL_API_URL')
+    }
+    if (!musaTrialPublicKeyPem.contains('-----BEGIN PUBLIC KEY-----') || !musaTrialPublicKeyPem.contains('-----END PUBLIC KEY-----')) {
+        throw new GradleException('Production MusaCAD release requires MUSACAD_TRIAL_PUBLIC_KEY_PEM')
+    }
+    File paidPublicKey = file('src/main/assets/MUSACAD-LICENSE-PUBLIC.pem')
+    if (!paidPublicKey.isFile() || !paidPublicKey.text.contains('-----BEGIN PUBLIC KEY-----')) {
+        throw new GradleException('Production MusaCAD release requires a valid offline paid-license public key asset')
+    }
+}
+
+tasks.register('verifyDirectProductionReleaseConfig') {
+    group = 'verification'
+    description = 'Fails a production direct release when signing/trial/offline-license configuration is incomplete.'
+    doLast {
+        if (!productionRelease) {
+            logger.lifecycle('MusaCAD production-release enforcement disabled for validation build.')
+            return
+        }
+        verifyCommonProductionRelease()
+    }
+}
+
+tasks.register('verifyPlayProductionReleaseConfig') {
+    group = 'verification'
+    description = 'Fails a production Play release when signing/trial/Play verification configuration is incomplete.'
+    doLast {
+        if (!productionRelease) {
+            logger.lifecycle('MusaCAD production-release enforcement disabled for validation build.')
+            return
+        }
+        verifyCommonProductionRelease()
+        if (!musaPlayVerifyUrl.startsWith('https://')) {
+            throw new GradleException('Production Play release requires an HTTPS MUSACAD_PLAY_VERIFY_URL')
+        }
+        if (!musaPlayProductId.trim()) {
+            throw new GradleException('Production Play release requires MUSACAD_PLAY_YEARLY_PRODUCT_ID')
+        }
+    }
+}
 
 android {
     namespace 'com.musa.cad'
@@ -49,6 +100,7 @@ android {
         buildConfigField "String", "TRIAL_PUBLIC_KEY_PEM", groovy.json.JsonOutput.toJson(musaTrialPublicKeyPem)
         buildConfigField "String", "PLAY_YEARLY_PRODUCT_ID", groovy.json.JsonOutput.toJson(musaPlayProductId)
         buildConfigField "String", "PLAY_VERIFY_URL", groovy.json.JsonOutput.toJson(musaPlayVerifyUrl)
+        buildConfigField "boolean", "ALLOW_LEGACY_SHORT_LICENSE", productionRelease ? "false" : "true"
     }
 
     flavorDimensions "distribution"
@@ -100,4 +152,15 @@ dependencies {
     implementation 'androidx.core:core:1.6.0'
     implementation 'com.google.android.material:material:1.4.0'
     playImplementation 'com.android.billingclient:billing:9.1.0'
+}
+
+afterEvaluate {
+    if (productionRelease) {
+        tasks.matching { it.name == 'assembleDirectRelease' || it.name == 'bundleDirectRelease' }.configureEach {
+            dependsOn tasks.named('verifyDirectProductionReleaseConfig')
+        }
+        tasks.matching { it.name == 'assemblePlayRelease' || it.name == 'bundlePlayRelease' }.configureEach {
+            dependsOn tasks.named('verifyPlayProductionReleaseConfig')
+        }
+    }
 }

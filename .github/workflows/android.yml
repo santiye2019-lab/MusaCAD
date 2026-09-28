@@ -264,6 +264,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-license-tests app/src/main/java/com/musa/cad/LicenseToken.java tests/LicenseTokenTest.java
           java -cp /tmp/musacad-license-tests LicenseTokenTest
+      - name: Test encrypted License Manager key backup
+        run: |
+          javac -d /tmp/musacad-license-backup licensemanager/src/main/java/com/musa/cad/licensemanager/LicenseBackupCrypto.java tests/LicenseBackupCryptoTest.java
+          java -cp /tmp/musacad-license-backup com.musa.cad.licensemanager.LicenseBackupCryptoTest
+      - name: Test production release security contract
+        run: |
+          javac -d /tmp/musacad-production-security tests/ProductionReleaseSecurityTest.java
+          java -cp /tmp/musacad-production-security ProductionReleaseSecurityTest
       - name: Check trial service source
         run: node --check server/trial-worker/src/index.js
       - name: Compile offline license generator
@@ -365,7 +373,7 @@ jobs:
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon lintPlayDebug lintDirectDebug testPlayDebugUnitTest testDirectDebugUnitTest compilePlayReleaseJavaWithJavac compileDirectReleaseJavaWithJavac
+          ./gradlew --no-daemon lintPlayDebug lintDirectDebug testPlayDebugUnitTest testDirectDebugUnitTest compilePlayReleaseJavaWithJavac compileDirectReleaseJavaWithJavac :licensemanager:lintDebug :licensemanager:testDebugUnitTest :licensemanager:compileDebugJavaWithJavac :licensemanager:compileReleaseJavaWithJavac
       - name: Build and smoke-test native converter
         run: |
           cmake -S app/src/main/cpp -B /tmp/musa-native -DCMAKE_BUILD_TYPE=Release
@@ -409,7 +417,7 @@ jobs:
           if-no-files-found: error
       - name: Package corresponding source
         run: |
-          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md
+          tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md
       - name: Upload native converter and corresponding source
         uses: actions/upload-artifact@v4
         with:
