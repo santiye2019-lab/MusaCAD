@@ -111,6 +111,7 @@ public final class MusaAiDisciplineExpert {
         findings+=appendChecks(out,p,st);
         if(findings==0)out.append("\n• Görünür CAD verisinden belirgin uzman kontrol adayı oluşmadı.");
 
+        if(findings>0&&highlights.isEmpty())highlights.addAll(st.ids);
         out.append("\nKontrol kapsamı");
         appendChecklist(out,p);
         out.append("\nNot: ").append(commandFamily(p))
