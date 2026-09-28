@@ -26,8 +26,9 @@ public final class MusaAiCloudIntegrationContractTest {
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
         require(license,"cloudEntitlementProof","signed entitlement proof");
-        require(cadJson,"\"rawDrawingIncluded\":false","no raw drawing policy");
-        require(cadJson,"\"automaticEditsAllowed\":false","no automatic edits policy");
+        require(cadJson,"rawDrawingIncluded","no raw drawing policy");
+        require(cadJson,"automaticEditsAllowed","no automatic edits policy");
+        require(cadJson,"editActionsRequireUserApproval","user approval policy");
 
         forbid(cloud,"OPENAI_API_KEY","OpenAI secret in Android client");
         forbid(gradle,"sk-proj-","hardcoded API key");
