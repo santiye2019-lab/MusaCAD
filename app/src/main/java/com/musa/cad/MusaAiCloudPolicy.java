@@ -5,6 +5,7 @@ public final class MusaAiCloudPolicy {
     public static boolean shouldUseCloud(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;
+        if(MusaAiProjectExpert.isCloudExpertCommand(raw))return true;
         if(MusaAiMechanicalExpert.isCloudExpertCommand(raw))return true;
         return q.equals("gandalf")||q.startsWith("gandalf ")||
             q.equals("cloudai")||q.startsWith("cloudai ")||
@@ -30,6 +31,7 @@ public final class MusaAiCloudPolicy {
 
     public static boolean allowEditProposals(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
+        if(MusaAiProjectExpert.isCloudExpertCommand(raw))return true;
         if(MusaAiMechanicalExpert.isCloudExpertCommand(raw))return true;
         return q.contains("duzelt")||q.contains("degistir")||q.contains("ekle")||
             q.contains("sil")||q.contains("tasi")||q.contains("ciz")||
