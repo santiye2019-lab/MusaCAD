@@ -406,6 +406,21 @@ public class CadView extends View {
         DxfParser.SourceEntity source=vectorDrawing.sourceById(sourceEdits.selectedId());
         return source==null?null:source.type;
     }
+    public boolean selectSourceById(int sourceId){
+        if(vectorDrawing==null||sourceId<0||!vectorDrawing.isSourceVisible(sourceId)||sourceEdits.hiddenSourceIds().contains(sourceId))return false;
+        DxfParser.SourceEntity source=vectorDrawing.sourceById(sourceId);
+        if(source==null||source.range==null)return false;
+        CadEdit prototype=source.prototype();
+        if(prototype==null)return false;
+        sourceEdits.select(source.sourceId,source.range,prototype,source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
+        if(!sourceEdits.hasSelection())return false;
+        selectedImageIndex=-1;mode=Mode.SELECT_ENTITY;
+        CadEdit selected=sourceEdits.currentSelected();
+        if(selected!=null){selectedPickX=selected.centerX();selectedPickY=selected.centerY();}
+        moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;
+        notifyValue();invalidate();return true;
+    }
+
     public int setAiHighlightedSources(Collection<Integer> sourceIds){
         aiHighlightedSourceIds.clear();
         if(vectorDrawing==null||sourceIds==null){invalidate();return 0;}
