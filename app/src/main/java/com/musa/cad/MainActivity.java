@@ -820,6 +820,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(activeDxf!=null){
+            MusaAiProjectControl.Result control=MusaAiProjectControl.analyze(currentAiDrawingIndex(),raw);
+            if(control.matched){
+                int shown=control.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(control.sourceIds);
+                if(control.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• Çizimde vurgulanan: "+shown+
+                    (control.sourceIds.size()>shown?" / "+control.sourceIds.size():""):"";
+                reply.send(control.text+highlight);
+                return;
+            }
+        }
+
+        if(activeDxf!=null){
             MusaAiQuantityTakeoff.Answer takeoff=MusaAiQuantityTakeoff.answer(currentAiDrawingIndex(),raw);
             if(takeoff.matched){
                 reply.send(takeoff.text);
@@ -849,7 +861,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if(q.contains("kontrol")||q.contains("hata")){
-            reply.send("Proje kontrol isteğini aldım. Bağlantısız hat, çap/etiket tutarsızlığı, eksik sembol ve benzeri kontrolleri sıradaki AI analiz modüllerinde bu panelden çalıştıracağız.");
+            reply.send(activeDxf==null
+                ?"Proje kontrolü için tam vektör çizim modelinin hazırlanması gerekiyor."
+                :"Bu kontrol isteği mevcut otomatik CAD kalite kurallarıyla eşleşmedi. “Projeyi kontrol et” veya “mükerrer nesneleri bul” diye deneyin.");
             return;
         }
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");

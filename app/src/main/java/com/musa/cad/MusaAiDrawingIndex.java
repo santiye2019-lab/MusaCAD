@@ -9,15 +9,24 @@ public final class MusaAiDrawingIndex {
         public final int sourceId;
         public final String type,layer,text;
         public final double length,area;
+        public final boolean closedKnown,closed;
+        public final String geometryKey;
         public Item(String type,String layer,String text){this(-1,type,layer,text,Double.NaN,Double.NaN);}
         public Item(int sourceId,String type,String layer,String text){this(sourceId,type,layer,text,Double.NaN,Double.NaN);}
         public Item(int sourceId,String type,String layer,String text,double length,double area){
+            this(sourceId,type,layer,text,length,area,false,false,"");
+        }
+        public Item(int sourceId,String type,String layer,String text,double length,double area,
+                    boolean closedKnown,boolean closed,String geometryKey){
             this.sourceId=sourceId;
             this.type=clean(type).toUpperCase(Locale.ROOT);
             this.layer=clean(layer);
             this.text=clean(text);
             this.length=Double.isFinite(length)&&length>=0d?length:Double.NaN;
             this.area=Double.isFinite(area)&&area>=0d?area:Double.NaN;
+            this.closedKnown=closedKnown;
+            this.closed=closedKnown&&closed;
+            this.geometryKey=clean(geometryKey);
         }
         public boolean hasLength(){return Double.isFinite(length);}
         public boolean hasArea(){return Double.isFinite(area);}
