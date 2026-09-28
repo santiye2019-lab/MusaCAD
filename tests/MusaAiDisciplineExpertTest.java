@@ -27,6 +27,14 @@ public final class MusaAiDisciplineExpertTest {
             throw new AssertionError("struct openings");
         if(MusaAiDisciplineExpert.detect("GELKAI_GROUNDING")!=MusaAiDisciplineExpert.Profile.ELEC_GROUNDING)
             throw new AssertionError("electrical grounding");
+        if(MusaAiDisciplineExpert.detect("MIMAI_SPACE")!=MusaAiDisciplineExpert.Profile.ARCH_SPACE)
+            throw new AssertionError("architectural space suffix");
+        if(MusaAiDisciplineExpert.detect("PEYAI_HARD")!=MusaAiDisciplineExpert.Profile.LAND_HARD)
+            throw new AssertionError("landscape hard suffix");
+        if(MusaAiDisciplineExpert.detect("ASNAI_ELECTRICAL")!=MusaAiDisciplineExpert.Profile.ELEV_ELECTRICAL)
+            throw new AssertionError("elevator electrical suffix");
+        if(MusaAiDisciplineExpert.detect("YANGAI_DETECTION")!=MusaAiDisciplineExpert.Profile.FIRE_DETECTION)
+            throw new AssertionError("fire detection suffix");
         if(!MusaAiDisciplineExpert.isCloudExpertCommand("GYANGAI_SMOKE"))throw new AssertionError("fire cloud");
         if(!"fire_smoke".equals(MusaAiDisciplineExpert.cloudProfile("GYANGAI_SMOKE")))throw new AssertionError("fire profile");
         if(!MusaAiDisciplineExpert.isHelpCommand("STATIKAI_HELP"))throw new AssertionError("help");
