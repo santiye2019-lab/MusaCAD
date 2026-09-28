@@ -200,15 +200,18 @@ public class MainActivity extends AppCompatActivity {
             .setTitle(newKey?"Yeni anahtar yedek parolası":"Anahtar yedek parolası")
             .setMessage("En az 12 karakter kullanın. Bu parola kurtarma için zorunludur ve MusaCAD tarafından geri alınamaz.")
             .setView(box).setNegativeButton("İPTAL",null).setPositiveButton("KAYDET",null).create();
-        dialog.setOnShowListener(x->{styleDialogButtons(dialog);dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            String a=p1.getText().toString(),b=p2.getText().toString();
-            if(a.length()<12){p1.setError("En az 12 karakter");return;}
-            if(!a.equals(b)){p2.setError("Parolalar eşleşmiyor");return;}
-            clearPendingPassword();pendingBackupPassword=a.toCharArray();pendingNewKey=newKey;pendingExistingBackup=!newKey;
-            Intent create=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
-            create.putExtra(Intent.EXTRA_TITLE,"MusaCAD-Lisans-Anahtari-"+System.currentTimeMillis()+".mlk");
-            startActivityForResult(create,CREATE_BACKUP);dialog.dismiss();
-        }));
+        dialog.setOnShowListener(x->{
+            styleDialogButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                String a=p1.getText().toString(),b=p2.getText().toString();
+                if(a.length()<12){p1.setError("En az 12 karakter");return;}
+                if(!a.equals(b)){p2.setError("Parolalar eşleşmiyor");return;}
+                clearPendingPassword();pendingBackupPassword=a.toCharArray();pendingNewKey=newKey;pendingExistingBackup=!newKey;
+                Intent create=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
+                create.putExtra(Intent.EXTRA_TITLE,"MusaCAD-Lisans-Anahtari-"+System.currentTimeMillis()+".mlk");
+                startActivityForResult(create,CREATE_BACKUP);dialog.dismiss();
+            });
+        });
         dialog.show();
     }
 
@@ -222,14 +225,18 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Anahtar yedeğini geri yükle")
             .setMessage("Yedeği oluştururken kullandığınız parolayı girin.")
             .setView(box).setNegativeButton("İPTAL",null).setPositiveButton("GERİ YÜKLE",null).create();
-        dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            char[] password=p.getText().toString().toCharArray();
-            try{
-                LicenseKeyStore.restore(this,backup,password);refreshKeyStatus();
-                Toast.makeText(this,"Güvenli lisans anahtarı geri yüklendi",Toast.LENGTH_LONG).show();dialog.dismiss();
-            }catch(Exception e){p.setError("Yedek açılamadı: "+e.getMessage());}
-            finally{Arrays.fill(password,'\0');}
-        });});dialog.show();
+        dialog.setOnShowListener(x->{
+            styleDialogButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                char[] password=p.getText().toString().toCharArray();
+                try{
+                    LicenseKeyStore.restore(this,backup,password);refreshKeyStatus();
+                    Toast.makeText(this,"Güvenli lisans anahtarı geri yüklendi",Toast.LENGTH_LONG).show();dialog.dismiss();
+                }catch(Exception e){p.setError("Yedek açılamadı: "+e.getMessage());}
+                finally{Arrays.fill(password,'\0');}
+            });
+        });
+        dialog.show();
     }
 
     private void sharePublicKey(){
