@@ -12,7 +12,7 @@ const OTHER_DEVICE="MC-ABCDEF12-34567890-ABCDEF12";
 const PURCHASE_TOKEN="purchase-token-1234567890";
 
 class FakeD1 {
-  constructor(){ this.playRows=new Map(); this.aiRows=new Map(); }
+  constructor(){ this.playRows=new Map(); }
   prepare(sql){
     const db=this;
     return {
@@ -45,10 +45,7 @@ class FakeD1 {
                 row.verified_at_ms=verifiedAt;
                 row.acknowledged_at_ms=acknowledgedAt;
               }
-            }else if(sql.includes("INSERT INTO ai_entitlements")){
-              const [deviceId,kind,expiresAtMs,updatedAtMs]=args;
-              db.aiRows.set(deviceId,{kind,expires_at_ms:expiresAtMs,updated_at_ms:updatedAtMs});
-            }
+            }            
             return {success:true};
           }
         };
@@ -69,6 +66,7 @@ function env(db,fetcher){
     MUSACAD_PLAY_YEARLY_PRODUCT_ID:PRODUCT,
     MUSACAD_PLAY_SERVICE_ACCOUNT_EMAIL:"musacad-play@test-project.iam.gserviceaccount.com",
     MUSACAD_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_PEM:privateKeyPem(),
+    MUSACAD_TRIAL_PRIVATE_KEY_PEM:privateKeyPem(),
     __fetch:fetcher
   };
 }
@@ -136,9 +134,7 @@ test("verified yearly subscription renewal is server-bound and acknowledged befo
   assert.equal(result.body.acknowledged,true);
   assert.equal(db.playRows.size,1);
   assert.equal([...db.playRows.values()][0].device_id,DEVICE);
-  assert.equal(db.aiRows.size,1);
-  assert.equal(db.aiRows.get(DEVICE).kind,"play");
-  assert.ok(db.aiRows.get(DEVICE).expires_at_ms>Date.now());
+  assert.match(result.body.cloudProof,/^MP1\./);
   assert.equal(mock.calls.filter(c=>c.url.endsWith(":acknowledge")).length,1);
 });
 
