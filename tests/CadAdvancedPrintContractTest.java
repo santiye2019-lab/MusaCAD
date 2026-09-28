@@ -20,8 +20,8 @@ public final class CadAdvancedPrintContractTest {
         require(print,"\"1:1\"","1:1 scale");
         require(print,"\"1:200\"","1:200 scale");
         require(print,"Özel ölçek","custom scale");
-        require(print,"PRINT PREVIEW","print preview");
-        require(print,"PDF olarak kaydet","physical printer / PDF target");
+        require(print,"ÖNİZLEME","print preview");
+        require(print,"FİZİKSEL YAZICI veya PDF","physical printer / PDF target");
         require(print,"drawImageOverlays","placed raster images");
         require(print,"CadFontManager.resolveTypeface","font parity");
         require(print,"drawVectorForPrint","vector PDF/print path");

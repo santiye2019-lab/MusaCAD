@@ -172,6 +172,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java tests/CadNavigationPolicyTest.java
           java -cp /tmp/musacad-tests CadNavigationPolicyTest
+      - name: Test UI responsiveness and print dialog contract
+        run: |
+          javac -d /tmp/musacad-tests tests/UiResponsivenessContractTest.java
+          java -cp /tmp/musacad-tests UiResponsivenessContractTest
       - name: Test DXF RAY geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfRay.java tests/DxfRayTest.java

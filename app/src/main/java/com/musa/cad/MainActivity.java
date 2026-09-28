@@ -1827,6 +1827,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
+    private void makeDialogButtonsReadable(AlertDialog dialog){
+        if(dialog==null)return;
+        int[] which={AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEUTRAL,AlertDialog.BUTTON_NEGATIVE};
+        for(int id:which){
+            Button button=dialog.getButton(id);
+            if(button==null)continue;
+            button.setTextColor(Color.WHITE);
+            button.setTextSize(11.5f);
+            button.setMinHeight(dp(48));
+            button.setSingleLine(false);
+            button.setMaxLines(2);
+            button.setEllipsize(null);
+        }
+    }
     private void installInteractiveFeedback(View view){
         if(view==null)return;view.setHapticFeedbackEnabled(true);view.setOnTouchListener((v,e)->{int action=e.getActionMasked();if(action==MotionEvent.ACTION_DOWN)v.animate().scaleX(.94f).scaleY(.94f).setDuration(70).start();else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();return false;});
     }
@@ -2368,6 +2382,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         projectCloseDialog.show();
+        makeDialogButtonsReadable(projectCloseDialog);
     }
 
     private void closeProjectNow(ProjectSession project){
