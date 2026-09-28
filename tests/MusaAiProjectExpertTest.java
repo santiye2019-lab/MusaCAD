@@ -14,7 +14,8 @@ public final class MusaAiProjectExpertTest {
                 new MusaAiDrawingIndex.Item(4,"LINE","STATIK_KIRIS","KIRIS",8,Double.NaN,false,false,"s4"),
                 new MusaAiDrawingIndex.Item(5,"LINE","MEKANIK_PIS_SU","DN100",12,Double.NaN,false,false,"same-2"),
                 new MusaAiDrawingIndex.Item(6,"LINE","STATIK_KIRIS","",12,Double.NaN,false,false,"same-2"),
-                new MusaAiDrawingIndex.Item(7,"TEXT","MIMARI_DUVAR","TODO kapı kontrol",Double.NaN,Double.NaN,false,false,"a7")
+                new MusaAiDrawingIndex.Item(7,"TEXT","MIMARI_DUVAR","TODO kapı kontrol",Double.NaN,Double.NaN,false,false,"a7"),
+                new MusaAiDrawingIndex.Item(8,"TEXT","STATIK_KOLON","Ø12/20",Double.NaN,Double.NaN,false,false,"s8")
             ),"m");
     }
 
@@ -47,6 +48,8 @@ public final class MusaAiProjectExpertTest {
         has(structural.text,"Statik kontrol");
         has(structural.text,"aks/grid");
         has(structural.text,"kesit/ebat");
+        if(structural.text.contains("görünür donatı/etriye referansı bulunamadı"))
+            throw new AssertionError("Ø reinforcement marker should be detected");
 
         MusaAiProjectExpert.Result coordination=MusaAiProjectExpert.analyze(index(),"PROJAI_COORD");
         if(!coordination.matched)throw new AssertionError("coordination expert");
