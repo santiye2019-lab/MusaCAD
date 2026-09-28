@@ -15,6 +15,7 @@ public final class MusaAiCloudIntegrationContractTest {
         String license=read("app/src/main/java/com/musa/cad/LicenseManager.java");
         String cadJson=read("app/src/main/java/com/musa/cad/MusaAiCadJson.java");
         String expert=read("app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java");
+        String disciplineExpert=read("app/src/main/java/com/musa/cad/MusaAiDisciplineExpert.java");
         String worker=read("server/ai-worker/src/index.js");
         String executor=read("app/src/main/java/com/musa/cad/MusaAiActionExecutor.java");
         String cadView=read("app/src/main/java/com/musa/cad/CadView.java");
@@ -25,7 +26,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"K_CLOUD_CONSENT","cloud privacy consent");
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
-        require(panel,"{\"Gandalf\",\"Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla\"}","Gandalf quick prompt");
+        require(panel,"{\"Gandalf\",\"Gandalf, bu projeyi tüm disiplinlerde derin analiz et ve raporla\"}","Gandalf quick prompt");
         require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
@@ -34,10 +35,13 @@ public final class MusaAiCloudIntegrationContractTest {
         require(cadJson,"automaticEditsAllowed","no automatic edits policy");
         require(cadJson,"editActionsRequireUserApproval","user approval policy");
         require(main,"MusaAiMechanicalExpert.analyze","local MEKAI expert routing");
-        require(cloud,"body.put(\"expertProfile\",expertProfile)","trusted MEKAI profile request");
+        require(main,"MusaAiDisciplineExpert.analyze","local discipline expert routing");
+        require(cloud,"body.put(\"expertProfile\",expertProfile)","trusted expert profile request");
         require(expert,"GMEKAI","GMEKAI command surface");
+        require(disciplineExpert,"GSTATIKAI_FULL","multi-discipline expert command surface");
         require(worker,"normalizeExpertProfile","server expert-profile allowlist");
         require(worker,"mechanicalExpertInstructions","server mechanical expert instructions");
+        require(worker,"disciplineExpertInstructions","server discipline expert instructions");
         require(main,"MusaAiSessionService.developerCached()","developer-only edit application gate");
         require(main,"Gandalf Developer • Önizleme","explicit Gandalf preview dialog");
         require(main,"setPositiveButton(\"UYGULA\"","explicit user approval button");
