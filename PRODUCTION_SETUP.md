@@ -8,14 +8,17 @@ Windows/Android Studio bilgisayarında PowerShell aç:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/production/setup-production-secrets.ps1
+
+# GitHub CLI ile signing secret'larını doğrudan yüklemek isterseniz:
+powershell -ExecutionPolicy Bypass -File tools/production/setup-production-secrets.ps1 -SetGitHubSecrets
 ```
 
 Script:
 - MusaCAD ana APK için kalıcı RSA Android keystore üretir.
 - License Manager için ayrı kalıcı Android keystore üretir.
 - Bilgisayarda OpenSSL varsa trial sunucusu için ayrı RSA private/public keypair üretir.
-- JKS dosyalarını Base64'a çevirip GitHub Secret adlarını gösteren yerel bir template hazırlar.
-- Parolaları template dosyasına yazmaz.
+- GitHub Secret adlarını içeren bir kontrol listesi hazırlar; Base64 JKS veya parola değerlerini dosyaya yazmaz.
+- `-SetGitHubSecrets` seçeneğinde GitHub CLI üzerinden JKS Base64 ve parolaları bellekte doğrudan repository secrets'a aktarır.
 - Var olan release keystore dosyasının üzerine yazmaz.
 
 **Release signing key'i kaybedilmemelidir.** En az iki şifreli offline yedek oluştur.
@@ -41,6 +44,17 @@ Variable olarak:
 - `MUSACAD_PLAY_ALLOW_LEGACY_UNBOUND=false`
 
 D1 şeması production database'e uygulanır.
+
+Cloudflare hesabında D1 database'i oluşturduktan ve Google Play service-account bilgilerini hazırladıktan sonra:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/production/deploy-cloudflare.ps1 `
+  -D1DatabaseId "<D1_DATABASE_ID>" `
+  -PlayServiceAccountEmail "<service-account@project.iam.gserviceaccount.com>" `
+  -PlayServiceAccountPrivateKeyPath "<google-private-key.pem>"
+```
+
+Bu script `wrangler d1 execute --remote` ile şemayı uygular, private key'leri `wrangler secret put` ile şifreli Worker secret olarak yükler ve Worker'ı deploy eder. Cloudflare CLI oturumu önceden açılmış olmalıdır.
 
 ## 3. GitHub Actions secrets
 
