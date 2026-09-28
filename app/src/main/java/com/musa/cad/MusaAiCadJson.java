@@ -13,6 +13,7 @@ public final class MusaAiCadJson {
     public static final int DEFAULT_MAX_ITEMS=1200;
     public static final int MAX_TEXT_CHARS=280;
     public static final int MAX_LAYERS=300;
+    public static final int MAX_GEOMETRY_VERTICES=64;
 
     public static String build(MusaAiDrawingIndex index,String fileName){
         return build(index,fileName,DEFAULT_MAX_ITEMS);
@@ -81,7 +82,33 @@ public final class MusaAiCadJson {
             out.append(',');decimalField(out,"centerY",item.centerY);
         }
         if(item.closedKnown){out.append(",\"closed\":").append(item.closed?"true":"false");}
+        appendEditableVertices(out,item);
         out.append('}');
+    }
+
+    private static void appendEditableVertices(StringBuilder out,MusaAiDrawingIndex.Item item){
+        if(item==null||item.geometryKey==null||item.geometryKey.isEmpty())return;
+        String type=item.type==null?"":item.type.toUpperCase(Locale.ROOT);
+        if(!("LINE".equals(type)||"POLYLINE".equals(type)||"LWPOLYLINE".equals(type)))return;
+        int first=item.geometryKey.indexOf('|'),last=item.geometryKey.indexOf("|c=");
+        if(first<0||last<=first+1)return;
+        String[] points=item.geometryKey.substring(first+1,last).split(";");
+        if(points.length<2)return;
+        out.append(",\"vertices\":[");
+        int written=0;
+        for(String point:points){
+            if(written>=MAX_GEOMETRY_VERTICES)break;
+            String[]xy=point.split(",");
+            if(xy.length!=2)continue;
+            try{
+                double x=Long.parseLong(xy[0].trim())/100000d;
+                double y=Long.parseLong(xy[1].trim())/100000d;
+                if(written++>0)out.append(',');
+                out.append('[').append(Double.toString(x)).append(',').append(Double.toString(y)).append(']');
+            }catch(Exception ignored){}
+        }
+        out.append(']');
+        if(points.length>written)out.append(",\"verticesTruncated\":true");
     }
 
     private static void field(StringBuilder out,String name,String value){

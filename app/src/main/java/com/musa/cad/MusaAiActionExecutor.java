@@ -17,6 +17,8 @@ public final class MusaAiActionExecutor {
     private static final int MAX_HIGHLIGHT_IDS=200;
     private static final int MAX_TEXT_CHARS=4000;
     private static final int MAX_LAYER_CHARS=128;
+    private static final int MAX_POLYLINE_POINTS=128;
+    private static final int MAX_BLOCK_LABEL_CHARS=120;
 
     public static final class Preview {
         public final int actionCount,mutationCount,deleteCount,highlightCount,unsupportedCount;
@@ -113,6 +115,54 @@ public final class MusaAiActionExecutor {
                         if(!cad.applyAiReplaceTextSource(id,value))throw new IllegalStateException("Metin değiştirilemedi • sourceId "+id);
                         applied++;break;
                     }
+                    case "cad_add_polyline":{
+                        String layer=requiredLayer(a);boolean closed=a.optBoolean("closed",false);
+                        double[] points=requiredPoints(a,"points",closed?3:2,MAX_POLYLINE_POINTS);
+                        if(!cad.applyAiAddPolyline(points,closed,layer))throw new IllegalStateException("Polyline eklenemedi • katman "+layer);
+                        applied++;break;
+                    }
+                    case "cad_offset_entity":{
+                        int id=requiredSourceId(a);double distance=requiredFinite(a,"distance");
+                        if(Math.abs(distance)<1e-9d)throw new IllegalArgumentException("Offset mesafesi sıfır olamaz");
+                        if(!cad.applyAiOffsetSource(id,distance))throw new IllegalStateException("Offset uygulanamadı • sourceId "+id);
+                        applied++;break;
+                    }
+                    case "cad_trim_line":{
+                        int target=requiredInt(a,"targetSourceId"),boundary=requiredInt(a,"boundarySourceId");
+                        double pickX=requiredFinite(a,"pickX"),pickY=requiredFinite(a,"pickY");
+                        if(!cad.applyAiTrimLine(target,boundary,pickX,pickY))throw new IllegalStateException("TRIM uygulanamadı • hedef "+target+" • sınır "+boundary);
+                        applied++;break;
+                    }
+                    case "cad_extend_line":{
+                        int target=requiredInt(a,"targetSourceId"),boundary=requiredInt(a,"boundarySourceId");
+                        if(!cad.applyAiExtendLine(target,boundary))throw new IllegalStateException("EXTEND uygulanamadı • hedef "+target+" • sınır "+boundary);
+                        applied++;break;
+                    }
+                    case "cad_continue_path":{
+                        int id=requiredSourceId(a);String from=a.optString("from","").trim().toLowerCase(Locale.ROOT);
+                        if(!"start".equals(from)&&!"end".equals(from))throw new IllegalArgumentException("Devam yönü start veya end olmalı");
+                        double[] points=requiredPoints(a,"points",1,MAX_POLYLINE_POINTS);
+                        if(!cad.applyAiContinuePath(id,"start".equals(from),points))throw new IllegalStateException("Hat devam ettirilemedi • sourceId "+id);
+                        applied++;break;
+                    }
+                    case "cad_add_pipe_note":{
+                        String layer=requiredLayer(a);
+                        double x=requiredFinite(a,"x"),y=requiredFinite(a,"y");
+                        String diameter=limitedString(a,"diameter",80),slope=limitedString(a,"slope",80);
+                        String value=pipeNote(diameter,slope);
+                        if(value.isEmpty())throw new IllegalArgumentException("Çap/eğim notu boş olamaz");
+                        if(!cad.applyAiAddText(x,y,value,layer))throw new IllegalStateException("Çap/eğim notu eklenemedi • katman "+layer);
+                        applied++;break;
+                    }
+                    case "cad_insert_mechanical_block":{
+                        String layer=requiredLayer(a);
+                        String blockId=limitedString(a,"blockId",80);
+                        String label=limitedString(a,"label",MAX_BLOCK_LABEL_CHARS);
+                        double x=requiredFinite(a,"x"),y=requiredFinite(a,"y"),scale=requiredFinite(a,"scale"),rotation=requiredFinite(a,"rotation");
+                        if(!cad.applyAiInsertLibraryBlock(blockId,x,y,scale,rotation,layer,label))
+                            throw new IllegalStateException("Mekanik blok yerleştirilemedi • "+blockId);
+                        applied++;break;
+                    }
                     default:skipped++;break;
                 }
             }
@@ -129,7 +179,10 @@ public final class MusaAiActionExecutor {
 
     private static boolean isMutation(String name){
         return "cad_move_entity".equals(name)||"cad_delete_entity".equals(name)||"cad_change_layer".equals(name)||
-            "cad_add_line".equals(name)||"cad_add_text".equals(name)||"cad_replace_text".equals(name);
+            "cad_add_line".equals(name)||"cad_add_text".equals(name)||"cad_replace_text".equals(name)||
+            "cad_add_polyline".equals(name)||"cad_offset_entity".equals(name)||"cad_trim_line".equals(name)||
+            "cad_extend_line".equals(name)||"cad_continue_path".equals(name)||"cad_add_pipe_note".equals(name)||
+            "cad_insert_mechanical_block".equals(name);
     }
 
     private static String label(String name){
@@ -140,6 +193,13 @@ public final class MusaAiActionExecutor {
         if("cad_add_line".equals(name))return "Çizgi ekle";
         if("cad_add_text".equals(name))return "Metin/not ekle";
         if("cad_replace_text".equals(name))return "Metni değiştir";
+        if("cad_add_polyline".equals(name))return "Polyline / hat ekle";
+        if("cad_offset_entity".equals(name))return "Offset oluştur";
+        if("cad_trim_line".equals(name))return "TRIM uygula";
+        if("cad_extend_line".equals(name))return "EXTEND uygula";
+        if("cad_continue_path".equals(name))return "Hattı devam ettir";
+        if("cad_add_pipe_note".equals(name))return "Çap/eğim notu ekle";
+        if("cad_insert_mechanical_block".equals(name))return "Mekanik blok yerleştir";
         return "Desteklenmeyen öneri: "+String.valueOf(name);
     }
 
@@ -147,6 +207,41 @@ public final class MusaAiActionExecutor {
         String text=raw==null?"{}":raw.trim();
         if(text.isEmpty())text="{}";
         return new JSONObject(text);
+    }
+
+    private static int requiredInt(JSONObject a,String key)throws Exception{
+        if(a==null||!a.has(key))throw new IllegalArgumentException(key+" eksik");
+        int id=a.getInt(key);if(id<0)throw new IllegalArgumentException("Geçersiz "+key);
+        return id;
+    }
+
+    private static double[] requiredPoints(JSONObject a,String key,int minPoints,int maxPoints)throws Exception{
+        JSONArray points=a==null?null:a.optJSONArray(key);
+        if(points==null||points.length()<minPoints||points.length()>maxPoints)
+            throw new IllegalArgumentException(key+" nokta sayısı geçersiz");
+        double[] out=new double[points.length()*2];
+        for(int i=0;i<points.length();i++){
+            JSONArray point=points.optJSONArray(i);
+            if(point==null||point.length()!=2)throw new IllegalArgumentException(key+"["+i+"] geçersiz");
+            double x=point.getDouble(0),y=point.getDouble(1);
+            if(!Double.isFinite(x)||!Double.isFinite(y)||Math.abs(x)>1e12d||Math.abs(y)>1e12d)
+                throw new IllegalArgumentException(key+"["+i+"] koordinatı geçersiz");
+            out[i*2]=x;out[i*2+1]=y;
+        }
+        return out;
+    }
+
+    private static String limitedString(JSONObject a,String key,int max)throws Exception{
+        String value=a==null?"":a.optString(key,"").trim();
+        if(value.length()>max)throw new IllegalArgumentException(key+" çok uzun");
+        return value;
+    }
+
+    private static String pipeNote(String diameter,String slope){
+        String d=diameter==null?"":diameter.trim(),s=slope==null?"":slope.trim();
+        if(d.isEmpty())return s;
+        if(s.isEmpty())return d;
+        return d+" • "+s;
     }
 
     private static int requiredSourceId(JSONObject a)throws Exception{

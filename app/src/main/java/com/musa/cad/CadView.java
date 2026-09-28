@@ -499,6 +499,106 @@ public class CadView extends View {
         return addImportedEdit(content.withLayerOverride(layer));
     }
 
+    public boolean applyAiAddPolyline(double[] drawingPoints,boolean closed,String layer){
+        if(vectorDrawing==null||!aiLayerExists(layer)||!MusaAiCadGeometry.validPolyline(drawingPoints,closed))return false;
+        float[] world=toFloat(drawingPoints);
+        if(world==null)return false;
+        CadEdit content=vectorDrawing.contentEditFromDrawing(CadEdit.polyline(world,closed));
+        if(content==null)return false;
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
+    public boolean applyAiOffsetSource(int sourceId,double distance){
+        if(!Double.isFinite(distance)||Math.abs(distance)<1e-9d||!selectAiSource(sourceId))return false;
+        CadEdit current=sourceEdits.currentSelected();if(current==null)return false;
+        CadEdit drawing=vectorDrawing.drawingEditFromContent(current);if(drawing==null)return false;
+        CadEdit offset=drawing.offset((float)distance);if(offset==null)return false;
+        CadEdit content=vectorDrawing.contentEditFromDrawing(offset);if(content==null)return false;
+        String layer=sourceEdits.selectedLayer();
+        return addImportedEdit(content.withLayerOverride(layer));
+    }
+
+    public boolean applyAiTrimLine(int targetSourceId,int boundarySourceId,double pickX,double pickY){
+        if(targetSourceId==boundarySourceId||!finite(pickX,pickY)||!selectAiSource(targetSourceId))return false;
+        CadEdit target=sourceEdits.currentSelected();
+        CadEdit boundary=aiCurrentContentFor(boundarySourceId);
+        if(target==null||boundary==null||target.type!=CadEdit.Type.LINE||boundary.type!=CadEdit.Type.LINE)return false;
+        CadEdit targetDrawing=vectorDrawing.drawingEditFromContent(target);
+        CadEdit boundaryDrawing=vectorDrawing.drawingEditFromContent(boundary);
+        if(targetDrawing==null||boundaryDrawing==null)return false;
+        double[] trimmed=MusaAiCadGeometry.trimLine(toDouble(targetDrawing.xy),toDouble(boundaryDrawing.xy),pickX,pickY);
+        if(trimmed==null)return false;
+        CadEdit replacement=vectorDrawing.contentEditFromDrawing(CadEdit.line((float)trimmed[0],(float)trimmed[1],(float)trimmed[2],(float)trimmed[3]));
+        if(replacement==null||!sourceEdits.replaceSelected(replacement))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiExtendLine(int targetSourceId,int boundarySourceId){
+        if(targetSourceId==boundarySourceId||!selectAiSource(targetSourceId))return false;
+        CadEdit target=sourceEdits.currentSelected();
+        CadEdit boundary=aiCurrentContentFor(boundarySourceId);
+        if(target==null||boundary==null||target.type!=CadEdit.Type.LINE||boundary.type!=CadEdit.Type.LINE)return false;
+        CadEdit targetDrawing=vectorDrawing.drawingEditFromContent(target);
+        CadEdit boundaryDrawing=vectorDrawing.drawingEditFromContent(boundary);
+        if(targetDrawing==null||boundaryDrawing==null)return false;
+        double[] extended=MusaAiCadGeometry.extendLine(toDouble(targetDrawing.xy),toDouble(boundaryDrawing.xy));
+        if(extended==null)return false;
+        CadEdit replacement=vectorDrawing.contentEditFromDrawing(CadEdit.line((float)extended[0],(float)extended[1],(float)extended[2],(float)extended[3]));
+        if(replacement==null||!sourceEdits.replaceSelected(replacement))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiContinuePath(int sourceId,boolean fromStart,double[] newPoints){
+        if(!selectAiSource(sourceId)||newPoints==null)return false;
+        CadEdit current=sourceEdits.currentSelected();
+        if(current==null||(current.type!=CadEdit.Type.LINE&&current.type!=CadEdit.Type.POLYLINE)||current.closed)return false;
+        CadEdit drawing=vectorDrawing.drawingEditFromContent(current);if(drawing==null)return false;
+        double[] combined=MusaAiCadGeometry.continuePath(toDouble(drawing.xy),fromStart,newPoints);
+        if(combined==null)return false;
+        float[] world=toFloat(combined);if(world==null)return false;
+        CadEdit replacement=vectorDrawing.contentEditFromDrawing(CadEdit.polyline(world,false));
+        if(replacement==null||!sourceEdits.replaceSelected(replacement))return false;
+        finishAiSourceMutation();return true;
+    }
+
+    public boolean applyAiInsertLibraryBlock(String blockId,double x,double y,double blockScale,double rotation,String layer,String label){
+        if(vectorDrawing==null||!finite(x,y,blockScale,rotation)||blockScale<=0d||blockScale>1000d||!aiLayerExists(layer))return false;
+        CadBlockLibrary.Entry entry=CadBlockLibrary.findById(blockId);
+        if(entry==null||!CadBlockLibrary.CATEGORY_MECHANICAL.equals(entry.category))return false;
+        LinkedHashMap<String,String> attributes=new LinkedHashMap<>();
+        if(label!=null&&!label.trim().isEmpty()){
+            if("mec_equipment_tag".equalsIgnoreCase(entry.id))attributes.put("TAG",label.trim());
+        }
+        CadBlock.Definition definition=entry.definition(attributes);
+        if(!registerBlockDefinition(definition))return false;
+        PointF contentPoint=vectorDrawing.contentPointFromDrawing((float)x,(float)y);
+        CadEdit insert=CadEdit.insert(definition.name,contentPoint.x,contentPoint.y,(float)blockScale,(float)rotation);
+        return insert!=null&&addImportedEdit(insert.withLayerOverride(layer));
+    }
+
+    private CadEdit aiCurrentContentFor(int sourceId){
+        if(vectorDrawing==null||sourceId<0)return null;
+        if(sourceEdits.hiddenSourceIds().contains(sourceId))return sourceEdits.currentFor(sourceId);
+        DxfParser.SourceEntity source=vectorDrawing.sourceById(sourceId);
+        if(source==null||!vectorDrawing.isSourceVisible(sourceId))return null;
+        return source.prototype();
+    }
+
+    private static double[] toDouble(float[] values){
+        if(values==null)return null;double[] out=new double[values.length];
+        for(int i=0;i<values.length;i++)out[i]=values[i];
+        return out;
+    }
+
+    private static float[] toFloat(double[] values){
+        if(values==null)return null;float[] out=new float[values.length];
+        for(int i=0;i<values.length;i++){
+            if(!Double.isFinite(values[i])||Math.abs(values[i])>Float.MAX_VALUE)return null;
+            out[i]=(float)values[i];
+        }
+        return out;
+    }
+
     private static boolean finite(double...values){
         if(values==null)return false;
         for(double value:values)if(!Double.isFinite(value)||Math.abs(value)>1e12d)return false;

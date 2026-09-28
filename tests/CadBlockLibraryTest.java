@@ -27,6 +27,9 @@ public final class CadBlockLibraryTest {
         require(found,"attribute text must be embedded into definition");
 
         require(CadBlockLibrary.filter(null,"sprinkler yangın").size()==1,"multi-token Turkish search");
+        require(CadBlockLibrary.findById("mec_diffuser")!=null,"mechanical diffuser block");
+        require(CadBlockLibrary.findById("mec_grille")!=null,"mechanical grille block");
+        require(CadBlockLibrary.findById("mec_fire_cabinet")!=null,"fire cabinet block");
         require(CadBlockLibrary.findById("missing")==null,"unknown id");
         System.out.println("CadBlockLibraryTest OK");
     }

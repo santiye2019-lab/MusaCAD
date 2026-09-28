@@ -12,7 +12,7 @@ public final class MusaAiCadJsonTest {
             Arrays.asList("PIS_SU","HAVALANDIRMA","NOTLAR"),
             Arrays.asList("PIS_SU","HAVALANDIRMA"),
             Arrays.asList(
-                new MusaAiDrawingIndex.Item(1,"LINE","PIS_SU","",12.5,Double.NaN,false,false,"",5,6),
+                new MusaAiDrawingIndex.Item(1,"LINE","PIS_SU","",12.5,Double.NaN,false,false,"LINE|0,0;1250000,0|c=0",5,6),
                 new MusaAiDrawingIndex.Item(2,"TEXT","PIS_SU","Ø100 %2",Double.NaN,Double.NaN,false,false,"",8,9),
                 new MusaAiDrawingIndex.Item(3,"LWPOLYLINE","HAVALANDIRMA","600x300",22,120,true,false,"",10,11)
             ),"mm"
@@ -25,6 +25,7 @@ public final class MusaAiCadJsonTest {
         has(json,"\"editActionsRequireUserApproval\":true");
         has(json,"\"sourceId\":1");
         has(json,"\"sourceId\":2");
+        has(json,"\"vertices\":[[0.0,0.0],[12.5,0.0]]");
         has(json,"\"truncated\":true");
         if(json.contains("\"sourceId\":3"))throw new AssertionError("item limit ignored");
         if(json.contains("geometryKey"))throw new AssertionError("internal geometry signature leaked");

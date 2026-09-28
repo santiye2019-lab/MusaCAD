@@ -51,7 +51,9 @@ async function handleAnalyze(request, env) {
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
-    "For cad_change_layer, cad_add_line and cad_add_text, use an exact existing layer name visible in the supplied CAD-JSON; never invent a new layer name. " +
+    "For cad_change_layer, cad_add_line, cad_add_text, cad_add_polyline, cad_add_pipe_note and cad_insert_mechanical_block, use an exact existing layer name visible in the supplied CAD-JSON; never invent a new layer name. " +
+    "Editable LINE/POLYLINE items may include vertices in drawing units. Use only supplied vertices/sourceIds and explicit user coordinates; never invent geometry coordinates. " +
+    "TRIM and EXTEND intersections are calculated by MusaCAD, not by you: identify the correct target/boundary sourceIds and, for TRIM, provide a pick point near the side that should be removed. " +
     "Never state that a proposed edit has already been applied. " +
     "Prefer sourceId-based edits for existing entities. Use web search only when it materially helps the user's request, and identify external sources in the answer.";
 
@@ -232,6 +234,101 @@ function cadProposalTools() {
         reason: { type: "string" }
       },
       ["sourceId", "text", "reason"]
+    ),
+    functionTool(
+      "cad_add_polyline",
+      "Propose adding an open or closed polyline using exact drawing-unit coordinates. Use only coordinates supplied by the user or CAD-JSON vertices.",
+      {
+        points: {
+          type: "array",
+          items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
+          minItems: 2,
+          maxItems: 128
+        },
+        closed: { type: "boolean" },
+        layer: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["points", "closed", "layer", "reason"]
+    ),
+    functionTool(
+      "cad_offset_entity",
+      "Propose a parallel/concentric offset of an existing LINE, CIRCLE or RECTANGLE. Distance is in drawing units and may be negative for the opposite side.",
+      {
+        sourceId: { type: "integer" },
+        distance: { type: "number" },
+        reason: { type: "string" }
+      },
+      ["sourceId", "distance", "reason"]
+    ),
+    functionTool(
+      "cad_trim_line",
+      "Propose trimming an existing LINE against another LINE. pickX/pickY is a drawing-unit point near the side of the target that should be removed. MusaCAD computes the exact intersection.",
+      {
+        targetSourceId: { type: "integer" },
+        boundarySourceId: { type: "integer" },
+        pickX: { type: "number" },
+        pickY: { type: "number" },
+        reason: { type: "string" }
+      },
+      ["targetSourceId", "boundarySourceId", "pickX", "pickY", "reason"]
+    ),
+    functionTool(
+      "cad_extend_line",
+      "Propose extending an existing LINE until it intersects another LINE segment. MusaCAD computes the exact intersection.",
+      {
+        targetSourceId: { type: "integer" },
+        boundarySourceId: { type: "integer" },
+        reason: { type: "string" }
+      },
+      ["targetSourceId", "boundarySourceId", "reason"]
+    ),
+    functionTool(
+      "cad_continue_path",
+      "Propose continuing an existing open LINE or POLYLINE from its start or end. points are ordered outward from the chosen existing endpoint and are in drawing units.",
+      {
+        sourceId: { type: "integer" },
+        from: { type: "string", enum: ["start", "end"] },
+        points: {
+          type: "array",
+          items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
+          minItems: 1,
+          maxItems: 128
+        },
+        reason: { type: "string" }
+      },
+      ["sourceId", "from", "points", "reason"]
+    ),
+    functionTool(
+      "cad_add_pipe_note",
+      "Propose adding a mechanical pipe annotation. diameter and slope may be empty individually, but at least one must contain a value such as DN100 or Eğim %2.",
+      {
+        x: { type: "number" },
+        y: { type: "number" },
+        diameter: { type: "string" },
+        slope: { type: "string" },
+        layer: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["x", "y", "diameter", "slope", "layer", "reason"]
+    ),
+    functionTool(
+      "cad_insert_mechanical_block",
+      "Propose inserting one approved built-in mechanical symbol. Coordinates are drawing units; scale is the MusaCAD block scale.",
+      {
+        blockId: {
+          type: "string",
+          enum: ["mec_pump","mec_valve","mec_fan","mec_radiator","mec_sprinkler","mec_diffuser","mec_grille","mec_fire_cabinet","mec_equipment_tag"]
+        },
+        x: { type: "number" },
+        y: { type: "number" },
+        scale: { type: "number" },
+        rotation: { type: "number" },
+        layer: { type: "string" },
+        label: { type: "string" },
+        reason: { type: "string" }
+      },
+      ["blockId", "x", "y", "scale", "rotation", "layer", "label", "reason"]
     )
   ];
 }

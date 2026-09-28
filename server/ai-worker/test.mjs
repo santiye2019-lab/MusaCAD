@@ -50,11 +50,18 @@ test("OpenAI output parser keeps answer, web usage and CAD proposals",()=>{
 
 test("CAD proposal tools are strict and proposal-only surface is bounded",()=>{
   const tools=cadProposalTools();
-  assert.ok(tools.length>=6);
+  assert.ok(tools.length>=13);
   const names=new Set(tools.map(t=>t.name));
   assert.ok(names.has("cad_move_entity"));
   assert.ok(names.has("cad_add_line"));
   assert.ok(names.has("cad_replace_text"));
+  assert.ok(names.has("cad_add_polyline"));
+  assert.ok(names.has("cad_offset_entity"));
+  assert.ok(names.has("cad_trim_line"));
+  assert.ok(names.has("cad_extend_line"));
+  assert.ok(names.has("cad_continue_path"));
+  assert.ok(names.has("cad_add_pipe_note"));
+  assert.ok(names.has("cad_insert_mechanical_block"));
   for(const tool of tools){
     assert.equal(tool.type,"function");
     assert.equal(tool.strict,true);
@@ -131,6 +138,9 @@ test("valid signed session reaches Responses API and returns proposed actions",a
   assert.equal(upstreamBody.store,false);
   assert.deepEqual(upstreamBody.include,["web_search_call.action.sources"]);
   assert.equal(upstreamBody.instructions.includes("PROPOSALS ONLY"),true);
+  assert.equal(upstreamBody.instructions.includes("vertices"),true);
+  assert.ok(upstreamBody.tools.some(t=>t.name==="cad_trim_line"));
+  assert.ok(upstreamBody.tools.some(t=>t.name==="cad_insert_mechanical_block"));
 });
 
 
