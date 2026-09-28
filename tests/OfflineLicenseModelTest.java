@@ -17,9 +17,9 @@ public final class OfflineLicenseModelTest {
         String gui=read("tools/license-generator/ShortLicenseGeneratorApp.java");
         String rsa=read("tools/license-generator/LicenseGenerator.java");
 
-        require(activity,"LicenseManager.serialId(this)","displayed 12-character Serial");
+        require(activity,"LicenseManager.installationId(this)","displayed secure MC1 identity");
         require(activity,"LicenseManager.activateCode(this,code)","local activation path");
-        require(activity,"internet veya Google Play gerektirmeden etkinleştirilebilir","offline/institutional user guidance");
+        require(activity,"Güvenli Lisans Kimliği için RSA imzalı MC1 lisansı kullanılır","offline/institutional user guidance");
 
         require(manager,"ShortLicenseCode.verify(code,serialId(c),now)","offline short-code verification");
         require(manager,"LicenseToken.verify","RSA offline license verification");
@@ -35,6 +35,6 @@ public final class OfflineLicenseModelTest {
         if(activation.contains("PlayBilling")||activation.contains("TrialService")||activation.contains("Http")||activation.contains("URL("))
             throw new AssertionError("Offline activation must not depend on Google Play or network");
 
-        System.out.println("Offline/direct-APK license model OK: Serial + short code + RSA institutional activation are preserved.");
+        System.out.println("Offline/direct-APK license model OK: production MC1 activation is device-bound and network-independent.");
     }
 }
