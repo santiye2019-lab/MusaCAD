@@ -8,6 +8,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
+import android.util.TypedValue;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -107,5 +109,19 @@ final class LockedScreenUi {
         lp.topMargin=Math.round(stage.getHeight()*y/artH);
         v.setLayoutParams(lp);
         v.bringToFront();
+    }
+
+    static int px(FrameLayout stage,float referencePx,float artW){
+        return LockedScreenLayout.scalePx(stage.getWidth(),artW,referencePx);
+    }
+
+    static void textPx(TextView view,FrameLayout stage,float referencePx,float artW){
+        if(view==null||stage==null)return;
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX,px(stage,referencePx,artW));
+    }
+
+    static void padding(FrameLayout stage,View view,float left,float top,float right,float bottom,float artW){
+        if(stage==null||view==null)return;
+        view.setPadding(px(stage,left,artW),px(stage,top,artW),px(stage,right,artW),px(stage,bottom,artW));
     }
 }
