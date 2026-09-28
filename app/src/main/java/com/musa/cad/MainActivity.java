@@ -1058,6 +1058,16 @@ public class MainActivity extends AppCompatActivity {
             pendingAiActions=cloud.actions;
             StringBuilder out=new StringBuilder(cloud.text);
             if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
+            if(!cloud.sources.isEmpty()){
+                out.append("\n\nKaynaklar:");
+                int sourceCount=0;
+                for(MusaAiCloudService.Source source:cloud.sources){
+                    if(sourceCount++>=8){out.append("\n• … +").append(cloud.sources.size()-8).append(" kaynak");break;}
+                    out.append("\n• ");
+                    if(!source.title.isEmpty())out.append(source.title).append(" — ");
+                    out.append(source.url);
+                }
+            }
             if(!cloud.actions.isEmpty()){
                 out.append("\n\nÖnerilen çizim işlemleri (henüz uygulanmadı):");
                 int shown=0;
