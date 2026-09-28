@@ -148,6 +148,40 @@ public final class MusaAiBoq {
         return new Comparison(out.toString(),compared,different,unmatched,projectOnly);
     }
 
+    public static Model filterByDiscipline(Model model,MusaAiDisciplineControl.Discipline discipline){
+        if(model==null||discipline==null)return new Model("Keşif",Collections.emptyList(),Collections.singletonList("Disiplin filtresi uygulanamadı."));
+        ArrayList<Row>rows=new ArrayList<>();
+        for(Row row:model.rows){
+            String hay=row.code+" "+row.description+" "+row.source;
+            if(MusaAiDisciplineControl.classifyText(hay).contains(discipline))rows.add(row);
+        }
+        ArrayList<String>warnings=new ArrayList<>();
+        if(rows.isEmpty())warnings.add(discipline.label+" için otomatik sınıflandırılan keşif satırı bulunamadı.");
+        return new Model(model.name+" • "+discipline.label,rows,warnings);
+    }
+
+    public static String disciplineCompatibility(Model boq,Model project,Collection<MusaAiDisciplineControl.Discipline>requested){
+        if(requested==null||requested.isEmpty())return "";
+        StringBuilder out=new StringBuilder("DİSİPLİN BAZLI PROJE – KEŞİF UYUM ÖZETİ");
+        int shown=0;
+        for(MusaAiDisciplineControl.Discipline d:requested){
+            Model b=filterByDiscipline(boq,d),p=filterByDiscipline(project,d);
+            if(b.rows.isEmpty()&&p.rows.isEmpty())continue;
+            shown++;
+            Comparison c=compare(b,p);
+            out.append("\n• ").append(d.label)
+               .append(": keşif ").append(b.rows.size())
+               .append(" satır • proje ").append(p.rows.size())
+               .append(" satır • eşleşen ").append(c.compared)
+               .append(" • fark/inceleme ").append(c.different)
+               .append(" • keşifte eşleşmeyen ").append(c.unmatchedBoq)
+               .append(" • projede eşleşmeyen ").append(c.projectOnly);
+        }
+        if(shown==0)out.append("\n• Seçilen disiplinlerde otomatik sınıflandırılabilen proje/keşif satırı bulunamadı.");
+        out.append("\nNot: Disiplin gruplaması poz açıklaması, katman adı ve kaynak metnindeki anahtar kelimelerle otomatik yapılır; sınıflandırılmamış satırlar ayrıca genel keşif karşılaştırmasında incelenmelidir.");
+        return out.toString();
+    }
+
     public static String summary(Model model){
         if(model==null)return "Keşif yüklenmedi.";
         StringBuilder out=new StringBuilder();

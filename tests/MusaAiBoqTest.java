@@ -45,6 +45,19 @@ public final class MusaAiBoqTest {
         MusaAiBoq.Comparison converted=MusaAiBoq.compare(metre,mm);
         require(converted.compared==1&&converted.different==0,"mm to m conversion");
 
+        MusaAiBoq.Model multiBoq=MusaAiBoq.of("multi",Arrays.asList(
+            new MusaAiBoq.Row("S01","STATİK KOLON DONATI","adet",4,"statik"),
+            new MusaAiBoq.Row("E01","ELEKTRİK PANO","adet",1,"elektrik")
+        ));
+        MusaAiBoq.Model multiProject=MusaAiBoq.of("project",Arrays.asList(
+            new MusaAiBoq.Row("","STATİK KOLON DONATI • adet","adet",4,"Çizim katmanı: S-STATIK"),
+            new MusaAiBoq.Row("","ELEKTRİK PANO • adet","adet",1,"Çizim katmanı: E-ELEKTRIK")
+        ));
+        String discipline=MusaAiBoq.disciplineCompatibility(multiBoq,multiProject,
+            Arrays.asList(MusaAiDisciplineControl.Discipline.STRUCTURAL,MusaAiDisciplineControl.Discipline.ELECTRICAL));
+        has(discipline,"Statik / taşıyıcı sistem","structural BOQ grouping");
+        has(discipline,"Elektrik","electrical BOQ grouping");
+
         System.out.println("MusaAiBoqTest OK");
     }
 }
