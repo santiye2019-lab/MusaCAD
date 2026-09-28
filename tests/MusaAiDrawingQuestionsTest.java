@@ -35,7 +35,7 @@ public final class MusaAiDrawingQuestionsTest {
         expectContains(index,"hangi katmanlar var","PIS_SU","SIHHI_CIHAZ");
         expectContains(index,"kaç daire var","Daire adedi: 2");
         expectContains(index,"kaç polyline var","Polyline adedi: 2");
-        expectContains(index,"kaç yazı var","Metin adedi: 4");
+        expectContains(index,"kaç yazı var","Metin adedi: 5");
         expectContains(index,"lavabo kelimesi kaç yerde geçiyor","“lavabo”","3 kez");
         expectContains(index,"pis su geçen katmanları göster","PIS_SU","NOTLAR");
         expectContains(index,"çizimde lavabo var mı","eşleşmesi bulundu");
