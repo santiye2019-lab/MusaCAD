@@ -792,6 +792,33 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(q.contains("ai seçimini temizle")||q.contains("ai secimini temizle")||q.contains("vurgulamayı temizle")||q.contains("vurgulamayi temizle")){
+            cad.clearAiHighlights();
+            reply.send("AI çoklu vurgulaması temizlendi.");
+            return;
+        }
+
+        if(activeDxf!=null){
+            MusaAiSmartSelection.Result selection=MusaAiSmartSelection.plan(
+                currentAiDrawingIndex(),raw,cad.selectedSourceType(),cad.selectedLayer());
+            if(selection.matched){
+                if(selection.totalMatches==0&&selection.sourceIds.isEmpty()){
+                    cad.clearAiHighlights();
+                    reply.send(selection.description.startsWith("Önce ")
+                        ?selection.description
+                        :selection.description+" • Eşleşen nesne bulunamadı.");
+                    return;
+                }
+                int shown=cad.setAiHighlightedSources(selection.sourceIds);
+                String note=selection.totalMatches>shown
+                    ?"\nToplam eşleşme: "+selection.totalMatches+" • Düzenlenebilir/vurgulanabilir: "+shown
+                    :"\nVurgulanan: "+shown;
+                if(shown==0&&selection.totalMatches>0)note+="\nEşleşmeler blok içi veya doğrudan düzenlenemeyen öğeler olabilir.";
+                reply.send(selection.description+note);
+                return;
+            }
+        }
+
         if(activeDxf!=null){
             MusaAiDrawingQuestions.Answer drawingAnswer=MusaAiDrawingQuestions.answer(currentAiDrawingIndex(),raw);
             if(drawingAnswer.matched){

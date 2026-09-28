@@ -6,8 +6,11 @@ import java.util.*;
 /** Immutable, lightweight drawing knowledge index used by MusaCAD AI. */
 public final class MusaAiDrawingIndex {
     public static final class Item {
+        public final int sourceId;
         public final String type,layer,text;
-        public Item(String type,String layer,String text){
+        public Item(String type,String layer,String text){this(-1,type,layer,text);}
+        public Item(int sourceId,String type,String layer,String text){
+            this.sourceId=sourceId;
             this.type=clean(type).toUpperCase(Locale.ROOT);
             this.layer=clean(layer);
             this.text=clean(text);

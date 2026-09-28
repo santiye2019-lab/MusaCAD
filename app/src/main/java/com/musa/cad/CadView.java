@@ -69,6 +69,7 @@ public class CadView extends View {
     private final LinkedHashMap<String,CadBlock.Definition> userBlocks=new LinkedHashMap<>();
     private final ArrayList<CadImageOverlay> imageOverlays=new ArrayList<>();
     private final SourceEditSession sourceEdits=new SourceEditSession();
+    private final LinkedHashSet<Integer> aiHighlightedSourceIds=new LinkedHashSet<>();
     private final Matrix imageMatrix=new Matrix();
     private final Matrix inverse=new Matrix();
     private Bitmap drawing;
@@ -223,7 +224,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=false;selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
+        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=false;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
@@ -251,7 +252,7 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        vectorDrawing=null;nativeDrawing=null;drawing=b;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        vectorDrawing=null;nativeDrawing=null;drawing=b;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -259,7 +260,7 @@ public class CadView extends View {
     public void setNativeDrawing(NativeScene result){
         if(result==null)throw new IllegalArgumentException("Native çizim yok");
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;vectorDrawing=null;nativeDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        drawing=null;vectorDrawing=null;nativeDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();notifyValue();
     }
 
@@ -272,7 +273,7 @@ public class CadView extends View {
             float[]content={screenX,screenY};Matrix inv=new Matrix();
             if(imageMatrix.invert(inv)){inv.mapPoints(content);worldAnchor=oldNative.contentToWorld(content[0],content[1]);worldScreenScale=scale*oldNative.drawingToContentScale();}
         }
-        drawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();
+        drawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();aiHighlightedSourceIds.clear();
         if("piksel".equals(unitName)){unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();}
         if(oldNative!=null)oldNative.alignTo(result.drawingToContentMatrix());
         fitScale=computeFitScale();
@@ -400,6 +401,23 @@ public class CadView extends View {
     private void addRegularEdits(Collection<CadEdit> list){if(list==null||list.isEmpty())return;for(CadEdit edit:list)if(edit!=null)edits.add(edit);redoEdits.clear();sourceEdits.clearRedo();lastUndoWasRegular=false;}
 
     public boolean hasSelectedEntity(){return mode==Mode.SELECT_ENTITY&&(sourceEdits.hasSelection()||selectedIsImage());}
+    public String selectedSourceType(){
+        if(vectorDrawing==null||!sourceEdits.hasSelection())return null;
+        DxfParser.SourceEntity source=vectorDrawing.sourceById(sourceEdits.selectedId());
+        return source==null?null:source.type;
+    }
+    public int setAiHighlightedSources(Collection<Integer> sourceIds){
+        aiHighlightedSourceIds.clear();
+        if(vectorDrawing==null||sourceIds==null){invalidate();return 0;}
+        for(Integer id:sourceIds){
+            if(id==null||id<0||aiHighlightedSourceIds.size()>=800)continue;
+            if(vectorDrawing.sourceById(id)!=null&&vectorDrawing.isSourceVisible(id)&&!sourceEdits.hiddenSourceIds().contains(id))aiHighlightedSourceIds.add(id);
+        }
+        invalidate();
+        return aiHighlightedSourceIds.size();
+    }
+    public void clearAiHighlights(){if(aiHighlightedSourceIds.isEmpty())return;aiHighlightedSourceIds.clear();invalidate();}
+    public int aiHighlightedCount(){return aiHighlightedSourceIds.size();}
     public boolean selectedIsImage(){return mode==Mode.SELECT_ENTITY&&selectedImageIndex>=0&&selectedImageIndex<imageOverlays.size();}
     public CadEdit selectedEntityCopy(){CadEdit selected=sourceEdits.currentSelected();return selected==null?null:selected.copy();}
     public boolean addImageOverlay(Bitmap bitmap,String name,String uri){
@@ -712,6 +730,7 @@ public class CadView extends View {
 
         if(lastSnapped&&!screen.isEmpty()&&!exporting){PointF point=screen.get(screen.size()-1);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.WHITE);paint.setStrokeWidth(2);c.drawRect(point.x-12,point.y-12,point.x+12,point.y+12,paint);paint.setStyle(Paint.Style.FILL);}
         if(selecting&&draggingSelection&&!exporting){paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.YELLOW);paint.setStrokeWidth(3);c.drawRect(Math.min(selectionX,selectionEndX),Math.min(selectionY,selectionEndY),Math.max(selectionX,selectionEndX),Math.max(selectionY,selectionEndY),paint);paint.setStyle(Paint.Style.FILL);}
+        if(!exporting&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}
         if(stylusHover&&!exporting)drawStylusCursor(c);
     }
@@ -788,6 +807,39 @@ public class CadView extends View {
         float grip=Math.max(5f,4f*getResources().getDisplayMetrics().density);paint.setStyle(Paint.Style.FILL);paint.setColor(moveSelectedArmed?Color.CYAN:Color.rgb(55,155,255));
         for(PointF corner:corners){float[] p={corner.x,corner.y};imageMatrix.mapPoints(p);c.drawRect(p[0]-grip,p[1]-grip,p[0]+grip,p[1]+grip,paint);}
         float[] center={image.centerX(),image.centerY()};imageMatrix.mapPoints(center);c.drawCircle(center[0],center[1],grip,paint);paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawAiHighlights(Canvas c){
+        if(vectorDrawing==null||aiHighlightedSourceIds.isEmpty())return;
+        paint.setPathEffect(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(Math.max(2f,1.5f*getResources().getDisplayMetrics().density));paint.setColor(Color.CYAN);
+        float pad=Math.max(7f,5f*getResources().getDisplayMetrics().density);
+        Set<Integer>hidden=sourceEdits.hiddenSourceIds();
+        for(Integer id:aiHighlightedSourceIds){
+            if(id==null||hidden.contains(id))continue;
+            DxfParser.SourceEntity source=vectorDrawing.sourceById(id);if(source==null||!vectorDrawing.isSourceVisible(id))continue;
+            CadEdit edit=sourceEdits.currentFor(id);if(edit==null)edit=source.prototype();if(edit==null)continue;
+            RectF box=aiHighlightBounds(edit,pad);if(box!=null)c.drawRoundRect(box,pad*.45f,pad*.45f,paint);
+        }
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private RectF aiHighlightBounds(CadEdit edit,float pad){
+        if(edit==null||edit.xy==null||edit.xy.length<2)return null;
+        float[]v=map(edit.xy);float left=Float.POSITIVE_INFINITY,top=Float.POSITIVE_INFINITY,right=Float.NEGATIVE_INFINITY,bottom=Float.NEGATIVE_INFINITY;
+        if(edit.type==CadEdit.Type.CIRCLE&&v.length>=4){
+            float r=(float)Math.hypot(v[2]-v[0],v[3]-v[1]);left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;
+        }else if(edit.type==CadEdit.Type.ARC&&v.length>=8){
+            float r=(float)Math.hypot(v[0]-v[6],v[1]-v[7]);left=v[6]-r;right=v[6]+r;top=v[7]-r;bottom=v[7]+r;
+        }else if(edit.type==CadEdit.Type.ELLIPSE&&v.length>=6){
+            float a=(float)Math.hypot(v[2]-v[0],v[3]-v[1]),b=(float)Math.hypot(v[4]-v[0],v[5]-v[1]),r=Math.max(a,b);
+            left=v[0]-r;right=v[0]+r;top=v[1]-r;bottom=v[1]+r;
+        }else{
+            for(int i=0;i+1<v.length;i+=2){left=Math.min(left,v[i]);right=Math.max(right,v[i]);top=Math.min(top,v[i+1]);bottom=Math.max(bottom,v[i+1]);}
+        }
+        if(!Float.isFinite(left)||!Float.isFinite(top)||!Float.isFinite(right)||!Float.isFinite(bottom))return null;
+        if(right-left<pad*2){float c=(left+right)*.5f;left=c-pad;right=c+pad;}else{left-=pad;right+=pad;}
+        if(bottom-top<pad*2){float c=(top+bottom)*.5f;top=c-pad;bottom=c+pad;}else{top-=pad;bottom+=pad;}
+        return new RectF(left,top,right,bottom);
     }
 
     private void drawSelectedSource(Canvas c){
