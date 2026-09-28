@@ -121,6 +121,28 @@ public final class MusaAiMechanicalExpert {
         return (q.equals("mekai")||q.startsWith("mekai "))&&!q.startsWith("mekai cloud ");
     }
 
+    public static boolean isHelpCommand(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return q.equals("mekai help")||q.equals("mekai yardim")||q.equals("mekai komut")||q.equals("mekai komutlari")||
+            q.equals("gmekai help")||q.equals("gmekai yardim")||q.equals("gmekai komutlari");
+    }
+
+    public static String commandHelp(){
+        return "MEKAI mekanik uzman komutları"+
+            "\n• MEKAI_FULL — tüm mekanik sistemler"+
+            "\n• MEKAI_WASTE / MEKAI_PISSU — pis su"+
+            "\n• MEKAI_RAIN / MEKAI_YAGMUR — yağmur suyu"+
+            "\n• MEKAI_WATER / MEKAI_TEMIZSU — temiz/sıcak-soğuk su"+
+            "\n• MEKAI_HEATING / MEKAI_ISITMA — ısıtma"+
+            "\n• MEKAI_VRF / MEKAI_COOLING — VRF/VRV/soğutma"+
+            "\n• MEKAI_VENT / MEKAI_HAVALANDIRMA — havalandırma"+
+            "\n• MEKAI_FIRE / MEKAI_YANGIN — yangın/sprinkler"+
+            "\n• MEKAI_GAS / MEKAI_DOGALGAZ — doğalgaz"+
+            "\n• MEKAI_EQUIPMENT / MEKAI_EKIPMAN — mekanik ekipman"+
+            "\n\nMEKAI_* yerel ve çevrimdışı taramadır. Aynı komutun başına G eklenirse (GMEKAI_*) Gandalf derin analiz, rapor ve güvenli çizim düzeltme önerileri üretir."+
+            "\nGüncel mevzuat/standart araştırması isteniyorsa GMEKAI komutuna ‘güncel yönetmelik ve standartlarla kontrol et’ ekleyin.";
+    }
+
     public static Profile detect(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return null;
