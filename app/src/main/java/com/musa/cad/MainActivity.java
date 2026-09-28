@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
@@ -72,6 +72,8 @@ public class MainActivity extends AppCompatActivity {
         final ArrayDeque<String> measurementHistory=new ArrayDeque<>();
         final ArrayList<MediaAttachment> mediaAttachments=new ArrayList<>();
         final ArrayList<CadImageOverlay> persistedImages=new ArrayList<>();
+        MusaAiBoq.Model boqModel;
+        String boqName="";
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
@@ -112,6 +114,8 @@ public class MainActivity extends AppCompatActivity {
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="",lastAiReport="";
+    private MusaAiPanel.Reply pendingBoqReply;
+    private ProjectSession pendingBoqProject;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
     private CadView.SessionState lastGandalfBatchState;
     private ProjectSession lastGandalfBatchProject;
@@ -809,7 +813,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
             return;
         }
 
@@ -835,6 +839,52 @@ public class MainActivity extends AppCompatActivity {
         }
         if(isGandalfPreviewCommand(aiControl)){
             showPendingGandalfActions(reply,false);
+            return;
+        }
+
+        if(isBoqLoadCommand(aiControl)){
+            if(currentProject==null){
+                reply.send("Keşif yüklemek için önce ilgili DWG/DXF projesini açın.");
+                return;
+            }
+            pendingBoqReply=reply;
+            pendingBoqProject=currentProject;
+            pickBoqDocument();
+            reply.send("Keşif dosyasını seçin. Excel (.xlsx) ve CSV doğrudan okunur; Word/TXT tablo yapısındaysa denenir. PDF sayısal karşılaştırmada otomatik güvenilir kabul edilmez.");
+            return;
+        }
+        if(isBoqClearCommand(aiControl)){
+            if(currentProject!=null){currentProject.boqModel=null;currentProject.boqName="";}
+            reply.send("Bu proje için yüklenen keşif bağlantısı temizlendi.");
+            return;
+        }
+        if(isBoqCompareCommand(aiControl)){
+            if(activeDxf==null){
+                reply.send("Proje–keşif karşılaştırması için tam vektör DWG/DXF çizimi hazır olmalı.");
+                return;
+            }
+            if(currentProject==null||currentProject.boqModel==null||currentProject.boqModel.isEmpty()){
+                reply.send("Karşılaştırılacak keşif yüklenmedi. Önce “Keşif yükle” yazın.");
+                return;
+            }
+            MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
+            MusaAiBoq.Comparison comparison=MusaAiBoq.compare(currentProject.boqModel,generated);
+            reply.send(comparison.text);
+            return;
+        }
+        if(isBoqGenerateCommand(aiControl)){
+            if(activeDxf==null){
+                reply.send("Projeden keşif oluşturmak için tam vektör DWG/DXF çizimi hazır olmalı.");
+                return;
+            }
+            MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
+            reply.send("ÇİZİMDEN OTOMATİK KEŞİF\n"+MusaAiBoq.summary(generated));
+            return;
+        }
+        if(isBoqSummaryCommand(aiControl)){
+            reply.send(currentProject==null||currentProject.boqModel==null
+                ?"Bu proje için keşif yüklenmedi. “Keşif yükle” diyebilirsiniz."
+                :MusaAiBoq.summary(currentProject.boqModel));
             return;
         }
 
@@ -1149,6 +1199,28 @@ public class MainActivity extends AppCompatActivity {
     private static boolean isGandalfUndoCommand(String q){
         return q.equals("gandalf geri al")||q.equals("gandalf degisikliklerini geri al")||
             q.equals("ai degisikliklerini geri al")||q.equals("gandalf duzeltmelerini geri al");
+    }
+
+    private static boolean isBoqLoadCommand(String q){
+        return q.equals("kesif yukle")||q.equals("boq yukle")||q.equals("metraj dosyasi yukle")||
+            q.equals("kesif dosyasi yukle")||q.equals("kesfi yukle");
+    }
+    private static boolean isBoqClearCommand(String q){
+        return q.equals("kesfi temizle")||q.equals("kesif temizle")||q.equals("boq temizle")||
+            q.equals("yuklu kesfi sil");
+    }
+    private static boolean isBoqCompareCommand(String q){
+        return (q.contains("kesif")||q.contains("boq"))&&
+            (q.contains("karsilastir")||q.contains("uyum")||q.contains("fark"));
+    }
+    private static boolean isBoqGenerateCommand(String q){
+        return (q.contains("kesif")||q.contains("metraj tablosu"))&&
+            (q.contains("olustur")||q.contains("uret")||q.contains("cikar"))&&
+            (q.contains("proje")||q.contains("cizim")||q.contains("otomatik"));
+    }
+    private static boolean isBoqSummaryCommand(String q){
+        return q.equals("kesif ozeti")||q.equals("yuklu kesif")||q.equals("boq ozeti")||
+            q.equals("kesfi goster");
     }
 
     private void showPendingGandalfActions(MusaAiPanel.Reply reply,boolean applyRequested){
@@ -1555,6 +1627,61 @@ public class MainActivity extends AppCompatActivity {
         if(!canEdit()||currentProject==null){result.setText("Medya • Düzenlenebilir bir çizim açın");return;}
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType(mime);
         startActivityForResult(intent,request);
+    }
+
+    private void pickBoqDocument(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv","text/plain",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/pdf"
+        });
+        startActivityForResult(intent,PICK_BOQ);
+    }
+
+    private void handleBoqPicked(Uri uri){
+        final MusaAiPanel.Reply reply=pendingBoqReply;
+        final ProjectSession target=pendingBoqProject;
+        pendingBoqReply=null;pendingBoqProject=null;
+        if(uri==null||target==null)return;
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        final String name=nameOf(uri);
+        String detected=getContentResolver().getType(uri);
+        final String mime=detected==null?CadDocumentSupport.bestMime(name,null):detected;
+        final CadDocumentSupport.Kind kind=CadDocumentSupport.kind(name,mime);
+        if(kind==CadDocumentSupport.Kind.PDF){
+            String message="PDF keşif seçildi: "+name+"\nPDF sayısal hücre yapısı bu aşamada güvenilir satır/miktar verisi olarak otomatik kabul edilmiyor. Karşılaştırma için tercihen XLSX veya CSV yükleyin; PDF inceleme belgesi olarak açılabilir.";
+            result.setText("Keşif • PDF için sayısal inceleme gerekli");
+            if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(!(kind==CadDocumentSupport.Kind.XLSX||kind==CadDocumentSupport.Kind.CSV||
+             kind==CadDocumentSupport.Kind.DOCX||kind==CadDocumentSupport.Kind.TEXT)){
+            String message="Bu keşif biçimi otomatik okunamıyor: "+CadDocumentSupport.displayType(name,mime)+". XLSX veya CSV kullanın.";
+            if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+            return;
+        }
+        result.setText("Keşif • "+name+" okunuyor…");
+        aiExecutor.submit(()->{
+            try(InputStream in=getContentResolver().openInputStream(uri)){
+                if(in==null)throw new IOException("Keşif dosyası açılamadı");
+                String extracted=OfficeTextExtractor.extract(in,name,mime);
+                MusaAiBoq.Model model=MusaAiBoq.parse(name,kind,extracted);
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    target.boqModel=model;target.boqName=name;
+                    result.setText("Keşif • "+name+" • "+model.rows.size()+" satır");
+                    String message="Keşif yüklendi.\n"+MusaAiBoq.summary(model)+
+                        "\n\n“Keşifle karşılaştır” diyerek aktif çizimin otomatik metrajıyla karşılaştırabilirsiniz.";
+                    if(reply!=null)reply.send(message);else Toast.makeText(this,"Keşif yüklendi • "+model.rows.size()+" satır",Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception e){
+                final String message="Keşif okunamadı: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage());
+                runOnUiThread(()->{result.setText(message);if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();});
+            }
+        });
     }
 
     private void pickDocument(){
@@ -2481,6 +2608,11 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==PICK_BOQ&&c!=RESULT_OK){
+            MusaAiPanel.Reply reply=pendingBoqReply;pendingBoqReply=null;pendingBoqProject=null;
+            if(reply!=null)reply.send("Keşif yükleme iptal edildi.");
+            return;
+        }
         if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
         if(c!=RESULT_OK||data==null)return;
         if(r==VIEW_DOCUMENT){handleDocumentImport(data);return;}
@@ -2488,6 +2620,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
+        if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
