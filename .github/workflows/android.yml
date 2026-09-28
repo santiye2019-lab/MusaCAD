@@ -110,6 +110,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/OfflineLicenseModelTest.java
           java -cp /tmp/musacad-tests OfflineLicenseModelTest
+      - name: Test MC1 production contract
+        run: |
+          javac -d /tmp/musacad-tests tests/Mc1ProductionContractTest.java
+          java -cp /tmp/musacad-tests Mc1ProductionContractTest
       - name: Test separate Play and direct distribution models
         run: |
           javac -d /tmp/musacad-tests tests/DistributionModelsTest.java
