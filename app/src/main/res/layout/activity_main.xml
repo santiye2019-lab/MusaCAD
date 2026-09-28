@@ -746,6 +746,16 @@
                 android:background="@drawable/right_rail_button_bg" />
 
             <ImageButton
+                android:id="@+id/aiButton"
+                android:layout_width="32dp"
+                android:layout_height="30dp"
+                android:layout_marginTop="3dp"
+                android:src="@drawable/ic_ai"
+                android:contentDescription="MusaCAD AI"
+                android:background="@drawable/right_rail_button_bg"
+                android:padding="7dp" />
+
+            <ImageButton
                 android:id="@+id/rightLayersButton"
                 android:layout_width="32dp"
                 android:layout_height="30dp"
