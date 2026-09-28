@@ -1,4 +1,5 @@
 const TRIAL_MS = 24 * 60 * 60 * 1000;
+const AI_SESSION_MS = 15 * 60 * 1000;
 const MAX_BODY_BYTES = 8192;
 const GOOGLE_OAUTH_URL = "https://oauth2.googleapis.com/token";
 const ANDROID_PUBLISHER_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
@@ -8,6 +9,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/v1/trial/start") return handleTrial(request, env);
     if (url.pathname === "/v1/play/verify") return handlePlayVerify(request, env);
+    if (url.pathname === "/v1/ai/session") return handleAiSession(request, env);
     return json({ status: "not_found" }, 404);
   }
 };
@@ -140,10 +142,114 @@ async function handlePlayVerify(request, env) {
       "UPDATE play_purchases SET verified_at_ms=?,acknowledged_at_ms=? WHERE token_hash=?"
     ).bind(now, now, tokenHash).run();
 
+    await env.DB.prepare(
+      "INSERT INTO ai_entitlements(device_id,kind,expires_at_ms,updated_at_ms) VALUES(?,?,?,?) " +
+      "ON CONFLICT(device_id) DO UPDATE SET kind=excluded.kind,expires_at_ms=excluded.expires_at_ms,updated_at_ms=excluded.updated_at_ms"
+    ).bind(deviceId, "play", expiresAtMs, now).run();
+
     return json({ status: "active", productId, purpose: "annual_renewal", expiresAtMs, acknowledged: true }, 200);
   } catch (_) {
     return json({ status: "server_error", message: "Google Play verification failed" }, 503);
   }
+}
+
+async function handleAiSession(request, env) {
+  if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
+  if (!env.DB || !env.MUSACAD_TRIAL_PRIVATE_KEY_PEM)
+    return json({ status: "server_error", message: "AI session signing is not configured" }, 503);
+
+  const parsed = await readJson(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
+  const deviceId = String(body.deviceId || "").trim().toUpperCase();
+  const packageName = String(body.packageName || "").trim();
+  const proof = String(body.entitlementProof || "").trim();
+  const allowedPackage = env.MUSACAD_PACKAGE_NAME || "com.musa.cad";
+  if (!validDeviceId(deviceId) || packageName !== allowedPackage)
+    return json({ status: "denied", message: "Invalid MusaCAD client binding" }, 403);
+
+  const now = Date.now();
+  let entitled = false;
+
+  if (proof.startsWith("MT1.")) {
+    entitled = await verifyCompactProof(proof, "MT1", deviceId, now, env.MUSACAD_TRIAL_PUBLIC_KEY_PEM, false);
+  } else if (proof.startsWith("MC1.")) {
+    entitled = await verifyCompactProof(proof, "MC1", deviceId, now, env.MUSACAD_LICENSE_PUBLIC_KEY_PEM, true);
+  }
+
+  if (!entitled) {
+    try {
+      const row = await env.DB.prepare(
+        "SELECT kind,expires_at_ms FROM ai_entitlements WHERE device_id=? LIMIT 1"
+      ).bind(deviceId).first();
+      const expiry = row ? Number(row.expires_at_ms) : 0;
+      entitled = !!row && Number.isFinite(expiry) && expiry > now;
+    } catch (_) {
+      entitled = false;
+    }
+  }
+
+  if (!entitled) return json({ status: "denied", message: "Active cloud-AI entitlement not found" }, 403);
+
+  const expiresAtMs = now + AI_SESSION_MS;
+  const token = await signPurposeToken("MAI1", deviceId, expiresAtMs, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM);
+  return json({ status: "active", token, expiresAtMs }, 200);
+}
+
+async function verifyCompactProof(token, prefix, expectedDeviceId, nowMs, publicKeyPem, perpetualAllowed) {
+  try {
+    if (!publicKeyPem) return false;
+    const parts = String(token || "").replace(/\s/g, "").split(".");
+    if (parts.length !== 3 || parts[0] !== prefix) return false;
+    const payloadBytes = decodeBase64url(parts[1]);
+    const signatureBytes = decodeBase64url(parts[2]);
+    const payload = new TextDecoder().decode(payloadBytes);
+    const fields = payload.split("|");
+    if (fields.length !== 3 || fields[0] !== prefix || fields[1] !== expectedDeviceId) return false;
+    const expiresAtMs = Number(fields[2]);
+    if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs < 0) return false;
+    if (expiresAtMs === 0 && !perpetualAllowed) return false;
+    if (expiresAtMs !== 0 && nowMs > expiresAtMs) return false;
+
+    const key = await crypto.subtle.importKey(
+      "spki",
+      pemBytes(publicKeyPem, "PUBLIC KEY"),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    return await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      signatureBytes,
+      payloadBytes
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+async function signPurposeToken(prefix, deviceId, expiresAtMs, privateKeyPem) {
+  const payload = `${prefix}|${deviceId}|${expiresAtMs}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemBytes(privateKeyPem, "PRIVATE KEY"),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const payloadBytes = new TextEncoder().encode(payload);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, payloadBytes);
+  return `${prefix}.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
+}
+
+function decodeBase64url(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
 }
 
 async function googleAccessToken(env, fetcher) {
@@ -234,17 +340,7 @@ function validDeviceId(value) {
 }
 
 async function signToken(deviceId, expiresAtMs, privateKeyPem) {
-  const payload = `MT1|${deviceId}|${expiresAtMs}`;
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    pemBytes(privateKeyPem, "PRIVATE KEY"),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const payloadBytes = new TextEncoder().encode(payload);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, payloadBytes);
-  return `MT1.${base64url(payloadBytes)}.${base64url(new Uint8Array(signature))}`;
+  return signPurposeToken("MT1", deviceId, expiresAtMs, privateKeyPem);
 }
 
 async function sha256Hex(value) {
