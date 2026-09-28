@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
         markModeSelected(R.id.panButton);
         categoryButtons=new int[]{R.id.groupAnnotateToolsButton,R.id.groupLineToolsButton,R.id.groupEditToolsButton,R.id.groupLayerToolsButton,R.id.groupMeasureToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupMoreToolsButton,R.id.groupLayoutToolsButton,R.id.groupViewToolsButton};
 
-        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.right3dButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.toolPanelClose,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
+        int[] interactive={R.id.menuButton,R.id.openButton,R.id.shareButton,R.id.headerMoreButton,R.id.quickOpenButton,R.id.newProjectButton,R.id.layersButton,R.id.propertiesButton,R.id.colorButton,R.id.lineTypeButton,R.id.pointButton,R.id.bottomLayersButton,R.id.rightLayersButton,R.id.snapToggle,R.id.panButton,R.id.selectEntityButton,R.id.moveEntityButton,R.id.rotateEntityButton,R.id.copyEntityButton,R.id.deleteEntityButton,R.id.calibrateButton,R.id.distanceButton,R.id.bottomMeasureButton,R.id.hatchButton,R.id.moreToolsButton,R.id.areaButton,R.id.lineButton,R.id.polylineButton,R.id.rectangleButton,R.id.circleButton,R.id.textButton,R.id.finishEditButton,R.id.saveDxfButton,R.id.zoomInButton,R.id.zoomOutButton,R.id.rightZoomInButton,R.id.rightZoomOutButton,R.id.right3dButton,R.id.aiButton,R.id.fitButton,R.id.rightFitButton,R.id.undoButton,R.id.clearButton,R.id.shareToolButton,R.id.commandSendButton,R.id.toolPanelClose,R.id.closeFileButton,R.id.nativeModeChip,R.id.sceneModeChip,R.id.groupLayerToolsButton,R.id.groupDimensionToolsButton,R.id.groupColorToolsButton,R.id.groupLayoutToolsButton,R.id.groupLineToolsButton,R.id.groupShapeToolsButton,R.id.groupEditToolsButton,R.id.groupMeasureToolsButton,R.id.groupViewToolsButton,R.id.groupAnnotateToolsButton,R.id.groupMoreToolsButton};
         for(int id:interactive)installInteractiveFeedback(findViewById(id));
 
         findViewById(R.id.menuButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.headerMoreButton).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});findViewById(R.id.appTitle).setOnClickListener(v->{hideToolPanel();showMainMenu(v);});
@@ -135,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.nativeModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(currentProject==null)result.setText("DWG Native • Önce çizim açın");else if(currentProject.nativeScene!=null)result.setText("DWG Native • hızlı sahne etkin");else result.setText("Vektör görünüm • tam çizim modeli");});
         findViewById(R.id.sceneModeChip).setOnClickListener(v->{v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);showViewToolsSheet();});
         findViewById(R.id.right3dButton).setOnClickListener(v->show3dToolsSheet());
+        findViewById(R.id.aiButton).setOnClickListener(v->showMusaAi());
         findViewById(R.id.layersButton).setOnClickListener(v->showLayers());
         findViewById(R.id.propertiesButton).setOnClickListener(v->showSelectedProperties());
         findViewById(R.id.colorButton).setOnClickListener(v->showSelectedColor());
@@ -731,6 +732,57 @@ public class MainActivity extends AppCompatActivity {
         }
         toolPanelHost.setVisibility(View.VISIBLE);
         toolPanelHost.bringToFront();
+    }
+
+    private void showMusaAi(){
+        hideToolPanel();
+        MusaAiPanel.show(this,new MusaAiPanel.Host(){
+            @Override public String contextLabel(){return musaAiContextLabel();}
+            @Override public void onPrompt(String prompt,MusaAiPanel.Reply reply){handleMusaAiPrompt(prompt,reply);}
+        });
+    }
+
+    private String musaAiContextLabel(){
+        if(currentProject==null)return "Bağlam • Henüz proje açık değil";
+        if(activeDxf!=null){
+            return "Bağlam • "+currentDisplayName+" • "+activeDxf.entityCount+" nesne • "+activeDxf.layerCount+" katman • "+activeDxf.activeLayout;
+        }
+        if(currentProject.nativeScene!=null){
+            return "Bağlam • "+currentDisplayName+" • DWG Native • "+currentProject.nativeScene.primitiveCount+" geometri";
+        }
+        return "Bağlam • "+currentDisplayName+" • çizim açık";
+    }
+
+    private void handleMusaAiPrompt(String prompt,MusaAiPanel.Reply reply){
+        String raw=prompt==null?"":prompt.trim();
+        String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
+        if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
+        if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
+            reply.send("MusaCAD AI için planlanan yetenekler:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            return;
+        }
+        if(currentProject==null){
+            reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
+            return;
+        }
+        if(q.contains("çizimde neler")||q.contains("çizim özeti")||q.contains("proje özeti")||q.contains("bu proje")){
+            if(activeDxf!=null){
+                String extra=activeDxf.oleObjectCount>0?" • OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount:"";
+                reply.send(currentDisplayName+"\n• Layout: "+activeDxf.activeLayout+"\n• Nesne: "+activeDxf.entityCount+"\n• Katman: "+activeDxf.layerCount+"\n• Seçilebilir nesne: "+activeDxf.editableSourceCount()+extra);
+            }else if(currentProject.nativeScene!=null){
+                reply.send(currentDisplayName+" açık. Native hızlı sahnede "+currentProject.nativeScene.primitiveCount+" geometri var. Tam vektör model hazır olduğunda AI daha ayrıntılı analiz yapabilecek.");
+            }else reply.send(currentDisplayName+" açık. Çizim modeli hazırlanıyor.");
+            return;
+        }
+        if(q.contains("metraj")){
+            reply.send("Metraj isteğini aldım. Metraj/sayım motoru MusaCAD AI'nın sonraki modüllerinden biri olarak bu panelde çalışacak.");
+            return;
+        }
+        if(q.contains("kontrol")||q.contains("hata")){
+            reply.send("Proje kontrol isteğini aldım. Bağlantısız hat, çap/etiket tutarsızlığı, eksik sembol ve benzeri kontrolleri sıradaki AI analiz modüllerinde bu panelden çalıştıracağız.");
+            return;
+        }
+        reply.send("Mesaj alındı. MusaCAD AI paneli ve proje bağlamı hazır. Sıradaki adımda doğal dil komut motorunu mevcut CAD komutlarına bağlayacağım.");
     }
 
     private void showToolSheet(String title,ToolAction...tools){
