@@ -5,6 +5,18 @@ import java.util.*;
 
 /** Immutable, lightweight drawing knowledge index used by MusaCAD AI. */
 public final class MusaAiDrawingIndex {
+    public static final class OleItem {
+        public final String type,text,mode;
+        public final boolean preview,structured;
+        public final int sheetCount,cellCount;
+        public OleItem(String type,boolean preview,boolean structured,String mode,String text,int sheetCount,int cellCount){
+            this.type=clean(type).toUpperCase(Locale.ROOT);
+            this.preview=preview;this.structured=structured;
+            this.mode=clean(mode);this.text=clean(text);
+            this.sheetCount=Math.max(0,sheetCount);this.cellCount=Math.max(0,cellCount);
+        }
+    }
+
     public static final class Item {
         public final int sourceId;
         public final String type,layer,text;
@@ -33,9 +45,10 @@ public final class MusaAiDrawingIndex {
     }
 
     public final String layout,unitName;
-    public final int entityCount,oleObjectCount;
-    public final Set<String> allLayers,visibleLayers;
+    public final int entityCount,oleObjectCount,olePreviewCount,oleMissingPreviewCount;
+    public final Set<String> allLayers,visibleLayers,oleTypes;
     private final List<Item> items;
+    private final List<OleItem> oleItems;
     private final Map<String,Integer> typeCounts;
 
     public MusaAiDrawingIndex(String layout,int entityCount,int oleObjectCount,
@@ -47,10 +60,15 @@ public final class MusaAiDrawingIndex {
     public MusaAiDrawingIndex(String layout,int entityCount,int oleObjectCount,
                               Collection<String>allLayers,Collection<String>visibleLayers,
                               Collection<Item>items,String unitName){
+        this(layout,entityCount,oleObjectCount,allLayers,visibleLayers,items,unitName,null);
+    }
+
+    public MusaAiDrawingIndex(String layout,int entityCount,int oleObjectCount,
+                              Collection<String>allLayers,Collection<String>visibleLayers,
+                              Collection<Item>items,String unitName,Collection<OleItem>oleItems){
         this.layout=clean(layout);
         this.unitName=clean(unitName);
         this.entityCount=Math.max(0,entityCount);
-        this.oleObjectCount=Math.max(0,oleObjectCount);
         this.allLayers=immutableSet(allLayers);
         this.visibleLayers=immutableSet(visibleLayers);
         ArrayList<Item>copy=new ArrayList<>();
@@ -62,9 +80,20 @@ public final class MusaAiDrawingIndex {
         }
         this.items=Collections.unmodifiableList(copy);
         this.typeCounts=Collections.unmodifiableMap(types);
+
+        ArrayList<OleItem>ocopy=new ArrayList<>();LinkedHashSet<String>otypes=new LinkedHashSet<>();int previews=0;
+        if(oleItems!=null)for(OleItem item:oleItems){
+            if(item==null)continue;ocopy.add(item);if(!item.type.isEmpty())otypes.add(item.type);if(item.preview)previews++;
+        }
+        this.oleItems=Collections.unmodifiableList(ocopy);
+        this.oleObjectCount=oleItems==null?Math.max(0,oleObjectCount):ocopy.size();
+        this.olePreviewCount=previews;
+        this.oleMissingPreviewCount=Math.max(0,this.oleObjectCount-previews);
+        this.oleTypes=Collections.unmodifiableSet(otypes);
     }
 
     public List<Item>items(){return items;}
+    public List<OleItem>oleItems(){return oleItems;}
     public Map<String,Integer>typeCounts(){return typeCounts;}
     public int countType(String type){return typeCounts.getOrDefault(clean(type).toUpperCase(Locale.ROOT),0);}
 
