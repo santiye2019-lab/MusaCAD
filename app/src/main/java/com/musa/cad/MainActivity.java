@@ -112,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
     private String lastCommandRaw="",lastAiReport="",lastAiReportTitle="MusaCAD AI Raporu";
+    private List<Integer> lastAiReportSourceIds=Collections.emptyList();
     private MusaAiEstimate.Document aiLoadedEstimate,aiProjectEstimate;
     private MusaAiPanel.Reply pendingEstimateReply;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
@@ -883,6 +884,7 @@ public class MainActivity extends AppCompatActivity {
                 currentAiDrawingIndex(),currentDisplayName,raw,aiLoadedEstimate,currentProjectEstimate());
             if(report.matched){
                 lastAiReport=report.text;lastAiReportTitle=report.title;
+                lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
                 int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
                 if(report.sourceIds.isEmpty())cad.clearAiHighlights();
                 reply.send(report.text+
@@ -963,6 +965,7 @@ public class MainActivity extends AppCompatActivity {
             MusaAiAutoReport.Result report=buildCurrentAiReport();
             if(!report.matched){reply.send("AI proje raporu oluşturulamadı.");return;}
             lastAiReport=report.text;
+            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
             int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
             if(report.sourceIds.isEmpty())cad.clearAiHighlights();
             shareAiReport(lastAiReport);
@@ -979,6 +982,7 @@ public class MainActivity extends AppCompatActivity {
             MusaAiAutoReport.Result report=buildCurrentAiReport();
             if(report.matched){
                 lastAiReport=report.text;
+                lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
                 int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
                 if(report.sourceIds.isEmpty())cad.clearAiHighlights();
                 String highlight=shown>0?"\n\n• Çizimde vurgulanan bulgu/değişiklik: "+shown+
@@ -1381,20 +1385,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void exportLastAiReport(boolean word,MusaAiPanel.Reply reply){
+        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()){
+            runOnUiThread(()->exportLastAiReport(word,reply));
+            return;
+        }
         if(lastAiReport==null||lastAiReport.trim().isEmpty()){
             reply.send("Önce bir proje/disiplin raporu oluşturun.");
             return;
         }
         final String report=lastAiReport,title=lastAiReportTitle;
+        Bitmap captured=null;
+        try{
+            if(cad!=null&&lastAiReportSourceIds!=null&&!lastAiReportSourceIds.isEmpty())
+                captured=cad.aiEvidenceSnapshot(lastAiReportSourceIds);
+        }catch(Exception ignored){}
+        final Bitmap evidence=captured;
         aiExecutor.submit(()->{
             try{
-                File file=word?MusaAiReportExport.docx(getApplicationContext(),title,report)
-                              :MusaAiReportExport.pdf(getApplicationContext(),title,report);
+                File file=word?MusaAiReportExport.docx(getApplicationContext(),title,report,evidence)
+                              :MusaAiReportExport.pdf(getApplicationContext(),title,report,evidence);
                 String mime=word?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/pdf";
                 runOnUiThread(()->shareFile(file,mime));
-                reply.send((word?"Word (.docx)":"PDF")+" raporu oluşturuldu • "+title);
+                reply.send((word?"Word (.docx)":"PDF")+" raporu oluşturuldu • "+title+
+                    (evidence!=null?"\n• İşaretli proje bölgesinin kanıt görüntüsü rapora eklendi.":""));
             }catch(Exception e){
                 reply.send("Rapor çıktısı oluşturulamadı: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage()));
+            }finally{
+                if(evidence!=null&&!evidence.isRecycled())evidence.recycle();
             }
         });
     }
