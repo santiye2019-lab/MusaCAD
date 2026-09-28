@@ -100,6 +100,7 @@ android {
         buildConfigField "String", "TRIAL_PUBLIC_KEY_PEM", groovy.json.JsonOutput.toJson(musaTrialPublicKeyPem)
         buildConfigField "String", "PLAY_YEARLY_PRODUCT_ID", groovy.json.JsonOutput.toJson(musaPlayProductId)
         buildConfigField "String", "PLAY_VERIFY_URL", groovy.json.JsonOutput.toJson(musaPlayVerifyUrl)
+        buildConfigField "boolean", "ALLOW_LEGACY_SHORT_LICENSE", productionRelease ? "false" : "true"
     }
 
     flavorDimensions "distribution"
