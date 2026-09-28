@@ -146,5 +146,4 @@ public final class MusaAiProjectPacket {
         b.append('"');
     }
 
-    private MusaAiProjectPacket(){}
 }
