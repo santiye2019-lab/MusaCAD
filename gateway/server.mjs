@@ -31,9 +31,14 @@ const OUTPUT_SCHEMA = {
         type: "object",
         properties: {
           command: { type: "string" },
-          description: { type: "string" }
+          description: { type: "string" },
+          source_ids: {
+            type: "array",
+            maxItems: 8,
+            items: { type: "integer", minimum: 0 }
+          }
         },
-        required: ["command", "description"],
+        required: ["command", "description", "source_ids"],
         additionalProperties: false
       }
     }
@@ -59,7 +64,9 @@ Rules:
 4. Never invent coordinates, dimensions, diameters, capacities, device counts,
    layers or objects that are absent from the packet.
 5. If a CAD edit would help, return it only as an action suggestion. Never
-   describe an action as already executed.
+   describe an action as already executed. When the project packet contains a
+   stable source_id for the intended target, include it in source_ids. Use an
+   empty source_ids array when the target cannot be identified safely.
 6. Keep actions small, reversible and directly tied to the user's request.
 7. Use only MusaCAD canonical CAD commands. The Android app will independently
    validate every command and requires user approval for edits.
@@ -130,9 +137,13 @@ function filterActions(actions) {
     if (!command) continue;
     const verb = command.split(/\s+/, 1)[0];
     if (!ALLOWED_VERBS.has(verb)) continue;
+    const sourceIds = Array.isArray(item?.source_ids)
+      ? item.source_ids.slice(0, 8).map(Number).filter(Number.isInteger).filter(id => id >= 0)
+      : [];
     out.push({
       command: command.slice(0, 160),
-      description: String(item?.description || "").trim().slice(0, 500)
+      description: String(item?.description || "").trim().slice(0, 500),
+      source_ids: sourceIds
     });
   }
   return out;
