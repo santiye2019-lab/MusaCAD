@@ -24,6 +24,8 @@ async function handleAnalyze(request, env) {
   const body = parsed.body || {};
   const prompt = String(body.prompt || "").trim();
   const cad = body.cad;
+  const cadPackage = body.cadPackage;
+  const packageMode = cadPackage !== undefined && cadPackage !== null;
   const allowWeb = body.allowWeb === true;
   const allowEditProposals = body.allowEditProposals === true;
   const expertProfile = normalizeExpertProfile(body.expertProfile);
@@ -34,10 +36,13 @@ async function handleAnalyze(request, env) {
     return json({ status: "denied", message: "Unsupported CAD-JSON payload" }, 400);
   if (cad.cloudPolicy && cad.cloudPolicy.rawDrawingIncluded === true)
     return json({ status: "denied", message: "Raw drawing upload is not accepted by this endpoint" }, 400);
+  if (packageMode && !validCadPackage(cadPackage))
+    return json({ status: "denied", message: "Unsupported CAD package payload" }, 400);
 
   const tools = [];
   if (allowWeb) tools.push({ type: "web_search" });
-  if (allowEditProposals) tools.push(...cadProposalTools());
+  // Package mode is deliberately read-only because sourceIds are local to each drawing.
+  if (allowEditProposals && !packageMode) tools.push(...cadProposalTools());
 
   const accessMode = session.mode === "developer" ? "developer" : "licensed";
   const instructions =
@@ -47,6 +52,9 @@ async function handleAnalyze(request, env) {
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
     "Analyze the supplied bounded CAD-JSON across architectural, structural, mechanical, electrical, landscape, infrastructure, elevator and fire-safety systems when present. " +
+    (packageMode
+      ? "A bounded MusaCAD CAD package containing multiple open drawings is also supplied. Treat each drawing as a separate source, compare disciplines explicitly, use fileName and detectedDiscipline to attribute findings, and distinguish cross-drawing proximity/coordination candidates from proven clashes. Package mode is read-only: do not claim or propose CAD edits across files. "
+      : "") +
     mechanicalExpertInstructions(expertProfile) +
     disciplineExpertInstructions(expertProfile) +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
@@ -63,7 +71,8 @@ async function handleAnalyze(request, env) {
       role: "user",
       content:
         "USER REQUEST:\n" + prompt +
-        "\n\nMUSACAD CAD-JSON:\n" + JSON.stringify(cad)
+        "\n\nMUSACAD CAD-JSON (active drawing):\n" + JSON.stringify(cad) +
+        (packageMode ? "\n\nMUSACAD CAD-PACKAGE:\n" + JSON.stringify(cadPackage) : "")
     }
   ];
 
@@ -118,8 +127,24 @@ async function handleAnalyze(request, env) {
     webUsed: parsedOutput.webUsed,
     sessionExpiresAtMs: session.expiresAtMs,
     accessMode,
-    expertProfile
+    expertProfile,
+    packageMode
   });
+}
+
+function validCadPackage(value) {
+  if (!value || typeof value !== "object" || value.schema !== "musacad-cad-package/v1") return false;
+  if (!Array.isArray(value.drawings) || value.drawings.length < 1 || value.drawings.length > 4) return false;
+  if (value.cloudPolicy && value.cloudPolicy.rawDrawingIncluded === true) return false;
+  if (value.cloudPolicy && value.cloudPolicy.packageEditToolsAllowed === true) return false;
+  for (const drawing of value.drawings) {
+    if (!drawing || typeof drawing !== "object") return false;
+    const one = drawing.cad;
+    if (!one || typeof one !== "object" || one.schema !== "musacad-cad-json/v1") return false;
+    if (one.cloudPolicy && one.cloudPolicy.rawDrawingIncluded === true) return false;
+    if (typeof drawing.fileName !== "string" || drawing.fileName.length > 160) return false;
+  }
+  return true;
 }
 
 function normalizeExpertProfile(value) {
