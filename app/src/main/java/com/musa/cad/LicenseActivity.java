@@ -150,7 +150,7 @@ public class LicenseActivity extends AppCompatActivity {
             distributionCard.addView(playPurchaseButton,buttonLp());
             updateRenewalButton();
         }else{
-            distributionCard.addView(textView("Doğrudan APK / Kurumsal",18f,Color.WHITE,true),matchWrap());
+            distributionCard.addView(textView("DOĞRUDAN APK / KURUMSAL",18f,Color.WHITE,true),matchWrap());
             TextView direct=textView("Güvenli Lisans Kimliği + MC1 lisansı kullanılır. Google Play satın alma bu sürümde kapalıdır.",12f,0xFFC7D7E0,false);
             direct.setPadding(0,dp(6),0,0);distributionCard.addView(direct,matchWrap());
         }
