@@ -80,12 +80,12 @@ public final class MusaAiMechanicalExpert {
 
             if(st.degenerate>0){
                 out.append("\n• ").append(p.label).append(": sıfır uzunluk/dejenere geometri ").append(st.degenerate);
-                findings+=st.degenerate;highlights.addAll(st.ids);
+                findings+=st.degenerate;highlights.addAll(st.issueIds);
             }
             if(st.openRuns>0&&isPipeProfile(p)){
                 out.append("\n• ").append(p.label).append(": açık hat polyline ").append(st.openRuns)
                    .append(" — bağlantı sürekliliğini kontrol edin.");
-                findings+=st.openRuns;highlights.addAll(st.ids);
+                findings+=st.openRuns;highlights.addAll(st.issueIds);
             }
             if(isPipeProfile(p)&&st.linear>0&&!st.diameter){
                 out.append("\n• ").append(p.label).append(": görünür çap / DN etiketi bulunamadı.");
@@ -129,7 +129,8 @@ public final class MusaAiMechanicalExpert {
         boolean expertNatural=q.contains("mekanik uzman")||q.contains("mekanik tesisat uzman");
         if(!explicit&&!expertNatural)return null;
 
-        if(has(q,"pis su","atik su","waste","sewer","drenaj","drain","pissu"))return Profile.WASTE;
+        if(has(q,"pis su","atik su","waste","sewer","pissu")||
+            (has(q,"drenaj","drain")&&!has(q,"kondens","condensate","roof drain","yagmur")))return Profile.WASTE;
         if(has(q,"yagmur","rain","storm"))return Profile.RAIN;
         if(has(q,"temiz su","sicak su","soguk su","kullanma suyu","water","temizsu"))return Profile.WATER;
         if(has(q,"isitma","heating","kalorifer","yerden isitma"))return Profile.HEATING;
