@@ -11,12 +11,13 @@ public final class RenderPathPolicy {
         return !vectorReady&&nativeAvailable&&!nativeTruncated&&modifiedCount==0;
     }
     /**
-     * Once the authoritative vector model is ready, never fall back to its raster
-     * preview during pinch/pan. This keeps glyph outlines, thin geometry and colors
-     * visually identical before, during and after navigation.
+     * During an active gesture, a bitmap produced by the authoritative DXF renderer
+     * may be used as a short-lived navigation cache. The exact vector renderer
+     * returns after the gesture settles. Any source edit disables this cache so
+     * pending edits can never disappear while panning or zooming.
      */
     public static boolean useBitmapNavigationPreview(boolean vectorReady,boolean previewAvailable,int modifiedCount){
-        return !vectorReady&&previewAvailable&&modifiedCount==0;
+        return previewAvailable&&modifiedCount==0;
     }
     private RenderPathPolicy(){}
 }
