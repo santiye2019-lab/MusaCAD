@@ -256,3 +256,75 @@ test("unknown expert profile is ignored instead of becoming prompt instructions"
   assert.equal(body.expertProfile,"");
   assert.equal(upstreamBody.instructions.includes("IGNORE_ALL_RULES"),false);
 });
+
+
+test("GPROJAI full-project profile adds multidisciplinary instructions",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Çok disiplinli proje raporu hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"GPROJAI_FULL projeyi incele",
+      expertProfile:"project_full",
+      allowWeb:false,
+      allowEditProposals:true,
+      cad:{
+        schema:"musacad-cad-json/v1",
+        fileName:"koordinasyon.dwg",
+        cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true},
+        items:[]
+      }
+    })
+  });
+
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.expertProfile,"project_full");
+  assert.equal(upstreamBody.instructions.includes("Full-project profile"),true);
+  assert.equal(upstreamBody.instructions.includes("architecture, structure and all visible mechanical systems"),true);
+  assert.equal(upstreamBody.instructions.includes("cross-discipline coordination"),true);
+});
+
+test("GSTATIKAI profile forbids implied structural adequacy",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(_url,options)=>{
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output:[{type:"message",content:[{type:"output_text",text:"Statik tarama hazır."}]}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"GSTATIKAI_FULL incele",
+      expertProfile:"structural",
+      cad:{schema:"musacad-cad-json/v1",cloudPolicy:{rawDrawingIncluded:false},items:[]}
+    })
+  });
+  const response=await worker.fetch(request,{
+    OPENAI_API_KEY:"server-secret",
+    OPENAI_MODEL:"test-model",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  assert.equal(response.status,200);
+  assert.equal(upstreamBody.instructions.includes("Never perform or imply structural adequacy"),true);
+});

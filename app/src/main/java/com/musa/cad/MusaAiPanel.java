@@ -135,15 +135,20 @@ public final class MusaAiPanel {
             {"Çizime sor","Bu çizimde neler var?"},
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
+            {"Mimari","ARKAI_FULL"},
+            {"Statik","STATIKAI_FULL"},
             {"Mekanik","AI_MEKANIK_KONTROL"},
             {"MEKAI","MEKAI_FULL"},
-            {"Gandalf","Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla"},
+            {"ProjAI","PROJAI_FULL"},
+            {"Gandalf","GPROJAI_FULL projeyi tüm disiplinler açısından derin analiz et ve raporla"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
         for(String[] item:prompts)addQuickPrompt(activity,quickRow,input,item[0],item[1]);
         addQuickPrompt(activity,quickRow,input,"G-MEKAI",
             "GMEKAI_FULL projeyi derin analiz et, hata raporu hazırla ve gerekli düzeltmeleri öner");
+        addQuickPrompt(activity,quickRow,input,"G-ProjAI",
+            "GPROJAI_FULL mimari, statik ve mekanik projeyi birlikte incele; koordinasyon risklerini ve düzeltme önerilerini raporla");
 
         Runnable submit=()->{
             String prompt=input.getText().toString().trim();

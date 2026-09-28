@@ -31,8 +31,13 @@ public final class MusaAiPanelContractTest {
         require(panel,"SOFT_INPUT_ADJUST_RESIZE","keyboard-safe AI panel");
         require(panel,"Çizime sor","drawing-question quick prompt");
         require(panel,"Metraj","takeoff quick prompt");
-        require(panel,"{\"MEKAI\",\"MEKAI_FULL\"}","local mechanical expert quick prompt");
+        require(panel,"{\"Mimari\",\"ARKAI_FULL\"}","architecture quick prompt");
+        require(panel,"{\"Statik\",\"STATIKAI_FULL\"}","structural quick prompt");
+        require(panel,"{\"Mekanik\",\"AI_MEKANIK_KONTROL\"}","legacy mechanical quick prompt");
+        require(panel,"{\"MEKAI\",\"MEKAI_FULL\"}","mechanical expert quick prompt");
+        require(panel,"{\"ProjAI\",\"PROJAI_FULL\"}","multidisciplinary quick prompt");
         require(panel,"\"G-MEKAI\"","developer mechanical expert quick prompt");
+        require(panel,"\"G-ProjAI\"","developer multidisciplinary quick prompt");
         require(panel,"Kontrol","inspection quick prompt");
         require(icon,"<vector","AI vector icon");
 

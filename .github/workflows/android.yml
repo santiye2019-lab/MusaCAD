@@ -100,7 +100,7 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiCadJsonTest
       - name: Test MusaCAD explicit cloud-AI routing policy
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiProjectExpert.java app/src/main/java/com/musa/cad/MusaAiCloudPolicy.java tests/MusaAiCloudPolicyTest.java
           java -cp /tmp/musacad-tests MusaAiCloudPolicyTest
       - name: Test MusaCAD cloud-AI security integration contract
         run: |
@@ -142,6 +142,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java tests/MusaAiMechanicalExpertTest.java
           java -cp /tmp/musacad-tests MusaAiMechanicalExpertTest
+      - name: Test MusaCAD multidisciplinary project expert profiles
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java app/src/main/java/com/musa/cad/MusaAiProjectExpert.java tests/MusaAiProjectExpertTest.java
+          java -cp /tmp/musacad-tests MusaAiProjectExpertTest
       - name: Test MusaCAD AI table legend and OLE analysis
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiTableOleAnalysis.java tests/MusaAiTableOleAnalysisTest.java

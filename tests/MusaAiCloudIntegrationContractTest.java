@@ -15,6 +15,7 @@ public final class MusaAiCloudIntegrationContractTest {
         String license=read("app/src/main/java/com/musa/cad/LicenseManager.java");
         String cadJson=read("app/src/main/java/com/musa/cad/MusaAiCadJson.java");
         String expert=read("app/src/main/java/com/musa/cad/MusaAiMechanicalExpert.java");
+        String projectExpert=read("app/src/main/java/com/musa/cad/MusaAiProjectExpert.java");
         String worker=read("server/ai-worker/src/index.js");
         String executor=read("app/src/main/java/com/musa/cad/MusaAiActionExecutor.java");
         String cadView=read("app/src/main/java/com/musa/cad/CadView.java");
@@ -25,7 +26,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"K_CLOUD_CONSENT","cloud privacy consent");
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
-        require(panel,"{\"Gandalf\",\"Gandalf, bu projeyi mekanik açıdan derin analiz et ve raporla\"}","Gandalf quick prompt");
+        require(panel,"{\"Gandalf\",\"GPROJAI_FULL projeyi tüm disiplinler açısından derin analiz et ve raporla\"}","Gandalf multidisciplinary quick prompt");
         require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
@@ -36,6 +37,15 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"MusaAiMechanicalExpert.analyze","local MEKAI expert routing");
         require(cloud,"body.put(\"expertProfile\",expertProfile)","trusted MEKAI profile request");
         require(expert,"GMEKAI","GMEKAI command surface");
+        require(projectExpert,"GARKAI","architecture cloud command surface");
+        require(projectExpert,"GSTATIKAI","structural cloud command surface");
+        require(projectExpert,"GPROJAI","multidisciplinary cloud command surface");
+        require(main,"MusaAiProjectExpert.analyze","local multidisciplinary expert routing");
+        require(worker,"projectExpertInstructions","server multidisciplinary expert instructions");
+        require(worker,"\"architecture\"","server architecture allowlist");
+        require(worker,"\"structural\"","server structural allowlist");
+        require(worker,"\"coordination\"","server coordination allowlist");
+        require(worker,"\"project_full\"","server full-project allowlist");
         require(worker,"normalizeExpertProfile","server expert-profile allowlist");
         require(worker,"mechanicalExpertInstructions","server mechanical expert instructions");
         require(main,"MusaAiSessionService.developerCached()","developer-only edit application gate");

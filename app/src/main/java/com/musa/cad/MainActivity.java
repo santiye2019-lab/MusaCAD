@@ -809,10 +809,14 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Mimari proje uzman kontrolü (ARKAI / GARKAI)\n• Statik proje uzman kontrolü (STATIKAI / GSTATIKAI)\n• Mekanik tesisat proje kontrolü\n• Mekanik tesisat uzman kontrolü (MEKAI / GMEKAI)\n• Çok disiplinli proje ve koordinasyon kontrolü (PROJAI / GPROJAI)\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
             return;
         }
 
+        if(MusaAiProjectExpert.isHelpCommand(raw)){
+            reply.send(MusaAiProjectExpert.commandHelp());
+            return;
+        }
         if(MusaAiMechanicalExpert.isHelpCommand(raw)){
             reply.send(MusaAiMechanicalExpert.commandHelp());
             return;
@@ -954,6 +958,21 @@ public class MainActivity extends AppCompatActivity {
             cad.clearAiHighlights();
             reply.send("AI çoklu vurgulaması temizlendi.");
             return;
+        }
+
+        if(activeDxf!=null){
+            MusaAiProjectExpert.Result projectExpert=MusaAiProjectExpert.analyze(currentAiDrawingIndex(),raw);
+            if(projectExpert.matched){
+                int shown=projectExpert.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(projectExpert.sourceIds);
+                if(projectExpert.sourceIds.isEmpty())cad.clearAiHighlights();
+                String highlight=shown>0?"\n• PROJAI uzman taramasında vurgulanan: "+shown+
+                    (projectExpert.sourceIds.size()>shown?" / "+projectExpert.sourceIds.size():""):"";
+                String cloudHint=projectExpert.profile==MusaAiProjectExpert.Profile.ARCHITECTURE?"GARKAI_FULL":
+                    projectExpert.profile==MusaAiProjectExpert.Profile.STRUCTURAL?"GSTATIKAI_FULL":
+                    projectExpert.profile==MusaAiProjectExpert.Profile.COORDINATION?"GPROJAI_COORD":"GPROJAI_FULL";
+                reply.send(projectExpert.text+highlight+"\n\nDerin Gandalf analizi için: "+cloudHint);
+                return;
+            }
         }
 
         if(activeDxf!=null){

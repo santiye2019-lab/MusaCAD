@@ -46,7 +46,8 @@ async function handleAnalyze(request, env) {
     (accessMode === "developer"
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
-    "Analyze the supplied bounded CAD-JSON, especially mechanical/plumbing/HVAC/fire/gas systems when present. " +
+    "Analyze the supplied bounded CAD-JSON as an engineering project assistant. Architectural, structural, mechanical/plumbing/HVAC/fire/gas and cross-discipline coordination may all be relevant. " +
+    projectExpertInstructions(expertProfile) +
     mechanicalExpertInstructions(expertProfile) +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
@@ -124,10 +125,39 @@ async function handleAnalyze(request, env) {
 function normalizeExpertProfile(value) {
   const known = new Set([
     "mechanical_full","waste","rain","water","heating",
-    "cooling","ventilation","fire","gas","equipment"
+    "cooling","ventilation","fire","gas","equipment",
+    "architecture","structural","coordination","project_full"
   ]);
   const key = String(value || "").trim().toLowerCase();
   return known.has(key) ? key : "";
+}
+
+function projectExpertInstructions(profile) {
+  if (!profile) return "";
+  const common =
+    "For this multidisciplinary expert request, structure the response as: Uzman Özeti, Disiplin Bulguları, Koordinasyon Riskleri, Eksik/Doğrulanamayan Veriler, and Önerilen Düzeltmeler. " +
+    "For each concrete finding identify sourceId and layer when available. Clearly separate directly observed CAD facts from engineering inference. " +
+    "Do not certify architectural, structural, life-safety or code compliance from CAD metadata alone. ";
+  switch (profile) {
+    case "architecture":
+      return common +
+        "Architecture profile: review visible room/space tags, walls, doors/windows, dimensions, levels, stairs/ramps, shafts/wet areas, drawing references and revision notes. " +
+        "Treat egress, accessibility, fire compartmentation and dimensional compliance as unverified unless all required geometry and current authoritative criteria are available. ";
+    case "structural":
+      return common +
+        "Structural profile: review visible grids/axes, columns, beams, shear walls, slabs, foundations, section labels, level references and reinforcement notes. " +
+        "Never perform or imply structural adequacy, seismic safety, member capacity or reinforcement sufficiency unless the required calculation model and inputs are explicitly provided. ";
+    case "coordination":
+      return common +
+        "Coordination profile: compare architectural, structural and mechanical identifiers; focus on shafts/openings/reservations, wet-area routing, equipment-space interfaces, and possible cross-discipline geometry conflicts. " +
+        "Call any metadata-only conflict a coordination candidate, not a confirmed clash. ";
+    case "project_full":
+      return common +
+        "Full-project profile: review architecture, structure and all visible mechanical systems as separate disciplines, then produce a cross-discipline coordination section. " +
+        "Prioritize missing references, inconsistent labels, duplicate/overlapping geometry candidates, shaft/opening coordination and revision risks. ";
+    default:
+      return "";
+  }
 }
 
 function mechanicalExpertInstructions(profile) {
@@ -158,7 +188,7 @@ function mechanicalExpertInstructions(profile) {
     case "equipment":
       return common + "MEKAI mechanical-equipment expert profile: focus on equipment tags, capacities, flow/pressure/power values, duty/standby references and visible piping/duct connections. Service clearances and maintainability require geometry/detail verification. ";
     default:
-      return common;
+      return "";
   }
 }
 
