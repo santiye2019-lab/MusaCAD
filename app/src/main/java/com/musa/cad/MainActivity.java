@@ -820,6 +820,14 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(activeDxf!=null){
+            MusaAiQuantityTakeoff.Answer takeoff=MusaAiQuantityTakeoff.answer(currentAiDrawingIndex(),raw);
+            if(takeoff.matched){
+                reply.send(takeoff.text);
+                return;
+            }
+        }
+
+        if(activeDxf!=null){
             MusaAiDrawingQuestions.Answer drawingAnswer=MusaAiDrawingQuestions.answer(currentAiDrawingIndex(),raw);
             if(drawingAnswer.matched){
                 reply.send(drawingAnswer.text);
