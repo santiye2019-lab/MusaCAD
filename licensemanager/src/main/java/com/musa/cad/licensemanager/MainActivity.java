@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         setContentView(buildUi());
         refreshHistory();
         refreshKeyStatus();
@@ -91,13 +93,13 @@ public class MainActivity extends AppCompatActivity {
 
         section(root,"Cihaz kimliği");
         identityField=input("MusaCAD Güvenli Lisans Kimliği");
-        identityField.setSingleLine(true);identityField.setTextSize(15f);
+        identityField.setSingleLine(true);setResponsiveTextSize(identityField,15f);
         root.addView(identityField,matchWrap());
         mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
                 boolean secure=position==0;
-                identityField.setHint(secure?"MusaCAD > Lisans Bilgisi > Güvenli Lisans Kimliği":"MusaCAD'deki 12 haneli Serial");
-                tokenView.setTextSize(secure?11f:24f);
+                identityField.setHint(secure?"Güvenli Lisans Kimliğini yapıştır":"12 haneli Serial");
+                setResponsiveTextSize(tokenView,secure?11f:24f);
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
         });
@@ -160,7 +162,7 @@ public class MainActivity extends AppCompatActivity {
             boolean secure=mode.getSelectedItemPosition()==0;
             if(!secure&&!BuildConfig.ALLOW_LEGACY_SHORT_LICENSE)throw new IllegalStateException("Production License Manager yalnız MC1 lisansı üretir");
             String token=secure?LicenseIssuer.issue(this,pendingIdentity,pendingDays):ShortLicenseCode.issue(pendingIdentity,pendingDays,System.currentTimeMillis());
-            tokenView.setText(token);tokenView.setTextSize(secure?11f:24f);
+            tokenView.setText(token);setResponsiveTextSize(tokenView,secure?11f:24f);
             LicenseHistory.add(this,pendingCustomer,pendingIdentity,pendingLabel,secure?"MC1":"Kısa kod",token);
             refreshHistory();
             Toast.makeText(this,secure?"RSA imzalı MC1 lisansı oluşturuldu":"12 haneli uyumluluk kodu oluşturuldu",Toast.LENGTH_SHORT).show();
@@ -325,13 +327,31 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onDestroy(){clearBackupOperation();super.onDestroy();}
 
     private void section(LinearLayout root,String label){TextView v=text(label,15,Color.WHITE,true);v.setPadding(0,dp(20),0,dp(7));root.addView(v);}
-    private EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(115,142,157));e.setInputType(InputType.TYPE_CLASS_TEXT);e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(25,181,165)));return e;}
-    private Button button(String label){Button b=new Button(this);b.setText(label);b.setTextColor(Color.WHITE);b.setTextSize(11);b.setAllCaps(false);b.setBackground(round(Color.rgb(11,59,96),12));return b;}
-    private TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setIncludeFontPadding(false);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private EditText input(String hint){
+        EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(115,142,157));
+        e.setInputType(InputType.TYPE_CLASS_TEXT);e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(25,181,165)));
+        setResponsiveTextSize(e,15f);e.setMinHeight(dp(48));e.setMaxLines(2);return e;
+    }
+    private Button button(String label){
+        Button b=new Button(this);b.setText(label);b.setTextColor(Color.WHITE);setResponsiveTextSize(b,11f);b.setAllCaps(false);
+        b.setSingleLine(false);b.setMaxLines(2);b.setGravity(Gravity.CENTER);b.setMinHeight(dp(48));b.setIncludeFontPadding(false);
+        b.setPadding(dp(8),dp(6),dp(8),dp(6));b.setBackground(round(Color.rgb(11,59,96),12));return b;
+    }
+    private TextView text(String value,float size,int color,boolean bold){
+        TextView t=new TextView(this);t.setText(value);setResponsiveTextSize(t,size);t.setTextColor(color);t.setIncludeFontPadding(false);
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;
+    }
+    private void setResponsiveTextSize(TextView view,float sp){
+        float fontScale=getResources().getConfiguration().fontScale;
+        float capped=Math.min(Math.max(fontScale,0.85f),1.15f);
+        float px=sp*getResources().getDisplayMetrics().density*capped;
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX,px);
+    }
     private Space space(int dp){return new Space(this);}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private LinearLayout.LayoutParams matchWrap(){return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);}
-    private LinearLayout.LayoutParams buttonParams(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(52));p.topMargin=dp(8);return p;}
+    private LinearLayout.LayoutParams rowButtonParams(){return new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f);}
+    private LinearLayout.LayoutParams buttonParams(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);p.topMargin=dp(8);return p;}
     private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private void showError(String message){new AlertDialog.Builder(this).setTitle("MusaCAD Lisans Yönetici").setMessage(message).setPositiveButton("TAMAM",null).show();}
 }
