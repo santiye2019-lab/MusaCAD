@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_ESTIMATE=36;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
@@ -111,7 +111,9 @@ public class MainActivity extends AppCompatActivity {
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
     private String crossProjectClipboardSource="";
-    private String lastCommandRaw="",lastAiReport="";
+    private String lastCommandRaw="",lastAiReport="",lastAiReportTitle="MusaCAD AI Raporu";
+    private MusaAiEstimate.Document aiLoadedEstimate,aiProjectEstimate;
+    private MusaAiPanel.Reply pendingEstimateReply;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
     private CadView.SessionState lastGandalfBatchState;
     private ProjectSession lastGandalfBatchProject;
@@ -809,7 +811,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları\n• Çizime soru sorma\n• Nesne sayımı ve metraj\n• Proje/hata kontrolü\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim\n• Tablo, lejant ve OLE analizi\n• Revizyon karşılaştırma\n• Sesli komut\n• Otomatik rapor üretimi");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj ve projeden taslak keşif üretimi\n• XLSX/CSV/TXT keşif yükleme ve proje–keşif karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve tam proje denetimi\n• MEKAI_* yerel mekanik uzman komutları\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
         }
 
@@ -836,6 +838,71 @@ public class MainActivity extends AppCompatActivity {
         if(isGandalfPreviewCommand(aiControl)){
             showPendingGandalfActions(reply,false);
             return;
+        }
+
+        if(MusaAiEstimate.isLoadCommand(raw)){
+            pickAiEstimate(reply);
+            return;
+        }
+        if(isAiReportWordCommand(aiControl)){
+            exportLastAiReport(true,reply);
+            return;
+        }
+        if(isAiReportPdfCommand(aiControl)){
+            exportLastAiReport(false,reply);
+            return;
+        }
+        if(MusaAiEstimate.isBuildCommand(raw)){
+            if(currentProject==null||activeDxf==null){
+                reply.send("Projeden keşif oluşturmak için önce tam vektör DWG/DXF projesini açın.");
+                return;
+            }
+            MusaAiEstimate.Document draft=currentProjectEstimate();
+            reply.send(MusaAiEstimate.summary(draft)+"\n\nBu çıktı TASLAK KEŞİF'tir; proje dışında kalan şartname/mahal/imalat bilgileri ayrıca doğrulanmalıdır.");
+            return;
+        }
+        if(MusaAiEstimate.isCompareCommand(raw)){
+            if(currentProject==null||activeDxf==null){
+                reply.send("Proje–keşif karşılaştırması için önce DWG/DXF projesini açın.");
+                return;
+            }
+            if(aiLoadedEstimate==null){
+                reply.send("Henüz keşif yüklenmedi. Önce “Keşif yükle” komutunu kullanın.");
+                return;
+            }
+            MusaAiEstimate.CompareResult comparison=MusaAiEstimate.compare(currentProjectEstimate(),aiLoadedEstimate);
+            reply.send(comparison.text+"\n\nDetaylı çıktı için “Tam proje denetim raporu oluştur” diyebilirsiniz.");
+            return;
+        }
+        if(MusaAiDetailedReport.asksDetailedReport(raw)){
+            if(currentProject==null||activeDxf==null){
+                reply.send("Detaylı disiplin raporu için önce tam vektör DWG/DXF projesini açın.");
+                return;
+            }
+            MusaAiDetailedReport.Result report=MusaAiDetailedReport.generate(
+                currentAiDrawingIndex(),currentDisplayName,raw,aiLoadedEstimate,currentProjectEstimate());
+            if(report.matched){
+                lastAiReport=report.text;lastAiReportTitle=report.title;
+                int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
+                if(report.sourceIds.isEmpty())cad.clearAiHighlights();
+                reply.send(report.text+
+                    (shown>0?"\n\n• Çizimde vurgulanan bulgu: "+shown:"")+
+                    "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
+                return;
+            }
+        }
+        if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
+            if(currentProject==null||activeDxf==null){
+                reply.send("Disiplin analizi için önce tam vektör DWG/DXF projesini açın.");
+                return;
+            }
+            MusaAiDisciplineAnalyzer.Result multi=MusaAiDisciplineAnalyzer.analyze(currentAiDrawingIndex(),raw);
+            if(multi.matched){
+                int shown=multi.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(multi.sourceIds);
+                if(multi.sourceIds.isEmpty())cad.clearAiHighlights();
+                reply.send(multi.text+(shown>0?"\n• Çizimde vurgulanan: "+shown:""));
+                return;
+            }
         }
 
         if(MusaAiCloudPolicy.shouldUseCloud(raw)){
@@ -916,7 +983,8 @@ public class MainActivity extends AppCompatActivity {
                 if(report.sourceIds.isEmpty())cad.clearAiHighlights();
                 String highlight=shown>0?"\n\n• Çizimde vurgulanan bulgu/değişiklik: "+shown+
                     (report.sourceIds.size()>shown?" / "+report.sourceIds.size():""):"";
-                reply.send(report.text+highlight+"\n\n“Raporu paylaş” diyerek TXT olarak paylaşabilirsiniz.");
+                lastAiReportTitle="Otomatik Proje Raporu";
+                reply.send(report.text+highlight+"\n\n“Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar” diyebilirsiniz.");
                 return;
             }
         }
@@ -1240,6 +1308,95 @@ public class MainActivity extends AppCompatActivity {
             if(candidate!=null){baseline=candidate.index;baselineName=candidate.name;}
         }
         return MusaAiAutoReport.generate(currentAiDrawingIndex(),currentDisplayName,baseline,baselineName);
+    }
+
+    private MusaAiEstimate.Document currentProjectEstimate(){
+        if(activeDxf==null)return null;
+        if(aiProjectEstimate==null||!currentDisplayName.equals(aiProjectEstimate.sourceName))
+            aiProjectEstimate=MusaAiEstimate.fromDrawing(currentAiDrawingIndex(),currentDisplayName);
+        return aiProjectEstimate;
+    }
+
+    private void pickAiEstimate(MusaAiPanel.Reply reply){
+        pendingEstimateReply=reply;
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv","application/csv","text/plain",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/pdf","application/vnd.ms-excel"
+        });
+        startActivityForResult(intent,PICK_ESTIMATE);
+        reply.send("Keşif dosyası seçicisi açıldı. En güvenilir otomatik karşılaştırma için XLSX veya CSV kullanın.");
+    }
+
+    private void handleAiEstimatePicked(Uri uri){
+        if(uri==null)return;
+        final MusaAiPanel.Reply callback=pendingEstimateReply;pendingEstimateReply=null;
+        final String name=nameOf(uri);
+        final String mime=getContentResolver().getType(uri);
+        aiExecutor.submit(()->{
+            try{
+                CadDocumentSupport.Kind kind=CadDocumentSupport.kind(name,mime);
+                if(kind==CadDocumentSupport.Kind.PDF){
+                    if(callback!=null)callback.send("PDF keşif seçildi • "+name+
+                        "\nPDF sayfası MusaCAD'de görüntülenebilir; ancak güvenilir poz/miktar satırlaştırması için bu sürümde XLSX/CSV keşif tercih edilir. PDF'den tahmini sayı uydurulmaz.");
+                    return;
+                }
+                if(kind==CadDocumentSupport.Kind.LEGACY_EXCEL){
+                    if(callback!=null)callback.send("Eski .xls keşif seçildi. Otomatik satır okuma için dosyayı .xlsx veya .csv olarak kaydedip yeniden seçin.");
+                    return;
+                }
+                if(!(kind==CadDocumentSupport.Kind.XLSX||kind==CadDocumentSupport.Kind.CSV||
+                     kind==CadDocumentSupport.Kind.TEXT||kind==CadDocumentSupport.Kind.DOCX)){
+                    if(callback!=null)callback.send("Bu keşif biçimi otomatik karşılaştırma için desteklenmiyor: "+name);
+                    return;
+                }
+                String extracted;
+                try(InputStream in=getContentResolver().openInputStream(uri)){
+                    if(in==null)throw new IOException("Keşif dosyası açılamadı");
+                    extracted=OfficeTextExtractor.extract(in,name,mime);
+                }
+                MusaAiEstimate.Document parsed=MusaAiEstimate.parseExtracted(name,kind.name(),extracted);
+                if(parsed.items.isEmpty()){
+                    if(callback!=null)callback.send("Keşif dosyası okundu ancak poz/açıklama/birim/miktar tablosu güvenilir biçimde bulunamadı: "+name);
+                    return;
+                }
+                aiLoadedEstimate=parsed;
+                if(callback!=null)callback.send("Keşif yüklendi.\n"+MusaAiEstimate.summary(parsed)+
+                    "\n\nŞimdi “Keşif karşılaştır” diyebilirsiniz.");
+            }catch(Exception e){
+                if(callback!=null)callback.send("Keşif yüklenemedi: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage()));
+            }
+        });
+    }
+
+    private static boolean isAiReportWordCommand(String q){
+        return (q.contains("rapor")&&q.contains("word"))||q.contains("docx olarak")||q.contains("word olarak cikar");
+    }
+    private static boolean isAiReportPdfCommand(String q){
+        return (q.contains("rapor")&&q.contains("pdf"))||q.contains("pdf olarak cikar");
+    }
+
+    private void exportLastAiReport(boolean word,MusaAiPanel.Reply reply){
+        if(lastAiReport==null||lastAiReport.trim().isEmpty()){
+            reply.send("Önce bir proje/disiplin raporu oluşturun.");
+            return;
+        }
+        final String report=lastAiReport,title=lastAiReportTitle;
+        aiExecutor.submit(()->{
+            try{
+                File file=word?MusaAiReportExport.docx(getApplicationContext(),title,report)
+                              :MusaAiReportExport.pdf(getApplicationContext(),title,report);
+                String mime=word?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/pdf";
+                runOnUiThread(()->shareFile(file,mime));
+                reply.send((word?"Word (.docx)":"PDF")+" raporu oluşturuldu • "+title);
+            }catch(Exception e){
+                reply.send("Rapor çıktısı oluşturulamadı: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage()));
+            }
+        });
     }
 
     private void shareAiReport(String report){
@@ -2485,6 +2642,7 @@ public class MainActivity extends AppCompatActivity {
         if(c!=RESULT_OK||data==null)return;
         if(r==VIEW_DOCUMENT){handleDocumentImport(data);return;}
         if(data.getData()==null)return;
+        if(r==PICK_ESTIMATE){handleAiEstimatePicked(data.getData());return;}
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
