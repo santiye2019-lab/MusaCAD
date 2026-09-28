@@ -166,6 +166,22 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiVoiceContractTest.java
           java -cp /tmp/musacad-tests MusaAiVoiceContractTest
+      - name: Test MusaCAD multi-discipline project analyzer
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java tests/MusaAiDisciplineAnalyzerTest.java
+          java -cp /tmp/musacad-tests MusaAiDisciplineAnalyzerTest
+      - name: Test MusaCAD detailed discipline BOQ reports
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiDetailedReport.java tests/MusaAiDetailedReportTest.java
+          java -cp /tmp/musacad-tests MusaAiDetailedReportTest
+      - name: Test MusaCAD Word PDF report export integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiReportExportContractTest.java
+          java -cp /tmp/musacad-tests MusaAiReportExportContractTest
+      - name: Test MusaCAD AI report evidence image integration
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiReportEvidenceContractTest.java
+          java -cp /tmp/musacad-tests MusaAiReportEvidenceContractTest
       - name: Test MusaCAD AI automatic project report
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiQuantityTakeoff.java app/src/main/java/com/musa/cad/MusaAiProjectControl.java app/src/main/java/com/musa/cad/MusaAiTableOleAnalysis.java app/src/main/java/com/musa/cad/MusaAiRevisionCompare.java app/src/main/java/com/musa/cad/MusaAiAutoReport.java tests/MusaAiAutoReportTest.java
