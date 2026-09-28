@@ -142,12 +142,8 @@ async function handlePlayVerify(request, env) {
       "UPDATE play_purchases SET verified_at_ms=?,acknowledged_at_ms=? WHERE token_hash=?"
     ).bind(now, now, tokenHash).run();
 
-    await env.DB.prepare(
-      "INSERT INTO ai_entitlements(device_id,kind,expires_at_ms,updated_at_ms) VALUES(?,?,?,?) " +
-      "ON CONFLICT(device_id) DO UPDATE SET kind=excluded.kind,expires_at_ms=excluded.expires_at_ms,updated_at_ms=excluded.updated_at_ms"
-    ).bind(deviceId, "play", expiresAtMs, now).run();
-
-    return json({ status: "active", productId, purpose: "annual_renewal", expiresAtMs, acknowledged: true }, 200);
+    const cloudProof = await signPurposeToken("MP1", deviceId, expiresAtMs, env.MUSACAD_TRIAL_PRIVATE_KEY_PEM);
+    return json({ status: "active", productId, purpose: "annual_renewal", expiresAtMs, acknowledged: true, cloudProof }, 200);
   } catch (_) {
     return json({ status: "server_error", message: "Google Play verification failed" }, 503);
   }
@@ -175,18 +171,8 @@ async function handleAiSession(request, env) {
     entitled = await verifyCompactProof(proof, "MT1", deviceId, now, env.MUSACAD_TRIAL_PUBLIC_KEY_PEM, false);
   } else if (proof.startsWith("MC1.")) {
     entitled = await verifyCompactProof(proof, "MC1", deviceId, now, env.MUSACAD_LICENSE_PUBLIC_KEY_PEM, true);
-  }
-
-  if (!entitled) {
-    try {
-      const row = await env.DB.prepare(
-        "SELECT kind,expires_at_ms FROM ai_entitlements WHERE device_id=? LIMIT 1"
-      ).bind(deviceId).first();
-      const expiry = row ? Number(row.expires_at_ms) : 0;
-      entitled = !!row && Number.isFinite(expiry) && expiry > now;
-    } catch (_) {
-      entitled = false;
-    }
+  } else if (proof.startsWith("MP1.")) {
+    entitled = await verifyCompactProof(proof, "MP1", deviceId, now, env.MUSACAD_TRIAL_PUBLIC_KEY_PEM, false);
   }
 
   if (!entitled) return json({ status: "denied", message: "Active cloud-AI entitlement not found" }, 403);
