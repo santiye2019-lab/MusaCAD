@@ -29,7 +29,8 @@ public final class MusaAiAutoReportTest {
         if(!r.matched)throw new AssertionError("not matched");
         has(r.text,"MUSACAD AI • OTOMATİK PROJE RAPORU");
         has(r.text,"1. METRAJ ÖZETİ");
-        has(r.text,"2. MEKANİK TESİSAT AI ÖZETİ");\n        has(r.text,"3. CAD KALİTE KONTROLÜ");
+        has(r.text,"2. MEKANİK TESİSAT AI ÖZETİ");
+        has(r.text,"3. CAD KALİTE KONTROLÜ");
         has(r.text,"4. GÖMÜLÜ BELGE / OLE");
         has(r.text,"Excel: 1");
         has(r.text,"5. REVİZYON DURUMU");
