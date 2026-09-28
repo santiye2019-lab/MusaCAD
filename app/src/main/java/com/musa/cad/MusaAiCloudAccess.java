@@ -56,6 +56,7 @@ public final class MusaAiCloudAccess {
     }
 
     public static void clear(Context context){
+        MusaAiCloudSession.clear();
         context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().clear().apply();
     }
 
