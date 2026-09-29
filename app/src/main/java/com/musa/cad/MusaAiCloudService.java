@@ -58,6 +58,19 @@ public final class MusaAiCloudService {
     }
 
     public static Result analyze(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt){
+        return analyzeInternal(context,index,fileName,rawPrompt,null);
+    }
+
+    public static Result analyzePackage(Context context,MusaAiDrawingIndex index,String fileName,
+                                        Collection<MusaAiProjectPackage.Drawing>drawings,String rawPrompt){
+        if(drawings==null||drawings.isEmpty())
+            return new Result(Status.INVALID_RESPONSE,"","Proje Paketi bağlamı hazırlanamadı",null,false);
+        MusaAiProjectPackage.Result local=MusaAiProjectPackage.generate(drawings,"proje paketi");
+        String packageJson=MusaAiCadPackageJson.build(drawings,local.matched?local.text:"");
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson);
+    }
+
+    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt,String packageJson){
         if(context==null||index==null)return new Result(Status.INVALID_RESPONSE,"","Çizim bağlamı hazırlanamadı",null,false);
 
         String endpoint=BuildConfig.AI_API_URL==null?"":BuildConfig.AI_API_URL.trim();
@@ -95,6 +108,8 @@ public final class MusaAiCloudService {
             if(expertProfile.isEmpty())expertProfile=MusaAiDisciplineExpert.cloudProfile(rawPrompt);
             if(!expertProfile.isEmpty())body.put("expertProfile",expertProfile);
             body.put("cad",new JSONObject(MusaAiCadJson.build(index,fileName)));
+            if(packageJson!=null&&!packageJson.trim().isEmpty())
+                body.put("cadPackage",new JSONObject(packageJson));
             JSONObject client=new JSONObject();
             client.put("app","MusaCAD");
             client.put("versionName",BuildConfig.VERSION_NAME);

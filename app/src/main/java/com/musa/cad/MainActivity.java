@@ -23,7 +23,7 @@ import java.util.concurrent.*;
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36;
     private static final int MAX_OPEN_PROJECTS=4;
-    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1";
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
@@ -1225,16 +1225,24 @@ public class MainActivity extends AppCompatActivity {
             reply.send("Gandalf AI için tam vektör DWG/DXF çiziminin hazırlanması gerekiyor.");
             return;
         }
+        boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
-        if(prefs.getBoolean(K_CLOUD_CONSENT,false)){
+        String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:K_CLOUD_CONSENT;
+        if(prefs.getBoolean(consentKey,false)){
             runMusaAiCloud(raw,reply);
             return;
         }
+        String scope=packageMode
+            ?"Derin analiz için açık vektör proje paketindeki çizimlerin sınırlı CAD-JSON özetleri güvenli MusaCAD sunucusuna gönderilir."
+            :"Derin analiz için aktif çizimin sınırlı CAD-JSON özeti güvenli MusaCAD sunucusuna gönderilir.";
+        String edit=packageMode
+            ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
+            :" Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz.";
         new AlertDialog.Builder(this)
-            .setTitle("Gandalf Cloud AI")
-            .setMessage("Derin analiz için aktif çizimin sınırlı CAD-JSON özeti güvenli MusaCAD sunucusuna gönderilir. Ham DWG/DXF dosyası varsayılan olarak gönderilmez. Katman adları, çizim metinleri, nesne türleri ve ölçü bilgileri bulut AI tarafından işlenebilir. Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz. Devam edilsin mi?")
+            .setTitle(packageMode?"Gandalf • Proje Paketi":"Gandalf Cloud AI")
+            .setMessage(scope+" Ham DWG/DXF dosyaları gönderilmez. Katman adları, çizim metinleri, nesne türleri ve ölçü bilgileri bulut AI tarafından işlenebilir."+edit+" Devam edilsin mi?")
             .setPositiveButton("DEVAM",(d,w)->{
-                prefs.edit().putBoolean(K_CLOUD_CONSENT,true).apply();
+                prefs.edit().putBoolean(consentKey,true).apply();
                 runMusaAiCloud(raw,reply);
             })
             .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf Cloud AI isteği iptal edildi. Yerel MusaCAD AI çevrimdışı kullanılmaya devam edebilir."))
@@ -1245,9 +1253,15 @@ public class MainActivity extends AppCompatActivity {
     private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply){
         final MusaAiDrawingIndex snapshot=currentAiDrawingIndex();
         final String displayName=currentDisplayName;
+        final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
+        final List<MusaAiProjectPackage.Drawing> packageDrawings=packageMode
+            ?Collections.unmodifiableList(new ArrayList<>(currentAiProjectPackageDrawings()))
+            :Collections.emptyList();
         if(snapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
         aiExecutor.submit(()->{
-            MusaAiCloudService.Result cloud=MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+            MusaAiCloudService.Result cloud=packageMode
+                ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
+                :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
             if(!cloud.ok()){
                 reply.send(cloud.message.isEmpty()?"Gandalf AI isteği tamamlanamadı.":cloud.message);
                 return;
@@ -1256,6 +1270,8 @@ public class MainActivity extends AppCompatActivity {
             StringBuilder out=new StringBuilder();
             if(MusaAiSessionService.developerCached())
                 out.append("Gandalf Developer • Yönetici modu aktif\n\n");
+            if(packageMode)
+                out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
             out.append(cloud.text);
             if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
             if(!cloud.sources.isEmpty()){
@@ -1268,7 +1284,10 @@ public class MainActivity extends AppCompatActivity {
                     out.append(source.url);
                 }
             }
-            if(!cloud.actions.isEmpty()){
+            if(packageMode&&!cloud.actions.isEmpty()){
+                pendingAiActions=Collections.emptyList();
+                out.append("\n\n• Güvenlik: Proje Paketi modunda gelen çizim işlem önerileri uygulanmadı.");
+            }else if(!cloud.actions.isEmpty()){
                 out.append("\n\nÖnerilen çizim işlemleri (henüz uygulanmadı):");
                 int shown=0;
                 for(MusaAiCloudService.Action action:cloud.actions){
@@ -1282,7 +1301,7 @@ public class MainActivity extends AppCompatActivity {
                     out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
             }
             reply.send(out.toString());
-            if(!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
+            if(!packageMode&&!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
                 runOnUiThread(()->showPendingGandalfActions(reply,false));
         });
     }

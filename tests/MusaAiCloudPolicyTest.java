@@ -5,6 +5,9 @@ public final class MusaAiCloudPolicyTest {
     private static void no(boolean value,String message){if(value)throw new AssertionError(message);}
     public static void main(String[]args){
         yes(MusaAiCloudPolicy.shouldUseCloud("Gandalf, bu projeyi derin analiz et"),"Gandalf prefix");
+        yes(MusaAiCloudPolicy.shouldUseProjectPackage("Gandalf, bu projeyi tüm disiplinlerde derin analiz et"),"all disciplines package");
+        yes(MusaAiCloudPolicy.shouldUseProjectPackage("Gandalf proje paketi kontrolü"),"package phrase");
+        no(MusaAiCloudPolicy.shouldUseProjectPackage("GSTATIKAI_OPENINGS"),"single discipline expert stays active drawing");
         yes(MusaAiCloudPolicy.shouldUseCloud("Bu projeyi güncel kaynaklarla derin analiz et"),"deep cloud intent");
         yes(MusaAiCloudPolicy.shouldUseCloud("GMEKAI_FIRE"),"GMEKAI cloud expert route");
         yes(MusaAiCloudPolicy.allowEditProposals("GMEKAI_VRF"),"GMEKAI exposes proposal tools");
