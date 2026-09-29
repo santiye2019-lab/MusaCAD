@@ -123,3 +123,28 @@ Android production build ortamı:
 - `MUSACAD_AI_API_URL=https://<ai-worker>/v1/analyze`
 
 OpenAI API anahtarı hiçbir zaman APK'ya, GitHub repository dosyasına, issue'ya veya istemci BuildConfig alanına yazılmaz. Gandalf'ın yerel CAD araçları production APK'da Cloud AI olmadan da çalışır. Cloud AI etkinleştirilecekse `MUSACAD_AI_SESSION_URL` ve `MUSACAD_AI_API_URL` birlikte ve HTTPS olarak verilmelidir; tek endpoint verilirse production build durur.
+
+
+## 7. Tek tık Gandalf Cloud kurulumu
+
+Repo içinde `.github/workflows/deploy-gandalf-ai.yml` workflow'u bulunur. Bu akış:
+
+1. Mevcut lisans Worker'ındaki `/v1/ai/session` endpoint'ini kontrol eder.
+2. `server/ai-worker` kodunu Cloudflare Workers'a `musacad-ai` adıyla deploy eder.
+3. `OPENAI_API_KEY` ve AI-session public key'ini yalnız Worker secret olarak yükler.
+4. Worker health endpoint'ini doğrular.
+5. Bulunan gerçek HTTPS Gandalf endpoint'lerini yalnız o build için Android'e geçirir.
+6. Gandalf Cloud etkin production APK'yı üretip artifact olarak yükler.
+
+Bu workflow için mevcut MusaCAD signing/trial secret'larına ek olarak yalnız şu yeni GitHub repository secret'ları gerekir:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `OPENAI_API_KEY`
+
+Cloudflare API token'ı yalnız ilgili hesaptaki Workers deploy yetkileriyle sınırlandırılmalıdır. OpenAI API anahtarı APK'ya yazılmaz; sadece `musacad-ai` Worker secret'ı olarak kullanılır.
+
+Workflow varsayılan olarak `gpt-5.6-sol` modelini Responses API üzerinden kullanır. Model daha sonra Worker config'inde değiştirilebilir.
+
+Ayrıca `Gandalf session backend probe` workflow'u mevcut lisans Worker'ında `/v1/ai/session` route'unun gerçekten yayında olup olmadığını kontrol eder. Probe HTTP 404 döndürürse trial/license Worker'ın güncel `server/trial-worker` koduyla yeniden deploy edilmesi gerekir. HTTP 503 ise AI-session imzalama/configuration secret'ları eksiktir.
+
