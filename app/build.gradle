@@ -27,10 +27,10 @@ def verifyCommonProductionRelease = {
     if (!musaTrialPublicKeyPem.contains('-----BEGIN PUBLIC KEY-----') || !musaTrialPublicKeyPem.contains('-----END PUBLIC KEY-----')) {
         throw new GradleException('Production MusaCAD release requires MUSACAD_TRIAL_PUBLIC_KEY_PEM')
     }
-    if ((musaAiApiUrl && !musaAiSessionUrl) || (!musaAiApiUrl && musaAiSessionUrl)) {
-        throw new GradleException('MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL must be configured together')
+    if (!musaAiApiUrl || !musaAiSessionUrl) {
+        throw new GradleException('Production MusaCAD requires MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL so Gandalf is not shipped disabled')
     }
-    if (musaAiApiUrl && (!musaAiApiUrl.startsWith('https://') || !musaAiSessionUrl.startsWith('https://'))) {
+    if (!musaAiApiUrl.startsWith('https://') || !musaAiSessionUrl.startsWith('https://')) {
         throw new GradleException('MusaCAD AI endpoints must use HTTPS')
     }
     File paidPublicKey = file('src/main/assets/MUSACAD-LICENSE-PUBLIC.pem')
