@@ -24,7 +24,10 @@ public final class MusaAiQuantityTakeoffTest {
     }
     private static void has(String s,String n){if(!s.contains(n))throw new AssertionError("missing "+n+" in "+s);}
     public static void main(String[]args){
-        has(ask("bu projede metraj çıkar"),"Metraj özeti");
+        has(ask("bu projede metraj çıkar"),"Metraj raporu");
+        has(ask("bu projede metraj çıkar"),"ÇİZGİSEL METRAJ");
+        has(ask("bu projede metraj çıkar"),"Pis su • PIS_SU");
+        has(ask("bu projede metraj çıkar"),"0,022 m");
         has(ask("PIS_SU katmanının toplam uzunluğu nedir"),"22");
         has(ask("SIHHI_CIHAZ katmanında kaç daire var"),"Adet: 2");
         has(ask("kapalı polylinelerin toplam alanı"),"20");
