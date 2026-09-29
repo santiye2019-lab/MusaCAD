@@ -319,6 +319,8 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Zımbalama kontrol çevresini kontrol et"),"punching-perimeter focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Burkulma boyunu kontrol et"),"steel-effective-length focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Çelik kesit sınıfını kontrol et"),"steel-section-classification focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Zımbalama kontrol çevresini kontrol et"),"punching-perimeter focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Burkulma boyunu kontrol et"),"steel-effective-length focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Tasarım kombinasyonlarını kontrol et"),"design-combo focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Design overwrite kontrol et"),"design-overwrite focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sismik izolatör atamalarını kontrol et"),"isolator focus must require report");
