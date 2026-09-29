@@ -991,7 +991,7 @@ public final class MusaAiStructuralCalc {
                 "collector","drag strut","diyafram kiri","diaphragm chord","chord force",
                 "dusey deprem","dikey deprem","vertical earthquake","vertical seismic","vertical response spectrum",
                 "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
-                "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","ex","ey","rsx","rsy",
+                "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","ex","ey","rsx","rsy",
                 "r d i","r/d/i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor",
                 "etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier",
                 "rijitlik carpani","rijitlik çarpanı","property modifier","section modifier",
@@ -1001,7 +1001,7 @@ public final class MusaAiStructuralCalc {
                 "hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load",
                 "sehim","deflection","servisabilite","serviceability",
                 "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
-                "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case"))
+                "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case"))
                 addUnique(loads,t);
         }
     }
