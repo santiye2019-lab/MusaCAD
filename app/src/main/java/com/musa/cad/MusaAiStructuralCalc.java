@@ -614,12 +614,31 @@ public final class MusaAiStructuralCalc {
         return m.find()?m.group(1).toUpperCase(Locale.ROOT)+m.group(2)+(m.group(3)==null?"":m.group(3).toUpperCase(Locale.ROOT)):"";
     }
     private static void collectSections(String raw,Set<String>out){
-        Matcher m=SECTION.matcher(raw==null?"":raw);
-        while(m.find()&&out.size()<250)out.add(section(m.group(1),m.group(2)));
+        String value=raw==null?"":raw;
+        Matcher m=SECTION.matcher(value);
+        while(m.find()&&out.size()<250){
+            if(isNonSectionDimension(value,m.start()))continue;
+            out.add(section(m.group(1),m.group(2)));
+        }
     }
     private static String firstSection(String raw){
-        Matcher m=SECTION.matcher(raw==null?"":raw);
-        return m.find()?section(m.group(1),m.group(2)):"";
+        String value=raw==null?"":raw;
+        Matcher m=SECTION.matcher(value);
+        while(m.find()){
+            if(isNonSectionDimension(value,m.start()))continue;
+            return section(m.group(1),m.group(2));
+        }
+        return "";
+    }
+    private static boolean isNonSectionDimension(String raw,int start){
+        if(raw==null||start<0)return false;
+        if(start>0){
+            char c=raw.charAt(start-1);
+            if(c=='Ø'||c=='Φ'||c=='ø')return true;
+        }
+        int from=Math.max(0,start-48);
+        String prefix=MusaAiDrawingIndex.normalize(raw.substring(from,start));
+        return has(prefix,"rezervasyon","bosluk","saft","opening","sleeve","zimbalama donatisi","punching reinforcement");
     }
     private static void collectDiameters(String raw,Set<String>out){
         Matcher m=REBAR_DIAMETER.matcher(raw==null?"":raw);
