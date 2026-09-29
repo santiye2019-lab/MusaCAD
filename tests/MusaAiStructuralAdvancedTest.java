@@ -585,6 +585,12 @@ public final class MusaAiStructuralAdvancedTest {
             "steel-section-classification focus must only return ST-113");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
+        require(result.text.contains("KATEGORİ ÖZETİ"),"structural category summary missing");
+        require(result.text.contains("PROJE / KOORDİNASYON"),"coordination category missing");
+        require(result.text.contains("DEPREM / DİNAMİK ANALİZ"),"seismic/dynamic category missing");
+        require(result.text.contains("ZEMİN / TEMEL"),"foundation/geotechnical category missing");
+        require(result.text.contains("TAŞIYICI TASARIM / DAYANIM"),"design category missing");
+        require(result.text.contains("MODEL BÜTÜNLÜĞÜ / ATAMALAR"),"model-integrity category missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
         System.out.println("MusaAiStructuralAdvancedTest OK");
     }
