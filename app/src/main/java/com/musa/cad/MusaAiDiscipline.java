@@ -73,7 +73,12 @@ public enum MusaAiDiscipline {
             "shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı",
             "pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama",
             "design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı",
-            "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama"))return STRUCTURAL;
+            "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama",
+            "load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi",
+            "response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü",
+            "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
+            "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
+            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
