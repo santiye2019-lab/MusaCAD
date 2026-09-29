@@ -11,13 +11,19 @@ public final class MusaAiStructuralCalculationTest {
                 new MusaAiDrawingIndex.Item(2,"TEXT","S_KIRIS","K12 KİRİŞ 25/50 C30 B420C Ø12"),
                 new MusaAiDrawingIndex.Item(3,"TEXT","S_TEMEL","RADYE TEMEL C30 B420C")
             ),"cm");
-        String report="STATİK HESAP RAPORU\nBeton sınıfı C35, donatı B420C. K1 kolon 30x60, K12 kiriş 25/50. Ø16 Ø12. Radye temel. Deprem spektrum SDS 1.0. Yük kombinasyonları G+Q. Modal periyot.";
+        String report="STATİK HESAP RAPORU\nBeton sınıfı C35, donatı B420C. K1 kolon 30x60, K12 kiriş 25/50. Ø16 Ø12. Radye temel. KOT +3.20. Deprem spektrum SDS 1.0. Yük kombinasyonları G+Q. Modal periyot.";
         MusaAiStructuralCalculation.Result r=MusaAiStructuralCalculation.compare(drawing,"hesap.docx",report);
         has(r.text,"STATİK PROJE ↔ HESAP RAPORU KARŞILAŞTIRMASI");
         has(r.text,"Beton sınıfı — UYUŞMAZLIK ADAYI");
         has(r.text,"Donatı çeliği sınıfı — UYUMLU");
         has(r.text,"30X60");
         has(r.text,"Deprem / spektrum parametreleri: metin ipucu bulundu");
+        for(MusaAiStructuralCalculation.Check c:r.checks){
+            if(c.field.equals("Kot / seviye")&&c.reportValue.contains("1.0"))
+                throw new AssertionError("SDS value must not be parsed as elevation: "+c.reportValue);
+            if(c.field.equals("Eleman etiketi")&&(c.reportValue.contains("C35")||c.reportValue.contains("B420C")))
+                throw new AssertionError("material class must not be parsed as element label: "+c.reportValue);
+        }
         if(r.mismatched<1)throw new AssertionError("expected mismatch");
         System.out.println("MusaAiStructuralCalculationTest OK");
     }
