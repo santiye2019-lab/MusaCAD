@@ -63,7 +63,12 @@ public enum MusaAiDiscipline {
             "support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint",
             "diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned",
             "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
-            "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier"))return STRUCTURAL;
+            "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier",
+            "unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz",
+            "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
+            "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
+            "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış",
+            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -120,7 +125,12 @@ public enum MusaAiDiscipline {
             "support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint",
             "diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned",
             "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
-            "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier"))return STRUCTURAL;
+            "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier",
+            "unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz",
+            "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
+            "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
+            "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış",
+            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;
