@@ -40,6 +40,18 @@ public final class DxfBlocks {
         Placement(Record record,Transform transform,String layer,String layout,int color,String lineType,double lineTypeScale,int lineWeight,boolean directRoot,String[] visibilityLayerKeys){this.record=record;this.transform=transform;this.layer=layer;this.layout=normalizeLayout(layout);this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=lineTypeScale;this.lineWeight=lineWeight;this.blockScale=transform.scale();this.directRoot=directRoot;this.visibilityLayerKeys=visibilityLayerKeys==null?new String[0]:visibilityLayerKeys.clone();}
     }
 
+    /** Root INSERT metadata kept separately from expanded block geometry for quantity takeoff. */
+    public static final class BlockInsertion {
+        public final String name,layer,layout;
+        public final int count;
+        BlockInsertion(String name,String layer,String layout,int count){
+            this.name=name==null?"":name.trim();
+            this.layer=layer==null?"":layer.trim();
+            this.layout=normalizeLayout(layout);
+            this.count=Math.max(1,count);
+        }
+    }
+
     private static final class Block{
         final Record header;final List<Record>members=new ArrayList<>();
         File file;Charset charset;long offset;int offsetLine;
@@ -53,7 +65,7 @@ public final class DxfBlocks {
     }
 
     public static final class Result {
-        public final List<Placement>placements=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
+        public final List<Placement>placements=new ArrayList<>();public final List<BlockInsertion>blockInsertions=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
         public int skipped,units;public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
         public boolean layerInitiallyVisible(String layer){return !initiallyHiddenLayerKeys.contains(DxfLayerState.key(layer));}
     }
@@ -207,6 +219,10 @@ public final class DxfBlocks {
         int columns=r.integer(70,1),rows=r.integer(71,1);
         if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
         double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        if(directRoot){
+            String rawName=r.text(2,"").trim();
+            if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
+        }
         double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
         // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
