@@ -36,6 +36,13 @@ public final class MusaAiQuantityTakeoff {
         double length,area;
     }
 
+    private static final class LayerStats {
+        final String layer;
+        int entities,lengthCount,areaCount,countable;
+        double length,area;
+        LayerStats(String layer){this.layer=layer==null||layer.trim().isEmpty()?"0":layer.trim();}
+    }
+
     public static Answer answer(MusaAiDrawingIndex index,String raw){
         if(index==null)return Answer.none();
         String q=MusaAiDrawingIndex.normalize(raw);
@@ -73,12 +80,126 @@ public final class MusaAiQuantityTakeoff {
     }
 
     private static String summary(MusaAiDrawingIndex index){
-        Filter all=new Filter();Stats s=stats(index,all);
-        return "Metraj özeti • "+index.layout+
-            "\n• Görünür indekslenen nesne: "+index.items().size()+
-            "\n• Çizgisel ölçüsü alınabilen: "+s.lengthCount+" • toplam "+number(s.length)+" "+unit(index)+
-            "\n• Kapalı alanı hesaplanabilen: "+s.areaCount+" • toplam "+number(s.area)+" "+areaUnit(index)+
-            "\nBelirli bir katman/tür için “PIS_SU katmanının toplam uzunluğu” veya “kapalı polylinelerin alanı” diye sorabilirsiniz.";
+        LinkedHashMap<String,LayerStats> byLayer=new LinkedHashMap<>();
+        for(MusaAiDrawingIndex.Item item:index.items()){
+            if(item==null||isAnnotation(item.type))continue;
+            String key=item.layer==null?"":item.layer.trim();
+            LayerStats s=byLayer.get(key);
+            if(s==null){s=new LayerStats(key);byLayer.put(key,s);}
+            s.entities++;
+            if(isLinearTakeoff(item)){s.length+=item.length;s.lengthCount++;}
+            if(isAreaTakeoff(item)){s.area+=item.area;s.areaCount++;}
+            if(isCountable(item.type))s.countable++;
+        }
+
+        double metersPerUnit=metersPerUnit(index.unitName);
+        boolean physical=Double.isFinite(metersPerUnit)&&metersPerUnit>0d;
+        ArrayList<LayerStats> linear=new ArrayList<>(),areas=new ArrayList<>(),counts=new ArrayList<>();
+        for(LayerStats s:byLayer.values()){
+            if(s.lengthCount>0)linear.add(s);
+            if(s.areaCount>0)areas.add(s);
+            if(s.countable>0)counts.add(s);
+        }
+        linear.sort((a,b)->Double.compare(b.length,a.length));
+        areas.sort((a,b)->Double.compare(b.area,a.area));
+        counts.sort((a,b)->Integer.compare(b.countable,a.countable));
+
+        StringBuilder out=new StringBuilder();
+        out.append("Metraj raporu • ").append(index.layout);
+        if(!physical){
+            out.append("\n⚠ DWG birimi tanımsız. Uzunluk/alanı metreye çevirmeden ham toplam göstermiyorum.");
+            out.append("\nBirim/ölçek doğrulandıktan sonra boru, kanal ve alan metrajı m / m² olarak hesaplanacak.");
+        }else{
+            appendLinear(out,linear,metersPerUnit);
+            appendAreas(out,areas,metersPerUnit*metersPerUnit);
+        }
+        appendCounts(out,counts);
+        if(linear.isEmpty()&&areas.isEmpty()&&counts.isEmpty())
+            out.append("\nMetraja uygun çizgisel, kapalı alan veya sayılabilir blok bulunamadı.");
+        out.append("\nNot: Metin, ölçülendirme, hatch ve yardımcı geometri genel metraja dahil edilmez.");
+        return out.toString();
+    }
+
+    private static void appendLinear(StringBuilder out,List<LayerStats> rows,double scale){
+        if(rows.isEmpty())return;
+        out.append("\n\nÇİZGİSEL METRAJ");
+        int shown=0;
+        for(LayerStats s:rows){
+            if(shown++>=12){out.append("\n• … diğer katmanlar");break;}
+            out.append("\n• ").append(layerLabel(s.layer)).append(": ")
+                .append(number(s.length*scale)).append(" m")
+                .append(" • ").append(s.lengthCount).append(" parça");
+        }
+    }
+
+    private static void appendAreas(StringBuilder out,List<LayerStats> rows,double scale){
+        if(rows.isEmpty())return;
+        out.append("\n\nALAN METRAJI");
+        int shown=0;
+        for(LayerStats s:rows){
+            if(shown++>=8){out.append("\n• … diğer katmanlar");break;}
+            out.append("\n• ").append(layerLabel(s.layer)).append(": ")
+                .append(number(s.area*scale)).append(" m²")
+                .append(" • ").append(s.areaCount).append(" kapalı sınır");
+        }
+    }
+
+    private static void appendCounts(StringBuilder out,List<LayerStats> rows){
+        if(rows.isEmpty())return;
+        out.append("\n\nADET / EKİPMAN");
+        int shown=0;
+        for(LayerStats s:rows){
+            if(shown++>=12){out.append("\n• … diğer katmanlar");break;}
+            out.append("\n• ").append(layerLabel(s.layer)).append(": ")
+                .append(s.countable).append(" adet");
+        }
+    }
+
+    private static boolean isAnnotation(String type){
+        return "TEXT".equals(type)||"MTEXT".equals(type)||"ATTRIB".equals(type)||"ATTDEF".equals(type)||
+            "DIMENSION".equals(type)||"HATCH".equals(type)||"XLINE".equals(type)||"RAY".equals(type)||
+            "VIEWPORT".equals(type)||"OLE2FRAME".equals(type)||"IMAGE".equals(type);
+    }
+
+    private static boolean isLinearTakeoff(MusaAiDrawingIndex.Item item){
+        if(item==null||!item.hasLength())return false;
+        return "LINE".equals(item.type)||"LWPOLYLINE".equals(item.type)||"POLYLINE".equals(item.type)||
+            "ARC".equals(item.type)||"SPLINE".equals(item.type)||"ELLIPSE".equals(item.type);
+    }
+
+    private static boolean isAreaTakeoff(MusaAiDrawingIndex.Item item){
+        if(item==null||!item.hasArea())return false;
+        return item.closedKnown&&item.closed&&("LWPOLYLINE".equals(item.type)||"POLYLINE".equals(item.type));
+    }
+
+    private static boolean isCountable(String type){
+        return "INSERT".equals(type)||"MINSERT".equals(type)||"POINT".equals(type);
+    }
+
+    private static String layerLabel(String layer){
+        String clean=layer==null||layer.trim().isEmpty()?"0":layer.trim();
+        String n=MusaAiDrawingIndex.normalize(clean);
+        String semantic="";
+        if(contains(n,"pis su","atiksu","atik su","waste"))semantic="Pis su";
+        else if(contains(n,"temiz su","soguk su","sicak su","domestic"))semantic="Temiz su";
+        else if(contains(n,"yangin","sprinkler","fire"))semantic="Yangın";
+        else if(contains(n,"dogalgaz","dogal gaz","gaz"))semantic="Doğalgaz";
+        else if(contains(n,"havalandirma","hava kanali","kanal","duct"))semantic="Havalandırma";
+        else if(contains(n,"vrf","klima","iklimlendirme","hvac"))semantic="İklimlendirme";
+        else if(contains(n,"sihhi cihaz","lavabo","klozet","urinal","fixture"))semantic="Sıhhi cihaz";
+        else if(contains(n,"vana","valf","valve"))semantic="Vana";
+        else if(contains(n,"drenaj","kondens"))semantic="Drenaj";
+        return semantic.isEmpty()?clean:semantic+" • "+clean;
+    }
+
+    private static double metersPerUnit(String raw){
+        String u=raw==null?"":raw.trim().toLowerCase(Locale.ROOT);
+        switch(u){
+            case "mm":return .001d;case "cm":return .01d;case "m":return 1d;case "km":return 1000d;
+            case "in":return .0254d;case "ft":return .3048d;case "yd":return .9144d;
+            case "us-in":return .0254000508001016d;case "us-ft":return .3048006096012192d;case "us-yd":return .9144018288036576d;
+            default:return Double.NaN;
+        }
     }
 
     private static Stats stats(MusaAiDrawingIndex index,Filter filter){
