@@ -1906,7 +1906,7 @@ public class MainActivity extends AppCompatActivity {
             try(InputStream in=getContentResolver().openInputStream(uri)){
                 if(in==null)throw new IOException("Statik hesap raporu açılamadı");
                 String extracted;
-                if(kind==CadDocumentSupport.Kind.PDF)extracted=MusaAiPdfTextExtractor.extract(in);
+                if(kind==CadDocumentSupport.Kind.PDF)extracted=MusaAiPdfBoxTextExtractor.extract(getApplicationContext(),in);
                 else if(kind==CadDocumentSupport.Kind.DOCX||kind==CadDocumentSupport.Kind.XLSX||
                         kind==CadDocumentSupport.Kind.CSV||kind==CadDocumentSupport.Kind.TEXT)
                     extracted=OfficeTextExtractor.extract(in,name,mime);
