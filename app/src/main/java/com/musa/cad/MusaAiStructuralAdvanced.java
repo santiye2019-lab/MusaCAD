@@ -236,7 +236,7 @@ public final class MusaAiStructuralAdvanced {
             "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
             "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
             "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı",
-            "object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame",
+            "object property compatibility","property type mismatch","wrong property type","property tip","property uyumluluk","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame",
             "shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı",
             "pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama",
             "design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı",
@@ -358,7 +358,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))ids.add("ST-81");
         if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))ids.add("ST-82");
         if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))ids.add("ST-83");
-        if(has(q,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))ids.add("ST-84");
+        if(has(q,"object property compatibility","property type mismatch","wrong property type","property tip","property uyumluluk","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))ids.add("ST-84");
         if(has(q,"shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı"))ids.add("ST-85");
         if(has(q,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama"))ids.add("ST-86");
         if(has(q,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı"))ids.add("ST-87");
@@ -435,7 +435,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))return "KAT KOTU / KOORDİNAT";
         if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))return "ANALİZ CASE DURUMU";
         if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))return "LOAD CASE / KOMBİNASYON REFERANSI";
-        if(has(q,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))return "ELEMAN / PROPERTY TİP UYUMLULUĞU";
+        if(has(q,"object property compatibility","property type mismatch","wrong property type","property tip","property uyumluluk","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))return "ELEMAN / PROPERTY TİP UYUMLULUĞU";
         if(has(q,"shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı"))return "SHELL / ALAN KALINLIK ATAMASI";
         if(has(q,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama"))return "PIER / SPANDREL ATAMALARI";
         if(has(q,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı"))return "TASARIM PROSEDÜRÜ / KAPSAMI";
@@ -1829,7 +1829,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void objectPropertyCompatibilityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame");
+        List<String>cues=serviceReportCues(calc,"object property compatibility","property type mismatch","wrong property type","property tip","property uyumluluk","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame");
         if(cues.isEmpty()){
             out.add(new Finding("ST-84",Status.DOGRULANAMADI,"Eleman / property tipi uyumluluğu okunamadı",
                 "Model raporundan frame/area/shell nesnesi ile atanan property tipinin uyumuna ilişkin açık kontrol satırı ayrıştırılamadı.",
