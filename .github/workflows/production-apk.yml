@@ -21,6 +21,8 @@ jobs:
       MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
       MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
       MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+      MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in             MUSACAD_RELEASE_KEYSTORE_B64             MUSACAD_KEYSTORE_PASSWORD             MUSACAD_KEY_ALIAS             MUSACAD_KEY_PASSWORD             MUSACAD_TRIAL_API_URL             MUSACAD_TRIAL_PUBLIC_KEY_PEM; do
+          for name in             MUSACAD_RELEASE_KEYSTORE_B64             MUSACAD_KEYSTORE_PASSWORD             MUSACAD_KEY_ALIAS             MUSACAD_KEY_PASSWORD             MUSACAD_TRIAL_API_URL             MUSACAD_TRIAL_PUBLIC_KEY_PEM             MUSACAD_AI_API_URL             MUSACAD_AI_SESSION_URL; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required production secret: $name"
               exit 1
@@ -50,6 +52,14 @@ jobs:
           case "$MUSACAD_TRIAL_API_URL" in
             https://*) ;;
             *) echo "::error::MUSACAD_TRIAL_API_URL must be HTTPS"; exit 1 ;;
+          esac
+          case "$MUSACAD_AI_API_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_AI_API_URL must be HTTPS"; exit 1 ;;
+          esac
+          case "$MUSACAD_AI_SESSION_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_AI_SESSION_URL must be HTTPS"; exit 1 ;;
           esac
 
       - name: Prepare production signing keystore
@@ -99,6 +109,7 @@ jobs:
             echo "- Debuggable: false"
             echo "- Signing: production keystore"
             echo "- Trial backend: production HTTPS endpoint"
+            echo "- Gandalf AI: production HTTPS analyze + session endpoints"
             echo "- SHA-256:"
             echo '  `'$(cut -d' ' -f1 /tmp/MusaCAD-v1.2.0-direct-production.sha256)'`'
           } >> "$GITHUB_STEP_SUMMARY"
