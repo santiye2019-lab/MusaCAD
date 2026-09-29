@@ -74,6 +74,14 @@ jobs:
           OPENAI_MAX_OUTPUT_TOKENS = "3200"
           EOF
 
+      - name: Bootstrap Gandalf Worker
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest deploy --name musacad-ai >/tmp/gandalf-bootstrap.log 2>&1
+          cat /tmp/gandalf-bootstrap.log
+
       - name: Install Gandalf Worker secrets
         shell: bash
         working-directory: server/ai-worker
