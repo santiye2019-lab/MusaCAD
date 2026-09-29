@@ -812,7 +812,7 @@ public final class MusaAiStructuralAdvanced {
         return r.kind!=Kind.OTHER||has(r.q,"statik","betonarme","tasiyici","donati","rezervasyon","bosluk","dilatasyon","zimbalama","kazik","radye",
             "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid",
             "doseme sureksiz","slab discontinuity","bodrum perdesi","basement wall","cevre perdesi",
-            "zemin tasima gucu","zemin emniyet gerilmesi","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
+            "zemin sinifi","zemin tasima gucu","zemin emniyet gerilmesi","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
     }
 
     private static Kind kind(String q,String tag){
