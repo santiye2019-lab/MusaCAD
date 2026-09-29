@@ -88,6 +88,32 @@ public final class MusaAiStructuralCalcTest {
         has(floorCmp.text,"Aks: rapor B-4 • DWG B-5");
         has(floorCmp.text,"Kesit: rapor 30x60 • DWG 30x55");
 
+        String rebarReport=
+            "1. KAT\n"+
+            "AKS A-1 K7 30x60 C30 B420C ALT 4Ø16 ÜST 2Ø14 ETRİYE Ø8/20\n"+
+            "AKS B-2 S7 40x40 C30 B420C 8Ø18 ETRİYE Ø8/15\n";
+        MusaAiStructuralCalc.Model rebarModel=MusaAiStructuralCalc.parse("donati-hesap.pdf",rebarReport);
+        yes(rebarModel.elements.size()==2,"two reinforcement-aware elements expected");
+        yes(rebarModel.elements.get(0).longitudinalRebar.contains("ALT:4Ø16"),"bottom longitudinal reinforcement missing");
+        yes(rebarModel.elements.get(0).longitudinalRebar.contains("ÜST:2Ø14"),"top longitudinal reinforcement missing");
+        yes(rebarModel.elements.get(0).stirrups.contains("ETRİYE:Ø8/20"),"stirrup spacing missing");
+        yes(rebarModel.elements.get(1).longitudinalRebar.contains("GENEL:8Ø18"),"general longitudinal reinforcement missing");
+
+        MusaAiDrawingIndex rebarIndex=new MusaAiDrawingIndex("Statik",2,0,
+            Arrays.asList("S_KIRIS","S_KOLON"),
+            Arrays.asList("S_KIRIS","S_KOLON"),
+            Arrays.asList(
+                new MusaAiDrawingIndex.Item(31,"TEXT","S_KIRIS","1. KAT AKS A-1 K7 30x60 C30 B420C ALT 4Ø16 ÜST 2Ø14 ETRİYE Ø8/20",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(32,"TEXT","S_KOLON","1. KAT AKS B-2 S7 40x40 C30 B420C 6Ø18 ETRİYE Ø8/20",Double.NaN,Double.NaN)
+            ),"cm");
+
+        MusaAiStructuralCalc.Comparison rebarCmp=MusaAiStructuralCalc.compare(rebarIndex,rebarModel);
+        yes(rebarCmp.sameElements==1,"K7 reinforcement should match exactly");
+        yes(rebarCmp.differentElements==1,"S7 reinforcement should differ");
+        yes(rebarCmp.sourceIds.contains(32),"rebar mismatch source should be highlighted");
+        has(rebarCmp.text,"Boyuna donatı: rapor GENEL:8Ø18 • DWG GENEL:6Ø18");
+        has(rebarCmp.text,"Etriye: rapor ETRİYE:Ø8/15 • DWG ETRİYE:Ø8/20");
+
         yes(MusaAiStructuralCalc.isEngineeringTextExtension("model.e2k"),"e2k should be accepted");
         System.out.println("MusaAiStructuralCalcTest OK");
     }
