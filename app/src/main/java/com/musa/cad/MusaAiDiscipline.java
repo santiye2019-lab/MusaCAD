@@ -93,7 +93,12 @@ public enum MusaAiDiscipline {
             "design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları",
             "design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer",
             "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
-            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))return STRUCTURAL;
+            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu",
+            "rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı",
+            "design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit",
+            "punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi",
+            "unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy",
+            "section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;

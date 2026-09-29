@@ -177,6 +177,11 @@ public final class MusaAiStructuralAdvanced {
         designOverwriteChecks(structuralCalc,findings);
         autoSelectSectionListChecks(structuralCalc,findings);
         outputStationChecks(structuralCalc,findings);
+        rebarCoverChecks(structuralCalc,findings);
+        slabDesignStripChecks(structuralCalc,findings);
+        punchingPerimeterSetupChecks(structuralCalc,findings);
+        steelEffectiveLengthChecks(structuralCalc,findings);
+        steelSectionClassificationChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -280,7 +285,12 @@ public final class MusaAiStructuralAdvanced {
             "design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları",
             "design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer",
             "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
-            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu");
+            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu",
+            "rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı",
+            "design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit",
+            "punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi",
+            "unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy",
+            "section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -336,7 +346,8 @@ public final class MusaAiStructuralAdvanced {
             "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
             "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
             "modal combination","cqc","srss","directional combination","direction combination","yon birlestirme","yön birleştirme");
-        if(has(q,"zimbala","punching"))ids.add("ST-14");
+        boolean punchingSetupQuery=has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi");
+        if(!punchingSetupQuery&&has(q,"zimbala","punching"))ids.add("ST-14");
         if(!dynamicSetupQuery&&has(q,"modal","mod anal","response spectrum")){ids.add("ST-29");ids.add("ST-30");ids.add("ST-31");}
         if(has(q,"kutle katilim","mass participation","etkin modal kutle")){ids.add("ST-30");ids.add("ST-29");}
         if(has(q,"periyot","period"))ids.add("ST-31");
@@ -431,11 +442,17 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer"))ids.add("ST-106");
         if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))ids.add("ST-107");
         if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))ids.add("ST-108");
+        if(has(q,"rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı"))ids.add("ST-109");
+        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit"))ids.add("ST-110");
+        if(has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi"))ids.add("ST-111");
+        if(has(q,"unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy"))ids.add("ST-112");
+        if(has(q,"section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı"))ids.add("ST-113");
         return ids;
     }
 
     private static String focusTitle(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
+        if(has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi"))return "ZIMBALAMA KONTROL ÇEVRESİ / AYARI";
         if(has(q,"zimbala","punching"))return "ZIMBALAMA";
         if(has(q,"load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi"))return "LOAD PATTERN TÜR / KATEGORİ";
         if(has(q,"response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü"))return "RESPONSE SPECTRUM FONKSİYON / YÖN";
@@ -457,6 +474,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer"))return "TASARIM OVERWRITE / ÖZEL DEĞERLER";
         if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))return "AUTO-SELECT / KESİT SEÇİM LİSTESİ";
         if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))return "OUTPUT / SONUÇ İSTASYONLARI";
+        if(has(q,"rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı"))return "DONATI PAS PAYI / BETON ÖRTÜSÜ";
+        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit"))return "DÖŞEME TASARIM ŞERİTLERİ";
+        if(has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi"))return "ZIMBALAMA KONTROL ÇEVRESİ / AYARI";
+        if(has(q,"unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy"))return "ÇELİK ETKİN / BURKULMA BOYU";
+        if(has(q,"section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı"))return "ÇELİK KESİT SINIFI / NARİNLİK";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -2288,6 +2310,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-108",s,"Output / sonuç istasyonu kontrolü",
             "Model raporundan output/result station verisi okundu: "+cueSummary(cues,10)+".",
             "Sonuç örnekleme aralığının kritik iç kuvvet/deformasyon bölgelerini kaçırmayacak şekilde tanımlandığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void rebarCoverChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-109",Status.DOGRULANAMADI,"Donatı pas payı / beton örtüsü okunamadı",
+                "Betonarme elemanların rebar/clear-cover atamalarına ilişkin açık model raporu ayrıştırılamadı.",
+                "Kolon, kiriş, perde, döşeme ve temel için kullanılan cover/pas payı değerlerini raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"cover missing","invalid cover","zero cover","cover mismatch","pas payi uyumsuz","pas payı uyumsuz","error","failed");
+        out.add(new Finding("ST-109",s,"Donatı pas payı / beton örtüsü kontrolü",
+            "Model raporundan cover/pas payı verisi okundu: "+cueSummary(cues,10)+".",
+            "Değerlerin eleman türü, çevresel etki ve onaylı detaylarla uyumunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void slabDesignStripChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-110",Status.DOGRULANAMADI,"Döşeme tasarım şeritleri okunamadı",
+                "Döşeme/radye tasarımında kullanılan design-strip tanımları ve atama kapsamı rapordan ayrıştırılamadı.",
+                "Kolon ve orta şeritlerini, yönlerini ve hangi döşeme alanlarını kapsadığını model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"design strip missing","strip not assigned","invalid strip","overlapping strip","tasarim seridi eksik","tasarım şeridi eksik","error","failed");
+        out.add(new Finding("ST-110",s,"Döşeme tasarım şeridi kontrolü",
+            "Model raporundan design-strip verisi okundu: "+cueSummary(cues,10)+".",
+            "Şerit yönü, genişliği ve kapsadığı döşeme/radye bölgelerini proje geometrisiyle karşılaştırın.",Collections.emptyList()));
+    }
+
+    private static void punchingPerimeterSetupChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-111",Status.DOGRULANAMADI,"Zımbalama kontrol çevresi / ayarı okunamadı",
+                "Zımbalama hesabında kullanılan kontrol çevresi, kolon yüzü veya boşluk etkilerine ilişkin açık model ayarı ayrıştırılamadı.",
+                "Zımbalama perimeter tanımını ve yakın boşlukların kontrol çevresine etkisini model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"punching perimeter missing","invalid perimeter","opening not considered","control perimeter error","zimbalama cevresi hatali","zımbalama çevresi hatalı","error","failed");
+        out.add(new Finding("ST-111",s,"Zımbalama kontrol çevresi / ayar kontrolü",
+            "Model raporundan punching-perimeter verisi okundu: "+cueSummary(cues,10)+".",
+            "Kontrol çevresinin kolon/perde geometrisi ve yakın rezervasyon/boşluklarla doğru ilişkilendirildiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void steelEffectiveLengthChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-112",Status.DOGRULANAMADI,"Çelik etkin / burkulma boyu kabulleri okunamadı",
+                "Çelik elemanların unbraced length, K-factor veya buckling-length kabullerine ilişkin açık tasarım raporu ayrıştırılamadı.",
+                "Çelik kolon/kirişler için etkin boy, desteksiz boy ve K-factor atamalarını raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"invalid effective length","unbraced length missing","k factor missing","buckling length mismatch","burkulma boyu uyumsuz","error","failed");
+        out.add(new Finding("ST-112",s,"Çelik etkin / burkulma boyu kontrolü",
+            "Model raporundan etkin boy/desteksiz boy verisi okundu: "+cueSummary(cues,10)+".",
+            "Kabul edilen mesnetlenme ve yanal tutulma koşullarının gerçek detaylarla uyumunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void steelSectionClassificationChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-113",Status.DOGRULANAMADI,"Çelik kesit sınıfı / narinlik verisi okunamadı",
+                "Çelik kesitlerin compact/noncompact/slender sınıflandırmasına ilişkin açık tasarım çıktısı ayrıştırılamadı.",
+                "Kesit sınıflandırması ve yerel narinlik sonuçlarını tasarım raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"classification failed","slender limit exceeded","section classification error","compactness failed","narinlik asimi","narinlik aşımı","error","failed");
+        out.add(new Finding("ST-113",s,"Çelik kesit sınıfı / narinlik kontrolü",
+            "Model raporundan kesit sınıfı/narinlik verisi okundu: "+cueSummary(cues,10)+".",
+            "Sınıflandırmanın seçilen çelik tasarım standardı ve gerçek kesit özellikleriyle uyumunu doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
