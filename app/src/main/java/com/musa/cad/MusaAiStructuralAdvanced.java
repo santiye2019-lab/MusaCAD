@@ -229,8 +229,8 @@ public final class MusaAiStructuralAdvanced {
             "unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz",
             "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
             "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
-            "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış",
-            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı");
+            "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
+            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -346,8 +346,8 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz"))ids.add("ST-79");
         if(has(q,"design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500"))ids.add("ST-80");
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))ids.add("ST-81");
-        if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış"))ids.add("ST-82");
-        if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı"))ids.add("ST-83");
+        if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))ids.add("ST-82");
+        if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))ids.add("ST-83");
         return ids;
     }
 
@@ -418,8 +418,8 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz"))return "BİRİM SİSTEMİ";
         if(has(q,"design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500"))return "YÖNETMELİK / TASARIM KODU";
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))return "KAT KOTU / KOORDİNAT";
-        if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış"))return "ANALİZ CASE DURUMU";
-        if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı"))return "LOAD CASE / KOMBİNASYON REFERANSI";
+        if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))return "ANALİZ CASE DURUMU";
+        if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))return "LOAD CASE / KOMBİNASYON REFERANSI";
         return "STATİK";
     }
 
@@ -1779,7 +1779,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void analysisCaseRunStatusChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış");
+        List<String>cues=serviceReportCues(calc,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış");
         if(cues.isEmpty()){
             out.add(new Finding("ST-82",Status.DOGRULANAMADI,"Analiz case çalışma durumu okunamadı",
                 "Hesap/model raporundan analiz durumlarının çalıştırılıp çalıştırılmadığına ilişkin açık kayıt ayrıştırılamadı.",
@@ -1794,7 +1794,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void loadCaseReferenceIntegrityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı");
+        List<String>cues=serviceReportCues(calc,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı");
         if(cues.isEmpty()){
             out.add(new Finding("ST-83",Status.DOGRULANAMADI,"Load case / kombinasyon referans bütünlüğü okunamadı",
                 "Hesap/model raporundan mükerrer, tanımsız veya eksik load case referansına ilişkin açık model-check çıktısı ayrıştırılamadı.",
