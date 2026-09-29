@@ -132,6 +132,11 @@ public final class MusaAiStructuralAdvanced {
         vibrationServiceabilityChecks(structuralCalc,findings);
         longTermEffectChecks(structuralCalc,findings);
         explicitServiceabilityFailureChecks(structuralCalc,findings);
+        modelInstabilityChecks(structuralCalc,findings);
+        disconnectedModelChecks(structuralCalc,findings);
+        meshQualityChecks(structuralCalc,findings);
+        convergenceChecks(structuralCalc,findings);
+        localAxisChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -190,7 +195,12 @@ public final class MusaAiStructuralAdvanced {
             "catlak genisligi","çatlak genişliği","crack width",
             "titresim","titreşim","vibration","comfort frequency","floor frequency",
             "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
-            "servis siniri","servis sınırı","serviceability limit");
+            "servis siniri","servis sınırı","serviceability limit",
+            "singular","singularity","tekil rijitlik","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness",
+            "unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint",
+            "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh",
+            "nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama hatasi","yakınsama hatası","iteration limit","iterasyon limiti",
+            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -288,6 +298,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"titresim","titreşim","vibration","comfort frequency","floor frequency"))ids.add("ST-61");
         if(has(q,"sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection"))ids.add("ST-62");
         if(has(q,"servis siniri","servis sınırı","serviceability limit","sehim asimi","sehim aşımı","catlak asimi","çatlak aşımı","titresim limiti","titreşim limiti"))ids.add("ST-63");
+        if(has(q,"singular","singularity","tekil rijitlik","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness"))ids.add("ST-64");
+        if(has(q,"unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint"))ids.add("ST-65");
+        if(has(q,"mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi"))ids.add("ST-66");
+        if(has(q,"nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti"))ids.add("ST-67");
+        if(has(q,"local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))ids.add("ST-68");
         return ids;
     }
 
@@ -340,6 +355,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"titresim","titreşim","vibration","comfort frequency","floor frequency"))return "TİTREŞİM / KONFOR";
         if(has(q,"sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection"))return "UZUN SÜRELİ ETKİLER";
         if(has(q,"servis siniri","servis sınırı","serviceability limit","sehim asimi","sehim aşımı","catlak asimi","çatlak aşımı","titresim limiti","titreşim limiti"))return "SERVİS SINIRI AŞIMLARI";
+        if(has(q,"singular","singularity","tekil rijitlik","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness"))return "MODEL TEKİLLİĞİ / KARARSIZLIK";
+        if(has(q,"unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint"))return "MODEL BAĞLANTI BÜTÜNLÜĞÜ";
+        if(has(q,"mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi"))return "SONLU ELEMAN / MESH KALİTESİ";
+        if(has(q,"nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti"))return "ANALİZ YAKINSAMASI";
+        if(has(q,"local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))return "YEREL EKSEN / ORYANTASYON";
         return "STATİK";
     }
 
@@ -1296,6 +1316,93 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-63",Status.UYUMSUZLUK,"Raporda açık servis sınırı aşımı",
             "Servis verilebilirlik ile ilgili açık sınır-aşımı/başarısızlık ifadeleri bulundu: "+cueSummary(bad,10)+".",
             "İlgili eleman, servis kombinasyonu ve kullanılan sınırı doğrudan hesap modelinde inceleyin; otomatik özet tek başına uygunluk kararı değildir.",Collections.emptyList()));
+    }
+
+    private static Status analysisWarningStatus(Collection<String>cues){
+        boolean positive=false,negative=false;
+        for(String cue:cues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,"no singularity","no instability","no mechanism","no unconnected","no disconnected","no orphan",
+                "converged successfully","convergence achieved","yakinsama saglandi","yakınsama sağlandı",
+                "mesh quality suitable","mesh uygun","local axis suitable","yerel eksen uygun","orientation verified")){
+                positive=true;
+                continue;
+            }
+            if(has(q,"singular","singularity","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness",
+                "unconnected","disconnected","orphan","floating node","floating joint",
+                "mesh warning","distorted element","nonconvergence","non-convergence","did not converge","not converged","convergence failed",
+                "yakinsamadi","yakınsamadı","yakinsama hatasi","yakınsama hatası","iteration limit","iterasyon limiti",
+                "uygunsuz","yetersiz","hata","error","failed","fail"))negative=true;
+            if(has(q,"uygun","suitable","verified","checked","basarili","başarılı","converged"))positive=true;
+        }
+        if(negative)return Status.UYUMSUZLUK;
+        if(positive)return Status.BILGI;
+        return Status.INCELEME_GEREKLI;
+    }
+
+    private static void modelInstabilityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"singular","singularity","tekil rijitlik","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-64",Status.DOGRULANAMADI,"Model tekilliği / kararsızlık uyarısı doğrulanamadı",
+                "Yüklenen hesap raporundan tekil rijitlik matrisi, kararsızlık, mekanizma veya sıfır/negatif rijitlik uyarısına ilişkin açık satır ayrıştırılamadı.",
+                "Analiz programının warning/error özetini ve kararsız düğüm/serbestlik kayıtlarını rapora dahil edin; MusaCAD görünmeyen model hatasını varsaymaz.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-64",analysisWarningStatus(cues),"Model tekilliği / kararsızlık rapor kontrolü",
+                "Hesap raporundan tekillik/kararsızlık verisi okundu: "+cueSummary(cues,10)+".",
+                "Uyarıyı ilgili düğüm, eleman, serbestlik derecesi ve analiz yük durumuyla doğrudan model üzerinde inceleyin.",Collections.emptyList()));
+    }
+
+    private static void disconnectedModelChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint","joint not connected","element not connected");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-65",Status.DOGRULANAMADI,"Bağlantısız düğüm / eleman uyarısı doğrulanamadı",
+                "Hesap raporundan bağlantısız/orphan düğüm veya eleman uyarısına ilişkin açık satır ayrıştırılamadı.",
+                "Model connectivity/check-model çıktısını rapora dahil edin ve birleşmesi gereken düğüm/elemanların tolerans içinde gerçekten bağlı olduğunu doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-65",analysisWarningStatus(cues),"Model bağlantı bütünlüğü rapor kontrolü",
+                "Hesap raporundan bağlantı bütünlüğü verisi okundu: "+cueSummary(cues,10)+".",
+                "İlgili düğüm/eleman etiketlerini modelde gösterip bağlantı, merge toleransı ve uç serbestliklerini kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void meshQualityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-66",Status.DOGRULANAMADI,"Sonlu eleman / mesh kalite bilgisi okunamadı",
+                "Yüklenen hesap raporundan kabuk/sonlu eleman mesh boyutu veya kalite uyarısına ilişkin açık satır ayrıştırılamadı.",
+                "Özellikle perde, döşeme, radye ve lokal gerilme bölgeleri için mesh boyutu/kalite özetini model çıktısına dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-66",analysisWarningStatus(cues),"Sonlu eleman / mesh kalite rapor kontrolü",
+                "Hesap raporundan mesh verisi okundu: "+cueSummary(cues,10)+".",
+                "Aşırı bozuk eleman, büyük aspect-ratio ve kritik bölgelerde yetersiz ağ inceliğini model üzerinde doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void convergenceChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"nonconvergence","non-convergence","did not converge","not converged","convergence failed","converged","convergence achieved","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-67",Status.DOGRULANAMADI,"Analiz yakınsama sonucu okunamadı",
+                "Yüklenen hesap raporundan doğrusal olmayan analiz yakınsaması veya iterasyon sınırına ilişkin açık sonuç ayrıştırılamadı.",
+                "Doğrusal olmayan analiz kullanılıyorsa yakınsama/iterasyon özetini ve başarısız yük adımlarını rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-67",analysisWarningStatus(cues),"Analiz yakınsama rapor kontrolü",
+                "Hesap raporundan yakınsama verisi okundu: "+cueSummary(cues,10)+".",
+                "Yakınsamayan yük adımı/analiz durumu varsa model, malzeme doğrusal olmayanlığı, mafsal ve çözüm ayarlarını doğrudan inceleyin.",Collections.emptyList()));
+    }
+
+    private static void localAxisChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-68",Status.DOGRULANAMADI,"Yerel eksen / eleman oryantasyonu okunamadı",
+                "Yüklenen hesap raporundan çubuk/kabuk yerel eksen veya kesit oryantasyonuna ilişkin açık kayıt ayrıştırılamadı.",
+                "Kiriş, kolon, perde ve kabuk elemanlarda yerel eksen/orientasyon görünümünü model kontrol çıktısına dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-68",analysisWarningStatus(cues),"Yerel eksen / oryantasyon rapor kontrolü",
+                "Hesap raporundan yerel eksen/orientasyon verisi okundu: "+cueSummary(cues,10)+".",
+                "Özellikle asimetrik kesitler, kabuk yönleri ve yüklerin yerel eksene bağlı olduğu elemanlarda yönleri modelde görsel olarak doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
