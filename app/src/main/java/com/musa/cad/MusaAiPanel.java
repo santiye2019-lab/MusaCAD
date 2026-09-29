@@ -52,7 +52,7 @@ public final class MusaAiPanel {
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         boolean developer=MusaAiSessionService.developerCached();
-        TextView title=text(activity,developer?"MusaCAD AI • Gandalf Developer":"MusaCAD AI",20f,Color.WHITE,true);
+        TextView title=text(activity,developer?"Gandalf • Developer":"Gandalf • MusaCAD AI",20f,Color.WHITE,true);
         header.addView(title,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
         TextView state=text(activity,developer?"DEV":"AI",10f,0xFFBFFAF4,true);
@@ -97,7 +97,7 @@ public final class MusaAiPanel {
         input.setSingleLine(false);
         input.setMaxLines(4);
         input.setMinHeight(dp(activity,48));
-        input.setHint("MusaCAD AI'ya yazın…");
+        input.setHint("Gandalf'a yazın veya sesli komut verin…");
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(0xFF718A98);
         input.setTextSize(13f);
@@ -146,7 +146,6 @@ public final class MusaAiPanel {
             {"MEKAI","MEKAI_FULL"},
             {"STATIKAI","STATIKAI_FULL"},
             {"ELKAI","ELKAI_FULL"},
-            {"Gandalf","Gandalf, bu projeyi tüm disiplinlerde derin analiz et ve raporla"},
             {"Kontrol","Projeyi kontrol et"},
             {"Rapor","Proje raporu oluştur"}
         };
@@ -171,6 +170,11 @@ public final class MusaAiPanel {
                 scrollBottom(messagesScroll);
             }));
         };
+
+        // Gandalf is an action, not a passive text preset: one tap starts the
+        // central agent immediately. Voice commands use the same host/router.
+        addQuickPromptAuto(activity,quickRow,input,"Gandalf",
+            "Gandalf, bu projeyi tüm disiplinlerde derin analiz et ve raporla",submit);
         MusaAiVoiceInput.Callback voiceCallback=new MusaAiVoiceInput.Callback(){
             @Override public void onText(String text){
                 activity.runOnUiThread(()->{
@@ -190,7 +194,7 @@ public final class MusaAiPanel {
         };
         voice.setOnClickListener(v->{
             appendBubble(activity,messages,false,
-                "Sesli giriş • Android konuşma tanıma hizmeti açılıyor. MusaCAD ses kaydı saklamaz.");
+                "Gandalf dinliyor • Android konuşma tanıma hizmeti açılıyor. MusaCAD ses kaydı saklamaz.");
             scrollBottom(messagesScroll);
             MusaAiVoiceInput.launch(activity,voiceCallback);
         });
@@ -229,6 +233,25 @@ public final class MusaAiPanel {
         lp.setMarginEnd(dp(activity,7));
         row.addView(chip,lp);
         chip.setOnClickListener(v->{input.setText(prompt);input.setSelection(input.length());input.requestFocus();});
+    }
+
+    private static void addQuickPromptAuto(Activity activity,LinearLayout row,EditText input,String label,String prompt,Runnable submit){
+        Button chip=new Button(activity);
+        chip.setText(label);
+        chip.setAllCaps(false);
+        chip.setTextColor(0xFFEAFBFF);
+        chip.setTextSize(10f);
+        chip.setMinHeight(dp(activity,36));
+        chip.setPadding(dp(activity,12),0,dp(activity,12),0);
+        chip.setBackground(round(activity,0xFF0C594F,18,0xFF16B8A6));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp(activity,36));
+        lp.setMarginEnd(dp(activity,7));
+        row.addView(chip,lp);
+        chip.setOnClickListener(v->{
+            input.setText(prompt);
+            input.setSelection(input.length());
+            submit.run();
+        });
     }
 
     private static TextView appendBubble(Activity activity,LinearLayout messages,boolean user,String value){
