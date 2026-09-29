@@ -190,6 +190,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java tests/MusaAiStructuralCalcTest.java
           java -cp /tmp/musacad-tests MusaAiStructuralCalcTest
+      - name: Test MusaCAD advanced structural coordination
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java tests/MusaAiStructuralAdvancedTest.java
+          java -cp /tmp/musacad-tests MusaAiStructuralAdvancedTest
       - name: Test bounded text extraction from structural PDF reports
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiPdfTextExtractor.java tests/MusaAiPdfTextExtractorTest.java
