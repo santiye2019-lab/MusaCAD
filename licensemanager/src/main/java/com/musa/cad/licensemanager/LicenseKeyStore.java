@@ -11,7 +11,6 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
@@ -25,7 +24,6 @@ final class LicenseKeyStore {
     private static final String WRAP_ALIAS="musacad_license_private_wrap_v2";
     private static final String PREFS="musacad_license_signing_key_v2";
     private static final String K_PRIVATE="private_wrapped",K_NONCE="private_nonce",K_PUBLIC="public_x509";
-    private static final SecureRandom RNG=new SecureRandom();
 
     static boolean hasKey(Context c){
         SharedPreferences p=c.getSharedPreferences(PREFS,0);
