@@ -174,7 +174,7 @@ public final class MusaAiPanel {
         // Gandalf is an action, not a passive text preset: one tap starts the
         // central agent immediately. Voice commands use the same host/router.
         addQuickPromptAuto(activity,quickRow,input,"Gandalf",
-            "Gandalf, bu projeyi tüm disiplinlerde derin analiz et ve raporla",submit);
+            "Bu projeyi tüm disiplinlerde kontrol et, önemli bulguları ve yapılacakları raporla",submit);
         MusaAiVoiceInput.Callback voiceCallback=new MusaAiVoiceInput.Callback(){
             @Override public void onText(String text){
                 activity.runOnUiThread(()->{

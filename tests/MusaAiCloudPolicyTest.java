@@ -4,7 +4,8 @@ public final class MusaAiCloudPolicyTest {
     private static void yes(boolean value,String message){if(!value)throw new AssertionError(message);}
     private static void no(boolean value,String message){if(value)throw new AssertionError(message);}
     public static void main(String[]args){
-        yes(MusaAiCloudPolicy.shouldUseCloud("Gandalf, bu projeyi derin analiz et"),"Gandalf prefix");
+        no(MusaAiCloudPolicy.shouldUseCloud("Gandalf, metraj çıkar"),"ordinary Gandalf command stays local");
+        yes(MusaAiCloudPolicy.shouldUseCloud("Gandalf, bu projeyi derin analiz et"),"explicit Gandalf deep analysis");
         yes(MusaAiCloudPolicy.shouldUseProjectPackage("Gandalf, bu projeyi tüm disiplinlerde derin analiz et"),"all disciplines package");
         yes(MusaAiCloudPolicy.shouldUseProjectPackage("Gandalf proje paketi kontrolü"),"package phrase");
         no(MusaAiCloudPolicy.shouldUseProjectPackage("GSTATIKAI_OPENINGS"),"single discipline expert stays active drawing");

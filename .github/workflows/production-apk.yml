@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in             MUSACAD_RELEASE_KEYSTORE_B64             MUSACAD_KEYSTORE_PASSWORD             MUSACAD_KEY_ALIAS             MUSACAD_KEY_PASSWORD             MUSACAD_TRIAL_API_URL             MUSACAD_TRIAL_PUBLIC_KEY_PEM             MUSACAD_AI_API_URL             MUSACAD_AI_SESSION_URL; do
+          for name in             MUSACAD_RELEASE_KEYSTORE_B64             MUSACAD_KEYSTORE_PASSWORD             MUSACAD_KEY_ALIAS             MUSACAD_KEY_PASSWORD             MUSACAD_TRIAL_API_URL             MUSACAD_TRIAL_PUBLIC_KEY_PEM; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required production secret: $name"
               exit 1
@@ -53,14 +53,20 @@ jobs:
             https://*) ;;
             *) echo "::error::MUSACAD_TRIAL_API_URL must be HTTPS"; exit 1 ;;
           esac
-          case "$MUSACAD_AI_API_URL" in
-            https://*) ;;
-            *) echo "::error::MUSACAD_AI_API_URL must be HTTPS"; exit 1 ;;
-          esac
-          case "$MUSACAD_AI_SESSION_URL" in
-            https://*) ;;
-            *) echo "::error::MUSACAD_AI_SESSION_URL must be HTTPS"; exit 1 ;;
-          esac
+          if [ -n "${MUSACAD_AI_API_URL:-}" ] || [ -n "${MUSACAD_AI_SESSION_URL:-}" ]; then
+            if [ -z "${MUSACAD_AI_API_URL:-}" ] || [ -z "${MUSACAD_AI_SESSION_URL:-}" ]; then
+              echo "::error::MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL must be configured together"
+              exit 1
+            fi
+            case "$MUSACAD_AI_API_URL" in
+              https://*) ;;
+              *) echo "::error::MUSACAD_AI_API_URL must be HTTPS"; exit 1 ;;
+            esac
+            case "$MUSACAD_AI_SESSION_URL" in
+              https://*) ;;
+              *) echo "::error::MUSACAD_AI_SESSION_URL must be HTTPS"; exit 1 ;;
+            esac
+          fi
 
       - name: Prepare production signing keystore
         shell: bash
@@ -109,7 +115,11 @@ jobs:
             echo "- Debuggable: false"
             echo "- Signing: production keystore"
             echo "- Trial backend: production HTTPS endpoint"
-            echo "- Gandalf AI: production HTTPS analyze + session endpoints"
+            if [ -n "${MUSACAD_AI_API_URL:-}" ]; then
+              echo "- Gandalf: local tools + Cloud AI"
+            else
+              echo "- Gandalf: local tools active; Cloud AI not configured"
+            fi
             echo "- SHA-256:"
             echo '  `'$(cut -d' ' -f1 /tmp/MusaCAD-v1.2.0-direct-production.sha256)'`'
           } >> "$GITHUB_STEP_SUMMARY"

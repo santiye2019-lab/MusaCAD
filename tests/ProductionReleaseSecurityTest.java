@@ -19,7 +19,7 @@ public final class ProductionReleaseSecurityTest {
         need(gradle,"verifyPlayProductionReleaseConfig","Play release gate");
         need(gradle,"MUSACAD_TRIAL_API_URL","trial endpoint requirement");
         need(gradle,"MUSACAD_TRIAL_PUBLIC_KEY_PEM","trial public key requirement");
-        need(gradle,"Production MusaCAD requires MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL","Gandalf production endpoint gate");
+        need(gradle,"MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL must be configured together","Gandalf optional cloud endpoint pair gate");
         need(gradle,"MUSACAD_PLAY_VERIFY_URL","Play verification endpoint requirement");
         need(gradle,"ALLOW_LEGACY_SHORT_LICENSE","legacy short-code production policy");
 

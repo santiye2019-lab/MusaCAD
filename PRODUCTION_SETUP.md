@@ -122,4 +122,4 @@ Android production build ortamı:
 - `MUSACAD_AI_SESSION_URL=https://<license-worker>/v1/ai/session`
 - `MUSACAD_AI_API_URL=https://<ai-worker>/v1/analyze`
 
-OpenAI API anahtarı hiçbir zaman APK'ya, GitHub repository dosyasına, issue'ya veya istemci BuildConfig alanına yazılmaz. Production MusaCAD'de Gandalf menüsü görünüyorsa iki AI endpoint'i de zorunlu ve HTTPS olmalıdır; eksik endpoint ile production APK üretimi durdurulur. Yerel geliştirme/debug derlemelerinde endpoint'ler boş bırakılabilir.
+OpenAI API anahtarı hiçbir zaman APK'ya, GitHub repository dosyasına, issue'ya veya istemci BuildConfig alanına yazılmaz. Gandalf'ın yerel CAD araçları production APK'da Cloud AI olmadan da çalışır. Cloud AI etkinleştirilecekse `MUSACAD_AI_SESSION_URL` ve `MUSACAD_AI_API_URL` birlikte ve HTTPS olarak verilmelidir; tek endpoint verilirse production build durur.

@@ -1333,7 +1333,16 @@ public class MainActivity extends AppCompatActivity {
                 ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
                 :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
             if(!cloud.ok()){
-                reply.send(cloud.message.isEmpty()?"Gandalf AI isteği tamamlanamadı.":cloud.message);
+                MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
+                String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
+                if(localFallback.matched){
+                    reply.send(reason+
+                        "\n\nGandalf yerel araçlarla devam etti:\n"+
+                        localFallback.text+
+                        "\n\nNot: Bu yedek analiz güncel web/kaynak taraması kullanmaz.");
+                }else{
+                    reply.send(reason+" Yerel Gandalf araçları da bu isteği eşleştiremedi.");
+                }
                 return;
             }
             pendingAiActions=cloud.actions;
