@@ -22,7 +22,8 @@ public final class MusaAiStructuralCalc {
     private static final Pattern FLOOR_BEFORE=Pattern.compile("(?iu)\\b([+-]?\\d{1,2})\\s*\\.?\\s*(?:KAT|FLOOR|STOREY)\\b");
     private static final Pattern FLOOR_GROUND=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern FLOOR_BASEMENT=Pattern.compile("(?iu)\\b(BODRUM|BASEMENT)\\s*(\\d{0,2})\\s*(?:KAT|FLOOR)?\\b");
-    private static final Pattern AXIS=Pattern.compile("(?iu)\\b(?:AKS|AXIS|GRID)\\s*[:=]?\\s*([A-ZÇĞİÖŞÜ0-9]{1,4})(?:\\s*[-/]\\s*([A-ZÇĞİÖŞÜ0-9]{1,4}))?\\b");\n    private static final Pattern ELEMENT_TAG=Pattern.compile("(?iu)(?:K|S|P|D|T|B|C|W|L|KIR|KOL|PER|BEAM|COL|WALL|SLAB|FOOT)\\d{1,4}[A-Z]?");
+    private static final Pattern AXIS=Pattern.compile("(?iu)\\b(?:AKS|AXIS|GRID)\\s*[:=]?\\s*([A-ZÇĞİÖŞÜ0-9]{1,4})(?:\\s*[-/]\\s*([A-ZÇĞİÖŞÜ0-9]{1,4}))?\\b");
+    private static final Pattern ELEMENT_TAG=Pattern.compile("(?iu)(?:K|S|P|D|T|B|C|W|L|KIR|KOL|PER|BEAM|COL|WALL|SLAB|FOOT)\\d{1,4}[A-Z]?");
 
     public enum ElementStatus { MATCH, MISMATCH, REPORT_ONLY, DRAWING_ONLY, UNVERIFIED }
 
