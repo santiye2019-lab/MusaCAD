@@ -32,6 +32,8 @@ jobs:
       MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
       MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
       MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+      MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
       MUSACAD_PLAY_VERIFY_URL: ${{ secrets.MUSACAD_PLAY_VERIFY_URL }}
       MUSACAD_PLAY_YEARLY_PRODUCT_ID: ${{ vars.MUSACAD_PLAY_YEARLY_PRODUCT_ID }}
       MUSACAD_MANAGER_PRODUCTION_RELEASE: "true"
@@ -68,6 +70,8 @@ jobs:
           need MUSACAD_KEY_PASSWORD "$MUSACAD_KEY_PASSWORD"
           need MUSACAD_TRIAL_API_URL "$MUSACAD_TRIAL_API_URL"
           need MUSACAD_TRIAL_PUBLIC_KEY_PEM "$MUSACAD_TRIAL_PUBLIC_KEY_PEM"
+          need MUSACAD_AI_API_URL "$MUSACAD_AI_API_URL"
+          need MUSACAD_AI_SESSION_URL "$MUSACAD_AI_SESSION_URL"
 
           if [ "${{ inputs.distribution }}" = "play" ]; then
             need MUSACAD_PLAY_VERIFY_URL "$MUSACAD_PLAY_VERIFY_URL"
@@ -137,6 +141,19 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Gandalf production endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MUSACAD_AI_API_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_AI_API_URL must be HTTPS"; exit 1 ;;
+          esac
+          case "$MUSACAD_AI_SESSION_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_AI_SESSION_URL must be HTTPS"; exit 1 ;;
+          esac
+
       - name: Probe production Play backend
         if: inputs.distribution == 'play'
         shell: bash
@@ -178,6 +195,7 @@ jobs:
             echo "- Main signing keystore: validated"
             echo "- Trial public key: parsed"
             echo "- Trial backend: reachable with controlled rejection"
+            echo "- Gandalf AI endpoints: configured and HTTPS"
             if [ "${{ inputs.distribution }}" = "play" ]; then
               echo "- Play backend: endpoint probe completed"
             fi
