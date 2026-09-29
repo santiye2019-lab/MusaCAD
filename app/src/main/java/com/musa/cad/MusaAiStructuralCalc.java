@@ -16,8 +16,8 @@ public final class MusaAiStructuralCalc {
     private static final Pattern SECTION=Pattern.compile("(?i)(?<!\\d)(\\d{2,4})\\s*[x×/]\\s*(\\d{2,4})(?!\\d)");
     private static final Pattern CONCRETE=Pattern.compile("(?i)(?<![A-Z0-9])C\\s*(\\d{2,3})(?![A-Z0-9])");
     private static final Pattern REBAR=Pattern.compile("(?i)(?<![A-Z0-9])([BS])\\s*(\\d{3})([A-Z])?(?![A-Z0-9])");
-    private static final Pattern TAG_SECTION=Pattern.compile(
-        "(?iu)\\b([A-ZÇĞİÖŞÜ]{1,5}\\s*[-_]?\\s*\\d{1,4})\\b[^\\n\\r]{0,28}?(\\d{2,4}\\s*[x×/]\\s*\\d{2,4})");
+    private static final Pattern TAG_TOKEN=Pattern.compile(
+        "(?iu)\\b([A-ZÇĞİÖŞÜ]{1,5}\\s*[-_]?\\s*\\d{1,4})\\b");
     private static final Pattern REBAR_DIAMETER=Pattern.compile("(?iu)(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})");
     private static final Pattern LEVEL=Pattern.compile("[+-]?\\s*\\d{1,3}[\\.,]\\d{1,3}");
 
@@ -262,13 +262,20 @@ public final class MusaAiStructuralCalc {
         while(m.find()&&out.size()<60)out.add("Ø"+m.group(1));
     }
     private static void collectTagged(String raw,Map<String,String>out){
-        Matcher m=TAG_SECTION.matcher(raw==null?"":raw);
-        while(m.find()&&out.size()<500){
-            Matcher s=SECTION.matcher(m.group(2));
-            if(!s.find())continue;
-            String tag=canonicalTag(m.group(1));
-            if(tag.matches("C\\d{2,3}")||tag.matches("[BS]\\d{3}[A-Z]?"))continue;
-            out.putIfAbsent(tag,section(s.group(1),s.group(2)));
+        String value=raw==null?"":raw;
+        Matcher sec=SECTION.matcher(value);
+        while(sec.find()&&out.size()<500){
+            int lineStart=Math.max(value.lastIndexOf('\\n',sec.start()),value.lastIndexOf('\\r',sec.start()));
+            int windowStart=Math.max(lineStart+1,sec.start()-56);
+            String prefix=value.substring(windowStart,sec.start());
+            Matcher tags=TAG_TOKEN.matcher(prefix);
+            String selected="";
+            while(tags.find()){
+                String candidate=canonicalTag(tags.group(1));
+                if(candidate.matches("C\\d{2,3}")||candidate.matches("[BS]\\d{3}[A-Z]?"))continue;
+                selected=candidate;
+            }
+            if(!selected.isEmpty())out.putIfAbsent(selected,section(sec.group(1),sec.group(2)));
         }
     }
     private static void collectFoundationTypes(String raw,Set<String>out){
