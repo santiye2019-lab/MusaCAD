@@ -275,7 +275,8 @@ public final class MusaAiStructuralCalc {
             out.append("\n• Tek tarafta görünen eleman doğrudan eksik kabul edilmez; kat, pafta, isimlendirme ve rapor kapsamı kontrol edilmelidir.");
         if(unverifiedElement>0)
             out.append("\n• DOĞRULANAMADI satırları eksik kat/aks/kesit/donatı verisi veya aynı etiketin belirsiz tekrarı nedeniyle otomatik hüküm verilemeyen elemanlardır.");
-        out.append("\n• Bindirme, ankraj, pas payı, sıklaştırma ve süreklilik için yalnız pafta/raporda açıkça yazılı değerler kıyaslanır; eksik değer yönetmelikten türetilmez.");\n        out.append("\n• Bu karşılaştırma statik analiz motoru değildir; iç kuvvet, kapasite, düzensizlik, deplasman, performans veya yönetmelik uygunluğu hesabı yapmaz.");
+        out.append("\n• Bindirme, ankraj, pas payı, sıklaştırma ve süreklilik için yalnız pafta/raporda açıkça yazılı değerler kıyaslanır; eksik değer yönetmelikten türetilmez.");
+        out.append("\n• Bu karşılaştırma statik analiz motoru değildir; iç kuvvet, kapasite, düzensizlik, deplasman, performans veya yönetmelik uygunluğu hesabı yapmaz.");
 
         return new Comparison(true,out.toString(),same,different,reportOnly,drawingOnly,
             sameElement,diffElement,reportOnlyElement,drawingOnlyElement,unverifiedElement,elementChecks,ids);
