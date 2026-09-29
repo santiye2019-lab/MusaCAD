@@ -353,7 +353,8 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
-        if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
+        boolean nonlinearHingeQuery=has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal");
+        if(!nonlinearHingeQuery&&has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
         if(has(q,"pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı"))ids.add("ST-54");
         if(has(q,"kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio"))ids.add("ST-55");
         if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))ids.add("ST-56");
