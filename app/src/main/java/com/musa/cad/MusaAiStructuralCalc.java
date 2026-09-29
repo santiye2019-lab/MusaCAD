@@ -1018,8 +1018,8 @@ public final class MusaAiStructuralCalc {
                 "unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz",
                 "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
                 "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
-                "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","calistirilmamis","çalıştırılmamış",
-                "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","yuk durumu referansi","yük durumu referansı",
+                "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
+                "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
