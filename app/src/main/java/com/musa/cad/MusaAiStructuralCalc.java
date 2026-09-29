@@ -18,8 +18,9 @@ public final class MusaAiStructuralCalc {
     private static final Pattern REBAR=Pattern.compile("(?i)(?<![A-Z0-9])([BS])\\s*(\\d{3})([A-Z])?(?![A-Z0-9])");
     private static final Pattern TAG_TOKEN=Pattern.compile("(?iu)\\b([A-ZÇĞİÖŞÜ]{1,8}\\s*[-_]?\\s*\\d{1,4})\\b");
     private static final Pattern REBAR_DIAMETER=Pattern.compile("(?iu)(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})");
-    private static final Pattern LONGITUDINAL_REBAR=Pattern.compile("(?iu)(?:(ALT\\s*DONATI|ÜST\\s*DONATI|UST\\s*DONATI|TOP|BOTTOM|BOT|ALT|ÜST|UST)\\s*[:=]?\\s*)?(\\d{1,3})\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})(?!\\s*[/@])");
-    private static final Pattern STIRRUP_REBAR=Pattern.compile("(?iu)(?:(ETR[İI]YE|STIRRUP)\\s*[:=]?\\s*)?(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})\\s*[/@]\\s*(\\d{1,3})(?:\\s*(?:MM|CM))?");
+    private static final Pattern LONGITUDINAL_REBAR=Pattern.compile("(?iu)(?:(ALT\\s*DONATI|ÜST\\s*DONATI|UST\\s*DONATI|İLAVE|ILAVE|ADDITIONAL|MESNET|SUPPORT|GÖVDE|GOVDE|SIDE|DÜŞEY|DUSEY|VERTICAL|YATAY|HORIZONTAL|TOP|BOTTOM|BOT|ALT|ÜST|UST)\\s*[:=]?\\s*)?(\\d{1,3})\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})(?!\\s*[/@])");
+    private static final Pattern STIRRUP_REBAR=Pattern.compile("(?iu)(ETR[İI]YE|STIRRUP)\\s*[:=]?\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})\\s*[/@]\\s*(\\d{1,3})(?:\\s*(?:MM|CM))?");
+    private static final Pattern DISTRIBUTED_REBAR=Pattern.compile("(?iu)(ALT\\s*DONATI|ÜST\\s*DONATI|UST\\s*DONATI|DÜŞEY|DUSEY|VERTICAL|YATAY|HORIZONTAL|TOP|BOTTOM|BOT|ALT|ÜST|UST)\\s*[:=]?\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})\\s*[/@]\\s*(\\d{1,3})(?:\\s*(?:MM|CM))?");
     private static final Pattern FLOOR_AFTER=Pattern.compile("(?iu)\\b(?:KAT|FLOOR|STOREY)\\s*[:=]?\\s*([+-]?\\d{1,2}|ZEM[İI]N|GROUND|BODRUM\\s*\\d{0,2}|BASEMENT\\s*\\d{0,2})\\b");
     private static final Pattern FLOOR_BEFORE=Pattern.compile("(?iu)\\b([+-]?\\d{1,2})\\s*\\.?\\s*(?:KAT|FLOOR|STOREY)\\b");
     private static final Pattern FLOOR_GROUND=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
@@ -28,23 +29,29 @@ public final class MusaAiStructuralCalc {
     private static final Pattern ELEMENT_TAG=Pattern.compile("(?iu)(?:K|S|P|D|T|B|C|W|L|KIR|KOL|PER|BEAM|COL|WALL|SLAB|FOOT)\\d{1,4}[A-Z]?");
 
     public enum ElementStatus { MATCH, MISMATCH, REPORT_ONLY, DRAWING_ONLY, UNVERIFIED }
+    public enum MemberType { BEAM, COLUMN, WALL, SLAB, FOUNDATION, UNKNOWN }
 
     public static final class Element {
         public final String tag,floor,axis,section,concreteGrade,rebarGrade;
-        public final Set<String> rebarDiameters,longitudinalRebar,stirrups;
+        public final MemberType memberType;
+        public final Set<String> rebarDiameters,longitudinalRebar,stirrups,distributedRebar,memberRebar;
         public final int sourceId;
 
-        Element(String tag,String floor,String axis,String section,String concreteGrade,String rebarGrade,
-                Collection<String>diameters,Collection<String>longitudinalRebar,Collection<String>stirrups,int sourceId){
+        Element(String tag,String floor,String axis,String section,String concreteGrade,String rebarGrade,MemberType memberType,
+                Collection<String>diameters,Collection<String>longitudinalRebar,Collection<String>stirrups,
+                Collection<String>distributedRebar,Collection<String>memberRebar,int sourceId){
             this.tag=canonicalTag(tag);
             this.floor=clean(floor);
             this.axis=clean(axis);
             this.section=clean(section);
             this.concreteGrade=clean(concreteGrade);
             this.rebarGrade=clean(rebarGrade);
+            this.memberType=memberType==null?MemberType.UNKNOWN:memberType;
             this.rebarDiameters=immutableSet(diameters);
             this.longitudinalRebar=immutableSet(longitudinalRebar);
             this.stirrups=immutableSet(stirrups);
+            this.distributedRebar=immutableSet(distributedRebar);
+            this.memberRebar=immutableSet(memberRebar);
             this.sourceId=sourceId;
         }
 
@@ -180,7 +187,7 @@ public final class MusaAiStructuralCalc {
         DrawingSnapshot drawing=snapshot(index);
         StringBuilder out=new StringBuilder("STATİK HESAP RAPORU ↔ DWG PROJE KARŞILAŞTIRMASI");
         out.append("\nRapor: ").append(report.name.isEmpty()?"Yüklenen hesap raporu":report.name);
-        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit + boyuna donatı + etriye ön kontrolü");
+        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit + eleman tipine özel donatı ön kontrolü");
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
         List<ElementCheck> elementChecks=compareElements(report.elements,drawing.elements);
@@ -328,6 +335,7 @@ public final class MusaAiStructuralCalc {
         LinkedHashSet<String>diameters=new LinkedHashSet<>();collectDiameters(raw,diameters);
         LinkedHashSet<String>longitudinal=new LinkedHashSet<>();collectLongitudinalRebar(raw,longitudinal);
         LinkedHashSet<String>stirrups=new LinkedHashSet<>();collectStirrups(raw,stirrups);
+        LinkedHashSet<String>distributed=new LinkedHashSet<>();collectDistributedRebar(raw,distributed);
 
         Matcher tags=TAG_TOKEN.matcher(raw);
         LinkedHashSet<String> found=new LinkedHashSet<>();
@@ -338,11 +346,14 @@ public final class MusaAiStructuralCalc {
             found.add(tag);
         }
         if(found.isEmpty())return;
-        boolean hasElementData=!section.isEmpty()||!diameters.isEmpty()||!longitudinal.isEmpty()||!stirrups.isEmpty()||
+        boolean hasElementData=!section.isEmpty()||!diameters.isEmpty()||!longitudinal.isEmpty()||!stirrups.isEmpty()||!distributed.isEmpty()||
             !axis.isEmpty()||!floor.isEmpty()||!concrete.isEmpty()||!rebar.isEmpty();
         if(!hasElementData)return;
         for(String tag:found){
-            out.add(new Element(tag,floor,axis,section,concrete,rebar,diameters,longitudinal,stirrups,sourceId));
+            MemberType memberType=detectMemberType(tag,raw);
+            LinkedHashSet<String>memberRebar=new LinkedHashSet<>();
+            collectMemberSpecificRebar(memberType,longitudinal,stirrups,distributed,memberRebar);
+            out.add(new Element(tag,floor,axis,section,concrete,rebar,memberType,diameters,longitudinal,stirrups,distributed,memberRebar,sourceId));
             if(out.size()>=2500)break;
         }
     }
@@ -370,9 +381,12 @@ public final class MusaAiStructuralCalc {
             state=compareField("Kesit",r.section,d.section,differences);mismatch|=state<0;unverified|=state>0;
             state=compareField("Beton",r.concreteGrade,d.concreteGrade,differences);mismatch|=state<0;unverified|=state>0;
             state=compareField("Donatı çeliği",r.rebarGrade,d.rebarGrade,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareMemberType(r.memberType,d.memberType,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Donatı çapı",r.rebarDiameters,d.rebarDiameters,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Boyuna donatı",r.longitudinalRebar,d.longitudinalRebar,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Etriye",r.stirrups,d.stirrups,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Aralıklı donatı",r.distributedRebar,d.distributedRebar,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Tip bazlı donatı",r.memberRebar,d.memberRebar,differences);mismatch|=state<0;unverified|=state>0;
 
             ElementStatus status=mismatch?ElementStatus.MISMATCH:(unverified?ElementStatus.UNVERIFIED:ElementStatus.MATCH);
             out.add(new ElementCheck(status,r,d,differences));
@@ -459,6 +473,7 @@ public final class MusaAiStructuralCalc {
                 .append(e==null?"KAT/AKS ?":e.location()).append(" • ")
                 .append(e==null?"?":e.tag);
             if(e!=null&&!e.section.isEmpty())out.append(" • ").append(e.section);
+            if(e!=null&&e.memberType!=MemberType.UNKNOWN)out.append(" • ").append(memberTypeLabel(e.memberType));
             if(c.differences.isEmpty()){
                 if(c.status==ElementStatus.MATCH)out.append(" • açık veriler uyumlu");
             }else{
@@ -499,7 +514,7 @@ public final class MusaAiStructuralCalc {
                 out.tagged.putIfAbsent(e.getKey(),e.getValue());
                 if(item.sourceId>=0)out.tagSource.putIfAbsent(e.getKey(),item.sourceId);
             }
-            addElementsFromLine(out.elements,item.text,defaultFloor,item.sourceId);
+            addElementsFromLine(out.elements,(item.text+" "+item.layer).trim(),defaultFloor,item.sourceId);
         }
         return out;
     }
@@ -580,11 +595,89 @@ public final class MusaAiStructuralCalc {
             out.add("ETRİYE:Ø"+diameter+"/"+spacing);
         }
     }
+    private static void collectDistributedRebar(String raw,Set<String>out){
+        Matcher m=DISTRIBUTED_REBAR.matcher(raw==null?"":raw);
+        while(m.find()&&out.size()<30){
+            String role=normalizeRebarRole(m.group(1));
+            int diameter=Integer.parseInt(m.group(2)),spacing=Integer.parseInt(m.group(3));
+            if(diameter<4||diameter>40||spacing<2||spacing>1000)continue;
+            out.add(role+":Ø"+diameter+"/"+spacing);
+        }
+    }
     private static String normalizeRebarRole(String raw){
         String q=MusaAiDrawingIndex.normalize(raw).toUpperCase(Locale.ROOT).replaceAll("\\s+","");
         if(q.equals("ALT")||q.equals("ALTDONATI")||q.equals("BOTTOM")||q.equals("BOT"))return "ALT";
         if(q.equals("UST")||q.equals("USTDONATI")||q.equals("TOP"))return "ÜST";
+        if(q.equals("ILAVE")||q.equals("ADDITIONAL"))return "İLAVE";
+        if(q.equals("MESNET")||q.equals("SUPPORT"))return "MESNET";
+        if(q.equals("GOVDE")||q.equals("SIDE"))return "GÖVDE";
+        if(q.equals("DUSEY")||q.equals("VERTICAL"))return "DÜŞEY";
+        if(q.equals("YATAY")||q.equals("HORIZONTAL"))return "YATAY";
         return "GENEL";
+    }
+    private static MemberType detectMemberType(String tag,String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(has(q,"kiris","beam"))return MemberType.BEAM;
+        if(has(q,"kolon","column"))return MemberType.COLUMN;
+        if(has(q,"perde","shear wall","wall"))return MemberType.WALL;
+        if(has(q,"doseme","slab"))return MemberType.SLAB;
+        if(has(q,"temel","foundation","footing","radye"))return MemberType.FOUNDATION;
+        String t=canonicalTag(tag);
+        if(t.matches("(?:K|KIR|B|BEAM)\\d{1,4}[A-Z]?"))return MemberType.BEAM;
+        if(t.matches("(?:S|KOL|C|COL)\\d{1,4}[A-Z]?"))return MemberType.COLUMN;
+        if(t.matches("(?:P|PER|W|WALL)\\d{1,4}[A-Z]?"))return MemberType.WALL;
+        if(t.matches("(?:D|SLAB)\\d{1,4}[A-Z]?"))return MemberType.SLAB;
+        if(t.matches("(?:T|FOOT)\\d{1,4}[A-Z]?"))return MemberType.FOUNDATION;
+        return MemberType.UNKNOWN;
+    }
+    private static void collectMemberSpecificRebar(MemberType type,Set<String>longitudinal,Set<String>stirrups,
+                                                    Set<String>distributed,Set<String>out){
+        if(type==null||type==MemberType.UNKNOWN)return;
+        String prefix=memberTypeLabel(type).toUpperCase(new Locale("tr","TR"));
+        if(type==MemberType.COLUMN){
+            for(String v:longitudinal)out.add(prefix+":BOYUNA:"+stripRole(v));
+            for(String v:stirrups)out.add(prefix+":"+v);
+        }else if(type==MemberType.BEAM){
+            for(String v:longitudinal)out.add(prefix+":"+v);
+            for(String v:stirrups)out.add(prefix+":"+v);
+        }else if(type==MemberType.WALL){
+            for(String v:distributed)if(v.startsWith("DÜŞEY:")||v.startsWith("YATAY:"))out.add(prefix+":"+v);
+            for(String v:longitudinal)if(v.startsWith("DÜŞEY:")||v.startsWith("YATAY:"))out.add(prefix+":"+v);
+        }else if(type==MemberType.SLAB){
+            for(String v:distributed)if(v.startsWith("ALT:")||v.startsWith("ÜST:"))out.add(prefix+":"+v);
+            for(String v:longitudinal)if(v.startsWith("ALT:")||v.startsWith("ÜST:"))out.add(prefix+":"+v);
+        }else if(type==MemberType.FOUNDATION){
+            for(String v:distributed)out.add(prefix+":"+v);
+            for(String v:longitudinal)out.add(prefix+":"+v);
+        }
+    }
+    private static String stripRole(String value){
+        if(value==null)return "";
+        int colon=value.indexOf(':');
+        return colon>=0&&colon+1<value.length()?value.substring(colon+1):value;
+    }
+    private static int compareMemberType(MemberType report,MemberType drawing,List<String>out){
+        MemberType r=report==null?MemberType.UNKNOWN:report,d=drawing==null?MemberType.UNKNOWN:drawing;
+        if(r==MemberType.UNKNOWN&&d==MemberType.UNKNOWN)return 0;
+        if(r==MemberType.UNKNOWN||d==MemberType.UNKNOWN){
+            out.add("Eleman tipi: "+(r==MemberType.UNKNOWN?"rapor veri yok":"rapor "+memberTypeLabel(r))+
+                " • "+(d==MemberType.UNKNOWN?"DWG veri yok":"DWG "+memberTypeLabel(d)));
+            return 1;
+        }
+        if(r==d)return 0;
+        out.add("Eleman tipi: rapor "+memberTypeLabel(r)+" • DWG "+memberTypeLabel(d));
+        return -1;
+    }
+    private static String memberTypeLabel(MemberType type){
+        if(type==null)return "BİLİNMİYOR";
+        switch(type){
+            case BEAM:return "Kiriş";
+            case COLUMN:return "Kolon";
+            case WALL:return "Perde";
+            case SLAB:return "Döşeme";
+            case FOUNDATION:return "Temel";
+            default:return "Bilinmiyor";
+        }
     }
     private static void collectTagged(String raw,Map<String,String>out){
         String value=raw==null?"":raw;

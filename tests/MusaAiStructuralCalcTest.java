@@ -114,6 +114,47 @@ public final class MusaAiStructuralCalcTest {
         has(rebarCmp.text,"Boyuna donatı: rapor GENEL:8Ø18 • DWG GENEL:6Ø18");
         has(rebarCmp.text,"Etriye: rapor ETRİYE:Ø8/15 • DWG ETRİYE:Ø8/20");
 
+        String memberReport=
+            "1. KAT\n"+
+            "AKS A-1 K10 30x60 C30 B420C ALT 4Ø16 ÜST 2Ø14 İLAVE 2Ø16 ETRİYE Ø8/20\n"+
+            "AKS B-2 S10 40x40 C30 B420C 8Ø18 ETRİYE Ø8/15\n"+
+            "AKS C-3 P10 25x200 C30 B420C DÜŞEY Ø12/20 YATAY Ø10/20\n"+
+            "AKS D-4 D10 15x300 C30 B420C ALT Ø12/20 ÜST Ø10/20\n";
+        MusaAiStructuralCalc.Model memberModel=MusaAiStructuralCalc.parse("tip-donati.pdf",memberReport);
+        yes(memberModel.elements.size()==4,"four member-specific reinforcement rows expected");
+        yes(memberModel.elements.get(0).memberType==MusaAiStructuralCalc.MemberType.BEAM,"K10 must be beam");
+        yes(memberModel.elements.get(1).memberType==MusaAiStructuralCalc.MemberType.COLUMN,"S10 must be column");
+        yes(memberModel.elements.get(2).memberType==MusaAiStructuralCalc.MemberType.WALL,"P10 must be wall");
+        yes(memberModel.elements.get(3).memberType==MusaAiStructuralCalc.MemberType.SLAB,"D10 must be slab");
+        yes(memberModel.elements.get(0).memberRebar.contains("KİRİŞ:İLAVE:2Ø16"),"beam additional reinforcement missing");
+        yes(memberModel.elements.get(1).memberRebar.contains("KOLON:BOYUNA:8Ø18"),"column longitudinal reinforcement missing");
+        yes(memberModel.elements.get(2).memberRebar.contains("PERDE:DÜŞEY:Ø12/20"),"wall vertical reinforcement missing");
+        yes(memberModel.elements.get(2).memberRebar.contains("PERDE:YATAY:Ø10/20"),"wall horizontal reinforcement missing");
+        yes(memberModel.elements.get(3).memberRebar.contains("DÖŞEME:ALT:Ø12/20"),"slab bottom distributed reinforcement missing");
+        yes(memberModel.elements.get(3).memberRebar.contains("DÖŞEME:ÜST:Ø10/20"),"slab top distributed reinforcement missing");
+        yes(memberModel.elements.get(2).stirrups.isEmpty(),"wall distributed reinforcement must not be treated as stirrup");
+        yes(memberModel.elements.get(3).stirrups.isEmpty(),"slab distributed reinforcement must not be treated as stirrup");
+
+        MusaAiDrawingIndex memberIndex=new MusaAiDrawingIndex("Statik",4,0,
+            Arrays.asList("S_KIRIS","S_KOLON","S_PERDE","S_DOSEME"),
+            Arrays.asList("S_KIRIS","S_KOLON","S_PERDE","S_DOSEME"),
+            Arrays.asList(
+                new MusaAiDrawingIndex.Item(41,"TEXT","S_KIRIS","1. KAT AKS A-1 K10 30x60 C30 B420C ALT 4Ø16 ÜST 2Ø14 İLAVE 2Ø16 ETRİYE Ø8/20",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(42,"TEXT","S_KOLON","1. KAT AKS B-2 S10 40x40 C30 B420C 8Ø18 ETRİYE Ø8/20",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(43,"TEXT","S_PERDE","1. KAT AKS C-3 P10 25x200 C30 B420C DÜŞEY Ø12/20 YATAY Ø10/25",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(44,"TEXT","S_DOSEME","1. KAT AKS D-4 D10 15x300 C30 B420C ALT Ø12/20 ÜST Ø10/20",Double.NaN,Double.NaN)
+            ),"cm");
+
+        MusaAiStructuralCalc.Comparison memberCmp=MusaAiStructuralCalc.compare(memberIndex,memberModel);
+        yes(memberCmp.sameElements==2,"beam and slab should match");
+        yes(memberCmp.differentElements==2,"column stirrup and wall horizontal spacing should differ");
+        yes(memberCmp.sourceIds.contains(42)&&memberCmp.sourceIds.contains(43),"member-specific mismatches should be highlighted");
+        has(memberCmp.text,"Tip bazlı donatı");
+        has(memberCmp.text,"KOLON:ETRİYE:Ø8/15");
+        has(memberCmp.text,"KOLON:ETRİYE:Ø8/20");
+        has(memberCmp.text,"PERDE:YATAY:Ø10/20");
+        has(memberCmp.text,"PERDE:YATAY:Ø10/25");
+
         yes(MusaAiStructuralCalc.isEngineeringTextExtension("model.e2k"),"e2k should be accepted");
         System.out.println("MusaAiStructuralCalcTest OK");
     }
