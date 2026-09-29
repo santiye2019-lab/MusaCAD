@@ -101,7 +101,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Response spectrum function spectrum direction UX UY checked and suitable\n"+
             "Modal case method Eigen Ritz vector checked and suitable\n"+
             "Damping ratio modal damping checked and suitable\n"+
-            "Modal combination CQC directional combination checked and suitable\n";
+            "Modal combination CQC directional combination checked and suitable\n"+
+            "Time history function ground motion function checked and suitable\n"+
+            "Time step duration checked and suitable\n"+
+            "Nonlinear hinge assignment plastic hinge property checked and suitable\n"+
+            "Nonlinear case parameters maximum iterations tolerance checked and suitable\n"+
+            "Staged construction stage sequence checked and suitable\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -190,6 +195,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-91"),"modal-case setup check missing");
         require(ids.contains("ST-92"),"damping definition check missing");
         require(ids.contains("ST-93"),"dynamic combination method check missing");
+        require(ids.contains("ST-94"),"time-history function check missing");
+        require(ids.contains("ST-95"),"time-step/duration check missing");
+        require(ids.contains("ST-96"),"nonlinear hinge assignment check missing");
+        require(ids.contains("ST-97"),"nonlinear case control check missing");
+        require(ids.contains("ST-98"),"staged-construction check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -259,6 +269,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal yöntemini kontrol et"),"modal-case setup focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sönüm oranını kontrol et"),"damping focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("CQC modal combination kontrol et"),"dynamic combination focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Time history function kontrol et"),"time-history function focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Zaman adımını kontrol et"),"time-step focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Plastik mafsal atamalarını kontrol et"),"nonlinear hinge focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Nonlinear solution control kontrol et"),"nonlinear case control focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Yapım aşamalarını kontrol et"),"staged-construction focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sönüm oranını kontrol et"),"damping focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesnet atamalarını kontrol et"),"support assignment focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Birim sistemini kontrol et"),"unit-system focus must require report");
@@ -437,6 +452,26 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result combinationFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"CQC modal combination kontrol et");
         require(combinationFocus.findings.size()==1&&"ST-93".equals(combinationFocus.findings.get(0).id),
             "dynamic combination focus must only return ST-93");
+
+        MusaAiStructuralAdvanced.Result thFunctionFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Time history function kontrol et");
+        require(thFunctionFocus.findings.size()==1&&"ST-94".equals(thFunctionFocus.findings.get(0).id),
+            "time-history function focus must only return ST-94");
+
+        MusaAiStructuralAdvanced.Result timeStepFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Zaman adımını kontrol et");
+        require(timeStepFocus.findings.size()==1&&"ST-95".equals(timeStepFocus.findings.get(0).id),
+            "time-step focus must only return ST-95");
+
+        MusaAiStructuralAdvanced.Result nonlinearHingeFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Plastik mafsal atamalarını kontrol et");
+        require(nonlinearHingeFocus.findings.size()==1&&"ST-96".equals(nonlinearHingeFocus.findings.get(0).id),
+            "nonlinear hinge focus must only return ST-96");
+
+        MusaAiStructuralAdvanced.Result nonlinearControlFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Nonlinear solution control kontrol et");
+        require(nonlinearControlFocus.findings.size()==1&&"ST-97".equals(nonlinearControlFocus.findings.get(0).id),
+            "nonlinear control focus must only return ST-97");
+
+        MusaAiStructuralAdvanced.Result stagedFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Yapım aşamalarını kontrol et");
+        require(stagedFocus.findings.size()==1&&"ST-98".equals(stagedFocus.findings.get(0).id),
+            "staged-construction focus must only return ST-98");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
