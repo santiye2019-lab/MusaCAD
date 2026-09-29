@@ -117,6 +117,11 @@ public final class MusaAiStructuralAdvanced {
         accidentalEccentricityChecks(structuralCalc,findings);
         diaphragmForcePathChecks(refs,structuralCalc,findings);
         verticalSeismicChecks(structuralCalc,findings);
+        loadCombinationChecks(structuralCalc,findings);
+        seismicLoadCaseChecks(structuralCalc,findings);
+        rdiSystemChecks(structuralCalc,findings);
+        effectiveStiffnessChecks(structuralCalc,findings);
+        releaseRigidZoneChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -165,7 +170,12 @@ public final class MusaAiStructuralAdvanced {
             "kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass",
             "kutle merkezi","rijitlik merkezi","center of mass","center of rigidity","eksantrisite","eccentricity",
             "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diaphragm chord",
-            "dusey deprem","dikey deprem","vertical earthquake","vertical seismic");
+            "dusey deprem","dikey deprem","vertical earthquake","vertical seismic",
+            "yuk kombinasyonu","load combination","load combo","kombinasyon",
+            "deprem yuk durumu","seismic load case","earthquake load case","rsx","rsy",
+            "r/d/i","r d i","tasiyici sistem katsay","behavior factor","overstrength","importance factor",
+            "etkin rijitlik","catlamis kesit","çatlamış kesit","cracked section","effective stiffness","stiffness modifier","property modifier",
+            "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -248,6 +258,11 @@ public final class MusaAiStructuralAdvanced {
         if(accidental)ids.add("ST-46");
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
+        if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
+        if(has(q,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
+        if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
+        if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
+        if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
         return ids;
     }
 
@@ -285,6 +300,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))return "KÜTLE–RİJİTLİK MERKEZİ / EKSANTRİSİTE";
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))return "DİYAFRAM KUVVET AKTARIMI";
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return "DÜŞEY DEPREM ETKİSİ";
+        if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))return "YÜK KOMBİNASYONLARI";
+        if(has(q,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy"))return "DEPREM YÜK DURUMLARI";
+        if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))return "R / D / I TAŞIYICI SİSTEM KABULLERİ";
+        if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))return "ETKİN / ÇATLAMIŞ KESİT RİJİTLİKLERİ";
+        if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))return "MAFSAL / RELEASE / RİJİT BÖLGE KABULLERİ";
         return "STATİK";
     }
 
@@ -997,6 +1017,87 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-48",reportedStatus(cues),"Düşey deprem etkisi rapor kontrolü",
                 "Hesap raporundan düşey deprem etkisine ilişkin veri okundu: "+cueSummary(cues,4)+".",
                 "İlgili yük durumunun hangi eleman ve kombinasyonlarda kullanıldığını ayrıca doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void loadCombinationChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=new ArrayList<>();
+        cues.addAll(loadCues(calc,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination"));
+        if(cues.isEmpty())
+            out.add(new Finding("ST-49",Status.DOGRULANAMADI,"Yük kombinasyonları okunamadı",
+                "Yüklenen hesap raporundan tasarım/servis yük kombinasyonlarına ilişkin açık satır ayrıştırılamadı.",
+                "Sabit, hareketli, deprem, rüzgâr ve diğer yüklerin hangi tasarım/servis kombinasyonlarında kullanıldığını rapor/model çıktısıyla doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-49",reportedStatus(cues),"Yük kombinasyonları rapor kontrolü",
+                "Hesap raporundan yük kombinasyonu verisi okundu: "+cueSummary(cues,6)+".",
+                "Kombinasyon listesinin son model revizyonuna ait olduğunu ve beklenen yük durumlarını kapsadığını doğrulayın; MusaCAD eksik kombinasyonu yönetmelikten türetmez.",Collections.emptyList()));
+    }
+
+    private static void seismicLoadCaseChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy","response spectrum x","response spectrum y");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-50",Status.DOGRULANAMADI,"Deprem yük durumları okunamadı",
+                "Hesap raporundan X/Y deprem yük durumları, spektrum yük durumları veya eşdeğer deprem yük durumları açık biçimde ayrıştırılamadı.",
+                "Deprem yük durumlarının yön, eksantrisite ve spektrum tanımlarını analiz modelinden doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-50",reportedStatus(cues),"Deprem yük durumları rapor kontrolü",
+                "Hesap raporundan deprem yük durumlarına ilişkin veri okundu: "+cueSummary(cues,6)+".",
+                "Yük durumlarının ilgili spektrum, yön ve eksantrisite tanımlarıyla eşleştiğini model üzerinde doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void rdiSystemChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        ArrayList<String>values=new ArrayList<>();
+        for(String key:Arrays.asList("R","D","I"))if(calc.designParameters.containsKey(key))
+            values.add(key+"="+calc.designParameters.get(key));
+        List<String>cues=reportCues(calc,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor","dayanim fazlaligi","dayanım fazlalığı","bina onem","bina önem");
+        if(values.size()<3&&cues.isEmpty())
+            out.add(new Finding("ST-51",Status.DOGRULANAMADI,"R / D / I taşıyıcı sistem kabulleri eksik",
+                "Hesap raporundan R, D ve I parametrelerinin tamamı açık biçimde ayrıştırılamadı.",
+                "Taşıyıcı sistem türü, davranış katsayısı R, dayanım fazlalığı D ve bina önem katsayısı I değerlerini proje bilgi sayfası/model çıktısıyla doğrulayın.",Collections.emptyList()));
+        else{
+            String detail="Okunan parametreler: "+(values.isEmpty()?"—":join(values,6))+".";
+            if(!cues.isEmpty())detail+=" İlgili rapor satırları: "+cueSummary(cues,4)+".";
+            out.add(new Finding("ST-51",Status.BILGI,"R / D / I taşıyıcı sistem kabulleri",detail,
+                "MusaCAD yalnız okunan değerleri raporlar; taşıyıcı sistem sınıfına göre uygun R/D/I seçimini bağımsız olarak hükme bağlamaz.",Collections.emptyList()));
+        }
+    }
+
+    private static void effectiveStiffnessChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-52",Status.DOGRULANAMADI,"Etkin / çatlamış kesit rijitlikleri okunamadı",
+                "Yüklenen hesap raporundan kolon, kiriş, perde veya döşeme için etkin/çatlamış kesit rijitlik kabulleri ayrıştırılamadı.",
+                "Eleman bazlı stiffness/property modifier değerlerini ve hangi analizlerde uygulandığını model çıktısından doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-52",reportedStatus(cues),"Etkin / çatlamış kesit rijitlikleri",
+                "Hesap raporundan rijitlik kabullerine ilişkin veri okundu: "+cueSummary(cues,6)+".",
+                "Modifier değerlerinin eleman türü ve analiz amacıyla uyumunu model üzerinde doğrulayın; MusaCAD katsayıları eksikse tahmin etmez.",Collections.emptyList()));
+    }
+
+    private static void releaseRigidZoneChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-53",Status.DOGRULANAMADI,"Mafsal / release / rijit bölge kabulleri okunamadı",
+                "Hesap raporundan eleman uç release/mafsal, rijit bölge veya end-offset tanımları ayrıştırılamadı.",
+                "Özellikle çelik/kompozit elemanlar, bağ kirişleri, konsollar ve kiriş-kolon birleşimlerinde uç kabullerini analiz modelinden doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-53",reportedStatus(cues),"Mafsal / release / rijit bölge kabulleri",
+                "Hesap raporundan eleman uç/rijit bölge verisi okundu: "+cueSummary(cues,6)+".",
+                "Tanımların gerçek birleşim davranışı ve detay paftalarıyla eşleştiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
+        ArrayList<String>out=new ArrayList<>();
+        if(calc==null)return out;
+        for(String cue:calc.loadCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,terms)&&!out.contains(cue))out.add(cue);
+        }
+        return out;
     }
 
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
