@@ -27,6 +27,16 @@ public final class MusaAiStructuralCalc {
     private static final Pattern COVER=Pattern.compile("(?iu)\\b(?:PAS\\s+PAYI|BETON\\s+ÖRTÜSÜ|BETON\\s+ORTUSU|COVER)\\s*[:=]?\\s*"+DETAIL_LENGTH+"\\b");
     private static final Pattern CONFINEMENT=Pattern.compile("(?iu)\\b(?:SIKLAŞTIRMA(?:\\s+BÖLGESİ|\\s+BOLGESI|\\s+BOYU)?|SARILMA\\s+BÖLGESİ|SARILMA\\s+BOLGESI|CONFINEMENT(?:\\s+ZONE)?)\\s*[:=]?\\s*"+DETAIL_LENGTH+"\\b");
     private static final Pattern CONTINUITY=Pattern.compile("(?iu)\\b(?:(ALT\\s*DONATI|ÜST\\s*DONATI|UST\\s*DONATI|DÜŞEY\\s*DONATI|DUSEY\\s*DONATI|YATAY\\s*DONATI|ALT|ÜST|UST|DÜŞEY|DUSEY|YATAY)\\s+(?:DONATI\\s*)?|DONATI\\s+)(SÜREKLİ|SUREKLI|DEVAMLI|KESİNTİSİZ|KESINTISIZ|CONTINUOUS|KESİLİR|KESILIR|SONLANIR|DISCONTINUOUS)\\b");
+    private static final String METRIC_LENGTH="(\\d{1,5}(?:[\\.,]\\d+)?)\\s*(MM|CM|M)";
+    private static final Pattern FOUNDATION_THICKNESS=Pattern.compile("(?iu)\\b(?:RADYE|RAFT|TEMEL|FOUNDATION)\\s*(?:KALINLIĞI|KALINLIGI|KALINLIK|THICKNESS)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern PILE_DIAMETER=Pattern.compile("(?iu)\\b(?:KAZIK|PILE)\\s*(?:ÇAPI|CAPI|DIAMETER)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern PILE_LENGTH=Pattern.compile("(?iu)\\b(?:KAZIK|PILE)\\s*(?:BOYU|LENGTH)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern PILE_SPACING=Pattern.compile("(?iu)\\b(?:KAZIK|PILE)\\s*(?:AKS\\s+ARALIĞI|AKS\\s+ARALIGI|ARALIĞI|ARALIGI|SPACING)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern PILE_COUNT=Pattern.compile("(?iu)\\b(?:KAZIK\\s*(?:ADED[İI]|SAYISI)|PILE\\s*COUNT)\\s*[:=]?\\s*(\\d{1,5})\\b");
+    private static final Pattern PILE_CAP_THICKNESS=Pattern.compile("(?iu)\\b(?:KAZIK\\s+BAŞLIĞI|KAZIK\\s+BASLIGI|PILE\\s+CAP)\\s*(?:KALINLIĞI|KALINLIGI|KALINLIK|THICKNESS)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern PUNCHING_REBAR=Pattern.compile("(?iu)\\b(?:ZIMBALAMA|PUNCHING)\\s*(?:DONATISI|DONATI|REINFORCEMENT)\\s*[:=]?\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})\\s*[/@]\\s*(\\d{1,3})\\b");
+    private static final Pattern PUNCHING_PERIMETER=Pattern.compile("(?iu)\\b(?:ZIMBALAMA|PUNCHING)\\s*(?:ÇEVRESİ|CEVRESI|PERIMETER)\\s*[:=]?\\s*"+METRIC_LENGTH+"\\b");
+    private static final Pattern OPENING_SIZE=Pattern.compile("(?iu)\\b(BOŞLUK|BOSLUK|REZERVASYON|ŞAFT|SAFT|OPENING|SLEEVE)\\s*(?:NO\\.?\\s*)?([A-ZÇĞİÖŞÜ]{1,3}\\d{1,4})?\\s*[:=]?\\s*(\\d{1,4}(?:[\\.,]\\d+)?)\\s*[x×/]\\s*(\\d{1,4}(?:[\\.,]\\d+)?)\\s*(MM|CM|M)\\b");
     private static final Pattern FLOOR_AFTER=Pattern.compile("(?iu)\\b(?:KAT|FLOOR|STOREY)\\s*[:=]?\\s*([+-]?\\d{1,2}|ZEM[İI]N|GROUND|BODRUM\\s*\\d{0,2}|BASEMENT\\s*\\d{0,2})\\b");
     private static final Pattern FLOOR_BEFORE=Pattern.compile("(?iu)\\b([+-]?\\d{1,2})\\s*\\.?\\s*(?:KAT|FLOOR|STOREY)\\b");
     private static final Pattern FLOOR_GROUND=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
@@ -40,14 +50,15 @@ public final class MusaAiStructuralCalc {
     public static final class Element {
         public final String tag,floor,axis,section,concreteGrade,rebarGrade;
         public final MemberType memberType;
-        public final Set<String> rebarDiameters,longitudinalRebar,stirrups,distributedRebar,memberRebar,lapSplices,anchorage,cover,confinement,continuity;
+        public final Set<String> rebarDiameters,longitudinalRebar,stirrups,distributedRebar,memberRebar,lapSplices,anchorage,cover,confinement,continuity,foundationDetails,punchingDetails,openings;
         public final int sourceId;
 
         Element(String tag,String floor,String axis,String section,String concreteGrade,String rebarGrade,MemberType memberType,
                 Collection<String>diameters,Collection<String>longitudinalRebar,Collection<String>stirrups,
                 Collection<String>distributedRebar,Collection<String>memberRebar,
                 Collection<String>lapSplices,Collection<String>anchorage,Collection<String>cover,
-                Collection<String>confinement,Collection<String>continuity,int sourceId){
+                Collection<String>confinement,Collection<String>continuity,
+                Collection<String>foundationDetails,Collection<String>punchingDetails,Collection<String>openings,int sourceId){
             this.tag=canonicalTag(tag);
             this.floor=clean(floor);
             this.axis=clean(axis);
@@ -65,6 +76,9 @@ public final class MusaAiStructuralCalc {
             this.cover=immutableSet(cover);
             this.confinement=immutableSet(confinement);
             this.continuity=immutableSet(continuity);
+            this.foundationDetails=immutableSet(foundationDetails);
+            this.punchingDetails=immutableSet(punchingDetails);
+            this.openings=immutableSet(openings);
             this.sourceId=sourceId;
         }
 
@@ -200,7 +214,7 @@ public final class MusaAiStructuralCalc {
         DrawingSnapshot drawing=snapshot(index);
         StringBuilder out=new StringBuilder("STATİK HESAP RAPORU ↔ DWG PROJE KARŞILAŞTIRMASI");
         out.append("\nRapor: ").append(report.name.isEmpty()?"Yüklenen hesap raporu":report.name);
-        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit + tip bazlı donatı + detaylandırma ön kontrolü");
+        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit + donatı + detaylandırma + temel/zımbalama/rezervasyon ön kontrolü");
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
         List<ElementCheck> elementChecks=compareElements(report.elements,drawing.elements);
@@ -276,6 +290,7 @@ public final class MusaAiStructuralCalc {
         if(unverifiedElement>0)
             out.append("\n• DOĞRULANAMADI satırları eksik kat/aks/kesit/donatı verisi veya aynı etiketin belirsiz tekrarı nedeniyle otomatik hüküm verilemeyen elemanlardır.");
         out.append("\n• Bindirme, ankraj, pas payı, sıklaştırma ve süreklilik için yalnız pafta/raporda açıkça yazılı değerler kıyaslanır; eksik değer yönetmelikten türetilmez.");
+        out.append("\n• Temel/kazık, zımbalama ve boşluk-rezervasyon verileri de yalnız açık ölçü/etiket üzerinden kıyaslanır; zımbalama kapasitesi veya temel taşıma gücü hesaplanmaz.");
         out.append("\n• Bu karşılaştırma statik analiz motoru değildir; iç kuvvet, kapasite, düzensizlik, deplasman, performans veya yönetmelik uygunluğu hesabı yapmaz.");
 
         return new Comparison(true,out.toString(),same,different,reportOnly,drawingOnly,
@@ -355,6 +370,9 @@ public final class MusaAiStructuralCalc {
         LinkedHashSet<String>cover=new LinkedHashSet<>();collectLengthDetail(raw,COVER,"PAS PAYI",cover);
         LinkedHashSet<String>confinement=new LinkedHashSet<>();collectLengthDetail(raw,CONFINEMENT,"SIKLAŞTIRMA",confinement);
         LinkedHashSet<String>continuity=new LinkedHashSet<>();collectContinuity(raw,continuity);
+        LinkedHashSet<String>foundationDetails=new LinkedHashSet<>();collectFoundationDetails(raw,foundationDetails);
+        LinkedHashSet<String>punchingDetails=new LinkedHashSet<>();collectPunchingDetails(raw,punchingDetails);
+        LinkedHashSet<String>openings=new LinkedHashSet<>();collectOpenings(raw,openings);
 
         Matcher tags=TAG_TOKEN.matcher(raw);
         LinkedHashSet<String> found=new LinkedHashSet<>();
@@ -367,13 +385,14 @@ public final class MusaAiStructuralCalc {
         if(found.isEmpty())return;
         boolean hasElementData=!section.isEmpty()||!diameters.isEmpty()||!longitudinal.isEmpty()||!stirrups.isEmpty()||!distributed.isEmpty()||
             !lapSplices.isEmpty()||!anchorage.isEmpty()||!cover.isEmpty()||!confinement.isEmpty()||!continuity.isEmpty()||
+            !foundationDetails.isEmpty()||!punchingDetails.isEmpty()||!openings.isEmpty()||
             !axis.isEmpty()||!floor.isEmpty()||!concrete.isEmpty()||!rebar.isEmpty();
         if(!hasElementData)return;
         for(String tag:found){
             MemberType memberType=detectMemberType(tag,raw);
             LinkedHashSet<String>memberRebar=new LinkedHashSet<>();
             collectMemberSpecificRebar(memberType,longitudinal,stirrups,distributed,memberRebar);
-            out.add(new Element(tag,floor,axis,section,concrete,rebar,memberType,diameters,longitudinal,stirrups,distributed,memberRebar,lapSplices,anchorage,cover,confinement,continuity,sourceId));
+            out.add(new Element(tag,floor,axis,section,concrete,rebar,memberType,diameters,longitudinal,stirrups,distributed,memberRebar,lapSplices,anchorage,cover,confinement,continuity,foundationDetails,punchingDetails,openings,sourceId));
             if(out.size()>=2500)break;
         }
     }
@@ -412,6 +431,9 @@ public final class MusaAiStructuralCalc {
             state=compareSetField("Pas payı",r.cover,d.cover,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Sıklaştırma bölgesi",r.confinement,d.confinement,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Donatı sürekliliği",r.continuity,d.continuity,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Temel / radye / kazık detayı",r.foundationDetails,d.foundationDetails,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Zımbalama detayı",r.punchingDetails,d.punchingDetails,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Boşluk / rezervasyon",r.openings,d.openings,differences);mismatch|=state<0;unverified|=state>0;
 
             ElementStatus status=mismatch?ElementStatus.MISMATCH:(unverified?ElementStatus.UNVERIFIED:ElementStatus.MATCH);
             out.add(new ElementCheck(status,r,d,differences));
@@ -646,7 +668,7 @@ public final class MusaAiStructuralCalc {
         if(has(q,"kolon","column"))return MemberType.COLUMN;
         if(has(q,"perde","shear wall","wall"))return MemberType.WALL;
         if(has(q,"doseme","slab"))return MemberType.SLAB;
-        if(has(q,"temel","foundation","footing","radye"))return MemberType.FOUNDATION;
+        if(has(q,"temel","foundation","footing","radye","kazik","pile"))return MemberType.FOUNDATION;
         String t=canonicalTag(tag);
         if(t.matches("(?:K|KIR|B|BEAM)\\d{1,4}[A-Z]?"))return MemberType.BEAM;
         if(t.matches("(?:S|KOL|C|COL)\\d{1,4}[A-Z]?"))return MemberType.COLUMN;
@@ -704,6 +726,71 @@ public final class MusaAiStructuralCalc {
             default:return "Bilinmiyor";
         }
     }
+    private static void collectFoundationDetails(String raw,Set<String>out){
+        collectMetricPattern(raw,FOUNDATION_THICKNESS,"TEMEL KALINLIĞI",out);
+        collectMetricPattern(raw,PILE_DIAMETER,"KAZIK ÇAPI",out);
+        collectMetricPattern(raw,PILE_LENGTH,"KAZIK BOYU",out);
+        collectMetricPattern(raw,PILE_SPACING,"KAZIK ARALIĞI",out);
+        collectMetricPattern(raw,PILE_CAP_THICKNESS,"KAZIK BAŞLIĞI",out);
+        Matcher count=PILE_COUNT.matcher(raw==null?"":raw);
+        while(count.find()&&out.size()<20){
+            try{
+                int n=Integer.parseInt(count.group(1));
+                if(n>0&&n<=100000)out.add("KAZIK ADEDİ:"+n);
+            }catch(Exception ignored){}
+        }
+    }
+    private static void collectPunchingDetails(String raw,Set<String>out){
+        Matcher rebar=PUNCHING_REBAR.matcher(raw==null?"":raw);
+        while(rebar.find()&&out.size()<20){
+            int dia=Integer.parseInt(rebar.group(1)),spacing=Integer.parseInt(rebar.group(2));
+            if(dia>=4&&dia<=40&&spacing>=2&&spacing<=1000)out.add("ZIMBALAMA DONATISI:Ø"+dia+"/"+spacing);
+        }
+        collectMetricPattern(raw,PUNCHING_PERIMETER,"ZIMBALAMA ÇEVRESİ",out);
+    }
+    private static void collectOpenings(String raw,Set<String>out){
+        Matcher m=OPENING_SIZE.matcher(raw==null?"":raw);
+        while(m.find()&&out.size()<30){
+            double a=metricMm(m.group(3),m.group(5)),b=metricMm(m.group(4),m.group(5));
+            if(!(a>0.0)||!(b>0.0)||a>100000.0||b>100000.0)continue;
+            String kind=normalizeOpeningKind(m.group(1));
+            String id=canonicalOpeningId(m.group(2));
+            StringBuilder value=new StringBuilder(kind);
+            if(!id.isEmpty())value.append(":").append(id);
+            value.append(":").append(formatDetailNumber(a)).append("x").append(formatDetailNumber(b)).append("mm");
+            out.add(value.toString());
+        }
+    }
+    private static void collectMetricPattern(String raw,Pattern pattern,String label,Set<String>out){
+        Matcher m=pattern.matcher(raw==null?"":raw);
+        while(m.find()&&out.size()<20){
+            double mm=metricMm(m.group(1),m.group(2));
+            if(mm>0.0&&mm<=100000.0)out.add(label+":"+formatDetailNumber(mm)+"mm");
+        }
+    }
+    private static double metricMm(String rawValue,String rawUnit){
+        if(rawValue==null||rawUnit==null)return Double.NaN;
+        double value;
+        try{value=Double.parseDouble(rawValue.replace(',','.'));}catch(Exception e){return Double.NaN;}
+        String unit=rawUnit.toUpperCase(Locale.ROOT);
+        if(unit.equals("CM"))value*=10.0;
+        else if(unit.equals("M"))value*=1000.0;
+        else if(!unit.equals("MM"))return Double.NaN;
+        return value;
+    }
+    private static String normalizeOpeningKind(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw).toUpperCase(Locale.ROOT).replaceAll("\\s+","");
+        if(q.equals("REZERVASYON"))return "REZERVASYON";
+        if(q.equals("SAFT"))return "ŞAFT";
+        if(q.equals("SLEEVE"))return "SLEEVE";
+        if(q.equals("OPENING"))return "BOŞLUK";
+        return "BOŞLUK";
+    }
+    private static String canonicalOpeningId(String raw){
+        if(raw==null)return "";
+        return raw.toUpperCase(new Locale("tr","TR")).replaceAll("[^A-ZÇĞİÖŞÜ0-9]","");
+    }
+
     private static void collectLengthDetail(String raw,Pattern pattern,String label,Set<String>out){
         Matcher m=pattern.matcher(raw==null?"":raw);
         while(m.find()&&out.size()<12){
