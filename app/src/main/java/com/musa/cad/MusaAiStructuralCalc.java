@@ -1034,7 +1034,7 @@ public final class MusaAiStructuralCalc {
                 "time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi",
                 "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
                 "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
-                "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","yapim asamasi","yapım aşaması",
+                "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
