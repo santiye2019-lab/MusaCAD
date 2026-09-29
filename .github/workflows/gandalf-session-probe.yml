@@ -1,0 +1,49 @@
+name: Gandalf session backend probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/gandalf-session-probe.yml'
+      - 'server/trial-worker/**'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+    steps:
+      - name: Probe /v1/ai/session
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${MUSACAD_TRIAL_API_URL:-}" ]; then
+            echo '::error::Missing MUSACAD_TRIAL_API_URL repository secret'
+            exit 1
+          fi
+          case "$MUSACAD_TRIAL_API_URL" in
+            */v1/trial/start) BASE_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}" ;;
+            *) echo '::error::MUSACAD_TRIAL_API_URL must end with /v1/trial/start'; exit 1 ;;
+          esac
+          SESSION_URL="$BASE_URL/v1/ai/session"
+          status=$(curl --silent --show-error --max-time 20 --output /tmp/session.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","entitlementProof":""}' "$SESSION_URL" || true)
+          cat /tmp/session.json || true
+          echo "HTTP $status"
+          if [ "$status" = "403" ] || [ "$status" = "400" ]; then
+            echo 'Gandalf AI session endpoint is present and rejecting invalid clients as expected.'
+            exit 0
+          fi
+          if [ "$status" = "404" ]; then
+            echo '::error::Trial Worker is deployed but /v1/ai/session is missing; server/trial-worker must be redeployed.'
+            exit 1
+          fi
+          if [ "$status" = "503" ]; then
+            echo '::error::AI session route exists but its signing/configuration secrets are incomplete.'
+            exit 1
+          fi
+          echo "::error::Unexpected AI session probe result: HTTP $status"
+          exit 1
