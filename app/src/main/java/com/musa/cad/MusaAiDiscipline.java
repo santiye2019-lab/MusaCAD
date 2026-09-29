@@ -28,7 +28,10 @@ public enum MusaAiDiscipline {
             "transfer kiris","transfer doseme","transfer kat","konsol","cantilever",
             "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid",
             "bodrum perdesi","basement wall","cevre perdesi","zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus",
-            "groundwater","yeralti suyu","yer alti suyu","temel alt kotu"))return STRUCTURAL;
+            "groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
+            "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
+            "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -50,7 +53,10 @@ public enum MusaAiDiscipline {
             "zimbalama","modal analiz","kat otelemesi","goreli kat otelemesi","kat otelen","goreli kat otelen","burulma","yumusak kat","zayif kat",
             "guclu kolon","zayif kiris","sarilma bolgesi","transfer kiris","transfer doseme","transfer kat","konsol",
             "kisa kolon","perde bag kirisi","rijit diyafram","semi rigid","bodrum perdesi","cevre perdesi",
-            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu"))return STRUCTURAL;
+            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
+            "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
+            "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;
