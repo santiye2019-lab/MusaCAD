@@ -3,6 +3,7 @@ package com.musa.cad;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.*;
+import java.util.regex.*;
 
 /** Offline quantity/takeoff engine over the active MusaCAD drawing index. */
 public final class MusaAiQuantityTakeoff {
@@ -15,11 +16,12 @@ public final class MusaAiQuantityTakeoff {
     }
 
     private static final class Filter {
-        String layer,type,text;
+        String layer,type,text,equipment;
         boolean matches(MusaAiDrawingIndex.Item item){
             if(layer!=null&&!MusaAiDrawingIndex.normalize(item.layer).equals(MusaAiDrawingIndex.normalize(layer)))return false;
             if(type!=null&&!matchesType(type,item.type))return false;
             if(text!=null&&!MusaAiDrawingIndex.normalize(item.text).contains(MusaAiDrawingIndex.normalize(text)))return false;
+            if(equipment!=null&&!equipment.equals(equipmentCategory(item)))return false;
             return true;
         }
         String label(){
@@ -27,6 +29,7 @@ public final class MusaAiQuantityTakeoff {
             if(layer!=null)p.add("katman: "+layer);
             if(type!=null)p.add(typeLabel(type));
             if(text!=null)p.add("metin: “"+text+"”");
+            if(equipment!=null)p.add(equipment);
             return p.isEmpty()?"aktif görünür çizim":String.join(" • ",p);
         }
     }
@@ -38,10 +41,29 @@ public final class MusaAiQuantityTakeoff {
 
     private static final class LayerStats {
         final String layer;
-        int entities,lengthCount,areaCount,countable;
+        int entities,lengthCount,areaCount;
         double length,area;
         LayerStats(String layer){this.layer=layer==null||layer.trim().isEmpty()?"0":layer.trim();}
     }
+
+    private static final class DiameterStats {
+        final String discipline;
+        final int diameter;
+        int parts;
+        double length;
+        DiameterStats(String discipline,int diameter){this.discipline=discipline;this.diameter=diameter;}
+    }
+
+    private static final class EquipmentStats {
+        final String label;
+        int count;
+        EquipmentStats(String label){this.label=label;}
+    }
+
+    private static final Pattern DIAMETER_PATTERN=Pattern.compile(
+        "(?iu)(?:^|[^A-Z0-9ĞÜŞİÖÇ])(?:DN|D|Ø|⌀|ÇAP|CAPI|CAP)\\s*[-_=:]?\\s*(\\d{2,4})(?=$|[^0-9])");
+    private static final Pattern MM_PATTERN=Pattern.compile(
+        "(?iu)(?:^|[^0-9])(\\d{2,4})\\s*MM(?=$|[^A-Z0-9])");
 
     public static Answer answer(MusaAiDrawingIndex index,String raw){
         if(index==null)return Answer.none();
@@ -59,6 +81,10 @@ public final class MusaAiQuantityTakeoff {
         filter.layer=detectLayer(index,q);
         filter.type=typeFrom(q);
         filter.text=extractTextTerm(q);
+        if(count){
+            String equipment=equipmentFromQuery(q);
+            if(equipment!=null){filter.equipment=equipment;filter.type="BLOCK";filter.text=null;}
+        }
         Stats s=stats(index,filter);
 
         if(length){
@@ -81,28 +107,58 @@ public final class MusaAiQuantityTakeoff {
 
     private static String summary(MusaAiDrawingIndex index){
         LinkedHashMap<String,LayerStats> byLayer=new LinkedHashMap<>();
+        LinkedHashMap<String,DiameterStats> byDiameter=new LinkedHashMap<>();
+        LinkedHashMap<String,EquipmentStats> equipment=new LinkedHashMap<>();
+
         for(MusaAiDrawingIndex.Item item:index.items()){
             if(item==null||isAnnotation(item.type))continue;
             String key=item.layer==null?"":item.layer.trim();
             LayerStats s=byLayer.get(key);
             if(s==null){s=new LayerStats(key);byLayer.put(key,s);}
-            s.entities++;
-            if(isLinearTakeoff(item)){s.length+=item.length;s.lengthCount++;}
-            if(isAreaTakeoff(item)){s.area+=item.area;s.areaCount++;}
-            if(isCountable(item.type))s.countable++;
+            s.entities+=item.quantity;
+
+            if(isLinearTakeoff(item)){
+                s.length+=item.length*item.quantity;
+                s.lengthCount+=item.quantity;
+                int diameter=diameterMm(item);
+                if(diameter>0){
+                    String discipline=disciplineLabel(item.layer+" "+item.text);
+                    String dkey=discipline+"|"+diameter;
+                    DiameterStats d=byDiameter.get(dkey);
+                    if(d==null){d=new DiameterStats(discipline,diameter);byDiameter.put(dkey,d);}
+                    d.length+=item.length*item.quantity;
+                    d.parts+=item.quantity;
+                }
+            }
+            if(isAreaTakeoff(item)){
+                s.area+=item.area*item.quantity;
+                s.areaCount+=item.quantity;
+            }
+            if(isCountable(item.type)){
+                String label=equipmentDisplayLabel(item);
+                EquipmentStats e=equipment.get(label);
+                if(e==null){e=new EquipmentStats(label);equipment.put(label,e);}
+                e.count+=item.quantity;
+            }
         }
 
         double metersPerUnit=metersPerUnit(index.unitName);
         boolean physical=Double.isFinite(metersPerUnit)&&metersPerUnit>0d;
-        ArrayList<LayerStats> linear=new ArrayList<>(),areas=new ArrayList<>(),counts=new ArrayList<>();
+        ArrayList<LayerStats> linear=new ArrayList<>(),areas=new ArrayList<>();
         for(LayerStats s:byLayer.values()){
             if(s.lengthCount>0)linear.add(s);
             if(s.areaCount>0)areas.add(s);
-            if(s.countable>0)counts.add(s);
         }
         linear.sort((a,b)->Double.compare(b.length,a.length));
         areas.sort((a,b)->Double.compare(b.area,a.area));
-        counts.sort((a,b)->Integer.compare(b.countable,a.countable));
+
+        ArrayList<DiameterStats> diameters=new ArrayList<>(byDiameter.values());
+        diameters.sort((a,b)->{
+            int d=a.discipline.compareToIgnoreCase(b.discipline);
+            return d!=0?d:Integer.compare(a.diameter,b.diameter);
+        });
+        ArrayList<EquipmentStats> equipmentRows=new ArrayList<>(equipment.values());
+        equipmentRows.sort((a,b)->Integer.compare(b.count,a.count));
 
         StringBuilder out=new StringBuilder();
         out.append("Metraj raporu • ").append(index.layout);
@@ -110,19 +166,32 @@ public final class MusaAiQuantityTakeoff {
             out.append("\n⚠ DWG birimi tanımsız. Uzunluk/alanı metreye çevirmeden ham toplam göstermiyorum.");
             out.append("\nBirim/ölçek doğrulandıktan sonra boru, kanal ve alan metrajı m / m² olarak hesaplanacak.");
         }else{
+            appendDiameters(out,diameters,metersPerUnit);
             appendLinear(out,linear,metersPerUnit);
             appendAreas(out,areas,metersPerUnit*metersPerUnit);
         }
-        appendCounts(out,counts);
-        if(linear.isEmpty()&&areas.isEmpty()&&counts.isEmpty())
+        appendEquipment(out,equipmentRows);
+        if(linear.isEmpty()&&areas.isEmpty()&&equipmentRows.isEmpty())
             out.append("\nMetraja uygun çizgisel, kapalı alan veya sayılabilir blok bulunamadı.");
         out.append("\nNot: Metin, ölçülendirme, hatch ve yardımcı geometri genel metraja dahil edilmez.");
         return out.toString();
     }
 
+    private static void appendDiameters(StringBuilder out,List<DiameterStats> rows,double scale){
+        if(rows.isEmpty())return;
+        out.append("\n\nÇAP BAZLI BORU / KANAL METRAJI");
+        int shown=0;
+        for(DiameterStats s:rows){
+            if(shown++>=18){out.append("\n• … diğer çaplar");break;}
+            out.append("\n• ").append(s.discipline).append(" Ø").append(s.diameter).append(": ")
+                .append(number(s.length*scale)).append(" m")
+                .append(" • ").append(s.parts).append(" parça");
+        }
+    }
+
     private static void appendLinear(StringBuilder out,List<LayerStats> rows,double scale){
         if(rows.isEmpty())return;
-        out.append("\n\nÇİZGİSEL METRAJ");
+        out.append("\n\nKATMAN BAZLI ÇİZGİSEL METRAJ");
         int shown=0;
         for(LayerStats s:rows){
             if(shown++>=12){out.append("\n• … diğer katmanlar");break;}
@@ -144,14 +213,13 @@ public final class MusaAiQuantityTakeoff {
         }
     }
 
-    private static void appendCounts(StringBuilder out,List<LayerStats> rows){
+    private static void appendEquipment(StringBuilder out,List<EquipmentStats> rows){
         if(rows.isEmpty())return;
         out.append("\n\nADET / EKİPMAN");
         int shown=0;
-        for(LayerStats s:rows){
-            if(shown++>=12){out.append("\n• … diğer katmanlar");break;}
-            out.append("\n• ").append(layerLabel(s.layer)).append(": ")
-                .append(s.countable).append(" adet");
+        for(EquipmentStats s:rows){
+            if(shown++>=18){out.append("\n• … diğer ekipmanlar");break;}
+            out.append("\n• ").append(s.label).append(": ").append(s.count).append(" adet");
         }
     }
 
@@ -173,23 +241,94 @@ public final class MusaAiQuantityTakeoff {
     }
 
     private static boolean isCountable(String type){
-        return "INSERT".equals(type)||"MINSERT".equals(type)||"POINT".equals(type);
+        return "BLOCK".equals(type)||"INSERT".equals(type)||"MINSERT".equals(type);
     }
 
     private static String layerLabel(String layer){
         String clean=layer==null||layer.trim().isEmpty()?"0":layer.trim();
-        String n=MusaAiDrawingIndex.normalize(clean);
-        String semantic="";
-        if(contains(n,"pis su","atiksu","atik su","waste"))semantic="Pis su";
-        else if(contains(n,"temiz su","soguk su","sicak su","domestic"))semantic="Temiz su";
-        else if(contains(n,"yangin","sprinkler","fire"))semantic="Yangın";
-        else if(contains(n,"dogalgaz","dogal gaz","gaz"))semantic="Doğalgaz";
-        else if(contains(n,"havalandirma","hava kanali","kanal","duct"))semantic="Havalandırma";
-        else if(contains(n,"vrf","klima","iklimlendirme","hvac"))semantic="İklimlendirme";
-        else if(contains(n,"sihhi cihaz","lavabo","klozet","urinal","fixture"))semantic="Sıhhi cihaz";
-        else if(contains(n,"vana","valf","valve"))semantic="Vana";
-        else if(contains(n,"drenaj","kondens"))semantic="Drenaj";
-        return semantic.isEmpty()?clean:semantic+" • "+clean;
+        String semantic=disciplineLabel(clean);
+        return "Diğer".equals(semantic)?clean:semantic+" • "+clean;
+    }
+
+    private static String disciplineLabel(String raw){
+        String n=MusaAiDrawingIndex.normalize(raw);
+        if(contains(n,"pis su","atiksu","atik su","waste","sewage"))return "Pis su";
+        if(contains(n,"temiz su","soguk su","sicak su","domestic","pprc"))return "Temiz su";
+        if(contains(n,"yangin","sprinkler","fire","hydrant"))return "Yangın";
+        if(contains(n,"dogalgaz","dogal gaz","gaz"))return "Doğalgaz";
+        if(contains(n,"havalandirma","hava kanali","kanal","duct"))return "Havalandırma";
+        if(contains(n,"vrf","klima","iklimlendirme","hvac","fancoil","fan coil"))return "İklimlendirme";
+        if(contains(n,"drenaj","kondens","condens"))return "Drenaj";
+        return "Diğer";
+    }
+
+    private static int diameterMm(MusaAiDrawingIndex.Item item){
+        String raw=(item.layer+" "+item.text).trim();
+        Matcher m=DIAMETER_PATTERN.matcher(raw);
+        if(m.find())return validDiameter(m.group(1));
+        m=MM_PATTERN.matcher(raw);
+        if(m.find())return validDiameter(m.group(1));
+        return 0;
+    }
+
+    private static int validDiameter(String raw){
+        try{int value=Integer.parseInt(raw);return value>=10&&value<=4000?value:0;}
+        catch(Exception e){return 0;}
+    }
+
+    private static String equipmentDisplayLabel(MusaAiDrawingIndex.Item item){
+        String category=equipmentCategory(item);
+        String block=item.text==null?"":item.text.trim();
+        if(category==null)return block.isEmpty()?layerLabel(item.layer):block+" • "+layerLabel(item.layer);
+        if(block.isEmpty()||MusaAiDrawingIndex.normalize(block).equals(MusaAiDrawingIndex.normalize(category)))return category;
+        return category+" • "+block;
+    }
+
+    private static String equipmentCategory(MusaAiDrawingIndex.Item item){
+        if(item==null)return null;
+        String n=MusaAiDrawingIndex.normalize((item.text==null?"":item.text)+" "+(item.layer==null?"":item.layer));
+        if(contains(n,"lavabo","wash basin","washbasin"))return "Lavabo";
+        if(contains(n,"klozet","toilet","water closet"," wc "))return "Klozet";
+        if(contains(n,"pisuvar","urinal"))return "Pisuvar";
+        if(contains(n,"suzgec","floor drain","yer suzgeci"))return "Süzgeç";
+        if(contains(n,"evye","kitchen sink"))return "Evye";
+        if(contains(n,"dus","shower"))return "Duş";
+        if(contains(n,"batarya","musluk","faucet"))return "Batarya / Musluk";
+        if(contains(n,"yangin dolabi","fire cabinet","hose reel"))return "Yangın dolabı";
+        if(contains(n,"sprinkler"))return "Sprinkler";
+        if(contains(n,"vana","valf","valve"))return "Vana";
+        if(contains(n,"pompa","pump"))return "Pompa";
+        if(contains(n,"hidrofor","booster"))return "Hidrofor";
+        if(contains(n,"menfez","grille","diffuser","difuzor"))return "Menfez / Difüzör";
+        if(contains(n,"fan coil","fancoil"))return "Fan-coil";
+        if(contains(n,"vrf"))return "VRF";
+        if(contains(n,"radyator","radiator"))return "Radyatör";
+        if(contains(n,"kazan","boiler"))return "Kazan";
+        if(contains(n,"fan"))return "Fan";
+        return null;
+    }
+
+    private static String equipmentFromQuery(String q){
+        String n=" "+MusaAiDrawingIndex.normalize(q)+" ";
+        if(contains(n,"lavabo","wash basin","washbasin"))return "Lavabo";
+        if(contains(n,"klozet","toilet","water closet"," wc "))return "Klozet";
+        if(contains(n,"pisuvar","urinal"))return "Pisuvar";
+        if(contains(n,"suzgec","floor drain","yer suzgeci"))return "Süzgeç";
+        if(contains(n,"evye","kitchen sink"))return "Evye";
+        if(contains(n,"dus","shower"))return "Duş";
+        if(contains(n,"batarya","musluk","faucet"))return "Batarya / Musluk";
+        if(contains(n,"yangin dolabi","fire cabinet","hose reel"))return "Yangın dolabı";
+        if(contains(n,"sprinkler"))return "Sprinkler";
+        if(contains(n,"vana","valf","valve"))return "Vana";
+        if(contains(n,"pompa","pump"))return "Pompa";
+        if(contains(n,"hidrofor","booster"))return "Hidrofor";
+        if(contains(n,"menfez","grille","diffuser","difuzor"))return "Menfez / Difüzör";
+        if(contains(n,"fan coil","fancoil"))return "Fan-coil";
+        if(contains(n,"vrf"))return "VRF";
+        if(contains(n,"radyator","radiator"))return "Radyatör";
+        if(contains(n,"kazan","boiler"))return "Kazan";
+        if(contains(n,"fan"))return "Fan";
+        return null;
     }
 
     private static double metersPerUnit(String raw){
@@ -206,9 +345,9 @@ public final class MusaAiQuantityTakeoff {
         Stats s=new Stats();
         for(MusaAiDrawingIndex.Item item:index.items()){
             if(!filter.matches(item))continue;
-            s.matched++;
-            if(item.hasLength()){s.length+=item.length;s.lengthCount++;}
-            if(item.hasArea()){s.area+=item.area;s.areaCount++;}
+            s.matched+=item.quantity;
+            if(item.hasLength()){s.length+=item.length*item.quantity;s.lengthCount+=item.quantity;}
+            if(item.hasArea()){s.area+=item.area*item.quantity;s.areaCount+=item.quantity;}
         }
         return s;
     }
@@ -261,6 +400,7 @@ public final class MusaAiQuantityTakeoff {
         if(contains(q,"olculendirme","dimension"))return "DIMENSION";
         if(contains(q,"metin","yazi","text","mtext"))return "TEXT_ANY";
         if(contains(q,"xline","sonsuz cizgi"))return "XLINE";
+        if(contains(q,"blok","block","ekipman"))return "BLOCK";
         if(contains(q,"nokta","point"))return "POINT";
         if(contains(q,"cizgi","line"))return "LINE";
         return null;
