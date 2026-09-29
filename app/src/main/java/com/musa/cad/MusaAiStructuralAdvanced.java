@@ -84,6 +84,10 @@ public final class MusaAiStructuralAdvanced {
         elevatorChecks(refs,findings);
         stairChecks(refs,findings);
         dilatationChecks(refs,findings);
+        cantileverChecks(refs,findings);
+        transferChecks(refs,findings);
+        slabServiceabilityChecks(refs,structuralCalc,findings);
+        seismicParameterChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -257,6 +261,66 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-12",Status.INCELEME_GEREKLI,"Dilatasyon / blok sürekliliği kontrolü",
                 n+" adet dilatasyon/derz ifadesi bulundu. Çizim indeksinden tek başına taşıyıcı elemanların derzi geçip geçmediği kesinleştirilemez.",
                 "Kiriş, döşeme, perde ve temel sürekliliğini blok ayrımı boyunca geometrik olarak doğrulayın; ortak temel varsa hesap modelindeki kabulü ayrıca kontrol edin.",ids));
+    }
+
+    private static void cantileverChecks(List<Ref>refs,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();boolean cantilever=false,detail=false;
+        for(Ref r:refs){
+            if(has(r.q,"konsol","cantilever")){cantilever=true;addId(ids,r);}
+            if(has(r.q,"ankraj","kenetlenme","ust donati","mesnet donati","anchorage","development length"))detail=true;
+        }
+        if(cantilever&&!detail)
+            out.add(new Finding("ST-16",Status.DOGRULANAMADI,"Konsol ankraj / üst donatı doğrulaması",
+                "Konsol eleman ifadesi bulundu ancak görünür indeks içinde açık ankraj, kenetlenme veya üst/mesnet donatısı detayı eşleştirilemedi.",
+                "Konsol kök bölgesi üst donatısı, ankraj/kenetlenme boyu ve mesnet detayını statik pafta ve hesap çıktısıyla doğrulayın.",ids));
+    }
+
+    private static void transferChecks(List<Ref>refs,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();int n=0;
+        for(Ref r:refs)if(has(r.q,"transfer kat","transfer doseme","transfer kiris","aktarma kiri","aktarma dose","transfer floor","transfer beam","transfer slab")){
+            n++;addId(ids,r);
+        }
+        if(n>0)
+            out.add(new Finding("ST-17",Status.INCELEME_GEREKLI,"Transfer katı / aktarma sistemi",
+                n+" adet transfer/aktarma sistemi ifadesi bulundu.",
+                "Üst kat kolon/perde yük aktarımını, transfer elemanlarının etiketlerini ve hesap modelindeki sürekliliği birlikte doğrulayın.",ids));
+    }
+
+    private static void slabServiceabilityChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        boolean slab=false,thickness=false,deflectionDrawing=false;LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Ref r:refs){
+            if(r.kind==Kind.SLAB){slab=true;addId(ids,r);}
+            if(has(r.q,"doseme kalinligi","slab thickness","h doseme","h="))thickness=true;
+            if(has(r.q,"sehim","deflection"))deflectionDrawing=true;
+        }
+        boolean deflectionReport=false;
+        if(calc!=null){
+            for(String cue:calc.loadCues)if(has(MusaAiDrawingIndex.normalize(cue),"sehim","deflection"))deflectionReport=true;
+            for(String value:calc.seismicCues)if(has(MusaAiDrawingIndex.normalize(value),"sehim","deflection"))deflectionReport=true;
+        }
+        if(slab&&!thickness)
+            out.add(new Finding("ST-18",Status.DOGRULANAMADI,"Döşeme kalınlığı otomatik doğrulanamadı",
+                "Döşeme öğeleri tanındı ancak görünür indeks içinde açık döşeme kalınlığı ifadesi çıkarılamadı.",
+                "Döşeme kalınlıklarını kalıp planı/lejandından görünür hale getirip rapor/model verisiyle karşılaştırın.",ids));
+        if(deflectionDrawing&&!deflectionReport&&calc!=null)
+            out.add(new Finding("ST-19",Status.DOGRULANAMADI,"Sehim sonucu rapor eşleşmesi",
+                "Çizim/proje tarafında sehim ifadesi bulundu ancak yüklenen hesap verisinden açık sehim sonucu eşleştirilemedi.",
+                "Servisabilite/sehim sonuçlarını içeren hesap raporu bölümünü veya model çıktısını yükleyin.",ids));
+    }
+
+    private static void seismicParameterChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        ArrayList<String>missing=new ArrayList<>();
+        for(String key:Arrays.asList("SDS","SD1","DTS","BYS"))if(!calc.designParameters.containsKey(key))missing.add(key);
+        if(!calc.designParameters.containsKey("Zemin Sınıfı"))missing.add("Zemin Sınıfı");
+        if(!missing.isEmpty())
+            out.add(new Finding("ST-20",Status.DOGRULANAMADI,"Deprem tasarım parametreleri eksik/okunamadı",
+                "Yüklenen hesap verisinde şu parametreler açık biçimde ayrıştırılamadı: "+join(missing,10)+".",
+                "SDS, SD1, DTS, BYS ve zemin sınıfını hesap raporunun proje bilgileri bölümünden doğrulayın.",Collections.emptyList()));
+        if(calc.loadCues.isEmpty())
+            out.add(new Finding("ST-21",Status.DOGRULANAMADI,"Yük kabulleri otomatik doğrulanamadı",
+                "Hesap raporundan sabit/hareketli/kar/rüzgâr yüklerine ilişkin güvenilir metin ipucu çıkarılamadı.",
+                "Yük kabulleri ve kombinasyon özetini içeren hesap bölümlerini rapora dahil edin.",Collections.emptyList()));
     }
 
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
