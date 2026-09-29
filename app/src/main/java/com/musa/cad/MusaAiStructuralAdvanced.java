@@ -1427,8 +1427,11 @@ public final class MusaAiStructuralAdvanced {
 
     private static String revisionToken(String raw){
         if(raw==null||raw.trim().isEmpty())return "";
-        Matcher m=Pattern.compile("(?iu)\\b(?:REV[İI]ZYON|REVISION|REV)\\s*(?:NO|NO\\.|NUMARASI|NUMBER)?\\s*[:=\\-]?\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
+        Matcher explicit=Pattern.compile("(?iu)\\bREV\\s*[:=\\-]\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
         String token="";
+        while(explicit.find())token=explicit.group(1).toUpperCase(Locale.ROOT);
+        if(!token.isEmpty())return token;
+        Matcher m=Pattern.compile("(?iu)\\b(?:REV[İI]ZYON|REVISION|REV)\\s*(?:NO|NO\\.|NUMARASI|NUMBER)?\\s*[:=\\-]?\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
         while(m.find()){
             String candidate=m.group(1).toUpperCase(Locale.ROOT);
             if(candidate.equals("REV")||candidate.equals("REVISION")||candidate.equals("REVİZYON"))continue;
@@ -1436,7 +1439,6 @@ public final class MusaAiStructuralAdvanced {
         }
         return token;
     }
-
     private static void revisionConsistencyChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
         LinkedHashSet<String>drawing=new LinkedHashSet<>(),report=new LinkedHashSet<>();
