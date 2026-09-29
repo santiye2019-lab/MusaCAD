@@ -820,6 +820,97 @@ public final class MusaAiStructuralAdvanced {
         return join(items,10);
     }
 
+    private static void foundationBehaviorChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"zemin basinci","temel basinci","soil pressure","contact pressure","oturma","settlement");
+        boolean shallow=calc.foundationTypes.contains("RADYE")||calc.foundationTypes.contains("TEKİL")||
+            calc.foundationTypes.contains("SÜREKLİ")||calc.foundationTypes.contains("BİRLEŞİK");
+        if(!shallow&&cues.isEmpty())return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-38",Status.DOGRULANAMADI,"Temel zemin basıncı / oturma sonucu okunamadı",
+                "Sığ temel sistemi tanındı ancak hesap raporundan açık zemin temas basıncı veya oturma sonucu ayrıştırılamadı.",
+                "Temel temas basıncı, taşıma gücü karşılaştırması ve varsa oturma sonuçlarını içeren hesap/geoteknik rapor bölümünü doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-38",reportedStatus(cues),"Temel zemin basıncı / oturma rapor kontrolü",
+                "Hesap raporundan temel davranışına ilişkin veri okundu: "+cueSummary(cues,5)+".",
+                "MusaCAD rapor satırını aktarır; zemin basıncı veya oturma hesabını bağımsız olarak yeniden üretmez.",Collections.emptyList()));
+    }
+
+    private static void pileCapacityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kazik kapasitesi","kazik tasima","pile capacity","pile load","kazik yuk");
+        boolean pile=calc.foundationTypes.contains("KAZIK");
+        if(!pile&&cues.isEmpty())return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-39",Status.DOGRULANAMADI,"Kazık yük / kapasite sonucu okunamadı",
+                "Kazıklı temel sistemi tanındı ancak hesap raporundan açık kazık yükü veya taşıma kapasitesi sonucu ayrıştırılamadı.",
+                "Kazık başına düşey/yatay yükler ile geoteknik/structural kazık kapasitesi tablosunu aynı kazık tipi için doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-39",reportedStatus(cues),"Kazık yük / kapasite rapor kontrolü",
+                "Hesap raporundan kazık yük/kapasite verisi okundu: "+cueSummary(cues,5)+".",
+                "Değerlerin aynı kazık çapı, boyu ve geoteknik tasarım kabulüne ait olduğunu doğrulayın; MusaCAD kazık kapasitesi hesaplamaz.",Collections.emptyList()));
+    }
+
+    private static void upliftChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"uplift","yuzme","hidrostatik","hydrostatic","buoyancy");
+        boolean groundwater=calc.designParameters.containsKey("Yeraltı Suyu");
+        if(!groundwater&&cues.isEmpty())return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-40",Status.DOGRULANAMADI,"Yeraltı suyu / yüzme kontrolü okunamadı",
+                "Hesap verisinde yeraltı suyu seviyesi "+calc.designParameters.get("Yeraltı Suyu")+" olarak okundu ancak açık uplift/yüzme/hidrostatik kontrol sonucu bulunamadı.",
+                "Temel alt kotu, yeraltı suyu seviyesi, yapı öz-ağırlığı ve hidrostatik kaldırma kontrolünü ilgili hesap bölümünde doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-40",reportedStatus(cues),"Yüzme / uplift rapor kontrolü",
+                "Hesap raporundan hidrostatik/yüzme kontrol verisi okundu: "+cueSummary(cues,5)+".",
+                "Rapor sonucunu güncel yeraltı suyu seviyesi ve temel kotuyla çapraz kontrol edin; otomatik tarama kaldırma güvenliği hesabı yapmaz.",Collections.emptyList()));
+    }
+
+    private static void secondOrderChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"p-delta","p delta","ikinci mertebe","second order","second-order");
+        boolean seismicContext=calc.designParameters.containsKey("SDS")||calc.designParameters.containsKey("DTS")||calc.designParameters.containsKey("BYS");
+        if(cues.isEmpty()&&!seismicContext)return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-41",Status.DOGRULANAMADI,"P-Delta / ikinci mertebe kontrolü okunamadı",
+                "Deprem tasarım parametreleri mevcut ancak yüklenen rapordan açık P-Delta/ikinci mertebe analiz satırı ayrıştırılamadı.",
+                "İkinci mertebe etkilerinin hesap modelinde dikkate alınıp alınmadığını analiz ayarları ve rapor özeti üzerinden doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-41",reportedStatus(cues),"P-Delta / ikinci mertebe rapor kontrolü",
+                "Hesap raporundan ikinci mertebe verisi okundu: "+cueSummary(cues,4)+".",
+                "MusaCAD rapor beyanını aktarır; stabilite katsayısını veya ikinci mertebe etkilerini yeniden hesaplamaz.",Collections.emptyList()));
+    }
+
+    private static void baseShearChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling");
+        boolean seismicContext=calc.designParameters.containsKey("SDS")||calc.designParameters.containsKey("SD1");
+        if(cues.isEmpty()&&!seismicContext)return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-42",Status.DOGRULANAMADI,"Taban kesmesi / spektrum ölçekleme sonucu okunamadı",
+                "Deprem spektrum parametreleri mevcut ancak rapordan açık taban kesmesi veya spektrum ölçekleme bilgisi ayrıştırılamadı.",
+                "Eşdeğer deprem yükü ile modal spektrum sonuçlarının ölçekleme/karşılaştırma özetini hesap raporundan doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-42",reportedStatus(cues),"Taban kesmesi / spektrum ölçekleme rapor kontrolü",
+                "Hesap raporundan taban kesmesi/ölçekleme verisi okundu: "+cueSummary(cues,5)+".",
+                "X/Y doğrultularını, yükleme kombinasyonunu ve son ölçek katsayılarını analiz modeliyle doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void soilStructureInteractionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring");
+        boolean subgrade=calc.designParameters.containsKey("Yatak Katsayısı");
+        if(!subgrade&&cues.isEmpty())return;
+        if(cues.isEmpty())
+            out.add(new Finding("ST-43",Status.DOGRULANAMADI,"Zemin–yapı etkileşimi / yay modeli okunamadı",
+                "Yatak katsayısı "+calc.designParameters.get("Yatak Katsayısı")+" olarak okundu ancak hesap raporunda açık zemin yayları/zemin–yapı etkileşimi tanımı ayrıştırılamadı.",
+                "Temel modelindeki yay/alan yayı tanımlarının kullanılan yatak katsayısı ve birim sistemiyle uyumunu doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-43",reportedStatus(cues),"Zemin–yapı etkileşimi / yay modeli",
+                "Hesap raporundan zemin-yapı etkileşimi verisi okundu: "+cueSummary(cues,5)+".",
+                "Yay katsayısı, birimler, sıkıştırma-only kabulü ve temel elemanlarına atanma kapsamını modelde doğrulayın.",Collections.emptyList()));
+    }
+
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
         if(calc.elements.isEmpty())
