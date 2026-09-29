@@ -172,6 +172,11 @@ public final class MusaAiStructuralAdvanced {
         baseIsolatorAssignmentChecks(structuralCalc,findings);
         tendonPrestressChecks(structuralCalc,findings);
         tensionCompressionOnlyChecks(structuralCalc,findings);
+        modelLockStateChecks(structuralCalc,findings);
+        designCombinationSelectionChecks(structuralCalc,findings);
+        designOverwriteChecks(structuralCalc,findings);
+        autoSelectSectionListChecks(structuralCalc,findings);
+        outputStationChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -270,7 +275,12 @@ public final class MusaAiStructuralAdvanced {
             "damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama",
             "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
             "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
-            "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç");
+            "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç",
+            "model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi",
+            "design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları",
+            "design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer",
+            "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
+            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -359,7 +369,8 @@ public final class MusaAiStructuralAdvanced {
         if(accidental)ids.add("ST-46");
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
-        if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
+        boolean designComboQuery=has(q,"design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları");
+        if(!designComboQuery&&has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
         if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
@@ -415,6 +426,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))ids.add("ST-101");
         if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))ids.add("ST-102");
         if(has(q,"tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç"))ids.add("ST-103");
+        if(has(q,"model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi"))ids.add("ST-104");
+        if(has(q,"design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları"))ids.add("ST-105");
+        if(has(q,"design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer"))ids.add("ST-106");
+        if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))ids.add("ST-107");
+        if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))ids.add("ST-108");
         return ids;
     }
 
@@ -436,6 +452,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))return "SİSMİK İZOLATÖR PROPERTY / ATAMA";
         if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))return "TENDON / ÖNGERME TANIMLARI";
         if(has(q,"tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç"))return "SADECE ÇEKME / BASINÇ DAVRANIŞI";
+        if(has(q,"model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi"))return "MODEL KİLİDİ / SONUÇ DURUMU";
+        if(has(q,"design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları"))return "TASARIM KOMBİNASYONU SEÇİMİ";
+        if(has(q,"design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer"))return "TASARIM OVERWRITE / ÖZEL DEĞERLER";
+        if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))return "AUTO-SELECT / KESİT SEÇİM LİSTESİ";
+        if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))return "OUTPUT / SONUÇ İSTASYONLARI";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -2192,6 +2213,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-103",s,"Sadece çekme / basınç davranış kontrolü",
             "Model raporundan tek yönlü eksenel davranış verisi okundu: "+cueSummary(cues,10)+".",
             "Cable/truss eleman davranışının gerçek taşıyıcı sistem ve analiz case'leriyle uyumunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void modelLockStateChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-104",Status.DOGRULANAMADI,"Model kilidi / sonuç durumu okunamadı",
+                "Modelin analiz sonrası kilitli olup olmadığı veya sonuçların mevcut model revizyonuna bağlı tutulup tutulmadığına ilişkin açık kayıt ayrıştırılamadı.",
+                "Analiz ve tasarım çıktısında model lock/results state bilgisini görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"model unlocked after analysis","results unlocked","lock mismatch","results invalid","model kilidi acik","model kilidi açık","error","failed");
+        out.add(new Finding("ST-104",s,"Model kilidi / sonuç durumu kontrolü",
+            "Model raporundan lock/results state bilgisi okundu: "+cueSummary(cues,10)+".",
+            "Model değişikliklerinden sonra eski sonuçların kullanılmadığını ve analiz/tasarım öncesi model durumunun tutarlı olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void designCombinationSelectionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-105",Status.DOGRULANAMADI,"Tasarım kombinasyonu seçimi okunamadı",
+                "Betonarme/çelik tasarımda hangi kombinasyonların design combo olarak seçildiğine ilişkin açık kayıt ayrıştırılamadı.",
+                "Tasarımda kullanılan kombinasyon listesini model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"design combo missing","no design combinations","combination not selected","tasarim kombinasyonu eksik","tasarım kombinasyonu eksik","error","failed");
+        out.add(new Finding("ST-105",s,"Tasarım kombinasyonu seçim kontrolü",
+            "Model raporundan design-combo seçimi okundu: "+cueSummary(cues,10)+".",
+            "Nihai taşıyıcı tasarımında gerekli kombinasyonların seçili olduğunu ve gereksiz/eski kombinasyonların tasarıma karışmadığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void designOverwriteChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-106",Status.DOGRULANAMADI,"Tasarım overwrite / özel değerleri okunamadı",
+                "Varsayılan tasarım ayarlarını değiştiren eleman-bazlı overwrite/override kayıtları rapordan ayrıştırılamadı.",
+                "Özel tasarım değerleri kullanılan elemanları ve değiştirilmiş parametreleri raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"invalid overwrite","overwrite conflict","unexpected overwrite","override conflict","tasarim override uyumsuz","tasarım override uyumsuz","error","failed");
+        out.add(new Finding("ST-106",s,"Tasarım overwrite / özel değer kontrolü",
+            "Model raporundan tasarım overwrite verisi okundu: "+cueSummary(cues,10)+".",
+            "Eleman bazlı özel değerlerin gerekçeli olduğunu ve yanlışlıkla varsayılandan farklı bırakılmadığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void autoSelectSectionListChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-107",Status.DOGRULANAMADI,"Auto-select / kesit seçim listesi okunamadı",
+                "Otomatik kesit seçimi kullanılan elemanlarda aday kesit listesine ilişkin açık model raporu ayrıştırılamadı.",
+                "Auto-select listelerinin aday kesitlerini ve hangi elemanlara atandığını raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"empty auto select list","invalid section list","section list missing","auto select missing","kesit listesi bos","kesit listesi boş","error","failed");
+        out.add(new Finding("ST-107",s,"Auto-select / kesit seçim listesi kontrolü",
+            "Model raporundan auto-select/kesit listesi verisi okundu: "+cueSummary(cues,10)+".",
+            "Aday kesit listesinin proje standardı ve tasarım amacıyla uyumlu olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void outputStationChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-108",Status.DOGRULANAMADI,"Output / sonuç istasyonları okunamadı",
+                "Frame eleman sonuçlarının hangi station/ara noktalarda raporlandığına ilişkin açık model ayarı ayrıştırılamadı.",
+                "Özellikle uzun, değişken kesitli veya yük yoğunluğu yüksek elemanlarda output station aralığını raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"output station missing","station spacing invalid","insufficient output stations","result station missing","sonuc istasyonu eksik","sonuç istasyonu eksik","error","failed");
+        out.add(new Finding("ST-108",s,"Output / sonuç istasyonu kontrolü",
+            "Model raporundan output/result station verisi okundu: "+cueSummary(cues,10)+".",
+            "Sonuç örnekleme aralığının kritik iç kuvvet/deformasyon bölgelerini kaçırmayacak şekilde tanımlandığını doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
