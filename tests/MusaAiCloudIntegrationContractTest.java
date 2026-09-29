@@ -26,6 +26,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"K_CLOUD_CONSENT","cloud privacy consent");
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
+        require(main,"MusaAiDisciplineAnalyzer.analyzeAll(snapshot)","local Gandalf cloud-failure fallback");
         require(panel,"addQuickPromptAuto(activity,quickRow,input,\"Gandalf\"","Gandalf one-tap action");
         require(panel,"\"Bu projeyi tüm disiplinlerde kontrol et, önemli bulguları ve yapılacakları raporla\"","Gandalf local-first prompt");
         require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
