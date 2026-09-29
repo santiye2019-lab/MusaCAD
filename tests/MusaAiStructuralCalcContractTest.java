@@ -9,7 +9,7 @@ public final class MusaAiStructuralCalcContractTest {
         has(main,"PICK_STRUCT_CALC");
         has(main,"pickStructuralCalcDocument");
         has(main,"handleStructuralCalcPicked");
-        has(main,"MusaAiPdfTextExtractor.extract");
+        has(main,"MusaAiPdfBoxTextExtractor.extract");
         has(main,"MusaAiStructuralCalc.compare");
         has(main,"structuralCalcModel");
         has(main,"Statik Hesap–Proje Karşılaştırma Raporu");
