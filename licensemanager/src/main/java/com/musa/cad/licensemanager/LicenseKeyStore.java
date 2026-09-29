@@ -74,9 +74,16 @@ final class LicenseKeyStore {
     static String fingerprint(Context c)throws Exception{return LicenseBackupCrypto.fingerprint(publicBytes(c));}
 
     private static void storeOperational(Context c,byte[] privatePkcs8,byte[] publicX509)throws Exception{
-        SecretKey key=wrapKey();byte[] nonce=new byte[12];RNG.nextBytes(nonce);
+        SecretKey key=wrapKey();
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE,key,new GCMParameterSpec(128,nonce));
+
+        // AndroidKeyStore GCM keys with randomized encryption enabled must generate
+        // their own IV. Supplying one here triggers:
+        // "Caller-provided IV not permitted".
+        cipher.init(Cipher.ENCRYPT_MODE,key);
+        byte[] nonce=cipher.getIV();
+        if(nonce==null||nonce.length==0)throw new IllegalStateException("Android Keystore nonce üretemedi");
+
         cipher.updateAAD(publicX509);
         byte[] wrapped=cipher.doFinal(privatePkcs8);
         boolean ok=c.getSharedPreferences(PREFS,0).edit()
