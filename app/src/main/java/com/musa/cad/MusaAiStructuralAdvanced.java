@@ -127,6 +127,11 @@ public final class MusaAiStructuralAdvanced {
         wallShearCapacityChecks(structuralCalc,findings);
         explicitCapacityFailureChecks(structuralCalc,findings);
         utilizationRankingChecks(structuralCalc,findings);
+        deflectionServiceabilityChecks(structuralCalc,findings);
+        crackWidthChecks(structuralCalc,findings);
+        vibrationServiceabilityChecks(structuralCalc,findings);
+        longTermEffectChecks(structuralCalc,findings);
+        explicitServiceabilityFailureChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -180,7 +185,12 @@ public final class MusaAiStructuralAdvanced {
             "deprem yuk durum","seismic load case","earthquake load case","rsx","rsy",
             "r/d/i","r d i","tasiyici sistem katsay","behavior factor","overstrength","importance factor",
             "etkin rijitlik","catlamis kesit","çatlamış kesit","cracked section","effective stiffness","stiffness modifier","property modifier",
-            "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset");
+            "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset",
+            "sehim","deflection","servisabilite","serviceability",
+            "catlak genisligi","çatlak genişliği","crack width",
+            "titresim","titreşim","vibration","comfort frequency","floor frequency",
+            "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
+            "servis siniri","servis sınırı","serviceability limit");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -273,6 +283,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))ids.add("ST-56");
         if(has(q,"kapasite asimi","kapasite aşımı","capacity failure","failed capacity","yetersiz eleman","uygunsuz eleman"))ids.add("ST-57");
         if(has(q,"kapasite orani","kapasite oranı","capacity ratio","utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio","kritik eleman"))ids.add("ST-58");
+        if(has(q,"sehim","deflection","servisabilite","serviceability"))ids.add("ST-59");
+        if(has(q,"catlak genisligi","çatlak genişliği","crack width"))ids.add("ST-60");
+        if(has(q,"titresim","titreşim","vibration","comfort frequency","floor frequency"))ids.add("ST-61");
+        if(has(q,"sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection"))ids.add("ST-62");
+        if(has(q,"servis siniri","servis sınırı","serviceability limit","sehim asimi","sehim aşımı","catlak asimi","çatlak aşımı","titresim limiti","titreşim limiti"))ids.add("ST-63");
         return ids;
     }
 
@@ -320,6 +335,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))return "PERDE KESME SONUÇLARI";
         if(has(q,"kapasite asimi","kapasite aşımı","capacity failure","failed capacity","yetersiz eleman","uygunsuz eleman"))return "KAPASİTE AŞIMI / BAŞARISIZ ELEMANLAR";
         if(has(q,"kapasite orani","kapasite oranı","capacity ratio","utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio","kritik eleman"))return "ELEMAN KULLANIM / KAPASİTE ORANLARI";
+        if(has(q,"sehim","deflection","servisabilite","serviceability"))return "SEHİM / SERVİS VERİLEBİLİRLİK";
+        if(has(q,"catlak genisligi","çatlak genişliği","crack width"))return "ÇATLAK GENİŞLİĞİ";
+        if(has(q,"titresim","titreşim","vibration","comfort frequency","floor frequency"))return "TİTREŞİM / KONFOR";
+        if(has(q,"sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection"))return "UZUN SÜRELİ ETKİLER";
+        if(has(q,"servis siniri","servis sınırı","serviceability limit","sehim asimi","sehim aşımı","catlak asimi","çatlak aşımı","titresim limiti","titreşim limiti"))return "SERVİS SINIRI AŞIMLARI";
         return "STATİK";
     }
 
@@ -686,7 +706,7 @@ public final class MusaAiStructuralAdvanced {
         boolean negative=false,positive=false;
         for(String cue:cues){
             String q=MusaAiDrawingIndex.normalize(cue);
-            if(has(q,"saglamiyor","saglanmiyor","uygunsuz","yetersiz","basarisiz","fail","failed","not satisfied","not comply","does not comply"))negative=true;
+            if(has(q,"saglamiyor","saglanmiyor","uygunsuz","yetersiz","basarisiz","asiyor","aşıyor","asildi","aşıldı","exceed","exceeded","fail","failed","not satisfied","not comply","does not comply"))negative=true;
             if(has(q,"sagliyor","saglanmistir","uygun","yeterli","basarili","satisfied","pass","passed","complies"))positive=true;
         }
         if(negative)return Status.UYUMSUZLUK;
@@ -1195,6 +1215,87 @@ public final class MusaAiStructuralAdvanced {
     private static final class ReportedRatio{
         final double value;final String cue;
         ReportedRatio(double value,String cue){this.value=value;this.cue=cue;}
+    }
+
+    private static List<String> serviceReportCues(MusaAiStructuralCalc.Model calc,String...terms){
+        ArrayList<String>out=new ArrayList<>();
+        if(calc==null)return out;
+        for(String cue:calc.loadCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,terms)&&!out.contains(cue))out.add(cue);
+        }
+        for(String cue:calc.seismicCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,terms)&&!out.contains(cue))out.add(cue);
+        }
+        return out;
+    }
+
+    private static void deflectionServiceabilityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"sehim","deflection","servisabilite","serviceability");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-59",Status.DOGRULANAMADI,"Sehim / servis verilebilirlik sonucu okunamadı",
+                "Yüklenen hesap raporundan sehim veya servis verilebilirlik sonucuna ilişkin açık satır ayrıştırılamadı.",
+                "Kiriş/döşeme servis kombinasyonu, hesaplanan sehim ve kullanılan sınır bilgisini rapora dahil edin; MusaCAD eksik sehim hesabı üretmez.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-59",reportedStatus(cues),"Sehim / servis verilebilirlik rapor kontrolü",
+                "Hesap raporundan servis sonucu okundu: "+cueSummary(cues,8)+".",
+                "Sonucu ilgili eleman/kat, açıklık, servis kombinasyonu ve raporda verilen sınırla birlikte doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void crackWidthChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"catlak genisligi","çatlak genişliği","crack width");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-60",Status.DOGRULANAMADI,"Çatlak genişliği sonucu okunamadı",
+                "Yüklenen hesap raporundan çatlak genişliği / crack-width kontrol sonucu ayrıştırılamadı.",
+                "Servis durumu çatlak genişliği sonuçlarını eleman etiketi ve kullanılan sınır ile birlikte rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-60",reportedStatus(cues),"Çatlak genişliği rapor kontrolü",
+                "Hesap raporundan çatlak genişliği verisi okundu: "+cueSummary(cues,8)+".",
+                "Raporlanan değeri eleman, donatı düzeni, çevresel/servis kabulü ve raporda belirtilen sınırla çapraz kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void vibrationServiceabilityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"titresim","titreşim","vibration","comfort frequency","floor frequency");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-61",Status.DOGRULANAMADI,"Titreşim / konfor sonucu okunamadı",
+                "Yüklenen hesap raporundan döşeme titreşimi, konfor veya ilgili frekans sonucu ayrıştırılamadı.",
+                "Titreşim açısından kontrol edilen alanlarda ilgili frekans/ivme/konfor çıktısını rapora dahil edin; MusaCAD eksik dinamik hesabı üretmez.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-61",reportedStatus(cues),"Titreşim / konfor rapor kontrolü",
+                "Hesap raporundan titreşim/konfor verisi okundu: "+cueSummary(cues,8)+".",
+                "Sonucu kullanım amacı, açıklık/döşeme bölgesi ve raporda verilen kabul sınırıyla birlikte değerlendirin.",Collections.emptyList()));
+    }
+
+    private static void longTermEffectChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-62",Status.DOGRULANAMADI,"Uzun süreli sehim / sünme-rötre sonucu okunamadı",
+                "Hesap raporundan uzun süreli deformasyon, sünme veya rötre etkisine ilişkin açık sonuç ayrıştırılamadı.",
+                "Uzun açıklıklı veya hassas elemanlarda kullanılan sünme/rötre kabulleri ile uzun süreli sehim sonuçlarını rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-62",reportedStatus(cues),"Uzun süreli etkiler rapor kontrolü",
+                "Hesap raporundan uzun süreli etki verisi okundu: "+cueSummary(cues,8)+".",
+                "Kabullerin malzeme yaşı, yükleme süresi ve proje servis koşullarıyla uyumunu hesap modelinden doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void explicitServiceabilityFailureChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        ArrayList<String>bad=new ArrayList<>();
+        for(String cue:calc.loadCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            boolean service=has(q,"sehim","deflection","servisabilite","serviceability","catlak genisligi","çatlak genişliği","crack width","titresim","titreşim","vibration","creep","shrinkage","sunme","sünme","rotre","rötre");
+            boolean failed=has(q,"asiyor","aşıyor","asildi","aşıldı","exceed","exceeded","uygunsuz","yetersiz","basarisiz","başarısız","fail","failed","not satisfied","does not comply");
+            if(service&&failed&&!bad.contains(cue))bad.add(cue);
+        }
+        if(bad.isEmpty())return;
+        out.add(new Finding("ST-63",Status.UYUMSUZLUK,"Raporda açık servis sınırı aşımı",
+            "Servis verilebilirlik ile ilgili açık sınır-aşımı/başarısızlık ifadeleri bulundu: "+cueSummary(bad,10)+".",
+            "İlgili eleman, servis kombinasyonu ve kullanılan sınırı doğrudan hesap modelinde inceleyin; otomatik özet tek başına uygunluk kararı değildir.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){

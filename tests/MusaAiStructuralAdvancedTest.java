@@ -64,7 +64,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Kolon S12 PMM interaction ratio = 0.82 uygun\n"+
             "Kiriş K40 beam shear ratio = 0.71 uygun\n"+
             "Perde P20 wall shear capacity ratio = 0.66 uygun\n"+
-            "Kolon S99 capacity ratio = 0.95\n";
+            "Kolon S99 capacity ratio = 0.95\n"+
+            "Servisabilite sehim deflection = 12 mm uygun\n"+
+            "Çatlak genişliği crack width = 0.25 mm uygun\n"+
+            "Döşeme titreşim vibration comfort frequency = 8.0 Hz uygun\n"+
+            "Uzun süreli sehim creep shrinkage kontrolü uygun\n"+
+            "Döşeme titreşim limiti aşıldı\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -118,6 +123,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-55"),"beam capacity check missing");
         require(ids.contains("ST-56"),"wall shear capacity check missing");
         require(ids.contains("ST-58"),"utilization ranking check missing");
+        require(ids.contains("ST-59"),"deflection/serviceability check missing");
+        require(ids.contains("ST-60"),"crack-width check missing");
+        require(ids.contains("ST-61"),"vibration check missing");
+        require(ids.contains("ST-62"),"long-term effects check missing");
+        require(ids.contains("ST-63"),"explicit serviceability failure check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -150,6 +160,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Kiriş kesme oranlarını kontrol et"),"beam capacity focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Perde kesme kapasitesini kontrol et"),"wall shear focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Kritik eleman kapasite oranlarını sırala"),"utilization ranking focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Sehim kontrolünü incele"),"deflection focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Çatlak genişliğini kontrol et"),"crack-width focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Döşeme titreşimini kontrol et"),"vibration focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Sünme rötre etkilerini kontrol et"),"long-term effects focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Çatlak genişliğini kontrol et"),"crack-width focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -205,6 +220,16 @@ public final class MusaAiStructuralAdvancedTest {
         require(utilizationFocus.findings.size()==1&&"ST-58".equals(utilizationFocus.findings.get(0).id),
             "utilization focus must only return ST-58");
         require(utilizationFocus.text.contains("0.950"),"utilization ranking should include highest reported ratio");
+
+        MusaAiStructuralAdvanced.Result crackFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Çatlak genişliğini kontrol et");
+        require(crackFocus.findings.size()==1&&"ST-60".equals(crackFocus.findings.get(0).id),
+            "crack-width focus must only return ST-60");
+
+        MusaAiStructuralAdvanced.Result vibrationFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Döşeme titreşimini kontrol et");
+        require(vibrationFocus.findings.size()==1&&"ST-61".equals(vibrationFocus.findings.get(0).id),
+            "vibration focus must only return ST-61");
+        require(vibrationFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.UYUMSUZLUK,
+            "vibration limit exceedance must be surfaced as mismatch");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
