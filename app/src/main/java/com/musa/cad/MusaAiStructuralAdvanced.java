@@ -216,11 +216,24 @@ public final class MusaAiStructuralAdvanced {
                 if(n++>=120){out.append("\n• … kalan bulgular rapor ekine bırakıldı.");break outer;}
                 out.append("\n\n[").append(f.id).append("] ").append(label(f.status)).append(" • ").append(f.title);
                 out.append("\n").append(f.detail);
+                if(!f.sourceIds.isEmpty())out.append("\nKaynak CAD öğeleri: ").append(sourceIdSummary(f.sourceIds,12));
                 if(!f.suggestion.isEmpty())out.append("\nÖneri: ").append(f.suggestion);
             }
         }
         out.append("\n\nNot: Bu modül açık proje/hesap verisini çapraz kontrol eder; hesap sonucu olmayan yerde taşıma gücü, zımbalama güvenliği, deprem performansı veya donatı yeterliliği uydurmaz.");
         return new Result(true,out.toString(),findings,ids);
+    }
+
+    private static String sourceIdSummary(Collection<Integer>ids,int max){
+        if(ids==null||ids.isEmpty())return "—";
+        StringBuilder out=new StringBuilder();int n=0;
+        for(Integer id:ids){
+            if(id==null)continue;
+            if(n++>=max){out.append(", …");break;}
+            if(out.length()>0)out.append(", ");
+            out.append("#").append(id);
+        }
+        return out.length()==0?"—":out.toString();
     }
 
     private static String reportCategory(String id){
@@ -352,6 +365,7 @@ public final class MusaAiStructuralAdvanced {
         for(Finding f:filtered){
             out.append("\n\n[").append(f.id).append("] ").append(label(f.status)).append(" • ").append(f.title);
             out.append("\n").append(f.detail);
+            if(!f.sourceIds.isEmpty())out.append("\nKaynak CAD öğeleri: ").append(sourceIdSummary(f.sourceIds,12));
             if(!f.suggestion.isEmpty())out.append("\nÖneri: ").append(f.suggestion);
         }
         out.append("\n\nNot: Odaklı kontrol açık proje/hesap verisini filtreler; eksik hesap sonucu veya güvenlik değeri uydurmaz.");
