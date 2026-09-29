@@ -78,7 +78,12 @@ public enum MusaAiDiscipline {
             "response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü",
             "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
             "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
-            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))return STRUCTURAL;
+            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme",
+            "time history function","time history case","ground motion function","record function","zaman tanim alani","zaman tanım alanı","zaman gecmisi","zaman geçmişi",
+            "time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi",
+            "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
+            "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
+            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;

@@ -162,6 +162,11 @@ public final class MusaAiStructuralAdvanced {
         modalCaseSetupChecks(structuralCalc,findings);
         dampingDefinitionChecks(structuralCalc,findings);
         dynamicCombinationMethodChecks(structuralCalc,findings);
+        timeHistoryFunctionChecks(structuralCalc,findings);
+        timeHistoryStepChecks(structuralCalc,findings);
+        nonlinearHingeAssignmentChecks(structuralCalc,findings);
+        nonlinearCaseControlChecks(structuralCalc,findings);
+        stagedConstructionChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -250,7 +255,12 @@ public final class MusaAiStructuralAdvanced {
             "response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü",
             "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
             "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
-            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme");
+            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme",
+            "time history function","time history case","ground motion function","record function","zaman tanim alani","zaman tanım alanı","zaman gecmisi","zaman geçmişi",
+            "time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi",
+            "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
+            "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
+            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -343,7 +353,8 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
-        if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
+        boolean nonlinearHingeQuery=has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal");
+        if(!nonlinearHingeQuery&&has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
         if(has(q,"pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı"))ids.add("ST-54");
         if(has(q,"kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio"))ids.add("ST-55");
         if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))ids.add("ST-56");
@@ -384,6 +395,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü"))ids.add("ST-91");
         if(has(q,"damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm"))ids.add("ST-92");
         if(has(q,"modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))ids.add("ST-93");
+        if(has(q,"time history function","time history case","ground motion function","record function","zaman tanim alani","zaman tanım alanı","zaman gecmisi","zaman geçmişi"))ids.add("ST-94");
+        if(has(q,"time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi"))ids.add("ST-95");
+        if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))ids.add("ST-96");
+        if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))ids.add("ST-97");
+        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))ids.add("ST-98");
         return ids;
     }
 
@@ -395,6 +411,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü"))return "MODAL CASE YÖNTEMİ";
         if(has(q,"damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm"))return "SÖNÜM TANIMLARI";
         if(has(q,"modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))return "DİNAMİK KOMBİNASYON YÖNTEMİ";
+        if(has(q,"time history function","time history case","ground motion function","record function","zaman tanim alani","zaman tanım alanı","zaman gecmisi","zaman geçmişi"))return "ZAMAN TANIM ALANI / KAYIT FONKSİYONU";
+        if(has(q,"time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi"))return "TIME-STEP / ANALİZ SÜRESİ";
+        if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))return "DOĞRUSAL OLMAYAN MAFSAL ATAMASI";
+        if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))return "DOĞRUSAL OLMAYAN ANALİZ KONTROLLERİ";
+        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))return "YAPIM AŞAMASI / STAGED CONSTRUCTION";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -2001,6 +2022,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-93",s,"Modal / yönsel kombinasyon yöntemi kontrolü",
             "Model raporundan dinamik kombinasyon ayarı okundu: "+cueSummary(cues,10)+".",
             "Modal ve yönsel birleştirme yöntemlerinin proje analiz esaslarıyla uyumunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void timeHistoryFunctionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"time history function","time history case","ground motion function","record function","zaman tanim alani","zaman tanım alanı","zaman gecmisi","zaman geçmişi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-94",Status.DOGRULANAMADI,"Zaman tanım alanı kayıt/fonksiyon bilgisi okunamadı",
+                "Model raporundan time-history case ile kullanılan yer hareketi/kayıt fonksiyonunun eşleşmesine ilişkin açık kayıt ayrıştırılamadı.",
+                "Her time-history case için fonksiyon adı, yönü ve ölçek ilişkisini model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"function missing","record missing","invalid function","wrong record","time history function mismatch","zaman tanim fonksiyonu uyumsuz","zaman tanım fonksiyonu uyumsuz","error","failed");
+        out.add(new Finding("ST-94",s,"Zaman tanım alanı kayıt/fonksiyon kontrolü",
+            "Model raporundan time-history fonksiyon verisi okundu: "+cueSummary(cues,10)+".",
+            "Kayıt fonksiyonu, yön ve ölçek tanımlarının ilgili analiz case'i ile doğru eşleştiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void timeHistoryStepChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-95",Status.DOGRULANAMADI,"Time-step / analiz süresi okunamadı",
+                "Zaman tanım alanı analizinde kullanılan zaman adımı, çıktı adımı veya toplam analiz süresine ilişkin açık kayıt ayrıştırılamadı.",
+                "Time-step, çıktı adımı sayısı ve toplam süreyi case özetinde görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"time step invalid","time step zero","duration mismatch","insufficient steps","zaman adimi hatali","zaman adımı hatalı","error","failed");
+        out.add(new Finding("ST-95",s,"Time-step / analiz süresi kontrolü",
+            "Model raporundan zaman adımı/süre verisi okundu: "+cueSummary(cues,10)+".",
+            "Zaman adımı ve analiz süresinin kullanılan yer hareketi kaydı ve çözüm yöntemiyle uyumunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void nonlinearHingeAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-96",Status.DOGRULANAMADI,"Doğrusal olmayan mafsal atamaları okunamadı",
+                "Plastik/nonlinear mafsal property ve eleman atamalarına ilişkin açık model raporu ayrıştırılamadı.",
+                "Nonlinear analiz kullanılan projelerde mafsal property adlarını, konumlarını ve atanan elemanları raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"hinge not assigned","missing hinge","undefined hinge","invalid hinge","plastik mafsal atanmamis","plastik mafsal atanmamış","error","failed");
+        out.add(new Finding("ST-96",s,"Doğrusal olmayan mafsal atama kontrolü",
+            "Model raporundan nonlinear/plastik mafsal verisi okundu: "+cueSummary(cues,10)+".",
+            "Mafsal property tipi, eleman uç konumu ve ilgili taşıyıcı elemanla eşleşmesini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void nonlinearCaseControlChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-97",Status.DOGRULANAMADI,"Doğrusal olmayan çözüm kontrol ayarları okunamadı",
+                "İterasyon sayısı, tolerans veya event-stepping gibi nonlinear çözüm kontrol parametreleri açık rapordan ayrıştırılamadı.",
+                "Nonlinear case çözüm parametrelerini model raporuna dahil edin; yalnız yakınsama sonucuna değil çözüm ayarlarına da bakın.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"invalid tolerance","iteration limit invalid","solution control missing","nonlinear control missing","event stepping invalid","error","failed");
+        out.add(new Finding("ST-97",s,"Doğrusal olmayan çözüm kontrol ayarları",
+            "Model raporundan nonlinear çözüm kontrol verisi okundu: "+cueSummary(cues,10)+".",
+            "İterasyon/tolerans/event-stepping ayarlarının kullanılan nonlinear analiz yaklaşımıyla tutarlı olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void stagedConstructionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-98",Status.DOGRULANAMADI,"Yapım aşaması / staged-construction tanımı okunamadı",
+                "Yapım aşamalı analiz kullanılıp kullanılmadığı veya stage sıralamasına ilişkin açık model raporu ayrıştırılamadı.",
+                "Staged-construction kullanılan projelerde aşama sırası, eklenen/çıkarılan elemanlar ve yüklerin hangi aşamada devreye girdiğini raporlayın.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"stage missing","invalid stage","stage sequence error","duplicate stage","construction stage error","asama sirasi hatali","aşama sırası hatalı","error","failed");
+        out.add(new Finding("ST-98",s,"Yapım aşaması / staged-construction kontrolü",
+            "Model raporundan yapım aşaması verisi okundu: "+cueSummary(cues,10)+".",
+            "Aşamaların sırasını, aktive/deaktive edilen elemanları ve aşama yüklerini proje yapım senaryosuyla karşılaştırın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
