@@ -1010,6 +1010,11 @@ public final class MusaAiStructuralCalc {
                 "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
                 "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
                 "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama",
+                "zero length","zero-length","very short element","very short member","coincident joint","coincident node","sifir uzunluk","sıfır uzunluk","degenerate element",
+                "support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint",
+                "diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned",
+                "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
+                "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
@@ -1018,6 +1023,8 @@ public final class MusaAiStructuralCalc {
                 "catlak genisligi","çatlak genişliği","crack width",
                 "titresim","titreşim","vibration","comfort frequency","floor frequency",
                 "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
+                "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
+                "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier",
                 "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
                 "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case"))
                 addUnique(loads,t);

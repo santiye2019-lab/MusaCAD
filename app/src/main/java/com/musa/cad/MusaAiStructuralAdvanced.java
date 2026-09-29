@@ -142,6 +142,11 @@ public final class MusaAiStructuralAdvanced {
         sectionAssignmentIntegrityChecks(structuralCalc,findings);
         storyElementMetadataChecks(structuralCalc,findings);
         duplicateElementIdentityChecks(structuralCalc,findings);
+        degenerateGeometryChecks(structuralCalc,findings);
+        supportBoundaryAssignmentChecks(structuralCalc,findings);
+        diaphragmConstraintAssignmentChecks(structuralCalc,findings);
+        loadAssignmentIntegrityChecks(structuralCalc,findings);
+        selfWeightGravityChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -210,7 +215,12 @@ public final class MusaAiStructuralAdvanced {
             "material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material",
             "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
             "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
-            "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama");
+            "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama",
+            "zero length","zero-length","very short element","very short member","coincident joint","coincident node","sifir uzunluk","sıfır uzunluk","degenerate element",
+            "support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint",
+            "diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned",
+            "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
+            "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -318,6 +328,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section"))ids.add("ST-71");
         if(has(q,"story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment","kat aks eleman","kat-aks-eleman"))ids.add("ST-72");
         if(has(q,"duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama","kimlik cakismasi","kimlik çakışması"))ids.add("ST-73");
+        if(has(q,"zero length","zero-length","very short element","very short member","coincident joint","coincident node","sifir uzunluk","sıfır uzunluk","degenerate element"))ids.add("ST-74");
+        if(has(q,"support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint"))ids.add("ST-75");
+        if(has(q,"diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned"))ids.add("ST-76");
+        if(has(q,"load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama"))ids.add("ST-77");
+        if(has(q,"self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier"))ids.add("ST-78");
         return ids;
     }
 
@@ -380,6 +395,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section"))return "KESİT / PROPERTY ATAMA BÜTÜNLÜĞÜ";
         if(has(q,"story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment","kat aks eleman","kat-aks-eleman"))return "KAT / AKS / ELEMAN VERİ BÜTÜNLÜĞÜ";
         if(has(q,"duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama","kimlik cakismasi","kimlik çakışması"))return "MÜKERRER / ÇELİŞKİLİ ELEMAN KİMLİĞİ";
+        if(has(q,"zero length","zero-length","very short element","very short member","coincident joint","coincident node","sifir uzunluk","sıfır uzunluk","degenerate element"))return "SIFIR / BOZUK GEOMETRİLİ ELEMANLAR";
+        if(has(q,"support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint"))return "MESNET / SINIR ŞARTI ATAMALARI";
+        if(has(q,"diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned"))return "DİYAFRAM / CONSTRAINT ATAMALARI";
+        if(has(q,"load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama"))return "YÜK ATAMA BÜTÜNLÜĞÜ";
+        if(has(q,"self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier"))return "ÖZ AĞIRLIK / GRAVITY TANIMLARI";
         return "STATİK";
     }
 
@@ -1603,6 +1623,93 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-73",Status.BILGI,"Ayrıştırılan kayıtlarda eleman kimliği çakışması görülmedi",
                 "Kat+eleman etiketi bazında açık mükerrer/çelişkili kayıt saptanmadı.",
                 "Bu kontrol yalnız rapordan ayrıştırılan elemanlarla sınırlıdır; modelin kendi duplicate/check-model aracını da çalıştırın.",Collections.emptyList()));
+    }
+
+    private static Status assignmentCueStatus(Collection<String>cues,String...negativeTerms){
+        boolean positive=false,negative=false;
+        for(String cue:cues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,negativeTerms))negative=true;
+            if(has(q,"uygun","sagliyor","sağlıyor","assigned","defined","verified","checked","basarili","başarılı","no warning","no error"))positive=true;
+        }
+        if(negative)return Status.UYUMSUZLUK;
+        if(positive)return Status.BILGI;
+        return Status.INCELEME_GEREKLI;
+    }
+
+    private static void degenerateGeometryChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"zero length","zero-length","very short element","very short member","coincident joint","coincident node","sifir uzunluk","sıfır uzunluk","degenerate element");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-74",Status.DOGRULANAMADI,"Sıfır / bozuk geometrili eleman kontrolü okunamadı",
+                "Hesap/model raporundan sıfır uzunluklu, aşırı kısa veya çakışık düğüm/eleman uyarısına ilişkin açık çıktı ayrıştırılamadı.",
+                "Model check/geometry check çıktısında zero-length, coincident joint ve degenerate element kontrollerini görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"zero length element detected","zero-length element detected","very short element warning","very short member warning","coincident joint detected","coincident node detected","degenerate element detected","sifir uzunluklu eleman bulundu","sıfır uzunluklu eleman bulundu","error","failed");
+        out.add(new Finding("ST-74",s,"Sıfır / bozuk geometrili eleman rapor kontrolü",
+            "Model raporundan geometri kontrol verisi okundu: "+cueSummary(cues,10)+".",
+            "Uyarı verilen düğüm ve elemanları yakınlaştırarak birleşim, eleman boyu ve üst üste binen geometri açısından inceleyin.",Collections.emptyList()));
+    }
+
+    private static void supportBoundaryAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"support restraint","joint restraint","boundary condition","mesnet atama","mesnet tanimi","mesnet tanımı","support not assigned","missing restraint","unrestrained joint");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-75",Status.DOGRULANAMADI,"Mesnet / sınır şartı atamaları okunamadı",
+                "Hesap raporundan mesnet, joint restraint veya boundary-condition atamasına ilişkin açık kayıt ayrıştırılamadı.",
+                "Temel/mesnet düğümleri için sabit, mafsallı, yaylı veya serbestlik tanımlarını model kontrol çıktısına dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"support not assigned","missing restraint","unrestrained joint","undefined support","boundary condition missing","mesnet atanmamis","mesnet atanmamış","error","failed");
+        out.add(new Finding("ST-75",s,"Mesnet / sınır şartı atama kontrolü",
+            "Model raporundan mesnet/restraint verisi okundu: "+cueSummary(cues,10)+".",
+            "Atamaların gerçek taşıyıcı sistem ve zemin/temel modelleme kabulüyle eşleştiğini düğüm bazında doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void diaphragmConstraintAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-76",Status.DOGRULANAMADI,"Diyafram / constraint ataması okunamadı",
+                "Hesap raporundan kat diyaframı veya constraint atamasına ilişkin açık model kaydı ayrıştırılamadı.",
+                "Rijit/yarı rijit diyafram kabulü kullanılan katlarda assignment özetini model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"diaphragm not assigned","constraint not assigned","missing diaphragm","undefined diaphragm","diyafram atanmamis","diyafram atanmamış","error","failed");
+        out.add(new Finding("ST-76",s,"Diyafram / constraint atama kontrolü",
+            "Model raporundan diyafram/constraint verisi okundu: "+cueSummary(cues,10)+".",
+            "Diyafram adının doğru kat düğümlerine atandığını ve rijit/yarı rijit kabulün hesap modeliyle uyumlu olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void loadAssignmentIntegrityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-77",Status.DOGRULANAMADI,"Yük atama bütünlüğü okunamadı",
+                "Hesap raporundan frame/area/shell yük ataması veya atanmamış yük uyarısına ilişkin açık kayıt ayrıştırılamadı.",
+                "Sabit, hareketli, duvar, kaplama, kar ve diğer tasarım yüklerinin eleman/alan assignment özetini rapora dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"load not assigned","unassigned load","missing load","load assignment missing","yuk atanmamis","yük atanmamış","error","failed");
+        out.add(new Finding("ST-77",s,"Yük atama bütünlüğü rapor kontrolü",
+            "Model raporundan yük atama verisi okundu: "+cueSummary(cues,10)+".",
+            "Yüklerin doğru load pattern, yön, büyüklük ve eleman/alan grubuna atandığını modelde örnekleme ile kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void selfWeightGravityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-78",Status.DOGRULANAMADI,"Öz ağırlık / gravity tanımı okunamadı",
+                "Hesap raporundan self-weight multiplier veya gravity yük durumuna ilişkin açık tanım ayrıştırılamadı.",
+                "Öz ağırlığın hangi load pattern içinde ve hangi çarpanla üretildiğini model raporunda görünür hale getirin; iki kez eklenmediğini doğrulayın.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"self weight multiplier = 0","self-weight multiplier = 0","self weight missing","gravity load missing","oz agirlik yok","öz ağırlık yok","duplicate self weight","self weight duplicated","error","failed");
+        out.add(new Finding("ST-78",s,"Öz ağırlık / gravity tanım kontrolü",
+            "Model raporundan öz ağırlık/gravity verisi okundu: "+cueSummary(cues,10)+".",
+            "Self-weight çarpanını, dead-load pattern ilişkisini ve öz ağırlığın başka sabit yük içinde tekrar edilip edilmediğini kontrol edin.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
