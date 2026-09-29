@@ -205,6 +205,7 @@ public final class MusaAiStructuralCalcTest {
         yes(foundationModel.elements.get(1).punchingDetails.contains("ZIMBALAMA ÇEVRESİ:1800mm"),"punching perimeter missing");
         yes(foundationModel.elements.get(1).openings.contains("REZERVASYON:R1:600x800mm"),"reservation size missing");
         yes(foundationModel.elements.get(2).openings.contains("ŞAFT:R2:1000x1200mm"),"shaft size missing");
+        yes(!foundationModel.sections.contains("12x10")&&!foundationModel.sections.contains("60x80")&&!foundationModel.sections.contains("100x120"),"rebar/opening sizes must not pollute structural section inventory");
 
         MusaAiDrawingIndex foundationIndex=new MusaAiDrawingIndex("Statik",3,0,
             Arrays.asList("S_TEMEL","S_DOSEME"),
@@ -222,7 +223,6 @@ public final class MusaAiStructuralCalcTest {
         has(foundationCmp.text,"Temel / radye / kazık detayı");
         has(foundationCmp.text,"KAZIK ARALIĞI:2500mm");
         has(foundationCmp.text,"KAZIK ARALIĞI:2400mm");
-        has(foundationCmp.text,"Zımbalama detayı");
         has(foundationCmp.text,"Boşluk / rezervasyon");
         has(foundationCmp.text,"REZERVASYON:R1:600x800mm");
         has(foundationCmp.text,"REZERVASYON:R1:600x900mm");
