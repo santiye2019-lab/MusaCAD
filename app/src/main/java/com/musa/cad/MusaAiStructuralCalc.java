@@ -984,7 +984,12 @@ public final class MusaAiStructuralCalc {
                 "uplift","yuzme","hidrostatik","hydrostatic","buoyancy",
                 "p-delta","p delta","ikinci mertebe","second order","second-order",
                 "taban kesme","base shear","spektrum olcekle","spectrum scale","scaling",
-                "zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))
+                "zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring",
+                "kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass",
+                "kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity",
+                "tesadufi eksantrisite","accidental eccentricity","additional eccentricity",
+                "collector","drag strut","diyafram kiri","diaphragm chord","chord force",
+                "dusey deprem","dikey deprem","vertical earthquake","vertical seismic","vertical response spectrum"))
                 addUnique(seismic,t);
             if(loads.size()<40&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load","sehim","deflection","servisabilite","serviceability"))
                 addUnique(loads,t);

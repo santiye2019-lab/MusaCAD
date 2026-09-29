@@ -49,7 +49,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Uplift yüzme kontrolü uygun\n"+
             "P-Delta ikinci mertebe kontrolü uygun\n"+
             "Taban kesme kuvveti ve spektrum ölçekleme uygun\n"+
-            "Zemin yapı etkileşimi area spring uygun\n";
+            "Zemin yapı etkileşimi area spring uygun\n"+
+            "Kütle kaynağı G + 0.30Q\n"+
+            "Kütle merkezi ve rijitlik merkezi eksantrisite kontrolü uygun\n"+
+            "Tesadüfi eksantrisite accidental eccentricity uygulanmıştır\n"+
+            "Diyafram collector drag strut kontrolü uygun\n"+
+            "Düşey deprem vertical seismic etkisi uygun\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -89,6 +94,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-41"),"second-order check missing");
         require(ids.contains("ST-42"),"base-shear scaling check missing");
         require(ids.contains("ST-43"),"soil-structure interaction check missing");
+        require(ids.contains("ST-44"),"mass-source check missing");
+        require(ids.contains("ST-45"),"center/eccentricity check missing");
+        require(ids.contains("ST-46"),"accidental-eccentricity check missing");
+        require(ids.contains("ST-47"),"diaphragm force-path check missing");
+        require(ids.contains("ST-48"),"vertical seismic check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -103,6 +113,13 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Taban kesmesini kontrol et"),"base-shear focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Kazık kapasitesini incele"),"pile-capacity focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("P-Delta kontrolü yap"),"P-Delta focus must require report");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kütle kaynağını kontrol et"),"mass-source focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kütle merkezi rijitlik merkezi eksantrisite kontrolü"),"center/eccentricity focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Tesadüfi eksantrisiteyi kontrol et"),"accidental-eccentricity focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Diyafram collector kontrolü"),"collector focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Düşey deprem etkisini kontrol et"),"vertical seismic focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Kütle kaynağını kontrol et"),"mass-source focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Düşey deprem etkisini kontrol et"),"vertical seismic focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -125,6 +142,18 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result pDeltaFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"P-Delta kontrolü yap");
         require(pDeltaFocus.findings.size()==1&&"ST-41".equals(pDeltaFocus.findings.get(0).id),
             "P-Delta focus must only return ST-41");
+
+        MusaAiStructuralAdvanced.Result massFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Kütle kaynağını kontrol et");
+        require(massFocus.findings.size()==1&&"ST-44".equals(massFocus.findings.get(0).id),
+            "mass-source focus must only return ST-44");
+
+        MusaAiStructuralAdvanced.Result eccentricityFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Tesadüfi eksantrisiteyi kontrol et");
+        require(eccentricityFocus.findings.size()==1&&"ST-46".equals(eccentricityFocus.findings.get(0).id),
+            "accidental eccentricity focus must only return ST-46");
+
+        MusaAiStructuralAdvanced.Result verticalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Düşey deprem etkisini kontrol et");
+        require(verticalFocus.findings.size()==1&&"ST-48".equals(verticalFocus.findings.get(0).id),
+            "vertical seismic focus must only return ST-48");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");

@@ -112,6 +112,11 @@ public final class MusaAiStructuralAdvanced {
         secondOrderChecks(structuralCalc,findings);
         baseShearChecks(structuralCalc,findings);
         soilStructureInteractionChecks(structuralCalc,findings);
+        massSourceChecks(structuralCalc,findings);
+        centerEccentricityChecks(structuralCalc,findings);
+        accidentalEccentricityChecks(structuralCalc,findings);
+        diaphragmForcePathChecks(refs,structuralCalc,findings);
+        verticalSeismicChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -156,7 +161,11 @@ public final class MusaAiStructuralAdvanced {
             "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
             "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
             "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
-            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness");
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness",
+            "kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass",
+            "kutle merkezi","rijitlik merkezi","center of mass","center of rigidity","eksantrisite","eccentricity",
+            "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diaphragm chord",
+            "dusey deprem","dikey deprem","vertical earthquake","vertical seismic");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -233,6 +242,12 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"p-delta","p delta","ikinci mertebe","second order","second-order"))ids.add("ST-41");
         if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))ids.add("ST-42");
         if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))ids.add("ST-43");
+        if(has(q,"kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass"))ids.add("ST-44");
+        boolean accidental=has(q,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity");
+        if(!accidental&&has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))ids.add("ST-45");
+        if(accidental)ids.add("ST-46");
+        if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
+        if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
         return ids;
     }
 
@@ -265,6 +280,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"p-delta","p delta","ikinci mertebe","second order","second-order"))return "P-DELTA / İKİNCİ MERTEBE";
         if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))return "TABAN KESMESİ / SPEKTRUM ÖLÇEKLEME";
         if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))return "ZEMİN–YAPI ETKİLEŞİMİ";
+        if(has(q,"kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass"))return "KÜTLE KAYNAĞI / DEPREM KÜTLESİ";
+        if(has(q,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity"))return "TESADÜFİ EKSANTRİSİTE";
+        if(has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))return "KÜTLE–RİJİTLİK MERKEZİ / EKSANTRİSİTE";
+        if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))return "DİYAFRAM KUVVET AKTARIMI";
+        if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return "DÜŞEY DEPREM ETKİSİ";
         return "STATİK";
     }
 
@@ -909,6 +929,74 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-43",reportedStatus(cues),"Zemin–yapı etkileşimi / yay modeli",
                 "Hesap raporundan zemin-yapı etkileşimi verisi okundu: "+cueSummary(cues,5)+".",
                 "Yay katsayısı, birimler, sıkıştırma-only kabulü ve temel elemanlarına atanma kapsamını modelde doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void massSourceChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-44",Status.DOGRULANAMADI,"Kütle kaynağı / deprem kütlesi okunamadı",
+                "Yüklenen hesap raporundan analiz kütle kaynağı veya deprem kütlesi tanımı ayrıştırılamadı.",
+                "Sabit yük, hareketli yük katılım oranı ve varsa ilave kütlelerin kütle kaynağında nasıl tanımlandığını rapor/model çıktısıyla doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-44",reportedStatus(cues),"Kütle kaynağı / deprem kütlesi rapor kontrolü",
+                "Hesap raporundan kütle kaynağına ilişkin veri okundu: "+cueSummary(cues,5)+".",
+                "Kütle kaynağının yük kombinasyonları ve proje kullanım sınıfıyla uyumunu model üzerinde ayrıca doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void centerEccentricityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity");
+        cues.removeIf(cue->has(MusaAiDrawingIndex.normalize(cue),"tesadufi eksantrisite","accidental eccentricity","additional eccentricity"));
+        if(cues.isEmpty())
+            out.add(new Finding("ST-45",Status.DOGRULANAMADI,"Kütle–rijitlik merkezi / eksantrisite verisi okunamadı",
+                "Hesap raporundan kat bazlı kütle merkezi, rijitlik merkezi veya doğal eksantrisite verisi ayrıştırılamadı.",
+                "Kat bazlı CM/CR koordinatları veya eksantrisite tablosunu rapora dahil edin; MusaCAD merkezleri çizimden tahmin etmez.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-45",reportedStatus(cues),"Kütle–rijitlik merkezi / eksantrisite rapor kontrolü",
+                "Hesap raporundan merkez/eksantrisite verisi okundu: "+cueSummary(cues,5)+".",
+                "Kritik katlarda plan geometrisi ve rijitlik dağılımıyla birlikte kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void accidentalEccentricityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-46",Status.DOGRULANAMADI,"Tesadüfi eksantrisite tanımı okunamadı",
+                "Yüklenen hesap raporundan tesadüfi/ilave eksantrisite uygulamasına ilişkin açık satır ayrıştırılamadı.",
+                "Deprem yük durumlarında tesadüfi eksantrisite tanımını ve yön kombinasyonlarını analiz modelinden doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-46",reportedStatus(cues),"Tesadüfi eksantrisite rapor kontrolü",
+                "Hesap raporundan tesadüfi eksantrisite verisi okundu: "+cueSummary(cues,4)+".",
+                "Tanımın ilgili tüm deprem yük durumlarına ve yönlere uygulandığını model üzerinde doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void diaphragmForcePathChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();ArrayList<String>drawing=new ArrayList<>();
+        for(Ref r:refs)if(has(r.q,"collector","drag strut","diyafram kirisi","diyafram kiri","diaphragm chord","chord force","toplayici eleman")){
+            drawing.add(location(r));addId(ids,r);
+        }
+        List<String>cues=reportCues(calc,"collector","drag strut","diyafram kirisi","diyafram kiri","diaphragm chord","chord force","toplayici eleman");
+        if(drawing.isEmpty()&&cues.isEmpty())return;
+        Status status=!cues.isEmpty()?reportedStatus(cues):(calc==null?Status.INCELEME_GEREKLI:Status.DOGRULANAMADI);
+        String detail=!cues.isEmpty()
+            ?"Hesap raporundan diyafram kuvvet aktarım elemanlarına ilişkin veri okundu: "+cueSummary(cues,4)+"."
+            :"Çizimde collector/chord/toplayıcı eleman ifadesi bulundu: "+join(drawing,6)+".";
+        out.add(new Finding("ST-47",status,"Diyafram collector / chord kuvvet aktarımı",detail,
+            "Büyük açıklık ve düzensizlik bölgelerinde diyafram kuvvet yolunu, collector/chord elemanlarını ve bağlantı detaylarını hesap modeliyle eşleştirin.",ids));
+    }
+
+    private static void verticalSeismicChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic","vertical response spectrum");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-48",Status.DOGRULANAMADI,"Düşey deprem etkisi tanımı okunamadı",
+                "Yüklenen hesap raporundan düşey deprem etkisi veya düşey spektrum tanımı ayrıştırılamadı.",
+                "Düşey deprem etkisinin gerekli olduğu eleman/koşullar için kullanılan yük durumu ve kombinasyonları model çıktısından doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-48",reportedStatus(cues),"Düşey deprem etkisi rapor kontrolü",
+                "Hesap raporundan düşey deprem etkisine ilişkin veri okundu: "+cueSummary(cues,4)+".",
+                "İlgili yük durumunun hangi eleman ve kombinasyonlarda kullanıldığını ayrıca doğrulayın.",Collections.emptyList()));
     }
 
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
