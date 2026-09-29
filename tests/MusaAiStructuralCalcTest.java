@@ -155,6 +155,39 @@ public final class MusaAiStructuralCalcTest {
         has(memberCmp.text,"PERDE:YATAY:Ø10/20");
         has(memberCmp.text,"PERDE:YATAY:Ø10/25");
 
+        String detailingReport=
+            "1. KAT\n"+
+            "AKS A-1 K20 30x60 C30 B420C ALT 4Ø16 ETRİYE Ø8/20 BİNDİRME 60 CM ANKRAJ 40Ø PAS PAYI 25 MM SIKLAŞTIRMA BOYU 600 MM ALT DONATI SÜREKLİ\n"+
+            "AKS B-2 S20 40x40 C30 B420C 8Ø18 ETRİYE Ø8/15 BİNDİRME 50Ø ANKRAJ 700 MM PAS PAYI 30 MM SIKLAŞTIRMA 500 MM DONATI SÜREKLİ\n"+
+            "AKS C-3 P20 25x200 C30 B420C DÜŞEY Ø12/20 YATAY Ø10/20 PAS PAYI 30 MM DÜŞEY DONATI SÜREKLİ\n";
+        MusaAiStructuralCalc.Model detailingModel=MusaAiStructuralCalc.parse("detay-hesap.pdf",detailingReport);
+        yes(detailingModel.elements.size()==3,"three detailing-aware elements expected");
+        MusaAiStructuralCalc.Element k20=detailingModel.elements.get(0);
+        yes(k20.lapSplices.contains("BİNDİRME:600mm"),"lap splice cm-to-mm normalization missing");
+        yes(k20.anchorage.contains("ANKRAJ:40Ø"),"anchorage diameter-multiple missing");
+        yes(k20.cover.contains("PAS PAYI:25mm"),"cover missing");
+        yes(k20.confinement.contains("SIKLAŞTIRMA:600mm"),"confinement zone missing");
+        yes(k20.continuity.contains("ALT:SÜREKLİ"),"bottom reinforcement continuity missing");
+        yes(detailingModel.elements.get(1).continuity.contains("GENEL:SÜREKLİ"),"general continuity missing");
+
+        MusaAiDrawingIndex detailingIndex=new MusaAiDrawingIndex("Statik",3,0,
+            Arrays.asList("S_KIRIS","S_KOLON","S_PERDE"),
+            Arrays.asList("S_KIRIS","S_KOLON","S_PERDE"),
+            Arrays.asList(
+                new MusaAiDrawingIndex.Item(51,"TEXT","S_KIRIS","1. KAT AKS A-1 K20 30x60 C30 B420C ALT 4Ø16 ETRİYE Ø8/20 BİNDİRME 600 MM ANKRAJ 40Ø PAS PAYI 30 MM SIKLAŞTIRMA 600 MM ALT DONATI SÜREKLİ",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(52,"TEXT","S_KOLON","1. KAT AKS B-2 S20 40x40 C30 B420C 8Ø18 ETRİYE Ø8/15 BİNDİRME 50Ø ANKRAJ 700 MM PAS PAYI 30 MM SIKLAŞTIRMA 450 MM DONATI SONLANIR",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(53,"TEXT","S_PERDE","1. KAT AKS C-3 P20 25x200 C30 B420C DÜŞEY Ø12/20 YATAY Ø10/20 PAS PAYI 30 MM DÜŞEY DONATI SÜREKLİ",Double.NaN,Double.NaN)
+            ),"cm");
+
+        MusaAiStructuralCalc.Comparison detailingCmp=MusaAiStructuralCalc.compare(detailingIndex,detailingModel);
+        yes(detailingCmp.sameElements==1,"P20 detailing should match");
+        yes(detailingCmp.differentElements==2,"K20 cover and S20 confinement/continuity should differ");
+        yes(detailingCmp.sourceIds.contains(51)&&detailingCmp.sourceIds.contains(52),"detailing mismatches should be highlighted");
+        has(detailingCmp.text,"Pas payı: rapor PAS PAYI:25mm • DWG PAS PAYI:30mm");
+        has(detailingCmp.text,"Sıklaştırma bölgesi: rapor SIKLAŞTIRMA:500mm • DWG SIKLAŞTIRMA:450mm");
+        has(detailingCmp.text,"Donatı sürekliliği: rapor GENEL:SÜREKLİ • DWG GENEL:SONLANIR");
+        has(detailingCmp.text,"Bindirme, ankraj, pas payı, sıklaştırma ve süreklilik");
+
         yes(MusaAiStructuralCalc.isEngineeringTextExtension("model.e2k"),"e2k should be accepted");
         System.out.println("MusaAiStructuralCalcTest OK");
     }
