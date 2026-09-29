@@ -44,7 +44,11 @@ public enum MusaAiDiscipline {
             "pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı","kapasite orani","kapasite oranı","capacity ratio",
             "utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio",
             "kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment",
-            "perde kesme","wall shear","shear capacity","kapasite asimi","kapasite aşımı","yetersiz eleman","uygunsuz eleman","kritik eleman"))return STRUCTURAL;
+            "perde kesme","wall shear","shear capacity","kapasite asimi","kapasite aşımı","yetersiz eleman","uygunsuz eleman","kritik eleman",
+            "sehim","deflection","servisabilite","serviceability","catlak genisligi","çatlak genişliği","crack width",
+            "titresim","titreşim","vibration","comfort frequency","floor frequency",
+            "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
+            "servis siniri","servis sınırı","serviceability limit"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -82,7 +86,11 @@ public enum MusaAiDiscipline {
             "pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı","kapasite orani","kapasite oranı","capacity ratio",
             "utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio",
             "kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment",
-            "perde kesme","wall shear","shear capacity","kapasite asimi","kapasite aşımı","yetersiz eleman","uygunsuz eleman","kritik eleman"))return STRUCTURAL;
+            "perde kesme","wall shear","shear capacity","kapasite asimi","kapasite aşımı","yetersiz eleman","uygunsuz eleman","kritik eleman",
+            "sehim","deflection","servisabilite","serviceability","catlak genisligi","çatlak genişliği","crack width",
+            "titresim","titreşim","vibration","comfort frequency","floor frequency",
+            "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
+            "servis siniri","servis sınırı","serviceability limit"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;
