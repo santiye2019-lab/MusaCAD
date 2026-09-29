@@ -13,6 +13,10 @@ public final class MusaAiStructuralCalcTest {
             "K2 25/50 Ø12\n"+
             "RADYE TEMEL\n"+
             "SDS = 1.10 SD1 = 0.55 DTS=1 BYS=3 Zemin Sınıfı ZC\n"+
+            "Zemin Taşıma Gücü = 200 kPa\n"+
+            "Yatak Katsayısı = 30 MN/m3\n"+
+            "Yeraltı Suyu = -3.50 m\n"+
+            "Temel Alt Kotu = -4.50 m\n"+
             "Hareketli yük 5.00 kN/m2\n";
 
         MusaAiStructuralCalc.Model model=MusaAiStructuralCalc.parse("hesap.pdf",report);
@@ -26,6 +30,10 @@ public final class MusaAiStructuralCalcTest {
         yes("1".equals(model.designParameters.get("DTS")),"DTS missing");
         yes("3".equals(model.designParameters.get("BYS")),"BYS missing");
         yes("ZC".equals(model.designParameters.get("Zemin Sınıfı")),"soil class missing");
+        yes(model.designParameters.get("Zemin Taşıma Gücü").contains("200"),"bearing capacity missing");
+        yes(model.designParameters.get("Yatak Katsayısı").contains("30"),"subgrade modulus missing");
+        yes(model.designParameters.get("Yeraltı Suyu").contains("-3.50"),"groundwater level missing");
+        yes(model.designParameters.get("Temel Alt Kotu").contains("-4.50"),"foundation bottom level missing");
         yes(!model.seismicCues.isEmpty(),"seismic cues missing");
         yes(model.elements.size()==2,"K1/K2 element rows should be parsed");
 
