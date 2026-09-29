@@ -88,7 +88,12 @@ public enum MusaAiDiscipline {
             "damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama",
             "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
             "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
-            "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç"))return STRUCTURAL;
+            "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç",
+            "model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi",
+            "design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları",
+            "design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer",
+            "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
+            "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
