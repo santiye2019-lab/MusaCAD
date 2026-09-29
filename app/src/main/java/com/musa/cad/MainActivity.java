@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
@@ -74,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
         final ArrayList<CadImageOverlay> persistedImages=new ArrayList<>();
         MusaAiBoq.Model boqModel;
         String boqName="";
+        MusaAiStructuralCalc.Model structuralCalcModel;
+        String structuralCalcName="";
         String defaultLayer="0";
         void dispose(){
             LoadTask pending=prepareTask;prepareTask=null;if(pending!=null&&pending.future!=null)pending.future.cancel(true);
@@ -117,6 +119,8 @@ public class MainActivity extends AppCompatActivity {
     private List<Integer> lastAiReportSourceIds=Collections.emptyList();
     private MusaAiPanel.Reply pendingBoqReply;
     private ProjectSession pendingBoqProject;
+    private MusaAiPanel.Reply pendingStructuralCalcReply;
+    private ProjectSession pendingStructuralCalcProject;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
     private CadView.SessionState lastGandalfBatchState;
     private ProjectSession lastGandalfBatchProject;
@@ -842,7 +846,7 @@ public class MainActivity extends AppCompatActivity {
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
-            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu ve açık tüm disiplin dosyalarını birlikte inceleyen Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
+            reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu, hesap raporu/model çıktısı ↔ DWG karşılaştırması ve Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
         }
 
@@ -872,6 +876,48 @@ public class MainActivity extends AppCompatActivity {
         }
         if(isGandalfPreviewCommand(aiControl)){
             showPendingGandalfActions(reply,false);
+            return;
+        }
+
+        if(isStructuralCalcLoadCommand(aiControl)){
+            if(currentProject==null){
+                reply.send("Statik hesap raporu yüklemek için önce ilgili DWG/DXF projesini açın.");
+                return;
+            }
+            pendingStructuralCalcReply=reply;
+            pendingStructuralCalcProject=currentProject;
+            pickStructuralCalcDocument();
+            reply.send("Statik hesap raporu/model dışa aktarımını seçin. Metin tabanlı PDF, DOCX, XLSX, TXT/CSV ve ETABS/SAP/SAFE metin çıktıları (.e2k/.s2k/.f2k) okunabilir. Taranmış görüntü PDF'leri otomatik hesap verisi sayılmaz.");
+            return;
+        }
+        if(isStructuralCalcClearCommand(aiControl)){
+            if(currentProject!=null){currentProject.structuralCalcModel=null;currentProject.structuralCalcName="";}
+            reply.send("Bu proje için yüklenen statik hesap raporu bağlantısı temizlendi.");
+            return;
+        }
+        if(isStructuralCalcCompareCommand(aiControl)){
+            if(activeDxf==null){
+                reply.send("Statik hesap raporu–DWG karşılaştırması için tam vektör DWG/DXF çizimi hazır olmalı.");
+                return;
+            }
+            if(currentProject==null||currentProject.structuralCalcModel==null){
+                reply.send("Karşılaştırılacak statik hesap raporu yüklenmedi. Önce “Statik hesap raporu yükle” yazın.");
+                return;
+            }
+            MusaAiStructuralCalc.Comparison comparison=MusaAiStructuralCalc.compare(currentAiDrawingIndex(),currentProject.structuralCalcModel);
+            lastAiReport=comparison.text;
+            lastAiReportTitle="Statik Hesap–Proje Karşılaştırma Raporu";
+            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(comparison.sourceIds));
+            int shown=comparison.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(comparison.sourceIds);
+            if(comparison.sourceIds.isEmpty())cad.clearAiHighlights();
+            reply.send(comparison.text+(shown>0?"\n\n• Farklı kesitle ilişkilendirilen çizim nesnesi: "+shown:"")+
+                "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
+            return;
+        }
+        if(isStructuralCalcSummaryCommand(aiControl)){
+            reply.send(currentProject==null||currentProject.structuralCalcModel==null
+                ?"Bu proje için statik hesap raporu yüklenmedi. “Statik hesap raporu yükle” diyebilirsiniz."
+                :MusaAiStructuralCalc.summary(currentProject.structuralCalcModel));
             return;
         }
 
@@ -954,7 +1000,9 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             MusaAiDetailedReport.Result detailed=MusaAiDetailedReport.generate(
-                currentAiDrawingIndex(),currentDisplayName,raw,currentProject==null?null:currentProject.boqModel);
+                currentAiDrawingIndex(),currentDisplayName,raw,
+                currentProject==null?null:currentProject.boqModel,
+                currentProject==null?null:currentProject.structuralCalcModel);
             if(detailed.matched){
                 lastAiReport=detailed.text;lastAiReportTitle=detailed.title;
                 lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(detailed.sourceIds));
@@ -1325,6 +1373,27 @@ public class MainActivity extends AppCompatActivity {
     private static boolean isGandalfUndoCommand(String q){
         return q.equals("gandalf geri al")||q.equals("gandalf degisikliklerini geri al")||
             q.equals("ai degisikliklerini geri al")||q.equals("gandalf duzeltmelerini geri al");
+    }
+
+    private static boolean isStructuralCalcLoadCommand(String q){
+        return q.equals("statik hesap raporu yukle")||q.equals("hesap raporu yukle")||
+            q.equals("statik hesap yukle")||q.equals("statik model yukle")||
+            q.equals("hesap modeli yukle");
+    }
+    private static boolean isStructuralCalcClearCommand(String q){
+        return (q.contains("statik")||q.contains("hesap"))&&
+            (q.contains("rapor")||q.contains("model"))&&
+            (q.contains("temizle")||q.contains("sil")||q.contains("kaldir"));
+    }
+    private static boolean isStructuralCalcCompareCommand(String q){
+        return (q.contains("statik")||q.contains("hesap"))&&
+            (q.contains("hesap")||q.contains("rapor")||q.contains("model"))&&
+            (q.contains("karsilastir")||q.contains("uyum")||q.contains("fark"))&&
+            (q.contains("proje")||q.contains("dwg")||q.contains("cizim")||q.contains("statik"));
+    }
+    private static boolean isStructuralCalcSummaryCommand(String q){
+        return q.equals("statik hesap ozeti")||q.equals("hesap raporu ozeti")||
+            q.equals("yuklu statik hesap raporu")||q.equals("statik modeli goster");
     }
 
     private static boolean isBoqLoadCommand(String q){
@@ -1793,6 +1862,75 @@ public class MainActivity extends AppCompatActivity {
         if(!canEdit()||currentProject==null){result.setText("Medya • Düzenlenebilir bir çizim açın");return;}
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType(mime);
         startActivityForResult(intent,request);
+    }
+
+    private void pickStructuralCalcDocument(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        // Deliberately use */* because ETABS/SAP/SAFE text exports often have
+        // vendor/unknown MIME types (.e2k/.s2k/.f2k).
+        intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent,PICK_STRUCT_CALC);
+    }
+
+    private void handleStructuralCalcPicked(Uri uri){
+        final MusaAiPanel.Reply reply=pendingStructuralCalcReply;
+        final ProjectSession target=pendingStructuralCalcProject;
+        pendingStructuralCalcReply=null;pendingStructuralCalcProject=null;
+        if(uri==null||target==null)return;
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+
+        final String name=nameOf(uri);
+        String detected=getContentResolver().getType(uri);
+        final String mime=detected==null?CadDocumentSupport.bestMime(name,null):detected;
+        final CadDocumentSupport.Kind kind=CadDocumentSupport.kind(name,mime);
+        final boolean engineeringText=MusaAiStructuralCalc.isEngineeringTextExtension(name)||
+            (mime!=null&&mime.toLowerCase(Locale.ROOT).startsWith("text/"));
+
+        boolean supported=kind==CadDocumentSupport.Kind.PDF||
+            kind==CadDocumentSupport.Kind.DOCX||
+            kind==CadDocumentSupport.Kind.XLSX||
+            kind==CadDocumentSupport.Kind.CSV||
+            kind==CadDocumentSupport.Kind.TEXT||
+            engineeringText;
+        if(!supported){
+            String message="Bu statik hesap raporu/model biçimi otomatik okunamıyor: "+name+
+                ". Desteklenenler: metin tabanlı PDF, DOCX, XLSX, TXT/CSV, E2K/S2K/F2K ve metin/XML dışa aktarımları.";
+            if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        result.setText("Statik hesap • "+name+" okunuyor…");
+        aiExecutor.submit(()->{
+            try(InputStream in=getContentResolver().openInputStream(uri)){
+                if(in==null)throw new IOException("Statik hesap raporu açılamadı");
+                String extracted;
+                if(kind==CadDocumentSupport.Kind.PDF)extracted=MusaAiPdfTextExtractor.extract(in);
+                else if(kind==CadDocumentSupport.Kind.DOCX||kind==CadDocumentSupport.Kind.XLSX||
+                        kind==CadDocumentSupport.Kind.CSV||kind==CadDocumentSupport.Kind.TEXT)
+                    extracted=OfficeTextExtractor.extract(in,name,mime);
+                else extracted=MusaAiStructuralCalc.readText(in);
+
+                MusaAiStructuralCalc.Model model=MusaAiStructuralCalc.parse(name,extracted);
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    target.structuralCalcModel=model;target.structuralCalcName=name;
+                    result.setText("Statik hesap • "+name+" • "+model.taggedSections.size()+" etiketli kesit");
+                    String message="Statik hesap raporu/model çıktısı yüklendi.\n"+
+                        MusaAiStructuralCalc.summary(model)+
+                        "\n\n“Statik hesapla projeyi karşılaştır” diyerek aktif DWG ile çapraz kontrol yapabilirsiniz.";
+                    if(reply!=null)reply.send(message);
+                    else Toast.makeText(this,"Statik hesap raporu yüklendi",Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception e){
+                final String message="Statik hesap raporu okunamadı: "+(e.getMessage()==null?"bilinmeyen hata":e.getMessage());
+                runOnUiThread(()->{
+                    result.setText(message);
+                    if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private void pickBoqDocument(){
@@ -2779,6 +2917,11 @@ public class MainActivity extends AppCompatActivity {
             if(reply!=null)reply.send("Keşif yükleme iptal edildi.");
             return;
         }
+        if(r==PICK_STRUCT_CALC&&c!=RESULT_OK){
+            MusaAiPanel.Reply reply=pendingStructuralCalcReply;pendingStructuralCalcReply=null;pendingStructuralCalcProject=null;
+            if(reply!=null)reply.send("Statik hesap raporu yükleme iptal edildi.");
+            return;
+        }
         if(r==OPEN&&c!=RESULT_OK)pendingHomeCategory=0;
         if(c!=RESULT_OK||data==null)return;
         if(r==VIEW_DOCUMENT){handleDocumentImport(data);return;}
@@ -2787,6 +2930,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
+        if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}

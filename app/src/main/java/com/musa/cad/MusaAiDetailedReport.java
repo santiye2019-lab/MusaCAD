@@ -38,18 +38,29 @@ public final class MusaAiDetailedReport {
     }
 
     public static Result generate(MusaAiDrawingIndex index,String drawingName,String raw,MusaAiBoq.Model loadedBoq){
+        return generate(index,drawingName,raw,loadedBoq,null);
+    }
+
+    public static Result generate(MusaAiDrawingIndex index,String drawingName,String raw,MusaAiBoq.Model loadedBoq,
+                                  MusaAiStructuralCalc.Model structuralCalc){
         if(index==null)return Result.none();
         String q=MusaAiDrawingIndex.normalize(raw);
         boolean all=q.contains("tam proje")||q.contains("tum disiplin")||q.contains("detayli proje");
         Level level=levelFrom(raw);
-        if(all)return generateAll(index,drawingName,loadedBoq,level);
+        if(all)return generateAll(index,drawingName,loadedBoq,level,structuralCalc);
         MusaAiDiscipline d=MusaAiDiscipline.fromQuery(raw);
         if(d==MusaAiDiscipline.UNKNOWN)return Result.none();
-        return generateDiscipline(index,drawingName,d,loadedBoq,level);
+        return generateDiscipline(index,drawingName,d,loadedBoq,level,structuralCalc);
     }
 
     public static Result generateDiscipline(MusaAiDrawingIndex index,String drawingName,MusaAiDiscipline d,
                                             MusaAiBoq.Model loadedBoq,Level level){
+        return generateDiscipline(index,drawingName,d,loadedBoq,level,null);
+    }
+
+    public static Result generateDiscipline(MusaAiDrawingIndex index,String drawingName,MusaAiDiscipline d,
+                                            MusaAiBoq.Model loadedBoq,Level level,
+                                            MusaAiStructuralCalc.Model structuralCalc){
         MusaAiDisciplineAnalyzer.Result analysis=MusaAiDisciplineAnalyzer.analyzeDiscipline(index,d);
         LinkedHashSet<Integer>ids=new LinkedHashSet<>(analysis.sourceIds);
         String title=d==MusaAiDiscipline.STRUCTURAL?"Statik Proje İnceleme Raporu":d.label+" Proje İnceleme Raporu";
@@ -77,6 +88,15 @@ public final class MusaAiDetailedReport {
             ids.addAll(structural.sourceIds);
             out.append("\n\n3A. STATİK TEKNİK VERİ ÖZETİ");
             appendStructuralSummary(out,structural,level);
+
+            out.append("\n\n3B. STATİK HESAP RAPORU ↔ DWG ÇAPRAZ KONTROLÜ");
+            if(structuralCalc==null){
+                out.append("\n• Bu projeye statik hesap raporu/model dışa aktarımı yüklenmedi. “Statik hesap raporu yükle” komutuyla PDF, DOCX, XLSX, TXT/CSV veya E2K/S2K/F2K metin çıktısı bağlanabilir.");
+            }else{
+                MusaAiStructuralCalc.Comparison structuralComparison=MusaAiStructuralCalc.compare(index,structuralCalc);
+                ids.addAll(structuralComparison.sourceIds);
+                out.append("\n").append(structuralComparison.text);
+            }
         }
 
         MusaAiBoq.Model projectAll=MusaAiBoq.generate(index,blank(drawingName,"Aktif proje")+" • otomatik proje metrajı");
@@ -112,6 +132,11 @@ public final class MusaAiDetailedReport {
     }
 
     public static Result generateAll(MusaAiDrawingIndex index,String drawingName,MusaAiBoq.Model loadedBoq,Level level){
+        return generateAll(index,drawingName,loadedBoq,level,null);
+    }
+
+    public static Result generateAll(MusaAiDrawingIndex index,String drawingName,MusaAiBoq.Model loadedBoq,Level level,
+                                     MusaAiStructuralCalc.Model structuralCalc){
         String title="Tam Proje Denetim ve Uygunluk Raporu";
         StringBuilder out=new StringBuilder();header(out,title,drawingName,index,level);
         MusaAiDisciplineAnalyzer.Result all=MusaAiDisciplineAnalyzer.analyzeAll(index);
@@ -139,6 +164,13 @@ public final class MusaAiDetailedReport {
         out.append("\n\n4. PROJE–KEŞİF KARŞILAŞTIRMASI");
         if(loadedBoq==null)out.append("\n• Yüklenmiş keşif yok.");
         else appendComparison(out,MusaAiBoq.compare(loadedBoq,project),level);
+
+        if(structuralCalc!=null){
+            out.append("\n\n4A. STATİK HESAP RAPORU ↔ DWG KARŞILAŞTIRMASI");
+            MusaAiStructuralCalc.Comparison structuralComparison=MusaAiStructuralCalc.compare(index,structuralCalc);
+            ids.addAll(structuralComparison.sourceIds);
+            out.append("\n").append(structuralComparison.text);
+        }
 
         out.append("\n\n5. DİSİPLİNLER ARASI KOORDİNASYON");
         out.append("\n• Mimari ↔ Statik: açıklıklar, şaftlar, rezervasyonlar, kotlar.");

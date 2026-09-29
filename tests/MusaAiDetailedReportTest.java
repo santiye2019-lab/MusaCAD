@@ -18,7 +18,10 @@ public final class MusaAiDetailedReportTest {
             new MusaAiBoq.Row("15.001","Betonarme kolon","m",9,"Statik keşif"),
             new MusaAiBoq.Row("25.001","Yangın sprinkler hattı","m",11,"Yangın keşfi")
         ));
-        MusaAiDetailedReport.Result statik=MusaAiDetailedReport.generate(index(),"statik.dwg","Statik detaylı rapor oluştur",boq);
+        MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.pdf",
+            "C30 B420C K1 30x70\nSDS 1.10 Zemin Sınıfı ZC\nRADYE TEMEL");
+        MusaAiDetailedReport.Result statik=MusaAiDetailedReport.generate(
+            index(),"statik.dwg","Statik detaylı rapor oluştur",boq,calc);
         if(!statik.matched)throw new AssertionError("not matched");
         has(statik.text,"STATİK PROJE İNCELEME RAPORU");
         has(statik.text,"PROJE–KEŞİF UYGUNLUĞU");
@@ -32,6 +35,8 @@ public final class MusaAiDetailedReportTest {
         has(statik.text,"Ø16");
         has(statik.text,"AKS A-1");
         has(statik.text,"+3.20");
+        has(statik.text,"STATİK HESAP RAPORU ↔ DWG ÇAPRAZ KONTROLÜ");
+        has(statik.text,"K1: rapor 30x70 • DWG 30x60");
         MusaAiDetailedReport.Result all=MusaAiDetailedReport.generate(index(),"proje.dwg","Tam proje denetim raporu oluştur",boq);
         has(all.text,"TAM PROJE DENETİM VE UYGUNLUK RAPORU");
         has(all.text,"DİSİPLİNLER ARASI KOORDİNASYON");
