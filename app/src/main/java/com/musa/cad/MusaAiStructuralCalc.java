@@ -989,9 +989,19 @@ public final class MusaAiStructuralCalc {
                 "kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity",
                 "tesadufi eksantrisite","accidental eccentricity","additional eccentricity",
                 "collector","drag strut","diyafram kiri","diaphragm chord","chord force",
-                "dusey deprem","dikey deprem","vertical earthquake","vertical seismic","vertical response spectrum"))
+                "dusey deprem","dikey deprem","vertical earthquake","vertical seismic","vertical response spectrum",
+                "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
+                "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","ex","ey","rsx","rsy",
+                "r d i","r/d/i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor",
+                "etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier",
+                "rijitlik carpani","rijitlik çarpanı","property modifier","section modifier",
+                "mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))
                 addUnique(seismic,t);
-            if(loads.size()<40&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load","sehim","deflection","servisabilite","serviceability"))
+            if(loads.size()<80&&has(q,
+                "hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load",
+                "sehim","deflection","servisabilite","serviceability",
+                "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
+                "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case"))
                 addUnique(loads,t);
         }
     }
