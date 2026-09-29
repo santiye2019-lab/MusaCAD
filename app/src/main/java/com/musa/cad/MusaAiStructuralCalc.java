@@ -943,6 +943,10 @@ public final class MusaAiStructuralCalc {
         collectNamedNumber(raw,out,"I","(?iu)(?:BİNA\\s*ÖNEM\\s*KATSAYISI|BINA\\s*ONEM\\s*KATSAYISI|IMPORTANCE\\s*FACTOR)\\s*(?:\\(I\\))?\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
         collectNamedNumber(raw,out,"T1X","(?iu)\\bT1\\s*[-_ ]?X\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
         collectNamedNumber(raw,out,"T1Y","(?iu)\\bT1\\s*[-_ ]?Y\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedText(raw,out,"Zemin Taşıma Gücü","(?iu)\\b(?:ZEM[İI]N\\s+(?:EMN[İI]YET\\s+GER[İI]LMES[İI]|TAŞIMA\\s+GÜCÜ|TASIMA\\s+GUCU)|ALLOWABLE\\s+BEARING\\s+(?:CAPACITY|PRESSURE)|BEARING\\s+CAPACITY)\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KPA|KN\\s*/\\s*M(?:2|²)|T\\s*/\\s*M(?:2|²)|KG\\s*/\\s*CM(?:2|²)))");
+        collectNamedText(raw,out,"Yatak Katsayısı","(?iu)\\b(?:YATAK\\s+KATSAYISI|ZEM[İI]N\\s+YATAK\\s+KATSAYISI|SUBGRADE\\s+MODULUS|MODULUS\\s+OF\\s+SUBGRADE\\s+REACTION|K[Ss])\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KN\\s*/\\s*M(?:3|³)|MN\\s*/\\s*M(?:3|³)|T\\s*/\\s*M(?:3|³)))");
+        collectNamedText(raw,out,"Yeraltı Suyu","(?iu)\\b(?:YERALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|YER\\s+ALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|GROUNDWATER(?:\\s+LEVEL)?)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
+        collectNamedText(raw,out,"Temel Alt Kotu","(?iu)\\b(?:TEMEL\\s+ALT\\s+KOTU|FOUNDATION\\s+(?:BOTTOM|BASE)\\s+LEVEL)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
     }
 
     private static void collectNamedNumber(String raw,Map<String,String>out,String key,String regex){
@@ -970,7 +974,11 @@ public final class MusaAiStructuralCalc {
                 "burulma","torsional irregularity","eta bi","etabi",
                 "yumusak kat","soft story","zayif kat","weak story",
                 "modal","mod sekli","mode shape","periyot","period","kutle katilim","mass participation",
-                "etkin modal kutle","effective modal mass","mod birlestirme","response spectrum","modal combination"))
+                "etkin modal kutle","effective modal mass","mod birlestirme","response spectrum","modal combination",
+                "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid diaphragm",
+                "doseme sureksiz","slab discontinuity","bodrum perdesi","basement wall","cevre perdesi",
+                "zemin tasima gucu","zemin emniyet gerilmesi","allowable bearing","bearing capacity",
+                "yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu"))
                 addUnique(seismic,t);
             if(loads.size()<40&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load","sehim","deflection","servisabilite","serviceability"))
                 addUnique(loads,t);
