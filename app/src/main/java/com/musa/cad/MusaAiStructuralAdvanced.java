@@ -260,7 +260,7 @@ public final class MusaAiStructuralAdvanced {
             "time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi",
             "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
             "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
-            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","yapim asamasi","yapım aşaması");
+            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -399,7 +399,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi"))ids.add("ST-95");
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))ids.add("ST-96");
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))ids.add("ST-97");
-        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","yapim asamasi","yapım aşaması"))ids.add("ST-98");
+        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))ids.add("ST-98");
         return ids;
     }
 
@@ -415,7 +415,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi"))return "TIME-STEP / ANALİZ SÜRESİ";
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))return "DOĞRUSAL OLMAYAN MAFSAL ATAMASI";
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))return "DOĞRUSAL OLMAYAN ANALİZ KONTROLLERİ";
-        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","yapim asamasi","yapım aşaması"))return "YAPIM AŞAMASI / STAGED CONSTRUCTION";
+        if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))return "YAPIM AŞAMASI / STAGED CONSTRUCTION";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -2086,7 +2086,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void stagedConstructionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","yapim asamasi","yapım aşaması");
+        List<String>cues=serviceReportCues(calc,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları");
         if(cues.isEmpty()){
             out.add(new Finding("ST-98",Status.DOGRULANAMADI,"Yapım aşaması / staged-construction tanımı okunamadı",
                 "Yapım aşamalı analiz kullanılıp kullanılmadığı veya stage sıralamasına ilişkin açık model raporu ayrıştırılamadı.",
