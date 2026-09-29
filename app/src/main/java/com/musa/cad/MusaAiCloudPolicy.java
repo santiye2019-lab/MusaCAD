@@ -6,8 +6,10 @@ public final class MusaAiCloudPolicy {
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;
         if(MusaAiMechanicalExpert.isCloudExpertCommand(raw)||MusaAiDisciplineExpert.isCloudExpertCommand(raw))return true;
-        return q.equals("gandalf")||q.startsWith("gandalf ")||
-            q.equals("cloudai")||q.startsWith("cloudai ")||
+        // "Gandalf" is the central assistant identity, not a synonym for cloud.
+        // Ordinary Gandalf voice/text commands should first use local CAD tools.
+        // Cloud is reserved for explicit deep/web/current-source intent.
+        return q.equals("cloudai")||q.startsWith("cloudai ")||
             q.contains("bulut ai")||q.contains("bulut yapay zeka")||
             q.contains("derin analiz")||q.contains("internetten kontrol")||
             q.contains("webden kontrol")||q.contains("guncel kaynaklarla");
