@@ -188,6 +188,46 @@ public final class MusaAiStructuralCalcTest {
         has(detailingCmp.text,"Donatı sürekliliği: rapor GENEL:SÜREKLİ • DWG GENEL:SONLANIR");
         has(detailingCmp.text,"Bindirme, ankraj, pas payı, sıklaştırma ve süreklilik");
 
+        String foundationReport=
+            "1. KAT\n"+
+            "AKS A-1 T30 RADYE TEMEL 80x800 C35 B420C RADYE KALINLIK 80 CM KAZIK ÇAPI 80 CM KAZIK BOYU 18 M KAZIK AKS ARALIĞI 250 CM KAZIK ADEDİ 24\n"+
+            "AKS B-2 D30 DÖŞEME 20x300 C35 B420C ZIMBALAMA DONATISI Ø12/10 ZIMBALAMA ÇEVRESİ 180 CM REZERVASYON R1 60x80 CM\n"+
+            "AKS C-3 D31 DÖŞEME 18x300 C35 B420C ZIMBALAMA DONATISI Ø10/10 ZIMBALAMA ÇEVRESİ 160 CM ŞAFT R2 100x120 CM\n";
+        MusaAiStructuralCalc.Model foundationModel=MusaAiStructuralCalc.parse("temel-zimbalama.pdf",foundationReport);
+        yes(foundationModel.elements.size()==3,"three foundation/punching elements expected");
+        MusaAiStructuralCalc.Element t30=foundationModel.elements.get(0);
+        yes(t30.foundationDetails.contains("TEMEL KALINLIĞI:800mm"),"raft thickness missing");
+        yes(t30.foundationDetails.contains("KAZIK ÇAPI:800mm"),"pile diameter missing");
+        yes(t30.foundationDetails.contains("KAZIK BOYU:18000mm"),"pile length missing");
+        yes(t30.foundationDetails.contains("KAZIK ARALIĞI:2500mm"),"pile spacing missing");
+        yes(t30.foundationDetails.contains("KAZIK ADEDİ:24"),"pile count missing");
+        yes(foundationModel.elements.get(1).punchingDetails.contains("ZIMBALAMA DONATISI:Ø12/10"),"punching reinforcement missing");
+        yes(foundationModel.elements.get(1).punchingDetails.contains("ZIMBALAMA ÇEVRESİ:1800mm"),"punching perimeter missing");
+        yes(foundationModel.elements.get(1).openings.contains("REZERVASYON:R1:600x800mm"),"reservation size missing");
+        yes(foundationModel.elements.get(2).openings.contains("ŞAFT:R2:1000x1200mm"),"shaft size missing");
+        yes(!foundationModel.sections.contains("12x10")&&!foundationModel.sections.contains("60x80")&&!foundationModel.sections.contains("100x120"),"rebar/opening sizes must not pollute structural section inventory");
+
+        MusaAiDrawingIndex foundationIndex=new MusaAiDrawingIndex("Statik",3,0,
+            Arrays.asList("S_TEMEL","S_DOSEME"),
+            Arrays.asList("S_TEMEL","S_DOSEME"),
+            Arrays.asList(
+                new MusaAiDrawingIndex.Item(61,"TEXT","S_TEMEL","1. KAT AKS A-1 T30 RADYE TEMEL 80x800 C35 B420C RADYE KALINLIK 800 MM KAZIK ÇAPI 800 MM KAZIK BOYU 18 M KAZIK AKS ARALIĞI 240 CM KAZIK ADEDİ 24",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(62,"TEXT","S_DOSEME","1. KAT AKS B-2 D30 DÖŞEME 20x300 C35 B420C ZIMBALAMA DONATISI Ø12/10 ZIMBALAMA ÇEVRESİ 1800 MM REZERVASYON R1 60x90 CM",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(63,"TEXT","S_DOSEME","1. KAT AKS C-3 D31 DÖŞEME 18x300 C35 B420C ZIMBALAMA DONATISI Ø10/10 ZIMBALAMA ÇEVRESİ 1600 MM ŞAFT R2 1000x1200 MM",Double.NaN,Double.NaN)
+            ),"cm");
+
+        MusaAiStructuralCalc.Comparison foundationCmp=MusaAiStructuralCalc.compare(foundationIndex,foundationModel);
+        yes(foundationCmp.sameElements==1,"D31 foundation coordination should match");
+        yes(foundationCmp.differentElements==2,"T30 pile spacing and D30 reservation should differ");
+        yes(foundationCmp.sourceIds.contains(61)&&foundationCmp.sourceIds.contains(62),"foundation/opening mismatches should be highlighted");
+        has(foundationCmp.text,"Temel / radye / kazık detayı");
+        has(foundationCmp.text,"KAZIK ARALIĞI:2500mm");
+        has(foundationCmp.text,"KAZIK ARALIĞI:2400mm");
+        has(foundationCmp.text,"Boşluk / rezervasyon");
+        has(foundationCmp.text,"REZERVASYON:R1:600x800mm");
+        has(foundationCmp.text,"REZERVASYON:R1:600x900mm");
+        has(foundationCmp.text,"zımbalama kapasitesi veya temel taşıma gücü hesaplanmaz");
+
         yes(MusaAiStructuralCalc.isEngineeringTextExtension("model.e2k"),"e2k should be accepted");
         System.out.println("MusaAiStructuralCalcTest OK");
     }
