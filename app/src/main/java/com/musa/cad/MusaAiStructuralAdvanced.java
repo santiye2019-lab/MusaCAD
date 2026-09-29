@@ -243,8 +243,9 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))ids.add("ST-42");
         if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))ids.add("ST-43");
         if(has(q,"kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass"))ids.add("ST-44");
-        if(has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))ids.add("ST-45");
-        if(has(q,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity"))ids.add("ST-46");
+        boolean accidental=has(q,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity");
+        if(!accidental&&has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))ids.add("ST-45");
+        if(accidental)ids.add("ST-46");
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
         return ids;
@@ -280,8 +281,8 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))return "TABAN KESMESİ / SPEKTRUM ÖLÇEKLEME";
         if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))return "ZEMİN–YAPI ETKİLEŞİMİ";
         if(has(q,"kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass"))return "KÜTLE KAYNAĞI / DEPREM KÜTLESİ";
-        if(has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))return "KÜTLE–RİJİTLİK MERKEZİ / EKSANTRİSİTE";
         if(has(q,"tesadufi eksantrisite","accidental eccentricity","additional eccentricity"))return "TESADÜFİ EKSANTRİSİTE";
+        if(has(q,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity"))return "KÜTLE–RİJİTLİK MERKEZİ / EKSANTRİSİTE";
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))return "DİYAFRAM KUVVET AKTARIMI";
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return "DÜŞEY DEPREM ETKİSİ";
         return "STATİK";
@@ -946,6 +947,7 @@ public final class MusaAiStructuralAdvanced {
     private static void centerEccentricityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
         List<String>cues=reportCues(calc,"kutle merkezi","rijitlik merkezi","center of mass","centre of mass","center of rigidity","centre of rigidity","eksantrisite","eccentricity");
+        cues.removeIf(cue->has(MusaAiDrawingIndex.normalize(cue),"tesadufi eksantrisite","accidental eccentricity","additional eccentricity"));
         if(cues.isEmpty())
             out.add(new Finding("ST-45",Status.DOGRULANAMADI,"Kütle–rijitlik merkezi / eksantrisite verisi okunamadı",
                 "Hesap raporundan kat bazlı kütle merkezi, rijitlik merkezi veya doğal eksantrisite verisi ayrıştırılamadı.",
