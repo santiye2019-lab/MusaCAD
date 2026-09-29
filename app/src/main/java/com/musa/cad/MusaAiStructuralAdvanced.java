@@ -167,6 +167,11 @@ public final class MusaAiStructuralAdvanced {
         nonlinearHingeAssignmentChecks(structuralCalc,findings);
         nonlinearCaseControlChecks(structuralCalc,findings);
         stagedConstructionChecks(structuralCalc,findings);
+        linkPropertyAssignmentChecks(structuralCalc,findings);
+        nonlinearLinkDamperChecks(structuralCalc,findings);
+        baseIsolatorAssignmentChecks(structuralCalc,findings);
+        tendonPrestressChecks(structuralCalc,findings);
+        tensionCompressionOnlyChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -260,7 +265,12 @@ public final class MusaAiStructuralAdvanced {
             "time step","time increment","number of output steps","output time step","duration","zaman adimi","zaman adımı","analiz suresi","analiz süresi",
             "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
             "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
-            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları");
+            "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları",
+            "link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama",
+            "damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama",
+            "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
+            "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
+            "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -400,6 +410,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))ids.add("ST-96");
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))ids.add("ST-97");
         if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))ids.add("ST-98");
+        if(has(q,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))ids.add("ST-99");
+        if(has(q,"damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama"))ids.add("ST-100");
+        if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))ids.add("ST-101");
+        if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))ids.add("ST-102");
+        if(has(q,"tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç"))ids.add("ST-103");
         return ids;
     }
 
@@ -416,6 +431,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))return "DOĞRUSAL OLMAYAN MAFSAL ATAMASI";
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))return "DOĞRUSAL OLMAYAN ANALİZ KONTROLLERİ";
         if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))return "YAPIM AŞAMASI / STAGED CONSTRUCTION";
+        if(has(q,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))return "LINK / BAĞLANTI PROPERTY ATAMASI";
+        if(has(q,"damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama"))return "DAMPER / GAP / NONLINEAR LINK";
+        if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))return "SİSMİK İZOLATÖR PROPERTY / ATAMA";
+        if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))return "TENDON / ÖNGERME TANIMLARI";
+        if(has(q,"tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç"))return "SADECE ÇEKME / BASINÇ DAVRANIŞI";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -2097,6 +2117,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-98",s,"Yapım aşaması / staged-construction kontrolü",
             "Model raporundan yapım aşaması verisi okundu: "+cueSummary(cues,10)+".",
             "Aşamaların sırasını, aktive/deaktive edilen elemanları ve aşama yüklerini proje yapım senaryosuyla karşılaştırın.",Collections.emptyList()));
+    }
+
+    private static void linkPropertyAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-99",Status.DOGRULANAMADI,"Link / bağlantı property ataması okunamadı",
+                "Model raporundan link/support-link nesnelerine property atanıp atanmadığına ilişkin açık kayıt ayrıştırılamadı.",
+                "Link eleman adlarını, property tiplerini ve bağlandıkları düğümleri model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"link property missing","link not assigned","undefined link property","invalid link assignment","link atanmamis","link atanmamış","error","failed");
+        out.add(new Finding("ST-99",s,"Link / bağlantı property atama kontrolü",
+            "Model raporundan link/property verisi okundu: "+cueSummary(cues,10)+".",
+            "Atanan link property'nin fiziksel bağlantı ve serbestlik yönleriyle uyumlu olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void nonlinearLinkDamperChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-100",Status.DOGRULANAMADI,"Damper / gap / nonlinear-link tanımı okunamadı",
+                "Sönümleyici, gap/hook veya diğer nonlinear link property tanımlarına ilişkin açık model raporu ayrıştırılamadı.",
+                "Nonlinear link türü ve aktif serbestlik/parametreleri model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"damper property missing","gap property missing","invalid damper","invalid gap","nonlinear link missing","error","failed");
+        out.add(new Finding("ST-100",s,"Damper / gap / nonlinear-link kontrolü",
+            "Model raporundan nonlinear link/damper verisi okundu: "+cueSummary(cues,10)+".",
+            "Property türünü, aktif yönleri ve tanımlı parametrelerin proje hesabıyla eşleşmesini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void baseIsolatorAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-101",Status.DOGRULANAMADI,"Sismik izolatör property / ataması okunamadı",
+                "Base/seismic isolator property ve eleman atamalarına ilişkin açık model raporu ayrıştırılamadı.",
+                "İzolatör property adını, tipini ve tabandaki tüm gerekli noktalara atama kapsamını raporlayın.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"isolator missing","isolator not assigned","undefined isolator","isolator assignment missing","izolator atanmamis","izolatör atanmamış","error","failed");
+        out.add(new Finding("ST-101",s,"Sismik izolatör property / atama kontrolü",
+            "Model raporundan izolatör verisi okundu: "+cueSummary(cues,10)+".",
+            "İzolatör tip/property atamalarının proje detayları ve analiz modeliyle eşleştiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void tendonPrestressChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-102",Status.DOGRULANAMADI,"Tendon / öngerme tanımları okunamadı",
+                "Prestress/post-tension tendon property, kuvvet veya atama bilgisine ilişkin açık model raporu ayrıştırılamadı.",
+                "Tendon geometrisi, property adı ve öngerme kuvvetini model/hesap raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"tendon missing","prestress force missing","tendon not assigned","invalid tendon","ongerme yok","öngerme yok","error","failed");
+        out.add(new Finding("ST-102",s,"Tendon / öngerme tanım kontrolü",
+            "Model raporundan tendon/öngerme verisi okundu: "+cueSummary(cues,10)+".",
+            "Tendon kuvveti, güzergâhı, kayıp kabulü ve eleman atamasını onaylı projeyle karşılaştırın.",Collections.emptyList()));
+    }
+
+    private static void tensionCompressionOnlyChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-103",Status.DOGRULANAMADI,"Sadece çekme / basınç davranışı okunamadı",
+                "Cable/truss veya yalnız çekme/basınç çalışan elemanlara ilişkin davranış ataması açık rapordan ayrıştırılamadı.",
+                "Bu davranışın kullanıldığı elemanlarda tension-only/compression-only tanımını model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"behavior missing","tension only missing","compression only missing","wrong behavior","davranis uyumsuz","davranış uyumsuz","error","failed");
+        out.add(new Finding("ST-103",s,"Sadece çekme / basınç davranış kontrolü",
+            "Model raporundan tek yönlü eksenel davranış verisi okundu: "+cueSummary(cues,10)+".",
+            "Cable/truss eleman davranışının gerçek taşıyıcı sistem ve analiz case'leriyle uyumunu doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
