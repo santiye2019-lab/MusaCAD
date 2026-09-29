@@ -1005,6 +1005,11 @@ public final class MusaAiStructuralCalc {
                 "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi",
                 "nonconvergence","non-convergence","did not converge","not converged","convergence failed","converged","convergence achieved","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti",
                 "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü",
+                "revizyon","revision","rev no","revizyon no","model revision","model rev",
+                "material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material",
+                "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
+                "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
+                "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
