@@ -1040,6 +1040,11 @@ public final class MusaAiStructuralCalc {
                 "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
                 "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
                 "tension only","compression only","cable behavior","truss behavior","only tension","only compression","sadece cekme","sadece çekme","sadece basinc","sadece basınç",
+                "model locked","model unlocked","analysis lock","results lock","lock model","model kilitli","model kilidi","analiz kilidi","sonuc kilidi","sonuç kilidi",
+                "design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları",
+                "design overwrite","frame design overwrite","concrete design overwrite","steel design overwrite","design override","tasarim override","tasarım override","tasarim ozel deger","tasarım özel değer",
+                "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
+                "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
