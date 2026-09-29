@@ -319,8 +319,8 @@ public final class MusaAiStructuralAdvancedTest {
         require(supportFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
             "reported suitable support assignment should be informational");
 
-        MusaAiStructuralAdvanced.Result loadFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Yük atamalarını kontrol et");
-        require(loadFocus.findings.size()==1&&"ST-77".equals(loadFocus.findings.get(0).id),
+        MusaAiStructuralAdvanced.Result loadAssignmentFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Yük atamalarını kontrol et");
+        require(loadAssignmentFocus.findings.size()==1&&"ST-77".equals(loadAssignmentFocus.findings.get(0).id),
             "load assignment focus must only return ST-77");
 
         MusaAiStructuralAdvanced.Result selfWeightFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Öz ağırlık çarpanını kontrol et");
