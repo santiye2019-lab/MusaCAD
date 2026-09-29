@@ -591,6 +591,7 @@ public final class MusaAiStructuralAdvancedTest {
         require(result.text.contains("ZEMİN / TEMEL"),"foundation/geotechnical category missing");
         require(result.text.contains("TAŞIYICI TASARIM / DAYANIM"),"design category missing");
         require(result.text.contains("MODEL BÜTÜNLÜĞÜ / ATAMALAR"),"model-integrity category missing");
+        require(result.text.indexOf("KATEGORİ ÖZETİ")<result.text.indexOf("[ST-"),"category summary must precede detailed findings");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
         System.out.println("MusaAiStructuralAdvancedTest OK");
     }
