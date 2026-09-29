@@ -19,7 +19,17 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiDrawingIndex index=new MusaAiDrawingIndex("KALIP",items.size(),0,
             Arrays.asList("STATIK","MIMARI"),Arrays.asList("STATIK","MIMARI"),items,"cm");
 
-        MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt","C35 B420C SDS=1.10");
+        String report="C35 B420C SDS=1.10\n"+
+            "Güçlü kolon zayıf kiriş kontrolü sağlıyor\n"+
+            "Kolon kiriş birleşim kontrolü uygun\n"+
+            "Düzensizlik A1 kontrolü uygun\n"+
+            "Göreli kat ötelenmesi kontrolü uygun\n"+
+            "Burulma düzensizliği uygun\n"+
+            "Yumuşak kat kontrolü uygun\n"+
+            "Modal analiz response spectrum\n"+
+            "Kütle katılım oranı X %95 Y %94\n"+
+            "Periyot T1X=1.25\n";
+        MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
         Set<String> ids=new LinkedHashSet<>();
@@ -37,6 +47,15 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-18"),"slab thickness verification missing");
         require(ids.contains("ST-20"),"seismic parameter verification missing");
         require(ids.contains("ST-21"),"load assumption verification missing");
+        require(ids.contains("ST-22"),"beam-column joint report check missing");
+        require(ids.contains("ST-23"),"strong-column weak-beam report check missing");
+        require(ids.contains("ST-25"),"irregularity report check missing");
+        require(ids.contains("ST-26"),"story drift report check missing");
+        require(ids.contains("ST-27"),"torsion report check missing");
+        require(ids.contains("ST-28"),"soft/weak story report check missing");
+        require(ids.contains("ST-29"),"modal analysis report check missing");
+        require(ids.contains("ST-30"),"mass participation report check missing");
+        require(ids.contains("ST-31"),"period report check missing");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
