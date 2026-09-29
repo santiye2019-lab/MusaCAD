@@ -37,7 +37,7 @@ public enum MusaAiDiscipline {
             "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diyafram kirisi","diaphragm chord",
             "dusey deprem","dikey deprem","vertical earthquake","vertical seismic",
             "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon",
-            "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy",
+            "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy",
             "r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor",
             "etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier",
             "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))return STRUCTURAL;
@@ -71,7 +71,7 @@ public enum MusaAiDiscipline {
             "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diyafram kirisi","diaphragm chord",
             "dusey deprem","dikey deprem","vertical earthquake","vertical seismic",
             "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon",
-            "deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy",
+            "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy",
             "r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor",
             "etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier",
             "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))return STRUCTURAL;
