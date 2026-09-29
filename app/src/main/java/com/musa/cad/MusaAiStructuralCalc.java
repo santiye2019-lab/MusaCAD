@@ -856,6 +856,7 @@ public final class MusaAiStructuralCalc {
         String value=raw==null?"":raw;
         Matcher sec=SECTION.matcher(value);
         while(sec.find()&&out.size()<500){
+            if(isNonSectionDimension(value,sec.start()))continue;
             int lineStart=Math.max(value.lastIndexOf('\n',sec.start()),value.lastIndexOf('\r',sec.start()));
             int windowStart=Math.max(lineStart+1,sec.start()-56);
             String prefix=value.substring(windowStart,sec.start());
