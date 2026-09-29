@@ -21,7 +21,11 @@ public enum MusaAiDiscipline {
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return UNKNOWN;
         if(has(q,"mimari","architect"))return ARCHITECTURAL;
-        if(has(q,"statik","structural","kolon","kiris","perde","doseme","temel"))return STRUCTURAL;
+        if(has(q,"statik","structural","kolon","kiris","perde","doseme","temel","radye","kazik",
+            "zimbalama","modal analiz","modal","kat otelemesi","goreli kat otelemesi","kat otelen","goreli kat otelen","story drift",
+            "burulma","torsion","yumusak kat","soft story","zayif kat","weak story",
+            "guclu kolon","strong column","zayif kiris","weak beam","sarilma bolgesi","confinement",
+            "transfer kiris","transfer doseme","transfer kat","konsol","cantilever"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -39,7 +43,9 @@ public enum MusaAiDiscipline {
         if(has(q,"asansor","elevator","lift","kuyu","ray","kabin","makine dairesi"))return ELEVATOR;
         if(has(q,"elektrik","elk","kablo","tava","pano","priz","armat ur","armatur","aydinlat","toprak","paratoner","jenerator","ups","data","cctv","zayif akim"))return ELECTRICAL;
         if(has(q,"mekanik","mek","pis su","atik su","temiz su","sihhi","vrf","hvac","havaland","kanal","fan","klima","isitma","sogutma","kazan","hidrofor","pompa","dogalgaz","dogal gaz","boyler"))return MECHANICAL;
-        if(has(q,"statik","beton","betonarme","donati","kolon","kiris","perde","doseme","temel","radye","fore kazik"))return STRUCTURAL;
+        if(has(q,"statik","beton","betonarme","donati","kolon","kiris","perde","doseme","temel","radye","fore kazik","kazik",
+            "zimbalama","modal analiz","kat otelemesi","goreli kat otelemesi","kat otelen","goreli kat otelen","burulma","yumusak kat","zayif kat",
+            "guclu kolon","zayif kiris","sarilma bolgesi","transfer kiris","transfer doseme","transfer kat","konsol"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;

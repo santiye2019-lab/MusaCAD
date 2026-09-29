@@ -23,6 +23,21 @@ public final class MusaAiDisciplineAnalyzerTest {
         if(!structural.matched)throw new AssertionError("structural not matched");
         has(structural.text,"STATİK PROJE KONTROLÜ");
         has(structural.text,"Rezervasyon / geçiş koordinasyonu");
+        String[] structuralQueries={
+            "Zımbalama kontrolü yap",
+            "Modal analizi kontrol et",
+            "Göreli kat ötelenmesini incele",
+            "Burulma düzensizliğine bak",
+            "Yumuşak kat kontrolü",
+            "Güçlü kolon zayıf kiriş kontrolü",
+            "Sarılma bölgesini kontrol et",
+            "Transfer kirişi kontrolü",
+            "Konsol detayını incele"
+        };
+        for(String q:structuralQueries)
+            if(MusaAiDiscipline.fromQuery(q)!=MusaAiDiscipline.STRUCTURAL)
+                throw new AssertionError("advanced structural query not routed: "+q);
+
         MusaAiDisciplineAnalyzer.Result electrical=MusaAiDisciplineAnalyzer.analyze(index(),"Elektrik projesini analiz et");
         has(electrical.text,"Disiplinler arası besleme koordinasyonu");
         MusaAiDisciplineAnalyzer.Result all=MusaAiDisciplineAnalyzer.analyze(index(),"Tam proje denetimi yap");
