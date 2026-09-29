@@ -1005,6 +1005,9 @@ public final class MusaAiStructuralCalc {
             if(loads.size()<80&&has(q,
                 "hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load",
                 "sehim","deflection","servisabilite","serviceability",
+                "catlak genisligi","çatlak genişliği","crack width",
+                "titresim","titreşim","vibration","comfort frequency","floor frequency",
+                "sunme","sünme","creep","rotre","rötre","shrinkage","uzun sureli sehim","uzun süreli sehim","long term deflection",
                 "yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon","combination",
                 "deprem yuk durum","deprem yük durum","seismic load case","earthquake load case"))
                 addUnique(loads,t);
