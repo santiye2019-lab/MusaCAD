@@ -9,8 +9,8 @@ public final class MusaAiStructuralCalcTest {
         String report=
             "BETONARME HESAP RAPORU\n"+
             "Beton sınıfı C30 Donatı B420C\n"+
-            "K1 30x70\n"+
-            "K2 25/50\n"+
+            "K1 30x70 Ø16\n"+
+            "K2 25/50 Ø12\n"+
             "RADYE TEMEL\n"+
             "SDS = 1.10 SD1 = 0.55 DTS=1 BYS=3 Zemin Sınıfı ZC\n"+
             "Hareketli yük 5.00 kN/m2\n";
@@ -20,14 +20,20 @@ public final class MusaAiStructuralCalcTest {
         yes(model.rebarGrades.contains("B420C"),"B420C missing");
         yes("30x70".equals(model.taggedSections.get("K1")),"K1 section missing");
         yes(model.foundationTypes.contains("RADYE"),"raft missing");
+        yes(model.rebarDiameters.contains("Ø16")&&model.rebarDiameters.contains("Ø12"),"rebar diameters missing");
+        yes("1.10".equals(model.designParameters.get("SDS")),"SDS missing");
+        yes("0.55".equals(model.designParameters.get("SD1")),"SD1 missing");
+        yes("1".equals(model.designParameters.get("DTS")),"DTS missing");
+        yes("3".equals(model.designParameters.get("BYS")),"BYS missing");
+        yes("ZC".equals(model.designParameters.get("Zemin Sınıfı")),"soil class missing");
         yes(!model.seismicCues.isEmpty(),"seismic cues missing");
 
         MusaAiDrawingIndex index=new MusaAiDrawingIndex("Zemin",3,0,
             Arrays.asList("S_KIRIS","S_TEMEL"),
             Arrays.asList("S_KIRIS","S_TEMEL"),
             Arrays.asList(
-                new MusaAiDrawingIndex.Item(11,"TEXT","S_KIRIS","K1 30x60 C30 B420C",Double.NaN,Double.NaN),
-                new MusaAiDrawingIndex.Item(12,"TEXT","S_KIRIS","K2 25x50 C30 B420C",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(11,"TEXT","S_KIRIS","K1 30x60 C30 B420C Ø16",Double.NaN,Double.NaN),
+                new MusaAiDrawingIndex.Item(12,"TEXT","S_KIRIS","K2 25x50 C30 B420C Ø12",Double.NaN,Double.NaN),
                 new MusaAiDrawingIndex.Item(13,"TEXT","S_TEMEL","RADYE TEMEL C30",Double.NaN,Double.NaN)
             ),"cm");
 
@@ -39,6 +45,9 @@ public final class MusaAiStructuralCalcTest {
         has(cmp.text,"K1: rapor 30x70 • DWG 30x60");
         has(cmp.text,"YÜKSEK");
         has(cmp.text,"RADYE");
+        has(cmp.text,"Donatı çapı");
+        has(cmp.text,"SDS = 1.10");
+        has(cmp.text,"Zemin Sınıfı = ZC");
 
         yes(MusaAiStructuralCalc.isEngineeringTextExtension("model.e2k"),"e2k should be accepted");
         System.out.println("MusaAiStructuralCalcTest OK");

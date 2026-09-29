@@ -25,13 +25,13 @@ public final class MusaAiStructuralCalc {
         public final String name;
         public final int textLength;
         public final Set<String> concreteGrades,rebarGrades,sections,rebarDiameters,foundationTypes;
-        public final Map<String,String> taggedSections;
+        public final Map<String,String> taggedSections,designParameters;
         public final List<String> seismicCues,loadCues,warnings;
 
         Model(String name,int textLength,Collection<String>concreteGrades,Collection<String>rebarGrades,
               Collection<String>sections,Collection<String>rebarDiameters,Collection<String>foundationTypes,
-              Map<String,String>taggedSections,Collection<String>seismicCues,Collection<String>loadCues,
-              Collection<String>warnings){
+              Map<String,String>taggedSections,Map<String,String>designParameters,
+              Collection<String>seismicCues,Collection<String>loadCues,Collection<String>warnings){
             this.name=clean(name);
             this.textLength=Math.max(0,textLength);
             this.concreteGrades=immutableSet(concreteGrades);
@@ -40,6 +40,7 @@ public final class MusaAiStructuralCalc {
             this.rebarDiameters=immutableSet(rebarDiameters);
             this.foundationTypes=immutableSet(foundationTypes);
             this.taggedSections=Collections.unmodifiableMap(new LinkedHashMap<>(taggedSections));
+            this.designParameters=Collections.unmodifiableMap(new LinkedHashMap<>(designParameters));
             this.seismicCues=Collections.unmodifiableList(new ArrayList<>(seismicCues));
             this.loadCues=Collections.unmodifiableList(new ArrayList<>(loadCues));
             this.warnings=Collections.unmodifiableList(new ArrayList<>(warnings));
@@ -74,6 +75,7 @@ public final class MusaAiStructuralCalc {
         final LinkedHashSet<String> concrete=new LinkedHashSet<>();
         final LinkedHashSet<String> rebar=new LinkedHashSet<>();
         final LinkedHashSet<String> sections=new LinkedHashSet<>();
+        final LinkedHashSet<String> diameters=new LinkedHashSet<>();
         final LinkedHashSet<String> foundations=new LinkedHashSet<>();
         final LinkedHashMap<String,String> tagged=new LinkedHashMap<>();
         final LinkedHashMap<String,Integer> tagSource=new LinkedHashMap<>();
@@ -84,7 +86,7 @@ public final class MusaAiStructuralCalc {
         if(raw.length()>MAX_TEXT)raw=raw.substring(0,MAX_TEXT);
         LinkedHashSet<String> concrete=new LinkedHashSet<>(),rebar=new LinkedHashSet<>(),
             sections=new LinkedHashSet<>(),diameters=new LinkedHashSet<>(),foundations=new LinkedHashSet<>();
-        LinkedHashMap<String,String>tagged=new LinkedHashMap<>();
+        LinkedHashMap<String,String>tagged=new LinkedHashMap<>(),designParameters=new LinkedHashMap<>();
         ArrayList<String> seismic=new ArrayList<>(),loads=new ArrayList<>(),warnings=new ArrayList<>();
 
         collectConcrete(raw,concrete);
@@ -93,6 +95,7 @@ public final class MusaAiStructuralCalc {
         collectDiameters(raw,diameters);
         collectTagged(raw,tagged);
         collectFoundationTypes(raw,foundations);
+        collectDesignParameters(raw,designParameters);
         collectCues(raw,seismic,loads);
 
         if(concrete.isEmpty())warnings.add("Beton sınıfı metinden güvenilir biçimde çıkarılamadı.");
@@ -102,7 +105,7 @@ public final class MusaAiStructuralCalc {
         if(seismic.isEmpty())warnings.add("Deprem/zemin parametrelerine ilişkin okunabilir metin ipucu bulunamadı.");
         if(raw.trim().isEmpty())warnings.add("Hesap raporundan okunabilir metin elde edilemedi.");
 
-        return new Model(name,raw.length(),concrete,rebar,sections,diameters,foundations,tagged,seismic,loads,warnings);
+        return new Model(name,raw.length(),concrete,rebar,sections,diameters,foundations,tagged,designParameters,seismic,loads,warnings);
     }
 
     public static Comparison compare(MusaAiDrawingIndex index,Model report){
@@ -141,13 +144,15 @@ public final class MusaAiStructuralCalc {
         appendSetComparison(out,"Beton",report.concreteGrades,drawing.concrete,true);
         appendSetComparison(out,"Donatı çeliği",report.rebarGrades,drawing.rebar,true);
 
-        out.append("\n\n3. KESİT KÜMESİ");
+        out.append("\n\n3. KESİT / DONATI VERİSİ");
         appendSetComparison(out,"Kesit/ebat",report.sections,drawing.sections,false);
+        appendSetComparison(out,"Donatı çapı",report.rebarDiameters,drawing.diameters,false);
 
         out.append("\n\n4. TEMEL SİSTEMİ");
         appendSetComparison(out,"Temel tipi",report.foundationTypes,drawing.foundations,false);
 
-        out.append("\n\n5. HESAP RAPORUNDAN OKUNAN TASARIM İPUÇLARI");
+        out.append("\n\n5. HESAP RAPORUNDAN OKUNAN TASARIM PARAMETRELERİ");
+        appendParameters(out,report.designParameters);
         appendSamples(out,"Deprem / zemin",report.seismicCues,10);
         appendSamples(out,"Yük",report.loadCues,8);
 
@@ -170,8 +175,10 @@ public final class MusaAiStructuralCalc {
         out.append("\n• Beton sınıfları: ").append(join(model.concreteGrades,8));
         out.append("\n• Donatı sınıfları: ").append(join(model.rebarGrades,8));
         out.append("\n• Kesit/ebat: ").append(model.sections.size()).append(" farklı değer");
+        out.append("\n• Donatı çapları: ").append(join(model.rebarDiameters,12));
         out.append("\n• Etiketli kesit: ").append(model.taggedSections.size());
         out.append("\n• Temel tipi: ").append(join(model.foundationTypes,6));
+        if(!model.designParameters.isEmpty())out.append("\n• Tasarım parametreleri: ").append(joinParameters(model.designParameters,10));
         if(!model.seismicCues.isEmpty())out.append("\n• Deprem/zemin ipucu: ").append(model.seismicCues.get(0));
         if(!model.warnings.isEmpty())out.append("\n• Uyarı: ").append(model.warnings.get(0));
         return out.toString();
@@ -210,6 +217,7 @@ public final class MusaAiStructuralCalc {
             collectConcrete(raw,out.concrete);
             collectRebar(raw,out.rebar);
             collectSections(raw,out.sections);
+            collectDiameters(raw,out.diameters);
             collectFoundationTypes(raw,out.foundations);
             LinkedHashMap<String,String> found=new LinkedHashMap<>();
             collectTagged(raw,found);
@@ -237,6 +245,13 @@ public final class MusaAiStructuralCalc {
             if(!onlyReport.isEmpty())out.append("\n  - Yalnız rapor: ").append(join(onlyReport,12));
             if(!onlyDrawing.isEmpty())out.append("\n  - Yalnız DWG: ").append(join(onlyDrawing,12));
         }
+    }
+
+    private static void appendParameters(StringBuilder out,Map<String,String>values){
+        out.append("\n• Açık parametreler:");
+        if(values==null||values.isEmpty()){out.append(" güvenilir değer ayrıştırılamadı.");return;}
+        for(Map.Entry<String,String>e:values.entrySet())
+            out.append("\n  - ").append(e.getKey()).append(" = ").append(e.getValue());
     }
 
     private static void appendSamples(StringBuilder out,String label,List<String>values,int max){
@@ -287,6 +302,25 @@ public final class MusaAiStructuralCalc {
         if(has(q,"birlesik temel","combined footing"))out.add("BİRLEŞİK");
     }
 
+    private static void collectDesignParameters(String raw,Map<String,String>out){
+        if(raw==null||raw.isEmpty())return;
+        collectNamedNumber(raw,out,"SDS","(?iu)\\bSDS\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"SD1","(?iu)\\bSD1\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"DTS","(?iu)\\bDTS\\s*[:=]?\\s*([1-4])\\b");
+        collectNamedNumber(raw,out,"BYS","(?iu)\\bBYS\\s*[:=]?\\s*([1-8])\\b");
+        collectNamedText(raw,out,"Zemin Sınıfı","(?iu)\\b(?:ZEM[İI]N\\s*SINIFI|GROUND\\s*TYPE)\\s*[:=]?\\s*(Z[A-F])\\b");
+    }
+
+    private static void collectNamedNumber(String raw,Map<String,String>out,String key,String regex){
+        Matcher m=Pattern.compile(regex).matcher(raw);
+        if(m.find())out.putIfAbsent(key,m.group(1).replace(',','.'));
+    }
+
+    private static void collectNamedText(String raw,Map<String,String>out,String key,String regex){
+        Matcher m=Pattern.compile(regex).matcher(raw);
+        if(m.find())out.putIfAbsent(key,m.group(1).toUpperCase(new Locale("tr","TR")));
+    }
+
     private static void collectCues(String raw,List<String>seismic,List<String>loads){
         if(raw==null)return;
         for(String line:raw.replace('\r','\n').split("\n")){
@@ -303,6 +337,16 @@ public final class MusaAiStructuralCalc {
     private static void addUnique(List<String>out,String value){if(!out.contains(value))out.add(value);}
     private static String section(String a,String b){return Integer.parseInt(a)+"x"+Integer.parseInt(b);}
     private static String canonicalTag(String raw){return raw==null?"":raw.toUpperCase(new Locale("tr","TR")).replaceAll("[^A-ZÇĞİÖŞÜ0-9]","");}
+    private static String joinParameters(Map<String,String>values,int max){
+        if(values==null||values.isEmpty())return "—";StringBuilder out=new StringBuilder();int n=0;
+        for(Map.Entry<String,String>e:values.entrySet()){
+            if(n++>=max){out.append(", …");break;}
+            if(out.length()>0)out.append(", ");
+            out.append(e.getKey()).append("=").append(e.getValue());
+        }
+        return out.toString();
+    }
+
     private static String join(Collection<String>values,int max){
         if(values==null||values.isEmpty())return "—";StringBuilder out=new StringBuilder();int n=0;
         for(String v:values){if(n++>=max){out.append(", …");break;}if(out.length()>0)out.append(", ");out.append(v);}
