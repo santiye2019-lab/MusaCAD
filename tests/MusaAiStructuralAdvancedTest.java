@@ -20,7 +20,8 @@ public final class MusaAiStructuralAdvancedTest {
             new MusaAiDrawingIndex.Item(14,"TEXT","STATIK","RİJİT DİYAFRAM D08 1. KAT"),
             new MusaAiDrawingIndex.Item(15,"TEXT","STATIK","PERDE P20 BODRUM 1 KAT AKS A/1 30x300"),
             new MusaAiDrawingIndex.Item(16,"TEXT","STATIK","PERDE P20 ZEMIN KAT AKS B/1 25x300"),
-            new MusaAiDrawingIndex.Item(17,"TEXT","STATIK","ZEMİN SINIFI ZC ZEMİN TAŞIMA GÜCÜ 250 KPA YATAK KATSAYISI 30000 KN/M3 TEMEL ALT KOTU -4.50 M")
+            new MusaAiDrawingIndex.Item(17,"TEXT","STATIK","ZEMİN SINIFI ZC ZEMİN TAŞIMA GÜCÜ 250 KPA YATAK KATSAYISI 30000 KN/M3 TEMEL ALT KOTU -4.50 M"),
+            new MusaAiDrawingIndex.Item(18,"TEXT","STATIK","PROJE REV B7")
         );
         MusaAiDrawingIndex index=new MusaAiDrawingIndex("KALIP",items.size(),0,
             Arrays.asList("STATIK","MIMARI"),Arrays.asList("STATIK","MIMARI"),items,"cm");
@@ -74,7 +75,13 @@ public final class MusaAiStructuralAdvancedTest {
             "Unconnected joint J77 detected\n"+
             "Shell mesh quality aspect ratio = 7.5 review required\n"+
             "Non-convergence: nonlinear case NL1 did not converge\n"+
-            "Local axis orientation assignment checked and suitable\n";
+            "Local axis orientation assignment checked and suitable\n"+
+            "Model revision REV=B7\n"+
+            "Material assignment C35 B420C assigned and suitable\n"+
+            "Section assignment property checked and suitable\n"+
+            "Story assignment and floor data checked\n"+
+            "1. KAT KIRIS K90 AKS A/2 30x60 C35 B420C\n"+
+            "1. KAT KIRIS K90 AKS A/2 30x60 C35 B420C\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -138,6 +145,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-66"),"mesh quality check missing");
         require(ids.contains("ST-67"),"convergence check missing");
         require(ids.contains("ST-68"),"local-axis check missing");
+        require(ids.contains("ST-69"),"revision consistency check missing");
+        require(ids.contains("ST-70"),"material assignment check missing");
+        require(ids.contains("ST-71"),"section assignment check missing");
+        require(ids.contains("ST-72"),"story/element metadata check missing");
+        require(ids.contains("ST-73"),"duplicate identity check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -181,6 +193,12 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Analiz yakınsamasını kontrol et"),"convergence focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Yerel eksenleri kontrol et"),"local-axis focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesh kalitesini kontrol et"),"mesh focus must require report");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Model revizyonunu proje ile karşılaştır"),"revision focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Malzeme atamalarını kontrol et"),"material assignment focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kesit atamalarını kontrol et"),"section assignment focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kat aks eleman verisini kontrol et"),"story metadata focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Mükerrer eleman kimliklerini kontrol et"),"duplicate identity focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Kesit atamalarını kontrol et"),"section assignment focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -262,6 +280,22 @@ public final class MusaAiStructuralAdvancedTest {
             "local-axis focus must only return ST-68");
         require(axisFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
             "reported suitable local-axis assignment should be informational");
+
+        MusaAiStructuralAdvanced.Result revisionFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Model revizyonunu proje ile karşılaştır");
+        require(revisionFocus.findings.size()==1&&"ST-69".equals(revisionFocus.findings.get(0).id),
+            "revision focus must only return ST-69");
+        require(revisionFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
+            "matching project/model revision should be informational: "+revisionFocus.text);
+
+        MusaAiStructuralAdvanced.Result sectionFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Kesit atamalarını kontrol et");
+        require(sectionFocus.findings.size()==1&&"ST-71".equals(sectionFocus.findings.get(0).id),
+            "section assignment focus must only return ST-71");
+
+        MusaAiStructuralAdvanced.Result duplicateFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Mükerrer eleman kimliklerini kontrol et");
+        require(duplicateFocus.findings.size()==1&&"ST-73".equals(duplicateFocus.findings.get(0).id),
+            "duplicate identity focus must only return ST-73");
+        require(duplicateFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.INCELEME_GEREKLI,
+            "duplicate identical report rows should require review without false conflict");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");

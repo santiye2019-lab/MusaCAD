@@ -137,6 +137,11 @@ public final class MusaAiStructuralAdvanced {
         meshQualityChecks(structuralCalc,findings);
         convergenceChecks(structuralCalc,findings);
         localAxisChecks(structuralCalc,findings);
+        revisionConsistencyChecks(refs,structuralCalc,findings);
+        materialAssignmentChecks(structuralCalc,findings);
+        sectionAssignmentIntegrityChecks(structuralCalc,findings);
+        storyElementMetadataChecks(structuralCalc,findings);
+        duplicateElementIdentityChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -200,7 +205,12 @@ public final class MusaAiStructuralAdvanced {
             "unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint",
             "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi",
             "nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama hatasi","yakınsama hatası","iteration limit","iterasyon limiti",
-            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü");
+            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü",
+            "revizyon","revision","rev no","revizyon no","model revision","model rev",
+            "material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material",
+            "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
+            "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
+            "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -303,6 +313,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi"))ids.add("ST-66");
         if(has(q,"nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti"))ids.add("ST-67");
         if(has(q,"local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))ids.add("ST-68");
+        if(has(q,"revizyon","revision","rev no","revizyon no","model revision","model rev"))ids.add("ST-69");
+        if(has(q,"material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material"))ids.add("ST-70");
+        if(has(q,"section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section"))ids.add("ST-71");
+        if(has(q,"story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment","kat aks eleman","kat-aks-eleman"))ids.add("ST-72");
+        if(has(q,"duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama","kimlik cakismasi","kimlik çakışması"))ids.add("ST-73");
         return ids;
     }
 
@@ -360,6 +375,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi"))return "SONLU ELEMAN / MESH KALİTESİ";
         if(has(q,"nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti"))return "ANALİZ YAKINSAMASI";
         if(has(q,"local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))return "YEREL EKSEN / ORYANTASYON";
+        if(has(q,"revizyon","revision","rev no","revizyon no","model revision","model rev"))return "MODEL / PROJE REVİZYON EŞLEŞMESİ";
+        if(has(q,"material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material"))return "MALZEME ATAMA BÜTÜNLÜĞÜ";
+        if(has(q,"section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section"))return "KESİT / PROPERTY ATAMA BÜTÜNLÜĞÜ";
+        if(has(q,"story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment","kat aks eleman","kat-aks-eleman"))return "KAT / AKS / ELEMAN VERİ BÜTÜNLÜĞÜ";
+        if(has(q,"duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama","kimlik cakismasi","kimlik çakışması"))return "MÜKERRER / ÇELİŞKİLİ ELEMAN KİMLİĞİ";
         return "STATİK";
     }
 
@@ -1403,6 +1423,186 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-68",analysisWarningStatus(cues),"Yerel eksen / oryantasyon rapor kontrolü",
                 "Hesap raporundan yerel eksen/orientasyon verisi okundu: "+cueSummary(cues,10)+".",
                 "Özellikle asimetrik kesitler, kabuk yönleri ve yüklerin yerel eksene bağlı olduğu elemanlarda yönleri modelde görsel olarak doğrulayın.",Collections.emptyList()));
+    }
+
+    private static String revisionToken(String raw){
+        if(raw==null||raw.trim().isEmpty())return "";
+        String upper=raw.toUpperCase(new Locale("tr","TR")).replace('İ','I');
+        String[]parts=upper.split("[^A-Z0-9]+");
+        boolean seen=false;
+        for(String part:parts){
+            if(part.isEmpty())continue;
+            if(part.equals("REV")||part.equals("REVISION")||part.equals("REVIZYON")){
+                seen=true;
+                continue;
+            }
+            if(!seen)continue;
+            if(part.equals("NO")||part.equals("NUMBER")||part.equals("NUMARASI"))continue;
+            if(part.matches("(?=.*[0-9])[A-Z0-9]{1,16}"))return part;
+        }
+        return "";
+    }
+    private static void revisionConsistencyChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        LinkedHashSet<String>drawing=new LinkedHashSet<>(),report=new LinkedHashSet<>();
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Ref r:refs){
+            String token=revisionToken(r.raw);
+            if(!token.isEmpty()){drawing.add(token);addId(ids,r);}
+        }
+        for(String cue:reportCues(calc,"revizyon","revision","rev no","revizyon no","model revision","model rev")){
+            String token=revisionToken(cue);
+            if(!token.isEmpty())report.add(token);
+        }
+        if(drawing.isEmpty()||report.isEmpty()){
+            out.add(new Finding("ST-69",Status.DOGRULANAMADI,"Model / proje revizyon eşleşmesi doğrulanamadı",
+                "Pafta/model revizyon bilgisinin iki tarafta da karşılaştırılabilir biçimde okunması mümkün olmadı. Proje: "+join(drawing,6)+" • Hesap: "+join(report,6)+".",
+                "Statik pafta anteti ile hesap/model çıktısında aynı revizyon kodu veya tarih bilgisini görünür biçimde bulundurun.",ids));
+            return;
+        }
+        LinkedHashSet<String>common=new LinkedHashSet<>(drawing);common.retainAll(report);
+        if(common.isEmpty())
+            out.add(new Finding("ST-69",Status.UYUMSUZLUK,"Model / proje revizyonu eşleşmiyor",
+                "Paftadan okunan revizyon: "+join(drawing,6)+" • hesap/model raporundan okunan revizyon: "+join(report,6)+".",
+                "Hesap modelinin son onaylı statik proje revizyonuna ait olduğunu doğrulayın; eski model ile yeni pafta birlikte kullanılmamalıdır.",ids));
+        else
+            out.add(new Finding("ST-69",Status.BILGI,"Model / proje revizyonu eşleşiyor",
+                "Karşılaştırılabilen ortak revizyon kodu bulundu: "+join(common,6)+".",
+                "Bu eşleşme yalnız görünür revizyon bilgisini doğrular; dosyanın tüm içeriğinin aynı revizyona ait olduğunu tek başına kanıtlamaz.",ids));
+    }
+
+    private static void materialAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material");
+        ArrayList<String>bad=new ArrayList<>();
+        for(String cue:cues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,"undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material","uygunsuz","failed","error"))bad.add(cue);
+        }
+        if(!bad.isEmpty()){
+            out.add(new Finding("ST-70",Status.UYUMSUZLUK,"Eksik / varsayılan malzeme ataması raporlandı",
+                "Hesap/model çıktısında malzeme atama uyarıları bulundu: "+cueSummary(bad,10)+".",
+                "İlgili elemanların beton/çelik malzeme property atamalarını modelde eleman bazında düzeltin.",Collections.emptyList()));
+            return;
+        }
+        if(calc.concreteGrades.isEmpty()&&calc.rebarGrades.isEmpty()){
+            out.add(new Finding("ST-70",Status.DOGRULANAMADI,"Malzeme sınıfı / ataması okunamadı",
+                "Hesap raporundan güvenilir beton veya donatı çeliği sınıfı ayrıştırılamadı.",
+                "Malzeme tanım ve eleman-atama özetini hesap/model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        int concreteMissing=0,rebarMissing=0;
+        for(MusaAiStructuralCalc.Element e:calc.elements){
+            if(e==null)continue;
+            if(e.concreteGrade.isEmpty())concreteMissing++;
+            if(e.rebarGrade.isEmpty())rebarMissing++;
+        }
+        if(!cues.isEmpty()&&reportedStatus(cues)==Status.BILGI)
+            out.add(new Finding("ST-70",Status.BILGI,"Malzeme atama özeti raporda mevcut",
+                "Okunan malzemeler: beton "+join(calc.concreteGrades,8)+" • donatı "+join(calc.rebarGrades,8)+". Raporlanmış atama bilgisi: "+cueSummary(cues,6)+".",
+                "Kritik elemanlarda malzeme property adının ve tasarım sınıfının modelde doğru elemana atandığını örnekleme ile doğrulayın.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-70",Status.INCELEME_GEREKLI,"Malzeme sınıfları var; eleman bazlı atama kısmi",
+                "Genel malzeme sınıfları okundu: beton "+join(calc.concreteGrades,8)+" • donatı "+join(calc.rebarGrades,8)+". Ayrıştırılan elemanlarda açık beton sınıfı olmayan "+concreteMissing+", donatı sınıfı olmayan "+rebarMissing+" kayıt var.",
+                "Global malzeme tanımı ile eleman property atamasını karıştırmayın; farklı malzeme kullanılan elemanları özellikle kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void sectionAssignmentIntegrityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section");
+        ArrayList<String>bad=new ArrayList<>();
+        for(String cue:cues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,"undefined section","section not assigned","property not assigned","default section","uygunsuz","failed","error"))bad.add(cue);
+        }
+        LinkedHashMap<String,LinkedHashSet<String>>byIdentity=new LinkedHashMap<>();
+        int missing=0;
+        for(MusaAiStructuralCalc.Element e:calc.elements){
+            if(e==null)continue;
+            if(e.section.isEmpty())missing++;
+            if(e.tag.isEmpty()||e.section.isEmpty())continue;
+            String key=e.floor+"|"+e.tag;
+            byIdentity.computeIfAbsent(key,k->new LinkedHashSet<>()).add(e.section);
+        }
+        ArrayList<String>conflicts=new ArrayList<>();
+        for(Map.Entry<String,LinkedHashSet<String>>e:byIdentity.entrySet())
+            if(e.getValue().size()>1)conflicts.add(e.getKey()+"="+join(e.getValue(),5));
+        if(!bad.isEmpty()||!conflicts.isEmpty())
+            out.add(new Finding("ST-71",Status.UYUMSUZLUK,"Kesit / property atama çelişkisi",
+                "Açık atama uyarıları: "+cueSummary(bad,6)+" • aynı kimlikte farklı kesitler: "+join(conflicts,8)+".",
+                "Modelde section property atamalarını eleman etiketi ve kat bazında gözden geçirin; varsayılan/boş property bırakmayın.",Collections.emptyList()));
+        else if(calc.sections.isEmpty())
+            out.add(new Finding("ST-71",Status.DOGRULANAMADI,"Kesit / property ataması okunamadı",
+                "Hesap raporundan güvenilir kesit listesi veya section property ataması ayrıştırılamadı.",
+                "Eleman-kesit eşleştirme tablosunu model raporuna dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-71",missing>0?Status.INCELEME_GEREKLI:Status.BILGI,"Kesit / property atama bütünlüğü",
+                "Raporlanan kesitler: "+join(calc.sections,12)+". Ayrıştırılan elemanlarda açık kesit bilgisi olmayan kayıt sayısı: "+missing+".",
+                "Kesitsiz görünen kayıtların rapor ayrıştırma eksikliği mi yoksa gerçek model property eksikliği mi olduğunu model üzerinde doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void storyElementMetadataChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        if(calc.elements.isEmpty()){
+            out.add(new Finding("ST-72",Status.DOGRULANAMADI,"Kat / aks / eleman metadata bütünlüğü doğrulanamadı",
+                "Kat-aks-eleman bazında ayrıştırılabilir kayıt bulunmadığı için model veri bütünlüğü incelenemedi.",
+                "Eleman listesi veya model tablo çıktısında kat, eleman etiketi, aks ve kesit alanlarını birlikte sağlayın.",Collections.emptyList()));
+            return;
+        }
+        int noFloor=0,noAxis=0,unknownType=0;
+        ArrayList<String>samples=new ArrayList<>();
+        for(MusaAiStructuralCalc.Element e:calc.elements){
+            if(e==null)continue;
+            boolean frame=e.memberType==MusaAiStructuralCalc.MemberType.BEAM||e.memberType==MusaAiStructuralCalc.MemberType.COLUMN||e.memberType==MusaAiStructuralCalc.MemberType.WALL;
+            if(e.floor.isEmpty()){noFloor++;if(samples.size()<8)samples.add(e.tag+" KAT?");}
+            if(frame&&e.axis.isEmpty()){noAxis++;if(samples.size()<8)samples.add(e.tag+" AKS?");}
+            if(e.memberType==MusaAiStructuralCalc.MemberType.UNKNOWN){unknownType++;if(samples.size()<8)samples.add(e.tag+" TİP?");}
+        }
+        Status status=(noFloor>0||noAxis>0||unknownType>0)?Status.INCELEME_GEREKLI:Status.BILGI;
+        out.add(new Finding("ST-72",status,"Kat / aks / eleman metadata bütünlüğü",
+            "Ayrıştırılan "+calc.elements.size()+" kayıtta kat bilgisi eksik: "+noFloor+" • çubuk/perde aksı eksik: "+noAxis+" • eleman tipi belirsiz: "+unknownType+". Örnekler: "+join(samples,8)+".",
+            "Eksik metadata gerçek model eksikliğiyse düzeltin; yalnız rapor formatından kaynaklanıyorsa kat/aks/eleman tablosunu dışa aktarın.",Collections.emptyList()));
+    }
+
+    private static void duplicateElementIdentityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        if(calc.elements.isEmpty()){
+            out.add(new Finding("ST-73",Status.DOGRULANAMADI,"Mükerrer / çelişkili eleman kimliği doğrulanamadı",
+                "Eleman tablosu ayrıştırılamadığı için aynı kat ve etikete ait çakışan kayıtlar denetlenemedi.",
+                "Kat + eleman etiketi + aks + kesit içeren model eleman listesini rapora dahil edin.",Collections.emptyList()));
+            return;
+        }
+        LinkedHashMap<String,ArrayList<MusaAiStructuralCalc.Element>>groups=new LinkedHashMap<>();
+        for(MusaAiStructuralCalc.Element e:calc.elements){
+            if(e==null||e.tag.isEmpty())continue;
+            String key=(e.floor.isEmpty()?"?":e.floor)+"|"+e.tag;
+            groups.computeIfAbsent(key,k->new ArrayList<>()).add(e);
+        }
+        ArrayList<String>duplicates=new ArrayList<>(),conflicts=new ArrayList<>();
+        for(Map.Entry<String,ArrayList<MusaAiStructuralCalc.Element>>g:groups.entrySet()){
+            if(g.getValue().size()<2)continue;
+            duplicates.add(g.getKey()+" x"+g.getValue().size());
+            LinkedHashSet<String>axes=new LinkedHashSet<>(),sections=new LinkedHashSet<>(),types=new LinkedHashSet<>();
+            for(MusaAiStructuralCalc.Element e:g.getValue()){
+                if(!e.axis.isEmpty())axes.add(e.axis);
+                if(!e.section.isEmpty())sections.add(e.section);
+                if(e.memberType!=MusaAiStructuralCalc.MemberType.UNKNOWN)types.add(e.memberType.name());
+            }
+            if(axes.size()>1||sections.size()>1||types.size()>1)
+                conflicts.add(g.getKey()+" [aks="+join(axes,4)+", kesit="+join(sections,4)+", tip="+join(types,4)+"]");
+        }
+        if(!conflicts.isEmpty())
+            out.add(new Finding("ST-73",Status.UYUMSUZLUK,"Aynı eleman kimliğinde çelişkili kayıtlar",
+                "Kat+etiket bazında çelişkili kayıtlar bulundu: "+join(conflicts,10)+".",
+                "Mükerrer model elemanlarını, kopyalanmış property atamalarını ve kat/etiket çakışmalarını modelde temizleyin.",Collections.emptyList()));
+        else if(!duplicates.isEmpty())
+            out.add(new Finding("ST-73",Status.INCELEME_GEREKLI,"Mükerrer eleman kimliği kayıtları",
+                "Ayrıştırılan raporda aynı kat+etiket birden çok satırda geçiyor: "+join(duplicates,10)+". Açık aks/kesit/tip çelişkisi saptanmadı.",
+                "Bunların raporun farklı sonuç satırları mı yoksa gerçek mükerrer model elemanları mı olduğunu kontrol edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-73",Status.BILGI,"Ayrıştırılan kayıtlarda eleman kimliği çakışması görülmedi",
+                "Kat+eleman etiketi bazında açık mükerrer/çelişkili kayıt saptanmadı.",
+                "Bu kontrol yalnız rapordan ayrıştırılan elemanlarla sınırlıdır; modelin kendi duplicate/check-model aracını da çalıştırın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
