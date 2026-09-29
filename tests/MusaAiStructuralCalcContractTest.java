@@ -11,6 +11,8 @@ public final class MusaAiStructuralCalcContractTest {
         has(main,"handleStructuralCalcPicked");
         has(main,"MusaAiPdfBoxTextExtractor.extract");
         has(main,"MusaAiStructuralCalc.compare");
+        has(main,"MusaAiStructuralAdvanced.analyzeFocused");
+        has(main,"MusaAiStructuralAdvanced.focusedQueryNeedsReport");
         has(main,"structuralCalcModel");
         has(main,"Statik Hesap–Proje Karşılaştırma Raporu");
         has(report,"3B. STATİK HESAP RAPORU ↔ DWG ÇAPRAZ KONTROLÜ");
