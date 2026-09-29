@@ -1015,6 +1015,11 @@ public final class MusaAiStructuralCalc {
                 "diaphragm assignment","diaphragm constraint","constraint assignment","diyafram atama","diyafram tanimi","diyafram tanımı","diaphragm not assigned",
                 "load assignment","load not assigned","unassigned load","missing load","area load","frame load","shell load","yuk atama","yük atama",
                 "self weight multiplier","self-weight multiplier","self weight","self-weight","oz agirlik","öz ağırlık","gravity load","gravity case","dead load multiplier",
+                "unit system","model units","birim sistemi","birim ayari","birim ayarı","unit mismatch","birim uyumsuz",
+                "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
+                "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
+                "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
+                "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,

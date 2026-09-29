@@ -86,7 +86,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Support restraint boundary condition assignment uygun\n"+
             "Diaphragm assignment constraint assignment uygun\n"+
             "Load assignment area load frame load uygun\n"+
-            "Self weight multiplier = 1.0 gravity load uygun\n";
+            "Self weight multiplier = 1.0 gravity load uygun\n"+
+            "Unit system kN-m-C checked and suitable\n"+
+            "Design code TBDY 2018 / TS500 checked and suitable\n"+
+            "Story elevation coordinate system checked and suitable\n"+
+            "Analysis case run status checked and suitable\n"+
+            "Combination reference load case reference checked and suitable\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -160,6 +165,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-76"),"diaphragm assignment check missing");
         require(ids.contains("ST-77"),"load assignment integrity check missing");
         require(ids.contains("ST-78"),"self-weight/gravity check missing");
+        require(ids.contains("ST-79"),"unit-system check missing");
+        require(ids.contains("ST-80"),"design-code check missing");
+        require(ids.contains("ST-81"),"story-elevation/coordinate check missing");
+        require(ids.contains("ST-82"),"analysis-case status check missing");
+        require(ids.contains("ST-83"),"load-case reference integrity check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -214,7 +224,13 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Diyafram atamalarını kontrol et"),"diaphragm assignment focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Yük atamalarını kontrol et"),"load assignment focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Öz ağırlık çarpanını kontrol et"),"self-weight focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Birim sistemini kontrol et"),"unit-system focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("TBDY yönetmelik sürümünü kontrol et"),"design-code focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kat kotlarını kontrol et"),"story-elevation focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Analiz case durumunu kontrol et"),"analysis-case status focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Load case referanslarını kontrol et"),"load-case reference focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesnet atamalarını kontrol et"),"support assignment focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Birim sistemini kontrol et"),"unit-system focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -328,6 +344,28 @@ public final class MusaAiStructuralAdvancedTest {
             "self-weight focus must only return ST-78");
         require(selfWeightFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
             "reported self-weight multiplier should be informational");
+
+        MusaAiStructuralAdvanced.Result unitFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Birim sistemini kontrol et");
+        require(unitFocus.findings.size()==1&&"ST-79".equals(unitFocus.findings.get(0).id),
+            "unit-system focus must only return ST-79");
+        require(unitFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
+            "reported unit system should be informational");
+
+        MusaAiStructuralAdvanced.Result codeFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"TBDY yönetmelik sürümünü kontrol et");
+        require(codeFocus.findings.size()==1&&"ST-80".equals(codeFocus.findings.get(0).id),
+            "design-code focus must only return ST-80");
+
+        MusaAiStructuralAdvanced.Result elevationFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Kat kotlarını kontrol et");
+        require(elevationFocus.findings.size()==1&&"ST-81".equals(elevationFocus.findings.get(0).id),
+            "story-elevation focus must only return ST-81");
+
+        MusaAiStructuralAdvanced.Result analysisStatusFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Analiz case durumunu kontrol et");
+        require(analysisStatusFocus.findings.size()==1&&"ST-82".equals(analysisStatusFocus.findings.get(0).id),
+            "analysis-case status focus must only return ST-82");
+
+        MusaAiStructuralAdvanced.Result loadRefFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Load case referanslarını kontrol et");
+        require(loadRefFocus.findings.size()==1&&"ST-83".equals(loadRefFocus.findings.get(0).id),
+            "load-case reference focus must only return ST-83");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
