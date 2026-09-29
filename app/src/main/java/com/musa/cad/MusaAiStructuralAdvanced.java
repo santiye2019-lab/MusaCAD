@@ -1428,8 +1428,13 @@ public final class MusaAiStructuralAdvanced {
     private static String revisionToken(String raw){
         if(raw==null||raw.trim().isEmpty())return "";
         Matcher m=Pattern.compile("(?iu)\\b(?:REV[İI]ZYON|REVISION|REV)\\s*(?:NO|NO\\.|NUMARASI|NUMBER)?\\s*[:=\\-]?\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
-        if(!m.find())return "";
-        return m.group(1).toUpperCase(Locale.ROOT);
+        String token="";
+        while(m.find()){
+            String candidate=m.group(1).toUpperCase(Locale.ROOT);
+            if(candidate.equals("REV")||candidate.equals("REVISION")||candidate.equals("REVİZYON"))continue;
+            token=candidate;
+        }
+        return token;
     }
 
     private static void revisionConsistencyChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
