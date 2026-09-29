@@ -11,7 +11,6 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
@@ -25,7 +24,6 @@ final class LicenseKeyStore {
     private static final String WRAP_ALIAS="musacad_license_private_wrap_v2";
     private static final String PREFS="musacad_license_signing_key_v2";
     private static final String K_PRIVATE="private_wrapped",K_NONCE="private_nonce",K_PUBLIC="public_x509";
-    private static final SecureRandom RNG=new SecureRandom();
 
     static boolean hasKey(Context c){
         SharedPreferences p=c.getSharedPreferences(PREFS,0);
@@ -74,9 +72,16 @@ final class LicenseKeyStore {
     static String fingerprint(Context c)throws Exception{return LicenseBackupCrypto.fingerprint(publicBytes(c));}
 
     private static void storeOperational(Context c,byte[] privatePkcs8,byte[] publicX509)throws Exception{
-        SecretKey key=wrapKey();byte[] nonce=new byte[12];RNG.nextBytes(nonce);
+        SecretKey key=wrapKey();
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE,key,new GCMParameterSpec(128,nonce));
+
+        // AndroidKeyStore GCM keys with randomized encryption enabled must generate
+        // their own IV. Supplying one here triggers:
+        // "Caller-provided IV not permitted".
+        cipher.init(Cipher.ENCRYPT_MODE,key);
+        byte[] nonce=cipher.getIV();
+        if(nonce==null||nonce.length==0)throw new IllegalStateException("Android Keystore nonce üretemedi");
+
         cipher.updateAAD(publicX509);
         byte[] wrapped=cipher.doFinal(privatePkcs8);
         boolean ok=c.getSharedPreferences(PREFS,0).edit()
