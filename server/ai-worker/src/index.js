@@ -1,6 +1,7 @@
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const GEMINI_CHAT_COMPLETIONS_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 export default {
   async fetch(request, env) {
@@ -13,8 +14,9 @@ export default {
 
 async function handleAnalyze(request, env) {
   if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
-  if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL || !env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
-    return json({ status: "server_error", message: "AI worker is not fully configured" }, 503);
+  const aiProvider = selectAiProvider(env);
+  if (!aiProvider.ok || !env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
+    return json({ status: "server_error", message: aiProvider.message || "AI worker is not fully configured" }, 503);
 
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
@@ -76,45 +78,84 @@ async function handleAnalyze(request, env) {
     }
   ];
 
-  const requestBody = {
-    model: String(env.OPENAI_MODEL),
-    instructions,
-    input,
-    tools,
-    parallel_tool_calls: true,
-    store: false,
-    max_output_tokens: positiveInt(env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000)
-  };
-  if (allowWeb) requestBody.include = ["web_search_call.action.sources"];
+  const maxOutputTokens = positiveInt(env.AI_MAX_OUTPUT_TOKENS || env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000);
+  let requestBody;
+  let upstreamUrl;
+  let upstreamKey;
+
+  if (aiProvider.name === "gemini") {
+    const geminiTools = tools
+      .filter(tool => tool && tool.type === "function")
+      .map(toChatCompletionsTool);
+    let systemInstructions = instructions;
+    if (allowWeb) {
+      systemInstructions += " This Gemini Free Tier route has no live web-search tool. Do not claim that you searched the web or verified current sources; state that current web verification is unavailable when relevant.";
+    }
+    requestBody = {
+      model: aiProvider.model,
+      messages: [
+        { role: "system", content: systemInstructions },
+        { role: "user", content: input[0].content }
+      ],
+      max_tokens: maxOutputTokens
+    };
+    if (geminiTools.length) {
+      requestBody.tools = geminiTools;
+      requestBody.tool_choice = "auto";
+    }
+    upstreamUrl = GEMINI_CHAT_COMPLETIONS_URL;
+    upstreamKey = String(env.GEMINI_API_KEY);
+  } else {
+    requestBody = {
+      model: aiProvider.model,
+      instructions,
+      input,
+      tools,
+      parallel_tool_calls: true,
+      store: false,
+      max_output_tokens: maxOutputTokens
+    };
+    if (allowWeb) requestBody.include = ["web_search_call.action.sources"];
+    upstreamUrl = OPENAI_RESPONSES_URL;
+    upstreamKey = String(env.OPENAI_API_KEY);
+  }
 
   const fetcher = typeof env.__fetch === "function" ? env.__fetch : fetch;
   let upstream;
   try {
-    upstream = await fetcher(OPENAI_RESPONSES_URL, {
+    upstream = await fetcher(upstreamUrl, {
       method: "POST",
       headers: {
-        authorization: "Bearer " + String(env.OPENAI_API_KEY),
+        authorization: "Bearer " + upstreamKey,
         "content-type": "application/json",
         accept: "application/json"
       },
       body: JSON.stringify(requestBody)
     });
   } catch (_) {
-    return json({ status: "server_error", message: "OpenAI connection failed" }, 503);
+    return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed" }, 503);
   }
 
   let data;
   try {
     data = await upstream.json();
   } catch (_) {
-    return json({ status: "server_error", message: "OpenAI returned invalid JSON" }, 502);
+    return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
   }
   if (!upstream.ok) {
-    const upstreamMessage = data && data.error && data.error.message ? String(data.error.message) : "OpenAI request failed";
+    if (upstream.status === 429 && aiProvider.name === "gemini") {
+      return json({
+        status: "quota_exhausted",
+        message: "Gemini ücretsiz kullanım kotası şu anda dolu. Kota yenilendiğinde Gandalf otomatik olarak yeniden çalışır."
+      }, 429);
+    }
+    const upstreamMessage = data && data.error && data.error.message
+      ? String(data.error.message)
+      : (aiProvider.name === "gemini" ? "Gemini request failed" : "OpenAI request failed");
     return json({ status: "server_error", message: upstreamMessage.slice(0, 300) }, upstream.status >= 500 ? 503 : 502);
   }
 
-  const parsedOutput = parseOpenAiOutput(data);
+  const parsedOutput = aiProvider.name === "gemini" ? parseGeminiChatOutput(data) : parseOpenAiOutput(data);
   const reply = parsedOutput.reply || (parsedOutput.actions.length
     ? "Gandalf AI çizim için " + parsedOutput.actions.length + " adet düzenleme önerisi hazırladı. Bu işlemler henüz uygulanmadı."
     : "Gandalf AI yanıt üretemedi.");
@@ -128,7 +169,10 @@ async function handleAnalyze(request, env) {
     sessionExpiresAtMs: session.expiresAtMs,
     accessMode,
     expertProfile,
-    packageMode
+    packageMode,
+    provider: aiProvider.name,
+    model: aiProvider.model,
+    usage: parsedOutput.usage
   });
 }
 
@@ -486,12 +530,91 @@ function parseOpenAiOutput(data) {
     }
   }
 
+  const usage = data && data.usage && typeof data.usage === "object" ? data.usage : {};
   return {
     reply: texts.join("\n\n").trim(),
     actions,
     sources: Array.from(sourceMap.values()).slice(0, 20),
-    webUsed
+    webUsed,
+    usage: {
+      inputTokens: safeTokenCount(usage.input_tokens),
+      outputTokens: safeTokenCount(usage.output_tokens),
+      totalTokens: safeTokenCount(usage.total_tokens)
+    }
   };
+}
+
+function parseGeminiChatOutput(data) {
+  const actions = [];
+  const texts = [];
+  const choices = data && Array.isArray(data.choices) ? data.choices : [];
+  const message = choices[0] && choices[0].message && typeof choices[0].message === "object" ? choices[0].message : {};
+  const content = message.content;
+  if (typeof content === "string" && content.trim()) texts.push(content.trim());
+  else if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part && typeof part.text === "string" && part.text.trim()) texts.push(part.text.trim());
+    }
+  }
+
+  const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  for (const call of calls) {
+    const fn = call && call.function && typeof call.function === "object" ? call.function : null;
+    if (!fn) continue;
+    const name = String(fn.name || "").trim();
+    if (!name) continue;
+    let args = {};
+    try { args = JSON.parse(String(fn.arguments || "{}")); } catch (_) { args = {}; }
+    actions.push({
+      name,
+      arguments: args,
+      reason: typeof args.reason === "string" ? args.reason : ""
+    });
+  }
+
+  const usage = data && data.usage && typeof data.usage === "object" ? data.usage : {};
+  return {
+    reply: texts.join("\n\n").trim(),
+    actions,
+    sources: [],
+    webUsed: false,
+    usage: {
+      inputTokens: safeTokenCount(usage.prompt_tokens),
+      outputTokens: safeTokenCount(usage.completion_tokens),
+      totalTokens: safeTokenCount(usage.total_tokens)
+    }
+  };
+}
+
+function toChatCompletionsTool(tool) {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  };
+}
+
+function selectAiProvider(env) {
+  const requested = String(env.AI_PROVIDER || "").trim().toLowerCase();
+  if (requested === "gemini" || (!requested && env.GEMINI_API_KEY)) {
+    if (!env.GEMINI_API_KEY || !env.GEMINI_MODEL)
+      return { ok: false, message: "Gemini AI worker is not fully configured" };
+    return { ok: true, name: "gemini", model: String(env.GEMINI_MODEL) };
+  }
+  if (requested === "openai" || (!requested && env.OPENAI_API_KEY)) {
+    if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL)
+      return { ok: false, message: "OpenAI AI worker is not fully configured" };
+    return { ok: true, name: "openai", model: String(env.OPENAI_MODEL) };
+  }
+  return { ok: false, message: "No AI provider is configured" };
+}
+
+function safeTokenCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
 async function verifySession(authHeader, publicKeyPem) {
@@ -593,4 +716,4 @@ function json(body, status = 200, extraHeaders = {}) {
   });
 }
 
-export { parseOpenAiOutput, cadProposalTools, verifySession };
+export { parseOpenAiOutput, parseGeminiChatOutput, cadProposalTools, verifySession };

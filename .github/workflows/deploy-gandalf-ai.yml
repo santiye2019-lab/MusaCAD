@@ -12,7 +12,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
       MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
       MUSACAD_PRODUCTION_RELEASE: "true"
@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID OPENAI_API_KEY MUSACAD_TRIAL_API_URL MUSACAD_TRIAL_PUBLIC_KEY_PEM MUSACAD_RELEASE_KEYSTORE_B64 MUSACAD_KEYSTORE_PASSWORD MUSACAD_KEY_ALIAS MUSACAD_KEY_PASSWORD; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GEMINI_API_KEY MUSACAD_TRIAL_API_URL MUSACAD_TRIAL_PUBLIC_KEY_PEM MUSACAD_RELEASE_KEYSTORE_B64 MUSACAD_KEYSTORE_PASSWORD MUSACAD_KEY_ALIAS MUSACAD_KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing repository secret: $name"
               missing=1
@@ -70,8 +70,9 @@ jobs:
           compatibility_date = "2026-09-01"
 
           [vars]
-          OPENAI_MODEL = "gpt-5.6-sol"
-          OPENAI_MAX_OUTPUT_TOKENS = "3200"
+          AI_PROVIDER = "gemini"
+          GEMINI_MODEL = "gemini-3.8-flash"
+          AI_MAX_OUTPUT_TOKENS = "3200"
           EOF
 
       - name: Bootstrap Gandalf Worker
@@ -87,7 +88,7 @@ jobs:
         working-directory: server/ai-worker
         run: |
           set -euo pipefail
-          printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@latest secret put OPENAI_API_KEY --name musacad-ai
+          printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@latest secret put GEMINI_API_KEY --name musacad-ai
           printf '%s' "$MUSACAD_TRIAL_PUBLIC_KEY_PEM" | npx --yes wrangler@latest secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM --name musacad-ai
 
       - name: Deploy Gandalf Worker
@@ -163,7 +164,8 @@ jobs:
             echo "- AI Worker: $GANDALF_WORKER_BASE"
             echo "- Analyze endpoint: $MUSACAD_AI_API_URL"
             echo "- Session endpoint: $MUSACAD_AI_SESSION_URL"
-            echo '- Model: gpt-5.6-sol'
+            echo '- Provider: Gemini Free Tier'
+            echo '- Model: gemini-3.8-flash'
             echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.0'
-            echo '- OpenAI API key remains server-side only'
+            echo '- Gemini API key remains server-side only'
           } >> "$GITHUB_STEP_SUMMARY"

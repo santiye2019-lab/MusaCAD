@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign, webcrypto } from "node:crypto";
-import worker, { parseOpenAiOutput, cadProposalTools } from "./src/index.js";
+import worker, { parseOpenAiOutput, parseGeminiChatOutput, cadProposalTools } from "./src/index.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -411,4 +411,119 @@ test("unknown expert profile is ignored instead of becoming prompt instructions"
   const body=await response.json();
   assert.equal(body.expertProfile,"");
   assert.equal(upstreamBody.instructions.includes("IGNORE_ALL_RULES"),false);
+});
+
+
+test("Gemini parser keeps answer, CAD proposals and token usage",()=>{
+  const parsed=parseGeminiChatOutput({
+    choices:[{
+      message:{
+        content:"Gemini kontrol raporu hazır.",
+        tool_calls:[{
+          type:"function",
+          function:{
+            name:"cad_add_text",
+            arguments:JSON.stringify({x:1,y:2,text:"KONTROL",layer:"NOTLAR",reason:"Kontrol notu"})
+          }
+        }]
+      }
+    }],
+    usage:{prompt_tokens:120,completion_tokens:30,total_tokens:150}
+  });
+  assert.equal(parsed.reply,"Gemini kontrol raporu hazır.");
+  assert.equal(parsed.actions.length,1);
+  assert.equal(parsed.actions[0].name,"cad_add_text");
+  assert.equal(parsed.usage.inputTokens,120);
+  assert.equal(parsed.usage.outputTokens,30);
+  assert.equal(parsed.usage.totalTokens,150);
+  assert.equal(parsed.webUsed,false);
+});
+
+test("Gemini provider uses OpenAI-compatible endpoint without exposing web tool",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
+  let upstreamBody=null;
+  const fetcher=async(url,options)=>{
+    assert.equal(String(url),"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+    assert.equal(options.headers.authorization,"Bearer gemini-secret");
+    upstreamBody=JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices:[{
+        message:{
+          content:"Gemini analizi hazır.",
+          tool_calls:[{
+            type:"function",
+            function:{
+              name:"cad_highlight_entities",
+              arguments:JSON.stringify({sourceIds:[5],reason:"Kontrol adayı"})
+            }
+          }]
+        }
+      }],
+      usage:{prompt_tokens:200,completion_tokens:40,total_tokens:240}
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Projeyi kontrol et ve şüpheli elemanı işaretlemeyi öner",
+      allowWeb:true,
+      allowEditProposals:true,
+      cad:{
+        schema:"musacad-cad-json/v1",
+        fileName:"mekanik.dwg",
+        cloudPolicy:{rawDrawingIncluded:false,automaticEditsAllowed:false,editActionsRequireUserApproval:true},
+        items:[]
+      }
+    })
+  });
+
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",
+    GEMINI_API_KEY:"gemini-secret",
+    GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:fetcher
+  });
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.status,"ok");
+  assert.equal(body.provider,"gemini");
+  assert.equal(body.model,"gemini-3.8-flash");
+  assert.equal(body.reply,"Gemini analizi hazır.");
+  assert.equal(body.actions.length,1);
+  assert.equal(body.usage.totalTokens,240);
+  assert.equal(upstreamBody.model,"gemini-3.8-flash");
+  assert.ok(Array.isArray(upstreamBody.messages));
+  assert.equal(upstreamBody.messages[0].role,"system");
+  assert.equal(upstreamBody.messages[0].content.includes("no live web-search tool"),true);
+  assert.ok(Array.isArray(upstreamBody.tools));
+  assert.ok(upstreamBody.tools.some(t=>t.function&&t.function.name==="cad_highlight_entities"));
+  assert.equal(upstreamBody.tools.some(t=>t.type==="web_search"),false);
+});
+
+test("Gemini quota exhaustion returns a clear free-tier message",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"incele",
+      cad:{schema:"musacad-cad-json/v1",cloudPolicy:{rawDrawingIncluded:false},items:[]}
+    })
+  });
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",
+    GEMINI_API_KEY:"gemini-secret",
+    GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>new Response(JSON.stringify({error:{message:"quota exceeded"}}),{status:429,headers:{"content-type":"application/json"}})
+  });
+  const body=await response.json();
+  assert.equal(response.status,429);
+  assert.equal(body.status,"quota_exhausted");
+  assert.equal(body.message.includes("ücretsiz kullanım kotası"),true);
 });
