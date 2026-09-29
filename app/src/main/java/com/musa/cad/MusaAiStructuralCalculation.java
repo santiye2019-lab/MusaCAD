@@ -118,7 +118,7 @@ public final class MusaAiStructuralCalculation {
             collect(raw,CONCRETE,f.concrete,20);collect(raw,STEEL,f.steel,20);
             collect(raw,SECTION,f.sections,80);collect(raw,REBAR,f.rebars,40);
             if(containsAny(q,"kot","seviye","level","elevation"))collect(raw,LEVEL,f.levels,40);
-            collect(raw,ELEMENT,f.elements,80);
+            collectElements(raw,f,80);
             f.foundation|=containsAny(q,"temel","radye","kazik","foundation","pile");
             f.wall|=containsAny(q,"perde","shear wall");
             f.column|=containsAny(q,"kolon","column");
@@ -131,7 +131,12 @@ public final class MusaAiStructuralCalculation {
         Facts f=new Facts();String raw=text==null?"":text;String q=norm(raw);
         collect(raw,CONCRETE,f.concrete,20);collect(raw,STEEL,f.steel,20);
         collect(raw,SECTION,f.sections,120);collect(raw,REBAR,f.rebars,60);
-        collect(raw,LEVEL,f.levels,60);collect(raw,ELEMENT,f.elements,120);
+        for(String line:raw.split("\\R")){
+            String lq=norm(line);
+            if(containsAny(lq,"kot","seviye","level","elevation"))collect(line,LEVEL,f.levels,60);
+            if(containsAny(lq,"kolon","kiris","perde","temel","doseme","column","beam","wall","foundation","slab"))
+                collectElements(line,f,120);
+        }
         f.foundation=containsAny(q,"temel","radye","kazik","foundation","pile");
         f.wall=containsAny(q,"perde","shear wall");
         f.column=containsAny(q,"kolon","column");
@@ -167,6 +172,15 @@ public final class MusaAiStructuralCalculation {
         while(m.find()&&out.size()<max){
             String v=m.group().replaceAll("\\s+","").toUpperCase(new Locale("tr","TR"));
             if(!v.isEmpty())out.add(v);
+        }
+    }
+
+    private static void collectElements(String raw,Facts f,int max){
+        Matcher m=ELEMENT.matcher(raw==null?"":raw);
+        while(m.find()&&f.elements.size()<max){
+            String v=m.group().replaceAll("\\s+","").toUpperCase(new Locale("tr","TR"));
+            if(v.isEmpty()||f.concrete.contains(v)||f.steel.contains(v))continue;
+            f.elements.add(v);
         }
     }
 
