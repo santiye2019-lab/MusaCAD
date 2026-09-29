@@ -69,7 +69,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Çatlak genişliği crack width = 0.25 mm uygun\n"+
             "Döşeme titreşim vibration comfort frequency = 8.0 Hz uygun\n"+
             "Uzun süreli sehim creep shrinkage kontrolü uygun\n"+
-            "Döşeme titreşim limiti aşıldı\n";
+            "Döşeme titreşim limiti aşıldı\n"+
+            "ERROR stiffness matrix singular at joint J45\n"+
+            "Unconnected joint J77 detected\n"+
+            "Shell mesh quality aspect ratio = 7.5 review required\n"+
+            "Non-convergence: nonlinear case NL1 did not converge\n"+
+            "Local axis orientation assignment checked and suitable\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -128,6 +133,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-61"),"vibration check missing");
         require(ids.contains("ST-62"),"long-term effects check missing");
         require(ids.contains("ST-63"),"explicit serviceability failure check missing");
+        require(ids.contains("ST-64"),"model instability check missing");
+        require(ids.contains("ST-65"),"disconnected model check missing");
+        require(ids.contains("ST-66"),"mesh quality check missing");
+        require(ids.contains("ST-67"),"convergence check missing");
+        require(ids.contains("ST-68"),"local-axis check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -165,6 +175,12 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Döşeme titreşimini kontrol et"),"vibration focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sünme rötre etkilerini kontrol et"),"long-term effects focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Çatlak genişliğini kontrol et"),"crack-width focus must require report");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Tekil rijitlik ve kararsızlık kontrolü"),"instability focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Bağlantısız düğümleri kontrol et"),"connectivity focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Mesh kalitesini kontrol et"),"mesh focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Analiz yakınsamasını kontrol et"),"convergence focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Yerel eksenleri kontrol et"),"local-axis focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesh kalitesini kontrol et"),"mesh focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -230,6 +246,22 @@ public final class MusaAiStructuralAdvancedTest {
             "vibration focus must only return ST-61");
         require(vibrationFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.UYUMSUZLUK,
             "vibration limit exceedance must be surfaced as mismatch");
+
+        MusaAiStructuralAdvanced.Result instabilityFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Tekil rijitlik ve kararsızlık kontrolü");
+        require(instabilityFocus.findings.size()==1&&"ST-64".equals(instabilityFocus.findings.get(0).id),
+            "instability focus must only return ST-64");
+        require(instabilityFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.UYUMSUZLUK,
+            "reported singularity must be surfaced as mismatch");
+
+        MusaAiStructuralAdvanced.Result meshFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Mesh kalitesini kontrol et");
+        require(meshFocus.findings.size()==1&&"ST-66".equals(meshFocus.findings.get(0).id),
+            "mesh focus must only return ST-66");
+
+        MusaAiStructuralAdvanced.Result axisFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Yerel eksenleri kontrol et");
+        require(axisFocus.findings.size()==1&&"ST-68".equals(axisFocus.findings.get(0).id),
+            "local-axis focus must only return ST-68");
+        require(axisFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
+            "reported suitable local-axis assignment should be informational");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
