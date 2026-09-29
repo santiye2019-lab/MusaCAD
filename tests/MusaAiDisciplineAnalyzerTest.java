@@ -32,7 +32,13 @@ public final class MusaAiDisciplineAnalyzerTest {
             "Güçlü kolon zayıf kiriş kontrolü",
             "Sarılma bölgesini kontrol et",
             "Transfer kirişi kontrolü",
-            "Konsol detayını incele"
+            "Konsol detayını incele",
+            "Kısa kolon kontrolü",
+            "Perde bağ kirişini kontrol et",
+            "Rijit diyaframı incele",
+            "Bodrum perdesini kontrol et",
+            "Zemin taşıma gücünü kontrol et",
+            "Yatak katsayısını incele"
         };
         for(String q:structuralQueries)
             if(MusaAiDiscipline.fromQuery(q)!=MusaAiDiscipline.STRUCTURAL)

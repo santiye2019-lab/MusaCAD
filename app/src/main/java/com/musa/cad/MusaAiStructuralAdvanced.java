@@ -46,6 +46,11 @@ public final class MusaAiStructuralAdvanced {
     private static final Pattern FLOOR_G=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern FLOOR_BSM=Pattern.compile("(?iu)\\b(BODRUM|BASEMENT)\\s*(\\d{0,2})\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern SIZE=Pattern.compile("(?iu)(\\d{2,5}(?:[\\.,]\\d+)?)\\s*[x×/]\\s*(\\d{2,5}(?:[\\.,]\\d+)?)\\s*(MM|CM|M)?");
+    private static final Pattern GEO_SOIL_CLASS=Pattern.compile("(?iu)\\b(?:ZEM[İI]N\\s*SINIFI|GROUND\\s*TYPE)\\s*[:=]?\\s*(Z[A-F])\\b");
+    private static final Pattern GEO_BEARING=Pattern.compile("(?iu)\\b(?:ZEM[İI]N\\s+(?:EMN[İI]YET\\s+GER[İI]LMES[İI]|TAŞIMA\\s+GÜCÜ|TASIMA\\s+GUCU)|ALLOWABLE\\s+BEARING\\s+(?:CAPACITY|PRESSURE)|BEARING\\s+CAPACITY)\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KPA|KN\\s*/\\s*M(?:2|²)|T\\s*/\\s*M(?:2|²)|KG\\s*/\\s*CM(?:2|²)))");
+    private static final Pattern GEO_SUBGRADE=Pattern.compile("(?iu)\\b(?:YATAK\\s+KATSAYISI|ZEM[İI]N\\s+YATAK\\s+KATSAYISI|SUBGRADE\\s+MODULUS|MODULUS\\s+OF\\s+SUBGRADE\\s+REACTION|K[Ss])\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KN\\s*/\\s*M(?:3|³)|MN\\s*/\\s*M(?:3|³)|T\\s*/\\s*M(?:3|³)))");
+    private static final Pattern GEO_GROUNDWATER=Pattern.compile("(?iu)\\b(?:YERALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|YER\\s+ALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|GROUNDWATER(?:\\s+LEVEL)?)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
+    private static final Pattern GEO_FOUNDATION_LEVEL=Pattern.compile("(?iu)\\b(?:TEMEL\\s+ALT\\s+KOTU|FOUNDATION\\s+(?:BOTTOM|BASE)\\s+LEVEL)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
 
     private static final class Ref {
         final MusaAiDrawingIndex.Item item;
@@ -96,6 +101,11 @@ public final class MusaAiStructuralAdvanced {
         torsionChecks(structuralCalc,findings);
         softWeakStoryChecks(structuralCalc,findings);
         modalChecks(structuralCalc,findings);
+        shortColumnChecks(refs,structuralCalc,findings);
+        couplingBeamChecks(refs,structuralCalc,findings);
+        diaphragmChecks(refs,structuralCalc,findings);
+        basementWallChecks(refs,findings);
+        geotechnicalChecks(refs,structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -136,7 +146,8 @@ public final class MusaAiStructuralAdvanced {
         return has(q,
             "modal","periyot","period","kutle katilim","mass participation",
             "kat otelen","story drift","burul","torsion","yumusak kat","soft story","zayif kat","weak story",
-            "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint");
+            "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint",
+            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -202,6 +213,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"asansor kuyu","elevator shaft"))ids.add("ST-10");
         if(has(q,"merdiven","stair"))ids.add("ST-11");
         if(has(q,"rezervasyon","delik","opening","sleeve")){ids.add("ST-07");ids.add("ST-08");ids.add("ST-09");}
+        if(has(q,"kisa kolon","short column"))ids.add("ST-32");
+        if(has(q,"perde bag kirisi","coupling beam"))ids.add("ST-33");
+        if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))ids.add("ST-34");
+        if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi")){ids.add("ST-35");ids.add("ST-03");}
+        if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre")){ids.add("ST-36");ids.add("ST-37");}
         return ids;
     }
 
@@ -223,6 +239,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"asansor kuyu","elevator shaft"))return "ASANSÖR KUYUSU";
         if(has(q,"merdiven","stair"))return "MERDİVEN";
         if(has(q,"rezervasyon","delik","opening","sleeve"))return "REZERVASYON / BOŞLUK";
+        if(has(q,"kisa kolon","short column"))return "KISA KOLON";
+        if(has(q,"perde bag kirisi","coupling beam"))return "PERDE BAĞ KİRİŞİ";
+        if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))return "DİYAFRAM / DÖŞEME SÜREKLİLİĞİ";
+        if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi"))return "BODRUM / PERDE SÜREKLİLİĞİ";
+        if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre"))return "ZEMİN / TEMEL PARAMETRELERİ";
         return "STATİK";
     }
 
@@ -606,6 +627,178 @@ public final class MusaAiStructuralAdvanced {
         return join(shortened,max);
     }
 
+    private static void shortColumnChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        ArrayList<String>drawing=new ArrayList<>();
+        for(Ref r:refs)if(has(r.q,"kisa kolon","short column")){
+            drawing.add(location(r));addId(ids,r);
+        }
+        List<String>report=reportCues(calc,"kisa kolon","short column");
+        if(drawing.isEmpty()&&report.isEmpty())return;
+        Status status=!report.isEmpty()?reportedStatus(report):(calc==null?Status.INCELEME_GEREKLI:Status.DOGRULANAMADI);
+        String detail=!report.isEmpty()
+            ?"Hesap raporundan kısa kolon ile ilgili veri okundu: "+cueSummary(report,4)+"."
+            :"Çizimde kısa kolon ifadesi bulunan kayıtlar: "+join(drawing,6)+".";
+        out.add(new Finding("ST-32",status,"Kısa kolon kontrol adayı",detail,
+            "Serbest kolon yüksekliği, dolgu/parapet etkisi, kesme talebi ve özel sarılma detayını hesap modeli ile paftada birlikte doğrulayın; MusaCAD kısa kolon dayanımı hesaplamaz.",ids));
+    }
+
+    private static void couplingBeamChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        ArrayList<String>drawing=new ArrayList<>();
+        boolean specialDetail=false;
+        for(Ref r:refs){
+            boolean coupling=has(r.q,"perde bag kirisi","perde baglant i kirisi","coupling beam")||
+                (has(r.q,"bag kirisi")&&has(r.q,"perde"));
+            if(coupling){drawing.add(location(r));addId(ids,r);}
+            if(coupling&&has(r.q,"capraz donati","diagonal donati","diagonal reinforcement","ozel etriye","special hoop"))specialDetail=true;
+        }
+        List<String>report=reportCues(calc,"perde bag kirisi","coupling beam");
+        if(drawing.isEmpty()&&report.isEmpty())return;
+        Status status=!report.isEmpty()?reportedStatus(report):(calc==null?Status.INCELEME_GEREKLI:Status.DOGRULANAMADI);
+        String detail=!report.isEmpty()
+            ?"Hesap raporundan perde bağ kirişi verisi okundu: "+cueSummary(report,4)+"."
+            :"Çizimde perde bağ kirişi olarak tanınan kayıtlar: "+join(drawing,6)+".";
+        if(specialDetail)detail+=" Çizimde özel/çapraz donatı ifadesi de görüldü.";
+        out.add(new Finding("ST-33",status,"Perde bağ kirişi / coupling beam kontrolü",detail,
+            "Bağ kirişinin perde açıklığı geometrisi, kesit ve özel donatı çözümünü aynı kat/aks için hesap raporu ve detay paftasında eşleştirin.",ids));
+    }
+
+    private static void diaphragmChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        ArrayList<String>drawing=new ArrayList<>();
+        int openingCount=0;
+        for(Ref r:refs){
+            if(has(r.q,"rijit diyafram","rigid diaphragm","semi rigid diaphragm","yar i rijit diyafram","yari rijit diyafram","doseme sureksiz","slab discontinuity")){
+                drawing.add(location(r));addId(ids,r);
+            }
+            if(r.kind==Kind.SLAB&&has(r.q,"bosluk","rezervasyon","saft","shaft","opening")){openingCount++;addId(ids,r);}
+        }
+        List<String>report=reportCues(calc,"rijit diyafram","rigid diaphragm","semi rigid diaphragm","doseme sureksiz","slab discontinuity");
+        if(drawing.isEmpty()&&report.isEmpty())return;
+        Status status=!report.isEmpty()?reportedStatus(report):(calc==null?Status.INCELEME_GEREKLI:Status.DOGRULANAMADI);
+        String detail=!report.isEmpty()
+            ?"Hesap raporundan diyafram/döşeme sürekliliği verisi okundu: "+cueSummary(report,4)+"."
+            :"Çizimde diyafram/döşeme sürekliliği ifadesi bulundu: "+join(drawing,6)+".";
+        if(openingCount>0)detail+=" Aynı görünür statik veride "+openingCount+" adet döşeme boşluğu/rezervasyon kaydı da bulunuyor.";
+        out.add(new Finding("ST-34",status,"Rijit diyafram / döşeme sürekliliği",detail,
+            "Diyafram kabulünü büyük boşluklar, şaftlar, dilatasyonlar ve döşeme süreksizlikleriyle birlikte hesap modelinde doğrulayın; otomatik tarama diyafram rijitliği hesabı yapmaz.",ids));
+    }
+
+    private static void basementWallChecks(List<Ref>refs,List<Finding>out){
+        LinkedHashMap<String,ArrayList<Ref>>byTag=new LinkedHashMap<>();
+        for(Ref r:refs)if(r.kind==Kind.WALL&&!r.tag.isEmpty()&&!r.floor.isEmpty())
+            byTag.computeIfAbsent(r.tag,k->new ArrayList<>()).add(r);
+
+        for(Map.Entry<String,ArrayList<Ref>>e:byTag.entrySet()){
+            ArrayList<Ref>basement=new ArrayList<>(),upper=new ArrayList<>();
+            for(Ref r:e.getValue()){
+                Integer fo=floorOrder(r.floor);if(fo==null)continue;
+                if(fo<0)basement.add(r);else upper.add(r);
+            }
+            if(basement.isEmpty()||upper.isEmpty())continue;
+            LinkedHashSet<String>bAxes=new LinkedHashSet<>(),uAxes=new LinkedHashSet<>(),bSections=new LinkedHashSet<>(),uSections=new LinkedHashSet<>();
+            LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+            for(Ref r:basement){if(!r.axis.isEmpty())bAxes.add(r.axis);if(!r.section.isEmpty())bSections.add(r.section);addId(ids,r);}
+            for(Ref r:upper){if(!r.axis.isEmpty())uAxes.add(r.axis);if(!r.section.isEmpty())uSections.add(r.section);addId(ids,r);}
+            boolean axisMismatch=!bAxes.isEmpty()&&!uAxes.isEmpty()&&Collections.disjoint(bAxes,uAxes);
+            boolean sectionChange=!bSections.isEmpty()&&!uSections.isEmpty()&&!bSections.equals(uSections);
+            if(axisMismatch||sectionChange){
+                StringBuilder detail=new StringBuilder(e.getKey()+" perdesi bodrumdan zemin/üst katlara devam ediyor.");
+                if(axisMismatch)detail.append(" Bodrum aksları ").append(join(bAxes,6)).append(", üst yapı aksları ").append(join(uAxes,6)).append(".");
+                if(sectionChange)detail.append(" Bodrum kesitleri ").append(join(bSections,6)).append(", üst yapı kesitleri ").append(join(uSections,6)).append(".");
+                out.add(new Finding("ST-35",Status.INCELEME_GEREKLI,"Bodrum–üst yapı perde geçişi",detail.toString(),
+                    "Bodrum çevre/perde sisteminin üst yapı perdesiyle aynı taşıyıcı hat üzerinde devam edip etmediğini ve geçiş detayının hesap modelinde karşılığını doğrulayın.",ids));
+            }
+        }
+    }
+
+    private static void geotechnicalChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        LinkedHashMap<String,String>drawing=projectGeoParameters(refs);
+        LinkedHashMap<String,String>report=new LinkedHashMap<>();
+        for(String key:Arrays.asList("Zemin Sınıfı","Zemin Taşıma Gücü","Yatak Katsayısı","Yeraltı Suyu","Temel Alt Kotu"))
+            if(calc.designParameters.containsKey(key))report.put(key,normalizeGeoValue(calc.designParameters.get(key)));
+
+        boolean foundationContext=!calc.foundationTypes.isEmpty()||!drawing.isEmpty()||
+            !reportCues(calc,"zemin tasima gucu","zemin emniyet gerilmesi","allowable bearing","bearing capacity","yatak katsayisi","subgrade modulus","temel alt kotu","groundwater","yeralti suyu").isEmpty();
+        if(!foundationContext)return;
+
+        ArrayList<String>missing=new ArrayList<>();
+        if(!report.containsKey("Zemin Sınıfı"))missing.add("Zemin Sınıfı");
+        boolean pileOnly=calc.foundationTypes.size()==1&&calc.foundationTypes.contains("KAZIK");
+        if(!pileOnly&&!report.containsKey("Zemin Taşıma Gücü")&&!report.containsKey("Yatak Katsayısı"))
+            missing.add("Zemin Taşıma Gücü / Yatak Katsayısı");
+        if(!missing.isEmpty())
+            out.add(new Finding("ST-36",Status.DOGRULANAMADI,"Zemin / temel tasarım parametreleri eksik veya okunamadı",
+                "Yüklenen statik hesap verisinde şu zemin/temel parametreleri açık biçimde ayrıştırılamadı: "+join(missing,8)+".",
+                "Zemin ve temel tasarımına esas değerleri geoteknik raporun ilgili sayfası ve statik hesap kabulüyle doğrulayın; MusaCAD eksik değeri yönetmelikten türetmez.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-36",Status.BILGI,"Zemin / temel parametreleri okundu",
+                "Statik hesap verisinden okunan parametreler: "+geoSummary(report)+".",
+                "Bu değerlerin güncel geoteknik rapor ve temel projesiyle aynı revizyona ait olduğunu doğrulayın.",Collections.emptyList()));
+
+        ArrayList<String>same=new ArrayList<>(),different=new ArrayList<>();
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Map.Entry<String,String>e:drawing.entrySet()){
+            String rv=report.get(e.getKey());if(rv==null)continue;
+            if(sameGeoValue(e.getValue(),rv))same.add(e.getKey()+"="+e.getValue());
+            else different.add(e.getKey()+": proje "+e.getValue()+" • hesap "+rv);
+        }
+        for(Ref r:refs)if(has(r.q,"zemin tasima gucu","zemin emniyet gerilmesi","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin sinifi"))addId(ids,r);
+        if(!different.isEmpty())
+            out.add(new Finding("ST-37",Status.UYUMSUZLUK,"Zemin / temel parametre proje–hesap farkı",
+                "Açıkça okunabilen ortak parametrelerde fark bulundu: "+join(different,8)+".",
+                "Geoteknik rapor, temel paftası ve hesap modelindeki kabul değerlerini aynı revizyon üzerinden karşılaştırın.",ids));
+        else if(!same.isEmpty())
+            out.add(new Finding("ST-37",Status.BILGI,"Zemin / temel parametre proje–hesap eşleşmesi",
+                "Açıkça okunabilen ortak parametreler eşleşiyor: "+join(same,8)+".",
+                "Eşleşme yalnız görünür metin değerleri içindir; temel taşıma gücü veya oturma hesabı yapılmamıştır.",ids));
+    }
+
+    private static LinkedHashMap<String,String>projectGeoParameters(List<Ref>refs){
+        LinkedHashMap<String,String>out=new LinkedHashMap<>();
+        for(Ref r:refs){
+            putGeo(out,"Zemin Sınıfı",GEO_SOIL_CLASS,r.raw);
+            putGeo(out,"Zemin Taşıma Gücü",GEO_BEARING,r.raw);
+            putGeo(out,"Yatak Katsayısı",GEO_SUBGRADE,r.raw);
+            putGeo(out,"Yeraltı Suyu",GEO_GROUNDWATER,r.raw);
+            putGeo(out,"Temel Alt Kotu",GEO_FOUNDATION_LEVEL,r.raw);
+        }
+        return out;
+    }
+
+    private static void putGeo(Map<String,String>out,String key,Pattern pattern,String raw){
+        Matcher m=pattern.matcher(raw==null?"":raw);
+        if(m.find())out.putIfAbsent(key,normalizeGeoValue(m.group(1)));
+    }
+
+    private static String normalizeGeoValue(String raw){
+        if(raw==null)return "";
+        String value=raw.toUpperCase(new Locale("tr","TR")).replace(',','.').replace("²","2").replace("³","3").replaceAll("\\s+","");
+        if(value.endsWith("KN/M2"))value=value.substring(0,value.length()-5)+"KPA";
+        if(value.endsWith("MN/M3")){
+            String n=value.substring(0,value.length()-5);
+            try{return canonicalNumber(Double.parseDouble(n)*1000d)+"KN/M3";}catch(Exception ignored){}
+        }
+        return value;
+    }
+
+    private static boolean sameGeoValue(String a,String b){return normalizeGeoValue(a).equals(normalizeGeoValue(b));}
+
+    private static String canonicalNumber(double value){
+        if(Math.abs(value-Math.rint(value))<1e-9)return Long.toString(Math.round(value));
+        String s=Double.toString(value);
+        while(s.endsWith("0"))s=s.substring(0,s.length()-1);
+        return s.endsWith(".")?s.substring(0,s.length()-1):s;
+    }
+
+    private static String geoSummary(Map<String,String>values){
+        ArrayList<String>items=new ArrayList<>();
+        for(Map.Entry<String,String>e:values.entrySet())items.add(e.getKey()+"="+e.getValue());
+        return join(items,10);
+    }
+
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
         if(calc.elements.isEmpty())
@@ -616,7 +809,10 @@ public final class MusaAiStructuralAdvanced {
 
     private static boolean isRelevant(Ref r){
         if(r==null)return false;
-        return r.kind!=Kind.OTHER||has(r.q,"statik","betonarme","tasiyici","donati","rezervasyon","bosluk","dilatasyon","zimbalama","kazik","radye");
+        return r.kind!=Kind.OTHER||has(r.q,"statik","betonarme","tasiyici","donati","rezervasyon","bosluk","dilatasyon","zimbalama","kazik","radye",
+            "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid",
+            "doseme sureksiz","slab discontinuity","bodrum perdesi","basement wall","cevre perdesi",
+            "zemin sinifi","zemin tasima gucu","zemin emniyet gerilmesi","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
     }
 
     private static Kind kind(String q,String tag){
