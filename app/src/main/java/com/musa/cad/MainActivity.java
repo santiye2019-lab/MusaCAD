@@ -1014,6 +1014,28 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
         }
+        MusaAiDiscipline focusedDiscipline=MusaAiDiscipline.fromQuery(raw);
+        if(activeDxf!=null&&focusedDiscipline==MusaAiDiscipline.STRUCTURAL&&MusaAiStructuralAdvanced.isFocusedQuery(raw)){
+            MusaAiStructuralCalc.Model calc=currentProject==null?null:currentProject.structuralCalcModel;
+            if(MusaAiStructuralAdvanced.focusedQueryNeedsReport(raw)&&calc==null){
+                cad.clearAiHighlights();
+                reply.send("Bu odaklı statik kontrol için hesap raporu/model çıktısı gerekli. Önce “Statik hesap raporu yükle” yazın. MusaCAD sonuç değeri uydurmaz.");
+                return;
+            }
+            MusaAiStructuralAdvanced.Result focused=MusaAiStructuralAdvanced.analyzeFocused(currentAiDrawingIndex(),calc,raw);
+            if(focused.matched){
+                lastAiReport=focused.text;
+                lastAiReportTitle="Odaklı Statik Kontrol";
+                lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(focused.sourceIds));
+                int shown=focused.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(focused.sourceIds);
+                if(focused.sourceIds.isEmpty())cad.clearAiHighlights();
+                reply.send(focused.text+
+                    (shown>0?"\n\n• Çizimde vurgulanan bulgu: "+shown:"")+
+                    "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
+                return;
+            }
+        }
+
         if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
             MusaAiDiscipline requested=MusaAiDiscipline.fromQuery(raw);
             boolean full=aiControl.contains("tam proje")||aiControl.contains("tum disiplin")||aiControl.contains("disiplinler arasi");
