@@ -1020,6 +1020,11 @@ public final class MusaAiStructuralCalc {
                 "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
                 "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
                 "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı",
+                "object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame",
+                "shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı",
+                "pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama",
+                "design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı",
+                "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
