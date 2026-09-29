@@ -91,7 +91,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Design code TBDY 2018 / TS500 checked and suitable\n"+
             "Story elevation coordinate system checked and suitable\n"+
             "Analysis case run status checked and suitable\n"+
-            "Combination reference load case reference checked and suitable\n";
+            "Combination reference load case reference checked and suitable\n"+
+            "Object property compatibility checked and suitable\n"+
+            "Shell thickness area thickness property checked and suitable\n"+
+            "Pier label and spandrel assignment checked and suitable\n"+
+            "Design procedure design status checked and suitable\n"+
+            "Auto mesh area mesh assignment checked and suitable\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -170,6 +175,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-81"),"story-elevation/coordinate check missing");
         require(ids.contains("ST-82"),"analysis-case status check missing");
         require(ids.contains("ST-83"),"load-case reference integrity check missing");
+        require(ids.contains("ST-84"),"object/property compatibility check missing");
+        require(ids.contains("ST-85"),"shell thickness assignment check missing");
+        require(ids.contains("ST-86"),"pier/spandrel assignment check missing");
+        require(ids.contains("ST-87"),"design procedure/status check missing");
+        require(ids.contains("ST-88"),"auto-mesh assignment check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -229,6 +239,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Kat kotlarını kontrol et"),"story-elevation focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Analiz case durumunu kontrol et"),"analysis-case status focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Load case referanslarını kontrol et"),"load-case reference focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Property tip uyumluluğunu kontrol et"),"object/property focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Shell thickness atamalarını kontrol et"),"shell-thickness focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Pier label atamalarını kontrol et"),"pier/spandrel focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Tasarım durumunu kontrol et"),"design-status focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Auto mesh atamalarını kontrol et"),"auto-mesh focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesnet atamalarını kontrol et"),"support assignment focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Birim sistemini kontrol et"),"unit-system focus must require report");
 
@@ -366,6 +381,26 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result loadRefFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Load case referanslarını kontrol et");
         require(loadRefFocus.findings.size()==1&&"ST-83".equals(loadRefFocus.findings.get(0).id),
             "load-case reference focus must only return ST-83");
+
+        MusaAiStructuralAdvanced.Result propertyFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Property tip uyumluluğunu kontrol et");
+        require(propertyFocus.findings.size()==1&&"ST-84".equals(propertyFocus.findings.get(0).id),
+            "object/property focus must only return ST-84");
+
+        MusaAiStructuralAdvanced.Result shellFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Shell thickness atamalarını kontrol et");
+        require(shellFocus.findings.size()==1&&"ST-85".equals(shellFocus.findings.get(0).id),
+            "shell-thickness focus must only return ST-85");
+
+        MusaAiStructuralAdvanced.Result pierFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Pier label atamalarını kontrol et");
+        require(pierFocus.findings.size()==1&&"ST-86".equals(pierFocus.findings.get(0).id),
+            "pier/spandrel focus must only return ST-86");
+
+        MusaAiStructuralAdvanced.Result designStatusFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Tasarım durumunu kontrol et");
+        require(designStatusFocus.findings.size()==1&&"ST-87".equals(designStatusFocus.findings.get(0).id),
+            "design-status focus must only return ST-87");
+
+        MusaAiStructuralAdvanced.Result autoMeshFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Auto mesh atamalarını kontrol et");
+        require(autoMeshFocus.findings.size()==1&&"ST-88".equals(autoMeshFocus.findings.get(0).id),
+            "auto-mesh focus must only return ST-88");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
