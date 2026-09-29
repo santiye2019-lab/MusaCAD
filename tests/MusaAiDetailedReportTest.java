@@ -19,7 +19,7 @@ public final class MusaAiDetailedReportTest {
             new MusaAiBoq.Row("25.001","Yangın sprinkler hattı","m",11,"Yangın keşfi")
         ));
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.pdf",
-            "C30 B420C K1 30x70\\nSDS 1.10 Zemin Sınıfı ZC\\nRADYE TEMEL");
+            "C30 B420C K1 30x70\nSDS 1.10 Zemin Sınıfı ZC\nRADYE TEMEL");
         MusaAiDetailedReport.Result statik=MusaAiDetailedReport.generate(
             index(),"statik.dwg","Statik detaylı rapor oluştur",boq,calc);
         if(!statik.matched)throw new AssertionError("not matched");
