@@ -132,6 +132,13 @@ public final class MusaAiDisciplineAnalyzer {
                     out.add(finding(d,Severity.MEDIUM,seq++,"Taşıyıcı eleman sınıfları ayrıştırılamadı","Statik olarak sınıflanan nesnelerde kolon/kiriş/perde/döşeme/temel isimleri okunamadı.","Statik pafta lejantı ve katman isimlerini kontrol edin.",ids(items)));
                 List<MusaAiDrawingIndex.Item> holes=filter(items,"delik","rezervasyon","bosluk","gecis");
                 if(!holes.isEmpty()){Set<Integer>x=ids(holes);ids.addAll(x);out.add(finding(d,Severity.HIGH,seq++,"Rezervasyon / geçiş koordinasyonu","Taşıyıcı sistemle ilişkili "+holes.size()+" adet delik, boşluk, rezervasyon veya geçiş ifadesi bulundu.","Mekanik/elektrik geçişlerini statik müellifle doğrulayın; sahada onaysız taşıyıcı eleman delinmemelidir.",x));}
+
+                MusaAiStructuralAdvanced.Result advanced=MusaAiStructuralAdvanced.analyze(index,null);
+                if(advanced.matched)for(MusaAiStructuralAdvanced.Finding af:advanced.findings){
+                    Severity severity=advancedSeverity(af.status);
+                    ids.addAll(af.sourceIds);
+                    out.add(new Finding(af.id,d,severity,af.title,af.detail,af.suggestion,af.sourceIds));
+                }
                 break;
             }
             case ELECTRICAL:{
@@ -206,6 +213,15 @@ public final class MusaAiDisciplineAnalyzer {
         int critical=0,high=0,medium=0,info=0;
         for(Finding f:r.findings){switch(f.severity){case CRITICAL:critical++;break;case HIGH:high++;break;case MEDIUM:medium++;break;default:info++;}}
         return "• Bulgu: "+r.findings.size()+" • Kritik: "+critical+" • Yüksek: "+high+" • Orta: "+medium+" • Bilgi: "+info;
+    }
+    private static Severity advancedSeverity(MusaAiStructuralAdvanced.Status status){
+        if(status==null)return Severity.INFO;
+        switch(status){
+            case UYUMSUZLUK:return Severity.HIGH;
+            case INCELEME_GEREKLI:return Severity.MEDIUM;
+            case DOGRULANAMADI:return Severity.INFO;
+            default:return Severity.INFO;
+        }
     }
     private static String severityLabel(Severity s){switch(s){case CRITICAL:return "KRİTİK";case HIGH:return "YÜKSEK";case MEDIUM:return "ORTA";default:return "BİLGİ";}}
     private static String blank(String s,String fallback){return s==null||s.trim().isEmpty()?fallback:s.trim();}

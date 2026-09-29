@@ -938,6 +938,11 @@ public final class MusaAiStructuralCalc {
         collectNamedNumber(raw,out,"DTS","(?iu)\\bDTS\\s*[:=]?\\s*([1-4])\\b");
         collectNamedNumber(raw,out,"BYS","(?iu)\\bBYS\\s*[:=]?\\s*([1-8])\\b");
         collectNamedText(raw,out,"Zemin Sınıfı","(?iu)\\b(?:ZEM[İI]N\\s*SINIFI|GROUND\\s*TYPE)\\s*[:=]?\\s*(Z[A-F])\\b");
+        collectNamedNumber(raw,out,"R","(?iu)(?:TAŞIYICI\\s*SİSTEM\\s*DAVRANIŞ\\s*KATSAYISI|TASIYICI\\s*SISTEM\\s*DAVRANIS\\s*KATSAYISI|R\\s*KATSAYISI)\\s*(?:\\(R\\))?\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"D","(?iu)(?:DAYANIM\\s*FAZLALIĞI\\s*KATSAYISI|DAYANIM\\s*FAZLALIGI\\s*KATSAYISI|D\\s*KATSAYISI)\\s*(?:\\(D\\))?\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"I","(?iu)(?:BİNA\\s*ÖNEM\\s*KATSAYISI|BINA\\s*ONEM\\s*KATSAYISI|IMPORTANCE\\s*FACTOR)\\s*(?:\\(I\\))?\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"T1X","(?iu)\\bT1\\s*[-_ ]?X\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        collectNamedNumber(raw,out,"T1Y","(?iu)\\bT1\\s*[-_ ]?Y\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
     }
 
     private static void collectNamedNumber(String raw,Map<String,String>out,String key,String regex){
@@ -956,9 +961,18 @@ public final class MusaAiStructuralCalc {
             String t=line.trim().replaceAll("\\s+"," ");
             if(t.isEmpty())continue;if(t.length()>180)t=t.substring(0,180)+"…";
             String q=MusaAiDrawingIndex.normalize(t);
-            if(seismic.size()<24&&has(q,"sds","sd1","dts","bys","zemin sinifi","deprem","spektrum","bina onem","tasarim spektrumu","ra r","dayanim fazlaligi"))
+            if(seismic.size()<96&&has(q,
+                "sds","sd1","dts","bys","zemin sinifi","deprem","spektrum","bina onem","tasarim spektrumu","ra r","dayanim fazlaligi",
+                "guclu kolon","zayif kiris","strong column","weak beam","kolon kiris birlesim","beam column joint",
+                "sarilma bolgesi","confinement zone","ozel deprem etriyesi","special seismic hoop",
+                "duzensizlik","irregularity","a1","a2","a3","b1","b2","b3",
+                "kat otelemesi","goreli kat otelemesi","story drift","interstory drift",
+                "burulma","torsional irregularity","eta bi","etabi",
+                "yumusak kat","soft story","zayif kat","weak story",
+                "modal","mod sekli","mode shape","periyot","period","kutle katilim","mass participation",
+                "etkin modal kutle","effective modal mass","mod birlestirme","response spectrum","modal combination"))
                 addUnique(seismic,t);
-            if(loads.size()<20&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load"))
+            if(loads.size()<40&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load","sehim","deflection","servisabilite","serviceability"))
                 addUnique(loads,t);
         }
     }

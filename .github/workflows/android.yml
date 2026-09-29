@@ -100,7 +100,7 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiCadJsonTest
       - name: Test MusaCAD bounded multi-drawing CAD package JSON
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiCadJson.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java app/src/main/java/com/musa/cad/MusaAiCadPackageJson.java tests/MusaAiCadPackageJsonTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiCadJson.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java app/src/main/java/com/musa/cad/MusaAiCadPackageJson.java tests/MusaAiCadPackageJsonTest.java
           java -cp /tmp/musacad-tests MusaAiCadPackageJsonTest
       - name: Test MusaCAD explicit cloud-AI routing policy
         run: |
@@ -184,12 +184,16 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiVoiceContractTest
       - name: Test MusaCAD multi-discipline project analyzer
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java tests/MusaAiDisciplineAnalyzerTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java tests/MusaAiDisciplineAnalyzerTest.java
           java -cp /tmp/musacad-tests MusaAiDisciplineAnalyzerTest
       - name: Test MusaCAD structural calculation report cross-check
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java tests/MusaAiStructuralCalcTest.java
           java -cp /tmp/musacad-tests MusaAiStructuralCalcTest
+      - name: Test MusaCAD advanced structural coordination
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java tests/MusaAiStructuralAdvancedTest.java
+          java -cp /tmp/musacad-tests MusaAiStructuralAdvancedTest
       - name: Test bounded text extraction from structural PDF reports
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiPdfTextExtractor.java tests/MusaAiPdfTextExtractorTest.java
@@ -204,11 +208,11 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiStructuralCalcContractTest
       - name: Test MusaCAD detailed discipline BOQ reports
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiDetailedReport.java tests/MusaAiDetailedReportTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiDetailedReport.java tests/MusaAiDetailedReportTest.java
           java -cp /tmp/musacad-tests MusaAiDetailedReportTest
       - name: Test MusaCAD multi-file project package audit
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java tests/MusaAiProjectPackageTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java tests/MusaAiProjectPackageTest.java
           java -cp /tmp/musacad-tests MusaAiProjectPackageTest
       - name: Test MusaCAD project package integration contract
         run: |
