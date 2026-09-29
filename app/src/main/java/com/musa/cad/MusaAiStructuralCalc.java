@@ -470,7 +470,7 @@ public final class MusaAiStructuralCalc {
 
     private static DrawingSnapshot snapshot(MusaAiDrawingIndex index){
         DrawingSnapshot out=new DrawingSnapshot();
-        String defaultFloor=detectFloor(index.name);
+        String defaultFloor=detectFloor(index.layout);
         for(MusaAiDrawingIndex.Item item:index.items()){
             if(item==null)continue;
             String raw=(item.layer+" "+item.text).trim();
@@ -490,7 +490,7 @@ public final class MusaAiStructuralCalc {
                 out.tagged.putIfAbsent(e.getKey(),e.getValue());
                 if(item.sourceId>=0)out.tagSource.putIfAbsent(e.getKey(),item.sourceId);
             }
-            addElementsFromLine(out.elements,raw,defaultFloor,item.sourceId);
+            addElementsFromLine(out.elements,item.text,defaultFloor,item.sourceId);
         }
         return out;
     }
@@ -574,14 +574,14 @@ public final class MusaAiStructuralCalc {
 
     private static String detectFloor(String raw){
         if(raw==null||raw.isEmpty())return "";
-        Matcher m=FLOOR_AFTER.matcher(raw);
-        if(m.find())return canonicalFloor(m.group(1));
-        m=FLOOR_BEFORE.matcher(raw);
-        if(m.find())return canonicalFloor(m.group(1));
-        m=FLOOR_BASEMENT.matcher(raw);
+        Matcher m=FLOOR_BASEMENT.matcher(raw);
         if(m.find())return canonicalFloor(m.group(1)+(m.group(2)==null?"":m.group(2)));
         m=FLOOR_GROUND.matcher(raw);
         if(m.find())return "ZEMIN";
+        m=FLOOR_AFTER.matcher(raw);
+        if(m.find())return canonicalFloor(m.group(1));
+        m=FLOOR_BEFORE.matcher(raw);
+        if(m.find())return canonicalFloor(m.group(1));
         return "";
     }
 
@@ -612,6 +612,9 @@ public final class MusaAiStructuralCalc {
         String q=MusaAiDrawingIndex.normalize(tag).toUpperCase(Locale.ROOT);
         return !q.startsWith("KAT")&&!q.startsWith("FLOOR")&&!q.startsWith("STOREY")&&
             !q.startsWith("AKS")&&!q.startsWith("AXIS")&&!q.startsWith("GRID")&&
+            !q.startsWith("KIRIS")&&!q.startsWith("KOLON")&&!q.startsWith("PERDE")&&
+            !q.startsWith("DOSEME")&&!q.startsWith("TEMEL")&&!q.startsWith("RADYE")&&
+            !q.startsWith("BODRUM")&&!q.startsWith("BASEMENT")&&
             !q.startsWith("SDS")&&!q.startsWith("SD")&&!q.startsWith("DTS")&&!q.startsWith("BYS");
     }
 
@@ -681,7 +684,10 @@ public final class MusaAiStructuralCalc {
         return out.toString();
     }
     private static boolean has(String q,String...terms){for(String t:terms)if(q.contains(MusaAiDrawingIndex.normalize(t)))return true;return false;}
-    private static Set<String>immutableSet(Collection<String>source){return Collections.unmodifiableSet(new LinkedHashSet<>(source==null?Collections.emptyList():source));}
+    private static Set<String>immutableSet(Collection<String>source){
+        if(source==null||source.isEmpty())return Collections.emptySet();
+        return Collections.unmodifiableSet(new LinkedHashSet<>(source));
+    }
     private static String extension(String name){if(name==null)return "";int dot=name.lastIndexOf('.');return dot>=0&&dot+1<name.length()?name.substring(dot+1).toLowerCase(Locale.ROOT):"";}
     private static String clean(String value){return value==null?"":value.trim();}
     private MusaAiStructuralCalc(){}
