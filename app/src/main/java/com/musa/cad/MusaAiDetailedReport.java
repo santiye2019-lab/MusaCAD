@@ -332,6 +332,12 @@ public final class MusaAiDetailedReport {
         return out.toString();
     }
 
+    private static boolean has(String q,String...terms){
+        if(q==null||q.isEmpty())return false;
+        for(String term:terms)if(q.contains(MusaAiDrawingIndex.normalize(term)))return true;
+        return false;
+    }
+
     private static final java.util.regex.Pattern STRUCT_SECTION=
         java.util.regex.Pattern.compile("(?i)(?<!\\d)\\d{2,4}\\s*[x×/]\\s*\\d{2,4}(?!\\d)");
     private static final java.util.regex.Pattern STRUCT_CONCRETE=
