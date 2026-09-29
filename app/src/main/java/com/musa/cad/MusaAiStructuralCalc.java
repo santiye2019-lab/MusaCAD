@@ -965,7 +965,7 @@ public final class MusaAiStructuralCalc {
             String t=line.trim().replaceAll("\\s+"," ");
             if(t.isEmpty())continue;if(t.length()>180)t=t.substring(0,180)+"…";
             String q=MusaAiDrawingIndex.normalize(t);
-            if(seismic.size()<96&&has(q,
+            if(seismic.size()<160&&has(q,
                 "sds","sd1","dts","bys","zemin sinifi","deprem","spektrum","bina onem","tasarim spektrumu","ra r","dayanim fazlaligi",
                 "guclu kolon","zayif kiris","strong column","weak beam","kolon kiris birlesim","beam column joint",
                 "sarilma bolgesi","confinement zone","ozel deprem etriyesi","special seismic hoop",
@@ -995,7 +995,12 @@ public final class MusaAiStructuralCalc {
                 "r d i","r/d/i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor",
                 "etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier",
                 "rijitlik carpani","rijitlik çarpanı","property modifier","section modifier",
-                "mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))
+                "mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset",
+                "pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı","kapasite orani","kapasite oranı","capacity ratio",
+                "utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio",
+                "kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio",
+                "perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity",
+                "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
                 "hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load",

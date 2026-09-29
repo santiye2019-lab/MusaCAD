@@ -60,7 +60,11 @@ public final class MusaAiStructuralAdvancedTest {
             "Deprem yük durumu RSY response spectrum Y\n"+
             "Taşıyıcı sistem katsayıları R/D/I uygundur\n"+
             "Etkin rijitlik cracked section stiffness modifier uygulanmıştır\n"+
-            "Kiriş uçlarında end release ve rigid zone tanımları uygundur\n";
+            "Kiriş uçlarında end release ve rigid zone tanımları uygundur\n"+
+            "Kolon S12 PMM interaction ratio = 0.82 uygun\n"+
+            "Kiriş K40 beam shear ratio = 0.71 uygun\n"+
+            "Perde P20 wall shear capacity ratio = 0.66 uygun\n"+
+            "Kolon S99 capacity ratio = 0.95\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -110,6 +114,10 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-51"),"RDI system check missing");
         require(ids.contains("ST-52"),"effective-stiffness check missing");
         require(ids.contains("ST-53"),"release/rigid-zone check missing");
+        require(ids.contains("ST-54"),"PMM interaction check missing");
+        require(ids.contains("ST-55"),"beam capacity check missing");
+        require(ids.contains("ST-56"),"wall shear capacity check missing");
+        require(ids.contains("ST-58"),"utilization ranking check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -138,6 +146,10 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Mafsal ve rijit bölge kabullerini kontrol et"),"release/rigid-zone focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Yük kombinasyonlarını kontrol et"),"load-combination focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Etkin rijitlikleri kontrol et"),"effective-stiffness focus must require report");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("PMM oranlarını kontrol et"),"PMM focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kiriş kesme oranlarını kontrol et"),"beam capacity focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Perde kesme kapasitesini kontrol et"),"wall shear focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kritik eleman kapasite oranlarını sırala"),"utilization ranking focus query missing");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -184,6 +196,15 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result stiffnessFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Etkin rijitlikleri kontrol et");
         require(stiffnessFocus.findings.size()==1&&"ST-52".equals(stiffnessFocus.findings.get(0).id),
             "effective stiffness focus must only return ST-52");
+
+        MusaAiStructuralAdvanced.Result pmmFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"PMM oranlarını kontrol et");
+        require(pmmFocus.findings.size()==1&&"ST-54".equals(pmmFocus.findings.get(0).id),
+            "PMM focus must only return ST-54");
+
+        MusaAiStructuralAdvanced.Result utilizationFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Kritik eleman kapasite oranlarını sırala");
+        require(utilizationFocus.findings.size()==1&&"ST-58".equals(utilizationFocus.findings.get(0).id),
+            "utilization focus must only return ST-58");
+        require(utilizationFocus.text.contains("0.950"),"utilization ranking should include highest reported ratio");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");

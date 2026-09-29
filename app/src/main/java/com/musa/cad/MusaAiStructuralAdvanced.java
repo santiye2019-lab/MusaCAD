@@ -122,6 +122,11 @@ public final class MusaAiStructuralAdvanced {
         rdiSystemChecks(structuralCalc,findings);
         effectiveStiffnessChecks(structuralCalc,findings);
         releaseRigidZoneChecks(structuralCalc,findings);
+        columnWallInteractionChecks(structuralCalc,findings);
+        beamCapacityChecks(structuralCalc,findings);
+        wallShearCapacityChecks(structuralCalc,findings);
+        explicitCapacityFailureChecks(structuralCalc,findings);
+        utilizationRankingChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -263,6 +268,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
         if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
+        if(has(q,"pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı"))ids.add("ST-54");
+        if(has(q,"kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio"))ids.add("ST-55");
+        if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))ids.add("ST-56");
+        if(has(q,"kapasite asimi","kapasite aşımı","capacity failure","failed capacity","yetersiz eleman","uygunsuz eleman"))ids.add("ST-57");
+        if(has(q,"kapasite orani","kapasite oranı","capacity ratio","utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio","kritik eleman"))ids.add("ST-58");
         return ids;
     }
 
@@ -305,6 +315,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))return "R / D / I TAŞIYICI SİSTEM KABULLERİ";
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))return "ETKİN / ÇATLAMIŞ KESİT RİJİTLİKLERİ";
         if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))return "MAFSAL / RELEASE / RİJİT BÖLGE KABULLERİ";
+        if(has(q,"pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı"))return "KOLON / PERDE PMM ETKİLEŞİMİ";
+        if(has(q,"kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio"))return "KİRİŞ KESME / EĞİLME SONUÇLARI";
+        if(has(q,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity"))return "PERDE KESME SONUÇLARI";
+        if(has(q,"kapasite asimi","kapasite aşımı","capacity failure","failed capacity","yetersiz eleman","uygunsuz eleman"))return "KAPASİTE AŞIMI / BAŞARISIZ ELEMANLAR";
+        if(has(q,"kapasite orani","kapasite oranı","capacity ratio","utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio","kritik eleman"))return "ELEMAN KULLANIM / KAPASİTE ORANLARI";
         return "STATİK";
     }
 
@@ -1091,6 +1106,95 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-53",reportedStatus(cues),"Mafsal / release / rijit bölge kabulleri",
                 "Hesap raporundan eleman uç/rijit bölge verisi okundu: "+cueSummary(cues,6)+".",
                 "Tanımların gerçek birleşim davranışı ve detay paftalarıyla eşleştiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void columnWallInteractionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"pmm","p-m-m","interaction ratio","etkilesim orani","etkileşim oranı");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-54",Status.DOGRULANAMADI,"Kolon / perde PMM etkileşim sonuçları okunamadı",
+                "Yüklenen hesap raporundan kolon/perde eksenel kuvvet–iki eksenli eğilme etkileşimine ilişkin açık sonuç satırı ayrıştırılamadı.",
+                "Eleman bazlı PMM/interaction ratio sonuçlarını içeren tasarım özetini rapora dahil edin; MusaCAD eksik etkileşim hesabını kendisi üretmez.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-54",reportedStatus(cues),"Kolon / perde PMM etkileşim raporu",
+                "Hesap raporundan PMM/interaction verisi okundu: "+cueSummary(cues,8)+".",
+                "Değerleri ilgili kat/eleman etiketi ve yük kombinasyonu ile eşleştirin; MusaCAD yalnız raporlanan sonucu aktarır.",Collections.emptyList()));
+    }
+
+    private static void beamCapacityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-55",Status.DOGRULANAMADI,"Kiriş kesme / eğilme kullanım sonuçları okunamadı",
+                "Hesap raporundan kiriş kesme veya eğilme kullanım/kapasite sonuçları ayrıştırılamadı.",
+                "Kiriş tasarım özetindeki kesme, moment ve varsa kullanım oranı sonuçlarını rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-55",reportedStatus(cues),"Kiriş kesme / eğilme rapor kontrolü",
+                "Hesap raporundan kiriş kapasite verisi okundu: "+cueSummary(cues,8)+".",
+                "Kritik satırları kiriş etiketi, kat ve belirleyici kombinasyonla eşleştirin; MusaCAD donatı kapasitesini yeniden hesaplamaz.",Collections.emptyList()));
+    }
+
+    private static void wallShearCapacityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-56",Status.DOGRULANAMADI,"Perde kesme kapasite sonucu okunamadı",
+                "Yüklenen hesap raporundan perde kesme talep/kapasite sonuçları ayrıştırılamadı.",
+                "Perde tasarım özetindeki kesme talebi, kapasite ve belirleyici kombinasyon satırlarını rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-56",reportedStatus(cues),"Perde kesme rapor kontrolü",
+                "Hesap raporundan perde kesme verisi okundu: "+cueSummary(cues,8)+".",
+                "Sonucu perde etiketi, kat, kesit ve donatı detayıyla çapraz kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void explicitCapacityFailureChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        ArrayList<String>bad=new ArrayList<>();
+        for(String cue:calc.seismicCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,"yetersiz","uygunsuz","failed","fail","does not comply","not satisfied","capacity failure","kapasite asimi","kapasite aşımı")&&!bad.contains(cue))
+                bad.add(cue);
+        }
+        if(bad.isEmpty())return;
+        out.add(new Finding("ST-57",Status.UYUMSUZLUK,"Raporda açık kapasite/uygunluk başarısızlığı",
+            "Hesap raporunda açık başarısız/yetersiz/uygunsuz ifadeler bulundu: "+cueSummary(bad,10)+".",
+            "İlgili elemanları ve belirleyici kombinasyonları doğrudan hesap modelinde inceleyin; otomatik özet tek başına mühendislik kararı değildir.",Collections.emptyList()));
+    }
+
+    private static void utilizationRankingChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kapasite orani","kapasite oranı","capacity ratio","utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio","interaction ratio");
+        if(cues.isEmpty())return;
+        ArrayList<ReportedRatio>ratios=new ArrayList<>();
+        Pattern p=Pattern.compile("(?i)(?:RATIO|ORAN[İI]?|UTILI[ZS]ATION|D\\s*/?\\s*C)\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?)");
+        for(String cue:cues){
+            Matcher m=p.matcher(cue);
+            if(m.find()){
+                try{ratios.add(new ReportedRatio(Double.parseDouble(m.group(1).replace(',','.')),cue));}catch(Exception ignored){}
+            }
+        }
+        if(ratios.isEmpty()){
+            out.add(new Finding("ST-58",Status.BILGI,"Eleman kullanım / kapasite oranı satırları bulundu",
+                "Rapor içinde kullanım/kapasite oranı ifadeleri bulundu ancak güvenilir sayısal oranlar ayrıştırılamadı: "+cueSummary(cues,6)+".",
+                "Kritik eleman sıralaması için eleman etiketi ve sayısal oran içeren tablo/model çıktısını kullanın.",Collections.emptyList()));
+            return;
+        }
+        ratios.sort((a,b)->Double.compare(b.value,a.value));
+        ArrayList<String>top=new ArrayList<>();
+        for(int i=0;i<Math.min(8,ratios.size());i++){
+            ReportedRatio r=ratios.get(i);
+            String cue=r.cue.trim().replaceAll("\\s+"," ");
+            if(cue.length()>120)cue=cue.substring(0,120)+"…";
+            top.add(String.format(Locale.ROOT,"%.3f • %s",r.value,cue));
+        }
+        out.add(new Finding("ST-58",Status.BILGI,"Raporlanan en yüksek kullanım / kapasite oranları",
+            "Rapor içindeki ayrıştırılabilir oranlar büyükten küçüğe sıralandı: "+join(top,8)+".",
+            "Bu sıralama yalnız raporda yazan oranları gösterir; eşik uygunluğu veya eleman güvenliği hakkında bağımsız hüküm vermez.",Collections.emptyList()));
+    }
+
+    private static final class ReportedRatio{
+        final double value;final String cue;
+        ReportedRatio(double value,String cue){this.value=value;this.cue=cue;}
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
