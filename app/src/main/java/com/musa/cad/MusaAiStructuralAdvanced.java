@@ -157,6 +157,11 @@ public final class MusaAiStructuralAdvanced {
         pierSpandrelAssignmentChecks(structuralCalc,findings);
         designProcedureStatusChecks(structuralCalc,findings);
         autoMeshAssignmentChecks(structuralCalc,findings);
+        loadPatternTypeChecks(structuralCalc,findings);
+        responseSpectrumAssignmentChecks(structuralCalc,findings);
+        modalCaseSetupChecks(structuralCalc,findings);
+        dampingDefinitionChecks(structuralCalc,findings);
+        dynamicCombinationMethodChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -240,7 +245,12 @@ public final class MusaAiStructuralAdvanced {
             "shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı",
             "pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama",
             "design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı",
-            "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama");
+            "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama",
+            "load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi",
+            "response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü",
+            "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
+            "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
+            "modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -290,8 +300,14 @@ public final class MusaAiStructuralAdvanced {
         String q=MusaAiDrawingIndex.normalize(raw);
         LinkedHashSet<String>ids=new LinkedHashSet<>();
         if(q.isEmpty())return ids;
+        boolean dynamicSetupQuery=has(q,
+            "load pattern type","load pattern category","pattern type mismatch","yuk pattern tipi","yük pattern tipi",
+            "response spectrum function","spectrum function","spectrum direction","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü",
+            "modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü",
+            "damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm",
+            "modal combination","cqc","srss","directional combination","direction combination","yon birlestirme","yön birleştirme");
         if(has(q,"zimbala","punching"))ids.add("ST-14");
-        if(has(q,"modal","mod anal","response spectrum")){ids.add("ST-29");ids.add("ST-30");ids.add("ST-31");}
+        if(!dynamicSetupQuery&&has(q,"modal","mod anal","response spectrum")){ids.add("ST-29");ids.add("ST-30");ids.add("ST-31");}
         if(has(q,"kutle katilim","mass participation","etkin modal kutle")){ids.add("ST-30");ids.add("ST-29");}
         if(has(q,"periyot","period"))ids.add("ST-31");
         if(has(q,"kat otelen","story drift","interstory drift"))ids.add("ST-26");
@@ -363,12 +379,22 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama"))ids.add("ST-86");
         if(has(q,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı"))ids.add("ST-87");
         if(has(q,"auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama"))ids.add("ST-88");
+        if(has(q,"load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi"))ids.add("ST-89");
+        if(has(q,"response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü"))ids.add("ST-90");
+        if(has(q,"modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü"))ids.add("ST-91");
+        if(has(q,"damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm"))ids.add("ST-92");
+        if(has(q,"modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))ids.add("ST-93");
         return ids;
     }
 
     private static String focusTitle(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(has(q,"zimbala","punching"))return "ZIMBALAMA";
+        if(has(q,"load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi"))return "LOAD PATTERN TÜR / KATEGORİ";
+        if(has(q,"response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü"))return "RESPONSE SPECTRUM FONKSİYON / YÖN";
+        if(has(q,"modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü"))return "MODAL CASE YÖNTEMİ";
+        if(has(q,"damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm"))return "SÖNÜM TANIMLARI";
+        if(has(q,"modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme"))return "DİNAMİK KOMBİNASYON YÖNTEMİ";
         if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
         if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
         if(has(q,"periyot","period"))return "PERİYOT";
@@ -1900,6 +1926,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-88",s,"Auto-mesh atama kapsamı kontrolü",
             "Model raporundan mesh atama bilgisi okundu: "+cueSummary(cues,10)+".",
             "Mesh kalitesinden ayrı olarak, tüm gerekli area/shell elemanların gerçekten mesh kapsamına girdiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void loadPatternTypeChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"load pattern type","load pattern category","pattern type mismatch","dead pattern","live pattern","wind pattern","snow pattern","quake pattern","yuk pattern tipi","yük pattern tipi");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-89",Status.DOGRULANAMADI,"Load pattern tür / kategori bilgisi okunamadı",
+                "Model raporundan DEAD/LIVE/WIND/SNOW/QUAKE gibi load-pattern tür atamalarına ilişkin açık kontrol satırı ayrıştırılamadı.",
+                "Load pattern adları ile program içindeki pattern type/kategori atamalarını raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"pattern type mismatch","wrong load pattern type","incorrect pattern type","yuk pattern tipi uyumsuz","yük pattern tipi uyumsuz","error","failed");
+        out.add(new Finding("ST-89",s,"Load pattern tür / kategori kontrolü",
+            "Model raporundan load-pattern tür bilgisi okundu: "+cueSummary(cues,10)+".",
+            "Sabit, hareketli, kar, rüzgâr ve deprem patternlerinin doğru kategoriyle tanımlandığını ve isim-tür çelişkisi olmadığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void responseSpectrumAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"response spectrum function","spectrum function","spectrum direction","ux uy uz","rs direction","spektrum fonksiyonu","spektrum yonu","spektrum yönü");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-90",Status.DOGRULANAMADI,"Response spectrum fonksiyon / yön ataması okunamadı",
+                "Response-spectrum case içinde kullanılan spektrum fonksiyonu ve UX/UY/UZ yön atamalarına ilişkin açık rapor satırı ayrıştırılamadı.",
+                "RSX/RSY gibi case'lerde fonksiyon adı, yön ve ölçek bilgisini model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"spectrum function missing","wrong spectrum function","spectrum direction missing","direction mismatch","rs direction mismatch","spektrum yonu uyumsuz","spektrum yönü uyumsuz","error","failed");
+        out.add(new Finding("ST-90",s,"Response spectrum fonksiyon / yön kontrolü",
+            "Model raporundan response-spectrum atama verisi okundu: "+cueSummary(cues,10)+".",
+            "Her response-spectrum case için doğru spektrum fonksiyonu ve global yönün seçildiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void modalCaseSetupChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"modal case method","eigen method","ritz vector","ritz vectors","modal source","modal setup","modal yontem","modal yöntem","ritz vektoru","ritz vektörü");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-91",Status.DOGRULANAMADI,"Modal case yöntem / kaynak ayarı okunamadı",
+                "Modal analiz case'inin Eigen/Ritz yöntemi veya Ritz başlangıç vektörleri gibi kurulum bilgileri açık rapordan ayrıştırılamadı.",
+                "Modal case yöntemini ve varsa Ritz vektör kaynaklarını model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"modal setup missing","modal source missing","ritz vector missing","invalid ritz","wrong modal method","modal yontem uyumsuz","modal yöntem uyumsuz","error","failed");
+        out.add(new Finding("ST-91",s,"Modal case yöntem / kaynak kontrolü",
+            "Model raporundan modal kurulum bilgisi okundu: "+cueSummary(cues,10)+".",
+            "Seçilen Eigen/Ritz yönteminin proje analiz yaklaşımıyla uyumlu olduğunu ve gerekli modal kaynakların tanımlandığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void dampingDefinitionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"damping ratio","modal damping","response spectrum damping","rayleigh damping","sonum orani","sönüm oranı","modal sonum","modal sönüm");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-92",Status.DOGRULANAMADI,"Sönüm oranı / damping tanımı okunamadı",
+                "Modal veya response-spectrum analizlerinde kullanılan damping/sönüm tanımına ilişkin açık rapor satırı ayrıştırılamadı.",
+                "Kullanılan damping oranını ve varsa frekansa bağlı/Rayleigh tanımını model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"damping missing","damping ratio invalid","negative damping","damping mismatch","sonum orani uyumsuz","sönüm oranı uyumsuz","error","failed");
+        out.add(new Finding("ST-92",s,"Sönüm tanımı kontrolü",
+            "Model raporundan damping/sönüm bilgisi okundu: "+cueSummary(cues,10)+".",
+            "Sönüm tanımının ilgili dinamik case'lere doğru atandığını ve proje kabulüyle uyumlu olduğunu doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void dynamicCombinationMethodChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"modal combination","cqc","srss","directional combination","direction combination","modal birlestirme","modal birleştirme","yon birlestirme","yön birleştirme");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-93",Status.DOGRULANAMADI,"Modal / yönsel kombinasyon yöntemi okunamadı",
+                "Response-spectrum sonuçlarının modal ve yönsel birleştirme yöntemlerine ilişkin açık ayar rapordan ayrıştırılamadı.",
+                "CQC/SRSS gibi modal kombinasyon ile yönsel kombinasyon ayarlarını model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"combination method missing","invalid modal combination","invalid directional combination","modal combination mismatch","direction combination mismatch","birlesim yontemi uyumsuz","birleşim yöntemi uyumsuz","error","failed");
+        out.add(new Finding("ST-93",s,"Modal / yönsel kombinasyon yöntemi kontrolü",
+            "Model raporundan dinamik kombinasyon ayarı okundu: "+cueSummary(cues,10)+".",
+            "Modal ve yönsel birleştirme yöntemlerinin proje analiz esaslarıyla uyumunu doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
