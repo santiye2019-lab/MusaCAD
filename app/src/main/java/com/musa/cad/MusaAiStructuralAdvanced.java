@@ -369,7 +369,8 @@ public final class MusaAiStructuralAdvanced {
         if(accidental)ids.add("ST-46");
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
-        if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
+        boolean designComboQuery=has(q,"design combo selection","design combination selection","design combinations selected","concrete design combos","steel design combos","tasarim kombinasyonu secimi","tasarım kombinasyonu seçimi","tasarim kombinasyonlari","tasarım kombinasyonları");
+        if(!designComboQuery&&has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
         if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
