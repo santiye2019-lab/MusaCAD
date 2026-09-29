@@ -38,7 +38,13 @@ public final class MusaAiDisciplineAnalyzerTest {
             "Rijit diyaframı incele",
             "Bodrum perdesini kontrol et",
             "Zemin taşıma gücünü kontrol et",
-            "Yatak katsayısını incele"
+            "Yatak katsayısını incele",
+            "Zemin basıncını kontrol et",
+            "Kazık kapasitesini incele",
+            "Uplift kontrolü",
+            "P-Delta kontrolü",
+            "Taban kesmesini incele",
+            "Zemin yapı etkileşimini kontrol et"
         };
         for(String q:structuralQueries)
             if(MusaAiDiscipline.fromQuery(q)!=MusaAiDiscipline.STRUCTURAL)
