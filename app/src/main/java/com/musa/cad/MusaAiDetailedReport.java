@@ -72,6 +72,13 @@ public final class MusaAiDetailedReport {
         out.append("\n\n3. DİSİPLİN KONTROL BULGULARI");
         appendFindings(out,analysis,level);
 
+        if(d==MusaAiDiscipline.STRUCTURAL){
+            StructuralSummary structural=structuralSummary(index);
+            ids.addAll(structural.sourceIds);
+            out.append("\n\n3A. STATİK TEKNİK VERİ ÖZETİ");
+            appendStructuralSummary(out,structural,level);
+        }
+
         MusaAiBoq.Model projectAll=MusaAiBoq.generate(index,blank(drawingName,"Aktif proje")+" • otomatik proje metrajı");
         MusaAiBoq.Model project=filter(projectAll,d);
         MusaAiBoq.Model loaded=filter(loadedBoq,d);
@@ -213,6 +220,134 @@ public final class MusaAiDetailedReport {
             default:out.append("\n• İlgili disiplinlerle koordinasyon kontrolü.");break;
         }
     }
+
+    private static final class StructuralSummary {
+        int structuralItems,columns,beams,walls,slabs,foundations,stairs,reservations,detailRefs;
+        final LinkedHashSet<String> sections=new LinkedHashSet<>();
+        final LinkedHashSet<String> materials=new LinkedHashSet<>();
+        final LinkedHashSet<String> rebars=new LinkedHashSet<>();
+        final LinkedHashSet<String> levels=new LinkedHashSet<>();
+        final LinkedHashSet<String> axes=new LinkedHashSet<>();
+        final LinkedHashSet<Integer> sourceIds=new LinkedHashSet<>();
+        final ArrayList<String> missing=new ArrayList<>();
+    }
+
+    private static StructuralSummary structuralSummary(MusaAiDrawingIndex index){
+        StructuralSummary r=new StructuralSummary();
+        if(index==null)return r;
+        for(MusaAiDrawingIndex.Item item:index.items()){
+            if(item==null)continue;
+            String raw=(item.layer+" "+item.text).trim();
+            String q=MusaAiDrawingIndex.normalize(raw);
+            boolean structural=MusaAiDiscipline.classify(raw)==MusaAiDiscipline.STRUCTURAL||
+                has(q,"kolon","kiris","perde","doseme","temel","radye","kazik","donati","betonarme","rezervasyon","tasiyici");
+            if(!structural)continue;
+            r.structuralItems++;
+            if(item.sourceId>=0)r.sourceIds.add(item.sourceId);
+
+            if(has(q,"temel","radye","kazik","papuc","foundation","pile"))r.foundations++;
+            else if(has(q,"kolon","column"))r.columns++;
+            else if(has(q,"kiris","beam"))r.beams++;
+            else if(has(q,"perde","shear wall"))r.walls++;
+            else if(has(q,"doseme","slab"))r.slabs++;
+            else if(has(q,"merdiven","stair"))r.stairs++;
+
+            if(has(q,"rezervasyon","bosluk","delik","gecis","opening","sleeve"))r.reservations++;
+            if(has(q,"detay","kesit","section","detail"))r.detailRefs++;
+
+            collectMatches(raw,STRUCT_SECTION,r.sections,12);
+            collectMatches(raw,STRUCT_CONCRETE,r.materials,10);
+            collectMatches(raw,STRUCT_REBAR_CLASS,r.materials,10);
+            collectMatches(raw,STRUCT_REBAR_DIAMETER,r.rebars,12);
+            if(has(q,"kot","seviye","elevation","level"))collectMatches(raw,STRUCT_LEVEL,r.levels,12);
+            if(has(q,"aks","axis","grid"))addSample(r.axes,item.text.isEmpty()?item.layer:item.text,12);
+        }
+        if(r.columns+r.beams+r.walls+r.slabs+r.foundations==0)
+            r.missing.add("Taşıyıcı eleman türleri (kolon/kiriş/perde/döşeme/temel) otomatik ayrıştırılamadı.");
+        if(r.sections.isEmpty())
+            r.missing.add("Kesit/ebat bilgileri otomatik okunamadı; kolon-kiriş-perde ölçüleri pafta/lejanda ayrıca doğrulanmalı.");
+        if(r.materials.isEmpty())
+            r.missing.add("Beton veya donatı çeliği sınıfı otomatik okunamadı.");
+        if(r.rebars.isEmpty())
+            r.missing.add("Donatı çapı/aralığına ilişkin okunabilir metin ipucu bulunamadı.");
+        if(r.axes.isEmpty())
+            r.missing.add("Aks/grid bilgisi otomatik okunamadı.");
+        if(r.levels.isEmpty())
+            r.missing.add("Kot/seviye bilgisi otomatik okunamadı.");
+        if(r.foundations==0)
+            r.missing.add("Temel sistemi bu görünür paftadan güvenilir biçimde tanınamadı.");
+        return r;
+    }
+
+    private static void appendStructuralSummary(StringBuilder out,StructuralSummary r,Level level){
+        out.append("\n• Statik olarak ilişkilendirilen görünür nesne: ").append(r.structuralItems);
+        out.append("\n• Eleman envanteri: kolon ").append(r.columns)
+           .append(" • kiriş ").append(r.beams)
+           .append(" • perde ").append(r.walls)
+           .append(" • döşeme ").append(r.slabs)
+           .append(" • temel/kazık ").append(r.foundations);
+        if(r.stairs>0)out.append(" • merdiven ").append(r.stairs);
+        out.append("\n• Rezervasyon/delik/geçiş adayı: ").append(r.reservations);
+        out.append(" • detay/kesit referansı: ").append(r.detailRefs);
+
+        if(!r.sections.isEmpty())out.append("\n• Okunan kesit/ebat ipuçları: ").append(joinSamples(r.sections,level==Level.SUMMARY?5:12));
+        if(!r.materials.isEmpty())out.append("\n• Okunan malzeme sınıfı ipuçları: ").append(joinSamples(r.materials,level==Level.SUMMARY?4:10));
+        if(!r.rebars.isEmpty())out.append("\n• Okunan donatı çapı ipuçları: ").append(joinSamples(r.rebars,level==Level.SUMMARY?5:12));
+        if(!r.axes.isEmpty())out.append("\n• Aks/grid ipuçları: ").append(joinSamples(r.axes,level==Level.SUMMARY?4:10));
+        if(!r.levels.isEmpty())out.append("\n• Kot/seviye ipuçları: ").append(joinSamples(r.levels,level==Level.SUMMARY?4:10));
+
+        out.append("\n\nEksik / doğrulanması gereken statik veri:");
+        if(r.missing.isEmpty())out.append("\n• Otomatik metin taramasında temel veri başlıklarının tümüne ilişkin en az bir ipucu bulundu; bu durum hesap yeterliliği veya doğruluğu anlamına gelmez.");
+        else{
+            int max=level==Level.SUMMARY?4:r.missing.size();
+            for(int i=0;i<Math.min(max,r.missing.size());i++)out.append("\n• ").append(r.missing.get(i));
+            if(max<r.missing.size())out.append("\n• … ").append(r.missing.size()-max).append(" ek veri başlığı tam/teknik raporda listelenir.");
+        }
+        out.append("\n• Statik hesap modeli, yük kombinasyonları, deprem parametreleri, zemin verisi ve eleman kapasiteleri DWG görünür verisinden güvenilir biçimde türetilemez; bunlar ayrı hesap raporu/modeliyle karşılaştırılmalıdır.");
+    }
+
+    private static void collectMatches(String raw,java.util.regex.Pattern pattern,Set<String>out,int max){
+        if(raw==null||raw.isEmpty()||out.size()>=max)return;
+        java.util.regex.Matcher m=pattern.matcher(raw);
+        while(m.find()&&out.size()<max){
+            String v=m.group().replaceAll("\\s+","").toUpperCase(Locale.ROOT);
+            if(!v.isEmpty())out.add(v);
+        }
+    }
+
+    private static void addSample(Set<String>out,String raw,int max){
+        if(out.size()>=max||raw==null)return;
+        String v=raw.trim().replaceAll("\\s+"," ");
+        if(v.length()>80)v=v.substring(0,80)+"…";
+        if(!v.isEmpty())out.add(v);
+    }
+
+    private static String joinSamples(Collection<String>values,int max){
+        StringBuilder out=new StringBuilder();int n=0;
+        for(String v:values){
+            if(n++>=max)break;
+            if(out.length()>0)out.append(", ");
+            out.append(v);
+        }
+        return out.toString();
+    }
+
+    private static boolean has(String q,String...terms){
+        if(q==null||q.isEmpty())return false;
+        for(String term:terms)if(q.contains(MusaAiDrawingIndex.normalize(term)))return true;
+        return false;
+    }
+
+    private static final java.util.regex.Pattern STRUCT_SECTION=
+        java.util.regex.Pattern.compile("(?i)(?<!\\d)\\d{2,4}\\s*[x×/]\\s*\\d{2,4}(?!\\d)");
+    private static final java.util.regex.Pattern STRUCT_CONCRETE=
+        java.util.regex.Pattern.compile("(?i)(?<![A-Z0-9])C\\s*\\d{2,3}(?![A-Z0-9])");
+    private static final java.util.regex.Pattern STRUCT_REBAR_CLASS=
+        java.util.regex.Pattern.compile("(?i)(?<![A-Z0-9])(?:B|S)\\s*\\d{3}[A-Z]?(?![A-Z0-9])");
+    private static final java.util.regex.Pattern STRUCT_REBAR_DIAMETER=
+        java.util.regex.Pattern.compile("(?i)(?:Ø|Φ|ø|\\bfi\\s*)\\s*\\d{1,2}");
+    private static final java.util.regex.Pattern STRUCT_LEVEL=
+        java.util.regex.Pattern.compile("[+-]?\\s*\\d{1,3}[\\.,]\\d{1,3}");
 
     private static String levelLabel(Level l){return l==Level.SUMMARY?"Özet":l==Level.FULL?"Tam Denetim":"Teknik";}
     private static String blank(String s,String f){return s==null||s.trim().isEmpty()?f:s.trim();}
