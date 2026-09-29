@@ -53,7 +53,12 @@ public enum MusaAiDiscipline {
             "unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint",
             "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi",
             "nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti",
-            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))return STRUCTURAL;
+            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü",
+            "revizyon","revision","rev no","revizyon no","model revision","model rev",
+            "material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material",
+            "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
+            "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
+            "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -100,7 +105,12 @@ public enum MusaAiDiscipline {
             "unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint",
             "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi",
             "nonconvergence","non-convergence","did not converge","not converged","convergence failed","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti",
-            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü"))return STRUCTURAL;
+            "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü",
+            "revizyon","revision","rev no","revizyon no","model revision","model rev",
+            "material assignment","material property","malzeme atama","malzeme ataması","undefined material","material not assigned","malzeme atanmamis","malzeme atanmamış","default material",
+            "section assignment","section property","kesit atama","kesit ataması","undefined section","section not assigned","property not assigned","default section",
+            "story assignment","story data","kat atama","kat bilgisi","unknown story","undefined story","floor assignment",
+            "duplicate element","duplicate joint","duplicate member","mukerrer eleman","mükerrer eleman","conflicting assignment","çelişkili atama","celiskili atama"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;
