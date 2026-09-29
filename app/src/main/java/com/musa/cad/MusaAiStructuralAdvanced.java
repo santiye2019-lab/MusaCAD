@@ -172,7 +172,7 @@ public final class MusaAiStructuralAdvanced {
             "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diaphragm chord",
             "dusey deprem","dikey deprem","vertical earthquake","vertical seismic",
             "yuk kombinasyonu","load combination","load combo","kombinasyon",
-            "deprem yuk durumu","seismic load case","earthquake load case","rsx","rsy",
+            "deprem yuk durum","seismic load case","earthquake load case","rsx","rsy",
             "r/d/i","r d i","tasiyici sistem katsay","behavior factor","overstrength","importance factor",
             "etkin rijitlik","catlamis kesit","çatlamış kesit","cracked section","effective stiffness","stiffness modifier","property modifier",
             "mafsal","hinge","release","end release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset");
@@ -259,7 +259,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))ids.add("ST-47");
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))ids.add("ST-48");
         if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))ids.add("ST-49");
-        if(has(q,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
+        if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))ids.add("ST-50");
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))ids.add("ST-51");
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))ids.add("ST-52");
         if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))ids.add("ST-53");
@@ -301,7 +301,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"collector","drag strut","diyafram kiri","diaphragm chord","chord force"))return "DİYAFRAM KUVVET AKTARIMI";
         if(has(q,"dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return "DÜŞEY DEPREM ETKİSİ";
         if(has(q,"yuk kombinasyonu","yük kombinasyonu","load combination","load combo","kombinasyon"))return "YÜK KOMBİNASYONLARI";
-        if(has(q,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy"))return "DEPREM YÜK DURUMLARI";
+        if(has(q,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy"))return "DEPREM YÜK DURUMLARI";
         if(has(q,"r/d/i","r d i","tasiyici sistem katsay","taşıyıcı sistem katsay","behavior factor","overstrength","importance factor"))return "R / D / I TAŞIYICI SİSTEM KABULLERİ";
         if(has(q,"etkin rijitlik","etkin kesit rijitligi","çatlamış kesit","catlamis kesit","cracked section","effective stiffness","stiffness modifier","property modifier","rijitlik carpani","rijitlik çarpanı"))return "ETKİN / ÇATLAMIŞ KESİT RİJİTLİKLERİ";
         if(has(q,"mafsal","hinge","release","end release","moment release","rijit bolge","rijit bölge","rigid zone","end offset","joint offset"))return "MAFSAL / RELEASE / RİJİT BÖLGE KABULLERİ";
@@ -1038,7 +1038,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void seismicLoadCaseChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=reportCues(calc,"deprem yuk durumu","deprem yük durumu","seismic load case","earthquake load case","rsx","rsy","response spectrum x","response spectrum y");
+        List<String>cues=reportCues(calc,"deprem yuk durum","deprem yük durum","seismic load case","earthquake load case","rsx","rsy","response spectrum x","response spectrum y");
         if(cues.isEmpty())
             out.add(new Finding("ST-50",Status.DOGRULANAMADI,"Deprem yük durumları okunamadı",
                 "Hesap raporundan X/Y deprem yük durumları, spektrum yük durumları veya eşdeğer deprem yük durumları açık biçimde ayrıştırılamadı.",
