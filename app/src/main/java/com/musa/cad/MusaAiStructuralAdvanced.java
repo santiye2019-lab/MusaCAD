@@ -88,6 +88,14 @@ public final class MusaAiStructuralAdvanced {
         transferChecks(refs,findings);
         slabServiceabilityChecks(refs,structuralCalc,findings);
         seismicParameterChecks(structuralCalc,findings);
+        beamColumnJointChecks(refs,structuralCalc,findings);
+        strongColumnWeakBeamChecks(refs,structuralCalc,findings);
+        confinementChecks(refs,structuralCalc,findings);
+        irregularityChecks(structuralCalc,findings);
+        storyDriftChecks(structuralCalc,findings);
+        torsionChecks(structuralCalc,findings);
+        softWeakStoryChecks(structuralCalc,findings);
+        modalChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -321,6 +329,182 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-21",Status.DOGRULANAMADI,"Yük kabulleri otomatik doğrulanamadı",
                 "Hesap raporundan sabit/hareketli/kar/rüzgâr yüklerine ilişkin güvenilir metin ipucu çıkarılamadı.",
                 "Yük kabulleri ve kombinasyon özetini içeren hesap bölümlerini rapora dahil edin.",Collections.emptyList()));
+    }
+
+    private static void beamColumnJointChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        boolean jointDrawing=false;LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Ref r:refs)if(has(r.q,"kolon kiris birlesim","kiris kolon birlesim","birlesim bolgesi","beam column joint","joint region")){
+            jointDrawing=true;addId(ids,r);
+        }
+        List<String>report=reportCues(calc,"kolon kiris birlesim","beam column joint","joint region");
+        if(jointDrawing&&report.isEmpty()&&calc!=null)
+            out.add(new Finding("ST-22",Status.DOGRULANAMADI,"Kiriş–kolon birleşim bölgesi rapor eşleşmesi",
+                "DWG/proje tarafında birleşim bölgesi ifadesi bulundu ancak yüklenen hesap raporundan eşleşen birleşim kontrol satırı çıkarılamadı.",
+                "Birleşim kesme güvenliği ve donatı detayına ilişkin hesap raporu bölümünü/etiketlerini proje ile eşleştirin.",ids));
+        else if(!report.isEmpty())
+            out.add(new Finding("ST-22",reportedStatus(report),"Kiriş–kolon birleşim kontrolü",
+                "Hesap raporundan birleşim bölgesi kontrol verisi okundu: "+cueSummary(report,3)+".",
+                "MusaCAD rapor beyanını aktarır; birleşim kapasitesini bağımsız olarak yeniden hesaplamaz. İlgili kolon/kiriş detayıyla çapraz kontrol edin.",ids));
+    }
+
+    private static void strongColumnWeakBeamChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>report=reportCues(calc,"guclu kolon","zayif kiris","strong column","weak beam");
+        boolean frame=false;LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Ref r:refs)if(r.kind==Kind.COLUMN||r.kind==Kind.BEAM){frame=true;addId(ids,r);}
+        if(!report.isEmpty())
+            out.add(new Finding("ST-23",reportedStatus(report),"Güçlü kolon–zayıf kiriş rapor kontrolü",
+                "Hesap raporundan güçlü kolon–zayıf kiriş kontrolüne ilişkin satır okundu: "+cueSummary(report,4)+".",
+                "Sonucun ilgili kat/aks birleşimleriyle eşleştiğini doğrulayın; MusaCAD burada oran hesabı uydurmaz.",ids));
+        else if(frame)
+            out.add(new Finding("ST-23",Status.DOGRULANAMADI,"Güçlü kolon–zayıf kiriş sonucu okunamadı",
+                "Kolon ve kiriş verisi mevcut ancak yüklenen hesap raporundan açık güçlü kolon–zayıf kiriş kontrol satırı ayrıştırılamadı.",
+                "Birleşim bazlı güçlü kolon–zayıf kiriş kontrol tablosunu içeren hesap raporu bölümünü yükleyin.",ids));
+    }
+
+    private static void confinementChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
+        boolean drawing=false,report=false,member=false;LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Ref r:refs){
+            if(r.kind==Kind.COLUMN||r.kind==Kind.BEAM||r.kind==Kind.WALL){member=true;addId(ids,r);}
+            if(has(r.q,"sarilma bolgesi","siklastirma bolgesi","ozel deprem etriyesi","confinement zone","special seismic hoop"))drawing=true;
+        }
+        if(calc!=null){
+            for(MusaAiStructuralCalc.Element e:calc.elements)if(e!=null&&!e.confinement.isEmpty()){report=true;break;}
+            if(!report&&!reportCues(calc,"sarilma bolgesi","siklastirma bolgesi","confinement zone","ozel deprem etriyesi").isEmpty())report=true;
+        }
+        if(member&&!drawing&&!report)
+            out.add(new Finding("ST-24",Status.DOGRULANAMADI,"Sarılma / sıklaştırma bölgesi doğrulanamadı",
+                "Taşıyıcı kolon-kiriş-perde verisi bulundu ancak çizim veya hesap verisinde açık sarılma/sıklaştırma bölgesi eşleştirilemedi.",
+                "Özel deprem etriyeleri, sarılma boyları ve birleşim bölgesi detaylarını görünür pafta/hesap verisiyle doğrulayın.",ids));
+        else if(drawing&&calc!=null&&!report)
+            out.add(new Finding("ST-24",Status.DOGRULANAMADI,"Sarılma detayı proje–rapor eşleşmesi",
+                "Çizimde sarılma/sıklaştırma ifadesi bulundu ancak hesap raporunda eşleşen açık detay verisi çıkarılamadı.",
+                "Kat/eleman etiketleri üzerinden sarılma bölgesini hesap raporuyla eşleştirin.",ids));
+    }
+
+    private static void irregularityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"duzensizlik","irregularity","a1","a2","a3","b1","b2","b3");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-25",Status.DOGRULANAMADI,"Düzensizlik kontrol özeti okunamadı",
+                "Yüklenen hesap raporundan A/B tipi düzensizliklere ilişkin açık kontrol satırı ayrıştırılamadı.",
+                "Düzensizlikler/deprem kontrol özeti bölümünü rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-25",reportedStatus(cues),"Düzensizlik rapor özeti",
+                "Hesap raporundan düzensizlik kontrolüne ilişkin veri okundu: "+cueSummary(cues,5)+".",
+                "Her düzensizlik türünü ilgili kat, geometrik veri ve analiz sonucu ile ayrı doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void storyDriftChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"kat otelemesi","goreli kat otelemesi","story drift","interstory drift");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-26",Status.DOGRULANAMADI,"Göreli kat ötelenmesi sonucu okunamadı",
+                "Hesap raporunda açık kat/göreli kat ötelenmesi satırı ayrıştırılamadı.",
+                "Kat bazlı ötelenme tablosunu veya analiz programı özetini rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-26",reportedStatus(cues),"Göreli kat ötelenmesi rapor kontrolü",
+                "Hesap raporundan kat ötelenmesi verisi okundu: "+cueSummary(cues,4)+".",
+                "MusaCAD rapordaki sonucu aktarır; sınır değer hesabını veri olmadan yeniden üretmez.",Collections.emptyList()));
+    }
+
+    private static void torsionChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"burulma","torsional irregularity","eta bi","etabi");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-27",Status.DOGRULANAMADI,"Burulma düzensizliği sonucu okunamadı",
+                "Hesap raporundan burulma düzensizliği/katsayısına ilişkin açık satır ayrıştırılamadı.",
+                "Kat bazlı burulma düzensizliği kontrol tablosunu rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-27",reportedStatus(cues),"Burulma düzensizliği rapor kontrolü",
+                "Hesap raporundan burulma kontrol verisi okundu: "+cueSummary(cues,4)+".",
+                "Kritik katları plan geometrisi, rijitlik dağılımı ve hesap modeliyle çapraz kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void softWeakStoryChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=reportCues(calc,"yumusak kat","soft story","zayif kat","weak story");
+        if(cues.isEmpty())
+            out.add(new Finding("ST-28",Status.DOGRULANAMADI,"Yumuşak / zayıf kat sonucu okunamadı",
+                "Yüklenen hesap raporundan yumuşak veya zayıf kat kontrolüne ilişkin açık satır ayrıştırılamadı.",
+                "Kat rijitlik/dayanım karşılaştırması bölümünü rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-28",reportedStatus(cues),"Yumuşak / zayıf kat rapor kontrolü",
+                "Hesap raporundan ilgili kontrol verisi okundu: "+cueSummary(cues,4)+".",
+                "Rapor sonucunu kat bazlı taşıyıcı sistem ve model rijitlikleriyle doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void modalChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>modal=reportCues(calc,"modal","mod sekli","mode shape","mod birlestirme","response spectrum","modal combination");
+        List<String>mass=reportCues(calc,"kutle katilim","mass participation","etkin modal kutle","effective modal mass");
+        List<String>period=reportCues(calc,"periyot","period");
+        if(modal.isEmpty())
+            out.add(new Finding("ST-29",Status.DOGRULANAMADI,"Modal analiz özeti okunamadı",
+                "Hesap raporundan modal analiz/mod birleştirme yöntemine ilişkin açık satır ayrıştırılamadı.",
+                "Modal analiz ve mod birleştirme özetini rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-29",reportedStatus(modal),"Modal analiz rapor özeti",
+                "Modal analiz verisi okundu: "+cueSummary(modal,4)+".",
+                "Mod sayısı ve kullanılan analiz yöntemini hesap modeliyle doğrulayın.",Collections.emptyList()));
+
+        if(mass.isEmpty())
+            out.add(new Finding("ST-30",Status.DOGRULANAMADI,"Modal kütle katılımı okunamadı",
+                "Hesap raporundan etkin/modal kütle katılımına ilişkin açık satır ayrıştırılamadı.",
+                "X/Y doğrultuları için kümülatif kütle katılım tablosunu rapora dahil edin.",Collections.emptyList()));
+        else
+            out.add(new Finding("ST-30",reportedStatus(mass),"Modal kütle katılım raporu",
+                "Hesap raporundan kütle katılım verisi okundu: "+cueSummary(mass,4)+".",
+                "Kümülatif katılımın kullanılan mod sayısıyla birlikte rapor/model üzerinde doğrulanması gerekir.",Collections.emptyList()));
+
+        boolean t1=calc.designParameters.containsKey("T1X")||calc.designParameters.containsKey("T1Y");
+        if(period.isEmpty()&&!t1)
+            out.add(new Finding("ST-31",Status.DOGRULANAMADI,"Hakim periyot verisi okunamadı",
+                "Hesap raporundan T1/periyot değerleri açık biçimde ayrıştırılamadı.",
+                "X/Y doğrultusu hakim periyotları ve modal periyot tablosunu rapora dahil edin.",Collections.emptyList()));
+        else{
+            String values="";
+            if(calc.designParameters.containsKey("T1X"))values+="T1X="+calc.designParameters.get("T1X");
+            if(calc.designParameters.containsKey("T1Y"))values+=(values.isEmpty()?"":" • ")+"T1Y="+calc.designParameters.get("T1Y");
+            if(values.isEmpty())values=cueSummary(period,3);
+            out.add(new Finding("ST-31",Status.BILGI,"Hakim periyot / modal periyot verisi",
+                "Hesap raporundan periyot verisi okundu: "+values+".",
+                "Değerlerin doğru model, yön ve son revizyon analizine ait olduğunu doğrulayın.",Collections.emptyList()));
+        }
+    }
+
+    private static List<String> reportCues(MusaAiStructuralCalc.Model calc,String...terms){
+        ArrayList<String>out=new ArrayList<>();
+        if(calc==null)return out;
+        for(String cue:calc.seismicCues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,terms)&&!out.contains(cue))out.add(cue);
+        }
+        return out;
+    }
+
+    private static Status reportedStatus(Collection<String>cues){
+        boolean negative=false,positive=false;
+        for(String cue:cues){
+            String q=MusaAiDrawingIndex.normalize(cue);
+            if(has(q,"saglamiyor","saglanmiyor","uygunsuz","yetersiz","basarisiz","fail","failed","not satisfied","not comply","does not comply"))negative=true;
+            if(has(q,"sagliyor","saglanmistir","uygun","yeterli","basarili","satisfied","pass","passed","complies"))positive=true;
+        }
+        if(negative)return Status.UYUMSUZLUK;
+        if(positive)return Status.BILGI;
+        return Status.INCELEME_GEREKLI;
+    }
+
+    private static String cueSummary(Collection<String>cues,int max){
+        if(cues==null||cues.isEmpty())return "—";
+        ArrayList<String>shortened=new ArrayList<>();int n=0;
+        for(String cue:cues){
+            if(n++>=max)break;
+            String x=cue==null?"":cue.trim().replaceAll("\\s+"," ");
+            if(x.length()>150)x=x.substring(0,150)+"…";
+            if(!x.isEmpty())shortened.add(x);
+        }
+        return join(shortened,max);
     }
 
     private static void reportChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
