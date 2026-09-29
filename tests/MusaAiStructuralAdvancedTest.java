@@ -285,7 +285,7 @@ public final class MusaAiStructuralAdvancedTest {
         require(revisionFocus.findings.size()==1&&"ST-69".equals(revisionFocus.findings.get(0).id),
             "revision focus must only return ST-69");
         require(revisionFocus.findings.get(0).status==MusaAiStructuralAdvanced.Status.BILGI,
-            "matching project/model revision should be informational");
+            "matching project/model revision should be informational: "+revisionFocus.text);
 
         MusaAiStructuralAdvanced.Result sectionFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Kesit atamalarını kontrol et");
         require(sectionFocus.findings.size()==1&&"ST-71".equals(sectionFocus.findings.get(0).id),
