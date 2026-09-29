@@ -14,7 +14,13 @@ public final class MusaAiStructuralAdvancedTest {
             new MusaAiDrawingIndex.Item(8,"TEXT","STATIK","5 CM DILATASYON"),
             new MusaAiDrawingIndex.Item(9,"TEXT","STATIK","KONSOL K20"),
             new MusaAiDrawingIndex.Item(10,"TEXT","STATIK","TRANSFER KIRIS K30"),
-            new MusaAiDrawingIndex.Item(11,"TEXT","STATIK","DOSEME D08")
+            new MusaAiDrawingIndex.Item(11,"TEXT","STATIK","DOSEME D08"),
+            new MusaAiDrawingIndex.Item(12,"TEXT","STATIK","KISA KOLON S12 ZEMIN KAT AKS E/3 30x50"),
+            new MusaAiDrawingIndex.Item(13,"TEXT","STATIK","PERDE BAĞ KİRİŞİ K40 1. KAT AKS D/5 30x80 ÇAPRAZ DONATI"),
+            new MusaAiDrawingIndex.Item(14,"TEXT","STATIK","RİJİT DİYAFRAM D08 1. KAT"),
+            new MusaAiDrawingIndex.Item(15,"TEXT","STATIK","PERDE P20 BODRUM 1 KAT AKS A/1 30x300"),
+            new MusaAiDrawingIndex.Item(16,"TEXT","STATIK","PERDE P20 ZEMIN KAT AKS B/1 25x300"),
+            new MusaAiDrawingIndex.Item(17,"TEXT","STATIK","ZEMİN SINIFI ZC ZEMİN TAŞIMA GÜCÜ 250 KPA YATAK KATSAYISI 30000 KN/M3 TEMEL ALT KOTU -4.50 M")
         );
         MusaAiDrawingIndex index=new MusaAiDrawingIndex("KALIP",items.size(),0,
             Arrays.asList("STATIK","MIMARI"),Arrays.asList("STATIK","MIMARI"),items,"cm");
@@ -28,7 +34,15 @@ public final class MusaAiStructuralAdvancedTest {
             "Yumuşak kat kontrolü uygun\n"+
             "Modal analiz response spectrum\n"+
             "Kütle katılım oranı X %95 Y %94\n"+
-            "Periyot T1X=1.25\n";
+            "Periyot T1X=1.25\n"+
+            "Kısa kolon kontrolü uygun\n"+
+            "Perde bağ kirişi kontrolü uygun\n"+
+            "Rijit diyafram kabulü\n"+
+            "Radye temel\n"+
+            "Zemin Sınıfı ZC\n"+
+            "Zemin Taşıma Gücü 200 KPA\n"+
+            "Yatak Katsayısı 30000 KN/M3\n"+
+            "Temel Alt Kotu -4.50 M\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -56,11 +70,22 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-29"),"modal analysis report check missing");
         require(ids.contains("ST-30"),"mass participation report check missing");
         require(ids.contains("ST-31"),"period report check missing");
+        require(ids.contains("ST-32"),"short-column check missing");
+        require(ids.contains("ST-33"),"coupling-beam check missing");
+        require(ids.contains("ST-34"),"diaphragm check missing");
+        require(ids.contains("ST-35"),"basement-wall transition check missing");
+        require(ids.contains("ST-36"),"geotechnical parameter completeness check missing");
+        require(ids.contains("ST-37"),"geotechnical project-report cross-check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
         require(!MusaAiStructuralAdvanced.focusedQueryNeedsReport("Zımbalama kontrolü"),"drawing punching check should not always require report");
         require(!MusaAiStructuralAdvanced.isFocusedQuery("Statik projeyi kontrol et"),"generic structural review must stay unfiltered");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Kısa kolon kontrolü yap"),"short-column focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Perde bağ kirişini kontrol et"),"coupling-beam focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Rijit diyaframı kontrol et"),"diaphragm focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Zemin taşıma gücünü kontrol et"),"geotechnical focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Zemin taşıma gücünü kontrol et"),"geotechnical focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -72,6 +97,13 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result driftFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Göreli kat ötelenmesini incele");
         require(driftFocus.findings.size()==1&&"ST-26".equals(driftFocus.findings.get(0).id),
             "story-drift focus must only return ST-26");
+
+        MusaAiStructuralAdvanced.Result geoFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Zemin taşıma gücünü kontrol et");
+        Set<String>geoIds=new LinkedHashSet<>();
+        for(MusaAiStructuralAdvanced.Finding f:geoFocus.findings)geoIds.add(f.id);
+        require(geoIds.contains("ST-36")&&geoIds.contains("ST-37"),"geotechnical focus missing ST-36/ST-37");
+        require(geoFocus.text.contains("proje 250KPA")&&geoFocus.text.contains("hesap 200KPA"),
+            "geotechnical mismatch values missing");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
