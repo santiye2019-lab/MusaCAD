@@ -1035,7 +1035,7 @@ public final class MusaAiStructuralCalc {
                 "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
                 "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
                 "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları",
-                "link property assignment","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama",
+                "link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama",
                 "damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama",
                 "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
                 "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
