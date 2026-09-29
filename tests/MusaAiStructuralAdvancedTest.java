@@ -111,7 +111,12 @@ public final class MusaAiStructuralAdvancedTest {
             "Viscous damper property checked and suitable\n"+
             "Base isolator property assignment checked and suitable\n"+
             "Prestress tendon force checked and suitable\n"+
-            "Tension only cable behavior checked and suitable\n";
+            "Tension only cable behavior checked and suitable\n"+
+            "Model locked results lock checked and suitable\n"+
+            "Design combo selection concrete design combos checked and suitable\n"+
+            "Frame design overwrite checked and suitable\n"+
+            "Auto select section list checked and suitable\n"+
+            "Frame output station spacing checked and suitable\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -210,6 +215,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-101"),"base-isolator assignment check missing");
         require(ids.contains("ST-102"),"tendon/prestress check missing");
         require(ids.contains("ST-103"),"tension/compression-only behavior check missing");
+        require(ids.contains("ST-104"),"model lock/result-state check missing");
+        require(ids.contains("ST-105"),"design-combination selection check missing");
+        require(ids.contains("ST-106"),"design overwrite check missing");
+        require(ids.contains("ST-107"),"auto-select section-list check missing");
+        require(ids.contains("ST-108"),"output-station check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -289,6 +299,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sismik izolatör atamalarını kontrol et"),"isolator focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Ön germe tendonunu kontrol et"),"prestress focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sadece çekme elemanlarını kontrol et"),"tension-only focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Model kilidini kontrol et"),"model-lock focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Tasarım kombinasyonlarını kontrol et"),"design-combo focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Design overwrite kontrol et"),"design-overwrite focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Otomatik kesit listesini kontrol et"),"auto-select focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Output station aralığını kontrol et"),"output-station focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sismik izolatör atamalarını kontrol et"),"isolator focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Ön germe tendonunu kontrol et"),"prestress focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sönüm oranını kontrol et"),"damping focus must require report");
@@ -509,6 +524,26 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result tensionOnlyFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Sadece çekme elemanlarını kontrol et");
         require(tensionOnlyFocus.findings.size()==1&&"ST-103".equals(tensionOnlyFocus.findings.get(0).id),
             "tension-only focus must only return ST-103");
+
+        MusaAiStructuralAdvanced.Result lockFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Model kilidini kontrol et");
+        require(lockFocus.findings.size()==1&&"ST-104".equals(lockFocus.findings.get(0).id),
+            "model-lock focus must only return ST-104");
+
+        MusaAiStructuralAdvanced.Result designComboFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Tasarım kombinasyonlarını kontrol et");
+        require(designComboFocus.findings.size()==1&&"ST-105".equals(designComboFocus.findings.get(0).id),
+            "design-combo focus must only return ST-105");
+
+        MusaAiStructuralAdvanced.Result overwriteFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Design overwrite kontrol et");
+        require(overwriteFocus.findings.size()==1&&"ST-106".equals(overwriteFocus.findings.get(0).id),
+            "design-overwrite focus must only return ST-106");
+
+        MusaAiStructuralAdvanced.Result autoSelectFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Otomatik kesit listesini kontrol et");
+        require(autoSelectFocus.findings.size()==1&&"ST-107".equals(autoSelectFocus.findings.get(0).id),
+            "auto-select focus must only return ST-107");
+
+        MusaAiStructuralAdvanced.Result stationFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Output station aralığını kontrol et");
+        require(stationFocus.findings.size()==1&&"ST-108".equals(stationFocus.findings.get(0).id),
+            "output-station focus must only return ST-108");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
