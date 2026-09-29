@@ -25,7 +25,7 @@ public final class MusaAiPanelContractTest {
 
         require(panel,"BottomSheetDialog","AI bottom sheet");
         require(panel,"MusaCAD AI","AI title");
-        require(panel,"MusaCAD AI'ya yazın","chat composer");
+        require(panel,"Gandalf'a yazın veya sesli komut verin","chat composer");
         require(panel,"interface Host","future model host abstraction");
         require(panel,"interface Reply","async reply abstraction");
         require(panel,"SOFT_INPUT_ADJUST_RESIZE","keyboard-safe AI panel");
@@ -34,6 +34,8 @@ public final class MusaAiPanelContractTest {
         require(panel,"{\"MEKAI\",\"MEKAI_FULL\"}","local mechanical expert quick prompt");
         require(panel,"\"G-MEKAI\"","developer mechanical expert quick prompt");
         require(panel,"Kontrol","inspection quick prompt");
+        require(panel,"addQuickPromptAuto","one-tap Gandalf quick action");
+        require(panel,"Gandalf dinliyor","Gandalf voice status");
         require(icon,"<vector","AI vector icon");
 
         System.out.println("MusaCAD AI panel contract OK.");

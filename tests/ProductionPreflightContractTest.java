@@ -16,6 +16,8 @@ public final class ProductionPreflightContractTest {
         need(wf,"MUSACAD_RELEASE_KEYSTORE_B64","main keystore secret");
         need(wf,"MUSACAD_MANAGER_KEYSTORE_B64","manager keystore secret");
         need(wf,"MUSACAD_TRIAL_PUBLIC_KEY_PEM","trial public key secret");
+        need(wf,"MUSACAD_AI_API_URL","Gandalf analyze endpoint secret");
+        need(wf,"MUSACAD_AI_SESSION_URL","Gandalf session endpoint secret");
         need(wf,"Probe production trial backend","trial endpoint probe");
         need(wf,"verifyDirectProductionReleaseConfig","Gradle direct gate");
         need(wf,"verifyPlayProductionReleaseConfig","Gradle Play gate");
