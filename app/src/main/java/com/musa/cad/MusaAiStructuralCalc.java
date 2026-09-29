@@ -978,7 +978,13 @@ public final class MusaAiStructuralCalc {
                 "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid diaphragm",
                 "doseme sureksiz","slab discontinuity","bodrum perdesi","basement wall","cevre perdesi",
                 "zemin tasima gucu","zemin emniyet gerilmesi","allowable bearing","bearing capacity",
-                "yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu"))
+                "yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
+                "zemin basinci","temel basinci","soil pressure","contact pressure","oturma","settlement",
+                "kazik kapasitesi","kazik tasima","pile capacity","pile load","kazik yuk",
+                "uplift","yuzme","hidrostatik","hydrostatic","buoyancy",
+                "p-delta","p delta","ikinci mertebe","second order","second-order",
+                "taban kesme","base shear","spektrum olcekle","spectrum scale","scaling",
+                "zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))
                 addUnique(seismic,t);
             if(loads.size()<40&&has(q,"hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku","live load","dead load","snow load","wind load","sehim","deflection","servisabilite","serviceability"))
                 addUnique(loads,t);
