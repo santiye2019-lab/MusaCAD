@@ -65,6 +65,7 @@ public final class MusaAiDetailedReport {
         LinkedHashSet<Integer>ids=new LinkedHashSet<>(analysis.sourceIds);
         String title=d==MusaAiDiscipline.STRUCTURAL?"Statik Proje İnceleme Raporu":d.label+" Proje İnceleme Raporu";
         StringBuilder out=new StringBuilder();
+        int advancedStructuralFindingCount=0;
         header(out,title,drawingName,index,level);
 
         out.append("\n\n1. İNCELEME KAPSAMI");
@@ -97,6 +98,16 @@ public final class MusaAiDetailedReport {
                 ids.addAll(structuralComparison.sourceIds);
                 out.append("\n").append(structuralComparison.text);
             }
+
+            out.append("\n\n3C. İLERİ STATİK KOORDİNASYON / SÜREKLİLİK");
+            MusaAiStructuralAdvanced.Result advanced=MusaAiStructuralAdvanced.analyze(index,structuralCalc);
+            if(advanced.matched){
+                ids.addAll(advanced.sourceIds);
+                advancedStructuralFindingCount=advanced.findings.size();
+                out.append("\n").append(advanced.text);
+            }else{
+                out.append("\n• İleri statik kontrol için yeterli görünür taşıyıcı/koordinasyon verisi tanınamadı.");
+            }
         }
 
         MusaAiBoq.Model projectAll=MusaAiBoq.generate(index,blank(drawingName,"Aktif proje")+" • otomatik proje metrajı");
@@ -128,7 +139,7 @@ public final class MusaAiDetailedReport {
         if(d==MusaAiDiscipline.STRUCTURAL)
             out.append("\n• Statik hesap uygunluğu için hesap raporu/modeli, yük kabulleri, malzeme sınıfları ve deprem parametreleri ayrıca karşılaştırılmalıdır.");
 
-        return new Result(true,title,out.toString(),d,ids,analysis.findings.size());
+        return new Result(true,title,out.toString(),d,ids,analysis.findings.size()+advancedStructuralFindingCount);
     }
 
     public static Result generateAll(MusaAiDrawingIndex index,String drawingName,MusaAiBoq.Model loadedBoq,Level level){
@@ -138,6 +149,7 @@ public final class MusaAiDetailedReport {
     public static Result generateAll(MusaAiDrawingIndex index,String drawingName,MusaAiBoq.Model loadedBoq,Level level,
                                      MusaAiStructuralCalc.Model structuralCalc){
         String title="Tam Proje Denetim ve Uygunluk Raporu";
+        int advancedStructuralFindingCount=0;
         StringBuilder out=new StringBuilder();header(out,title,drawingName,index,level);
         MusaAiDisciplineAnalyzer.Result all=MusaAiDisciplineAnalyzer.analyzeAll(index);
         LinkedHashSet<Integer>ids=new LinkedHashSet<>(all.sourceIds);
@@ -172,6 +184,14 @@ public final class MusaAiDetailedReport {
             out.append("\n").append(structuralComparison.text);
         }
 
+        out.append("\n\n4B. İLERİ STATİK KOORDİNASYON / SÜREKLİLİK");
+        MusaAiStructuralAdvanced.Result advanced=MusaAiStructuralAdvanced.analyze(index,structuralCalc);
+        if(advanced.matched){
+            ids.addAll(advanced.sourceIds);
+            advancedStructuralFindingCount=advanced.findings.size();
+            out.append("\n").append(advanced.text);
+        }else out.append("\n• İleri statik kontrol için yeterli görünür taşıyıcı/koordinasyon verisi tanınamadı.");
+
         out.append("\n\n5. DİSİPLİNLER ARASI KOORDİNASYON");
         out.append("\n• Mimari ↔ Statik: açıklıklar, şaftlar, rezervasyonlar, kotlar.");
         out.append("\n• Statik ↔ Mekanik/Elektrik: taşıyıcı eleman geçişleri, delik ve rezervasyonlar.");
@@ -184,7 +204,7 @@ public final class MusaAiDetailedReport {
         out.append("\n• MusaCAD AI görünür proje verisinden ön kontrol, koordinasyon ve taslak keşif karşılaştırması üretir.");
         out.append("\n• Yönetmelik, statik güvenlik, nihai keşif/hakediş veya resmi proje onayı yetkili kişilerce doğrulanmalıdır.");
 
-        return new Result(true,title,out.toString(),MusaAiDiscipline.UNKNOWN,ids,all.findings.size());
+        return new Result(true,title,out.toString(),MusaAiDiscipline.UNKNOWN,ids,all.findings.size()+advancedStructuralFindingCount);
     }
 
     private static void appendFindings(StringBuilder out,MusaAiDisciplineAnalyzer.Result analysis,Level level){
