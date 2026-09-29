@@ -31,7 +31,11 @@ public enum MusaAiDiscipline {
             "groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
             "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
             "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
-            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness"))return STRUCTURAL;
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness",
+            "kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass",
+            "kutle merkezi","rijitlik merkezi","center of mass","center of rigidity","eksantrisite","eccentricity",
+            "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diyafram kirisi","diaphragm chord",
+            "dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return STRUCTURAL;
         if(has(q,"mekanik","hvac","vrf","pis su","temiz su","havalandirma","isitma","sogutma"))return MECHANICAL;
         if(has(q,"elektrik","kuvvetli akim","zayif akim","kablo","pano","aydinlatma","topraklama","jenerator","ups"))return ELECTRICAL;
         if(has(q,"peyzaj","bitkilendirme","sulama","sert zemin","yesil alan"))return LANDSCAPE;
@@ -56,7 +60,11 @@ public enum MusaAiDiscipline {
             "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
             "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
             "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
-            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness"))return STRUCTURAL;
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness",
+            "kutle kaynagi","mass source","deprem kutlesi","seismic weight","seismic mass",
+            "kutle merkezi","rijitlik merkezi","center of mass","center of rigidity","eksantrisite","eccentricity",
+            "tesadufi eksantrisite","accidental eccentricity","collector","drag strut","diyafram kirisi","diaphragm chord",
+            "dusey deprem","dikey deprem","vertical earthquake","vertical seismic"))return STRUCTURAL;
         if(has(q,"peyzaj","bitki","agac","sulama","cim","sert zemin","yumusak zemin","bordur","peyz"))return LANDSCAPE;
         if(has(q,"altyapi","kanalizasyon","rogar","yagmur suyu","drenaj","telekom","dogalgaz hatti","icme suyu","kaz i","kazi","dolgu"))return INFRASTRUCTURE;
         if(has(q,"mimari","mim","duvar","kapi","pencere","mahal","seramik","boya","asma tavan","cephe","cati","merdiven","rampa"))return ARCHITECTURAL;
