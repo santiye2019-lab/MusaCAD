@@ -1,0 +1,113 @@
+name: Redeploy Gandalf session backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_name:
+        description: 'Existing MusaCAD license/trial Worker name'
+        required: true
+        default: 'musacad-trial-api'
+      d1_database_name:
+        description: 'Existing D1 database name'
+        required: true
+        default: 'musacad-trials'
+
+permissions:
+  contents: read
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Cloudflare access
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID MUSACAD_TRIAL_API_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Discover existing D1 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest d1 list --json > /tmp/d1.json
+          DB_ID=$(jq -r --arg name "${{ inputs.d1_database_name }}" '.[] | select(.name==$name) | (.uuid // .id // empty)' /tmp/d1.json | head -1)
+          if [ -z "$DB_ID" ] || [ "$DB_ID" = "null" ]; then
+            echo "::error::D1 database '${{ inputs.d1_database_name }}' was not found in this Cloudflare account."
+            jq -r '.[].name' /tmp/d1.json || true
+            exit 1
+          fi
+          echo "MUSACAD_D1_DATABASE_ID=$DB_ID" >> "$GITHUB_ENV"
+
+      - name: Prepare existing trial Worker config
+        shell: bash
+        working-directory: server/trial-worker
+        run: |
+          set -euo pipefail
+          cat > wrangler.toml <<EOF
+          name = "${{ inputs.worker_name }}"
+          main = "src/index.js"
+          compatibility_date = "2026-09-01"
+          keep_vars = true
+
+          [[d1_databases]]
+          binding = "DB"
+          database_name = "${{ inputs.d1_database_name }}"
+          database_id = "$MUSACAD_D1_DATABASE_ID"
+          EOF
+
+      - name: Apply current D1 schema
+        shell: bash
+        working-directory: server/trial-worker
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest d1 execute "${{ inputs.d1_database_name }}" --remote --file schema.sql --yes
+
+      - name: Redeploy existing trial/license Worker
+        shell: bash
+        working-directory: server/trial-worker
+        run: |
+          set -euo pipefail
+          # Existing Cloudflare Worker secrets are intentionally not re-uploaded.
+          # Wrangler deployments preserve secrets; --keep-vars preserves dashboard vars.
+          npx --yes wrangler@latest deploy --name "${{ inputs.worker_name }}" --keep-vars
+
+      - name: Verify Gandalf AI session endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MUSACAD_TRIAL_API_URL" in
+            */v1/trial/start) BASE_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}" ;;
+            *) echo '::error::MUSACAD_TRIAL_API_URL must end with /v1/trial/start'; exit 1 ;;
+          esac
+          SESSION_URL="$BASE_URL/v1/ai/session"
+          status=$(curl --silent --show-error --max-time 20 --output /tmp/session.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","entitlementProof":""}' "$SESSION_URL" || true)
+          cat /tmp/session.json || true
+          echo "HTTP $status"
+          if [ "$status" != "403" ] && [ "$status" != "400" ]; then
+            echo "::error::Gandalf AI session endpoint is still unhealthy after redeploy (HTTP $status)."
+            exit 1
+          fi
+          echo "MUSACAD_AI_SESSION_URL=$SESSION_URL" >> "$GITHUB_ENV"
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo '## Gandalf session backend updated'
+            echo "- Worker: ${{ inputs.worker_name }}"
+            echo "- D1: ${{ inputs.d1_database_name }}"
+            echo "- Session endpoint: $MUSACAD_AI_SESSION_URL"
+            echo '- Existing Worker secrets preserved'
+          } >> "$GITHUB_STEP_SUMMARY"
