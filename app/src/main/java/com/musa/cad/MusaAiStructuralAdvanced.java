@@ -1447,7 +1447,6 @@ public final class MusaAiStructuralAdvanced {
         LinkedHashSet<String>drawing=new LinkedHashSet<>(),report=new LinkedHashSet<>();
         LinkedHashSet<Integer>ids=new LinkedHashSet<>();
         for(Ref r:refs){
-            if(!has(r.q,"revizyon","revision","rev no","revizyon no","model revision","model rev"))continue;
             String token=revisionToken(r.raw);
             if(!token.isEmpty()){drawing.add(token);addId(ids,r);}
         }
