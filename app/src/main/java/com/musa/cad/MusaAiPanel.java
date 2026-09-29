@@ -141,6 +141,8 @@ public final class MusaAiPanel {
             {"Mekanik","AI_MEKANIK_KONTROL"},
             {"Elektrik","Elektrik projesini kontrol et"},
             {"Statik","Statik teknik rapor oluştur"},
+            {"Hesap Raporu","Statik hesap raporu yükle"},
+            {"Statik Kıyas","Statik hesap raporu ile karşılaştır"},
             {"Tam Denetim","Tam proje denetim raporu oluştur"},
             {"Uzmanlar","Disiplin AI yardım"},
             {"MEKAI","MEKAI_FULL"},
