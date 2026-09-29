@@ -259,6 +259,7 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal yöntemini kontrol et"),"modal-case setup focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sönüm oranını kontrol et"),"damping focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("CQC modal combination kontrol et"),"dynamic combination focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sönüm oranını kontrol et"),"damping focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesnet atamalarını kontrol et"),"support assignment focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Birim sistemini kontrol et"),"unit-system focus must require report");
 
