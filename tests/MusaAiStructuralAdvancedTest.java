@@ -304,6 +304,8 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Design overwrite kontrol et"),"design-overwrite focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Otomatik kesit listesini kontrol et"),"auto-select focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Output station aralığını kontrol et"),"output-station focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Tasarım kombinasyonlarını kontrol et"),"design-combo focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Design overwrite kontrol et"),"design-overwrite focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sismik izolatör atamalarını kontrol et"),"isolator focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Ön germe tendonunu kontrol et"),"prestress focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sönüm oranını kontrol et"),"damping focus must require report");
