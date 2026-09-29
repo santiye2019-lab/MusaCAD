@@ -1427,17 +1427,20 @@ public final class MusaAiStructuralAdvanced {
 
     private static String revisionToken(String raw){
         if(raw==null||raw.trim().isEmpty())return "";
-        Matcher explicit=Pattern.compile("(?iu)\\bREV\\s*[:=\\-]\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
-        String token="";
-        while(explicit.find())token=explicit.group(1).toUpperCase(Locale.ROOT);
-        if(!token.isEmpty())return token;
-        Matcher m=Pattern.compile("(?iu)\\b(?:REV[İI]ZYON|REVISION|REV)\\s*(?:NO|NO\\.|NUMARASI|NUMBER)?\\s*[:=\\-]?\\s*([A-Z0-9][A-Z0-9._/-]{0,15})").matcher(raw);
-        while(m.find()){
-            String candidate=m.group(1).toUpperCase(Locale.ROOT);
-            if(candidate.equals("REV")||candidate.equals("REVISION")||candidate.equals("REVİZYON"))continue;
-            token=candidate;
+        String upper=raw.toUpperCase(new Locale("tr","TR")).replace('İ','I');
+        String[]parts=upper.split("[^A-Z0-9]+");
+        boolean seen=false;
+        for(String part:parts){
+            if(part.isEmpty())continue;
+            if(part.equals("REV")||part.equals("REVISION")||part.equals("REVIZYON")){
+                seen=true;
+                continue;
+            }
+            if(!seen)continue;
+            if(part.equals("NO")||part.equals("NUMBER")||part.equals("NUMARASI"))continue;
+            if(part.matches("(?=.*[0-9])[A-Z0-9]{1,16}"))return part;
         }
-        return token;
+        return "";
     }
     private static void revisionConsistencyChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
