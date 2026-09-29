@@ -506,10 +506,13 @@ public final class MusaAiStructuralAdvanced {
             out.add(new Finding("ST-20",Status.DOGRULANAMADI,"Deprem tasarım parametreleri eksik/okunamadı",
                 "Yüklenen hesap verisinde şu parametreler açık biçimde ayrıştırılamadı: "+join(missing,10)+".",
                 "SDS, SD1, DTS, BYS ve zemin sınıfını hesap raporunun proje bilgileri bölümünden doğrulayın.",Collections.emptyList()));
-        if(calc.loadCues.isEmpty())
+        List<String>basicLoads=loadCues(calc,
+            "hareketli yuk","sabit yuk","kar yuku","ruzgar yuku","duvar yuku",
+            "live load","dead load","snow load","wind load");
+        if(basicLoads.isEmpty())
             out.add(new Finding("ST-21",Status.DOGRULANAMADI,"Yük kabulleri otomatik doğrulanamadı",
                 "Hesap raporundan sabit/hareketli/kar/rüzgâr yüklerine ilişkin güvenilir metin ipucu çıkarılamadı.",
-                "Yük kabulleri ve kombinasyon özetini içeren hesap bölümlerini rapora dahil edin.",Collections.emptyList()));
+                "Temel yük kabullerini içeren hesap bölümünü rapora dahil edin; yük kombinasyonları ST-49 kapsamında ayrıca kontrol edilir.",Collections.emptyList()));
     }
 
     private static void beamColumnJointChecks(List<Ref>refs,MusaAiStructuralCalc.Model calc,List<Finding>out){
