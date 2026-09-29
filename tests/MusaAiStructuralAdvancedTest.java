@@ -289,6 +289,8 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sismik izolatör atamalarını kontrol et"),"isolator focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Ön germe tendonunu kontrol et"),"prestress focus query missing");
         require(MusaAiStructuralAdvanced.isFocusedQuery("Sadece çekme elemanlarını kontrol et"),"tension-only focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sismik izolatör atamalarını kontrol et"),"isolator focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Ön germe tendonunu kontrol et"),"prestress focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Sönüm oranını kontrol et"),"damping focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Mesnet atamalarını kontrol et"),"support assignment focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Birim sistemini kontrol et"),"unit-system focus must require report");
