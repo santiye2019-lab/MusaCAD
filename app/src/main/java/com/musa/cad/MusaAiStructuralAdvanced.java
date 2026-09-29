@@ -152,6 +152,11 @@ public final class MusaAiStructuralAdvanced {
         storyElevationCoordinateChecks(structuralCalc,findings);
         analysisCaseRunStatusChecks(structuralCalc,findings);
         loadCaseReferenceIntegrityChecks(structuralCalc,findings);
+        objectPropertyCompatibilityChecks(structuralCalc,findings);
+        shellThicknessAssignmentChecks(structuralCalc,findings);
+        pierSpandrelAssignmentChecks(structuralCalc,findings);
+        designProcedureStatusChecks(structuralCalc,findings);
+        autoMeshAssignmentChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -230,7 +235,12 @@ public final class MusaAiStructuralAdvanced {
             "design code","code version","tasarim yonetmeligi","tasarım yönetmeliği","yonetmelik surumu","yönetmelik sürümü","tbdy","ts500",
             "story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch",
             "analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış",
-            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı");
+            "duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı",
+            "object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame",
+            "shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı",
+            "pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama",
+            "design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı",
+            "auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -348,6 +358,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))ids.add("ST-81");
         if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))ids.add("ST-82");
         if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))ids.add("ST-83");
+        if(has(q,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))ids.add("ST-84");
+        if(has(q,"shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı"))ids.add("ST-85");
+        if(has(q,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama"))ids.add("ST-86");
+        if(has(q,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı"))ids.add("ST-87");
+        if(has(q,"auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama"))ids.add("ST-88");
         return ids;
     }
 
@@ -420,6 +435,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"story elevation","floor elevation","kat kotu","kat kotlari","kat kotları","coordinate system","koordinat sistemi","elevation mismatch"))return "KAT KOTU / KOORDİNAT";
         if(has(q,"analysis case","run status","analysis status","not run","case failed","analysis outdated","analiz durumu","analiz case","case durumu","analiz case durumu","calistirilmamis","çalıştırılmamış"))return "ANALİZ CASE DURUMU";
         if(has(q,"duplicate load case","duplicate combination","undefined load case","missing load case","combination reference","load case reference","load case referans","load case referansi","load case referansı","yuk durumu referansi","yük durumu referansı"))return "LOAD CASE / KOMBİNASYON REFERANSI";
+        if(has(q,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame"))return "ELEMAN / PROPERTY TİP UYUMLULUĞU";
+        if(has(q,"shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı"))return "SHELL / ALAN KALINLIK ATAMASI";
+        if(has(q,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama"))return "PIER / SPANDREL ATAMALARI";
+        if(has(q,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı"))return "TASARIM PROSEDÜRÜ / KAPSAMI";
+        if(has(q,"auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama"))return "AUTO-MESH ATAMA KAPSAMI";
         return "STATİK";
     }
 
@@ -1805,6 +1825,81 @@ public final class MusaAiStructuralAdvanced {
         out.add(new Finding("ST-83",s,"Load case / kombinasyon referans bütünlüğü",
             "Model raporundan load case/kombinasyon referans verisi okundu: "+cueSummary(cues,10)+".",
             "Hatalı veya mükerrer adları düzelterek kombinasyonları yeniden üretin ve analiz sonuçlarını yeniden çalıştırın.",Collections.emptyList()));
+    }
+
+    private static void objectPropertyCompatibilityChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"object property compatibility","property type mismatch","wrong property type","eleman property uyumsuz","nesne property uyumsuz","frame property area","area property frame");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-84",Status.DOGRULANAMADI,"Eleman / property tipi uyumluluğu okunamadı",
+                "Model raporundan frame/area/shell nesnesi ile atanan property tipinin uyumuna ilişkin açık kontrol satırı ayrıştırılamadı.",
+                "Model-check çıktısında nesne tipi ile section/area property tipinin uyumlu olduğunu görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"property type mismatch","wrong property type","frame property assigned to area","area property assigned to frame","eleman property uyumsuz","nesne property uyumsuz","error","failed");
+        out.add(new Finding("ST-84",s,"Eleman / property tipi uyumluluk kontrolü",
+            "Model raporundan nesne-property uyumluluk verisi okundu: "+cueSummary(cues,10)+".",
+            "Uyarı verilen nesnelerde frame/area/shell tipini ve atanan property sınıfını doğrudan modelden doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void shellThicknessAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"shell thickness","area thickness","slab thickness property","wall thickness property","thickness not assigned","default thickness","kabuk kalinligi","kabuk kalınlığı","alan kalinligi","alan kalınlığı");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-85",Status.DOGRULANAMADI,"Shell / alan kalınlık atamaları okunamadı",
+                "Döşeme, perde veya diğer area/shell elemanların kalınlık property atamalarına ilişkin açık model raporu bulunamadı.",
+                "Döşeme ve perde area property adlarını, kalınlıklarını ve atama kapsamını model kontrol çıktısına dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"thickness not assigned","default thickness","undefined thickness","zero thickness","kabuk kalinligi yok","kabuk kalınlığı yok","error","failed");
+        out.add(new Finding("ST-85",s,"Shell / alan kalınlık atama kontrolü",
+            "Model raporundan kalınlık/property verisi okundu: "+cueSummary(cues,10)+".",
+            "Döşeme/perde kalınlıklarının onaylı pafta ve kesitlerle eşleştiğini, varsayılan property kalmadığını doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void pierSpandrelAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"pier label","spandrel label","pier assignment","spandrel assignment","unassigned pier","unassigned spandrel","perde pier","spandrel atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-86",Status.DOGRULANAMADI,"Pier / spandrel atamaları okunamadı",
+                "Perde ve bağ kirişi tasarımında kullanılan pier/spandrel etiketlerinin atama durumuna ilişkin açık rapor satırı ayrıştırılamadı.",
+                "Perde tasarımında kullanılan pier/spandrel etiketlerini kat ve eleman bazında model raporuna dahil edin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"unassigned pier","unassigned spandrel","duplicate pier label","duplicate spandrel label","missing pier","missing spandrel","pier atanmamis","pier atanmamış","error","failed");
+        out.add(new Finding("ST-86",s,"Pier / spandrel atama kontrolü",
+            "Model raporundan pier/spandrel verisi okundu: "+cueSummary(cues,10)+".",
+            "Etiketlerin perde sürekliliğini ve bağ kirişi bölgelerini doğru temsil ettiğini katlar boyunca kontrol edin.",Collections.emptyList()));
+    }
+
+    private static void designProcedureStatusChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"design procedure","design status","not designed","design excluded","no design","check only","design group","tasarim durumu","tasarım durumu","tasarim disi","tasarım dışı");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-87",Status.DOGRULANAMADI,"Tasarım prosedürü / kapsam durumu okunamadı",
+                "Taşıyıcı elemanların tasarım/check kapsamına dahil edilip edilmediğini gösteren açık model raporu ayrıştırılamadı.",
+                "Tasarım dışı bırakılan, yalnız check edilen veya farklı tasarım prosedürü kullanan elemanları raporda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"not designed","design excluded","no design","excluded from design","tasarim disi","tasarım dışı","design failed","error","failed");
+        out.add(new Finding("ST-87",s,"Tasarım prosedürü / kapsam kontrolü",
+            "Model raporundan tasarım durumu verisi okundu: "+cueSummary(cues,10)+".",
+            "Taşıyıcı sistemde gerekli elemanların yanlışlıkla tasarım dışı kalmadığını ve doğru tasarım prosedürünün seçildiğini doğrulayın.",Collections.emptyList()));
+    }
+
+    private static void autoMeshAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
+        if(calc==null)return;
+        List<String>cues=serviceReportCues(calc,"auto mesh","automatic mesh","area mesh assignment","mesh assignment","mesh not assigned","unmeshed area","otomatik mesh","mesh atama");
+        if(cues.isEmpty()){
+            out.add(new Finding("ST-88",Status.DOGRULANAMADI,"Auto-mesh atama kapsamı okunamadı",
+                "Area/shell elemanların mesh atama kapsamına ilişkin açık model-check satırı ayrıştırılamadı.",
+                "Döşeme, perde ve radye area elemanları için auto-mesh/mesh assignment kapsamını model raporunda görünür hale getirin.",Collections.emptyList()));
+            return;
+        }
+        Status s=assignmentCueStatus(cues,"mesh not assigned","unmeshed area","mesh assignment missing","auto mesh disabled","otomatik mesh yok","mesh atanmamis","mesh atanmamış","error","failed");
+        out.add(new Finding("ST-88",s,"Auto-mesh atama kapsamı kontrolü",
+            "Model raporundan mesh atama bilgisi okundu: "+cueSummary(cues,10)+".",
+            "Mesh kalitesinden ayrı olarak, tüm gerekli area/shell elemanların gerçekten mesh kapsamına girdiğini doğrulayın.",Collections.emptyList()));
     }
 
     private static List<String> loadCues(MusaAiStructuralCalc.Model calc,String...terms){
