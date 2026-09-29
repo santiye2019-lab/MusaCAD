@@ -1,0 +1,161 @@
+name: Deploy Gandalf AI and build APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-build:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+      MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_PRODUCTION_RELEASE: "true"
+      MUSACAD_KEYSTORE_FILE: /tmp/musacad-release.jks
+      MUSACAD_RELEASE_KEYSTORE_B64: ${{ secrets.MUSACAD_RELEASE_KEYSTORE_B64 }}
+      MUSACAD_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_KEYSTORE_PASSWORD }}
+      MUSACAD_KEY_ALIAS: ${{ secrets.MUSACAD_KEY_ALIAS }}
+      MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Gandalf deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID OPENAI_API_KEY MUSACAD_TRIAL_API_URL MUSACAD_TRIAL_PUBLIC_KEY_PEM MUSACAD_RELEASE_KEYSTORE_B64 MUSACAD_KEYSTORE_PASSWORD MUSACAD_KEY_ALIAS MUSACAD_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          case "$MUSACAD_TRIAL_API_URL" in
+            https://*) ;;
+            *) echo "::error::MUSACAD_TRIAL_API_URL must use HTTPS"; exit 1 ;;
+          esac
+
+      - name: Verify existing AI session endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MUSACAD_TRIAL_API_URL" in
+            */v1/trial/start) BASE_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}" ;;
+            *) echo "::error::MUSACAD_TRIAL_API_URL must end with /v1/trial/start"; exit 1 ;;
+          esac
+          SESSION_URL="$BASE_URL/v1/ai/session"
+          status=$(curl --silent --show-error --max-time 20 --output /tmp/gandalf-session-probe.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","entitlementProof":""}' "$SESSION_URL" || true)
+          if [ "$status" != "403" ] && [ "$status" != "400" ]; then
+            echo "::error::Existing MusaCAD license worker does not expose a healthy /v1/ai/session endpoint (HTTP $status). Redeploy server/trial-worker before Gandalf Cloud can be enabled."
+            cat /tmp/gandalf-session-probe.json || true
+            exit 1
+          fi
+          echo "MUSACAD_AI_SESSION_URL=$SESSION_URL" >> "$GITHUB_ENV"
+
+      - name: Prepare Gandalf Worker config
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          cat > wrangler.toml <<'EOF'
+          name = "musacad-ai"
+          main = "src/index.js"
+          compatibility_date = "2026-09-01"
+
+          [vars]
+          OPENAI_MODEL = "gpt-5.6-sol"
+          OPENAI_MAX_OUTPUT_TOKENS = "3200"
+          EOF
+
+      - name: Install Gandalf Worker secrets
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@latest secret put OPENAI_API_KEY --name musacad-ai
+          printf '%s' "$MUSACAD_TRIAL_PUBLIC_KEY_PEM" | npx --yes wrangler@latest secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM --name musacad-ai
+
+      - name: Deploy Gandalf Worker
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest deploy --name musacad-ai 2>&1 | tee /tmp/gandalf-deploy.log
+          AI_BASE=$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/gandalf-deploy.log | tail -1 || true)
+          if [ -z "$AI_BASE" ]; then
+            echo "::error::Could not determine deployed Gandalf Worker URL from Wrangler output."
+            exit 1
+          fi
+          AI_URL="$AI_BASE/v1/analyze"
+          HEALTH_URL="$AI_BASE/health"
+          curl --fail --silent --show-error --max-time 20 "$HEALTH_URL" | tee /tmp/gandalf-health.json
+          echo "MUSACAD_AI_API_URL=$AI_URL" >> "$GITHUB_ENV"
+          echo "GANDALF_WORKER_BASE=$AI_BASE" >> "$GITHUB_ENV"
+
+      - name: Test Gandalf Worker code
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          npm test
+
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prepare production signing keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MUSACAD_RELEASE_KEYSTORE_B64" | base64 -d > "$MUSACAD_KEYSTORE_FILE"
+          chmod 600 "$MUSACAD_KEYSTORE_FILE"
+          keytool -list -keystore "$MUSACAD_KEYSTORE_FILE" -storepass "$MUSACAD_KEYSTORE_PASSWORD" -alias "$MUSACAD_KEY_ALIAS" >/dev/null
+
+      - name: Build Gandalf-enabled production APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectRelease
+          apk="app/build/outputs/apk/direct/release/app-direct-release.apk"
+          test -s "$apk"
+          cp "$apk" /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk
+          sha256sum /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk | tee /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.sha256
+
+      - name: Upload Gandalf-enabled APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Gandalf-Cloud-production-v1.2.0
+          path: |
+            /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk
+            /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo '## Gandalf AI deployment complete'
+            echo "- AI Worker: $GANDALF_WORKER_BASE"
+            echo "- Analyze endpoint: $MUSACAD_AI_API_URL"
+            echo "- Session endpoint: $MUSACAD_AI_SESSION_URL"
+            echo '- Model: gpt-5.6-sol'
+            echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.0'
+            echo '- OpenAI API key remains server-side only'
+          } >> "$GITHUB_STEP_SUMMARY"
