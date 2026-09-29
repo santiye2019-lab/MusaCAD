@@ -18,7 +18,7 @@ public final class MusaAiDrawingIndex {
     }
 
     public static final class Item {
-        public final int sourceId;
+        public final int sourceId,quantity;
         public final String type,layer,text;
         public final double length,area,centerX,centerY;
         public final boolean closedKnown,closed;
@@ -34,7 +34,12 @@ public final class MusaAiDrawingIndex {
         }
         public Item(int sourceId,String type,String layer,String text,double length,double area,
                     boolean closedKnown,boolean closed,String geometryKey,double centerX,double centerY){
+            this(sourceId,type,layer,text,length,area,closedKnown,closed,geometryKey,centerX,centerY,1);
+        }
+        public Item(int sourceId,String type,String layer,String text,double length,double area,
+                    boolean closedKnown,boolean closed,String geometryKey,double centerX,double centerY,int quantity){
             this.sourceId=sourceId;
+            this.quantity=Math.max(1,quantity);
             this.type=clean(type).toUpperCase(Locale.ROOT);
             this.layer=clean(layer);
             this.text=clean(text);
@@ -83,7 +88,7 @@ public final class MusaAiDrawingIndex {
         if(items!=null)for(Item item:items){
             if(item==null)continue;
             copy.add(item);
-            if(!item.type.isEmpty())types.put(item.type,types.getOrDefault(item.type,0)+1);
+            if(!item.type.isEmpty())types.put(item.type,types.getOrDefault(item.type,0)+item.quantity);
         }
         this.items=Collections.unmodifiableList(copy);
         this.typeCounts=Collections.unmodifiableMap(types);
@@ -116,7 +121,7 @@ public final class MusaAiDrawingIndex {
         for(Item item:items){
             String hay=normalize(item.text);if(hay.isEmpty())continue;
             int at=0;
-            while((at=hay.indexOf(wanted,at))>=0){count++;at+=Math.max(1,wanted.length());}
+            while((at=hay.indexOf(wanted,at))>=0){count+=item.quantity;at+=Math.max(1,wanted.length());}
         }
         return count;
     }

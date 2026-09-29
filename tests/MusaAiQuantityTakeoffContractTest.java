@@ -14,6 +14,9 @@ public final class MusaAiQuantityTakeoffContractTest {
         require(parser,"aiArea(measure)","DXF area indexing");
         require(index,"public final double length,area","measurement metadata");
         require(index,"unitName","drawing unit metadata");
+        require(parser,"blockInsertions","block insertion takeoff bridge");
+        require(parser,"\"BLOCK\"","block names indexed for equipment count");
+        require(index,"quantity","block-array quantity metadata");
         System.out.println("MusaAiQuantityTakeoffContractTest OK");
     }
 }

@@ -31,7 +31,9 @@ public class DxfBlocksTest {
         point(read(b,insert("A",10,10,20,20)),12,22);
         point(read(b,insert("a",10,10,20,20,50,90,41,2,42,3)),4,24);
         point(read(b,insert("A",41,-1)),-2,2);
-        points(read(b,insert("A",10,10,20,20,70,2,71,2,44,5,45,7)),12,22,17,22,12,29,17,29);
+        DxfBlocks.Result arrayInsert=read(b,insert("A",10,10,20,20,70,2,71,2,44,5,45,7));
+        points(arrayInsert,12,22,17,22,12,29,17,29);
+        if(arrayInsert.blockInsertions.size()!=1||!"A".equals(arrayInsert.blockInsertions.get(0).name)||arrayInsert.blockInsertions.get(0).count!=4)throw new AssertionError("Root block insertion metadata");
         points(read(b,insert("A",10,10,20,20,50,90,70,2,71,2,44,5,45,7)),8,22,8,27,1,22,1,27);
         points(read(b,insert("A",10,10,20,20,41,2,70,2,44,5)),14,22,19,22);
         String nested=b+block("B",insert("A",10,5,20,6));point(read(nested,insert("B",10,10,20,20)),16,26);
@@ -40,7 +42,7 @@ public class DxfBlocksTest {
         point(read(b,insert("A",10,10,20,20,30,6540.072947)),12,22);
         point(read(b,insert("A",230,-1)),-2,2);
         skipped(read(b,insert("A",210,1,220,0,230,0)));
-        DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");
+        DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");if(repeated.blockInsertions.size()!=2)throw new AssertionError("Repeated block insertion metadata");
 
         String tableBlock=block("*T1",LINE);
         DxfBlocks.Result table=read(tableBlock,tags(0,"ACAD_TABLE",2,"*T1",10,100,20,200,11,1,21,0));
