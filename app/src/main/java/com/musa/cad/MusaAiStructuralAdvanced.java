@@ -127,6 +127,105 @@ public final class MusaAiStructuralAdvanced {
         return new Result(true,out.toString(),findings,ids);
     }
 
+    public static boolean isFocusedQuery(String raw){
+        return !focusIds(raw).isEmpty();
+    }
+
+    public static boolean focusedQueryNeedsReport(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return has(q,
+            "modal","periyot","period","kutle katilim","mass participation",
+            "kat otelen","story drift","burul","torsion","yumusak kat","soft story","zayif kat","weak story",
+            "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint");
+    }
+
+    public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
+        LinkedHashSet<String>wanted=focusIds(raw);
+        if(wanted.isEmpty())return Result.none();
+        Result all=analyze(index,calc);
+        if(!all.matched)return all;
+
+        ArrayList<Finding>filtered=new ArrayList<>();
+        LinkedHashSet<Integer>ids=new LinkedHashSet<>();
+        for(Finding f:all.findings)if(wanted.contains(f.id)){
+            filtered.add(f);ids.addAll(f.sourceIds);
+        }
+
+        StringBuilder out=new StringBuilder("ODAKLI STATİK KONTROL • ").append(focusTitle(raw));
+        if(filtered.isEmpty()){
+            out.append("\n• Bu başlık için görünür proje/hesap verisinden eşleştirilebilir bulgu üretilemedi.");
+            if(focusedQueryNeedsReport(raw)&&calc==null)
+                out.append("\n• Bu kontrol için statik hesap raporu/model çıktısı gerekir.");
+            out.append("\n• Sonuç yokluğu uygunluk onayı anlamına gelmez.");
+            return new Result(true,out.toString(),Collections.emptyList(),Collections.emptyList());
+        }
+
+        int mismatch=0,review=0,unverified=0,info=0;
+        for(Finding f:filtered){
+            switch(f.status){
+                case UYUMSUZLUK:mismatch++;break;
+                case INCELEME_GEREKLI:review++;break;
+                case DOGRULANAMADI:unverified++;break;
+                default:info++;
+            }
+        }
+        out.append("\n• UYUMSUZLUK: ").append(mismatch)
+           .append(" • İNCELEME GEREKLİ: ").append(review)
+           .append(" • DOĞRULANAMADI: ").append(unverified)
+           .append(" • BİLGİ: ").append(info);
+        for(Finding f:filtered){
+            out.append("\n\n[").append(f.id).append("] ").append(label(f.status)).append(" • ").append(f.title);
+            out.append("\n").append(f.detail);
+            if(!f.suggestion.isEmpty())out.append("\nÖneri: ").append(f.suggestion);
+        }
+        out.append("\n\nNot: Odaklı kontrol açık proje/hesap verisini filtreler; eksik hesap sonucu veya güvenlik değeri uydurmaz.");
+        return new Result(true,out.toString(),filtered,ids);
+    }
+
+    private static LinkedHashSet<String>focusIds(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        LinkedHashSet<String>ids=new LinkedHashSet<>();
+        if(q.isEmpty())return ids;
+        if(has(q,"zimbala","punching"))ids.add("ST-14");
+        if(has(q,"modal","mod anal","response spectrum")){ids.add("ST-29");ids.add("ST-30");ids.add("ST-31");}
+        if(has(q,"kutle katilim","mass participation","etkin modal kutle")){ids.add("ST-30");ids.add("ST-29");}
+        if(has(q,"periyot","period"))ids.add("ST-31");
+        if(has(q,"kat otelen","story drift","interstory drift"))ids.add("ST-26");
+        if(has(q,"burul","torsion"))ids.add("ST-27");
+        if(has(q,"yumusak kat","soft story","zayif kat","weak story"))ids.add("ST-28");
+        if(has(q,"guclu kolon","strong column","zayif kiris","weak beam")){ids.add("ST-23");ids.add("ST-22");}
+        if(has(q,"kolon kiris birlesim","kiris kolon birlesim","beam column joint"))ids.add("ST-22");
+        if(has(q,"sarilma","siklastirma","confinement"))ids.add("ST-24");
+        if(has(q,"transfer","aktarma")){ids.add("ST-17");ids.add("ST-02");ids.add("ST-03");ids.add("ST-04");}
+        if(has(q,"konsol","cantilever"))ids.add("ST-16");
+        if(has(q,"dilatasyon","deprem derzi","expansion joint"))ids.add("ST-12");
+        if(has(q,"asansor kuyu","elevator shaft"))ids.add("ST-10");
+        if(has(q,"merdiven","stair"))ids.add("ST-11");
+        if(has(q,"rezervasyon","delik","opening","sleeve")){ids.add("ST-07");ids.add("ST-08");ids.add("ST-09");}
+        return ids;
+    }
+
+    private static String focusTitle(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(has(q,"zimbala","punching"))return "ZIMBALAMA";
+        if(has(q,"modal","mod anal","response spectrum"))return "MODAL ANALİZ";
+        if(has(q,"kutle katilim","mass participation"))return "MODAL KÜTLE KATILIMI";
+        if(has(q,"periyot","period"))return "PERİYOT";
+        if(has(q,"kat otelen","story drift"))return "KAT ÖTELENMESİ";
+        if(has(q,"burul","torsion"))return "BURULMA";
+        if(has(q,"yumusak kat","soft story","zayif kat","weak story"))return "YUMUŞAK / ZAYIF KAT";
+        if(has(q,"guclu kolon","strong column","zayif kiris","weak beam"))return "GÜÇLÜ KOLON – ZAYIF KİRİŞ";
+        if(has(q,"kolon kiris birlesim","beam column joint"))return "KİRİŞ–KOLON BİRLEŞİMİ";
+        if(has(q,"sarilma","siklastirma","confinement"))return "SARILMA / SIKLAŞTIRMA";
+        if(has(q,"transfer","aktarma"))return "TRANSFER / AKTARMA SİSTEMİ";
+        if(has(q,"konsol","cantilever"))return "KONSOL";
+        if(has(q,"dilatasyon","deprem derzi","expansion joint"))return "DİLATASYON";
+        if(has(q,"asansor kuyu","elevator shaft"))return "ASANSÖR KUYUSU";
+        if(has(q,"merdiven","stair"))return "MERDİVEN";
+        if(has(q,"rezervasyon","delik","opening","sleeve"))return "REZERVASYON / BOŞLUK";
+        return "STATİK";
+    }
+
     private static void continuityChecks(List<Ref>refs,List<Finding>out){
         LinkedHashSet<Integer> projectFloors=new LinkedHashSet<>();
         for(Ref r:refs){Integer f=floorOrder(r.floor);if(f!=null)projectFloors.add(f);}

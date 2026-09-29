@@ -57,6 +57,22 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-30"),"mass participation report check missing");
         require(ids.contains("ST-31"),"period report check missing");
 
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
+        require(!MusaAiStructuralAdvanced.focusedQueryNeedsReport("Zımbalama kontrolü"),"drawing punching check should not always require report");
+        require(!MusaAiStructuralAdvanced.isFocusedQuery("Statik projeyi kontrol et"),"generic structural review must stay unfiltered");
+
+        MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
+        Set<String>modalIds=new LinkedHashSet<>();
+        for(MusaAiStructuralAdvanced.Finding f:modalFocus.findings)modalIds.add(f.id);
+        require(modalIds.size()==3&&modalIds.contains("ST-29")&&modalIds.contains("ST-30")&&modalIds.contains("ST-31"),
+            "modal focus must only return ST-29/30/31");
+        require(!modalFocus.text.contains("[ST-27]"),"modal focus leaked torsion finding");
+
+        MusaAiStructuralAdvanced.Result driftFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Göreli kat ötelenmesini incele");
+        require(driftFocus.findings.size()==1&&"ST-26".equals(driftFocus.findings.get(0).id),
+            "story-drift focus must only return ST-26");
+
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
         System.out.println("MusaAiStructuralAdvancedTest OK");
