@@ -106,6 +106,12 @@ public final class MusaAiStructuralAdvanced {
         diaphragmChecks(refs,structuralCalc,findings);
         basementWallChecks(refs,findings);
         geotechnicalChecks(refs,structuralCalc,findings);
+        foundationBehaviorChecks(structuralCalc,findings);
+        pileCapacityChecks(structuralCalc,findings);
+        upliftChecks(structuralCalc,findings);
+        secondOrderChecks(structuralCalc,findings);
+        baseShearChecks(structuralCalc,findings);
+        soilStructureInteractionChecks(structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -147,7 +153,10 @@ public final class MusaAiStructuralAdvanced {
             "modal","periyot","period","kutle katilim","mass participation",
             "kat otelen","story drift","burul","torsion","yumusak kat","soft story","zayif kat","weak story",
             "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint",
-            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
+            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu",
+            "zemin basinci","temel basinci","soil pressure","oturma","settlement","kazik kapasitesi","pile capacity","pile load",
+            "uplift","yuzme","hidrostatik","p-delta","p delta","ikinci mertebe","second order",
+            "taban kesme","base shear","spektrum olcekle","spectrum scale","zemin yapi etkilesimi","soil structure interaction","yay katsayisi","spring stiffness");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -218,6 +227,12 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))ids.add("ST-34");
         if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi")){ids.add("ST-35");ids.add("ST-03");}
         if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre")){ids.add("ST-36");ids.add("ST-37");}
+        if(has(q,"zemin basinci","temel basinci","soil pressure","contact pressure","oturma","settlement"))ids.add("ST-38");
+        if(has(q,"kazik kapasitesi","kazik tasima","pile capacity","pile load","kazik yuk"))ids.add("ST-39");
+        if(has(q,"uplift","yuzme","hidrostatik","hydrostatic","buoyancy"))ids.add("ST-40");
+        if(has(q,"p-delta","p delta","ikinci mertebe","second order","second-order"))ids.add("ST-41");
+        if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))ids.add("ST-42");
+        if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))ids.add("ST-43");
         return ids;
     }
 
@@ -244,6 +259,12 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))return "DİYAFRAM / DÖŞEME SÜREKLİLİĞİ";
         if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi"))return "BODRUM / PERDE SÜREKLİLİĞİ";
         if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre"))return "ZEMİN / TEMEL PARAMETRELERİ";
+        if(has(q,"zemin basinci","temel basinci","soil pressure","contact pressure","oturma","settlement"))return "TEMEL BASINCI / OTURMA";
+        if(has(q,"kazik kapasitesi","kazik tasima","pile capacity","pile load","kazik yuk"))return "KAZIK YÜK / KAPASİTE";
+        if(has(q,"uplift","yuzme","hidrostatik","hydrostatic","buoyancy"))return "YÜZME / UPLIFT";
+        if(has(q,"p-delta","p delta","ikinci mertebe","second order","second-order"))return "P-DELTA / İKİNCİ MERTEBE";
+        if(has(q,"taban kesme","base shear","spektrum olcekle","spectrum scale","scaling"))return "TABAN KESMESİ / SPEKTRUM ÖLÇEKLEME";
+        if(has(q,"zemin yapi etkilesimi","soil structure interaction","soil-structure interaction","yay katsayisi","spring stiffness","area spring"))return "ZEMİN–YAPI ETKİLEŞİMİ";
         return "STATİK";
     }
 
