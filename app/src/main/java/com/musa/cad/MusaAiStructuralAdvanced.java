@@ -287,7 +287,7 @@ public final class MusaAiStructuralAdvanced {
             "auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi",
             "output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu",
             "rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı",
-            "design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","tasarim seridi","tasarım şeridi",
+            "design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit",
             "punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi",
             "unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy",
             "section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı");
@@ -443,7 +443,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))ids.add("ST-107");
         if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))ids.add("ST-108");
         if(has(q,"rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı"))ids.add("ST-109");
-        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","tasarim seridi","tasarım şeridi"))ids.add("ST-110");
+        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit"))ids.add("ST-110");
         if(has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi"))ids.add("ST-111");
         if(has(q,"unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy"))ids.add("ST-112");
         if(has(q,"section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı"))ids.add("ST-113");
@@ -475,7 +475,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"auto select list","auto select section","auto-select list","section selection list","otomatik kesit listesi","kesit secim listesi","kesit seçim listesi"))return "AUTO-SELECT / KESİT SEÇİM LİSTESİ";
         if(has(q,"output station","frame output station","output station spacing","result station","station spacing","cikti istasyonu","çıktı istasyonu","sonuc istasyonu","sonuç istasyonu"))return "OUTPUT / SONUÇ İSTASYONLARI";
         if(has(q,"rebar cover","clear cover","concrete cover","reinforcement cover","donati pas payi","donatı pas payı","beton ortusu","beton örtüsü","pas payi","pas payı"))return "DONATI PAS PAYI / BETON ÖRTÜSÜ";
-        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","tasarim seridi","tasarım şeridi"))return "DÖŞEME TASARIM ŞERİTLERİ";
+        if(has(q,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit"))return "DÖŞEME TASARIM ŞERİTLERİ";
         if(has(q,"punching perimeter","punching check perimeter","punching opening","punching control perimeter","zimbalama cevresi","zımbalama çevresi","zimbalama kontrol cevresi","zımbalama kontrol çevresi"))return "ZIMBALAMA KONTROL ÇEVRESİ / AYARI";
         if(has(q,"unbraced length","effective length factor","k factor","steel effective length","buckling length","burkulma boyu","etkin boy katsayisi","etkin boy katsayısı","desteksiz boy"))return "ÇELİK ETKİN / BURKULMA BOYU";
         if(has(q,"section compactness","compact section","noncompact section","slender section","steel section classification","kesit narinligi","kesit narinliği","kesit sinifi","kesit sınıfı"))return "ÇELİK KESİT SINIFI / NARİNLİK";
@@ -2329,7 +2329,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void slabDesignStripChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","tasarim seridi","tasarım şeridi");
+        List<String>cues=serviceReportCues(calc,"design strip","slab design strip","strip assignment","design strip assignment","doseme tasarim seridi","döşeme tasarım şeridi","doseme tasarim serit","döşeme tasarım şerit","tasarim seridi","tasarım şeridi","tasarim serit","tasarım şerit");
         if(cues.isEmpty()){
             out.add(new Finding("ST-110",Status.DOGRULANAMADI,"Döşeme tasarım şeritleri okunamadı",
                 "Döşeme/radye tasarımında kullanılan design-strip tanımları ve atama kapsamı rapordan ayrıştırılamadı.",
