@@ -965,7 +965,7 @@ public final class MusaAiStructuralCalc {
             String t=line.trim().replaceAll("\\s+"," ");
             if(t.isEmpty())continue;if(t.length()>180)t=t.substring(0,180)+"…";
             String q=MusaAiDrawingIndex.normalize(t);
-            if(seismic.size()<160&&has(q,
+            if(seismic.size()<220&&has(q,
                 "sds","sd1","dts","bys","zemin sinifi","deprem","spektrum","bina onem","tasarim spektrumu","ra r","dayanim fazlaligi",
                 "guclu kolon","zayif kiris","strong column","weak beam","kolon kiris birlesim","beam column joint",
                 "sarilma bolgesi","confinement zone","ozel deprem etriyesi","special seismic hoop",
@@ -1000,6 +1000,11 @@ public final class MusaAiStructuralCalc {
                 "utilization","utilisation","kullanim orani","kullanım oranı","demand capacity","d/c ratio","dc ratio",
                 "kiris kesme","kiriş kesme","beam shear","kiris moment","kiriş moment","beam moment","flexural ratio","moment ratio",
                 "perde kesme","wall shear","shear wall shear","kesme kapasitesi","shear capacity",
+                "singular","singularity","tekil rijitlik","instability","unstable","kararsiz","kararsız","mechanism","mekanizma","zero stiffness","negative stiffness",
+                "unconnected","disconnected","orphan node","orphan joint","baglantisiz dugum","bağlantısız düğüm","baglantisiz eleman","bağlantısız eleman","floating node","floating joint","joint not connected","element not connected",
+                "mesh quality","mesh warning","finite element mesh","shell mesh","aspect ratio","distorted element","mesh size","sonlu eleman ag","sonlu eleman ağ","kabuk mesh","mesh kalitesi",
+                "nonconvergence","non-convergence","did not converge","not converged","convergence failed","converged","convergence achieved","yakinsamadi","yakınsamadı","yakinsama","yakınsama","iteration limit","iterasyon limiti",
+                "local axis","local axes","yerel eksen","orientation assignment","section orientation","major axis","minor axis","eleman yonu","eleman yönü",
                 "yetersiz","uygunsuz","failed","fail","does not comply","not satisfied"))
                 addUnique(seismic,t);
             if(loads.size()<80&&has(q,
