@@ -46,6 +46,11 @@ public final class MusaAiStructuralAdvanced {
     private static final Pattern FLOOR_G=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern FLOOR_BSM=Pattern.compile("(?iu)\\b(BODRUM|BASEMENT)\\s*(\\d{0,2})\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern SIZE=Pattern.compile("(?iu)(\\d{2,5}(?:[\\.,]\\d+)?)\\s*[x×/]\\s*(\\d{2,5}(?:[\\.,]\\d+)?)\\s*(MM|CM|M)?");
+    private static final Pattern GEO_SOIL_CLASS=Pattern.compile("(?iu)\\b(?:ZEM[İI]N\\s*SINIFI|GROUND\\s*TYPE)\\s*[:=]?\\s*(Z[A-F])\\b");
+    private static final Pattern GEO_BEARING=Pattern.compile("(?iu)\\b(?:ZEM[İI]N\\s+(?:EMN[İI]YET\\s+GER[İI]LMES[İI]|TAŞIMA\\s+GÜCÜ|TASIMA\\s+GUCU)|ALLOWABLE\\s+BEARING\\s+(?:CAPACITY|PRESSURE)|BEARING\\s+CAPACITY)\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KPA|KN\\s*/\\s*M(?:2|²)|T\\s*/\\s*M(?:2|²)|KG\\s*/\\s*CM(?:2|²)))");
+    private static final Pattern GEO_SUBGRADE=Pattern.compile("(?iu)\\b(?:YATAK\\s+KATSAYISI|ZEM[İI]N\\s+YATAK\\s+KATSAYISI|SUBGRADE\\s+MODULUS|MODULUS\\s+OF\\s+SUBGRADE\\s+REACTION|K[Ss])\\s*[:=]?\\s*([0-9]+(?:[\\.,][0-9]+)?\\s*(?:KN\\s*/\\s*M(?:3|³)|MN\\s*/\\s*M(?:3|³)|T\\s*/\\s*M(?:3|³)))");
+    private static final Pattern GEO_GROUNDWATER=Pattern.compile("(?iu)\\b(?:YERALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|YER\\s+ALTI\\s+SUYU(?:\\s+SEV[İI]YES[İI])?|GROUNDWATER(?:\\s+LEVEL)?)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
+    private static final Pattern GEO_FOUNDATION_LEVEL=Pattern.compile("(?iu)\\b(?:TEMEL\\s+ALT\\s+KOTU|FOUNDATION\\s+(?:BOTTOM|BASE)\\s+LEVEL)\\s*[:=]?\\s*([+-]?[0-9]+(?:[\\.,][0-9]+)?\\s*M)");
 
     private static final class Ref {
         final MusaAiDrawingIndex.Item item;
@@ -96,6 +101,11 @@ public final class MusaAiStructuralAdvanced {
         torsionChecks(structuralCalc,findings);
         softWeakStoryChecks(structuralCalc,findings);
         modalChecks(structuralCalc,findings);
+        shortColumnChecks(refs,structuralCalc,findings);
+        couplingBeamChecks(refs,structuralCalc,findings);
+        diaphragmChecks(refs,structuralCalc,findings);
+        basementWallChecks(refs,findings);
+        geotechnicalChecks(refs,structuralCalc,findings);
         reportChecks(structuralCalc,findings);
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
@@ -136,7 +146,8 @@ public final class MusaAiStructuralAdvanced {
         return has(q,
             "modal","periyot","period","kutle katilim","mass participation",
             "kat otelen","story drift","burul","torsion","yumusak kat","soft story","zayif kat","weak story",
-            "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint");
+            "guclu kolon","strong column","zayif kiris","weak beam","kolon kiris birlesim","beam column joint",
+            "zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
     }
 
     public static Result analyzeFocused(MusaAiDrawingIndex index,MusaAiStructuralCalc.Model calc,String raw){
@@ -202,6 +213,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"asansor kuyu","elevator shaft"))ids.add("ST-10");
         if(has(q,"merdiven","stair"))ids.add("ST-11");
         if(has(q,"rezervasyon","delik","opening","sleeve")){ids.add("ST-07");ids.add("ST-08");ids.add("ST-09");}
+        if(has(q,"kisa kolon","short column"))ids.add("ST-32");
+        if(has(q,"perde bag kirisi","coupling beam"))ids.add("ST-33");
+        if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))ids.add("ST-34");
+        if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi")){ids.add("ST-35");ids.add("ST-03");}
+        if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre")){ids.add("ST-36");ids.add("ST-37");}
         return ids;
     }
 
@@ -223,6 +239,11 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"asansor kuyu","elevator shaft"))return "ASANSÖR KUYUSU";
         if(has(q,"merdiven","stair"))return "MERDİVEN";
         if(has(q,"rezervasyon","delik","opening","sleeve"))return "REZERVASYON / BOŞLUK";
+        if(has(q,"kisa kolon","short column"))return "KISA KOLON";
+        if(has(q,"perde bag kirisi","coupling beam"))return "PERDE BAĞ KİRİŞİ";
+        if(has(q,"rijit diyafram","rigid diaphragm","semi rigid","doseme sureksiz","slab discontinuity"))return "DİYAFRAM / DÖŞEME SÜREKLİLİĞİ";
+        if(has(q,"bodrum perde","bodrum perdesi","basement wall","cevre perdesi"))return "BODRUM / PERDE SÜREKLİLİĞİ";
+        if(has(q,"zemin tasima","zemin emniyet","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu","zemin temel parametre"))return "ZEMİN / TEMEL PARAMETRELERİ";
         return "STATİK";
     }
 
@@ -616,7 +637,10 @@ public final class MusaAiStructuralAdvanced {
 
     private static boolean isRelevant(Ref r){
         if(r==null)return false;
-        return r.kind!=Kind.OTHER||has(r.q,"statik","betonarme","tasiyici","donati","rezervasyon","bosluk","dilatasyon","zimbalama","kazik","radye");
+        return r.kind!=Kind.OTHER||has(r.q,"statik","betonarme","tasiyici","donati","rezervasyon","bosluk","dilatasyon","zimbalama","kazik","radye",
+            "kisa kolon","short column","perde bag kirisi","coupling beam","rijit diyafram","rigid diaphragm","semi rigid",
+            "doseme sureksiz","slab discontinuity","bodrum perdesi","basement wall","cevre perdesi",
+            "zemin tasima gucu","zemin emniyet gerilmesi","yatak katsayisi","subgrade modulus","groundwater","yeralti suyu","yer alti suyu","temel alt kotu");
     }
 
     private static Kind kind(String q,String tag){
