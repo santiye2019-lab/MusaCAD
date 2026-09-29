@@ -266,7 +266,7 @@ public final class MusaAiStructuralAdvanced {
             "nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal",
             "nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı",
             "staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları",
-            "link property assignment","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama",
+            "link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama",
             "damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama",
             "base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör",
             "tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama",
@@ -410,7 +410,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))ids.add("ST-96");
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))ids.add("ST-97");
         if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))ids.add("ST-98");
-        if(has(q,"link property assignment","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))ids.add("ST-99");
+        if(has(q,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))ids.add("ST-99");
         if(has(q,"damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama"))ids.add("ST-100");
         if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))ids.add("ST-101");
         if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))ids.add("ST-102");
@@ -431,7 +431,7 @@ public final class MusaAiStructuralAdvanced {
         if(has(q,"nonlinear hinge assignment","plastic hinge assignment","hinge property","hinge assignment","nonlinear hinge","plastik mafsal atama","plastik mafsal"))return "DOĞRUSAL OLMAYAN MAFSAL ATAMASI";
         if(has(q,"nonlinear case parameters","nonlinear solution control","maximum iterations","iteration tolerance","event stepping","nonlinear control","dogrusal olmayan analiz ayari","doğrusal olmayan analiz ayarı"))return "DOĞRUSAL OLMAYAN ANALİZ KONTROLLERİ";
         if(has(q,"staged construction","construction stage","stage definition","stage sequence","staged nonlinear","asama tanimi","aşama tanımı","asamalar","aşamalar","yapim asamasi","yapım aşaması","yapim asamalari","yapım aşamaları"))return "YAPIM AŞAMASI / STAGED CONSTRUCTION";
-        if(has(q,"link property assignment","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))return "LINK / BAĞLANTI PROPERTY ATAMASI";
+        if(has(q,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama"))return "LINK / BAĞLANTI PROPERTY ATAMASI";
         if(has(q,"damper property","viscous damper","friction damper","gap element","hook element","nonlinear link property","sönümleyici property","damper atama","gap atama"))return "DAMPER / GAP / NONLINEAR LINK";
         if(has(q,"base isolator","seismic isolator","isolator property","isolator assignment","izolator property","izolatör property","sismik izolator","sismik izolatör"))return "SİSMİK İZOLATÖR PROPERTY / ATAMA";
         if(has(q,"tendon property","prestress tendon","post tension","prestress force","tendon force","on germe","ön germe","ard germe","art germe","tendon atama"))return "TENDON / ÖNGERME TANIMLARI";
@@ -2121,7 +2121,7 @@ public final class MusaAiStructuralAdvanced {
 
     private static void linkPropertyAssignmentChecks(MusaAiStructuralCalc.Model calc,List<Finding>out){
         if(calc==null)return;
-        List<String>cues=serviceReportCues(calc,"link property assignment","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama");
+        List<String>cues=serviceReportCues(calc,"link property assignment","link property","link assignment","support link","link element property","baglanti elemani property","bağlantı elemanı property","link atama");
         if(cues.isEmpty()){
             out.add(new Finding("ST-99",Status.DOGRULANAMADI,"Link / bağlantı property ataması okunamadı",
                 "Model raporundan link/support-link nesnelerine property atanıp atanmadığına ilişkin açık kayıt ayrıştırılamadı.",
