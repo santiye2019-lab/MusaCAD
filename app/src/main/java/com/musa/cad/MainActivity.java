@@ -1866,14 +1866,8 @@ public class MainActivity extends AppCompatActivity {
         String detected=getContentResolver().getType(uri);
         final String mime=detected==null?CadDocumentSupport.bestMime(name,null):detected;
         final CadDocumentSupport.Kind kind=CadDocumentSupport.kind(name,mime);
-        if(kind==CadDocumentSupport.Kind.PDF){
-            String message="PDF statik hesap raporu seçildi: "+name+"\nBu sürüm PDF içeriğini güvenilir hesap verisi olarak otomatik okumuyor. DOCX veya TXT rapor yükleyin; PDF metin çıkarma desteği sonraki katmanda eklenecek.";
-            result.setText("Statik hesap • PDF metin çıkarma gerekli");
-            if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
-            return;
-        }
-        if(!(kind==CadDocumentSupport.Kind.DOCX||kind==CadDocumentSupport.Kind.TEXT)){
-            String message="Bu hesap raporu biçimi otomatik okunamıyor: "+CadDocumentSupport.displayType(name,mime)+". DOCX veya TXT kullanın.";
+        if(!(kind==CadDocumentSupport.Kind.PDF||kind==CadDocumentSupport.Kind.DOCX||kind==CadDocumentSupport.Kind.TEXT)){
+            String message="Bu hesap raporu biçimi otomatik okunamıyor: "+CadDocumentSupport.displayType(name,mime)+". PDF, DOCX veya TXT kullanın.";
             if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
             return;
         }
@@ -1881,8 +1875,23 @@ public class MainActivity extends AppCompatActivity {
         aiExecutor.submit(()->{
             try(InputStream in=getContentResolver().openInputStream(uri)){
                 if(in==null)throw new IOException("Statik hesap raporu açılamadı");
-                String extracted=OfficeTextExtractor.extract(in,name,mime);
+                String extracted;
+                String pdfNotice="";
+                if(kind==CadDocumentSupport.Kind.PDF){
+                    MusaPdfTextExtractor.Result pdf=MusaPdfTextExtractor.extract(this,in);
+                    extracted=pdf.text;
+                    if(extracted==null||extracted.trim().isEmpty()){
+                        String why=pdf.likelyScanned
+                            ?"PDF büyük olasılıkla taranmış/görüntü tabanlı; metin katmanı bulunamadı. OCR desteği gerekir."
+                            :"PDF'den okunabilir metin çıkarılamadı.";
+                        throw new IOException(why);
+                    }
+                    pdfNotice="\n• PDF metni: "+pdf.processedPages+"/"+pdf.pageCount+" sayfa işlendi"+
+                        (pdf.truncated?" • güvenli sınır nedeniyle metin kısaltıldı":"")+
+                        (pdf.likelyScanned?" • düşük metin yoğunluğu tespit edildi":"");
+                }else extracted=OfficeTextExtractor.extract(in,name,mime);
                 if(extracted==null||extracted.trim().isEmpty())throw new IOException("Belgeden okunabilir metin çıkarılamadı");
+                final String extractionNotice=pdfNotice;
                 MusaAiStructuralCalculation.Result compared=MusaAiStructuralCalculation.compare(currentAiDrawingIndex(),name,extracted);
                 runOnUiThread(()->{
                     if(isFinishing()||isDestroyed())return;
@@ -1891,7 +1900,7 @@ public class MainActivity extends AppCompatActivity {
                     lastAiReportSourceIds=Collections.emptyList();
                     cad.clearAiHighlights();
                     result.setText("Statik hesap • "+name+" • karşılaştırma hazır");
-                    String message="Statik hesap raporu bağlandı.\n\n"+compared.text+
+                    String message="Statik hesap raporu bağlandı."+extractionNotice+"\n\n"+compared.text+
                         "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.";
                     if(reply!=null)reply.send(message);else Toast.makeText(this,"Statik hesap raporu bağlandı",Toast.LENGTH_LONG).show();
                 });
