@@ -887,7 +887,7 @@ public class MainActivity extends AppCompatActivity {
             pendingStructuralCalculationReply=reply;
             pendingStructuralCalculationProject=currentProject;
             pickStructuralCalculationDocument();
-            reply.send("Statik hesap raporunu seçin. İlk sürümde DOCX ve TXT metni yerelde okunur. PDF için güvenilir metin çıkarma desteği ayrıca eklenecek.");
+            reply.send("Statik hesap raporunu seçin. PDF, DOCX ve TXT yerelde okunur. Taranmış/görüntü tabanlı PDF'de metin katmanı yoksa OCR gerektiği açıkça bildirilir.");
             return;
         }
         if(isStructuralCalculationClearCommand(aiControl)){
