@@ -22,7 +22,7 @@ public final class MusaAiStructuralCalc {
     private static final Pattern FLOOR_BEFORE=Pattern.compile("(?iu)\\b([+-]?\\d{1,2})\\s*\\.?\\s*(?:KAT|FLOOR|STOREY)\\b");
     private static final Pattern FLOOR_GROUND=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
     private static final Pattern FLOOR_BASEMENT=Pattern.compile("(?iu)\\b(BODRUM|BASEMENT)\\s*(\\d{0,2})\\s*(?:KAT|FLOOR)?\\b");
-    private static final Pattern AXIS=Pattern.compile("(?iu)\\b(?:AKS|AXIS|GRID)\\s*[:=]?\\s*([A-ZÇĞİÖŞÜ0-9]{1,4})(?:\\s*[-/]\\s*([A-ZÇĞİÖŞÜ0-9]{1,4}))?\\b");
+    private static final Pattern AXIS=Pattern.compile("(?iu)\\b(?:AKS|AXIS|GRID)\\s*[:=]?\\s*([A-ZÇĞİÖŞÜ0-9]{1,4})(?:\\s*[-/]\\s*([A-ZÇĞİÖŞÜ0-9]{1,4}))?\\b");\n    private static final Pattern ELEMENT_TAG=Pattern.compile("(?iu)(?:K|S|P|D|T|B|C|W|L|KIR|KOL|PER|BEAM|COL|WALL|SLAB|FOOT)\\d{1,4}[A-Z]?");
 
     public enum ElementStatus { MATCH, MISMATCH, REPORT_ONLY, DRAWING_ONLY, UNVERIFIED }
 
@@ -574,10 +574,14 @@ public final class MusaAiStructuralCalc {
 
     private static String detectFloor(String raw){
         if(raw==null||raw.isEmpty())return "";
+        String q=MusaAiDrawingIndex.normalize(raw).trim();
         Matcher m=FLOOR_BASEMENT.matcher(raw);
         if(m.find())return canonicalFloor(m.group(1)+(m.group(2)==null?"":m.group(2)));
-        m=FLOOR_GROUND.matcher(raw);
-        if(m.find())return "ZEMIN";
+        if(!q.contains("zemin sinifi")&&!q.contains("ground type")){
+            m=FLOOR_GROUND.matcher(raw);
+            if(m.find()&&(q.equals("zemin")||q.equals("ground")||q.contains("zemin kat")||q.contains("ground floor")))
+                return "ZEMIN";
+        }
         m=FLOOR_AFTER.matcher(raw);
         if(m.find())return canonicalFloor(m.group(1));
         m=FLOOR_BEFORE.matcher(raw);
@@ -610,12 +614,7 @@ public final class MusaAiStructuralCalc {
         if(tag==null||tag.isEmpty())return false;
         if(tag.matches("C\\d{2,3}")||tag.matches("[BS]\\d{3}[A-Z]?"))return false;
         String q=MusaAiDrawingIndex.normalize(tag).toUpperCase(Locale.ROOT);
-        return !q.startsWith("KAT")&&!q.startsWith("FLOOR")&&!q.startsWith("STOREY")&&
-            !q.startsWith("AKS")&&!q.startsWith("AXIS")&&!q.startsWith("GRID")&&
-            !q.startsWith("KIRIS")&&!q.startsWith("KOLON")&&!q.startsWith("PERDE")&&
-            !q.startsWith("DOSEME")&&!q.startsWith("TEMEL")&&!q.startsWith("RADYE")&&
-            !q.startsWith("BODRUM")&&!q.startsWith("BASEMENT")&&
-            !q.startsWith("SDS")&&!q.startsWith("SD")&&!q.startsWith("DTS")&&!q.startsWith("BYS");
+        return ELEMENT_TAG.matcher(q).matches();
     }
 
     private static Set<String> elementFloors(Collection<Element>elements){
