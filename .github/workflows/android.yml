@@ -194,6 +194,12 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiStructuralCalculation.java tests/MusaAiStructuralCalculationTest.java
           java -cp /tmp/musacad-tests MusaAiStructuralCalculationTest
+      - name: Test structural PDF calculation-report integration contract
+        run: |
+          grep -F "com.tom-roush:pdfbox-android:2.0.27.0" app/build.gradle
+          grep -F "MusaPdfTextExtractor.extract(this,in)" app/src/main/java/com/musa/cad/MainActivity.java
+          grep -F "likelyScanned" app/src/main/java/com/musa/cad/MusaPdfTextExtractor.java
+          grep -F "PDF, DOCX ve TXT yerelde okunur" app/src/main/java/com/musa/cad/MainActivity.java
       - name: Test MusaCAD multi-file project package audit
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java tests/MusaAiProjectPackageTest.java
