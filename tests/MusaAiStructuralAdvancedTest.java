@@ -54,7 +54,13 @@ public final class MusaAiStructuralAdvancedTest {
             "Kütle merkezi ve rijitlik merkezi eksantrisite kontrolü uygun\n"+
             "Tesadüfi eksantrisite accidental eccentricity uygulanmıştır\n"+
             "Diyafram collector drag strut kontrolü uygun\n"+
-            "Düşey deprem vertical seismic etkisi uygun\n";
+            "Düşey deprem vertical seismic etkisi uygun\n"+
+            "Yük kombinasyonu COMB1 = 1.4G + 1.6Q\n"+
+            "Deprem yük durumu RSX response spectrum X\n"+
+            "Deprem yük durumu RSY response spectrum Y\n"+
+            "Taşıyıcı sistem katsayıları R/D/I uygundur\n"+
+            "Etkin rijitlik cracked section stiffness modifier uygulanmıştır\n"+
+            "Kiriş uçlarında end release ve rigid zone tanımları uygundur\n";
         MusaAiStructuralCalc.Model calc=MusaAiStructuralCalc.parse("hesap.txt",report);
         MusaAiStructuralAdvanced.Result result=MusaAiStructuralAdvanced.analyze(index,calc);
         require(result.matched,"advanced structural result must match");
@@ -99,6 +105,11 @@ public final class MusaAiStructuralAdvancedTest {
         require(ids.contains("ST-46"),"accidental-eccentricity check missing");
         require(ids.contains("ST-47"),"diaphragm force-path check missing");
         require(ids.contains("ST-48"),"vertical seismic check missing");
+        require(ids.contains("ST-49"),"load-combination check missing");
+        require(ids.contains("ST-50"),"seismic-load-case check missing");
+        require(ids.contains("ST-51"),"RDI system check missing");
+        require(ids.contains("ST-52"),"effective-stiffness check missing");
+        require(ids.contains("ST-53"),"release/rigid-zone check missing");
 
         require(MusaAiStructuralAdvanced.isFocusedQuery("Modal analizi kontrol et"),"modal focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Göreli kat ötelenmesini incele"),"story drift should require report");
@@ -120,6 +131,13 @@ public final class MusaAiStructuralAdvancedTest {
         require(MusaAiStructuralAdvanced.isFocusedQuery("Düşey deprem etkisini kontrol et"),"vertical seismic focus query missing");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Kütle kaynağını kontrol et"),"mass-source focus must require report");
         require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Düşey deprem etkisini kontrol et"),"vertical seismic focus must require report");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Yük kombinasyonlarını kontrol et"),"load-combination focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Deprem yük durumlarını kontrol et"),"seismic-load-case focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("R/D/I katsayılarını kontrol et"),"RDI focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Etkin rijitlikleri kontrol et"),"effective-stiffness focus query missing");
+        require(MusaAiStructuralAdvanced.isFocusedQuery("Mafsal ve rijit bölge kabullerini kontrol et"),"release/rigid-zone focus query missing");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Yük kombinasyonlarını kontrol et"),"load-combination focus must require report");
+        require(MusaAiStructuralAdvanced.focusedQueryNeedsReport("Etkin rijitlikleri kontrol et"),"effective-stiffness focus must require report");
 
         MusaAiStructuralAdvanced.Result modalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Modal analizi kontrol et");
         Set<String>modalIds=new LinkedHashSet<>();
@@ -154,6 +172,18 @@ public final class MusaAiStructuralAdvancedTest {
         MusaAiStructuralAdvanced.Result verticalFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Düşey deprem etkisini kontrol et");
         require(verticalFocus.findings.size()==1&&"ST-48".equals(verticalFocus.findings.get(0).id),
             "vertical seismic focus must only return ST-48");
+
+        MusaAiStructuralAdvanced.Result loadFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Yük kombinasyonlarını kontrol et");
+        require(loadFocus.findings.size()==1&&"ST-49".equals(loadFocus.findings.get(0).id),
+            "load combination focus must only return ST-49");
+
+        MusaAiStructuralAdvanced.Result rdiFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"R/D/I katsayılarını kontrol et");
+        require(rdiFocus.findings.size()==1&&"ST-51".equals(rdiFocus.findings.get(0).id),
+            "RDI focus must only return ST-51");
+
+        MusaAiStructuralAdvanced.Result stiffnessFocus=MusaAiStructuralAdvanced.analyzeFocused(index,calc,"Etkin rijitlikleri kontrol et");
+        require(stiffnessFocus.findings.size()==1&&"ST-52".equals(stiffnessFocus.findings.get(0).id),
+            "effective stiffness focus must only return ST-52");
 
         require(result.text.contains("DOĞRULANAMADI"),"status taxonomy missing");
         require(result.text.contains("hesap sonucu"),"conservative safety note missing");
