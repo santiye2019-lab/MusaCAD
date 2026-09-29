@@ -18,6 +18,8 @@ public final class MusaAiStructuralCalc {
     private static final Pattern REBAR=Pattern.compile("(?i)(?<![A-Z0-9])([BS])\\s*(\\d{3})([A-Z])?(?![A-Z0-9])");
     private static final Pattern TAG_TOKEN=Pattern.compile("(?iu)\\b([A-ZÇĞİÖŞÜ]{1,8}\\s*[-_]?\\s*\\d{1,4})\\b");
     private static final Pattern REBAR_DIAMETER=Pattern.compile("(?iu)(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})");
+    private static final Pattern LONGITUDINAL_REBAR=Pattern.compile("(?iu)(?:(ALT\\s*DONATI|ÜST\\s*DONATI|UST\\s*DONATI|TOP|BOTTOM|BOT|ALT|ÜST|UST)\\s*[:=]?\\s*)?(\\d{1,3})\\s*(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})(?!\\s*[/@])");
+    private static final Pattern STIRRUP_REBAR=Pattern.compile("(?iu)(?:(ETR[İI]YE|STIRRUP)\\s*[:=]?\\s*)?(?:Ø|Φ|ø|\\bfi\\s*)\\s*(\\d{1,2})\\s*[/@]\\s*(\\d{1,3})(?:\\s*(?:MM|CM))?");
     private static final Pattern FLOOR_AFTER=Pattern.compile("(?iu)\\b(?:KAT|FLOOR|STOREY)\\s*[:=]?\\s*([+-]?\\d{1,2}|ZEM[İI]N|GROUND|BODRUM\\s*\\d{0,2}|BASEMENT\\s*\\d{0,2})\\b");
     private static final Pattern FLOOR_BEFORE=Pattern.compile("(?iu)\\b([+-]?\\d{1,2})\\s*\\.?\\s*(?:KAT|FLOOR|STOREY)\\b");
     private static final Pattern FLOOR_GROUND=Pattern.compile("(?iu)\\b(ZEM[İI]N|GROUND)\\s*(?:KAT|FLOOR)?\\b");
@@ -29,11 +31,11 @@ public final class MusaAiStructuralCalc {
 
     public static final class Element {
         public final String tag,floor,axis,section,concreteGrade,rebarGrade;
-        public final Set<String> rebarDiameters;
+        public final Set<String> rebarDiameters,longitudinalRebar,stirrups;
         public final int sourceId;
 
         Element(String tag,String floor,String axis,String section,String concreteGrade,String rebarGrade,
-                Collection<String>diameters,int sourceId){
+                Collection<String>diameters,Collection<String>longitudinalRebar,Collection<String>stirrups,int sourceId){
             this.tag=canonicalTag(tag);
             this.floor=clean(floor);
             this.axis=clean(axis);
@@ -41,6 +43,8 @@ public final class MusaAiStructuralCalc {
             this.concreteGrade=clean(concreteGrade);
             this.rebarGrade=clean(rebarGrade);
             this.rebarDiameters=immutableSet(diameters);
+            this.longitudinalRebar=immutableSet(longitudinalRebar);
+            this.stirrups=immutableSet(stirrups);
             this.sourceId=sourceId;
         }
 
@@ -176,7 +180,7 @@ public final class MusaAiStructuralCalc {
         DrawingSnapshot drawing=snapshot(index);
         StringBuilder out=new StringBuilder("STATİK HESAP RAPORU ↔ DWG PROJE KARŞILAŞTIRMASI");
         out.append("\nRapor: ").append(report.name.isEmpty()?"Yüklenen hesap raporu":report.name);
-        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit/donatı ön kontrolü");
+        out.append("\nKarşılaştırma türü: kat + aks + eleman etiketi + kesit + boyuna donatı + etriye ön kontrolü");
 
         LinkedHashSet<Integer> ids=new LinkedHashSet<>();
         List<ElementCheck> elementChecks=compareElements(report.elements,drawing.elements);
@@ -322,6 +326,8 @@ public final class MusaAiStructuralCalc {
         String concrete=firstConcrete(raw);
         String rebar=firstRebar(raw);
         LinkedHashSet<String>diameters=new LinkedHashSet<>();collectDiameters(raw,diameters);
+        LinkedHashSet<String>longitudinal=new LinkedHashSet<>();collectLongitudinalRebar(raw,longitudinal);
+        LinkedHashSet<String>stirrups=new LinkedHashSet<>();collectStirrups(raw,stirrups);
 
         Matcher tags=TAG_TOKEN.matcher(raw);
         LinkedHashSet<String> found=new LinkedHashSet<>();
@@ -332,11 +338,11 @@ public final class MusaAiStructuralCalc {
             found.add(tag);
         }
         if(found.isEmpty())return;
-        boolean hasElementData=!section.isEmpty()||!diameters.isEmpty()||!axis.isEmpty()||!floor.isEmpty()||
-            !concrete.isEmpty()||!rebar.isEmpty();
+        boolean hasElementData=!section.isEmpty()||!diameters.isEmpty()||!longitudinal.isEmpty()||!stirrups.isEmpty()||
+            !axis.isEmpty()||!floor.isEmpty()||!concrete.isEmpty()||!rebar.isEmpty();
         if(!hasElementData)return;
         for(String tag:found){
-            out.add(new Element(tag,floor,axis,section,concrete,rebar,diameters,sourceId));
+            out.add(new Element(tag,floor,axis,section,concrete,rebar,diameters,longitudinal,stirrups,sourceId));
             if(out.size()>=2500)break;
         }
     }
@@ -365,6 +371,8 @@ public final class MusaAiStructuralCalc {
             state=compareField("Beton",r.concreteGrade,d.concreteGrade,differences);mismatch|=state<0;unverified|=state>0;
             state=compareField("Donatı çeliği",r.rebarGrade,d.rebarGrade,differences);mismatch|=state<0;unverified|=state>0;
             state=compareSetField("Donatı çapı",r.rebarDiameters,d.rebarDiameters,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Boyuna donatı",r.longitudinalRebar,d.longitudinalRebar,differences);mismatch|=state<0;unverified|=state>0;
+            state=compareSetField("Etriye",r.stirrups,d.stirrups,differences);mismatch|=state<0;unverified|=state>0;
 
             ElementStatus status=mismatch?ElementStatus.MISMATCH:(unverified?ElementStatus.UNVERIFIED:ElementStatus.MATCH);
             out.add(new ElementCheck(status,r,d,differences));
@@ -554,6 +562,29 @@ public final class MusaAiStructuralCalc {
     private static void collectDiameters(String raw,Set<String>out){
         Matcher m=REBAR_DIAMETER.matcher(raw==null?"":raw);
         while(m.find()&&out.size()<60)out.add("Ø"+Integer.parseInt(m.group(1)));
+    }
+    private static void collectLongitudinalRebar(String raw,Set<String>out){
+        Matcher m=LONGITUDINAL_REBAR.matcher(raw==null?"":raw);
+        while(m.find()&&out.size()<40){
+            String role=normalizeRebarRole(m.group(1));
+            int count=Integer.parseInt(m.group(2)),diameter=Integer.parseInt(m.group(3));
+            if(count<1||count>100||diameter<4||diameter>50)continue;
+            out.add(role+":"+count+"Ø"+diameter);
+        }
+    }
+    private static void collectStirrups(String raw,Set<String>out){
+        Matcher m=STIRRUP_REBAR.matcher(raw==null?"":raw);
+        while(m.find()&&out.size()<20){
+            int diameter=Integer.parseInt(m.group(2)),spacing=Integer.parseInt(m.group(3));
+            if(diameter<4||diameter>25||spacing<2||spacing>1000)continue;
+            out.add("ETRİYE:Ø"+diameter+"/"+spacing);
+        }
+    }
+    private static String normalizeRebarRole(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw).toUpperCase(Locale.ROOT).replaceAll("\\s+","");
+        if(q.equals("ALT")||q.equals("ALTDONATI")||q.equals("BOTTOM")||q.equals("BOT"))return "ALT";
+        if(q.equals("UST")||q.equals("USTDONATI")||q.equals("TOP"))return "ÜST";
+        return "GENEL";
     }
     private static void collectTagged(String raw,Map<String,String>out){
         String value=raw==null?"":raw;
