@@ -7,8 +7,8 @@ public final class MusaAiDetailedReportTest {
             Arrays.asList("S_KOLON","S_KIRIS","YANGIN_SPRINKLER"),
             Arrays.asList("S_KOLON","S_KIRIS","YANGIN_SPRINKLER"),
             Arrays.asList(
-                new MusaAiDrawingIndex.Item(1,"LWPOLYLINE","S_KOLON","KOLON",10,4),
-                new MusaAiDrawingIndex.Item(2,"LINE","S_KIRIS","KİRİŞ REZERVASYON",8,Double.NaN),
+                new MusaAiDrawingIndex.Item(1,"LWPOLYLINE","S_KOLON","KOLON K1 30x60 C30 B420C Ø16 AKS A-1 KOT +3.20",10,4),
+                new MusaAiDrawingIndex.Item(2,"LINE","S_KIRIS","KİRİŞ 25/50 REZERVASYON Ø12",8,Double.NaN),
                 new MusaAiDrawingIndex.Item(3,"LINE","YANGIN_SPRINKLER","SPRINKLER",12,Double.NaN)
             ),"m");
     }
@@ -23,6 +23,15 @@ public final class MusaAiDetailedReportTest {
         has(statik.text,"STATİK PROJE İNCELEME RAPORU");
         has(statik.text,"PROJE–KEŞİF UYGUNLUĞU");
         has(statik.text,"KOORDİNASYON / ÇAPRAZ KONTROL");
+        has(statik.text,"STATİK TEKNİK VERİ ÖZETİ");
+        has(statik.text,"kolon 1");
+        has(statik.text,"kiriş 1");
+        has(statik.text,"30X60");
+        has(statik.text,"C30");
+        has(statik.text,"B420C");
+        has(statik.text,"Ø16");
+        has(statik.text,"AKS A-1");
+        has(statik.text,"+3.20");
         MusaAiDetailedReport.Result all=MusaAiDetailedReport.generate(index(),"proje.dwg","Tam proje denetim raporu oluştur",boq);
         has(all.text,"TAM PROJE DENETİM VE UYGUNLUK RAPORU");
         has(all.text,"DİSİPLİNLER ARASI KOORDİNASYON");
