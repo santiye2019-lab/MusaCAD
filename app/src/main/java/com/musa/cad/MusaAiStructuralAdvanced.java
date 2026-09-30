@@ -189,6 +189,7 @@ public final class MusaAiStructuralAdvanced {
 
         StringBuilder out=new StringBuilder("İLERİ STATİK KOORDİNASYON / SÜREKLİLİK KONTROLÜ");
         int mismatch=0,review=0,unverified=0,info=0;
+        LinkedHashMap<String,ArrayList<Finding>>categories=new LinkedHashMap<>();
         for(Finding f:findings){
             switch(f.status){
                 case UYUMSUZLUK:mismatch++;break;
@@ -196,21 +197,42 @@ public final class MusaAiStructuralAdvanced {
                 case DOGRULANAMADI:unverified++;break;
                 default:info++;
             }
+            String category=reportCategory(f.id);
+            categories.computeIfAbsent(category,k->new ArrayList<>()).add(f);
         }
         out.append("\n• UYUMSUZLUK: ").append(mismatch);
         out.append(" • İNCELEME GEREKLİ: ").append(review);
         out.append(" • DOĞRULANAMADI: ").append(unverified);
         out.append(" • BİLGİ: ").append(info);
+        out.append("\n\nKATEGORİ ÖZETİ");
+        for(Map.Entry<String,ArrayList<Finding>>e:categories.entrySet())
+            out.append("\n• ").append(e.getKey()).append(": ").append(e.getValue().size());
 
         int n=0;
-        for(Finding f:findings){
-            if(n++>=120){out.append("\n• … kalan bulgular rapor ekine bırakıldı.");break;}
-            out.append("\n\n[").append(f.id).append("] ").append(label(f.status)).append(" • ").append(f.title);
-            out.append("\n").append(f.detail);
-            if(!f.suggestion.isEmpty())out.append("\nÖneri: ").append(f.suggestion);
+        outer:
+        for(Map.Entry<String,ArrayList<Finding>>e:categories.entrySet()){
+            out.append("\n\n=== ").append(e.getKey()).append(" ===");
+            for(Finding f:e.getValue()){
+                if(n++>=120){out.append("\n• … kalan bulgular rapor ekine bırakıldı.");break outer;}
+                out.append("\n\n[").append(f.id).append("] ").append(label(f.status)).append(" • ").append(f.title);
+                out.append("\n").append(f.detail);
+                if(!f.suggestion.isEmpty())out.append("\nÖneri: ").append(f.suggestion);
+            }
         }
         out.append("\n\nNot: Bu modül açık proje/hesap verisini çapraz kontrol eder; hesap sonucu olmayan yerde taşıma gücü, zımbalama güvenliği, deprem performansı veya donatı yeterliliği uydurmaz.");
         return new Result(true,out.toString(),findings,ids);
+    }
+
+    private static String reportCategory(String id){
+        if(id==null||!id.startsWith("ST-"))return "GENEL";
+        int n;
+        try{n=Integer.parseInt(id.substring(3));}catch(Exception e){return "GENEL";}
+        if(n>=1&&n<=19)return "PROJE / KOORDİNASYON";
+        if((n>=20&&n<=35)||(n>=41&&n<=42)||(n>=44&&n<=50)||(n>=89&&n<=98))return "DEPREM / DİNAMİK ANALİZ";
+        if((n>=36&&n<=40)||n==43)return "ZEMİN / TEMEL";
+        if((n>=51&&n<=63)||(n>=109&&n<=113))return "TAŞIYICI TASARIM / DAYANIM";
+        if((n>=64&&n<=88)||(n>=99&&n<=108))return "MODEL BÜTÜNLÜĞÜ / ATAMALAR";
+        return "GENEL";
     }
 
     public static boolean isFocusedQuery(String raw){
