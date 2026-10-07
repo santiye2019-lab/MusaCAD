@@ -22,7 +22,11 @@ public final class RenderPathPolicy {
      * pending edits can never disappear while panning or zooming.
      */
     public static boolean useBitmapNavigationPreview(boolean vectorReady,boolean previewAvailable,int modifiedCount){
-        return previewAvailable&&modifiedCount==0;
+        // The preview is only used while the viewport is moving. Source additions and
+        // replacements are drawn as live overlays by CadView, and the exact vector
+        // frame returns after settle. Keeping this cache enabled prevents one edit from
+        // permanently degrading every later pinch/pan into a full-DWG redraw.
+        return previewAvailable;
     }
     private RenderPathPolicy(){}
 }
