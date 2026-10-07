@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Lightweight ASCII DXF renderer for common 2D entities. */
 public final class DxfParser {
-    private static final int SIZE=2400,MARGIN=80,PREVIEW_SIZE=1200,SCREEN_BG=Color.rgb(7,19,29);
+    private static final int SIZE=2400,MARGIN=80,PREVIEW_SIZE=1200,SCREEN_BG=CadRenderPalette.SCREEN_BACKGROUND;
     private interface Entity{void bounds(RectF b);void draw(Canvas c,Paint p,Matrix m);}
 
     private static final class Line implements Entity{
@@ -464,7 +464,7 @@ public final class DxfParser {
         return renderStreaming(file,true);
     }
 
-    /** Native-fast-scene DWGs can skip the redundant raster navigation bitmap. */
+    /** Optional authoritative full-drawing navigation preview. Production DWG/DXF views keep this enabled. */
     public static Result render(File file,boolean makePreview)throws IOException{
         return renderStreaming(file,makePreview);
     }
@@ -516,7 +516,7 @@ public final class DxfParser {
                 if(total>0&&inside>=total*.9f)b.set(preferred);
             }
         }
-        float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix view=new Matrix();view.postTranslate(-b.left,-b.bottom);view.postScale(s,-s);view.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);RectF contentBounds=new RectF(b);view.mapRect(contentBounds);Set<String>visibleKeys=DxfLayerState.normalized(visible);ArrayList<Entity>shown=new ArrayList<>();for(Entity e:layoutEntities){LayerEntity layer=(LayerEntity)e;if(layer.isVisible(visibleKeys))shown.add(e);}Bitmap bitmap=makePreview?Bitmap.createBitmap(PREVIEW_SIZE,PREVIEW_SIZE,Bitmap.Config.RGB_565):null;
+        float s=Math.min((SIZE-2f*MARGIN)/b.width(),(SIZE-2f*MARGIN)/b.height());Matrix view=new Matrix();view.postTranslate(-b.left,-b.bottom);view.postScale(s,-s);view.postTranslate(MARGIN+(SIZE-2*MARGIN-b.width()*s)/2f,MARGIN+(SIZE-2*MARGIN-b.height()*s)/2f);RectF contentBounds=new RectF(b);view.mapRect(contentBounds);Set<String>visibleKeys=DxfLayerState.normalized(visible);ArrayList<Entity>shown=new ArrayList<>();for(Entity e:layoutEntities){LayerEntity layer=(LayerEntity)e;if(layer.isVisible(visibleKeys))shown.add(e);}Bitmap bitmap=makePreview?Bitmap.createBitmap(PREVIEW_SIZE,PREVIEW_SIZE,Bitmap.Config.ARGB_8888):null;
         try{if(bitmap!=null){Canvas canvas=new Canvas(bitmap);canvas.drawColor(SCREEN_BG);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);float previewFactor=PREVIEW_SIZE/(float)SIZE;Matrix contentToPreview=new Matrix();contentToPreview.setScale(previewFactor,previewFactor);Matrix previewView=new Matrix();previewView.setConcat(contentToPreview,view);drawViewportModels(canvas,paint,previewView,document,active,visibleKeys,false,false,global);for(Entity e:shown){FileTransfer.checkCancelled();((LayerEntity)e).drawStyled(canvas,paint,previewView,false,false,global);}}FileTransfer.checkCancelled();int displayCount=0;for(Entity entity:shown){LayerEntity layer=(LayerEntity)entity;if(!"MUSACAD_BLANK".equals(layer.sourceType))displayCount++;}return new Result(bitmap,displayCount,skipped,snapPoints(shown,view),document,view,all,visible,layouts,active,contentBounds,s,mm,unitName,global,lineTypes,modelExtents,blockInsertions);}catch(IOException|RuntimeException|OutOfMemoryError e){if(bitmap!=null)bitmap.recycle();throw e;}
     }
 

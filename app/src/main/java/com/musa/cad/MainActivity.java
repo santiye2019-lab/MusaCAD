@@ -3050,7 +3050,10 @@ public class MainActivity extends AppCompatActivity {
                     try{
                         int status=engine.exportDxf(converted);FileTransfer.checkCancelled();
                         if(converted.length()>512L*1024*1024)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
-                        DxfParser.Result parsed=DxfParser.render(converted,loaded.nativeScene==null);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
+                        // Always build the authoritative DXF-rendered navigation preview.
+                        // Native first paint is only a loading bridge; pinch/pan after the full
+                        // model is ready must never fall back to re-rendering the whole DWG.
+                        DxfParser.Result parsed=DxfParser.render(converted,true);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
                         loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
                     }finally{if(!keep)converted.delete();}
                 }
@@ -3280,8 +3283,9 @@ public class MainActivity extends AppCompatActivity {
         currentProject.file=currentFile;currentProject.workingDxf=editingBaseDxf;currentProject.parsed=activeDxf;currentProject.name=currentDisplayName;
         currentProject.viewState=cad.captureSessionState();currentProject.dirty=currentProject.baselineSet&&cad.editFingerprint()!=currentProject.savedFingerprint;currentProject.lastAccessMs=System.currentTimeMillis();
         queueRecoveryForCurrent(false);
-        // The vector preview bitmap is not used for zoom rendering; recycle it for inactive tabs to reduce RAM pressure.
-        if(currentProject.parsed!=null&&currentProject.parsed.bitmap!=null&&!currentProject.parsed.bitmap.isRecycled())currentProject.parsed.bitmap.recycle();
+        // Keep the authoritative navigation preview alive while a project tab is open.
+        // It is the zero-jank pinch/pan cache; recycling it here forced large drawings
+        // back onto the full vector renderer after every tab switch.
     }
 
     private void activateProject(ProjectSession project){

@@ -98,7 +98,7 @@ public final class NativeScene {
 
     /** Small vector thumbnail without allocating the old full-size raster preview. */
     public Bitmap thumbnail(int width,int height){
-        int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(Color.rgb(7,19,29));
+        int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(CadRenderPalette.SCREEN_BACKGROUND);
         Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);
         Matrix combined=new Matrix();combined.setConcat(fit,worldToContent);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);
         float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
@@ -115,7 +115,14 @@ public final class NativeScene {
     /** Once the full DXF model is ready, use its exact world-to-content transform for gesture previews. */
     public void alignTo(Matrix drawingToContent){if(drawingToContent!=null)worldToContent.set(drawingToContent);}
 
-    public void draw(Canvas canvas,Matrix contentToScreen){
+    public void draw(Canvas canvas,Matrix contentToScreen){draw(canvas,contentToScreen,false);}
+
+    /**
+     * Native first-paint renderer. At rest we keep every supported primitive so the
+     * initial drawing cannot lose colored sub-pixel geometry. During an active
+     * navigation gesture only, very small primitives may be culled to protect frame time.
+     */
+    public void draw(Canvas canvas,Matrix contentToScreen,boolean navigationFast){
         if(canvas==null||contentToScreen==null)return;
         combinedMatrix.setConcat(contentToScreen,worldToContent);
         Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;float worldPerPixel=0f;
@@ -125,7 +132,7 @@ public final class NativeScene {
             float pad=worldPerPixel>0f?worldPerPixel*12f:0f;visibleRect.inset(-pad,-pad);visible=visibleRect;
         }
         drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
-        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
+        float minWorldSpan=navigationFast&&visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
         grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
     }
 
@@ -149,7 +156,7 @@ public final class NativeScene {
             boolean closed;int n;
             if(streamVersion>=3){int signed=Math.round(raw[p++]);closed=signed<0;n=Math.abs(signed);}else{closed=raw[p++]!=0;n=Math.round(raw[p++]);}
             path.rewind();for(int i=0;i<n;i++){point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);if(i==0)path.moveTo(point[0],point[1]);else path.lineTo(point[0],point[1]);}if(closed||type==5)path.close();
-            if(type==5){Paint.Style old=paint.getStyle();int oldColor=paint.getColor();paint.setStyle(Paint.Style.FILL);paint.setColor(Color.rgb(7,19,29));canvas.drawPath(path,paint);paint.setColor(oldColor);paint.setStyle(old);}
+            if(type==5){Paint.Style old=paint.getStyle();int oldColor=paint.getColor();paint.setStyle(Paint.Style.FILL);paint.setColor(CadRenderPalette.SCREEN_BACKGROUND);canvas.drawPath(path,paint);paint.setColor(oldColor);paint.setStyle(old);}
             else canvas.drawPath(path,paint);
         }else if(type==3){
             point[0]=raw[p++];point[1]=raw[p++];matrix.mapPoints(point);float r=3.5f;canvas.drawLine(point[0]-r,point[1],point[0]+r,point[1],paint);canvas.drawLine(point[0],point[1]-r,point[0],point[1]+r,paint);

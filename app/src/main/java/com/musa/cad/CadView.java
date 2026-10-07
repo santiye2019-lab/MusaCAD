@@ -109,30 +109,34 @@ public class CadView extends View {
     private int freehandPressureSamples;
 
     public CadView(Context c,AttributeSet a){
-        super(c,a);setBackgroundColor(Color.rgb(18,24,30));setFocusable(true);
+        super(c,a);setBackgroundColor(CadRenderPalette.SCREEN_BACKGROUND);setFocusable(true);
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             @Override public boolean onScaleBegin(ScaleGestureDetector d){beginFastNavigation();return true;}
             @Override public boolean onScale(ScaleGestureDetector d){
                 beginFastNavigation();
-                float next=clampNavigationScale(scale*d.getScaleFactor());float f=next/scale;scale=next;
+                float gestureFactor=CadNavigationPolicy.pinchScaleFactor(d.getScaleFactor());
+                float next=clampNavigationScale(scale*gestureFactor);float f=next/scale;scale=next;
                 imageMatrix.postScale(f,f,d.getFocusX(),d.getFocusY());requestNavigationFrame();return true;
             }
             @Override public void onScaleEnd(ScaleGestureDetector d){settleFastNavigation();requestNavigationFrame();notifyValue();}
         });
         gestureDetector=new GestureDetector(c,new GestureDetector.SimpleOnGestureListener(){
-            @Override public boolean onDoubleTap(MotionEvent e){if(mode!=Mode.PAN||!hasDrawing())return false;fit();invalidate();notifyValue();return true;}
+            @Override public boolean onDoubleTap(MotionEvent e){if(mode!=Mode.PAN||!hasDrawing())return false;stopFastNavigation();fit();invalidate();notifyValue();return true;}
         });
     }
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseNativeFastScene(){return RenderPathPolicy.useNativeFast(vectorDrawing!=null,nativeDrawing!=null,nativeDrawing!=null&&nativeDrawing.truncated,sourceEdits.modifiedCount());}
-    private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
+    private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled();}
     private boolean shouldUsePreviewForNavigation(){return RenderPathPolicy.useBitmapNavigationPreview(vectorDrawing!=null,canUseFastVectorPreview(),sourceEdits.modifiedCount());}
     private float clampNavigationScale(float candidate){return CadNavigationPolicy.clampScale(candidate,scale,fitScale);}
     private void requestNavigationFrame(){postInvalidateOnAnimation();}
     private void beginFastNavigation(){
         if(!canUseNativeFastScene()&&!shouldUsePreviewForNavigation()){if(fastNavigation)stopFastNavigation();return;}
-        fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,NAVIGATION_SETTLE_MS);
+        // Keep the fast renderer latched for the entire gesture. Scheduling a delayed
+        // full-vector frame on every MOVE used to race the finger and caused periodic
+        // heavyweight redraws (visible as pinch/pan stutter on large DWGs).
+        removeCallbacks(endFastNavigation);fastNavigation=true;
     }
     private void settleFastNavigation(){if(!fastNavigation)return;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,NAVIGATION_SETTLE_MS);}
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
@@ -224,7 +228,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=false;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
+        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=true;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
@@ -294,7 +298,7 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -901,12 +905,21 @@ public class CadView extends View {
         super.onDraw(c);
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
-                vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-                authoritativeVectorFramePending=false;
-            }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix);
+                // First frame after open/upgrade comes from the exact DXF-rendered color
+                // preview, so correct colors appear immediately without waiting for a
+                // potentially expensive full-vector frame. Refine on the next vsync.
+                if(canUseFastVectorPreview()){
+                    vectorDrawing.drawPreview(c,imageMatrix,paint);
+                    authoritativeVectorFramePending=false;
+                    postInvalidateOnAnimation();
+                }else{
+                    vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+                    authoritativeVectorFramePending=false;
+                }
+            }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix,true);
             else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix,fastNavigation);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
@@ -1078,6 +1091,7 @@ public class CadView extends View {
         if(mode==Mode.PAN)gestureDetector.onTouchEvent(e);if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
         if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){beginFastNavigation();float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();requestNavigationFrame();return true;}
+        if((e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL)&&mode==Mode.PAN){settleFastNavigation();requestNavigationFrame();return true;}
         if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
     }
 
