@@ -115,7 +115,14 @@ public final class NativeScene {
     /** Once the full DXF model is ready, use its exact world-to-content transform for gesture previews. */
     public void alignTo(Matrix drawingToContent){if(drawingToContent!=null)worldToContent.set(drawingToContent);}
 
-    public void draw(Canvas canvas,Matrix contentToScreen){
+    public void draw(Canvas canvas,Matrix contentToScreen){draw(canvas,contentToScreen,false);}
+
+    /**
+     * Native first-paint renderer. At rest we keep every supported primitive so the
+     * initial drawing cannot lose colored sub-pixel geometry. During an active
+     * navigation gesture only, very small primitives may be culled to protect frame time.
+     */
+    public void draw(Canvas canvas,Matrix contentToScreen,boolean navigationFast){
         if(canvas==null||contentToScreen==null)return;
         combinedMatrix.setConcat(contentToScreen,worldToContent);
         Rect clip=canvas.getClipBounds();visibleRect.set(clip);RectF visible=null;float worldPerPixel=0f;
@@ -125,7 +132,7 @@ public final class NativeScene {
             float pad=worldPerPixel>0f?worldPerPixel*12f:0f;visibleRect.inset(-pad,-pad);visible=visibleRect;
         }
         drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
-        float minWorldSpan=visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
+        float minWorldSpan=navigationFast&&visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
         grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
     }
 
