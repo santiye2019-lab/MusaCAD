@@ -127,7 +127,7 @@ public class CadView extends View {
 
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseNativeFastScene(){return RenderPathPolicy.useNativeFast(vectorDrawing!=null,nativeDrawing!=null,nativeDrawing!=null&&nativeDrawing.truncated,sourceEdits.modifiedCount());}
-    private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled()&&sourceEdits.modifiedCount()==0;}
+    private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled();}
     private boolean shouldUsePreviewForNavigation(){return RenderPathPolicy.useBitmapNavigationPreview(vectorDrawing!=null,canUseFastVectorPreview(),sourceEdits.modifiedCount());}
     private float clampNavigationScale(float candidate){return CadNavigationPolicy.clampScale(candidate,scale,fitScale);}
     private void requestNavigationFrame(){postInvalidateOnAnimation();}
