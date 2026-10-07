@@ -7,7 +7,7 @@ public class RenderPathPolicyTest {
     public static void main(String[] args){
         expect(true,RenderPathPolicy.useNativeFast(false,true,false,0),"native first paint before vector load");
         expect(false,RenderPathPolicy.useNativeFast(true,true,false,0),"full vector renderer must remain authoritative");
-        expect(false,RenderPathPolicy.useNativeFast(false,true,true,0),"truncated native scene");
+        expect(true,RenderPathPolicy.useNativeFast(false,true,true,0),"truncated native scene stays fast until vector handoff");
         expect(false,RenderPathPolicy.useNativeFast(false,true,false,1),"edited drawing");
         expect(false,RenderPathPolicy.useNativeFast(false,false,false,0),"native scene missing");
         expect(true,RenderPathPolicy.useBitmapNavigationPreview(true,true,0),"vector-derived preview cache keeps navigation responsive");
