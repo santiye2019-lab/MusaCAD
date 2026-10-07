@@ -188,16 +188,16 @@ jobs:
           ./gradlew --no-daemon assembleDirectRelease
           apk="app/build/outputs/apk/direct/release/app-direct-release.apk"
           test -s "$apk"
-          cp "$apk" /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk
-          sha256sum /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk | tee /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.sha256
+          cp "$apk" /tmp/MusaCAD-v1.2.1-Gandalf-Cloud-production.apk
+          sha256sum /tmp/MusaCAD-v1.2.1-Gandalf-Cloud-production.apk | tee /tmp/MusaCAD-v1.2.1-Gandalf-Cloud-production.sha256
 
       - name: Upload Gandalf-enabled APK
         uses: actions/upload-artifact@v4
         with:
-          name: MusaCAD-Gandalf-Cloud-production-v1.2.0
+          name: MusaCAD-Gandalf-Cloud-production-v1.2.1
           path: |
-            /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.apk
-            /tmp/MusaCAD-v1.2.0-Gandalf-Cloud-production.sha256
+            /tmp/MusaCAD-v1.2.1-Gandalf-Cloud-production.apk
+            /tmp/MusaCAD-v1.2.1-Gandalf-Cloud-production.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -211,6 +211,6 @@ jobs:
             echo "- Session endpoint: $MUSACAD_AI_SESSION_URL"
             echo '- Provider: Gemini Free Tier'
             echo '- Model: gemini-3.8-flash'
-            echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.0'
+            echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.1'
             echo '- Gemini API key remains server-side only'
           } >> "$GITHUB_STEP_SUMMARY"
