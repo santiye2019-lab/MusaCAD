@@ -8,7 +8,12 @@ package com.musa.cad;
  */
 public final class RenderPathPolicy {
     public static boolean useNativeFast(boolean vectorReady,boolean nativeAvailable,boolean nativeTruncated,int modifiedCount){
-        return !vectorReady&&nativeAvailable&&!nativeTruncated&&modifiedCount==0;
+        // Before the authoritative vector model exists, the native scene is the only
+        // geometry cache available for gesture frames. A truncated scene may be
+        // incomplete, but refusing its fast path would force the same large partial
+        // scene through the full-quality renderer on every MOVE and cause severe jank.
+        // The moment vectorReady becomes true, native rendering is never used again.
+        return !vectorReady&&nativeAvailable&&modifiedCount==0;
     }
     /**
      * During an active gesture, a bitmap produced by the authoritative DXF renderer
