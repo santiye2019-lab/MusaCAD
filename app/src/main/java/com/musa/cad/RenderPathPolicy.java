@@ -17,9 +17,8 @@ public final class RenderPathPolicy {
     }
     /**
      * During an active gesture, a bitmap produced by the authoritative DXF renderer
-     * may be used as a short-lived navigation cache. The exact vector renderer
-     * returns after the gesture settles. Any source edit disables this cache so
-     * pending edits can never disappear while panning or zooming.
+     * is used as a short-lived navigation cache. The exact vector renderer returns
+     * after the gesture settles; live edit overlays remain drawn above the cache.
      */
     public static boolean useBitmapNavigationPreview(boolean vectorReady,boolean previewAvailable,int modifiedCount){
         // The preview is only used while the viewport is moving. Source additions and
