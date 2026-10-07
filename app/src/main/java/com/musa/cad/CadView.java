@@ -228,7 +228,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=false;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
+        stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=true;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
         setSnapPoints(result.snapPoints);notifyValue();invalidate();
@@ -298,7 +298,7 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
+        drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
 
@@ -905,8 +905,17 @@ public class CadView extends View {
         super.onDraw(c);
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
-                vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-                authoritativeVectorFramePending=false;
+                // First frame after open/upgrade comes from the exact DXF-rendered color
+                // preview, so correct colors appear immediately without waiting for a
+                // potentially expensive full-vector frame. Refine on the next vsync.
+                if(canUseFastVectorPreview()){
+                    vectorDrawing.drawPreview(c,imageMatrix,paint);
+                    authoritativeVectorFramePending=false;
+                    postInvalidateOnAnimation();
+                }else{
+                    vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+                    authoritativeVectorFramePending=false;
+                }
             }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix,true);
             else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
