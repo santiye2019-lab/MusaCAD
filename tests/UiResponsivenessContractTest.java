@@ -14,6 +14,7 @@ public final class UiResponsivenessContractTest {
         String main=read("app/src/main/java/com/musa/cad/MainActivity.java");
         String parser=read("app/src/main/java/com/musa/cad/DxfParser.java");
         String nativeScene=read("app/src/main/java/com/musa/cad/NativeScene.java");
+        String manifest=read("app/src/main/AndroidManifest.xml");
 
         require(view,"NAVIGATION_SETTLE_MS=160L","gesture settle window");
         require(view,"settleFastNavigation()","delayed full-vector redraw");
@@ -30,6 +31,7 @@ public final class UiResponsivenessContractTest {
         if(main.contains("currentProject.parsed.bitmap.recycle()"))throw new AssertionError("Responsiveness regression: open-tab navigation preview is recycled");
         require(parser,"Bitmap.Config.ARGB_8888","full-color navigation preview");
         require(nativeScene,"navigationFast&&visible!=null&&offsets.length>50000","native LOD only during active navigation");
+        require(manifest,"android:hardwareAccelerated=\"true\"","hardware-accelerated CAD canvas");
 
         require(print,"ExecutorService previewExecutor=Executors.newSingleThreadExecutor","non-blocking print preview");
         require(print,"mainHandler.postDelayed(kickoff,100L)","debounced automatic preview");
