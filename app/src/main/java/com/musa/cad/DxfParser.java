@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Lightweight ASCII DXF renderer for common 2D entities. */
 public final class DxfParser {
-    private static final int SIZE=2400,MARGIN=80,PREVIEW_SIZE=1200,SCREEN_BG=Color.rgb(7,19,29);
+    private static final int SIZE=2400,MARGIN=80,PREVIEW_SIZE=1200,SCREEN_BG=CadRenderPalette.SCREEN_BACKGROUND;
     private interface Entity{void bounds(RectF b);void draw(Canvas c,Paint p,Matrix m);}
 
     private static final class Line implements Entity{
