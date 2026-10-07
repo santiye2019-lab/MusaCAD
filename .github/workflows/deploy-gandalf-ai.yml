@@ -42,7 +42,7 @@ jobs:
             *) echo "::error::MUSACAD_TRIAL_API_URL must use HTTPS"; exit 1 ;;
           esac
 
-      - name: Verify existing AI session endpoint
+      - name: Verify or refresh AI session endpoint
         shell: bash
         run: |
           set -euo pipefail
@@ -51,9 +51,54 @@ jobs:
             *) echo "::error::MUSACAD_TRIAL_API_URL must end with /v1/trial/start"; exit 1 ;;
           esac
           SESSION_URL="$BASE_URL/v1/ai/session"
-          status=$(curl --silent --show-error --max-time 20 --output /tmp/gandalf-session-probe.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","entitlementProof":""}' "$SESSION_URL" || true)
+
+          probe_session() {
+            curl --silent --show-error --max-time 20               --output /tmp/gandalf-session-probe.json               --write-out '%{http_code}'               --request POST               --header 'content-type: application/json'               --data '{"deviceId":"INVALID-PREFLIGHT-ID","packageName":"com.musa.cad","entitlementProof":""}'               "$SESSION_URL" || true
+          }
+
+          status="$(probe_session)"
+          if [ "$status" = "404" ]; then
+            echo "AI session route is missing; refreshing the existing trial Worker with current repository code."
+
+            WORKER_HOST="${BASE_URL#https://}"
+            WORKER_HOST="${WORKER_HOST%%/*}"
+            WORKER_NAME="${WORKER_HOST%%.*}"
+            if [ -z "$WORKER_NAME" ]; then
+              echo "::error::Could not determine trial Worker name from MUSACAD_TRIAL_API_URL."
+              exit 1
+            fi
+
+            SETTINGS_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/settings"
+            curl --fail --silent --show-error               --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               --header "Accept: application/json"               "$SETTINGS_URL" > /tmp/trial-worker-settings.json
+
+            D1_ID="$(jq -r '.result.bindings[]? | select(.type=="d1" and .name=="DB") | (.id // .database_id // .namespace_id // empty)' /tmp/trial-worker-settings.json | head -1)"
+            if [ -z "$D1_ID" ]; then
+              echo "::error::Could not read the existing DB D1 binding for $WORKER_NAME."
+              cat /tmp/trial-worker-settings.json || true
+              exit 1
+            fi
+
+            cat > server/trial-worker/wrangler.toml <<EOF
+          name = "$WORKER_NAME"
+          main = "src/index.js"
+          compatibility_date = "2026-09-01"
+
+          [[d1_databases]]
+          binding = "DB"
+          database_name = "musacad-trials"
+          database_id = "$D1_ID"
+          EOF
+
+            (
+              cd server/trial-worker
+              npx --yes wrangler@latest deploy --keep-vars --name "$WORKER_NAME"
+            )
+
+            status="$(probe_session)"
+          fi
+
           if [ "$status" != "403" ] && [ "$status" != "400" ]; then
-            echo "::error::Existing MusaCAD license worker does not expose a healthy /v1/ai/session endpoint (HTTP $status). Redeploy server/trial-worker before Gandalf Cloud can be enabled."
+            echo "::error::MusaCAD license Worker does not expose a healthy /v1/ai/session endpoint (HTTP $status)."
             cat /tmp/gandalf-session-probe.json || true
             exit 1
           fi
