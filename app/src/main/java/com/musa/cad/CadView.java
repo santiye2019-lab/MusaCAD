@@ -109,7 +109,7 @@ public class CadView extends View {
     private int freehandPressureSamples;
 
     public CadView(Context c,AttributeSet a){
-        super(c,a);setBackgroundColor(Color.rgb(18,24,30));setFocusable(true);
+        super(c,a);setBackgroundColor(CadRenderPalette.SCREEN_BACKGROUND);setFocusable(true);
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             @Override public boolean onScaleBegin(ScaleGestureDetector d){beginFastNavigation();return true;}
             @Override public boolean onScale(ScaleGestureDetector d){
