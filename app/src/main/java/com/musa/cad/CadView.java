@@ -114,13 +114,14 @@ public class CadView extends View {
             @Override public boolean onScaleBegin(ScaleGestureDetector d){beginFastNavigation();return true;}
             @Override public boolean onScale(ScaleGestureDetector d){
                 beginFastNavigation();
-                float next=clampNavigationScale(scale*d.getScaleFactor());float f=next/scale;scale=next;
+                float gestureFactor=CadNavigationPolicy.pinchScaleFactor(d.getScaleFactor());
+                float next=clampNavigationScale(scale*gestureFactor);float f=next/scale;scale=next;
                 imageMatrix.postScale(f,f,d.getFocusX(),d.getFocusY());requestNavigationFrame();return true;
             }
             @Override public void onScaleEnd(ScaleGestureDetector d){settleFastNavigation();requestNavigationFrame();notifyValue();}
         });
         gestureDetector=new GestureDetector(c,new GestureDetector.SimpleOnGestureListener(){
-            @Override public boolean onDoubleTap(MotionEvent e){if(mode!=Mode.PAN||!hasDrawing())return false;fit();invalidate();notifyValue();return true;}
+            @Override public boolean onDoubleTap(MotionEvent e){if(mode!=Mode.PAN||!hasDrawing())return false;stopFastNavigation();fit();invalidate();notifyValue();return true;}
         });
     }
 
@@ -132,7 +133,10 @@ public class CadView extends View {
     private void requestNavigationFrame(){postInvalidateOnAnimation();}
     private void beginFastNavigation(){
         if(!canUseNativeFastScene()&&!shouldUsePreviewForNavigation()){if(fastNavigation)stopFastNavigation();return;}
-        fastNavigation=true;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,NAVIGATION_SETTLE_MS);
+        // Keep the fast renderer latched for the entire gesture. Scheduling a delayed
+        // full-vector frame on every MOVE used to race the finger and caused periodic
+        // heavyweight redraws (visible as pinch/pan stutter on large DWGs).
+        removeCallbacks(endFastNavigation);fastNavigation=true;
     }
     private void settleFastNavigation(){if(!fastNavigation)return;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,NAVIGATION_SETTLE_MS);}
     private void stopFastNavigation(){removeCallbacks(endFastNavigation);fastNavigation=false;}
@@ -1078,6 +1082,7 @@ public class CadView extends View {
         if(mode==Mode.PAN)gestureDetector.onTouchEvent(e);if(e.getActionMasked()==MotionEvent.ACTION_DOWN)multiTouch=false;if(e.getPointerCount()>1)multiTouch=true;scaleDetector.onTouchEvent(e);if(multiTouch)return true;
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){lastX=e.getX();lastY=e.getY();return true;}
         if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&mode==Mode.PAN){beginFastNavigation();float dx=e.getX()-lastX,dy=e.getY()-lastY;imageMatrix.postTranslate(dx,dy);lastX=e.getX();lastY=e.getY();requestNavigationFrame();return true;}
+        if((e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL)&&mode==Mode.PAN){settleFastNavigation();requestNavigationFrame();return true;}
         if(e.getActionMasked()==MotionEvent.ACTION_UP&&mode!=Mode.PAN)return addCadPoint(e.getX(),e.getY());return true;
     }
 
