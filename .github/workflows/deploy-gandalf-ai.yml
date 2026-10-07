@@ -2,12 +2,15 @@ name: Deploy Gandalf AI and build APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 permissions:
   contents: read
 
 jobs:
   deploy-and-build:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy-gandalf-apk]') }}
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -94,7 +97,12 @@ jobs:
               npx --yes wrangler@latest deploy --keep-vars --name "$WORKER_NAME"
             )
 
-            status="$(probe_session)"
+            for attempt in $(seq 1 12); do
+              status="$(probe_session)"
+              if [ "$status" = "403" ] || [ "$status" = "400" ]; then break; fi
+              echo "Session endpoint not ready yet (HTTP $status), retry $attempt/12..."
+              sleep 5
+            done
           fi
 
           if [ "$status" != "403" ] && [ "$status" != "400" ]; then
@@ -149,7 +157,19 @@ jobs:
           fi
           AI_URL="$AI_BASE/v1/analyze"
           HEALTH_URL="$AI_BASE/health"
-          curl --fail --silent --show-error --max-time 20 "$HEALTH_URL" | tee /tmp/gandalf-health.json
+          health_status="000"
+          for attempt in $(seq 1 12); do
+            health_status="$(curl --silent --show-error --max-time 20 -o /tmp/gandalf-health.json -w '%{http_code}' "$HEALTH_URL" || true)"
+            if [ "$health_status" = "200" ]; then break; fi
+            echo "Gandalf Worker health not ready yet (HTTP $health_status), retry $attempt/12..."
+            sleep 5
+          done
+          if [ "$health_status" != "200" ]; then
+            echo "::error::Gandalf Worker health check failed after retries (HTTP $health_status)."
+            cat /tmp/gandalf-health.json || true
+            exit 1
+          fi
+          cat /tmp/gandalf-health.json
           echo "MUSACAD_AI_API_URL=$AI_URL" >> "$GITHUB_ENV"
           echo "GANDALF_WORKER_BASE=$AI_BASE" >> "$GITHUB_ENV"
 
