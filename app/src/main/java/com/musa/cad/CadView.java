@@ -907,10 +907,10 @@ public class CadView extends View {
             if(authoritativeVectorFramePending){
                 vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
                 authoritativeVectorFramePending=false;
-            }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix);
+            }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix,true);
             else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
             else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix,fastNavigation);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
