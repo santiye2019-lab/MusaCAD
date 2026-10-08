@@ -280,7 +280,7 @@ function validateVisualEvidence(value) {
   const allRequested = sweep
     ? images.length === last-first+2
     : images.length === 5;
-  if (value.complete === true && !allRequested) return null;
+  if (sweep && value.complete === true && !allRequested) return null;
   return {
     images, regions,
     complete: value.complete === true && allRequested,
