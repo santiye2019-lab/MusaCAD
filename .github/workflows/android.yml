@@ -94,6 +94,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiYfkCatalogQuery.java tests/MusaAiYfkCatalogQueryTest.java
           java -cp /tmp/musacad-tests MusaAiYfkCatalogQueryTest
+      - name: Test official mechanical poz taxonomy and analysis commands
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiYfkTechnicalSources.java tests/MusaAiYfkTechnicalSourcesTest.java
+          java -cp /tmp/musacad-tests MusaAiYfkTechnicalSourcesTest
       - name: Test manually approved YFK price mapping CSV
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCsbEstimate.java app/src/main/java/com/musa/cad/MusaAiCsbPriceCsv.java tests/MusaAiCsbPriceCsvTest.java
