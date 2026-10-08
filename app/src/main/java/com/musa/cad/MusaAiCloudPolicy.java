@@ -6,6 +6,8 @@ public final class MusaAiCloudPolicy {
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;
         if(MusaAiMechanicalExpert.isCloudExpertCommand(raw)||MusaAiDisciplineExpert.isCloudExpertCommand(raw))return true;
+        // Natural-language project review is cloud-first, with explicit offline opt-out.
+        if(MusaAiReviewScope.asksAnalysis(raw))return !MusaAiReviewScope.offlineRequested(raw);
         // "Gandalf" is the central assistant identity, not a synonym for cloud.
         // Ordinary Gandalf voice/text commands should first use local CAD tools.
         // Cloud is reserved for explicit deep/web/current-source intent.
