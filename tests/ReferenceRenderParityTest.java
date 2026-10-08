@@ -55,7 +55,7 @@ public final class ReferenceRenderParityTest {
             "Test DXF block expansion, colors, styles and source origins",
             "Test DXF paper-space viewport geometry",
             "Guard native IMAGE and OLE frame fallback",
-            "Test DWG first-open critical path"
+            "Test progressive native DWG first-frame and complete editor handoff"
         };
         for(String gate:gates)requireGate(workflow,gate);
 
