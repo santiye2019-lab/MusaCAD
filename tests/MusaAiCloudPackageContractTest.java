@@ -10,7 +10,9 @@ public final class MusaAiCloudPackageContractTest {
         String worker=read("server/ai-worker/src/index.js");
         has(main,"MusaAiCloudPolicy.shouldUseProjectPackage");
         has(main,"K_CLOUD_PACKAGE_CONSENT");
-        has(main,"packageMode?K_CLOUD_PACKAGE_CONSENT:K_CLOUD_CONSENT");
+        has(main,"packageMode?K_CLOUD_PACKAGE_CONSENT:");
+        has(main,"hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT");
+        has(main,"boolean hybridVisual=MusaAiAnalysisIntent.isReview(raw)&&!packageMode");
         has(main,"MusaAiCloudService.analyzePackage");
         has(main,"Gandalf Proje Paketi");
         has(service,"MusaAiCadPackageJson.build");
