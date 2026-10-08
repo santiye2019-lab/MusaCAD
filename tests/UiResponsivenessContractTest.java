@@ -56,6 +56,17 @@ public final class UiResponsivenessContractTest {
         require(parser,"public MusaAiDrawingIndex aiDrawingIndex(int maxItems)","bounded AI drawing index");
         require(main,"CLOUD_AI_INDEX_MAX_ITEMS=5000","bounded Gandalf projection budget");
 
+        int generalStart=main.indexOf("private void runMusaAiGeneralProjectAnalysis");
+        int generalEnd=main.indexOf("private void handleMusaAiCloudPrompt",generalStart);
+        if(generalStart<0||generalEnd<=generalStart)
+            throw new AssertionError("Gandalf general voice analysis handler missing");
+        String general=main.substring(generalStart,generalEnd);
+        require(main,"MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)","voice command routing");
+        require(general,"aiExecutor.submit","general CAD analysis runs off UI thread");
+        require(general,"drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)","bounded local analysis projection");
+        if(general.indexOf("drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)")<general.indexOf("aiExecutor.submit"))
+            throw new AssertionError("ANR regression: general AI indexing moved onto UI thread");
+
         System.out.println("UI responsiveness contract OK: authoritative first-frame color, sharp vector pinch/pan, bounded background Gandalf CAD-JSON, reduced hot-frame allocations, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
     }
 }
