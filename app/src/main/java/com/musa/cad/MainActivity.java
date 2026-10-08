@@ -19,6 +19,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
@@ -33,6 +35,16 @@ public class MainActivity extends AppCompatActivity {
         t.setPriority(Thread.NORM_PRIORITY-1);
         return t;
     });
+    // Local CAD review must not wait behind Cloud AI network requests.
+    private final ExecutorService localAiExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-local-review");
+        t.setPriority(Thread.NORM_PRIORITY-1);
+        return t;
+    });
+    private final android.os.Handler localAiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final int QUICK_REVIEW_MAX_ITEMS=1200;
+    private static final int QUICK_REVIEW_MAX_SCANNED=18000;
+    private static final long QUICK_REVIEW_TIMEOUT_MS=12000L;
     private final ExecutorService recentExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-recents");
         t.setPriority(Thread.MIN_PRIORITY);
@@ -868,6 +880,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String aiControl=MusaAiDrawingIndex.normalize(raw);
+        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)
+            &&!MusaAiCloudPolicy.shouldUseCloud(raw)){
+            runMusaAiGeneralProjectAnalysis(reply);
+            return;
+        }
         if(isGandalfUndoCommand(aiControl)){
             undoLastGandalfBatch(reply);
             return;
@@ -1042,19 +1059,6 @@ public class MainActivity extends AppCompatActivity {
                     "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
                 return;
             }
-        }
-
-        // Android voice recognition commonly returns "projeye analiz yap" or
-        // "projeyi analiz et". This is a full-project command, not an unknown
-        // drawing question. Keep the opt-in cloud policy intact.
-        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)
-            &&!MusaAiCloudPolicy.shouldUseCloud(raw)){
-            if(activeDxf==null){
-                reply.send("Genel proje analizi için DWG/DXF tam vektör modeli henüz hazır değil. Çizim yüklemesi tamamlandığında yeniden 'Projeyi analiz et' deyin.");
-                return;
-            }
-            runMusaAiGeneralProjectAnalysis(reply);
-            return;
         }
 
         if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
@@ -1316,39 +1320,90 @@ public class MainActivity extends AppCompatActivity {
         final ProjectSession project=currentProject;
         final String drawingName=currentDisplayName;
         if(drawing==null){
-            reply.send("Proje analizi için tam vektör çizim modelinin hazırlanması gerekiyor.");
+            String nativeState=project!=null&&project.nativeScene!=null
+                ?" Bu proje şu anda DWG Native önizlemesinde; tam vektör çözümlemesi henüz tamamlanmadı.":"";
+            reply.send("Genel proje incelemesi için tam vektör DWG/DXF modeli hazır olmalı."+nativeState+
+                " Çizimin vektör yüklemesi tamamlandıktan sonra yeniden deneyin.");
             return;
         }
-        // Building a CAD index or inspecting every entity on the main thread
-        // can trigger Android's ANR dialog for large DWG files.
+
+        // A fast local report is independent of cloud sessions and has a
+        // guaranteed terminal response even when the source DWG is huge.
+        final AtomicBoolean finished=new AtomicBoolean(false);
+        final AtomicReference<Future<?>> submitted=new AtomicReference<>();
+        final String quickMetadata="Proje: "+drawingName+
+            "\nLayout: "+drawing.activeLayout+
+            "\nToplam CAD nesnesi: "+drawing.entityCount+
+            "\nKatman: "+drawing.layerCount;
+        reply.progress("Gandalf • Yerel proje analizi hazırlanıyor (sunucudan bağımsız)…");
+        final Runnable deadline=()->{
+            if(!finished.compareAndSet(false,true))return;
+            Future<?> running=submitted.get();
+            if(running!=null)running.cancel(true);
+            if(currentProject!=project||activeDxf!=drawing){
+                reply.send("Yerel analiz sürerken aktif proje değişti. Yeni proje için tekrar deneyin.");
+                return;
+            }
+            reply.send("Gandalf • Hızlı yerel kontrol bu çizimde 12 saniyelik işleme sınırına ulaştı."+
+                "\n"+quickMetadata+
+                "\n\nBu bir hata/uygunluk raporu değildir; çizim nesnelerinin teknik incelemesi tamamlanmadı."+
+                " Yerel analiz başlatılamadığı için internet bağlantısına ilişkin bir sonuç çıkarılamaz.");
+        };
+        localAiHandler.postDelayed(deadline,QUICK_REVIEW_TIMEOUT_MS);
         try{
-            aiExecutor.submit(()->{
+            submitted.set(localAiExecutor.submit(()->{
                 try{
-                    MusaAiDrawingIndex index=drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                    MusaAiDrawingIndex index=drawing.aiDrawingIndexQuickReview(
+                        QUICK_REVIEW_MAX_ITEMS,QUICK_REVIEW_MAX_SCANNED);
+                    if(Thread.currentThread().isInterrupted())return;
                     MusaAiDisciplineAnalyzer.Result report=MusaAiDisciplineAnalyzer.analyzeAll(index);
+                    if(Thread.currentThread().isInterrupted())return;
                     runOnUiThread(()->{
+                        if(!finished.compareAndSet(false,true))return;
+                        localAiHandler.removeCallbacks(deadline);
                         if(currentProject!=project||activeDxf!=drawing){
-                            reply.send("Analiz sırasında aktif proje değişti. Yeni proje için tekrar 'Projeyi analiz et' deyin.");
+                            reply.send("Analiz sırasında aktif proje değişti. Yeni proje için tekrar deneyin.");
                             return;
                         }
                         lastAiReport=report.text;
-                        lastAiReportTitle="Gandalf • Genel Proje Ön Analizi";
+                        lastAiReportTitle="Gandalf • Hızlı Genel Proje Ön Analizi";
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
-                        int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
-                        if(report.sourceIds.isEmpty())cad.clearAiHighlights();
                         reply.send("Gandalf • "+drawingName+"\n"+report.text+
-                            (shown>0?"\n\nÇizimde vurgulanan inceleme adayı: "+shown:"")+
-                            "\n\nBu sonuç sınırlı CAD verisiyle yapılan yerel ön incelemedir. Derin bulut analizi için 'Bu projeyi derin analiz et' deyin."+
-                            "\nRapor çıktısı için 'Raporu PDF olarak çıkar' veya 'Raporu Word olarak çıkar' deyin.");
+                            "\n\nTarama sınırı: ilk "+QUICK_REVIEW_MAX_SCANNED+
+                            " adaydan en fazla "+QUICK_REVIEW_MAX_ITEMS+" vektör öğe."+
+                            " Tüm proje tarandı veya kesin mevzuat denetimi yapıldı anlamına gelmez."+
+                            "\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
+                        // Keep viewport work after terminal reply, and cap highlights.
+                        if(!report.sourceIds.isEmpty()){
+                            int count=0;
+                            ArrayList<Integer> highlights=new ArrayList<>();
+                            for(Integer id:report.sourceIds){
+                                if(id!=null&&id>=0)highlights.add(id);
+                                if(++count>=30)break;
+                            }
+                            cad.setAiHighlightedSources(highlights);
+                        }else cad.clearAiHighlights();
                     });
                 }catch(OutOfMemoryError e){
-                    reply.send("Gandalf proje analizi bellek sınırına ulaştı. Çizim açık kalacak; daha küçük bir paftayla yeniden deneyin.");
+                    runOnUiThread(()->{
+                        if(!finished.compareAndSet(false,true))return;
+                        localAiHandler.removeCallbacks(deadline);
+                        reply.send("Gandalf yerel analizinde bellek sınırına ulaşıldı. Çizim açık kaldı.\n"+quickMetadata);
+                    });
                 }catch(Exception e){
-                    reply.send("Gandalf proje analizi başlatılamadı. Çizimi tekrar açıp yeniden deneyin.");
+                    runOnUiThread(()->{
+                        if(!finished.compareAndSet(false,true))return;
+                        localAiHandler.removeCallbacks(deadline);
+                        reply.send("Gandalf yerel analizini tamamlayamadı.\n"+quickMetadata+
+                            "\nTekrar deneyin veya daha küçük bir pafta açın.");
+                    });
                 }
-            });
+            }));
         }catch(RejectedExecutionException e){
-            reply.send("Gandalf analiz kuyruğu şu an kullanılamıyor. Uygulamayı yeniden açıp tekrar deneyin.");
+            if(finished.compareAndSet(false,true)){
+                localAiHandler.removeCallbacks(deadline);
+                reply.send("Gandalf yerel analiz iş parçacığı başlatılamadı. Uygulamayı yeniden başlatıp deneyin.");
+            }
         }
     }
 
@@ -3498,7 +3553,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();localAiExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}

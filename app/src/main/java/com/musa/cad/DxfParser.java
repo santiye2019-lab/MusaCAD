@@ -189,6 +189,36 @@ public final class DxfParser {
         public MusaAiDrawingIndex aiDrawingIndex(){return aiDrawingIndex(Integer.MAX_VALUE);}
 
         /**
+         * Lightweight, strictly bounded preview for an ordinary spoken "projeyi analiz et".
+         * This intentionally does not build polygon geometry keys, measure complex curves
+         * or attempt a comprehensive drawing validation.
+         */
+        public MusaAiDrawingIndex aiDrawingIndexQuickReview(int maxItems,int maxEntitiesToVisit){
+            final int itemBudget=Math.max(1,Math.min(1500,maxItems));
+            final int visitBudget=Math.max(itemBudget,Math.min(20000,maxEntitiesToVisit));
+            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>(Math.min(itemBudget,1024));
+            int visited=0;
+            for(Entity wrapped:document){
+                if(Thread.currentThread().isInterrupted()||visited++>=visitBudget||items.size()>=itemBudget)break;
+                if(!(wrapped instanceof LayerEntity))continue;
+                LayerEntity layer=(LayerEntity)wrapped;
+                if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||
+                    "MUSACAD_BLANK".equals(layer.sourceType))continue;
+                String type=layer.sourceType==null?"":layer.sourceType;
+                String itemText="";
+                if("TEXT".equalsIgnoreCase(type)||"MTEXT".equalsIgnoreCase(type)||
+                    "ATTRIB".equalsIgnoreCase(type)||"ATTDEF".equalsIgnoreCase(type)){
+                    itemText=analysisText(layer.entity);
+                    if(itemText.length()>256)itemText=itemText.substring(0,256);
+                }
+                items.add(new MusaAiDrawingIndex.Item(layer.sourceId,type,layer.layer,itemText));
+            }
+            return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,
+                layerNames,visibleLayers,items,drawingUnitName);
+        }
+
+
+        /**
          * Builds an AI projection with a hard item budget. Cloud requests use a bounded
          * projection so a multi-hundred-thousand-entity drawing can never monopolize the
          * Android main thread or allocate an unbounded temporary AI index.

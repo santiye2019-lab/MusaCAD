@@ -62,10 +62,18 @@ public final class UiResponsivenessContractTest {
             throw new AssertionError("Gandalf general voice analysis handler missing");
         String general=main.substring(generalStart,generalEnd);
         require(main,"MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)","voice command routing");
-        require(general,"aiExecutor.submit","general CAD analysis runs off UI thread");
-        require(general,"drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)","bounded local analysis projection");
-        if(general.indexOf("drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)")<general.indexOf("aiExecutor.submit"))
-            throw new AssertionError("ANR regression: general AI indexing moved onto UI thread");
+        require(general,"localAiExecutor.submit","general CAD analysis uses dedicated local executor");
+        require(general,"drawing.aiDrawingIndexQuickReview(","fast bounded local analysis projection");
+        require(general,"localAiHandler.postDelayed(deadline,QUICK_REVIEW_TIMEOUT_MS)","strict local watchdog");
+        require(general,"finished.compareAndSet(false,true)","at most one local terminal reply");
+        require(general,"reply.progress","visible local analysis progress");
+        if(general.indexOf("drawing.aiDrawingIndexQuickReview(")<general.indexOf("localAiExecutor.submit"))
+            throw new AssertionError("ANR regression: quick local indexing moved onto UI thread");
+        require(parser,"public MusaAiDrawingIndex aiDrawingIndexQuickReview(","bounded light review projection");
+        require(parser,"maxEntitiesToVisit","bounded entity visit count");
+        require(main,"localAiExecutor.shutdownNow()","dedicated local executor shutdown");
+        if(main.indexOf("runMusaAiGeneralProjectAnalysis(reply);")>main.indexOf("if(MusaAiProjectPackage.asksPackageReview(raw))"))
+            throw new AssertionError("Local voice analysis must be routed before expensive full-project logic");
 
         System.out.println("UI responsiveness contract OK: authoritative first-frame color, sharp vector pinch/pan, bounded background Gandalf CAD-JSON, reduced hot-frame allocations, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
     }
