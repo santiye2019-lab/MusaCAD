@@ -1944,7 +1944,7 @@ public class MainActivity extends AppCompatActivity {
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
         int acceptedTiles=0,acceptedBatches=0;
         String issue="";
-        StringBuilder report=new StringBuilder("GANDALF • GÖRSEL + DWG MÜHENDİSLİK PAFTA ANALİZİ");
+        StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
         report.append("\nLayout: ").append(snapshot.layout);
         report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
@@ -1961,6 +1961,7 @@ public class MainActivity extends AppCompatActivity {
         }catch(Exception e){
             viewCatalog=MusaAiViewCatalog.analyze(snapshot);
         }
+        report.append("\n\n1. İNCELENECEK KAT / KESİT / VAZİYET GÖRÜNÜMLERİ");
         report.append(viewCatalog.report);
         int focusedEligible=0;
         for(MusaAiViewCatalog.View v:viewCatalog.views)if(v.positioned())focusedEligible++;
@@ -1999,7 +2000,7 @@ public class MainActivity extends AppCompatActivity {
             }
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
-            report.append("\n\n========== GÖRSEL GRUP ").append(batch+1).append(" / ")
+            report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
             if(!cloud.sources.isEmpty()){
@@ -2058,7 +2059,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
-                report.append("\n\n========== KAT / KESİT / VAZİYET YAKIN-PLAN GRUBU ")
+                report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
                     .append(group+1).append("/").append(focusBatchCount)
                     .append(" ==========\n").append(detailed.text);
                 if(!closeups.complete){
@@ -2075,7 +2076,7 @@ public class MainActivity extends AppCompatActivity {
         }
         if(viewCatalog.truncated)
             focusedIssue+=(focusedIssue.isEmpty()?"":" ")+"Başlık/kot taraması örneklem sınırına ulaştı.";
-        report.append("\n\n========== KAT / KESİT / VAZİYET GÖRSEL KAPSAMI ==========");
+        report.append("\n\n4. KAT / KESİT / VAZİYET DENETİM KAPSAMI");
         report.append("\nKonumlu başlık adayı: ").append(focusedEligible);
         report.append("\nAI yanıtı alınan yakın-plan görüntüsü: ")
             .append(focusedReviewed).append("/").append(focusedEligible);
@@ -2096,14 +2097,14 @@ public class MainActivity extends AppCompatActivity {
             lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(fallback.sourceIds));
         }else{
             MusaAiEngineeringReview.Result local=MusaAiEngineeringReview.analyze(snapshot,fileName);
-            report.append("\n\n========== BAĞIMSIZ DWG VEKTÖR KANITLARI ==========");
+            report.append("\n\n5. BAĞIMSIZ DWG VEKTÖR / ÖLÇÜ KANITLARI");
             report.append("\n").append(local.text);
             lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(local.sourceIds));
         }
 
         boolean visualComplete=acceptedTiles==total&&
             acceptedBatches==MusaAiVisualSweepPlan.BATCH_COUNT&&issue.isEmpty();
-        report.append("\n\n========== GÖRSEL KAPSAM / DOĞRULAMA ==========");
+        report.append("\n\n6. GÖRSEL KAPSAM / VERİ GÜVENİLİRLİĞİ");
         report.append("\nAI yanıtı alınan ayrıntı bölgesi: ").append(acceptedTiles).append("/").append(total);
         report.append("\nGrup: ").append(acceptedBatches).append("/")
             .append(MusaAiVisualSweepPlan.BATCH_COUNT);
@@ -2117,11 +2118,32 @@ public class MainActivity extends AppCompatActivity {
         report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
         MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
                             currentProject==null?Collections.emptyList():currentProject.csbRates);
+        report.append("\n\n7. TEKNİK ÖN METRAJ / KEŞİF KONTROLÜ");
         report.append(measured.report);
+        if(MusaAiYfk2025Library.status(this).installed){
+            report.append("\n\n8. 2025 RESMÎ POZ ADAYLARI (ÇEVRİM DIŞI KİTAP)");
+            report.append("\nKaynak kodları ve aday tarifler yalnız cihazdaki 2025 kitabından gelir. "+
+                "Malzeme/çap/sınıf/ölçü birimi ve montaj kapsamı eşleşmeden keşfe kesin poz atanmaz.\n");
+            report.append(MusaAiYfk2025Library.suggestForTakeoff(this,measured));
+        }else{
+            report.append("\n\n8. POZ KAYNAĞI: 2025 kitabı bu telefona yüklenmemiş. "+
+                "Gandalf panelindeki 'Poz kitabı yükle' düğmesini kullanın.");
+        }
         if(currentProject!=null&&currentProject.boqModel!=null)
             report.append(MusaAiCsbMaterialCompare.compare(
                 currentProject.boqModel,measured).report);
-        String completeReport=report.toString();
+        String cover="GÖRSEL PROJE ANALİZİ • İNCELEME ÖZETİ"+
+            "\nProje: "+fileName+" • Layout: "+snapshot.layout+
+            "\nDisiplin: "+MusaAiAnalysisIntent.label(scope)+
+            "\nGörsel AI tarafından yanıtlanan bölge: "+acceptedTiles+"/"+total+
+            "\nYakından incelenen görünüm adayı: "+focusedReviewed+"/"+focusedEligible+
+            "\nRapor niteliği: "+
+            (visualComplete&&focusedIssue.isEmpty()?"Planlanan bölge taraması tamamlandı.":
+                "KISMİ / KONTROL GEREKTİRİYOR.")+
+            "\nBu rapor gerçekten gönderilmiş görsel bölgeleri ve çizimdeki vektör"+
+            " kanıtlarını ayrı bölümlerde içerir; görülmeyen pafta, okunamayan kot"+
+            " veya belirsiz çap tespit edilmiş gibi gösterilmez.\n\n";
+        String completeReport=cover+report.toString();
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()?" Çoklu Görünüm ":" Kısmi ")+"Görsel Proje İncelemesi";
