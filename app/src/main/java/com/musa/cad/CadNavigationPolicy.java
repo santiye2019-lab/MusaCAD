@@ -27,5 +27,21 @@ public final class CadNavigationPolicy {
         return Float.isFinite(worldPerPixel)&&worldPerPixel>0f?worldPerPixel*EDGE_PAD_PIXELS:0f;
     }
 
+    /**
+     * During active pinch/pan only, tiny entities in extremely dense drawings
+     * can be temporarily culled. When gesture settles, the authoritative full
+     * vector render returns; no geometry is removed from the DWG.
+     * World-per-pixel is computed from inverse viewport matrix each frame.
+     */
+    public static float movingMinWorldSpan(int visibleEntityCount,float worldPerPixel){
+        if(visibleEntityCount<18000||!Float.isFinite(worldPerPixel)||
+            worldPerPixel<=0f)return 0f;
+        return worldPerPixel*(visibleEntityCount>=60000?0.9f:0.45f);
+    }
+    public static boolean isSubpixelBothAxes(float width,float height,float limit){
+        return limit>0f && Float.isFinite(width)&&Float.isFinite(height) &&
+            width>=0f&&height>=0f && width<limit&&height<limit;
+    }
+
     private CadNavigationPolicy(){}
 }
