@@ -18,7 +18,7 @@ public final class MusaAiMechanicalControlContractTest {
         require(main,"MusaAiMechanicalControl.analyze","mechanical AI bridge");
         require(main,"setAiHighlightedSources(mechanical.sourceIds)","mechanical finding highlights");
         require(main,"Mekanik tesisat proje kontrolü","AI help");
-        require(panel,"{\"Mekanik\",\"AI_MEKANIK_KONTROL\"}","mechanical quick action");
+        require(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)","mechanical control routed from free-form conversation");
 
         require(engine,"Mekanik tesisat AI kontrolü","mechanical report title");
         require(engine,"Pis su / atık su","waste-water system");
