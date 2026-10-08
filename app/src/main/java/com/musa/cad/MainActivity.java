@@ -1726,9 +1726,11 @@ public class MainActivity extends AppCompatActivity {
                 MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
                     getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
                 if(cloud.ok()){
+                    reply.cloudStatus(true);
                     pendingAiActions=Collections.emptyList();
                     reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
                 }else{
+                    reply.cloudStatus(false);
                     reply.send("Bulut sohbeti kullanılamıyor: "+
                         (cloud.message.isEmpty()?"Sunucu yanıt vermedi.":cloud.message)+
                         "\nYeniden deneyin veya bir çizim açıp yerel CAD araçlarını kullanın.");
@@ -1852,6 +1854,7 @@ public class MainActivity extends AppCompatActivity {
                         :MusaAiCloudService.analyzeWithContext(getApplicationContext(),snapshot,displayName,
                             raw,recentContext,localContextEvidence(snapshot));
                     if(!cloud.ok()){
+                        reply.cloudStatus(false);
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
@@ -1866,6 +1869,7 @@ public class MainActivity extends AppCompatActivity {
                         reply.send(fallbackReport+"\n\nRaporu Word/PDF olarak dışa aktarabilirsiniz.");
                         return;
                     }
+                    reply.cloudStatus(true);
                     pendingAiActions=cloud.actions;
                     StringBuilder out=new StringBuilder();
                     if(MusaAiSessionService.developerCached())
@@ -1994,10 +1998,12 @@ public class MainActivity extends AppCompatActivity {
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
                 recentContext,evidenceSummary);
             if(!cloud.ok()){
+                reply.cloudStatus(false);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
                     (cloud.message.isEmpty()?"Sunucu isteği başarısız.":cloud.message);
                 break;
             }
+            reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
@@ -2053,6 +2059,7 @@ public class MainActivity extends AppCompatActivity {
                     getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json,
                     recentContext,evidenceSummary);
                 if(!detailed.ok()){
+                    reply.cloudStatus(false);
                     focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
                         (detailed.message.isEmpty()?"AI hizmeti yanıt vermedi.":detailed.message);
                     break;
