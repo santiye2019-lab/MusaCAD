@@ -1,3 +1,27 @@
+test("AI provider timeout returns bounded error instead of hanging",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi derin analiz et",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const started=Date.now();
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",
+    GEMINI_API_KEY:"dummy",
+    GEMINI_MODEL:"test",
+    AI_UPSTREAM_TIMEOUT_MS:"60",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>new Promise(()=>{})
+  });
+  const body=await response.json();
+  assert.equal(response.status,504);
+  assert.equal(body.status,"timeout");
+  assert.match(body.message,/süresi içinde|gecikti/);
+  assert.ok(Date.now()-started<5000);
+});
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign, webcrypto } from "node:crypto";

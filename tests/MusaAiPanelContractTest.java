@@ -37,6 +37,9 @@ public final class MusaAiPanelContractTest {
         require(panel,"addQuickPromptAuto","one-tap Gandalf quick action");
         require(panel,"Gandalf dinliyor","Gandalf voice status");
         require(icon,"<vector","AI vector icon");
+        require(panel,"timeoutHandler.postDelayed(timeout,75_000L)","Gandalf request never stays processing indefinitely");
+        require(panel,"completed.compareAndSet(false,true)","only first terminal reply can update request");
+        require(panel,"@Override public void progress","intermediate cloud state visible to user");
 
         System.out.println("MusaCAD AI panel contract OK.");
     }

@@ -128,6 +128,13 @@ jobs:
           AI_MAX_OUTPUT_TOKENS = "3200"
           EOF
 
+      - name: Test Gandalf Worker code
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          npm test
+
       - name: Bootstrap Gandalf Worker
         shell: bash
         working-directory: server/ai-worker
@@ -173,12 +180,6 @@ jobs:
           echo "MUSACAD_AI_API_URL=$AI_URL" >> "$GITHUB_ENV"
           echo "GANDALF_WORKER_BASE=$AI_BASE" >> "$GITHUB_ENV"
 
-      - name: Test Gandalf Worker code
-        shell: bash
-        working-directory: server/ai-worker
-        run: |
-          set -euo pipefail
-          npm test
 
       - name: Fetch pinned LibreDWG source
         uses: actions/checkout@v4

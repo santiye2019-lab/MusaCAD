@@ -26,6 +26,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Test Gandalf AI Worker including provider timeout
+        run: |
+          node --check server/ai-worker/src/index.js
+          node --test server/ai-worker/test.mjs
       - name: Test DXF attribute visibility
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfAttributeVisibility.java tests/DxfAttributeVisibilityTest.java

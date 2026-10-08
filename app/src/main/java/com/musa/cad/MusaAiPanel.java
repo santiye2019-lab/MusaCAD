@@ -1,6 +1,9 @@
 package com.musa.cad;
 
 import android.app.Activity;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -30,6 +33,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 public final class MusaAiPanel {
     public interface Reply {
         void send(String text);
+        default void progress(String text){}
     }
 
     public interface Host {
@@ -162,13 +166,36 @@ public final class MusaAiPanel {
             appendBubble(activity,messages,true,prompt);
             TextView pending=appendBubble(activity,messages,false,"İşleniyor…");
             scrollBottom(messagesScroll);
-            host.onPrompt(prompt,text->activity.runOnUiThread(()->{
-                pending.setText(text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim());
-                Linkify.addLinks(pending,Linkify.WEB_URLS);
-                pending.setMovementMethod(LinkMovementMethod.getInstance());
-                pending.setLinksClickable(true);
+            final AtomicBoolean completed=new AtomicBoolean(false);
+            final Handler timeoutHandler=new Handler(Looper.getMainLooper());
+            final Runnable timeout=()->{
+                if(!completed.compareAndSet(false,true))return;
+                pending.setText("Gandalf isteği 75 saniyede tamamlanamadı. İnternet/AI hizmeti yavaş veya yanıt vermiyor olabilir. Çizimi yerel olarak incelemek için 'Projeyi analiz et' deyin. Bulut analizi için daha sonra tekrar deneyin.");
                 scrollBottom(messagesScroll);
-            }));
+            };
+            timeoutHandler.postDelayed(timeout,75_000L);
+            Reply requestReply=new Reply(){
+                @Override public void send(String text){
+                    activity.runOnUiThread(()->{
+                        if(!completed.compareAndSet(false,true))return;
+                        timeoutHandler.removeCallbacks(timeout);
+                        pending.setText(text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim());
+                        Linkify.addLinks(pending,Linkify.WEB_URLS);
+                        pending.setMovementMethod(LinkMovementMethod.getInstance());
+                        pending.setLinksClickable(true);
+                        scrollBottom(messagesScroll);
+                    });
+                }
+                @Override public void progress(String text){
+                    activity.runOnUiThread(()->{
+                        if(completed.get())return;
+                        if(text!=null&&!text.trim().isEmpty())pending.setText(text.trim());
+                        scrollBottom(messagesScroll);
+                    });
+                }
+            };
+            try{host.onPrompt(prompt,requestReply);}
+            catch(Exception e){requestReply.send("Gandalf komutu işlenirken hata oluştu. Tekrar deneyin.");}
         };
 
         // Gandalf is an action, not a passive text preset: one tap starts the
