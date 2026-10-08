@@ -172,9 +172,11 @@ public final class MusaAiPanel {
             scrollBottom(messagesScroll);
             final AtomicBoolean completed=new AtomicBoolean(false);
             final Handler timeoutHandler=new Handler(Looper.getMainLooper());
+            final long startedMs=android.os.SystemClock.elapsedRealtime();
+            final long maxRequestMs=240_000L;
             final Runnable timeout=()->{
                 if(!completed.compareAndSet(false,true))return;
-                pending.setText("Gandalf isteği 75 saniyede tamamlanamadı. İnternet/AI hizmeti yavaş veya yanıt vermiyor olabilir. Çizimi yerel olarak incelemek için 'Projeyi analiz et' deyin. Bulut analizi için daha sonra tekrar deneyin.");
+                pending.setText("Gandalf isteği ilerleme veya toplam süre sınırına ulaştı. Çizime müdahale edilmedi. İsteği yeniden başlatabilir ya da yerel analiz kullanabilirsiniz.");
                 scrollBottom(messagesScroll);
             };
             timeoutHandler.postDelayed(timeout,75_000L);
@@ -193,6 +195,11 @@ public final class MusaAiPanel {
                 @Override public void progress(String text){
                     activity.runOnUiThread(()->{
                         if(completed.get())return;
+                        // A multi-region vision sweep has bounded provider calls; restart
+                        // the idle watchdog only on actual progress, with a hard total cap.
+                        long elapsed=android.os.SystemClock.elapsedRealtime()-startedMs;
+                        timeoutHandler.removeCallbacks(timeout);
+                        timeoutHandler.postDelayed(timeout,Math.max(1L,Math.min(75_000L,maxRequestMs-elapsed)));
                         if(text!=null&&!text.trim().isEmpty())pending.setText(text.trim());
                         scrollBottom(messagesScroll);
                     });
