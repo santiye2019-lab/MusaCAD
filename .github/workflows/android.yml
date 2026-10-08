@@ -142,10 +142,11 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiProjectControlContractTest.java
           java -cp /tmp/musacad-tests MusaAiProjectControlContractTest
-      - name: Test Gandalf engineering DWG evidence reader
+      - name: Test Gandalf engineering DWG evidence and coordinate zones
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiEngineeringReview.java tests/MusaAiEngineeringReviewTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiSheetZones.java app/src/main/java/com/musa/cad/MusaAiEngineeringReview.java tests/MusaAiEngineeringReviewTest.java tests/MusaAiSheetZonesTest.java
           java -cp /tmp/musacad-tests MusaAiEngineeringReviewTest
+          java -cp /tmp/musacad-tests MusaAiSheetZonesTest
       - name: Test MusaCAD AI mechanical control
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalControl.java tests/MusaAiMechanicalControlTest.java
