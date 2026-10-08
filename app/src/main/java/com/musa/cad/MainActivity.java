@@ -807,7 +807,38 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onViewPdf(String answer,MusaAiPanel.Reply reply){
                 viewGandalfAnswerPdf(answer,reply);
             }
+            @Override public void onImportPriceBook(MusaAiPanel.Reply reply){
+                chooseYfk2025Book(reply);
+            }
         });
+    }
+
+    private void chooseYfk2025Book(MusaAiPanel.Reply reply){
+        if(yfkDownloadActive.get()){
+            if(reply!=null)reply.send("Önce devam eden poz kitabı işlemi tamamlanmalı.");
+            return;
+        }
+        MusaAiYfk2025Library.Status installed=MusaAiYfk2025Library.status(this);
+        if(installed.installed){
+            if(reply!=null)reply.send(MusaAiYfk2025Library.statusText(this)+
+                "\n2025 poz kitabı zaten cihazda kurulu. Başka yılın yeni pozları"+
+                " '2025 2026 yeni pozları tara' komutuyla karşılaştırılabilir.");
+            return;
+        }
+        pendingYfk2025Reply=reply;
+        Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        picker.addCategory(Intent.CATEGORY_OPENABLE);
+        picker.setType("application/pdf");
+        picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try{
+            startActivityForResult(picker,PICK_YFK_2025);
+            if(reply!=null)reply.progress(
+                "2025 ÇŞİDB İnşaat ve Tesisat Birim Fiyatları PDF dosyasını seçin. "+
+                "Kitap yalnız telefonun özel alanında indekslenecek; internet gerekmez.");
+        }catch(Exception error){
+            pendingYfk2025Reply=null;
+            if(reply!=null)reply.send("PDF seçici açılamadı: "+error.getMessage());
+        }
     }
 
     private String musaAiContextLabel(){
