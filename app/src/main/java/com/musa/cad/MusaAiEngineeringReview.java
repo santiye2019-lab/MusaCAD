@@ -66,6 +66,9 @@ public final class MusaAiEngineeringReview {
             q.contains("derin analiz")||q.contains("projeden kesif")||
             q.contains("kesif yukle")||q.contains("revizyon")||
             q.contains("metraj cikar")||q.contains("raporu word")||q.contains("raporu pdf"))return false;
+        // Focused architectural/structural/electrical workflows retain their own expert routing.
+        if(has(q,"statik","mimari","elektrik","peyzaj","asansor")&&
+            !has(q,"mekanik","pis su","temiz su","yangin","tesisat","havalandirma"))return false;
         boolean request=has(q,"analiz","incele","kontrol","denet","metrajini oku","olculeri oku");
         boolean context=has(q,"proje","cizim","pafta","tesisat","boru","kanal","yangin pompa",
             "hidrofor","havalandirma","sihhi","pis su","sprinkler");
@@ -90,6 +93,12 @@ public final class MusaAiEngineeringReview {
             System system=classify(normalized);
             if(isLinear(item)&&system!=null&&item.hasLength()&&item.length>0){
                 runs.get(system).add(item);
+                // This diameter is assigned to a measured segment by its *own*
+                // explicit layer identifier; nearby free-floating notes are not.
+                Matcher assigned=DIAMETER.matcher(item.layer.replace('_',' '));
+                if(assigned.find()&&dimensions.size()<60){
+                    addDimension(dimensions,"DN"+assigned.group(1)+" • hat katmanı",item.sourceId);
+                }
             }
             // Read technical sizes from actual TEXT / MTEXT / ATTRIB or named BLOCKs,
             // not from arbitrary line identifiers.
