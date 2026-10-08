@@ -12,11 +12,12 @@ public final class MusaAiConversationalIntent {
         String original=raw.trim();
         String q=MusaAiDrawingIndex.normalize(original);
         if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(original))return original;
-        if(editLike(q))return original;
         if(isPdfRequest(original))return "Raporu PDF olarak çıkar";
+        // Recognize safe high-level document/BOQ intent before edit guards.
+        if(isGenericBoq(q))return "Projeden keşif oluştur";
+        if(editLike(q))return original;
         // Keep the user's discipline and detailed measurements intact.
         if(isGenericTakeoff(q))return "Bu projede metraj çıkar";
-        if(isGenericBoq(q))return "Projeden keşif oluştur";
         if(isGenericReview(q))return original+"; projeyi mühendislik açısından analiz et";
         return original;
     }
