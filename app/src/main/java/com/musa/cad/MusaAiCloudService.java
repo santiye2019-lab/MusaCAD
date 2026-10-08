@@ -59,7 +59,7 @@ public final class MusaAiCloudService {
     }
 
     public static Result analyze(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt){
-        return analyzeInternal(context,index,fileName,rawPrompt,null);
+        return analyzeInternal(context,index,fileName,rawPrompt,null,null,"all");
     }
 
     public static Result analyzePackage(Context context,MusaAiDrawingIndex index,String fileName,
@@ -68,10 +68,16 @@ public final class MusaAiCloudService {
             return new Result(Status.INVALID_RESPONSE,"","Proje Paketi bağlamı hazırlanamadı",null,false);
         MusaAiProjectPackage.Result local=MusaAiProjectPackage.generate(drawings,"proje paketi");
         String packageJson=MusaAiCadPackageJson.build(drawings,local.matched?local.text:"");
-        return analyzeInternal(context,index,fileName,rawPrompt,packageJson);
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson,null,"all");
     }
 
-    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt,String packageJson){
+    public static Result analyzeHybrid(Context context,MusaAiDrawingIndex index,String fileName,
+                                      String rawPrompt,String scope,JSONObject visualEvidence){
+        return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope);
+    }
+
+    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
+                                          String rawPrompt,String packageJson,JSONObject visualEvidence,String scope){
         if(context==null||index==null)return new Result(Status.INVALID_RESPONSE,"","Çizim bağlamı hazırlanamadı",null,false);
 
         String endpoint=BuildConfig.AI_API_URL==null?"":BuildConfig.AI_API_URL.trim();
@@ -105,6 +111,8 @@ public final class MusaAiCloudService {
             body.put("prompt",prompt);
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
+            body.put("analysisScope",scope==null?"all":scope);
+            if(visualEvidence!=null)body.put("visualEvidence",visualEvidence);
             String expertProfile=MusaAiMechanicalExpert.cloudProfile(rawPrompt);
             if(expertProfile.isEmpty())expertProfile=MusaAiDisciplineExpert.cloudProfile(rawPrompt);
             if(!expertProfile.isEmpty())body.put("expertProfile",expertProfile);

@@ -551,3 +551,180 @@ test("Gemini quota exhaustion returns a clear free-tier message",async()=>{
   assert.equal(body.status,"quota_exhausted");
   assert.equal(body.message.includes("ücretsiz kullanım kotası"),true);
 });
+
+
+test("Gemini receives consented visual CAD regions together with vector evidence and discipline scope",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  const jpeg="/9j/"+("A".repeat(120));
+  let sent=null, endpoint="";
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Sıhhi tesisat olarak analiz et",
+      analysisScope:"sanitary",
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:7,type:"LINE",layer:"SIHHI",length:12}]},
+      visualEvidence:{
+        schema:"musacad-visual-evidence/v1",
+        rawDrawingIncluded:false,complete:false,
+        images:[{
+          mime:"image/jpeg",base64:jpeg,label:"full-sheet-overview",
+          width:800,height:800,contentBounds:[0,0,100,100],drawingBounds:[1000,2000,1100,2100]
+        }]
+      }
+    })
+  });
+  const response=await worker.fetch(req,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      endpoint=String(url);
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        choices:[{message:{role:"assistant",content:"Çizimde görülen boru güzergâhı için çap teyidi gerekli."}}]
+      }),{status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.status,"ok");
+  assert.equal(data.analysisScope,"sanitary");
+  assert.equal(data.visualRegionCount,1);
+  assert.equal(data.visualCoverageComplete,false);
+  assert.match(endpoint,/generativelanguage\.googleapis\.com/);
+  assert.equal(sent.messages[1].content[0].type,"text");
+  assert.match(sent.messages[1].content[0].text,/SIHHI/);
+  assert.match(sent.messages[0].content,/primary discipline scope: sanitary/);
+  assert.match(sent.messages[1].content[0].text,/drawingBounds/);
+  assert.equal(sent.messages[1].content[1].type,"image_url");
+  assert.equal(sent.messages[1].content[1].image_url.url,"data:image/jpeg;base64,"+jpeg);
+});
+
+test("OpenAI multimodal route constructs input_image with the same CAD evidence",async()=>{
+  const keys=sessionPair();
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Statik paftayı analiz et",analysisScope:"structural",
+      cad:{schema:"musacad-cad-json/v1",items:[]},
+      visualEvidence:{schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,complete:true,
+        images:[{mime:"image/jpeg",base64:"/9j/"+("A".repeat(120)),label:"full-sheet-overview",
+          width:800,height:800,contentBounds:[0,0,200,200],drawingBounds:[0,0,200,200]}]}
+    })
+  });
+  let sent;
+  const res=await worker.fetch(req,{
+    OPENAI_API_KEY:"dummy",OPENAI_MODEL:"test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      assert.equal(String(url),"https://api.openai.com/v1/responses");
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({output:[{type:"message",content:[{type:"output_text",text:"Statik görsel ön inceleme."}]}]}),
+        {status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  assert.equal(res.status,200);
+  assert.equal(sent.input[0].content[1].type,"input_image");
+  assert.equal(sent.input[0].content[0].type,"input_text");
+  assert.match(sent.instructions,/primary discipline scope: structural/);
+});
+
+test("Malformed or unauthorized visual payload is rejected before provider call",async()=>{
+  const keys=sessionPair();
+  let invoked=false;
+  const body={prompt:"projeyi analiz et",cad:{schema:"musacad-cad-json/v1",items:[]},
+    visualEvidence:{schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,
+      images:[{mime:"image/png",base64:"AAA",label:"full-sheet-overview",
+        width:600,height:600,contentBounds:[0,0,10,10]}]}};
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},body:JSON.stringify(body)});
+  const res=await worker.fetch(req,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{invoked=true;throw new Error("provider must not be called")}
+  });
+  assert.equal(res.status,400);
+  assert.equal(invoked,false);
+});
+
+
+test("last 3x3 sweep batch with one detailed tile sends mapped vision to Gemini",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const img=(label,from,to)=>({
+    mime:"image/jpeg",base64:jpeg,label,width:1200,height:1200,
+    contentBounds:[from,from,to,to],drawingBounds:[1000+from,2000+from,1000+to,2000+to]
+  });
+  let sent;
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{
+      authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Projeyi analiz et",analysisScope:"all",
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:41,type:"TEXT",layer:"PIS_SU",text:"DN100",centerX:1250,centerY:2250}]},
+      visualEvidence:{
+        schema:"musacad-visual-evidence/v1",sweepSchema:"musacad-visual-sweep/v1",
+        sweepBatch:3,sweepBatchCount:3,totalDetailedTiles:9,firstTile:9,lastTile:9,
+        rawDrawingIncluded:false,complete:true,
+        images:[img("full-sheet-overview",0,300),img("sheet-tile-9",200,300)]
+      }
+    })
+  });
+  const response=await worker.fetch(req,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"stub",GEMINI_MODEL:"gemini-test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({choices:[{message:{content:"sheet-tile-9: DN100 görünüyor."}}]}),
+        {status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  assert.equal(response.status,200);
+  const output=await response.json();
+  assert.equal(output.status,"ok");
+  assert.equal(output.visualRegionCount,2);
+  assert.equal(output.visualCoverageComplete,true);
+  assert.match(sent.messages[1].content[0].text,/sheet-tile-9/);
+  assert.match(sent.messages[1].content[0].text,/VISUAL SWEEP BATCH: 3/);
+  assert.match(sent.messages[1].content[0].text,/CO-LOCATED SOURCE CANDIDATES/);
+  assert.match(sent.messages[1].content[0].text,/"sourceId":41/);
+  assert.equal(sent.messages[1].content[2].type,"image_url");
+});
+
+test("sweep rejects skipped tile identity or fabricated full coverage before provider",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const frame=label=>({
+    mime:"image/jpeg",base64:jpeg,label,width:640,height:640,
+    contentBounds:[0,0,100,100],drawingBounds:[0,0,100,100]
+  });
+  for(const [labels,complete] of [
+    [["full-sheet-overview","sheet-tile-2"],false],
+    [["full-sheet-overview","sheet-tile-1"],true],
+    [["full-sheet-overview","sheet-tile-1","sheet-tile-1"],false]
+  ]){
+    let upstream=false;
+    const req=new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{
+        authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+        "content-type":"application/json"},
+      body:JSON.stringify({
+        prompt:"Projeyi analiz et",cad:{schema:"musacad-cad-json/v1",items:[]},
+        visualEvidence:{schema:"musacad-visual-evidence/v1",sweepSchema:"musacad-visual-sweep/v1",
+          sweepBatch:1,sweepBatchCount:3,totalDetailedTiles:9,firstTile:1,lastTile:4,
+          complete,rawDrawingIncluded:false,images:labels.map(frame)}
+      })
+    });
+    const res=await worker.fetch(req,{
+      AI_PROVIDER:"gemini",GEMINI_API_KEY:"stub",GEMINI_MODEL:"test",
+      MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{upstream=true;throw Error("must not call upstream");}
+    });
+    assert.equal(res.status,400);
+    assert.equal(upstream,false);
+  }
+});

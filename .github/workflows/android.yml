@@ -82,6 +82,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadCommand.java tests/CadCommandTest.java
           java -cp /tmp/musacad-tests CadCommandTest
+      - name: Test Gandalf natural-language hybrid discipline intent
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java tests/MusaAiAnalysisIntentTest.java
+          java -cp /tmp/musacad-tests MusaAiAnalysisIntentTest
+      - name: Test Gandalf 3x3 visual sweep coverage
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiVisualSweepPlan.java tests/MusaAiVisualSweepPlanTest.java
+          java -cp /tmp/musacad-tests MusaAiVisualSweepPlanTest
       - name: Test MusaCAD AI panel contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiPanelContractTest.java
