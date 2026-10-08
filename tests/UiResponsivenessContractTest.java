@@ -12,6 +12,7 @@ public final class UiResponsivenessContractTest {
         String view=read("app/src/main/java/com/musa/cad/CadView.java");
         String print=read("app/src/main/java/com/musa/cad/CadPrint.java");
         String main=read("app/src/main/java/com/musa/cad/MainActivity.java");
+        String panel=read("app/src/main/java/com/musa/cad/MusaAiPanel.java");
         String parser=read("app/src/main/java/com/musa/cad/DxfParser.java");
         String nativeScene=read("app/src/main/java/com/musa/cad/NativeScene.java");
         String manifest=read("app/src/main/AndroidManifest.xml");
