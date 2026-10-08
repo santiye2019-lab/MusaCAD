@@ -29,11 +29,15 @@ public final class MusaAiPanelContractTest {
         require(panel,"interface Host","future model host abstraction");
         require(panel,"interface Reply","async reply abstraction");
         require(panel,"SOFT_INPUT_ADJUST_RESIZE","keyboard-safe AI panel");
-        require(panel,"PDF olarak görüntüle","PDF preview top button");
+        require(panel,"PDF görüntüle","PDF preview top button");
+        require(panel,"Poz kitabı yükle","separate offline YFK book import button");
         require(panel,"onViewPdf","PDF preview host callback");
         require(panel,"previousTurns.toString()","conversation context");
         require(panel,"recentTurns.addLast","bounded chat turns");
-        require(panel,"Yerel + bulut","honest local/cloud status");
+        require(panel,"MusaAiCloudHealth.check","real server health probe");
+        require(panel,"AI bağlı","real model response indicator");
+        require(panel,"setScrollbarFadingEnabled(false)","always-visible message scrollbar");
+        require(panel,"onImportPriceBook","explicit YFK book import callback");
         if(panel.contains("addQuickPromptAuto")||panel.contains("String[][] prompts"))
             throw new AssertionError("Legacy command chips must not replace natural conversation");
         require(panel,"Gandalf dinliyor","Gandalf voice status");
