@@ -142,6 +142,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiProjectControlContractTest.java
           java -cp /tmp/musacad-tests MusaAiProjectControlContractTest
+      - name: Test Gandalf engineering DWG evidence reader
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiEngineeringReview.java tests/MusaAiEngineeringReviewTest.java
+          java -cp /tmp/musacad-tests MusaAiEngineeringReviewTest
       - name: Test MusaCAD AI mechanical control
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiMechanicalControl.java tests/MusaAiMechanicalControlTest.java
