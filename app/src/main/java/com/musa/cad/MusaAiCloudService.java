@@ -81,6 +81,27 @@ public final class MusaAiCloudService {
         return analyzeInternal(context,index,fileName,rawPrompt,packageJson,null,"all");
     }
 
+    public static Result analyzePackageWithContext(Context context,MusaAiDrawingIndex index,
+                                                   String fileName,
+                                                   Collection<MusaAiProjectPackage.Drawing>drawings,
+                                                   String rawPrompt,String recentTurns,
+                                                   String localEvidence){
+        if(drawings==null||drawings.isEmpty())
+            return new Result(Status.INVALID_RESPONSE,"","Proje Paketi bağlamı hazırlanamadı",null,false);
+        MusaAiProjectPackage.Result local=MusaAiProjectPackage.generate(drawings,"proje paketi");
+        String packageJson=MusaAiCadPackageJson.build(drawings,local.matched?local.text:"");
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson,null,"all",
+            recentTurns,localEvidence);
+    }
+
+    public static Result analyzeHybridWithContext(Context context,MusaAiDrawingIndex index,
+                                                  String fileName,String rawPrompt,String scope,
+                                                  JSONObject visualEvidence,String recentTurns,
+                                                  String localEvidence){
+        return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope,
+            recentTurns,localEvidence);
+    }
+
     public static Result analyzeHybrid(Context context,MusaAiDrawingIndex index,String fileName,
                                       String rawPrompt,String scope,JSONObject visualEvidence){
         return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope);
