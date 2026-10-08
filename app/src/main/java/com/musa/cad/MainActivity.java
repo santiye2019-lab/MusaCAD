@@ -1434,7 +1434,7 @@ public class MainActivity extends AppCompatActivity {
         String scope=packageMode
             ?"Açık proje paketinin sınırlı CAD-JSON özetleri sunucuya gönderilir."
             :hybridVisual
-                ?"Bu hibrit analizde aktif DWG paftasının GENEL GÖRÜNTÜSÜ ve en fazla dört ayrıntı bölgesi JPEG olarak, ayrıca katman/metin/ölçüleri içeren sınırlı CAD-JSON verisi MusaCAD sunucusu üzerinden model sağlayıcısına (şu anda Google Gemini) aktarılır. Görseller proje bilgisi ve gizli içerik taşıyabilir."
+                ?"Bu görsel tarama aktif DWG paftasını 3×3=9 ayrıntı bölgesi ve genel görünümle inceler. Görüntüler en fazla 3 ayrı istek grubunda, grup başına en fazla 5 JPEG ile aktarılır. Katman/metin/ölçü içeren sınırlı CAD-JSON verileri de MusaCAD sunucusu üzerinden yapılandırılmış AI sağlayıcısına gönderilir. Görseller gizli proje bilgileri taşıyabilir; birden fazla AI isteği kullanım kotası tüketebilir."
                 :"Aktif çizimin sınırlı CAD-JSON özeti çevrim içi AI sunucusuna gönderilir.";
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
