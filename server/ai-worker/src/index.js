@@ -1,4 +1,4 @@
-const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const GEMINI_CHAT_COMPLETIONS_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
@@ -31,6 +31,13 @@ async function handleAnalyze(request, env) {
   const allowWeb = body.allowWeb === true;
   const allowEditProposals = body.allowEditProposals === true;
   const expertProfile = normalizeExpertProfile(body.expertProfile);
+  const allowedScopes = new Set(["all","mechanical","sanitary","wastewater","fire","ventilation",
+    "heating","cooling","gas","structural","architectural","electrical","landscape","infrastructure","elevator"]);
+  const analysisScope = typeof body.analysisScope === "string" && allowedScopes.has(body.analysisScope)
+    ? body.analysisScope : "all";
+  const visualEvidence = body.visualEvidence == null ? null : validateVisualEvidence(body.visualEvidence);
+  if (body.visualEvidence != null && !visualEvidence)
+    return json({ status: "denied", message: "Invalid or oversized visual CAD evidence" }, 400);
 
   if (!prompt || prompt.length > MAX_PROMPT_CHARS)
     return json({ status: "denied", message: "Prompt is empty or too large" }, 400);
@@ -54,6 +61,10 @@ async function handleAnalyze(request, env) {
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
     "Analyze the supplied bounded CAD-JSON across architectural, structural, mechanical, electrical, landscape, infrastructure, elevator and fire-safety systems when present. " +
+    "User-requested primary discipline scope: " + analysisScope + ". Emphasize this system's engineering constraints; use other disciplines only for coordination. For all, identify relevant disciplines from evidence rather than inventing discipline-specific findings. " +
+    (visualEvidence
+      ? "The user explicitly consented to visual CAD evidence. Combine visual sheet images with vector annotations/measurements. Visual images cover labeled sheet regions; they may be incomplete or low resolution. Identify lines as pipes/ducts/equipment ONLY with legend, shape, topology, annotation or other supporting evidence, and mark uncertain classification as a candidate. Distinguish missing-from-this-image from missing-from-project. Do not imply any unchecked part of the plan was reviewed. Do not invent equipment Q/H ratings, pipe diameter, duct size or reliable quantity takeoff without readable corroborating data. "
+      : "No visual images were supplied. Do not claim you visually examined the DWG sheet; only CAD metadata is available. ") +
     (packageMode
       ? "A bounded MusaCAD CAD package containing multiple open drawings is also supplied. Treat each drawing as a separate source, compare disciplines explicitly, use fileName and detectedDiscipline to attribute findings, and distinguish cross-drawing proximity/coordination candidates from proven clashes. Package mode is read-only: do not claim or propose CAD edits across files. "
       : "") +
@@ -78,6 +89,11 @@ async function handleAnalyze(request, env) {
     }
   ];
 
+  if (visualEvidence) {
+    input[0].content += "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
+      "\nEvery image is a separate region of the same loaded DWG. Match only supported region labels and drawing-content coordinates against CAD source IDs; never claim a match based on mere proximity alone.";
+  }
+
   const maxOutputTokens = positiveInt(env.AI_MAX_OUTPUT_TOKENS || env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000);
   let requestBody;
   let upstreamUrl;
@@ -95,7 +111,10 @@ async function handleAnalyze(request, env) {
       model: aiProvider.model,
       messages: [
         { role: "system", content: systemInstructions },
-        { role: "user", content: input[0].content }
+        { role: "user", content: visualEvidence
+          ? [{ type: "text", text: input[0].content }, ...visualEvidence.images.map(
+              frame => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + frame.base64 } }))]
+          : input[0].content }
       ],
       max_tokens: maxOutputTokens
     };
@@ -109,7 +128,15 @@ async function handleAnalyze(request, env) {
     requestBody = {
       model: aiProvider.model,
       instructions,
-      input,
+      input: visualEvidence ? [{
+        role: "user",
+        content: [
+          { type: "input_text", text: input[0].content },
+          ...visualEvidence.images.map(frame => ({
+            type: "input_image", image_url: "data:image/jpeg;base64," + frame.base64
+          }))
+        ]
+      }] : input,
       tools,
       parallel_tool_calls: true,
       store: false,
@@ -189,8 +216,40 @@ async function handleAnalyze(request, env) {
     packageMode,
     provider: aiProvider.name,
     model: aiProvider.model,
+    analysisScope,
+    visualRegionCount: visualEvidence ? visualEvidence.images.length : 0,
+    visualCoverageComplete: visualEvidence ? visualEvidence.complete : false,
     usage: parsedOutput.usage
   });
+}
+
+function validateVisualEvidence(value) {
+  if (!value || typeof value !== "object" ||
+      value.schema !== "musacad-visual-evidence/v1" ||
+      value.rawDrawingIncluded !== false || !Array.isArray(value.images) ||
+      value.images.length < 1 || value.images.length > 5) return null;
+  let total = 0;
+  const images = [], regions = [];
+  for (const img of value.images) {
+    if (!img || img.mime !== "image/jpeg" || typeof img.base64 !== "string" ||
+        img.base64.length < 100 || img.base64.length > 900000 ||
+        !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(img.base64) ||
+        typeof img.label !== "string" ||
+        !/^(full-sheet-overview|sheet-quadrant-[1-4])$/.test(img.label) ||
+        !Number.isInteger(img.width) || img.width < 128 || img.width > 1200 ||
+        !Number.isInteger(img.height) || img.height < 128 || img.height > 1200 ||
+        !Array.isArray(img.contentBounds) || img.contentBounds.length !== 4 ||
+        !img.contentBounds.every(n => typeof n === "number" && Number.isFinite(n)) ||
+        img.contentBounds[2] <= img.contentBounds[0] ||
+        img.contentBounds[3] <= img.contentBounds[1]) return null;
+    total += img.base64.length;
+    if (total > 1650000) return null;
+    images.push({ base64: img.base64 });
+    regions.push({ label: img.label, contentBounds: img.contentBounds,
+      width: img.width, height: img.height });
+  }
+  if (images[0] && value.images[0].label !== "full-sheet-overview") return null;
+  return { images, regions, complete: value.complete === true && images.length === 5 };
 }
 
 function validCadPackage(value) {
