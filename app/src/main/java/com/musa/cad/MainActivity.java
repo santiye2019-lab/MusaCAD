@@ -1336,10 +1336,10 @@ public class MainActivity extends AppCompatActivity {
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
                         int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
                         if(report.sourceIds.isEmpty())cad.clearAiHighlights();
-                        reply.send("Gandalf • "+drawingName+"\\n"+report.text+
-                            (shown>0?"\\n\\nÇizimde vurgulanan inceleme adayı: "+shown:"")+
-                            "\\n\\nBu sonuç sınırlı CAD verisiyle yapılan yerel ön incelemedir. Derin bulut analizi için 'Bu projeyi derin analiz et' deyin."+
-                            "\\nRapor çıktısı için 'Raporu PDF olarak çıkar' veya 'Raporu Word olarak çıkar' deyin.");
+                        reply.send("Gandalf • "+drawingName+"\n"+report.text+
+                            (shown>0?"\n\nÇizimde vurgulanan inceleme adayı: "+shown:"")+
+                            "\n\nBu sonuç sınırlı CAD verisiyle yapılan yerel ön incelemedir. Derin bulut analizi için 'Bu projeyi derin analiz et' deyin."+
+                            "\nRapor çıktısı için 'Raporu PDF olarak çıkar' veya 'Raporu Word olarak çıkar' deyin.");
                     });
                 }catch(OutOfMemoryError e){
                     reply.send("Gandalf proje analizi bellek sınırına ulaştı. Çizim açık kalacak; daha küçük bir paftayla yeniden deneyin.");
