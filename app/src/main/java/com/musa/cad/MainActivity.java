@@ -1568,7 +1568,12 @@ public class MainActivity extends AppCompatActivity {
                         else
                             out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
                     }
-                    reply.send(out.toString());
+                    lastAiReport=out.toString();
+                    lastAiReportTitle="Gandalf • "+(hybridVisual?"Hibrit ":"")+
+                        MusaAiAnalysisIntent.label(requestedScope)+" Proje Analiz Raporu";
+                    lastAiReportSourceIds=Collections.emptyList();
+                    reply.send(out.toString()+
+                        "\n\nÇıktı: 'Raporu Word olarak çıkar' veya 'Raporu PDF olarak çıkar'.");
                     if(!packageMode&&!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
                         runOnUiThread(()->showPendingGandalfActions(reply,false));
                 }catch(OutOfMemoryError e){
