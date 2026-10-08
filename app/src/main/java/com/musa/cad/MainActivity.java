@@ -3984,7 +3984,9 @@ public class MainActivity extends AppCompatActivity {
                                 activateProject(project);
                                 result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
                                     "Önizleme renkleri nihai değildir.");
-                                scheduleRecentNativeRecord(uri,loaded.name,nativePreview);
+                                // NativeScene owns mutable Canvas/Paint scratch buffers;
+                                // never thumbnail it from another thread while the UI draws.
+                                scheduleRecentMetadataRecord(uri,loaded.name);
                             }finally{uiHandoff.countDown();}
                         });
                         try{
