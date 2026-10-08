@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3";
@@ -149,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
     private List<Integer> lastAiReportSourceIds=Collections.emptyList();
     private MusaAiPanel.Reply pendingBoqReply;
     private ProjectSession pendingBoqProject;
+    private MusaAiPanel.Reply pendingYfk2025Reply;
     private MusaAiPanel.Reply pendingCsbRateReply;
     private ProjectSession pendingCsbRateProject;
     private MusaAiPanel.Reply pendingStructuralCalcReply;
@@ -888,6 +889,50 @@ public class MainActivity extends AppCompatActivity {
         }
         if(MusaAiDisciplineExpert.isHelpCommand(raw)){
             reply.send(MusaAiDisciplineExpert.commandHelp());
+            return;
+        }
+
+        // 2025 YFK complete price book is USER-SUPPLIED: import stays app-private.
+        // Historical price columns are never silently applied to current project BOQs.
+        if(MusaAiYfk2025Parser.wantsImport(raw)){
+            if(yfkDownloadActive.get()){
+                reply.send("Başka bir YFK katalog işlemi sürüyor. Tamamlanmasını bekleyin.");
+                return;
+            }
+            if(MusaAiYfk2025Library.status(this).installed){
+                reply.send(MusaAiYfk2025Library.statusText(this)+
+                    "\nBu kurulum zaten cihazda mevcut; aynı kitap tekrar kopyalanmadı.");
+                return;
+            }
+            pendingYfk2025Reply=reply;
+            Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            picker.addCategory(Intent.CATEGORY_OPENABLE);
+            picker.setType("application/pdf");
+            picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(picker,PICK_YFK_2025);
+            reply.send("2025 İnşaat ve Tesisat Birim Fiyatları PDF dosyasını seçin. " +
+                "Dosya yalnızca telefonunuzda kalacak. İndeksleme bittikten sonra " +
+                "internet olmadan poz tarifi ve 2025 fiyat sütunlarını arayabilirsiniz.");
+            return;
+        }
+        if(MusaAiYfk2025Parser.wantsStatus(raw)){
+            reply.send(MusaAiYfk2025Library.statusText(this));
+            return;
+        }
+        if(MusaAiYfk2025Parser.wantsCompare(raw)){
+            reply.progress("2025 ve 2026 ÇŞİDB poz kodları çevrim dışı karşılaştırılıyor…");
+            yfkCatalogExecutor.submit(()->{
+                String comparison=MusaAiYfk2025Library.compareNew2026(this);
+                runOnUiThread(()->{if(reply!=null)reply.send(comparison);});
+            });
+            return;
+        }
+        if(MusaAiYfk2025Parser.wantsLookup(raw)){
+            reply.progress("2025 çevrim dışı poz kataloğunda aranıyor…");
+            yfkCatalogExecutor.submit(()->{
+                String answer=MusaAiYfk2025Library.lookup(this,raw);
+                runOnUiThread(()->{if(reply!=null)reply.send(answer);});
+            });
             return;
         }
 
@@ -2547,6 +2592,40 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void handleYfk2025Picked(Uri uri){
+        final MusaAiPanel.Reply reply=pendingYfk2025Reply;
+        pendingYfk2025Reply=null;
+        if(uri==null)return;
+        if(!yfkDownloadActive.compareAndSet(false,true)){
+            if(reply!=null)reply.send("YFK arşivi şu anda meşgul; yeniden deneyin.");
+            return;
+        }
+        if(reply!=null)reply.progress("2025 ÇŞİDB kitabı cihazda hazırlanıyor…");
+        yfkCatalogExecutor.submit(()->{
+            try{
+                MusaAiYfk2025Library.Status installed=
+                    MusaAiYfk2025Library.importPdf(this,uri,message->
+                        runOnUiThread(()->{
+                            if(!isFinishing()&&!isDestroyed()&&result!=null)
+                                result.setText("2025 YFK • "+message);
+                        }));
+                runOnUiThread(()->{
+                    if(reply!=null)reply.send(
+                        "2025 ÇŞİDB kitabı çevrim dışı kuruldu: "+installed.items+
+                        " poz/rayiç, "+installed.pages+" sayfa.\n"+
+                        "Örnek: '2025 poz 25.100.1005' • "+
+                        "'2025 katalog durumu' • '2025 2026 yeni pozları tara'.\n"+
+                        "2025 fiyatı güncel fiyat olarak kullanılmayacaktır.");
+                });
+            }catch(Exception e){
+                final String issue=e.getMessage()==null?"PDF okunamadı":e.getMessage();
+                runOnUiThread(()->{if(reply!=null)reply.send(
+                    "2025 kitabı kurulamadı: "+issue+
+                    "\nPDF dosyasının doğru 2025 baskısı ve metin katmanı içerdiğini kontrol edin.");});
+            }finally{yfkDownloadActive.set(false);}
+        });
+    }
+
     private void pickCsbPriceDocument(){
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -3589,6 +3668,12 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==PICK_YFK_2025&&c!=RESULT_OK){
+            MusaAiPanel.Reply reply=pendingYfk2025Reply;
+            pendingYfk2025Reply=null;
+            if(reply!=null)reply.send("2025 kitabı yükleme iptal edildi.");
+            return;
+        }
         if(r==PICK_CSB_RATES&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingCsbRateReply;
             pendingCsbRateReply=null;pendingCsbRateProject=null;
@@ -3612,6 +3697,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
+        if(r==PICK_YFK_2025){handleYfk2025Picked(data.getData());return;}
         if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
