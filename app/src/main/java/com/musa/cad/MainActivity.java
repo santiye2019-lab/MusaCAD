@@ -891,6 +891,77 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // Private, consent-based 2026 YFK mechanical analysis source library.
+        // Poz texts stay on the device; no official books are redistributed in APK/GitHub.
+        if(MusaAiYfkTechnicalSources.wantsInstall(raw)){
+            if(yfkDownloadActive.get()){
+                reply.send("YFK indirme/indeksleme işlemi sürüyor; tamamlanmasını bekleyin.");
+                return;
+            }
+            new AlertDialog.Builder(this)
+                .setTitle("YFK 2026 mekanik analiz kütüphanesi")
+                .setMessage("Üç resmî mekanik tesisat analiz PDF'si Bakanlığın kaynağından " +
+                    "yalnızca bu telefonun özel alanına indirilecek; kaynaklı poz ve malzeme " +
+                    "arama dizini oluşturulacaktır. Kitaplar GitHub'a veya APK içine " +
+                    "eklenmez. İşlem büyük dosyalar nedeniyle zaman ve depolama alanı " +
+                    "gerektirebilir. Fiyatlar otomatik kullanılmaz. Devam edilsin mi?")
+                .setPositiveButton("RESMÎ ANALİZLERİ KUR",(dialog,which)->{
+                    if(!yfkDownloadActive.compareAndSet(false,true))return;
+                    reply.progress("Mekanik analiz kitapları indiriliyor/indeksleniyor…");
+                    yfkCatalogExecutor.submit(()->{
+                        try{
+                            String installed=MusaAiYfkTechnicalLibrary.downloadAll(this,message->
+                                runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&result!=null)
+                                    result.setText("YFK • "+message);}));
+                            runOnUiThread(()->{if(reply!=null)reply.send(installed+
+                                "\nKomutlar: 'Mekanik analizde PVC boru ara', " +
+                                "'Mekanik analizde 25.100.1005 pozunu incele', 'Poz eşleştir'.");});
+                        }catch(Exception e){
+                            final String message=e.getMessage()==null?"analiz ciltleri okunamadı":e.getMessage();
+                            runOnUiThread(()->{if(reply!=null)reply.send(
+                                "Mekanik analiz kütüphanesi kısmen veya tamamen kurulamadı: "+
+                                message+"\nKurulu ciltleri 'Mekanik analiz durumu' ile kontrol edin.");});
+                        }finally{yfkDownloadActive.set(false);}
+                    });
+                }).setNegativeButton("VAZGEÇ",null).show();
+            return;
+        }
+        if(MusaAiYfkTechnicalSources.wantsStatus(raw)){
+            reply.send(MusaAiYfkTechnicalLibrary.status(this));
+            return;
+        }
+        if(MusaAiYfkTechnicalSources.wantsMatch(raw)){
+            if(activeDxf==null){
+                reply.send("Poz adayları için öncelikle tam vektör DWG/DXF proje açın.");
+                return;
+            }
+            final MusaAiDrawingIndex drawing=currentAiDrawingIndex();
+            final java.util.List<MusaAiCsbEstimate.Rate> verifiedRates=
+                currentProject==null?java.util.Collections.emptyList():
+                new java.util.ArrayList<>(currentProject.csbRates);
+            reply.progress("Metraj ve resmî teknik poz/analiz sayfası adayları aranıyor…");
+            yfkCatalogExecutor.submit(()->{
+                try{
+                    MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
+                        drawing,verifiedRates);
+                    String candidate=MusaAiYfkTechnicalLibrary.suggestForTakeoff(this,measured);
+                    runOnUiThread(()->{if(reply!=null)reply.send(candidate);});
+                }catch(Exception e){
+                    runOnUiThread(()->{if(reply!=null)reply.send(
+                        "Poz ön eşleştirmesi tamamlanamadı; kaynak dizinini kontrol edin.");});
+                }
+            });
+            return;
+        }
+        if(MusaAiYfkTechnicalSources.wantsLookup(raw)){
+            reply.progress("2026 mekanik poz tarif ve analizleri aranıyor…");
+            yfkCatalogExecutor.submit(()->{
+                String lookup=MusaAiYfkTechnicalLibrary.find(this,raw);
+                runOnUiThread(()->{if(reply!=null)reply.send(lookup);});
+            });
+            return;
+        }
+
         // 2026 YFK official PDF is downloaded at the user's explicit request
         // into app-private storage, never embedded or redistributed in APK.
         if(MusaAiYfkCatalogQuery.wantsDownload(raw)){
