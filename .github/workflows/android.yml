@@ -86,6 +86,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java tests/MusaAiAnalysisIntentTest.java
           java -cp /tmp/musacad-tests MusaAiAnalysisIntentTest
+      - name: Test verified YFK source price mapping CSV gate
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCsbEstimate.java app/src/main/java/com/musa/cad/MusaAiCsbPriceCsv.java tests/MusaAiCsbPriceCsvTest.java
+          java -cp /tmp/musacad-tests MusaAiCsbPriceCsvTest
       - name: Test Gandalf sanitary source-linked CSB takeoff safety
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCsbEstimate.java tests/MusaAiCsbEstimateTest.java
