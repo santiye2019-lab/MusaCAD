@@ -68,6 +68,11 @@ public final class MusaAiCloudIntegrationContractTest {
         require(worker,"\"cad_add_pipe_note\"","mechanical note tool");
 
         require(cloud,"SocketTimeoutException","informative client network timeout");
+        require(cloud,"body.put(\"visualEvidence\",visualEvidence)","explicit visual payload transport");
+        require(cloud,"body.put(\"analysisScope\"","engineering discipline transport");
+        require(worker,"validateVisualEvidence","validate and bound image evidence server-side");
+        require(worker,"input_image","OpenAI vision message construction");
+        require(worker,"image_url","Gemini vision message construction");
         require(worker,"AI_UPSTREAM_TIMEOUT_MS","bounded server AI provider call");
         require(worker,"Promise.race","AI gateway request deadline");
         require(main,"Yerel proje kontrolüne geçiliyor","automatic local fallback after cloud error");
