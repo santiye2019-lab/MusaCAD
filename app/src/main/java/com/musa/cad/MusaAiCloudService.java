@@ -108,6 +108,19 @@ public final class MusaAiCloudService {
             String expertProfile=MusaAiMechanicalExpert.cloudProfile(rawPrompt);
             if(expertProfile.isEmpty())expertProfile=MusaAiDisciplineExpert.cloudProfile(rawPrompt);
             if(!expertProfile.isEmpty())body.put("expertProfile",expertProfile);
+            // The cloud model receives the whole bounded CAD index and also a
+            // locally grounded review summary, so focus does not erase cross-discipline context.
+            MusaAiReviewScope reviewScope=MusaAiReviewScope.parse(rawPrompt);
+            if(reviewScope!=null){
+                JSONObject scopeJson=new JSONObject();
+                scopeJson.put("discipline",reviewScope.discipline.name());
+                scopeJson.put("system",reviewScope.system);
+                scopeJson.put("label",reviewScope.label);
+                body.put("reviewScope",scopeJson);
+                String evidence=reviewScope.localEvidence(index,fileName);
+                if(evidence.length()>10000)evidence=evidence.substring(0,10000);
+                body.put("localEvidence",evidence);
+            }
             body.put("cad",new JSONObject(MusaAiCadJson.build(index,fileName)));
             if(packageJson!=null&&!packageJson.trim().isEmpty())
                 body.put("cadPackage",new JSONObject(packageJson));
