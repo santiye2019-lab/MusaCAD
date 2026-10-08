@@ -95,7 +95,9 @@ async function handleAnalyze(request, env) {
       " / " + (visualEvidence.sweepBatch ? 3 : 1) +
       ". Do not claim all nine tiles were checked based on this single request." +
       "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
-      "\nEvery image is a separate region of the same loaded DWG. contentBounds are rendered viewport-content coordinates, while drawingBounds are DWG world coordinates shared with vector item.centerX/centerY. Use drawingBounds when correlating a visual finding with CAD items; never claim a sourceId match from proximity alone.";
+      "\nEvery image is a separate region of the same loaded DWG. contentBounds are rendered viewport-content coordinates, while drawingBounds are DWG world coordinates shared with vector item.centerX/centerY. Use drawingBounds when correlating a visual finding with CAD items; never claim a sourceId match from proximity alone." +
+      "\n\nCO-LOCATED SOURCE CANDIDATES (NOT verified object matches): " +
+      JSON.stringify(regionalCadCandidates(cad, visualEvidence.regions));
   }
 
   const maxOutputTokens = positiveInt(env.AI_MAX_OUTPUT_TOKENS || env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000);
@@ -287,6 +289,39 @@ function validateVisualEvidence(value) {
     sweepBatch: sweep ? value.sweepBatch : null,
     totalDetailedTiles: sweep ? 9 : null
   };
+}
+
+/**
+ * Lightweight spatial cross-index between center points in bounded CAD-JSON
+ * and the world-coordinate rectangles sent as image evidence. Deliberately
+ * labels them CANDIDATES: a nearby text does not establish pipe identity,
+ * engineering connectivity or symbol classification.
+ */
+function regionalCadCandidates(cad, regions) {
+  const items = Array.isArray(cad?.items) ? cad.items.slice(0,5000) : [];
+  const out = [];
+  for (const r of regions.slice(0,5)) {
+    const [x0,y0,x1,y1] = r.drawingBounds;
+    const evidence = [];
+    for (const i of items) {
+      if (!i || typeof i !== "object" ||
+          !Number.isFinite(i.centerX) || !Number.isFinite(i.centerY) ||
+          i.centerX < x0 || i.centerX > x1 || i.centerY < y0 || i.centerY > y1) continue;
+      // Prioritize labeled components and meaningful named layers. Lines without
+      // their complete geometry cannot by themselves prove topology.
+      const hasLabel = typeof i.text === "string" && i.text.trim().length > 0;
+      if (!hasLabel && i.type !== "INSERT" && i.type !== "BLOCK") continue;
+      evidence.push({
+        sourceId:Number.isSafeInteger(i.sourceId) ? i.sourceId : -1,
+        type:String(i.type||"").slice(0,30),
+        layer:String(i.layer||"").slice(0,80),
+        text:hasLabel ? i.text.slice(0,140) : ""
+      });
+      if (evidence.length >= 24) break;
+    }
+    out.push({ region:r.label, candidates:evidence, boundedSample:true });
+  }
+  return out;
 }
 
 function validCadPackage(value) {
