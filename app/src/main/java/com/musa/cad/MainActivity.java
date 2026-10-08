@@ -990,7 +990,10 @@ public class MainActivity extends AppCompatActivity {
                     MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
                         drawing,verifiedRates);
                     String candidate=MusaAiYfkTechnicalLibrary.suggestForTakeoff(this,measured);
-                    runOnUiThread(()->{if(reply!=null)reply.send(candidate);});
+                    if(MusaAiYfk2025Library.status(this).installed)
+                        candidate+= "\n\n"+MusaAiYfk2025Library.suggestForTakeoff(this,measured);
+                    final String sourcedCandidates=candidate;
+                    runOnUiThread(()->{if(reply!=null)reply.send(sourcedCandidates);});
                 }catch(Exception e){
                     runOnUiThread(()->{if(reply!=null)reply.send(
                         "Poz ön eşleştirmesi tamamlanamadı; kaynak dizinini kontrol edin.");});
