@@ -1369,8 +1369,10 @@ public class MainActivity extends AppCompatActivity {
                     if(Thread.currentThread().isInterrupted())return;
                     reply.progress("Gandalf • Cihaz değerleri, boru çapları, kanal ölçüleri ve metraj değerlendiriliyor…");
                     MusaAiReviewScope localScope=MusaAiReviewScope.parse(raw);
-                    MusaAiDrawingIndex scopedIndex=localScope==null?index:localScope.filteredIndex(index);
-                    MusaAiEngineeringReview.Result report=MusaAiEngineeringReview.analyze(scopedIndex,drawingName);
+                    // Keep the original fast review path for unscoped commands.
+                    MusaAiEngineeringReview.Result report=localScope==null
+                        ?MusaAiEngineeringReview.analyze(index,drawingName)
+                        :MusaAiEngineeringReview.analyze(localScope.filteredIndex(index),drawingName);
                     if(Thread.currentThread().isInterrupted())return;
                     runOnUiThread(()->{
                         if(!finished.compareAndSet(false,true))return;
