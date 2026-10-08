@@ -29,6 +29,18 @@ public final class MusaAiAnalysisIntentTest {
             throw new AssertionError("Takeoff route hijacked");
         if(MusaAiAnalysisIntent.isReview("GMEKAI_FIRE kontrol et"))
             throw new AssertionError("Expert route hijacked");
+        if(!MusaAiAnalysisIntent.isReview("Silivrikapı Spor Köyü projesini analiz et"))
+            throw new AssertionError("Place name must not trigger destructive sil command");
+        if(!MusaAiAnalysisIntent.isLocalOnly("Projeyi çevrim dışı analiz et"))
+            throw new AssertionError("Offline Turkish command not recognized");
+        if(!MusaAiAnalysisIntent.isLocalOnly("Projeyi yerel olarak incele"))
+            throw new AssertionError("Local Turkish command not recognized");
+        if(!MusaAiAnalysisIntent.isLocalOnly("Projeyi analiz et internet kullanma"))
+            throw new AssertionError("Explicit no-internet intent ignored");
+        if(MusaAiAnalysisIntent.isLocalOnly("Projeyi mühendislik açısından analiz et"))
+            throw new AssertionError("Regular hybrid request mistaken for local");
+        if(MusaAiAnalysisIntent.isReview("Bu çizgiyi sil"))
+            throw new AssertionError("Direct edit/delete intent misrouted");
         System.out.println("MusaAiAnalysisIntentTest OK");
     }
 }
