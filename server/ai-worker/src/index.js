@@ -70,6 +70,7 @@ async function handleAnalyze(request, env) {
       : "") +
     mechanicalExpertInstructions(expertProfile) +
     disciplineExpertInstructions(expertProfile) +
+    "If visualEvidence contains a sweepBatch, analyze ONLY those named regions and the overview; never imply that other high-resolution regions were scanned. State each finding with its visible region label, observed component, supporting drawing annotation/geometry when present, degree of confidence, and what needs verification. Separate confirmed visible observations, plausible candidates, and unverified design checks. A visual match to a CAD sourceId requires actual spatial and textual/graph evidence, not proximity alone. " +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
@@ -90,7 +91,10 @@ async function handleAnalyze(request, env) {
   ];
 
   if (visualEvidence) {
-    input[0].content += "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
+    input[0].content += "\n\nVISUAL SWEEP BATCH: " + (visualEvidence.sweepBatch ?? "legacy") +
+      " / " + (visualEvidence.sweepBatch ? 3 : 1) +
+      ". Do not claim all nine tiles were checked based on this single request."; 
+
       "\nEvery image is a separate region of the same loaded DWG. contentBounds are rendered viewport-content coordinates, while drawingBounds are DWG world coordinates shared with vector item.centerX/centerY. Use drawingBounds when correlating a visual finding with CAD items; never claim a sourceId match from proximity alone.";
   }
 
@@ -228,14 +232,31 @@ function validateVisualEvidence(value) {
       value.schema !== "musacad-visual-evidence/v1" ||
       value.rawDrawingIncluded !== false || !Array.isArray(value.images) ||
       value.images.length < 1 || value.images.length > 5) return null;
+
+  const sweep = value.sweepSchema === "musacad-visual-sweep/v1";
+  if (value.sweepSchema != null && !sweep) return null;
+  let first = 0, last = 0;
+  if (sweep) {
+    if (value.sweepBatchCount !== 3 || value.totalDetailedTiles !== 9 ||
+        !Number.isInteger(value.sweepBatch) || value.sweepBatch < 1 || value.sweepBatch > 3 ||
+        !Number.isInteger(value.firstTile) || !Number.isInteger(value.lastTile)) return null;
+    first = (value.sweepBatch - 1) * 4 + 1;
+    last = Math.min(9,first+3);
+    if (value.firstTile !== first || value.lastTile !== last) return null;
+  }
+
   let total = 0;
   const images = [], regions = [];
-  for (const img of value.images) {
+  const labels = new Set();
+  for (let i=0;i<value.images.length;i++) {
+    const img = value.images[i];
     if (!img || img.mime !== "image/jpeg" || typeof img.base64 !== "string" ||
         img.base64.length < 100 || img.base64.length > 900000 ||
         !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(img.base64) ||
         typeof img.label !== "string" ||
-        !/^(full-sheet-overview|sheet-quadrant-[1-4])$/.test(img.label) ||
+        !(sweep ? /^(full-sheet-overview|sheet-tile-[1-9])$/.test(img.label)
+                 : /^(full-sheet-overview|sheet-quadrant-[1-4])$/.test(img.label)) ||
+        labels.has(img.label) ||
         !Number.isInteger(img.width) || img.width < 128 || img.width > 1200 ||
         !Number.isInteger(img.height) || img.height < 128 || img.height > 1200 ||
         !Array.isArray(img.contentBounds) || img.contentBounds.length !== 4 ||
@@ -246,14 +267,26 @@ function validateVisualEvidence(value) {
         !img.drawingBounds.every(n => typeof n === "number" && Number.isFinite(n)) ||
         img.drawingBounds[2] <= img.drawingBounds[0] ||
         img.drawingBounds[3] <= img.drawingBounds[1]) return null;
+    if (i === 0 && img.label !== "full-sheet-overview") return null;
+    if (sweep && i>0 && img.label !== "sheet-tile-"+(first+i-1)) return null;
+    labels.add(img.label);
     total += img.base64.length;
     if (total > 1650000) return null;
     images.push({ base64: img.base64 });
     regions.push({ label: img.label, contentBounds: img.contentBounds,
       drawingBounds: img.drawingBounds, width: img.width, height: img.height });
   }
-  if (images[0] && value.images[0].label !== "full-sheet-overview") return null;
-  return { images, regions, complete: value.complete === true && images.length === 5 };
+  if (sweep && value.images.length>last-first+2) return null;
+  const allRequested = sweep
+    ? images.length === last-first+2
+    : images.length === 5;
+  if (value.complete === true && !allRequested) return null;
+  return {
+    images, regions,
+    complete: value.complete === true && allRequested,
+    sweepBatch: sweep ? value.sweepBatch : null,
+    totalDetailedTiles: sweep ? 9 : null
+  };
 }
 
 function validCadPackage(value) {
