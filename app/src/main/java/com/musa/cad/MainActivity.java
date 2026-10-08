@@ -26,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
-    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3";
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
@@ -1329,11 +1329,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(MusaAiCloudPolicy.shouldUseCloud(raw)){
-            if(currentProject==null){
-                reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
-                return;
-            }
-            handleMusaAiCloudPrompt(raw,reply,recentContext);
+            if(currentProject==null)handleCloudChatWithoutDrawing(raw,recentContext,reply);
+            else handleMusaAiCloudPrompt(raw,reply,recentContext);
             return;
         }
 
@@ -1352,7 +1349,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if(currentProject==null){
-            reply.send("Bu işlem için önce bir DWG veya DXF projesi açın. AI paneli proje açılmadan da kullanılabilir, ancak çizim analizi için aktif proje gerekir.");
+            if(MusaAiConversationalIntent.shouldCloudInterpret(raw))
+                handleCloudChatWithoutDrawing(raw,recentContext,reply);
+            else
+                reply.send("Bu CAD komutu için önce bir DWG veya DXF çizimi açın.");
             return;
         }
 
@@ -1654,6 +1654,57 @@ public class MainActivity extends AppCompatActivity {
                 localAiHandler.removeCallbacks(deadline);
                 reply.send("Gandalf yerel analiz iş parçacığı başlatılamadı. Uygulamayı yeniden başlatıp deneyin.");
             }
+        }
+    }
+
+    private void handleCloudChatWithoutDrawing(String raw,String recentContext,
+                                               MusaAiPanel.Reply reply){
+        if(MusaAiAnalysisIntent.isLocalOnly(raw)){
+            reply.send("Çevrim dışı istekte proje çizimi yok; yerel mühendislik delili sunulamıyor.");
+            return;
+        }
+        SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
+        if(!prefs.getBoolean(K_CLOUD_CHAT_CONSENT,false)){
+            new AlertDialog.Builder(this)
+                .setTitle("Gandalf • Çizimsiz sohbet")
+                .setMessage("Henüz proje açık değil. Sorunuz ve bu sohbet penceresindeki "+
+                    "en fazla dört kısa önceki soru-yanıt MusaCAD bulut AI ağına aktarılabilir. "+
+                    "DWG veya teknik çizim gönderilmez. Bu izin, çizim CAD-JSON/görsel veri "+
+                    "gönderme izninden bağımsızdır. Devam edilsin mi?")
+                .setPositiveButton("SOHBETE DEVAM ET",(d,w)->{
+                    prefs.edit().putBoolean(K_CLOUD_CHAT_CONSENT,true).apply();
+                    runCloudChatWithoutDrawing(raw,recentContext,reply);
+                })
+                .setNegativeButton("İPTAL",(d,w)->reply.send(
+                    "Çevrim içi sohbet iptal edildi; proje açınca yerel araçları kullanabilirsiniz."))
+                .setOnCancelListener(d->reply.send("Çevrim içi sohbet iptal edildi."))
+                .show();
+            return;
+        }
+        runCloudChatWithoutDrawing(raw,recentContext,reply);
+    }
+
+    private void runCloudChatWithoutDrawing(String raw,String recentContext,
+                                           MusaAiPanel.Reply reply){
+        reply.progress("Gandalf • Çevrim içi sohbet yanıtı hazırlanıyor…");
+        try{
+            aiExecutor.submit(()->{
+                MusaAiDrawingIndex empty=new MusaAiDrawingIndex(
+                    "",0,0,Collections.emptyList(),Collections.emptyList(),
+                    Collections.emptyList(),"");
+                MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
+                    getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
+                if(cloud.ok()){
+                    pendingAiActions=Collections.emptyList();
+                    reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
+                }else{
+                    reply.send("Bulut sohbeti kullanılamıyor: "+
+                        (cloud.message.isEmpty()?"Sunucu yanıt vermedi.":cloud.message)+
+                        "\nYeniden deneyin veya bir çizim açıp yerel CAD araçlarını kullanın.");
+                }
+            });
+        }catch(RejectedExecutionException error){
+            reply.send("Gandalf sohbet iş parçacığı şu anda kullanılamıyor.");
         }
     }
 
