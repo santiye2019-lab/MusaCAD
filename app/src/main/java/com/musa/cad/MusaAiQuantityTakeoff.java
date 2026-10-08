@@ -109,9 +109,36 @@ public final class MusaAiQuantityTakeoff {
         LinkedHashMap<String,LayerStats> byLayer=new LinkedHashMap<>();
         LinkedHashMap<String,DiameterStats> byDiameter=new LinkedHashMap<>();
         LinkedHashMap<String,EquipmentStats> equipment=new LinkedHashMap<>();
+        int unclassifiedBlocks=0, unverifiedLayerBlocks=0, ignoredGeometry=0, duplicatedSources=0;
+        HashSet<Integer> seenSources=new HashSet<>();
 
         for(MusaAiDrawingIndex.Item item:index.items()){
             if(item==null||isAnnotation(item.type))continue;
+            if(item.sourceId>=0&&!seenSources.add(item.sourceId)){
+                duplicatedSources++;
+                continue;
+            }
+            if(isCountable(item.type)){
+                String textCategory=equipmentCategory(new MusaAiDrawingIndex.Item(
+                    item.type,"",item.text));
+                if(textCategory==null){
+                    if(equipmentCategory(item)!=null)unverifiedLayerBlocks+=item.quantity;
+                    else unclassifiedBlocks+=item.quantity;
+                    continue;
+                }
+                String label=equipmentDisplayLabel(item);
+                EquipmentStats equipmentStats=equipment.get(label);
+                if(equipmentStats==null){
+                    equipmentStats=new EquipmentStats(label);
+                    equipment.put(label,equipmentStats);
+                }
+                equipmentStats.count+=item.quantity;
+                continue;
+            }
+            if("Diğer".equals(disciplineLabel(item.layer+" "+item.text))){
+                if(isLinearTakeoff(item)||isAreaTakeoff(item))ignoredGeometry+=item.quantity;
+                continue;
+            }
             String key=item.layer==null?"":item.layer.trim();
             LayerStats s=byLayer.get(key);
             if(s==null){s=new LayerStats(key);byLayer.put(key,s);}
@@ -134,13 +161,7 @@ public final class MusaAiQuantityTakeoff {
                 s.area+=item.area*item.quantity;
                 s.areaCount+=item.quantity;
             }
-            if(isCountable(item.type)){
-                String label=equipmentDisplayLabel(item);
-                EquipmentStats e=equipment.get(label);
-                if(e==null){e=new EquipmentStats(label);equipment.put(label,e);}
-                e.count+=item.quantity;
-            }
-        }
+         }
 
         double metersPerUnit=metersPerUnit(index.unitName);
         boolean physical=Double.isFinite(metersPerUnit)&&metersPerUnit>0d;
@@ -161,7 +182,8 @@ public final class MusaAiQuantityTakeoff {
         equipmentRows.sort((a,b)->Integer.compare(b.count,a.count));
 
         StringBuilder out=new StringBuilder();
-        out.append("Metraj raporu • ").append(index.layout);
+        out.append("TESİSAT ÖN METRAJ RAPORU • ").append(index.layout);
+        out.append("\nDurum: Çizimden tespit edilen adaylar. Onaylı keşif veya resmi poz listesi değildir.");
         if(!physical){
             out.append("\n⚠ DWG birimi tanımsız. Uzunluk/alanı metreye çevirmeden ham toplam göstermiyorum.");
             out.append("\nBirim/ölçek doğrulandıktan sonra boru, kanal ve alan metrajı m / m² olarak hesaplanacak.");
@@ -171,15 +193,27 @@ public final class MusaAiQuantityTakeoff {
             appendAreas(out,areas,metersPerUnit*metersPerUnit);
         }
         appendEquipment(out,equipmentRows);
+        out.append("\n\nİNCELEMEYE AYRILANLAR");
+        out.append("\n• Türü tanımlanamayan blok: ").append(unclassifiedBlocks).append(" adet");
+        out.append("\n• Yalnız katman adına göre tahmin edilebilen cihaz bloğu: ")
+            .append(unverifiedLayerBlocks).append(" adet (keşif miktarına katılmadı)");
+        out.append("\n• Tesisat türü belirlenemeyen geometrik nesne: ")
+            .append(ignoredGeometry).append(" adet (metraj dışı)");
+        if(duplicatedSources>0)
+            out.append("\n• Yinelenen CAD kaynak kimliği: ")
+                .append(duplicatedSources).append(" (ikinci kez sayılmadı)");
         if(linear.isEmpty()&&areas.isEmpty()&&equipmentRows.isEmpty())
-            out.append("\nMetraja uygun çizgisel, kapalı alan veya sayılabilir blok bulunamadı.");
-        out.append("\nNot: Metin, ölçülendirme, hatch ve yardımcı geometri genel metraja dahil edilmez.");
+            out.append("\nTeyitli tesisat metrajı çıkarılamadı; yalnız blok sayımından keşif oluşturulamaz.");
+        out.append("\n\nSONRAKİ KONTROL: Kat/pafta, boru malzemesi, DN/PN, güzergâh, ")
+            .append("armatür teknik özellikleri ve kaynak nesneler doğrulanmalı. ")
+            .append("Poz ve 2025 fiyat eşleştirmesi ayrıca kontrol edilmeli.");
+        out.append("\nNot: Metin, ölçülendirme, hatch, mimari ve yardımcı geometri tesisat ön metrajından ayrıldı.");
         return out.toString();
     }
 
     private static void appendDiameters(StringBuilder out,List<DiameterStats> rows,double scale){
         if(rows.isEmpty())return;
-        out.append("\n\nÇAP BAZLI BORU / KANAL METRAJI");
+        out.append("\n\nÇAP ETİKETİ BULUNAN BORU / KANAL ADAYLARI");
         int shown=0;
         for(DiameterStats s:rows){
             if(shown++>=18){out.append("\n• … diğer çaplar");break;}
@@ -191,7 +225,7 @@ public final class MusaAiQuantityTakeoff {
 
     private static void appendLinear(StringBuilder out,List<LayerStats> rows,double scale){
         if(rows.isEmpty())return;
-        out.append("\n\nKATMAN BAZLI ÇİZGİSEL METRAJ");
+        out.append("\n\nTESİSAT KATMANLARI • GÜZERGÂH UZUNLUĞU ADAYLARI");
         int shown=0;
         for(LayerStats s:rows){
             if(shown++>=12){out.append("\n• … diğer katmanlar");break;}
@@ -203,7 +237,7 @@ public final class MusaAiQuantityTakeoff {
 
     private static void appendAreas(StringBuilder out,List<LayerStats> rows,double scale){
         if(rows.isEmpty())return;
-        out.append("\n\nALAN METRAJI");
+        out.append("\n\nTESİSAT KATMANLARI • KAPALI ALAN ADAYLARI");
         int shown=0;
         for(LayerStats s:rows){
             if(shown++>=8){out.append("\n• … diğer katmanlar");break;}
@@ -215,7 +249,7 @@ public final class MusaAiQuantityTakeoff {
 
     private static void appendEquipment(StringBuilder out,List<EquipmentStats> rows){
         if(rows.isEmpty())return;
-        out.append("\n\nADET / EKİPMAN");
+        out.append("\n\nTANIMLANAN TESİSAT CİHAZI / ADET ADAYLARI");
         int shown=0;
         for(EquipmentStats s:rows){
             if(shown++>=18){out.append("\n• … diğer ekipmanlar");break;}
@@ -279,7 +313,7 @@ public final class MusaAiQuantityTakeoff {
     private static String equipmentDisplayLabel(MusaAiDrawingIndex.Item item){
         String category=equipmentCategory(item);
         String block=item.text==null?"":item.text.trim();
-        if(category==null)return block.isEmpty()?layerLabel(item.layer):block+" • "+layerLabel(item.layer);
+        if(category==null)return "";
         if(block.isEmpty()||MusaAiDrawingIndex.normalize(block).equals(MusaAiDrawingIndex.normalize(category)))return category;
         return category+" • "+block;
     }
