@@ -665,7 +665,7 @@ test("last 3x3 sweep batch with one detailed tile sends mapped vision to Gemini"
       "content-type":"application/json"},
     body:JSON.stringify({
       prompt:"Projeyi analiz et",analysisScope:"all",
-      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:41,type:"TEXT",text:"DN100"}]},
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:41,type:"TEXT",layer:"PIS_SU",text:"DN100",centerX:1250,centerY:2250}]},
       visualEvidence:{
         schema:"musacad-visual-evidence/v1",sweepSchema:"musacad-visual-sweep/v1",
         sweepBatch:3,sweepBatchCount:3,totalDetailedTiles:9,firstTile:9,lastTile:9,
@@ -690,6 +690,8 @@ test("last 3x3 sweep batch with one detailed tile sends mapped vision to Gemini"
   assert.equal(output.visualCoverageComplete,true);
   assert.match(sent.messages[1].content[0].text,/sheet-tile-9/);
   assert.match(sent.messages[1].content[0].text,/VISUAL SWEEP BATCH: 3/);
+  assert.match(sent.messages[1].content[0].text,/CO-LOCATED SOURCE CANDIDATES/);
+  assert.match(sent.messages[1].content[0].text,/"sourceId":41/);
   assert.equal(sent.messages[1].content[2].type,"image_url");
 });
 
