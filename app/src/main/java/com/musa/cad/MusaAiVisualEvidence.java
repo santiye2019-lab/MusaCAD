@@ -92,11 +92,21 @@ public final class MusaAiVisualEvidence {
             JSONArray contentBounds=new JSONArray();
             contentBounds.put(roi.left).put(roi.top).put(roi.right).put(roi.bottom);
             one.put("contentBounds",contentBounds);
+            // CAD-JSON item.centerX/centerY are WORLD coordinates. Publish both
+            // coordinate systems to avoid mismatching a visual symbol with a
+            // nearby but unrelated entity sourceId.
+            android.graphics.PointF worldA=drawing.drawingPointFromContent(roi.left,roi.top);
+            android.graphics.PointF worldB=drawing.drawingPointFromContent(roi.right,roi.bottom);
+            JSONArray drawingBounds=new JSONArray();
+            drawingBounds.put(Math.min(worldA.x,worldB.x)).put(Math.min(worldA.y,worldB.y))
+                .put(Math.max(worldA.x,worldB.x)).put(Math.max(worldA.y,worldB.y));
+            one.put("drawingBounds",drawingBounds);
             images.put(one);
         }
         JSONObject payload=new JSONObject();
         payload.put("schema","musacad-visual-evidence/v1");
         payload.put("coordinateSpace","musacad-drawing-content");
+        payload.put("drawingCoordinateSpace","dwg-world");
         payload.put("images",images);
         payload.put("renderedRegionCount",images.length());
         payload.put("requestedRegionCount",regions.size());
