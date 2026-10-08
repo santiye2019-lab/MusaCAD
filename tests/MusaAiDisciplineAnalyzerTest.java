@@ -69,6 +69,17 @@ public final class MusaAiDisciplineAnalyzerTest {
             throw new AssertionError("focused mechanical command must keep its expert route");
         if(!MusaAiDisciplineAnalyzer.analyzeAll(index()).matched)
             throw new AssertionError("general voice route must have a real local analysis");
+        ArrayList<MusaAiDrawingIndex.Item> quickItems=new ArrayList<>();
+        for(int i=0;i<1200;i++){
+            quickItems.add(new MusaAiDrawingIndex.Item(i,"LINE",
+                i%2==0?"MEK_PIS_SU":"YANGIN_SPRINKLER",""));
+        }
+        MusaAiDrawingIndex quickIndex=new MusaAiDrawingIndex(
+            "Model",1000000,0,Arrays.asList("MEK_PIS_SU","YANGIN_SPRINKLER"),
+            Arrays.asList("MEK_PIS_SU","YANGIN_SPRINKLER"),quickItems);
+        MusaAiDisciplineAnalyzer.Result quick=MusaAiDisciplineAnalyzer.analyzeAll(quickIndex);
+        if(!quick.matched||!quick.text.contains("ÇOK DİSİPLİNLİ"))
+            throw new AssertionError("bounded quick index did not generate a local review");
         System.out.println("MusaAiDisciplineAnalyzerTest OK");
     }
 }
