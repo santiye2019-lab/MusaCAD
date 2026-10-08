@@ -39,6 +39,9 @@ public final class MusaAiPanel {
     public interface Host {
         String contextLabel();
         void onPrompt(String prompt,Reply reply);
+        default void onViewPdf(String answer,Reply reply) {
+            reply.send("PDF görüntüleme bu sürümde yapılandırılmadı.");
+        }
     }
 
     public static void show(Activity activity,Host host){
@@ -71,12 +74,19 @@ public final class MusaAiPanel {
         context.setMaxLines(2);
         root.addView(context,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        HorizontalScrollView quickScroll=new HorizontalScrollView(activity);
-        quickScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout quickRow=new LinearLayout(activity);
-        quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        quickScroll.addView(quickRow,new HorizontalScrollView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(quickScroll,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        // One deliberate report action at the top; natural-language chat is
+        // the primary navigation instead of dozens of rigid command chips.
+        Button pdfPreview=new Button(activity);
+        pdfPreview.setText("PDF olarak görüntüle");
+        pdfPreview.setAllCaps(false);
+        pdfPreview.setTextColor(Color.WHITE);
+        pdfPreview.setTextSize(12f);
+        pdfPreview.setMinHeight(dp(activity,40));
+        pdfPreview.setBackground(round(activity,0xFF0C594F,12,0xFF16B8A6));
+        LinearLayout.LayoutParams pdfLp=new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,dp(activity,42));
+        pdfLp.bottomMargin=dp(activity,5);
+        root.addView(pdfPreview,pdfLp);
 
         ScrollView messagesScroll=new ScrollView(activity);
         messagesScroll.setFillViewport(true);
@@ -90,8 +100,8 @@ public final class MusaAiPanel {
 
         appendBubble(activity,messages,false,
             developer
-                ?"Gandalf Developer modu aktif. Yerel MusaCAD AI özelliklerinin yanında tam bulut analiz yüzeyi kullanılabilir. Çizim değişiklikleri yine önizleme ve açık kullanıcı onayı olmadan uygulanmaz."
-                :"Merhaba. Ben MusaCAD AI. Yerel mod çevrimdışı çizim soruları, metraj ve proje kontrolünü yapar. Gandalf Cloud AI ise kullanıcı onayıyla sınırlı CAD-JSON bağlamını kullanarak daha derin mühendislik analizi ve güncel kaynak araştırması yapabilir.");
+                ?"Gandalf Developer • Sorunuzu doğal cümleyle yazın. Bulut AI, izin verdiğinizde yerel CAD verileriyle birlikte çalışır; çizim değişiklikleri için onay gerekir."
+                :"Gandalf • Sorunuzu kendi kelimelerinizle yazın. Yerel DWG araçları ölçer ve kontrol eder; izinli bağlantıda çevrim içi AI bunları yorumlar. Bağlantı olmadığında yerel yanıt gösterilir.");
 
         LinearLayout composer=new LinearLayout(activity);
         composer.setOrientation(LinearLayout.HORIZONTAL);
@@ -135,33 +145,9 @@ public final class MusaAiPanel {
         composer.addView(send,sendLp);
         root.addView(composer,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        String[][] prompts={
-            {"Çizime sor","Bu çizimde neler var?"},
-            {"Mühendislik Analizi","Projeyi mühendislik açısından analiz et"},
-            {"Pis Su Kontrolü","Pis su tesisatındaki çapları ve hat metrajını analiz et"},
-            {"Havalandırma","Havalandırma kanal kesitlerini analiz et"},
-            {"Yangın Sistemi","Yangın pompası ve yangın tesisatı etiketlerini kontrol et"},
-            {"Komut ver","Ekrana sığdır"},
-            {"Metraj","Bu projede metraj çıkar"},
-            {"Keşif","Keşif yükle"},
-            {"Keşif Oluştur","Projeden keşif oluştur"},
-            {"Kıyas","Keşif karşılaştır"},
-            {"Mekanik","AI_MEKANIK_KONTROL"},
-            {"Elektrik","Elektrik projesini kontrol et"},
-            {"Statik","Statik teknik rapor oluştur"},
-            {"Tam Denetim","Tam proje denetim raporu oluştur"},
-            {"Uzmanlar","Disiplin AI yardım"},
-            {"MEKAI","MEKAI_FULL"},
-            {"STATIKAI","STATIKAI_FULL"},
-            {"ELKAI","ELKAI_FULL"},
-            {"Kontrol","Projeyi kontrol et"},
-            {"Rapor","Proje raporu oluştur"}
-        };
-        for(String[] item:prompts)addQuickPrompt(activity,quickRow,input,item[0],item[1]);
-        addQuickPrompt(activity,quickRow,input,"G-MEKAI",
-            "GMEKAI_FULL projeyi derin analiz et, hata raporu hazırla ve gerekli düzeltmeleri öner");
-        addQuickPrompt(activity,quickRow,input,"G-STATİK",
-            "GSTATIKAI_FULL statik projeyi derin analiz et, koordinasyon hatalarını ve eksik verileri raporla");
+        final String[] latestAssistantAnswer={""};
+        // Session-only short history: never written to device storage.
+        final java.util.ArrayDeque<String> recentTurns=new java.util.ArrayDeque<>();
 
         Runnable submit=()->{
             String prompt=input.getText().toString().trim();
@@ -171,6 +157,11 @@ public final class MusaAiPanel {
             TextView pending=appendBubble(activity,messages,false,"İşleniyor…");
             scrollBottom(messagesScroll);
             final AtomicBoolean completed=new AtomicBoolean(false);
+            final StringBuilder previousTurns=new StringBuilder();
+            for(String turn:recentTurns){
+                if(previousTurns.length()+turn.length()>2600)continue;
+                previousTurns.append(turn).append("\\n");
+            }
             final Handler timeoutHandler=new Handler(Looper.getMainLooper());
             final long startedMs=android.os.SystemClock.elapsedRealtime();
             final long maxRequestMs=240_000L;
@@ -185,7 +176,12 @@ public final class MusaAiPanel {
                     activity.runOnUiThread(()->{
                         if(!completed.compareAndSet(false,true))return;
                         timeoutHandler.removeCallbacks(timeout);
-                        pending.setText(text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim());
+                        String answer=text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim();
+                        pending.setText(answer);
+                        latestAssistantAnswer[0]=answer;
+                        recentTurns.addLast("Kullanıcı: "+prompt.substring(0,Math.min(300,prompt.length()))+
+                            "\\nGandalf: "+answer.substring(0,Math.min(500,answer.length())));
+                        while(recentTurns.size()>4)recentTurns.removeFirst();
                         Linkify.addLinks(pending,Linkify.WEB_URLS);
                         pending.setMovementMethod(LinkMovementMethod.getInstance());
                         pending.setLinksClickable(true);
@@ -209,10 +205,23 @@ public final class MusaAiPanel {
             catch(Exception e){requestReply.send("Gandalf komutu işlenirken hata oluştu. Tekrar deneyin.");}
         };
 
-        // Gandalf is an action, not a passive text preset: one tap starts the
-        // central agent immediately. Voice commands use the same host/router.
-        addQuickPromptAuto(activity,quickRow,input,"Gandalf",
-            "Bu projeyi tüm disiplinlerde kontrol et, önemli bulguları ve yapılacakları raporla",submit);
+        pdfPreview.setOnClickListener(v->{
+            String latest=latestAssistantAnswer[0];
+            if(latest==null||latest.trim().isEmpty()){
+                appendBubble(activity,messages,false,
+                    "Önce bir soru sorun veya rapor oluşturun; ardından son yanıtı PDF açabilirsiniz.");
+                scrollBottom(messagesScroll);
+                return;
+            }
+            host.onViewPdf(latest,new Reply(){
+                @Override public void send(String message){
+                    activity.runOnUiThread(()->{
+                        appendBubble(activity,messages,false,message);
+                        scrollBottom(messagesScroll);
+                    });
+                }
+            });
+        });
         MusaAiVoiceInput.Callback voiceCallback=new MusaAiVoiceInput.Callback(){
             @Override public void onText(String text){
                 activity.runOnUiThread(()->{
@@ -256,40 +265,6 @@ public final class MusaAiPanel {
         });
         sheet.setOnDismissListener(d->MusaAiVoiceInput.clear(voiceCallback));
         sheet.show();
-    }
-
-    private static void addQuickPrompt(Activity activity,LinearLayout row,EditText input,String label,String prompt){
-        Button chip=new Button(activity);
-        chip.setText(label);
-        chip.setAllCaps(false);
-        chip.setTextColor(0xFFEAFBFF);
-        chip.setTextSize(10f);
-        chip.setMinHeight(dp(activity,36));
-        chip.setPadding(dp(activity,12),0,dp(activity,12),0);
-        chip.setBackground(round(activity,0xFF12384C,18,0xFF246C88));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp(activity,36));
-        lp.setMarginEnd(dp(activity,7));
-        row.addView(chip,lp);
-        chip.setOnClickListener(v->{input.setText(prompt);input.setSelection(input.length());input.requestFocus();});
-    }
-
-    private static void addQuickPromptAuto(Activity activity,LinearLayout row,EditText input,String label,String prompt,Runnable submit){
-        Button chip=new Button(activity);
-        chip.setText(label);
-        chip.setAllCaps(false);
-        chip.setTextColor(0xFFEAFBFF);
-        chip.setTextSize(10f);
-        chip.setMinHeight(dp(activity,36));
-        chip.setPadding(dp(activity,12),0,dp(activity,12),0);
-        chip.setBackground(round(activity,0xFF0C594F,18,0xFF16B8A6));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,dp(activity,36));
-        lp.setMarginEnd(dp(activity,7));
-        row.addView(chip,lp);
-        chip.setOnClickListener(v->{
-            input.setText(prompt);
-            input.setSelection(input.length());
-            submit.run();
-        });
     }
 
     private static TextView appendBubble(Activity activity,LinearLayout messages,boolean user,String value){
