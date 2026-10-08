@@ -1,0 +1,74 @@
+package com.musa.cad;
+
+/**
+ * Voice/text interpretation for automatic multimodal engineering review.
+ * Specialist/edit/report export commands retain their existing routes.
+ * A discipline scope is a model instruction, not a claim that other
+ * visible drawing elements were omitted or rendered invisible.
+ */
+public final class MusaAiAnalysisIntent {
+    private MusaAiAnalysisIntent(){}
+
+    public static boolean isReview(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(q.isEmpty())return false;
+        if(q.startsWith("mekai ")||q.startsWith("gmekai ")||
+           q.startsWith("statikai ")||q.startsWith("gstatikai ")||
+           q.startsWith("elkai ")||q.startsWith("gelkai "))return false;
+        if(contains(q,"onerileri uygula","onerileri onizle","degistir","duzelt","sil",
+            "dosya kaydet","metraj cikar","kesif olustur","kesif yukle",
+            "raporu pdf","raporu word","revizyon","secili alani"))return false;
+        boolean operation=contains(q,"analiz","incele","denetle","kontrol et","proje kontrolu",
+            "proje incele","teknik rapor hazirla");
+        boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
+            "pis su","atik su","yangin","havalandirma","klima","isitma","statik",
+            "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
+            "hidrofor","pompa","sprinkler","hepsini");
+        return operation&&topic;
+    }
+
+    public static String scope(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(contains(q,"pis su","atik su","kanalizasyon","wastewater","sewer"))return "wastewater";
+        if(contains(q,"sihhi tesisat","temiz su","sicak su","soguk su","kullanma suyu"))return "sanitary";
+        if(contains(q,"yangin","sprinkler","hidrant","fire"))return "fire";
+        if(contains(q,"havalandirma","hava kanali","ventilasyon","spiro","egzoz"))return "ventilation";
+        if(contains(q,"kalorifer","isitma","radyator","yerden isitma"))return "heating";
+        if(contains(q,"sogutma","klima","vrf","chiller","fancoil"))return "cooling";
+        if(contains(q,"dogalgaz","gaz tesisati"))return "gas";
+        if(contains(q,"mekanik","tesisat","boru","pompa","hidrofor"))return "mechanical";
+        if(contains(q,"statik","betonarme","tasiyici"))return "structural";
+        if(contains(q,"mimari","mimarilik"))return "architectural";
+        if(contains(q,"elektrik","aydinlatma","pano"))return "electrical";
+        if(contains(q,"peyzaj","bitkilendirme"))return "landscape";
+        if(contains(q,"altyapi","rogar","sulama altyapisi"))return "infrastructure";
+        if(contains(q,"asansor","elevator"))return "elevator";
+        return "all";
+    }
+
+    public static String label(String scope){
+        if(scope==null)return "Tüm disiplinler";
+        switch(scope){
+            case "wastewater":return "Pis su / atık su";
+            case "sanitary":return "Sıhhi tesisat";
+            case "fire":return "Yangın tesisatı";
+            case "ventilation":return "Havalandırma";
+            case "heating":return "Isıtma";
+            case "cooling":return "Klima / soğutma";
+            case "gas":return "Doğalgaz";
+            case "mechanical":return "Mekanik tesisat";
+            case "structural":return "Statik";
+            case "architectural":return "Mimari";
+            case "electrical":return "Elektrik";
+            case "landscape":return "Peyzaj";
+            case "infrastructure":return "Altyapı";
+            case "elevator":return "Asansör";
+            default:return "Tüm disiplinler";
+        }
+    }
+
+    private static boolean contains(String hay,String... needles){
+        for(String n:needles)if(hay.contains(MusaAiDrawingIndex.normalize(n)))return true;
+        return false;
+    }
+}
