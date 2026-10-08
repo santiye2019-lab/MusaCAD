@@ -62,6 +62,16 @@ public final class MusaAiCloudService {
         return analyzeInternal(context,index,fileName,rawPrompt,null,null,"all");
     }
 
+    /** User-consented chat continuity and on-device engineering evidence.
+     * Never includes raw DWG, image or entire local price book.
+     */
+    public static Result analyzeWithContext(Context context,MusaAiDrawingIndex index,
+                                            String fileName,String rawPrompt,
+                                            String recentTurns,String localEvidence){
+        return analyzeInternal(context,index,fileName,rawPrompt,null,null,"all",
+            recentTurns,localEvidence);
+    }
+
     public static Result analyzePackage(Context context,MusaAiDrawingIndex index,String fileName,
                                         Collection<MusaAiProjectPackage.Drawing>drawings,String rawPrompt){
         if(drawings==null||drawings.isEmpty())
@@ -78,6 +88,12 @@ public final class MusaAiCloudService {
 
     private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
                                           String rawPrompt,String packageJson,JSONObject visualEvidence,String scope){
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson,visualEvidence,scope,"","");
+    }
+
+    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
+                                          String rawPrompt,String packageJson,JSONObject visualEvidence,String scope,
+                                          String recentTurns,String localEvidence){
         if(context==null||index==null)return new Result(Status.INVALID_RESPONSE,"","Çizim bağlamı hazırlanamadı",null,false);
 
         String endpoint=BuildConfig.AI_API_URL==null?"":BuildConfig.AI_API_URL.trim();
@@ -112,6 +128,11 @@ public final class MusaAiCloudService {
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
             body.put("analysisScope",scope==null?"all":scope);
+            // Include only bounded, consented conversation continuity.
+            if(recentTurns!=null&&!recentTurns.trim().isEmpty())
+                body.put("previousChat",recentTurns.substring(0,Math.min(2600,recentTurns.length())));
+            if(localEvidence!=null&&!localEvidence.trim().isEmpty())
+                body.put("localEvidence",localEvidence.substring(0,Math.min(2200,localEvidence.length())));
             if(visualEvidence!=null)body.put("visualEvidence",visualEvidence);
             String expertProfile=MusaAiMechanicalExpert.cloudProfile(rawPrompt);
             if(expertProfile.isEmpty())expertProfile=MusaAiDisciplineExpert.cloudProfile(rawPrompt);
