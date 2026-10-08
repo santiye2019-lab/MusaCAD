@@ -42,6 +42,14 @@ public final class MusaAiViewCatalogTest {
         check(r.report.contains("kot/düşey"),"coordination prompts include section levels");
         check(r.report.contains("BAŞLIK ENVANTERİDİR"),"report cannot imply visual audit");
         check(r.unpositionedViews==1,"missing coordinate signaled");
+        check(MusaAiViewCatalog.classify("tip kat pis su tesisat plani")==MusaAiViewCatalog.Kind.FLOOR,
+            "unnumbered typical floor plumbing title");
+        check(MusaAiViewCatalog.classify("normal kat sihhi tesisat plani")==MusaAiViewCatalog.Kind.FLOOR,
+            "unnumbered normal floor plumbing title");
+        check(MusaAiViewCatalog.classify("bodrum pis su tesisat plani")==MusaAiViewCatalog.Kind.BASEMENT,
+            "basement drawing with omitted kat word");
+        check(MusaAiViewCatalog.classify("zemin temiz su tesisat plani")==MusaAiViewCatalog.Kind.GROUND,
+            "ground floor drawing with omitted kat word");
         check(MusaAiViewCatalog.classify("deniz seviyesine gore kot 0 00")==null,"level note is not a view");
         check(MusaAiViewCatalog.classify("bd00 dn100 boru")==null,"pipe cannot become view");
         MusaAiDrawingIndex none=new MusaAiDrawingIndex("Model",0,0,
