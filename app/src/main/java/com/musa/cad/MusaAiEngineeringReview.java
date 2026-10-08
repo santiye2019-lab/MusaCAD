@@ -70,8 +70,9 @@ public final class MusaAiEngineeringReview {
         if(has(q,"statik","mimari","elektrik","peyzaj","asansor")&&
             !has(q,"mekanik","pis su","temiz su","yangin","tesisat","havalandirma"))return false;
         boolean request=has(q,"analiz","incele","kontrol","denet","metrajini oku","olculeri oku");
-        boolean context=has(q,"proje","cizim","pafta","tesisat","boru","kanal","yangin","pompa",
-            "hidrofor","havalandirma","sihhi","pis su","sprinkler");
+        boolean context=q.contains("proje")||q.contains("cizim")||q.contains("pafta")||
+            has(q,"tesisat","boru","kanal","yangin","pompa",
+                "hidrofor","havalandirma","sihhi","pis su","sprinkler");
         return request&&context;
     }
 
