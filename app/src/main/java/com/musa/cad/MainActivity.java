@@ -26,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
-    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1";
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_tiles_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
@@ -880,6 +880,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String aiControl=MusaAiDrawingIndex.normalize(raw);
+        // General and discipline-scoped engineering speech uses hybrid
+        // vision + CAD by default, with separate consent and offline fallback.
+        if(MusaAiAnalysisIntent.isReview(raw)){
+            handleMusaAiCloudPrompt(raw,reply);
+            return;
+        }
         if((MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)||
             MusaAiEngineeringReview.asksReview(raw))&&!MusaAiCloudPolicy.shouldUseCloud(raw)){
             runMusaAiGeneralProjectAnalysis(reply);
@@ -1414,23 +1420,27 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
-        String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:K_CLOUD_CONSENT;
+        boolean hybridVisual=MusaAiAnalysisIntent.isReview(raw)&&!packageMode;
+        String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:
+            hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT;
         if(prefs.getBoolean(consentKey,false)){
-            runMusaAiCloud(raw,reply);
+            runMusaAiCloud(raw,reply,hybridVisual);
             return;
         }
         String scope=packageMode
-            ?"Derin analiz için açık vektör proje paketindeki çizimlerin sınırlı CAD-JSON özetleri güvenli MusaCAD sunucusuna gönderilir."
-            :"Derin analiz için aktif çizimin sınırlı CAD-JSON özeti güvenli MusaCAD sunucusuna gönderilir.";
+            ?"Açık proje paketinin sınırlı CAD-JSON özetleri sunucuya gönderilir."
+            :hybridVisual
+                ?"Bu hibrit analizde aktif DWG paftasının GENEL GÖRÜNTÜSÜ ve en fazla dört ayrıntı bölgesi JPEG olarak, ayrıca katman/metin/ölçüleri içeren sınırlı CAD-JSON verisi çevrim içi AI sunucusuna gönderilir. Görseller proje bilgisi ve gizli içerik taşıyabilir."
+                :"Aktif çizimin sınırlı CAD-JSON özeti çevrim içi AI sunucusuna gönderilir.";
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
             :" Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz.";
         new AlertDialog.Builder(this)
-            .setTitle(packageMode?"Gandalf • Proje Paketi":"Gandalf Cloud AI")
-            .setMessage(scope+" Ham DWG/DXF dosyaları gönderilmez. Katman adları, çizim metinleri, nesne türleri ve ölçü bilgileri bulut AI tarafından işlenebilir."+edit+" Devam edilsin mi?")
+            .setTitle(hybridVisual?"Gandalf • Hibrit Görsel+CAD Analizi":packageMode?"Gandalf • Proje Paketi":"Gandalf Cloud AI")
+            .setMessage(scope+" Ham DWG/DXF dosyaları gönderilmez. Analiz görüntülerinde de proje verileri bulunabilir."+edit+" Bu görsel veri aktarımına izin veriyor musunuz?")
             .setPositiveButton("DEVAM",(d,w)->{
                 prefs.edit().putBoolean(consentKey,true).apply();
-                runMusaAiCloud(raw,reply);
+                runMusaAiCloud(raw,reply,hybridVisual);
             })
             .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf Cloud AI isteği iptal edildi. Yerel MusaCAD AI çevrimdışı kullanılmaya devam edebilir."))
             .setOnCancelListener(d->reply.send("Gandalf Cloud AI isteği iptal edildi."))
@@ -1451,11 +1461,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply){
+        runMusaAiCloud(raw,reply,false);
+    }
+
+    private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply,boolean hybridVisual){
         // Capture only cheap immutable references on the UI thread. The expensive
         // CAD-to-AI projection is built below on MusaCAD-cloud-ai so large drawings
         // can never trigger Android's "uygulama yanıt vermiyor" watchdog.
         final DxfParser.Result activeSnapshot=activeDxf;
         final String displayName=currentDisplayName;
+        final String requestedScope=MusaAiAnalysisIntent.scope(raw);
         final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
         final List<AiCloudProjectSource> packageSources=packageMode
             ?currentAiCloudProjectSources():Collections.emptyList();
@@ -1479,22 +1494,36 @@ public class MainActivity extends AppCompatActivity {
                         packageDrawings=Collections.unmodifiableList(built);
                     }
 
-                    reply.progress("Gandalf • Güvenli AI oturumu açılıyor, analiz yanıtı bekleniyor…");
+                    MusaAiVisualEvidence.Result visual=null;
+                    String visualWarning="";
+                    if(hybridVisual){
+                        try{
+                            visual=MusaAiVisualEvidence.render(activeSnapshot,text->reply.progress(text));
+                            if(visual.imageCount==0)
+                                visualWarning="Görsel pafta oluşturulamadı; yalnızca CAD verileri gönderildi.";
+                            else if(!visual.complete)
+                                visualWarning="Tüm görsel bölgeler aktarılamadı; görsel kapsam sınırlı.";
+                        }catch(Exception ex){
+                            visualWarning="Görsel pafta hazırlığı başarısız; yalnızca CAD-JSON verileri gönderildi.";
+                        }
+                    }
+                    reply.progress("Gandalf • "+MusaAiAnalysisIntent.label(requestedScope)+
+                        " için görsel ve sayısal deliller çevrim içi AI tarafından değerlendiriliyor…");
                     MusaAiCloudService.Result cloud=packageMode
                         ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
-                        :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+                        :hybridVisual
+                            ?MusaAiCloudService.analyzeHybrid(getApplicationContext(),snapshot,displayName,raw,requestedScope,
+                                visual==null||visual.imageCount==0?null:visual.json)
+                            :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
                     if(!cloud.ok()){
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
-                        MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
+                        MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
-                        if(localFallback.matched){
-                            reply.send(reason+
-                                "\n\nGandalf yerel araçlarla devam etti:\n"+
-                                localFallback.text+
-                                "\n\nNot: Bu yedek analiz güncel web/kaynak taraması kullanmaz.");
-                        }else{
-                            reply.send(reason+" Yerel Gandalf araçları da bu isteği eşleştiremedi.");
-                        }
+                        reply.send(reason+
+                            "\n\nGandalf yerel vektör analiziyle devam etti (görsel AI sonucu değildir):\n"+
+                            localFallback.text+
+                            "\n\nİstenen disiplin: "+MusaAiAnalysisIntent.label(requestedScope)+
+                            "\nNot: Bu yedek analiz canlı görsel yorumlama veya web/kaynak taraması kullanmaz.");
                         return;
                     }
                     pendingAiActions=cloud.actions;
@@ -1503,6 +1532,14 @@ public class MainActivity extends AppCompatActivity {
                         out.append("Gandalf Developer • Yönetici modu aktif\n\n");
                     if(packageMode)
                         out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
+                    if(hybridVisual){
+                        out.append("Gandalf Hibrit AI • ").append(MusaAiAnalysisIntent.label(requestedScope)).append("\n");
+                        if(visual!=null&&visual.imageCount>0)
+                            out.append("Görsel: ").append(visual.imageCount).append("/")
+                                .append(visual.regionCount).append(" pafta bölgesi; vektör CAD delilleriyle birlikte.\n\n");
+                        else out.append("Yalnız CAD-JSON bağlamı (görsel yok).\n\n");
+                        if(!visualWarning.isEmpty())out.append(visualWarning).append("\n\n");
+                    }
                     out.append(cloud.text);
                     if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
                     if(!cloud.sources.isEmpty()){
