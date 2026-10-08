@@ -184,8 +184,8 @@ public final class MusaAiViewCatalog {
     }
     private static int order(Kind kind){
         switch(kind){
-            case SITE:return 0;case BASEMENT:return 1;case GROUND:return 2;
-            case FLOOR:return 3;case ROOF:return 4;case SECTION:return 5;
+            case SITE:return 0;case SECTION:return 1;case ROOF:return 2;
+            case BASEMENT:return 3;case GROUND:return 4;case FLOOR:return 5;
             case ELEVATION:return 6;default:return 7;
         }
     }
