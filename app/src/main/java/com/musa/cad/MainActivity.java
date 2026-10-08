@@ -3013,39 +3013,14 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Native DWG motoru açılıyor…");});
+                // Do not expose the provisional native DWG scene to the user.
+                // Its partial color semantics could make the first visible frame blue
+                // and then change after DXF handoff. Keep the loading surface visible
+                // until the authoritative vector model is ready so the first drawing
+                // frame already has the final CAD colors.
+                runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText("DWG vektör model hazırlanıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
-                    NativeScene fast=null;
-                    try{fast=engine.fastScene();}catch(IOException|OutOfMemoryError ignored){}
-                    Bitmap embeddedPreview=null;
-                    if(fast==null){try{embeddedPreview=DwgPreview.read(loaded.file);}catch(Exception ignored){}}
-                    if(fast!=null||embeddedPreview!=null){
-                        loaded.nativeScene=fast;loaded.bitmap=embeddedPreview;
-                        ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.nativeScene=fast;project.bitmap=embeddedPreview;project.name=loaded.name;project.dxf=false;project.preparingEditor=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                        loaded.project=project;
-                        java.util.concurrent.CountDownLatch attached=new java.util.concurrent.CountDownLatch(1);
-                        java.util.concurrent.atomic.AtomicBoolean accepted=new java.util.concurrent.atomic.AtomicBoolean(false);
-                        runOnUiThread(()->{
-                            try{
-                                if(activeLoad!=task||isFinishing()||isDestroyed())return;
-                                if(task.dialog!=null)task.dialog.dismiss();
-                                activeLoad=null;project.prepareTask=task;
-                                projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
-                                String partial=project.nativeScene!=null&&project.nativeScene.truncated?" • hızlı sahne kısmi":"";
-                                result.setText((project.nativeScene!=null?"Native hızlı görünüm":"Hızlı DWG önizleme")+" hazır"+partial+" • Tam vektör ve düzenleme araçları hazırlanıyor…");accepted.set(true);
-                            }finally{attached.countDown();}
-                        });
-                        try{attached.await();}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new InterruptedIOException("Dosya açma iptal edildi");}
-                        if(!accepted.get())throw new InterruptedIOException("Dosya açma iptal edildi");
-                        loaded.handedOff=true;
-                        // Recent-file thumbnail generation is deliberately off the critical DWG path.
-                        // Large native scenes can contain tens of thousands of primitives; rendering a
-                        // thumbnail here used to delay the full DXF export after first paint.
-                        scheduleRecentNativeRecord(uri,loaded.name,loaded.nativeScene);
-                    }
-
                     FileTransfer.checkCancelled();
-                    runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText("Tam vektör model hazırlanıyor…");});
                     File converted=File.createTempFile("MusaCAD_donusen_",".dxf",getCacheDir());boolean keep=false;
                     try{
                         int status=engine.exportDxf(converted);FileTransfer.checkCancelled();

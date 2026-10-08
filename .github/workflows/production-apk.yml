@@ -104,13 +104,13 @@ jobs:
             jarsigner -verify "$apk"
           fi
 
-          cp "$apk" /tmp/MusaCAD-v1.2.1-direct-production.apk
-          sha256sum /tmp/MusaCAD-v1.2.1-direct-production.apk | tee /tmp/MusaCAD-v1.2.1-direct-production.sha256
+          cp "$apk" /tmp/MusaCAD-v1.2.2-direct-production.apk
+          sha256sum /tmp/MusaCAD-v1.2.2-direct-production.apk | tee /tmp/MusaCAD-v1.2.2-direct-production.sha256
 
           {
             echo "## MusaCAD production signed APK"
             echo "- Variant: directRelease"
-            echo "- Version: 1.2.1 (16)"
+            echo "- Version: 1.2.2 (17)"
             echo "- Production enforcement: enabled"
             echo "- Debuggable: false"
             echo "- Signing: production keystore"
@@ -121,15 +121,15 @@ jobs:
               echo "- Gandalf: local tools active; Cloud AI not configured"
             fi
             echo "- SHA-256:"
-            echo '  `'$(cut -d' ' -f1 /tmp/MusaCAD-v1.2.1-direct-production.sha256)'`'
+            echo '  `'$(cut -d' ' -f1 /tmp/MusaCAD-v1.2.2-direct-production.sha256)'`'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload production signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: MusaCAD-production-direct-v1.2.1
+          name: MusaCAD-production-direct-v1.2.2
           path: |
-            /tmp/MusaCAD-v1.2.1-direct-production.apk
-            /tmp/MusaCAD-v1.2.1-direct-production.sha256
+            /tmp/MusaCAD-v1.2.2-direct-production.apk
+            /tmp/MusaCAD-v1.2.2-direct-production.sha256
           if-no-files-found: error
           retention-days: 14

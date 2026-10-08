@@ -16,20 +16,20 @@ public final class UiResponsivenessContractTest {
         String nativeScene=read("app/src/main/java/com/musa/cad/NativeScene.java");
         String manifest=read("app/src/main/AndroidManifest.xml");
 
-        require(view,"NAVIGATION_SETTLE_MS=160L","gesture settle window");
+        require(view,"NAVIGATION_SETTLE_MS=90L","gesture settle window");
         require(view,"settleFastNavigation()","delayed full-vector redraw");
-        require(view,"shouldUsePreviewForNavigation()","fast navigation cache");
+        require(view,"private boolean shouldUsePreviewForNavigation(){return false;}","bitmap navigation disabled");
         require(view,"authoritativeVectorFramePending=true","first complete vector frame after DWG upgrade");
         require(view,"if(authoritativeVectorFramePending)","authoritative color handoff");
         require(view,"if(visualOverlay)invalidate();","command changes avoid unnecessary full redraw");
         require(view,"CadNavigationPolicy.pinchScaleFactor","CAD-speed pinch response");
         require(view,"removeCallbacks(endFastNavigation);fastNavigation=true;","gesture-wide fast-render latch");
         require(view,"mode==Mode.PAN){settleFastNavigation();requestNavigationFrame();return true;}","pan release settles once");
-        require(view,"nativeDrawing.draw(c,imageMatrix,fastNavigation)","native renderer quality/gesture split");
+        require(view,"drawVectorNavigation(c,imageMatrix","sharp vector navigation");
 
-        require(main,"DxfParser.render(converted,true)","DWG authoritative navigation preview");
+        require(main,"DWG vektör model hazırlanıyor","authoritative DWG first frame");
         if(main.contains("currentProject.parsed.bitmap.recycle()"))throw new AssertionError("Responsiveness regression: open-tab navigation preview is recycled");
-        require(parser,"Bitmap.Config.ARGB_8888","full-color navigation preview");
+        require(parser,"public void drawVectorNavigation","sharp vector navigation renderer");
         require(nativeScene,"navigationFast&&visible!=null&&offsets.length>50000","native LOD only during active navigation");
         require(manifest,"android:hardwareAccelerated=\"true\"","hardware-accelerated CAD canvas");
 
@@ -43,6 +43,6 @@ public final class UiResponsivenessContractTest {
         require(main,"makeDialogButtonsReadable(projectCloseDialog)","readable save/close actions");
         require(main,"button.setTextColor(Color.WHITE)","white close dialog actions");
 
-        System.out.println("UI responsiveness contract OK: persistent full-color preview, gesture-latched fast navigation, native idle color fidelity, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
+        System.out.println("UI responsiveness contract OK: authoritative first-frame color, sharp vector pinch/pan, reduced hot-frame allocations, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
     }
 }

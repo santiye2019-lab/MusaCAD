@@ -97,7 +97,7 @@ public class CadView extends View {
     private float dimTextHeightContent=24f,dimArrowSizeContent=14f;
     private int dimPrecision=2;
 
-    private static final long NAVIGATION_SETTLE_MS=160L;
+    private static final long NAVIGATION_SETTLE_MS=90L;
     private boolean selecting,draggingSelection,exporting,reportEvidenceExporting,fastNavigation,authoritativeVectorFramePending;
     private final Runnable endFastNavigation=()->{fastNavigation=false;requestNavigationFrame();};
     private float selectionX,selectionY,selectionEndX,selectionEndY;
@@ -128,14 +128,13 @@ public class CadView extends View {
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseNativeFastScene(){return RenderPathPolicy.useNativeFast(vectorDrawing!=null,nativeDrawing!=null,nativeDrawing!=null&&nativeDrawing.truncated,sourceEdits.modifiedCount());}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled();}
-    private boolean shouldUsePreviewForNavigation(){return RenderPathPolicy.useBitmapNavigationPreview(vectorDrawing!=null,canUseFastVectorPreview(),sourceEdits.modifiedCount());}
+    private boolean shouldUsePreviewForNavigation(){return false;}
     private float clampNavigationScale(float candidate){return CadNavigationPolicy.clampScale(candidate,scale,fitScale);}
     private void requestNavigationFrame(){postInvalidateOnAnimation();}
     private void beginFastNavigation(){
-        if(!canUseNativeFastScene()&&!shouldUsePreviewForNavigation()){if(fastNavigation)stopFastNavigation();return;}
-        // Keep the fast renderer latched for the entire gesture. Scheduling a delayed
-        // full-vector frame on every MOVE used to race the finger and caused periodic
-        // heavyweight redraws (visible as pinch/pan stutter on large DWGs).
+        if(vectorDrawing==null&&!canUseNativeFastScene()){if(fastNavigation)stopFastNavigation();return;}
+        // The navigation frame stays vector-based. Bitmap previews are deliberately
+        // excluded so pinch/pan remains sharp at every zoom level.
         removeCallbacks(endFastNavigation);fastNavigation=true;
     }
     private void settleFastNavigation(){if(!fastNavigation)return;removeCallbacks(endFastNavigation);postDelayed(endFastNavigation,NAVIGATION_SETTLE_MS);}
@@ -905,20 +904,14 @@ public class CadView extends View {
         super.onDraw(c);
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
-                // First frame after open/upgrade comes from the exact DXF-rendered color
-                // preview, so correct colors appear immediately without waiting for a
-                // potentially expensive full-vector frame. Refine on the next vsync.
-                if(canUseFastVectorPreview()){
-                    vectorDrawing.drawPreview(c,imageMatrix,paint);
-                    authoritativeVectorFramePending=false;
-                    postInvalidateOnAnimation();
-                }else{
-                    vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-                    authoritativeVectorFramePending=false;
-                }
-            }else if(fastNavigation&&canUseNativeFastScene())nativeDrawing.draw(c,imageMatrix,true);
-            else if(fastNavigation&&shouldUsePreviewForNavigation())vectorDrawing.drawPreview(c,imageMatrix,paint);
-            else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+                // First visible vector frame is already the final authoritative CAD
+                // renderer. No provisional bitmap/native frame is shown, so colors do
+                // not change after opening and there is no zoom-time blur handoff.
+                vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
+                authoritativeVectorFramePending=false;
+            }else if(fastNavigation){
+                vectorDrawing.drawVectorNavigation(c,imageMatrix,sourceEdits.hiddenSourceIds());
+            }else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
         }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix,fastNavigation);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 

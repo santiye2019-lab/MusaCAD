@@ -7,7 +7,7 @@ public final class CadNavigationPolicy {
     public static final float EDGE_PAD_PIXELS=24f;
     // Slightly faster than raw finger-distance scaling, matching dedicated CAD viewers
     // without introducing step-wise zoom jumps.
-    public static final float PINCH_RESPONSE=1.18f;
+    public static final float PINCH_RESPONSE=1.32f;
 
     public static float clampScale(float candidate,float current,float fitScale){
         float base=Float.isFinite(fitScale)&&fitScale>0f?fitScale:1e-6f;
