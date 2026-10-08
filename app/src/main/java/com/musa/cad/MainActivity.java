@@ -30,6 +30,14 @@ public class MainActivity extends AppCompatActivity {
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
+    // Dedicated executor: downloading/reading a 741-page price book must not
+    // block Android UI or the separate local/cloud CAD engineering engines.
+    private final ExecutorService yfkCatalogExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-YFK-private-catalog");
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
+    private final AtomicBoolean yfkDownloadActive=new AtomicBoolean(false);
     private final ExecutorService aiExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-cloud-ai");
         t.setPriority(Thread.NORM_PRIORITY-1);
@@ -880,6 +888,76 @@ public class MainActivity extends AppCompatActivity {
         }
         if(MusaAiDisciplineExpert.isHelpCommand(raw)){
             reply.send(MusaAiDisciplineExpert.commandHelp());
+            return;
+        }
+
+        // 2026 YFK official PDF is downloaded at the user's explicit request
+        // into app-private storage, never embedded or redistributed in APK.
+        if(MusaAiYfkCatalogQuery.wantsDownload(raw)){
+            MusaAiYfkOfflineCatalog.Status status=MusaAiYfkOfflineCatalog.status(this);
+            if(status.installed){
+                reply.send("ÇŞİDB 2026 Ocak kitabı bu cihazda hazır: "+status.pages+
+                    " sayfa. “Poz 25.100.1005” veya “ÇŞB kitabında lavabo ara” diyerek çevrim dışı çağırabilirsiniz.");
+                return;
+            }
+            if(yfkDownloadActive.get()){
+                reply.send("ÇŞİDB kitabı zaten indiriliyor veya indeksleniyor; ilerleme durumunu bekleyin.");
+                return;
+            }
+            new AlertDialog.Builder(this)
+                .setTitle("ÇŞİDB 2026 kitabı • cihaz içi arşiv")
+                .setMessage("741 sayfalık 2026 YFK birim fiyat kitabı Bakanlığın kendi sunucusundan "+
+                    "cihazınıza indirilecek ve tüm sayfaları çevrim dışı aranabilir hale getirilecektir. "+
+                    "İndirme ve indeksleme zaman/alan kullanır. Yayının tüm hakları saklıdır; "+
+                    "PDF kişisel uygulama depolamasında tutulur, uygulamayla dağıtılmaz. "+
+                    "Bu Ocak 2026 yayınıdır; sonraki aylık fiyat düzeltmelerini içermez. "+
+                    "Devam etmek istiyor musunuz?")
+                .setPositiveButton("RESMÎ KAYNAKTAN İNDİR",(dialog,which)->{
+                    if(!yfkDownloadActive.compareAndSet(false,true))return;
+                    reply.progress("ÇŞİDB 2026 resmî kitabı indiriliyor…");
+                    yfkCatalogExecutor.submit(()->{
+                        try{
+                            MusaAiYfkOfflineCatalog.Status installed=
+                                MusaAiYfkOfflineCatalog.downloadAndIndex(this,message->
+                                    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&result!=null)
+                                        result.setText("ÇŞİDB • "+message);}));
+                            runOnUiThread(()->{
+                                if(reply!=null)reply.send("ÇŞİDB 2026 kitabı çevrim dışı hazır: "+
+                                    installed.pages+" sayfa, "+(installed.bytes/(1024*1024))+
+                                    " MB PDF. “Poz 25.100.1005” komutuyla deneyin. "+
+                                    "Fiyatları keşfe uygulamadan önce imalat tarifini, birimi ve geçerli ayı doğrulayın.");
+                            });
+                        }catch(Exception e){
+                            final String error=e.getMessage()==null?"resmî PDF indirilemedi":e.getMessage();
+                            runOnUiThread(()->{if(reply!=null)reply.send(
+                                "ÇŞİDB kitabı kurulamadı: "+error+
+                                ". Kaynak PDF'ye erişim ve cihazdaki boş alanı kontrol edin.");});
+                        }finally{yfkDownloadActive.set(false);}
+                    });
+                })
+                .setNegativeButton("VAZGEÇ",null).show();
+            return;
+        }
+        if(MusaAiYfkCatalogQuery.wantsStatus(raw)){
+            MusaAiYfkOfflineCatalog.Status status=MusaAiYfkOfflineCatalog.status(this);
+            reply.send(status.installed?"2026 YFK fiyat kitabı yerel arşivde hazır: "+
+                status.pages+" sayfa. Kaynak: "+status.source+
+                "\nDönem: "+status.period+" (güncel aylık fiyat garantisi yok).":
+                "ÇŞİDB 2026 kitabı yerel arşivde kurulu değil. “ÇŞB kitabını indir” yazın.");
+            return;
+        }
+        if(!MusaAiYfkCatalogQuery.lookup(raw).isEmpty()){
+            reply.progress("2026 ÇŞİDB resmî kitabında poz aranıyor…");
+            yfkCatalogExecutor.submit(()->{
+                try{
+                    MusaAiYfkOfflineCatalog.Lookup found=
+                        MusaAiYfkOfflineCatalog.find(this,raw);
+                    runOnUiThread(()->{if(reply!=null)reply.send(found.answer);});
+                }catch(Exception e){
+                    runOnUiThread(()->{if(reply!=null)reply.send("ÇŞİDB poz araması başarısız: "+
+                        (e.getMessage()==null?"yerel indeks okunamadı":e.getMessage()));});
+                }
+            });
             return;
         }
 
@@ -3895,7 +3973,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();localAiExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();localAiExecutor.shutdownNow();yfkCatalogExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
