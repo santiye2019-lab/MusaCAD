@@ -16,6 +16,20 @@ public final class CadNavigationPolicyTest {
         near(CadNavigationPolicy.pinchScaleFactor(Float.NaN),1f,"invalid pinch factor");
         near(CadNavigationPolicy.cullingPadWorld(2.5f),60f,"24 pixel culling guard");
         near(CadNavigationPolicy.cullingPadWorld(Float.NaN),0f,"invalid culling scale");
+        near(CadNavigationPolicy.movingMinWorldSpan(17999,2f),0f,
+            "smaller scenes retain all navigation detail");
+        near(CadNavigationPolicy.movingMinWorldSpan(18000,2f),.9f,
+            "dense scene motion subpixel LOD");
+        near(CadNavigationPolicy.movingMinWorldSpan(60000,2f),1.8f,
+            "extremely dense scene stronger motion LOD");
+        near(CadNavigationPolicy.movingMinWorldSpan(90000,Float.NaN),0f,
+            "invalid dimensions cannot trigger geometry suppression");
+        if(!CadNavigationPolicy.isSubpixelBothAxes(.4f,.6f,.9f))
+            throw new AssertionError("tiny glyph candidate may be culled while moving");
+        if(CadNavigationPolicy.isSubpixelBothAxes(30f,.6f,.9f))
+            throw new AssertionError("long pipe or line never culled while moving");
+        if(CadNavigationPolicy.isSubpixelBothAxes(.4f,.6f,0f))
+            throw new AssertionError("settled frame is always full fidelity");
         System.out.println("CAD navigation scale/culling policy cases passed");
     }
 }
