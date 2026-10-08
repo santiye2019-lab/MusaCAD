@@ -21,6 +21,11 @@ public final class MusaAiAnalysisIntentTest {
         scope("Mimari proje analizi yap","architectural");
         scope("Elektrik projesini denetle","electrical");
         scope("Asansör projesini analiz et","elevator");
+        scope("Kesitleri kontrol et","all");
+        scope("Vaziyet planını incele","all");
+        scope("Kotları denetle","all");
+        scope("Çatı planını analiz et","all");
+        scope("Bodrum katı incele","all");
         if(MusaAiAnalysisIntent.isReview("Önerileri uygula"))
             throw new AssertionError("Unapproved edit route hijacked");
         if(MusaAiAnalysisIntent.isReview("Raporu PDF olarak çıkar"))

@@ -728,3 +728,98 @@ test("sweep rejects skipped tile identity or fabricated full coverage before pro
     assert.equal(upstream,false);
   }
 });
+
+
+test("Gandalf view-focus images keep floor section and site title source linkage",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const img=(label,i)=>{
+    const result={mime:"image/jpeg",base64:jpeg,label,width:1200,height:1200,
+      contentBounds:[i*100,0,i*100+99,99],
+      drawingBounds:[i*1000,0,i*1000+999,999]};
+    if(i>0)Object.assign(result,{
+      viewTitle:i===1?"BODRUM KAT PLANI":"A-A KESITI",
+      viewKind:i===1?"basement":"section",viewSourceId:i+31,candidateCrop:true});
+    return result;
+  };
+  let sent=null;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Tüm paftaları ve kotları denetle",analysisScope:"sanitary",
+      cad:{schema:"musacad-cad-json/v1",items:[
+        {sourceId:32,centerX:1500,centerY:200,type:"TEXT",text:"KOT: -3.20"}]},
+      visualEvidence:{
+        schema:"musacad-visual-evidence/v1",viewSchema:"musacad-visual-views/v1",
+        viewBatch:1,viewBatchCount:1,totalCandidateViews:2,firstView:1,lastView:2,
+        candidateCropsNotVerifiedViewFrames:true,rawDrawingIncluded:false,
+        images:[img("full-sheet-overview",0),img("view-focus-1",1),img("view-focus-2",2)],
+        complete:true
+      }
+    })
+  });
+  const res=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(_url,init)=>{
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        choices:[{message:{content:"Kesit ile kot karşılaştırması için ortak datum teyidi gerekir."}}]
+      }),{status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  assert.equal(res.status,200);
+  const result=await res.json();
+  assert.equal(result.status,"ok");
+  assert.equal(result.visualRegionCount,3);
+  assert.equal(result.visualCoverageComplete,true);
+  assert.match(sent.messages[0].content,/candidate close-ups around labels/);
+  assert.match(sent.messages[1].content[0].text,/FOCUSED VIEW BATCH: 1/);
+  assert.match(sent.messages[1].content[0].text,/BODRUM KAT PLANI/);
+  assert.match(sent.messages[1].content[0].text,/"viewSourceId":32/);
+  assert.equal(sent.messages[1].content[3].type,"image_url");
+});
+
+test("view-focus rejects invented view extents or skipped view references",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const image=(label,i)=>({mime:"image/jpeg",base64:jpeg,label,
+    width:1200,height:1200,contentBounds:[0,0,100,100],
+    drawingBounds:[0,0,100,100],
+    ...(i>0?{viewTitle:"ZEMIN KAT",viewKind:"ground",viewSourceId:i,
+      candidateCrop:true}:{})});
+  for(const entry of [
+    {title:"missing crop-approximation warning",warn:false,
+      images:[image("full-sheet-overview",0),image("view-focus-1",1)]},
+    {title:"wrong view label",warn:true,
+      images:[image("full-sheet-overview",0),image("view-focus-2",1)]},
+    {title:"false complete",warn:true,
+      images:[image("full-sheet-overview",0),image("view-focus-1",1)]}
+  ]){
+    let called=false;
+    const request=new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{
+        authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+        "content-type":"application/json"},
+      body:JSON.stringify({
+        prompt:"katlari kontrol et",
+        cad:{schema:"musacad-cad-json/v1",items:[]},
+        visualEvidence:{
+          schema:"musacad-visual-evidence/v1",viewSchema:"musacad-visual-views/v1",
+          viewBatch:1,viewBatchCount:1,totalCandidateViews:2,firstView:1,lastView:2,
+          candidateCropsNotVerifiedViewFrames:entry.warn,
+          rawDrawingIncluded:false,complete:true,images:entry.images
+        }
+      })
+    });
+    const res=await worker.fetch(request,{
+      AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"test",
+      MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{called=true;throw Error("should never forward invalid view evidence");}
+    });
+    assert.equal(res.status,400,entry.title);
+    assert.equal(called,false,entry.title);
+  }
+});

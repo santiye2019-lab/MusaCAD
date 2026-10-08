@@ -141,6 +141,124 @@ public final class MusaAiVisualEvidence {
         return new Result(payload,images.length(),regions.size(),renderedTiles,complete);
     }
 
+    /**
+     * Additional focused inspection around positioned view-title candidates.
+     * The crop is a heuristic neighbourhood, never an authoritative frame
+     * boundary: a nearby title may be outside its drawing frame.
+     * Up to twelve candidate views (three batches) are bounded independently
+     * of the whole-sheet 3x3 sweep.
+     */
+    public static final int MAX_FOCUSED_VIEWS=12;
+    public static final int FOCUSED_BATCH_SIZE=4;
+
+    public static Result renderViewsBatch(DxfParser.Result drawing,
+                                          List<MusaAiViewCatalog.View> titles,int batch,
+                                          Progress progress)throws Exception{
+        if(drawing==null||titles==null)throw new IllegalArgumentException("Pafta görünüm listesi eksik");
+        ArrayList<MusaAiViewCatalog.View> positioned=new ArrayList<>();
+        for(MusaAiViewCatalog.View v:titles){
+            if(v==null||!v.positioned())continue;
+            positioned.add(v);
+            if(positioned.size()>=MAX_FOCUSED_VIEWS)break;
+        }
+        int batchCount=(positioned.size()+FOCUSED_BATCH_SIZE-1)/FOCUSED_BATCH_SIZE;
+        if(batch<0||batch>=batchCount)throw new IllegalArgumentException("Geçersiz görünüm grubu");
+        RectF whole=drawing.printableContentBounds();
+        if(whole==null||!finite(whole)||whole.width()<=1||whole.height()<=1)
+            throw new IllegalArgumentException("Geçersiz DWG kapsamı");
+        int from=batch*FOCUSED_BATCH_SIZE;
+        int until=Math.min(positioned.size(),from+FOCUSED_BATCH_SIZE);
+        ArrayList<RectF> crops=new ArrayList<>();
+        crops.add(new RectF(whole));
+        ArrayList<MusaAiViewCatalog.View> views=new ArrayList<>();
+        double approxColumns=Math.max(1,Math.ceil(Math.sqrt(positioned.size())));
+        float candidateW=(float)(whole.width()/approxColumns*1.4d);
+        float candidateH=(float)(whole.height()/approxColumns*1.4d);
+        candidateW=Math.max(whole.width()*0.20f,Math.min(whole.width(),candidateW));
+        candidateH=Math.max(whole.height()*0.20f,Math.min(whole.height(),candidateH));
+        for(int index=from;index<until;index++){
+            MusaAiViewCatalog.View v=positioned.get(index);
+            PointF point=drawing.contentPointFromDrawing((float)v.x,(float)v.y);
+            if(point==null||!Float.isFinite(point.x)||!Float.isFinite(point.y)){
+                // Keep positional slot: the server rejects missing indexed crops.
+                break;
+            }
+            // Titles often sit beneath the view drawing. Offset the crop centre
+            // slightly upwards, while avoiding off-page rectangles.
+            float l=Math.max(whole.left,Math.min(whole.right-candidateW,
+                point.x-candidateW*0.5f));
+            float t=Math.max(whole.top,Math.min(whole.bottom-candidateH,
+                point.y-candidateH*0.65f));
+            crops.add(new RectF(l,t,l+candidateW,t+candidateH));
+            views.add(v);
+        }
+
+        JSONArray images=new JSONArray();
+        int chars=0,details=0;
+        long started=android.os.SystemClock.elapsedRealtime();
+        for(int idx=0;idx<crops.size();idx++){
+            if(Thread.currentThread().isInterrupted()||
+                android.os.SystemClock.elapsedRealtime()-started>MAX_RENDER_MS)break;
+            RectF roi=crops.get(idx);
+            int side=idx==0?OVERVIEW_SIDE:TILE_SIDE;
+            Bitmap bitmap=null;byte[] jpg;
+            if(progress!=null)progress.onProgress("Gandalf • Kat/kesit/vaziyet görüntüsü "+
+                (batch+1)+"/"+batchCount+" • "+idx+"/"+views.size());
+            try{
+                bitmap=Bitmap.createBitmap(side,side,Bitmap.Config.RGB_565);
+                Canvas canvas=new Canvas(bitmap);
+                canvas.drawColor(Color.WHITE);
+                Matrix map=new Matrix();
+                if(!map.setRectToRect(roi,new RectF(8,8,side-8,side-8),Matrix.ScaleToFit.CENTER))break;
+                int save=canvas.save();
+                canvas.clipRect(0,0,side,side);
+                drawing.drawVectorForPrint(canvas,map,false);
+                canvas.restoreToCount(save);
+                ByteArrayOutputStream buffer=new ByteArrayOutputStream(128000);
+                if(!bitmap.compress(Bitmap.CompressFormat.JPEG,idx==0?48:56,buffer))break;
+                jpg=buffer.toByteArray();
+            }finally{if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();}
+            String encoded=Base64.encodeToString(jpg,Base64.NO_WRAP);
+            if(encoded.length()>MAX_SINGLE_BASE64_CHARS||
+                chars+encoded.length()>MAX_BASE64_CHARS)break;
+            chars+=encoded.length();
+            JSONObject image=new JSONObject();
+            image.put("mime","image/jpeg");
+            image.put("base64",encoded);
+            image.put("label",idx==0?"full-sheet-overview":"view-focus-"+(from+idx));
+            image.put("width",side);
+            image.put("height",side);
+            image.put("contentBounds",bounds(roi.left,roi.top,roi.right,roi.bottom));
+            PointF a=drawing.drawingPointFromContent(roi.left,roi.top);
+            PointF b=drawing.drawingPointFromContent(roi.right,roi.bottom);
+            image.put("drawingBounds",bounds(Math.min(a.x,b.x),Math.min(a.y,b.y),
+                Math.max(a.x,b.x),Math.max(a.y,b.y)));
+            if(idx>0){
+                MusaAiViewCatalog.View v=views.get(idx-1);
+                image.put("viewTitle",v.title);
+                image.put("viewKind",v.kind.name().toLowerCase(java.util.Locale.ROOT));
+                image.put("viewSourceId",v.sourceId);
+                image.put("candidateCrop",true);
+                details++;
+            }
+            images.put(image);
+        }
+        JSONObject out=new JSONObject();
+        out.put("schema","musacad-visual-evidence/v1");
+        out.put("viewSchema","musacad-visual-views/v1");
+        out.put("viewBatch",batch+1);
+        out.put("viewBatchCount",batchCount);
+        out.put("totalCandidateViews",positioned.size());
+        out.put("firstView",from+1);
+        out.put("lastView",until);
+        out.put("images",images);
+        out.put("rawDrawingIncluded",false);
+        out.put("candidateCropsNotVerifiedViewFrames",true);
+        boolean complete=details==until-from&&images.length()==crops.size();
+        out.put("complete",complete);
+        return new Result(out,images.length(),crops.size(),details,complete);
+    }
+
     private static JSONArray bounds(double a,double b,double c,double d) throws org.json.JSONException{
         JSONArray out=new JSONArray();out.put(a).put(b).put(c).put(d);return out;
     }

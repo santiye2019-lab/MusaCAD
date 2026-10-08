@@ -70,6 +70,7 @@ async function handleAnalyze(request, env) {
       : "") +
     mechanicalExpertInstructions(expertProfile) +
     disciplineExpertInstructions(expertProfile) +
+    "If visualEvidence contains a viewBatch, the individual visual regions are candidate close-ups around labels for floors, sections, elevations and site plans. These candidate crops ARE NOT verified full view boundaries. For each supplied named view, separately inspect its visible engineering components and elevation/kot marks; compare floor–section elevations, vertical stacks, roof ventilation and site sewer/water entry only when both matching views have actually been provided with legible marks and a common datum. Never infer a clash or numeric discrepancy from title text or spatial proximity alone. Explicitly state views not reviewed. " +
     "If visualEvidence contains a sweepBatch, analyze ONLY those named regions and the overview; never imply that other high-resolution regions were scanned. State each finding with its visible region label, observed component, supporting drawing annotation/geometry when present, degree of confidence, and what needs verification. Separate confirmed visible observations, plausible candidates, and unverified design checks. A visual match to a CAD sourceId requires actual spatial and textual/graph evidence, not proximity alone. " +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
@@ -91,7 +92,9 @@ async function handleAnalyze(request, env) {
   ];
 
   if (visualEvidence) {
-    input[0].content += "\n\nVISUAL SWEEP BATCH: " + (visualEvidence.sweepBatch ?? "legacy") +
+    input[0].content += "\n\nFOCUSED VIEW BATCH: " + (visualEvidence.viewBatch ?? "none") +
+      " (cropped around title anchors, NOT verified plan frame extents)." +
+      "\n\nVISUAL SWEEP BATCH: " + (visualEvidence.sweepBatch ?? "legacy") +
       " / " + (visualEvidence.sweepBatch ? 3 : 1) +
       ". Do not claim all nine tiles were checked based on this single request." +
       "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
@@ -236,8 +239,22 @@ function validateVisualEvidence(value) {
       value.images.length < 1 || value.images.length > 5) return null;
 
   const sweep = value.sweepSchema === "musacad-visual-sweep/v1";
-  if (value.sweepSchema != null && !sweep) return null;
+  const focused = value.viewSchema === "musacad-visual-views/v1";
+  if ((value.sweepSchema != null && !sweep) ||
+      (value.viewSchema != null && !focused) || (sweep && focused)) return null;
   let first = 0, last = 0;
+  if (focused) {
+    if (value.candidateCropsNotVerifiedViewFrames !== true ||
+        !Number.isInteger(value.totalCandidateViews) ||
+        value.totalCandidateViews < 1 || value.totalCandidateViews > 12 ||
+        !Number.isInteger(value.viewBatch) || !Number.isInteger(value.viewBatchCount) ||
+        value.viewBatchCount !== Math.ceil(value.totalCandidateViews/4) ||
+        value.viewBatch < 1 || value.viewBatch > value.viewBatchCount ||
+        !Number.isInteger(value.firstView) || !Number.isInteger(value.lastView)) return null;
+    first = (value.viewBatch-1)*4+1;
+    last = Math.min(value.totalCandidateViews,first+3);
+    if (value.firstView !== first || value.lastView !== last) return null;
+  }
   if (sweep) {
     if (value.sweepBatchCount !== 3 || value.totalDetailedTiles !== 9 ||
         !Number.isInteger(value.sweepBatch) || value.sweepBatch < 1 || value.sweepBatch > 3 ||
@@ -257,7 +274,8 @@ function validateVisualEvidence(value) {
         !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(img.base64) ||
         typeof img.label !== "string" ||
         !(sweep ? /^(full-sheet-overview|sheet-tile-[1-9])$/.test(img.label)
-                 : /^(full-sheet-overview|sheet-quadrant-[1-4])$/.test(img.label)) ||
+                 : focused ? /^(full-sheet-overview|view-focus-(?:[1-9]|1[0-2]))$/.test(img.label)
+                           : /^(full-sheet-overview|sheet-quadrant-[1-4])$/.test(img.label)) ||
         labels.has(img.label) ||
         !Number.isInteger(img.width) || img.width < 128 || img.width > 1200 ||
         !Number.isInteger(img.height) || img.height < 128 || img.height > 1200 ||
@@ -271,23 +289,33 @@ function validateVisualEvidence(value) {
         img.drawingBounds[3] <= img.drawingBounds[1]) return null;
     if (i === 0 && img.label !== "full-sheet-overview") return null;
     if (sweep && i>0 && img.label !== "sheet-tile-"+(first+i-1)) return null;
+    if (focused && i>0 &&
+        (img.label !== "view-focus-"+(first+i-1) ||
+         !["site","basement","ground","floor","roof","section","elevation","detail"].includes(img.viewKind) ||
+         typeof img.viewTitle !== "string" || img.viewTitle.length < 1 ||
+         img.viewTitle.length > 160 || !Number.isInteger(img.viewSourceId) ||
+         img.candidateCrop !== true)) return null;
     labels.add(img.label);
     total += img.base64.length;
     if (total > 1650000) return null;
     images.push({ base64: img.base64 });
     regions.push({ label: img.label, contentBounds: img.contentBounds,
-      drawingBounds: img.drawingBounds, width: img.width, height: img.height });
+      drawingBounds: img.drawingBounds, width: img.width, height: img.height,
+      ...(focused && i>0 ? { viewTitle: img.viewTitle, viewKind: img.viewKind,
+        viewSourceId: img.viewSourceId, candidateCrop: true } : {}) });
   }
-  if (sweep && value.images.length>last-first+2) return null;
-  const allRequested = sweep
+  if ((sweep || focused) && value.images.length>last-first+2) return null;
+  const allRequested = (sweep || focused)
     ? images.length === last-first+2
     : images.length === 5;
-  if (sweep && value.complete === true && !allRequested) return null;
+  if ((sweep || focused) && value.complete === true && !allRequested) return null;
   return {
     images, regions,
     complete: value.complete === true && allRequested,
     sweepBatch: sweep ? value.sweepBatch : null,
-    totalDetailedTiles: sweep ? 9 : null
+    totalDetailedTiles: sweep ? 9 : null,
+    viewBatch: focused ? value.viewBatch : null,
+    totalCandidateViews: focused ? value.totalCandidateViews : null
   };
 }
 

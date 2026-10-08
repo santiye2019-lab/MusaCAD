@@ -26,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
-    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_sweep_v2";
+    private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
@@ -1434,7 +1434,7 @@ public class MainActivity extends AppCompatActivity {
         String scope=packageMode
             ?"Açık proje paketinin sınırlı CAD-JSON özetleri sunucuya gönderilir."
             :hybridVisual
-                ?"Bu görsel tarama aktif DWG paftasını 3×3=9 ayrıntı bölgesi ve genel görünümle inceler. Görüntüler en fazla 3 ayrı istek grubunda, grup başına en fazla 5 JPEG ile aktarılır. Katman/metin/ölçü içeren sınırlı CAD-JSON verileri de MusaCAD sunucusu üzerinden yapılandırılmış AI sağlayıcısına gönderilir. Görseller gizli proje bilgileri taşıyabilir; birden fazla AI isteği kullanım kotası tüketebilir."
+                ?"Gandalf, açık DWG için genel görüntü ve 9 ayrıntı bölgesi yanında kat planı, kesit, vaziyet ve çatı gibi DWG başlıklarından tanınan en fazla 12 görünüm çevresinin ek yakın-plan görüntülerini oluşturur. Bu ek görüntüler yaklaşık alanlardır; gerçek pafta sınırları doğrulanmış değildir. Toplam en fazla 6 AI istek grubu ve grup başına en fazla 5 JPEG, sınırlı katman/metin/ölçü CAD-JSON verileriyle birlikte MusaCAD sunucusu üzerinden model sağlayıcısına aktarılır. Görseller gizli proje bilgileri taşıyabilir ve ek AI kotası kullanır."
                 :"Aktif çizimin sınırlı CAD-JSON özeti çevrim içi AI sunucusuna gönderilir.";
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
@@ -1592,8 +1592,25 @@ public class MainActivity extends AppCompatActivity {
         report.append("\nProje: ").append(fileName);
         report.append("\nLayout: ").append(snapshot.layout);
         report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
-        report.append("\nYöntem: genel pafta + 3×3 yüksek çözünürlüklü tarama; CAD verileri ile birlikte.");
+        report.append("\nYöntem: tüm açık yerleşimde 3×3 tarama + yazıdan bulunan kat planı, kesit, vaziyet ve çatı adaylarına yakın görsel inceleme.");
         pendingAiActions=Collections.emptyList();
+        final long inspectionStarted=android.os.SystemClock.elapsedRealtime();
+        reply.progress("Gandalf • Kat, kesit, vaziyet ve kot başlıkları taranıyor…");
+        MusaAiViewCatalog.Result viewCatalog;
+        try{
+            // The ordinary cloud index may stop before title blocks that occur
+            // later in a large drawing; sample annotation evidence independently.
+            viewCatalog=MusaAiViewCatalog.analyze(
+                drawing.aiDrawingIndexQuickReview(6000,120000));
+        }catch(Exception e){
+            viewCatalog=MusaAiViewCatalog.analyze(snapshot);
+        }
+        report.append(viewCatalog.report);
+        int focusedEligible=0;
+        for(MusaAiViewCatalog.View v:viewCatalog.views)if(v.positioned())focusedEligible++;
+        final int focusedRequested=Math.min(MusaAiVisualEvidence.MAX_FOCUSED_VIEWS,focusedEligible);
+        int focusedReviewed=0,focusedBatches=0;
+        String focusedIssue="";
         for(int batch=0;batch<MusaAiVisualSweepPlan.BATCH_COUNT;batch++){
             if(Thread.currentThread().isInterrupted()){
                 issue="Tarama işlemi kesildi.";break;
@@ -1612,7 +1629,7 @@ public class MainActivity extends AppCompatActivity {
             }
             reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
-            String task=raw+"\nBu istek tek görsel tarama grubudur: "+
+            String task=raw+"\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
@@ -1640,6 +1657,78 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
         }
+
+        // After the full-layout sweep, request individually identified close-ups.
+        // This cannot prove that an entire floor/section outline was captured:
+        // region extents are only heuristically estimated around title anchors.
+        if(focusedRequested>0 && issue.isEmpty()){
+            final int focusBatchCount=(focusedRequested+MusaAiVisualEvidence.FOCUSED_BATCH_SIZE-1)/
+                MusaAiVisualEvidence.FOCUSED_BATCH_SIZE;
+            for(int group=0;group<focusBatchCount;group++){
+                if(Thread.currentThread().isInterrupted()||drawing!=activeDxf){
+                    focusedIssue="Görünüm yakın-plan taraması kesildi veya çizim değiştirildi.";break;
+                }
+                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>145_000L){
+                    focusedIssue="Çoklu pafta taraması güvenli süre sınırına ulaştı.";break;
+                }
+                MusaAiVisualEvidence.Result closeups;
+                try{
+                    closeups=MusaAiVisualEvidence.renderViewsBatch(drawing,viewCatalog.views,
+                        group,reply::progress);
+                }catch(Exception e){
+                    focusedIssue="Kat/kesit/vaziyet görüntü grubunun hazırlanması tamamlanamadı.";break;
+                }
+                if(closeups.renderedTiles==0){
+                    focusedIssue="Yakın-plan görüntüsü oluşturulamadı.";break;
+                }
+                reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
+                    (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
+                    "/"+focusedRequested+" yakın-plan adayı işlendi…");
+                String focusPrompt=raw+"\n"+viewCatalog.report+
+                    "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
+                    " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
+                    " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
+                    " ve şebeke bağlantılarındaki uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
+                    " Her bulguda görünüm etiketi, okunan değeri, kaynak ve belirsizliği belirt."+
+                    " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
+                MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybrid(
+                    getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json);
+                if(!detailed.ok()){
+                    focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
+                        (detailed.message.isEmpty()?"AI hizmeti yanıt vermedi.":detailed.message);
+                    break;
+                }
+                focusedReviewed+=closeups.renderedTiles;
+                focusedBatches++;
+                report.append("\n\n========== KAT / KESİT / VAZİYET YAKIN-PLAN GRUBU ")
+                    .append(group+1).append("/").append(focusBatchCount)
+                    .append(" ==========\n").append(detailed.text);
+                if(!closeups.complete){
+                    focusedIssue="Bazı görünüm çevresi görüntüleri hazırlanamadı.";break;
+                }
+            }
+        }else if(focusedRequested>0){
+            focusedIssue="Genel görsel tarama tamamlanamadığı için yakın-plan analiz başlatılmadı.";
+        }
+        if(focusedEligible>focusedRequested){
+            String skipped="Çizimde "+focusedEligible+" konumlu görünüm başlığı var; tek incelemede en fazla "+
+                focusedRequested+" yakından tarandı. Kalanlar ayrı analiz gerektirir.";
+            focusedIssue=focusedIssue.isEmpty()?skipped:focusedIssue+" "+skipped;
+        }
+        if(viewCatalog.truncated)
+            focusedIssue+=(focusedIssue.isEmpty()?"":" ")+"Başlık/kot taraması örneklem sınırına ulaştı.";
+        report.append("\n\n========== KAT / KESİT / VAZİYET GÖRSEL KAPSAMI ==========");
+        report.append("\nKonumlu başlık adayı: ").append(focusedEligible);
+        report.append("\nAI yanıtı alınan yakın-plan görüntüsü: ")
+            .append(focusedReviewed).append("/").append(focusedEligible);
+        report.append("\nİncelenen ek görüntü grubu: ").append(focusedBatches);
+        if(!focusedIssue.isEmpty())report.append("\nSınırlama: ").append(focusedIssue);
+        if(focusedEligible==0)report.append(
+            "\nKat/kesit/vaziyet başlıklarına güvenilir çizim koordinatı bağlanamadı; "+
+            "bu görünümler tek tek yakın-plandan incelenmedi.");
+        report.append("\nNOT: Başlık yakın-planı ile görünüm çerçevesi aynı şey değildir;"+
+            " bir kat veya kesitin tamamının yakın-plandan incelendiği varsayılmamalıdır."+
+            " Kot tutarsızlığı ancak ortak referanslar, okunabilir ölçüler ve mühendislik doğrulamasıyla teyit edilir.");
 
         if(acceptedBatches==0){
             MusaAiEngineeringReview.Result fallback=MusaAiEngineeringReview.analyze(snapshot,fileName);
@@ -1671,7 +1760,7 @@ public class MainActivity extends AppCompatActivity {
         String completeReport=report.toString();
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
-            (visualComplete?" Tam Bölgeli ":" Kısmi ")+"Görsel Proje İncelemesi";
+            (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()?" Çoklu Görünüm ":" Kısmi ")+"Görsel Proje İncelemesi";
         reply.send(completeReport+"\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
     }
 
