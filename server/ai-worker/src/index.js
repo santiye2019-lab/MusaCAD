@@ -93,8 +93,8 @@ async function handleAnalyze(request, env) {
   if (visualEvidence) {
     input[0].content += "\n\nVISUAL SWEEP BATCH: " + (visualEvidence.sweepBatch ?? "legacy") +
       " / " + (visualEvidence.sweepBatch ? 3 : 1) +
-      ". Do not claim all nine tiles were checked based on this single request."; 
-
+      ". Do not claim all nine tiles were checked based on this single request." +
+      "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
       "\nEvery image is a separate region of the same loaded DWG. contentBounds are rendered viewport-content coordinates, while drawingBounds are DWG world coordinates shared with vector item.centerX/centerY. Use drawingBounds when correlating a visual finding with CAD items; never claim a sourceId match from proximity alone.";
   }
 
