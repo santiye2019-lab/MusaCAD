@@ -111,7 +111,7 @@ public final class MusaAiPanel {
                 :"Gandalf • Sorunuzu kendi kelimelerinizle yazın. Yerel DWG araçları ölçer ve kontrol eder; izinli bağlantıda çevrim içi AI bunları yorumlar. Bağlantı olmadığında yerel yanıt gösterilir.");
 
         LinearLayout composer=new LinearLayout(activity);
-        composer.setOrientation(LinearLayout.HORIZONTAL);
+        composer.setOrientation(LinearLayout.VERTICAL);
         composer.setGravity(Gravity.BOTTOM);
 
         EditText input=new EditText(activity);
@@ -125,7 +125,16 @@ public final class MusaAiPanel {
         input.setPadding(dp(activity,12),dp(activity,7),dp(activity,12),dp(activity,7));
         input.setBackground(round(activity,0xFF0A2638,12,0xFF245D79));
         input.setImeOptions(EditorInfo.IME_ACTION_SEND);
-        composer.addView(input,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        // Full-width editor avoids the narrow multi-line column seen on phones.
+        composer.addView(input,new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout actionRow=new LinearLayout(activity);
+        actionRow.setOrientation(LinearLayout.HORIZONTAL);
+        actionRow.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams actionLp=new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+        actionLp.topMargin=dp(activity,6);
+        composer.addView(actionRow,actionLp);
 
         Button voice=new Button(activity);
         voice.setText("Ses");
@@ -137,7 +146,7 @@ public final class MusaAiPanel {
         voice.setBackground(round(activity,0xFF12384C,12,0xFF246C88));
         LinearLayout.LayoutParams voiceLp=new LinearLayout.LayoutParams(dp(activity,64),ViewGroup.LayoutParams.WRAP_CONTENT);
         voiceLp.setMarginStart(dp(activity,8));
-        composer.addView(voice,voiceLp);
+        actionRow.addView(voice,voiceLp);
 
         Button send=new Button(activity);
         send.setText("Gönder");
@@ -149,7 +158,7 @@ public final class MusaAiPanel {
         send.setBackground(round(activity,0xFF087E75,12,0xFF26D1C0));
         LinearLayout.LayoutParams sendLp=new LinearLayout.LayoutParams(dp(activity,82),ViewGroup.LayoutParams.WRAP_CONTENT);
         sendLp.setMarginStart(dp(activity,8));
-        composer.addView(send,sendLp);
+        actionRow.addView(send,sendLp);
         root.addView(composer,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         final String[] latestAssistantAnswer={""};
