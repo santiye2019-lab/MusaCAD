@@ -1430,7 +1430,7 @@ public class MainActivity extends AppCompatActivity {
         String scope=packageMode
             ?"Açık proje paketinin sınırlı CAD-JSON özetleri sunucuya gönderilir."
             :hybridVisual
-                ?"Bu hibrit analizde aktif DWG paftasının GENEL GÖRÜNTÜSÜ ve en fazla dört ayrıntı bölgesi JPEG olarak, ayrıca katman/metin/ölçüleri içeren sınırlı CAD-JSON verisi çevrim içi AI sunucusuna gönderilir. Görseller proje bilgisi ve gizli içerik taşıyabilir."
+                ?"Bu hibrit analizde aktif DWG paftasının GENEL GÖRÜNTÜSÜ ve en fazla dört ayrıntı bölgesi JPEG olarak, ayrıca katman/metin/ölçüleri içeren sınırlı CAD-JSON verisi MusaCAD sunucusu üzerinden model sağlayıcısına (şu anda Google Gemini) aktarılır. Görseller proje bilgisi ve gizli içerik taşıyabilir."
                 :"Aktif çizimin sınırlı CAD-JSON özeti çevrim içi AI sunucusuna gönderilir.";
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
@@ -1519,11 +1519,15 @@ public class MainActivity extends AppCompatActivity {
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
-                        reply.send(reason+
+                        String fallbackReport=reason+
                             "\n\nGandalf yerel vektör analiziyle devam etti (görsel AI sonucu değildir):\n"+
                             localFallback.text+
                             "\n\nİstenen disiplin: "+MusaAiAnalysisIntent.label(requestedScope)+
-                            "\nNot: Bu yedek analiz canlı görsel yorumlama veya web/kaynak taraması kullanmaz.");
+                            "\nNot: Bu yedek analiz canlı görsel yorumlama veya web/kaynak taraması kullanmaz.";
+                        lastAiReport=fallbackReport;
+                        lastAiReportTitle="Gandalf • Yerel Yedek Analiz Raporu";
+                        lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(localFallback.sourceIds));
+                        reply.send(fallbackReport+"\n\nRaporu Word/PDF olarak dışa aktarabilirsiniz.");
                         return;
                     }
                     pendingAiActions=cloud.actions;
