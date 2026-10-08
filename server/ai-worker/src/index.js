@@ -121,26 +121,43 @@ async function handleAnalyze(request, env) {
   }
 
   const fetcher = typeof env.__fetch === "function" ? env.__fetch : fetch;
-  let upstream;
+  const upstreamTimeoutMs = positiveInt(env.AI_UPSTREAM_TIMEOUT_MS, 24000, 50, 25000);
+  const controller = new AbortController();
+  let timeoutId;
+  const deadline = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new Error("AI_UPSTREAM_TIMEOUT"));
+    }, upstreamTimeoutMs);
+  });
+  let upstream, data;
   try {
-    upstream = await fetcher(upstreamUrl, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer " + upstreamKey,
-        "content-type": "application/json",
-        accept: "application/json"
-      },
-      body: JSON.stringify(requestBody)
-    });
-  } catch (_) {
-    return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed" }, 503);
-  }
+    try {
+      upstream = await Promise.race([fetcher(upstreamUrl, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer " + upstreamKey,
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      }), deadline]);
+    } catch (_) {
+      if (controller.signal.aborted)
+        return json({ status: "timeout", message: "Gandalf AI modeli süresi içinde yanıt vermedi. Yerel proje analizi kullanılabilir." }, 504);
+      return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed" }, 503);
+    }
 
-  let data;
-  try {
-    data = await upstream.json();
-  } catch (_) {
-    return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
+    try {
+      data = await Promise.race([upstream.json(), deadline]);
+    } catch (_) {
+      if (controller.signal.aborted)
+        return json({ status: "timeout", message: "Gandalf AI yanıtı gecikti. Yerel proje analizi kullanılabilir." }, 504);
+      return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
   if (!upstream.ok) {
     if (upstream.status === 429 && aiProvider.name === "gemini") {
