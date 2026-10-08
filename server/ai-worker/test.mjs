@@ -136,6 +136,8 @@ test("valid signed session reaches Responses API and returns proposed actions",a
       prompt:"Güncel kaynaklarla kontrol et ve gerekli notu eklemeyi öner",
       allowWeb:true,
       allowEditProposals:true,
+      previousChat:"Kullanıcı: Pompa sayısı kaç?\\nGandalf: Çizimde 2 pompa adayı.",
+      localEvidence:"Yerel ön metraj: 2 pompa bloğu; kaynak doğrulaması gerekli.",
       cad:{
         schema:"musacad-cad-json/v1",
         fileName:"mekanik.dwg",
@@ -163,6 +165,10 @@ test("valid signed session reaches Responses API and returns proposed actions",a
   assert.deepEqual(upstreamBody.include,["web_search_call.action.sources"]);
   assert.equal(upstreamBody.instructions.includes("PROPOSALS ONLY"),true);
   assert.equal(upstreamBody.instructions.includes("vertices"),true);
+  assert.ok(upstreamBody.input[0].content.includes("PRIOR CONVERSATION"));
+  assert.ok(upstreamBody.input[0].content.includes("Yerel ön metraj: 2 pompa bloğu"));
+  assert.ok(upstreamBody.instructions.includes("paraphrases"));
+
   assert.ok(upstreamBody.tools.some(t=>t.name==="cad_trim_line"));
   assert.ok(upstreamBody.tools.some(t=>t.name==="cad_insert_mechanical_block"));
 });
