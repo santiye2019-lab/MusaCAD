@@ -569,7 +569,7 @@ test("Gemini receives consented visual CAD regions together with vector evidence
         rawDrawingIncluded:false,complete:false,
         images:[{
           mime:"image/jpeg",base64:jpeg,label:"full-sheet-overview",
-          width:800,height:800,contentBounds:[0,0,100,100]
+          width:800,height:800,contentBounds:[0,0,100,100],drawingBounds:[1000,2000,1100,2100]
         }]
       }
     })
@@ -595,6 +595,7 @@ test("Gemini receives consented visual CAD regions together with vector evidence
   assert.equal(sent.messages[1].content[0].type,"text");
   assert.match(sent.messages[1].content[0].text,/SIHHI/);
   assert.match(sent.messages[0].content,/primary discipline scope: sanitary/);
+  assert.match(sent.messages[1].content[0].text,/drawingBounds/);
   assert.equal(sent.messages[1].content[1].type,"image_url");
   assert.equal(sent.messages[1].content[1].image_url.url,"data:image/jpeg;base64,"+jpeg);
 });
@@ -610,7 +611,7 @@ test("OpenAI multimodal route constructs input_image with the same CAD evidence"
       cad:{schema:"musacad-cad-json/v1",items:[]},
       visualEvidence:{schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,complete:true,
         images:[{mime:"image/jpeg",base64:"/9j/"+("A".repeat(120)),label:"full-sheet-overview",
-          width:800,height:800,contentBounds:[0,0,200,200]}]}
+          width:800,height:800,contentBounds:[0,0,200,200],drawingBounds:[0,0,200,200]}]}
     })
   });
   let sent;
