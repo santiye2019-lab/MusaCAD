@@ -1406,6 +1406,7 @@ public class MainActivity extends AppCompatActivity {
             ?currentAiCloudProjectSources():Collections.emptyList();
         if(activeSnapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
 
+        reply.progress("Gandalf • Çizim bağlamı hazırlanıyor…");
         try{
             aiExecutor.submit(()->{
                 try{
@@ -1423,10 +1424,12 @@ public class MainActivity extends AppCompatActivity {
                         packageDrawings=Collections.unmodifiableList(built);
                     }
 
+                    reply.progress("Gandalf • Güvenli AI oturumu açılıyor, analiz yanıtı bekleniyor…");
                     MusaAiCloudService.Result cloud=packageMode
                         ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
                         :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
                     if(!cloud.ok()){
+                        reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
                         MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
                         if(localFallback.matched){
