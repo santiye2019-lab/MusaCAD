@@ -78,7 +78,6 @@ public final class MusaAiViewCatalog {
             Kind kind=classify(normalized);
             if(kind!=null){
                 if(views.size()>=MAX_VIEWS){truncated=true;continue;}
-                if(!item.hasCenter())unpositioned++;
                 // Co-located duplicate text at identical drawing coordinates is one title.
                 boolean duplicate=false;
                 for(View previous:views){
@@ -87,8 +86,11 @@ public final class MusaAiViewCatalog {
                         Math.abs(previous.x-item.centerX)<0.0001 &&
                         Math.abs(previous.y-item.centerY)<0.0001){duplicate=true;break;}
                 }
-                if(!duplicate)views.add(new View(kind,raw.length()>160?raw.substring(0,160):raw,
-                    item.centerX,item.centerY,item.sourceId));
+                if(!duplicate){
+                    if(!item.hasCenter())unpositioned++;
+                    views.add(new View(kind,raw.length()>160?raw.substring(0,160):raw,
+                        item.centerX,item.centerY,item.sourceId));
+                }
             }
             if(levels.size()<MAX_LEVELS){
                 LinkedHashSet<String> rawMarks=new LinkedHashSet<>();
@@ -169,16 +171,21 @@ public final class MusaAiViewCatalog {
             return Kind.ELEVATION;
         if(normalized.contains("cati")&&(normalized.contains("plan")||
             normalized.contains("tesisat")||normalized.contains("drenaj")))return Kind.ROOF;
-        if(normalized.contains("bodrum")&&normalized.contains("kat"))
-            return Kind.BASEMENT;
+        if(normalized.contains("bodrum")&&(normalized.contains("kat")||
+            normalized.contains("plan")))return Kind.BASEMENT;
         if(normalized.contains("zemin kat")||normalized.contains("giris kat")||
-            normalized.contains("giris plani"))return Kind.GROUND;
+            normalized.contains("giris plani")||
+            (normalized.contains("zemin")&&normalized.contains("tesisat")&&
+                normalized.contains("plan")))return Kind.GROUND;
         if(normalized.contains("detay")&&
             (normalized.contains("plan")||normalized.contains("kesit")||normalized.contains("olcek")))
             return Kind.DETAIL;
-        if(NUMBERED_FLOOR.matcher(normalized).find()||
-            (normalized.contains("kat plani")&&normalized.length()<135)||
-            normalized.contains("asma kat plani")||normalized.contains("teras kat plani"))
+        boolean namedFloor=(normalized.contains("normal kat")||
+            normalized.contains("tip kat")||normalized.contains("asma kat")||
+            normalized.contains("teras kat")||NUMBERED_FLOOR.matcher(normalized).find());
+        boolean aPlan=normalized.contains("plan")||normalized.contains("plani")||normalized.contains("tesisat");
+        if((namedFloor&&aPlan)||
+            (normalized.contains("kat plani")&&normalized.length()<135))
             return Kind.FLOOR;
         return null;
     }
