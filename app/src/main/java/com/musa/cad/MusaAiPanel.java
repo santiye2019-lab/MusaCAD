@@ -137,6 +137,10 @@ public final class MusaAiPanel {
 
         String[][] prompts={
             {"Çizime sor","Bu çizimde neler var?"},
+            {"Mühendislik Analizi","Projeyi mühendislik açısından analiz et"},
+            {"Pis Su Kontrolü","Pis su tesisatındaki çapları ve hat metrajını analiz et"},
+            {"Havalandırma","Havalandırma kanal kesitlerini analiz et"},
+            {"Yangın Sistemi","Yangın pompası ve yangın tesisatı etiketlerini kontrol et"},
             {"Komut ver","Ekrana sığdır"},
             {"Metraj","Bu projede metraj çıkar"},
             {"Keşif","Keşif yükle"},

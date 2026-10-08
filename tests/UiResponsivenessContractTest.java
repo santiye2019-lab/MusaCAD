@@ -12,6 +12,7 @@ public final class UiResponsivenessContractTest {
         String view=read("app/src/main/java/com/musa/cad/CadView.java");
         String print=read("app/src/main/java/com/musa/cad/CadPrint.java");
         String main=read("app/src/main/java/com/musa/cad/MainActivity.java");
+        String panel=read("app/src/main/java/com/musa/cad/MusaAiPanel.java");
         String parser=read("app/src/main/java/com/musa/cad/DxfParser.java");
         String nativeScene=read("app/src/main/java/com/musa/cad/NativeScene.java");
         String manifest=read("app/src/main/AndroidManifest.xml");
@@ -64,6 +65,7 @@ public final class UiResponsivenessContractTest {
         require(main,"MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)","voice command routing");
         require(general,"localAiExecutor.submit","general CAD analysis uses dedicated local executor");
         require(general,"drawing.aiDrawingIndexQuickReview(","fast bounded local analysis projection");
+        require(general,"MusaAiEngineeringReview.analyze(index,drawingName)","source-grounded engineering evidence output");
         require(general,"localAiHandler.postDelayed(deadline,QUICK_REVIEW_TIMEOUT_MS)","strict local watchdog");
         require(general,"finished.compareAndSet(false,true)","at most one local terminal reply");
         require(general,"reply.progress","visible local analysis progress");
@@ -72,6 +74,8 @@ public final class UiResponsivenessContractTest {
         require(parser,"public MusaAiDrawingIndex aiDrawingIndexQuickReview(","bounded light review projection");
         require(parser,"maxEntitiesToVisit","bounded entity visit count");
         require(main,"localAiExecutor.shutdownNow()","dedicated local executor shutdown");
+        require(main,"MusaAiEngineeringReview.asksReview(raw)","engineering intent route");
+        require(panel,"Mühendislik Analizi","engineer review quick action");
         if(main.indexOf("runMusaAiGeneralProjectAnalysis(reply);")>main.indexOf("if(MusaAiProjectPackage.asksPackageReview(raw))"))
             throw new AssertionError("Local voice analysis must be routed before expensive full-project logic");
 

@@ -193,30 +193,76 @@ public final class DxfParser {
          * This intentionally does not build polygon geometry keys, measure complex curves
          * or attempt a comprehensive drawing validation.
          */
+        /**
+         * Engineering-first, bounded scan of the active DWG layout. Collects
+         * text/attributes and measured mechanical centerlines across the
+         * visited document, rather than just the first unrelated CAD lines.
+         * Deliberately excludes expensive geometry keys/polygon overlays.
+         */
         public MusaAiDrawingIndex aiDrawingIndexQuickReview(int maxItems,int maxEntitiesToVisit){
-            final int itemBudget=Math.max(1,Math.min(1500,maxItems));
-            final int visitBudget=Math.max(itemBudget,Math.min(20000,maxEntitiesToVisit));
-            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>(Math.min(itemBudget,1024));
+            final int itemLimit=Math.max(1,Math.min(6000,maxItems));
+            final int visitLimit=Math.max(itemLimit,Math.min(120000,maxEntitiesToVisit));
+            final int textLimit=Math.max(1,itemLimit/3);
+            ArrayList<MusaAiDrawingIndex.Item> annotations=new ArrayList<>();
+            ArrayList<MusaAiDrawingIndex.Item> lines=new ArrayList<>();
+            HashMap<String,Boolean> mechanicalLayers=new HashMap<>();
             int visited=0;
             for(Entity wrapped:document){
-                if(Thread.currentThread().isInterrupted()||visited++>=visitBudget||items.size()>=itemBudget)break;
+                if(Thread.currentThread().isInterrupted()||visited++>=visitLimit)break;
                 if(!(wrapped instanceof LayerEntity))continue;
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||
                     "MUSACAD_BLANK".equals(layer.sourceType))continue;
                 String type=layer.sourceType==null?"":layer.sourceType;
-                String itemText="";
-                if("TEXT".equalsIgnoreCase(type)||"MTEXT".equalsIgnoreCase(type)||
-                    "ATTRIB".equalsIgnoreCase(type)||"ATTDEF".equalsIgnoreCase(type)){
-                    itemText=analysisText(layer.entity);
-                    if(itemText.length()>256)itemText=itemText.substring(0,256);
+                boolean annotation="TEXT".equalsIgnoreCase(type)||"MTEXT".equalsIgnoreCase(type)||
+                    "ATTRIB".equalsIgnoreCase(type)||"ATTDEF".equalsIgnoreCase(type);
+                if(annotation){
+                    if(annotations.size()>=textLimit)continue;
+                    String note=analysisText(layer.entity);
+                    if(note.length()>320)note=note.substring(0,320);
+                    CadEdit e=layer.sourceEditWorld;
+                    annotations.add(new MusaAiDrawingIndex.Item(layer.sourceId,type,layer.layer,note,
+                        Double.NaN,Double.NaN,false,false,"",
+                        e==null?Double.NaN:e.centerX(),e==null?Double.NaN:e.centerY()));
+                    continue;
                 }
-                items.add(new MusaAiDrawingIndex.Item(layer.sourceId,type,layer.layer,itemText));
+                if(lines.size()>=itemLimit-textLimit)continue;
+                boolean linear="LINE".equalsIgnoreCase(type)||"LWPOLYLINE".equalsIgnoreCase(type)||
+                    "POLYLINE".equalsIgnoreCase(type)||"ARC".equalsIgnoreCase(type);
+                if(!linear)continue;
+                Boolean technical=mechanicalLayers.get(layer.layer);
+                if(technical==null){
+                    String n=MusaAiDrawingIndex.normalize(layer.layer);
+                    technical=n.contains("pis su")||n.contains("atik su")||n.contains("sihhi")||
+                        n.contains("temiz su")||n.contains("soguk su")||n.contains("sicak su")||
+                        n.contains("yangin")||n.contains("sprink")||n.contains("hidrant")||
+                        n.contains("havalandirma")||n.contains("kanal")||n.contains("duct")||
+                        n.contains("spiro")||n.contains("kalorifer")||n.contains("isitma")||
+                        n.contains("klima")||n.contains("vrf")||n.contains("sogutma")||
+                        n.contains("dogalgaz")||n.contains("drenaj")||n.contains("yagmur suyu");
+                    mechanicalLayers.put(layer.layer,technical);
+                }
+                if(!technical)continue;
+                CadEdit e=layer.sourceEditWorld;
+                if(e==null||e.xy==null||e.xy.length>4096)continue;
+                double length=aiLength(e);
+                if(!Double.isFinite(length)||length<=0)continue;
+                lines.add(new MusaAiDrawingIndex.Item(layer.sourceId,type,layer.layer,"",
+                    length,Double.NaN,false,false,"",e.centerX(),e.centerY()));
+            }
+            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>(annotations.size()+lines.size());
+            items.addAll(annotations);items.addAll(lines);
+            for(DxfBlocks.BlockInsertion insertion:blockInsertions){
+                if(items.size()>=itemLimit)break;
+                if(insertion==null||!activeLayout.equals(insertion.layout)||
+                    !visibleLayerKeys.contains(DxfLayerState.key(insertion.layer)))continue;
+                items.add(new MusaAiDrawingIndex.Item(-1,"BLOCK",insertion.layer,
+                    insertion.name,Double.NaN,Double.NaN,false,false,"",
+                    Double.NaN,Double.NaN,insertion.count));
             }
             return new MusaAiDrawingIndex(activeLayout,entityCount,oleObjectCount,
                 layerNames,visibleLayers,items,drawingUnitName);
         }
-
 
         /**
          * Builds an AI projection with a hard item budget. Cloud requests use a bounded
