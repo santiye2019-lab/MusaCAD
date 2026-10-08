@@ -798,7 +798,15 @@ public class MainActivity extends AppCompatActivity {
         hideToolPanel();
         MusaAiPanel.show(this,new MusaAiPanel.Host(){
             @Override public String contextLabel(){return musaAiContextLabel();}
-            @Override public void onPrompt(String prompt,MusaAiPanel.Reply reply){handleMusaAiPrompt(prompt,reply);}
+            @Override public void onPrompt(String prompt,MusaAiPanel.Reply reply){
+                handleMusaAiPrompt(prompt,"",reply);
+            }
+            @Override public void onPrompt(String prompt,String recentContext,MusaAiPanel.Reply reply){
+                handleMusaAiPrompt(prompt,recentContext,reply);
+            }
+            @Override public void onViewPdf(String answer,MusaAiPanel.Reply reply){
+                viewGandalfAnswerPdf(answer,reply);
+            }
         });
     }
 
@@ -874,8 +882,9 @@ public class MainActivity extends AppCompatActivity {
             (q.contains("temizle")||q.contains("sil")||q.contains("sifirla"));
     }
 
-    private void handleMusaAiPrompt(String prompt,MusaAiPanel.Reply reply){
-        String raw=prompt==null?"":prompt.trim();
+    private void handleMusaAiPrompt(String prompt,String recentContext,MusaAiPanel.Reply reply){
+        // Canonicalize only safe high-level paraphrases; do not fuzzy-execute CAD edits.
+        String raw=MusaAiConversationalIntent.canonical(prompt);
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
@@ -1088,7 +1097,7 @@ public class MainActivity extends AppCompatActivity {
             if(MusaAiAnalysisIntent.isLocalOnly(raw))
                 runMusaAiGeneralProjectAnalysis(reply);
             else
-                handleMusaAiCloudPrompt(raw,reply);
+                handleMusaAiCloudPrompt(raw,reply,recentContext);
             return;
         }
         if((MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)||
@@ -1324,7 +1333,7 @@ public class MainActivity extends AppCompatActivity {
                 reply.send("Gandalf AI ile çizim analizi için önce bir DWG veya DXF projesi açın.");
                 return;
             }
-            handleMusaAiCloudPrompt(raw,reply);
+            handleMusaAiCloudPrompt(raw,reply,recentContext);
             return;
         }
 
@@ -1546,17 +1555,14 @@ public class MainActivity extends AppCompatActivity {
             }else reply.send(currentDisplayName+" açık. Çizim modeli hazırlanıyor.");
             return;
         }
-        if(q.contains("metraj")){
-            reply.send("Metraj isteğini aldım. Metraj/sayım motoru MusaCAD AI'nın sonraki modüllerinden biri olarak bu panelde çalışacak.");
+        // Fallback to online language understanding for all open-ended questions.
+        // The same consent gate applies; explicit offline/yerel requests never leave device.
+        if(activeDxf!=null&&MusaAiConversationalIntent.shouldCloudInterpret(raw)){
+            handleMusaAiCloudPrompt(raw,reply,recentContext);
             return;
         }
-        if(q.contains("kontrol")||q.contains("hata")){
-            reply.send(activeDxf==null
-                ?"Proje kontrolü için tam vektör çizim modelinin hazırlanması gerekiyor."
-                :"Bu kontrol isteği mevcut otomatik CAD kalite kurallarıyla eşleşmedi. “Projeyi kontrol et” veya “mükerrer nesneleri bul” diye deneyin.");
-            return;
-        }
-        reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
+        reply.send("Bu isteği mevcut yerel çizim araçlarıyla doğrulayamadım. "+
+            "Çevrim içi AI izniyle daha serbest sorular sorabilir veya farklı ifade edebilirsiniz.");
     }
 
     private void runMusaAiGeneralProjectAnalysis(MusaAiPanel.Reply reply){
@@ -1651,7 +1657,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void handleMusaAiCloudPrompt(String raw,MusaAiPanel.Reply reply){
+    private static String localContextEvidence(MusaAiDrawingIndex snapshot){
+        if(snapshot==null)return "";
+        // All quantities remain tentative. The whole PDF/YFK catalog is never sent.
+        StringBuilder evidence=new StringBuilder("Yerel çizim indeksi • ")
+            .append(snapshot.layout).append(" • ").append(snapshot.entityCount).append(" CAD nesnesi.")
+            .append(" Çizim birimi: ").append(snapshot.unitName.isEmpty()?"belirsiz":snapshot.unitName).append(". ");
+        try{
+            MusaAiCsbEstimate.Result materials=MusaAiCsbEstimate.analyze(
+                snapshot,Collections.emptyList());
+            evidence.append("YEREL MEKANİK METRAJ KONTROLÜ: ");
+            String text=materials.report;
+            evidence.append(text.substring(0,Math.min(1700,text.length())));
+        }catch(Exception ignored){
+            evidence.append("Yerel mühendislik özeti hesaplanamadı; otomatik miktar varsayma.");
+        }
+        return evidence.toString();
+    }
+
+    private void handleMusaAiCloudPrompt(String raw,MusaAiPanel.Reply reply,String recentContext){
         if(activeDxf==null){
             reply.send("Gandalf AI için tam vektör DWG/DXF çiziminin hazırlanması gerekiyor.");
             return;
@@ -1662,14 +1686,15 @@ public class MainActivity extends AppCompatActivity {
         String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:
             hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT;
         if(prefs.getBoolean(consentKey,false)){
-            runMusaAiCloud(raw,reply,hybridVisual);
+            runMusaAiCloud(raw,reply,hybridVisual,recentContext);
             return;
         }
         String scope=packageMode
             ?"Açık proje paketinin sınırlı CAD-JSON özetleri sunucuya gönderilir."
             :hybridVisual
                 ?"Gandalf, açık DWG için genel görüntü ve 9 ayrıntı bölgesi yanında kat planı, kesit, vaziyet ve çatı gibi DWG başlıklarından tanınan en fazla 12 görünüm çevresinin ek yakın-plan görüntülerini oluşturur. Bu ek görüntüler yaklaşık alanlardır; gerçek pafta sınırları doğrulanmış değildir. Toplam en fazla 6 AI istek grubu ve grup başına en fazla 5 JPEG, sınırlı katman/metin/ölçü CAD-JSON verileriyle birlikte MusaCAD sunucusu üzerinden model sağlayıcısına aktarılır. Görseller gizli proje bilgileri taşıyabilir ve ek AI kotası kullanır."
-                :"Aktif çizimin sınırlı CAD-JSON özeti çevrim içi AI sunucusuna gönderilir.";
+                :"Aktif çizimin sınırlı CAD-JSON özeti, yerel mühendislik ön tespitleri "+
+                    "ve bu oturumdaki son dört kısa soru-yanıt çevrim içi AI sunucusuna gönderilir.";
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
             :" Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz.";
@@ -1678,7 +1703,7 @@ public class MainActivity extends AppCompatActivity {
             .setMessage(scope+" Ham DWG/DXF dosyaları gönderilmez. Analiz görüntülerinde de proje verileri bulunabilir."+edit+" Bu görsel veri aktarımına izin veriyor musunuz?")
             .setPositiveButton("DEVAM",(d,w)->{
                 prefs.edit().putBoolean(consentKey,true).apply();
-                runMusaAiCloud(raw,reply,hybridVisual);
+                runMusaAiCloud(raw,reply,hybridVisual,recentContext);
             })
             .setNegativeButton("İPTAL",(d,w)->reply.send("Gandalf Cloud AI isteği iptal edildi. Yerel MusaCAD AI çevrimdışı kullanılmaya devam edebilir."))
             .setOnCancelListener(d->reply.send("Gandalf Cloud AI isteği iptal edildi."))
@@ -1699,10 +1724,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply){
-        runMusaAiCloud(raw,reply,false);
+        runMusaAiCloud(raw,reply,false,"");
     }
 
-    private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply,boolean hybridVisual){
+    private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply,boolean hybridVisual,
+                                String recentContext){
         // Capture only cheap immutable references on the UI thread. The expensive
         // CAD-to-AI projection is built below on MusaCAD-cloud-ai so large drawings
         // can never trigger Android's "uygulama yanıt vermiyor" watchdog.
@@ -1739,7 +1765,8 @@ public class MainActivity extends AppCompatActivity {
                     reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
                     MusaAiCloudService.Result cloud=packageMode
                         ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
-                        :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+                        :MusaAiCloudService.analyzeWithContext(getApplicationContext(),snapshot,displayName,
+                            raw,recentContext,localContextEvidence(snapshot));
                     if(!cloud.ok()){
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
@@ -2185,6 +2212,40 @@ public class MainActivity extends AppCompatActivity {
 
     private static boolean isAiReportPdfCommand(String q){
         return (q.contains("rapor")&&q.contains("pdf"))||q.contains("pdf olarak cikar");
+    }
+
+    private void viewGandalfAnswerPdf(String answer,MusaAiPanel.Reply reply){
+        if(answer==null||answer.trim().isEmpty()){
+            reply.send("PDF için önce Gandalf'tan bir yanıt alın.");
+            return;
+        }
+        final String document=answer;
+        reply.progress("Son Gandalf yanıtı PDF olarak hazırlanıyor…");
+        aiExecutor.submit(()->{
+            try{
+                File file=MusaAiReportExport.pdf(getApplicationContext(),
+                    "Gandalf • MusaCAD Yanıtı",document);
+                runOnUiThread(()->{
+                    try{
+                        Uri uri=FileProvider.getUriForFile(this,getPackageName()+".files",file);
+                        Intent intent=new Intent(Intent.ACTION_VIEW);
+                        intent.setDataAndType(uri,"application/pdf");
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        intent.setClipData(ClipData.newRawUri("Gandalf PDF",uri));
+                        try{
+                            startActivity(intent);
+                        }catch(android.content.ActivityNotFoundException missingViewer){
+                            shareFile(file,"application/pdf");
+                        }
+                        reply.send("Son yanıt PDF olarak hazırlandı.");
+                    }catch(Exception ex){
+                        reply.send("PDF görüntüleyici açılamadı: "+ex.getMessage());
+                    }
+                });
+            }catch(Exception error){
+                reply.send("PDF hazırlanamadı: "+(error.getMessage()==null?"bilinmeyen hata":error.getMessage()));
+            }
+        });
     }
 
     private void exportLastAiReport(boolean word,MusaAiPanel.Reply reply){
