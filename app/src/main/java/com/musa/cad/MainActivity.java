@@ -883,7 +883,11 @@ public class MainActivity extends AppCompatActivity {
         // General and discipline-scoped engineering speech uses hybrid
         // vision + CAD by default, with separate consent and offline fallback.
         if(MusaAiAnalysisIntent.isReview(raw)){
-            handleMusaAiCloudPrompt(raw,reply);
+            // An explicit "yerel/çevrim dışı" command must not enter cloud consent/network flows.
+            if(MusaAiAnalysisIntent.isLocalOnly(raw))
+                runMusaAiGeneralProjectAnalysis(reply);
+            else
+                handleMusaAiCloudPrompt(raw,reply);
             return;
         }
         if((MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)||
