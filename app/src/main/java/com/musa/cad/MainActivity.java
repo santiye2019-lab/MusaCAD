@@ -42,9 +42,9 @@ public class MainActivity extends AppCompatActivity {
         return t;
     });
     private final android.os.Handler localAiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    private static final int QUICK_REVIEW_MAX_ITEMS=1200;
-    private static final int QUICK_REVIEW_MAX_SCANNED=18000;
-    private static final long QUICK_REVIEW_TIMEOUT_MS=12000L;
+    private static final int QUICK_REVIEW_MAX_ITEMS=4800;
+    private static final int QUICK_REVIEW_MAX_SCANNED=120000;
+    private static final long QUICK_REVIEW_TIMEOUT_MS=20000L;
     private final ExecutorService recentExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-recents");
         t.setPriority(Thread.MIN_PRIORITY);
@@ -880,8 +880,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String aiControl=MusaAiDrawingIndex.normalize(raw);
-        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)
-            &&!MusaAiCloudPolicy.shouldUseCloud(raw)){
+        if((MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)||
+            MusaAiEngineeringReview.asksReview(raw))&&!MusaAiCloudPolicy.shouldUseCloud(raw)){
             runMusaAiGeneralProjectAnalysis(reply);
             return;
         }
@@ -1335,7 +1335,7 @@ public class MainActivity extends AppCompatActivity {
             "\nLayout: "+drawing.activeLayout+
             "\nToplam CAD nesnesi: "+drawing.entityCount+
             "\nKatman: "+drawing.layerCount;
-        reply.progress("Gandalf • Yerel proje analizi hazırlanıyor (sunucudan bağımsız)…");
+        reply.progress("Gandalf • DWG paftasındaki cihaz ve tesisat etiketleri taranıyor…");
         final Runnable deadline=()->{
             if(!finished.compareAndSet(false,true))return;
             Future<?> running=submitted.get();
@@ -1344,7 +1344,7 @@ public class MainActivity extends AppCompatActivity {
                 reply.send("Yerel analiz sürerken aktif proje değişti. Yeni proje için tekrar deneyin.");
                 return;
             }
-            reply.send("Gandalf • Hızlı yerel kontrol bu çizimde 12 saniyelik işleme sınırına ulaştı."+
+            reply.send("Gandalf • Mühendislik pafta incelemesi 20 saniyelik işleme sınırına ulaştı."+
                 "\n"+quickMetadata+
                 "\n\nBu bir hata/uygunluk raporu değildir; çizim nesnelerinin teknik incelemesi tamamlanmadı."+
                 " Yerel analiz başlatılamadığı için internet bağlantısına ilişkin bir sonuç çıkarılamaz.");
@@ -1356,7 +1356,8 @@ public class MainActivity extends AppCompatActivity {
                     MusaAiDrawingIndex index=drawing.aiDrawingIndexQuickReview(
                         QUICK_REVIEW_MAX_ITEMS,QUICK_REVIEW_MAX_SCANNED);
                     if(Thread.currentThread().isInterrupted())return;
-                    MusaAiDisciplineAnalyzer.Result report=MusaAiDisciplineAnalyzer.analyzeAll(index);
+                    reply.progress("Gandalf • Cihaz değerleri, boru çapları, kanal ölçüleri ve metraj değerlendiriliyor…");
+                    MusaAiEngineeringReview.Result report=MusaAiEngineeringReview.analyze(index,drawingName);
                     if(Thread.currentThread().isInterrupted())return;
                     runOnUiThread(()->{
                         if(!finished.compareAndSet(false,true))return;
@@ -1366,12 +1367,11 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                         lastAiReport=report.text;
-                        lastAiReportTitle="Gandalf • Hızlı Genel Proje Ön Analizi";
+                        lastAiReportTitle="Gandalf • Kaynaklı Mühendislik Ön İncelemesi";
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
-                        reply.send("Gandalf • "+drawingName+"\n"+report.text+
-                            "\n\nTarama sınırı: ilk "+QUICK_REVIEW_MAX_SCANNED+
-                            " adaydan en fazla "+QUICK_REVIEW_MAX_ITEMS+" vektör öğe."+
-                            " Tüm proje tarandı veya kesin mevzuat denetimi yapıldı anlamına gelmez."+
+                        reply.send(report.text+
+                            "\n\nOkunan: "+report.equipmentLabels+" cihaz/ekipman etiketi, "+
+                            report.dimensions+" çap/kanal boyutu, "+report.measuredRuns+" ölçülebilir merkez hat parçası."+
                             "\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
                         // Keep viewport work after terminal reply, and cap highlights.
                         if(!report.sourceIds.isEmpty()){
