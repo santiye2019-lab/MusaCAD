@@ -1498,27 +1498,14 @@ public class MainActivity extends AppCompatActivity {
                         packageDrawings=Collections.unmodifiableList(built);
                     }
 
-                    MusaAiVisualEvidence.Result visual=null;
-                    String visualWarning="";
                     if(hybridVisual){
-                        try{
-                            visual=MusaAiVisualEvidence.render(activeSnapshot,text->reply.progress(text));
-                            if(visual.imageCount==0)
-                                visualWarning="Görsel pafta oluşturulamadı; yalnızca CAD verileri gönderildi.";
-                            else if(!visual.complete)
-                                visualWarning="Tüm görsel bölgeler aktarılamadı; görsel kapsam sınırlı.";
-                        }catch(Exception ex){
-                            visualWarning="Görsel pafta hazırlığı başarısız; yalnızca CAD-JSON verileri gönderildi.";
-                        }
+                        runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,requestedScope,reply);
+                        return;
                     }
-                    reply.progress("Gandalf • "+MusaAiAnalysisIntent.label(requestedScope)+
-                        " için görsel ve sayısal deliller çevrim içi AI tarafından değerlendiriliyor…");
+                    reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
                     MusaAiCloudService.Result cloud=packageMode
                         ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
-                        :hybridVisual
-                            ?MusaAiCloudService.analyzeHybrid(getApplicationContext(),snapshot,displayName,raw,requestedScope,
-                                visual==null||visual.imageCount==0?null:visual.json)
-                            :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+                        :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
                     if(!cloud.ok()){
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
@@ -1540,14 +1527,6 @@ public class MainActivity extends AppCompatActivity {
                         out.append("Gandalf Developer • Yönetici modu aktif\n\n");
                     if(packageMode)
                         out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
-                    if(hybridVisual){
-                        out.append("Gandalf Hibrit AI • ").append(MusaAiAnalysisIntent.label(requestedScope)).append("\n");
-                        if(visual!=null&&visual.imageCount>0)
-                            out.append("Görsel: ").append(visual.imageCount).append("/")
-                                .append(visual.regionCount).append(" pafta bölgesi; vektör CAD delilleriyle birlikte.\n\n");
-                        else out.append("Yalnız CAD-JSON bağlamı (görsel yok).\n\n");
-                        if(!visualWarning.isEmpty())out.append(visualWarning).append("\n\n");
-                    }
                     out.append(cloud.text);
                     if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
                     if(!cloud.sources.isEmpty()){
@@ -1595,6 +1574,105 @@ public class MainActivity extends AppCompatActivity {
         }catch(RejectedExecutionException e){
             reply.send("Gandalf AI işlemi şu anda başlatılamıyor. Uygulamayı yeniden açıp tekrar deneyin.");
         }
+    }
+
+    /**
+     * Whole-sheet visual review on the existing dedicated cloud worker.
+     * Each request carries an overview and up to four 1200px region images.
+     * The final report is explicitly partial if ANY of nine tiles did not
+     * receive a successful cloud response; server errors never become findings.
+     */
+    private void runMusaAiWholeSheetVision(DxfParser.Result drawing,
+                                           MusaAiDrawingIndex snapshot,String fileName,
+                                           String raw,String scope,MusaAiPanel.Reply reply){
+        final int total=MusaAiVisualSweepPlan.TILE_COUNT;
+        int acceptedTiles=0,acceptedBatches=0;
+        String issue="";
+        StringBuilder report=new StringBuilder("GANDALF • GÖRSEL + DWG MÜHENDİSLİK PAFTA ANALİZİ");
+        report.append("\nProje: ").append(fileName);
+        report.append("\nLayout: ").append(snapshot.layout);
+        report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
+        report.append("\nYöntem: genel pafta + 3×3 yüksek çözünürlüklü tarama; CAD verileri ile birlikte.");
+        pendingAiActions=Collections.emptyList();
+        for(int batch=0;batch<MusaAiVisualSweepPlan.BATCH_COUNT;batch++){
+            if(Thread.currentThread().isInterrupted()){
+                issue="Tarama işlemi kesildi.";break;
+            }
+            if(drawing!=activeDxf){
+                issue="Analiz devam ederken aktif çizim değiştirildi.";break;
+            }
+            MusaAiVisualEvidence.Result rendered;
+            try{
+                rendered=MusaAiVisualEvidence.renderBatch(drawing,batch,reply::progress);
+            }catch(Exception ex){
+                issue="Paftanın "+(batch+1)+". görsel grubunun hazırlanması başarısız.";break;
+            }
+            if(rendered.renderedTiles==0){
+                issue=(batch+1)+". grupta okunabilir ayrıntı görüntüsü üretilemedi.";break;
+            }
+            reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
+                " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
+            String task=raw+"\nBu istek tek görsel tarama grubudur: "+
+                (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
+                ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
+                " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
+            MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybrid(
+                getApplicationContext(),snapshot,fileName,task,scope,rendered.json);
+            if(!cloud.ok()){
+                issue=(batch+1)+". grupta AI sonucu alınamadı: "+
+                    (cloud.message.isEmpty()?"Sunucu isteği başarısız.":cloud.message);
+                break;
+            }
+            acceptedBatches++;
+            acceptedTiles+=rendered.renderedTiles;
+            report.append("\n\n========== GÖRSEL GRUP ").append(batch+1).append(" / ")
+                .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
+            report.append("\n").append(cloud.text);
+            if(!cloud.sources.isEmpty()){
+                report.append("\nKaynak bağlantıları:");
+                for(int i=0;i<Math.min(4,cloud.sources.size());i++){
+                    MusaAiCloudService.Source s=cloud.sources.get(i);
+                    report.append("\n• ").append(s.title).append(" ").append(s.url);
+                }
+            }
+            if(!rendered.complete){
+                issue=(batch+1)+". görsel grup kısmi oluşturuldu; eksik ayrıntı bölgeleri var.";
+                break;
+            }
+        }
+
+        if(acceptedBatches==0){
+            MusaAiEngineeringReview.Result fallback=MusaAiEngineeringReview.analyze(snapshot,fileName);
+            report.append("\n\nGÖRSEL ANALİZ GERÇEKLEŞMEDİ");
+            if(!issue.isEmpty())report.append("\nNeden: ").append(issue);
+            report.append("\nYalnız yerel vektör incelemesi:\n").append(fallback.text);
+            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(fallback.sourceIds));
+        }else{
+            MusaAiEngineeringReview.Result local=MusaAiEngineeringReview.analyze(snapshot,fileName);
+            report.append("\n\n========== BAĞIMSIZ DWG VEKTÖR KANITLARI ==========");
+            report.append("\n").append(local.text);
+            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(local.sourceIds));
+        }
+
+        boolean visualComplete=acceptedTiles==total&&
+            acceptedBatches==MusaAiVisualSweepPlan.BATCH_COUNT&&issue.isEmpty();
+        report.append("\n\n========== GÖRSEL KAPSAM / DOĞRULAMA ==========");
+        report.append("\nAI yanıtı alınan ayrıntı bölgesi: ").append(acceptedTiles).append("/").append(total);
+        report.append("\nGrup: ").append(acceptedBatches).append("/")
+            .append(MusaAiVisualSweepPlan.BATCH_COUNT);
+        report.append("\nGörsel tarama: ").append(visualComplete?
+            "Tüm planlanan 9 ayrıntı bölgesinin görüntüleri AI tarafından işlendi.":
+            "KISMİ — eksik bölgeler hakkında sonuç çıkarılamaz.");
+        if(!issue.isEmpty())report.append("\nSınırlama: ").append(issue);
+        report.append("\nUYARI: Bu işlem her paftanın her detayını mühendisçe doğruladığını göstermez.");
+        report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
+        report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
+        report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
+        String completeReport=report.toString();
+        lastAiReport=completeReport;
+        lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
+            (visualComplete?" Tam Bölgeli ":" Kısmi ")+"Görsel Proje İncelemesi";
+        reply.send(completeReport+"\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
     }
 
     private static boolean isGandalfPreviewCommand(String q){
