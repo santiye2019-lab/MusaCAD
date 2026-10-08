@@ -186,10 +186,20 @@ public final class DxfParser {
             return new RectF(Math.min(p[0],p[2]),Math.min(p[1],p[3]),Math.max(p[0],p[2]),Math.max(p[1],p[3]));
         }
         public Set<String> lineTypeNames(){return Collections.unmodifiableSet(new TreeSet<>(lineTypes.keySet()));}
-        public MusaAiDrawingIndex aiDrawingIndex(){
-            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>();
-            ArrayList<MusaAiDrawingIndex.OleItem> oles=new ArrayList<>();
+        public MusaAiDrawingIndex aiDrawingIndex(){return aiDrawingIndex(Integer.MAX_VALUE);}
+
+        /**
+         * Builds an AI projection with a hard item budget. Cloud requests use a bounded
+         * projection so a multi-hundred-thousand-entity drawing can never monopolize the
+         * Android main thread or allocate an unbounded temporary AI index.
+         */
+        public MusaAiDrawingIndex aiDrawingIndex(int maxItems){
+            int limit=maxItems<=0?1:maxItems;
+            boolean bounded=limit<Integer.MAX_VALUE;
+            ArrayList<MusaAiDrawingIndex.Item> items=new ArrayList<>(Math.min(limit,4096));
+            ArrayList<MusaAiDrawingIndex.OleItem> oles=bounded?null:new ArrayList<>();
             for(Entity wrapped:document){
+                if(items.size()>=limit)break;
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
                 CadEdit measure=layer.sourceEditWorld;
@@ -199,22 +209,26 @@ public final class DxfParser {
                     aiLength(measure),aiArea(measure),topologyKnown,topologyKnown&&measure.closed,
                     aiGeometryKey(measure,layer.sourceType),
                     measure==null?Double.NaN:measure.centerX(),measure==null?Double.NaN:measure.centerY()));
-                Entity raw=layer.entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
-                if(raw instanceof OleFrameEntity){
-                    OleFrameEntity ole=(OleFrameEntity)raw;
-                    oles.add(new MusaAiDrawingIndex.OleItem(
-                        ole.objectType,ole.preview!=null&&!ole.preview.isRecycled(),
-                        ole.oleText.structured,ole.oleText.mode,ole.oleText.text,
-                        ole.oleText.sheetCount,ole.oleText.cellCount));
+                if(!bounded){
+                    Entity raw=layer.entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
+                    if(raw instanceof OleFrameEntity){
+                        OleFrameEntity ole=(OleFrameEntity)raw;
+                        oles.add(new MusaAiDrawingIndex.OleItem(
+                            ole.objectType,ole.preview!=null&&!ole.preview.isRecycled(),
+                            ole.oleText.structured,ole.oleText.mode,ole.oleText.text,
+                            ole.oleText.sheetCount,ole.oleText.cellCount));
+                    }
                 }
             }
             for(DxfBlocks.BlockInsertion block:blockInsertions){
+                if(items.size()>=limit)break;
                 if(block==null||!activeLayout.equals(block.layout)||!visibleLayerKeys.contains(DxfLayerState.key(block.layer)))continue;
                 items.add(new MusaAiDrawingIndex.Item(
                     -1,"BLOCK",block.layer,block.name,Double.NaN,Double.NaN,
                     false,false,"",Double.NaN,Double.NaN,block.count));
             }
-            return new MusaAiDrawingIndex(activeLayout,entityCount,oles.size(),layerNames,visibleLayers,items,drawingUnitName,oles);
+            return new MusaAiDrawingIndex(activeLayout,entityCount,bounded?oleObjectCount:oles.size(),
+                layerNames,visibleLayers,items,drawingUnitName,bounded?null:oles);
         }
         public double drawingDistanceFromContent(double contentDistance){return worldToContentScale>0d?contentDistance/worldToContentScale:contentDistance;}
         public float contentLengthFromDrawing(double drawingLength){return worldToContentScale>0d?(float)(drawingLength*worldToContentScale):(float)drawingLength;}
