@@ -1215,10 +1215,18 @@ public class MainActivity extends AppCompatActivity {
                 reply.send("Projeden keşif oluşturmak için tam vektör DWG/DXF çizimi hazır olmalı.");
                 return;
             }
-            MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
-            reply.send("ÇİZİMDEN OTOMATİK KEŞİF\n"+MusaAiBoq.summary(generated)+
-                MusaAiCsbEstimate.analyze(currentAiDrawingIndex(),
-                    currentProject==null?Collections.emptyList():currentProject.csbRates).report);
+            // Layer/entity counts are not a bill of quantities. Show the
+            // conservative technical takeoff, never a pseudo-BOQ of all CAD objects.
+            MusaAiDrawingIndex sourceDrawing=currentAiDrawingIndex();
+            MusaAiCsbEstimate.Result technical=MusaAiCsbEstimate.analyze(sourceDrawing,
+                currentProject==null?Collections.emptyList():currentProject.csbRates);
+            String preview=MusaAiQuantityTakeoff.answer(sourceDrawing,"metraj").text;
+            reply.send("PROJE ÖN METRAJI — HENÜZ ONAYLI KEŞİF DEĞİL\n"+
+                "Yalnız aktif pafta/layout tarandı. Mimari ve anonim CAD blokları imalat olarak sayılmaz.\n\n"+
+                preview+"\n\n"+technical.report+
+                "\n\nKesin keşif için tüm katlar, kesitler, vaziyet planı, cihaz listesi, "+
+                "DN/PN/malzeme ve montaj kapsamı birlikte doğrulanmalı; poz kodları "+
+                "doğrulanmış 2025/2026 kaynaklarından ayrı eşleştirilmelidir.");
             return;
         }
         if(isBoqSummaryCommand(aiControl)){
