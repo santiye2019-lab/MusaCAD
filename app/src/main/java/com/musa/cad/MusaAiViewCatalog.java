@@ -92,8 +92,21 @@ public final class MusaAiViewCatalog {
             }
             if(levels.size()<MAX_LEVELS){
                 LinkedHashSet<String> rawMarks=new LinkedHashSet<>();
-                collect(SIGNED_LEVEL,raw,rawMarks);
-                collect(NAMED_LEVEL,raw,rawMarks);
+                // Prefer the complete named kot note, not two duplicate
+                // records for "KOT: -3.20" and its nested "-3.20" substring.
+                ArrayList<int[]> namedSpans=new ArrayList<>();
+                Matcher named=NAMED_LEVEL.matcher(raw);
+                while(named.find()&&rawMarks.size()<8){
+                    rawMarks.add(named.group().trim());
+                    namedSpans.add(new int[]{named.start(),named.end()});
+                }
+                Matcher signed=SIGNED_LEVEL.matcher(raw);
+                while(signed.find()&&rawMarks.size()<8){
+                    boolean inside=false;
+                    for(int[] span:namedSpans)
+                        if(signed.start()>=span[0]&&signed.end()<=span[1]){inside=true;break;}
+                    if(!inside)rawMarks.add(signed.group().trim());
+                }
                 // Numeric expressions are only POTENTIAL levels; distinguish
                 // pipe elevations, structural datum and linear dimensions later.
                 for(String mark:rawMarks){
