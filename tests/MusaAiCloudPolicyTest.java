@@ -16,6 +16,12 @@ public final class MusaAiCloudPolicyTest {
         yes(MusaAiCloudPolicy.shouldUseCloud("GELKAI_POWER"),"GELKAI cloud expert route");
         yes(MusaAiCloudPolicy.allowEditProposals("GYANGAI_SMOKE"),"GYANGAI exposes proposal tools");
         no(MusaAiCloudPolicy.shouldUseCloud("Projeyi kontrol et"),"local control should stay local");
+        yes(MusaAiCloudPolicy.shouldUseCloud("Gandalf, projeyi analiz et"),"general project review cloud-first");
+        yes(MusaAiCloudPolicy.shouldUseCloud("Mekanik olarak analiz et"),"focused mechanical review cloud-first");
+        yes(MusaAiCloudPolicy.shouldUseCloud("Sıhhi tesisat olarak analiz et"),"sanitary review cloud-first");
+        yes(MusaAiCloudPolicy.shouldUseCloud("Statik projeyi analiz et"),"structural review cloud-first");
+        no(MusaAiCloudPolicy.shouldUseCloud("Sıhhi tesisat olarak yerel analiz et"),"user offline opt-out");
+        no(MusaAiCloudPolicy.shouldUseCloud("Raporu PDF olarak çıkar"),"export must not use cloud");
         yes(MusaAiCloudPolicy.allowWeb("Gandalf, güncel yönetmeliğe göre webden kontrol et"),"web intent");
         no(MusaAiCloudPolicy.allowWeb("Gandalf, çizimi analiz et"),"web should be explicit");
         yes(MusaAiCloudPolicy.allowEditProposals("Gandalf, bu hattı düzelt"),"edit proposal intent");

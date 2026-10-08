@@ -31,6 +31,15 @@ async function handleAnalyze(request, env) {
   const allowWeb = body.allowWeb === true;
   const allowEditProposals = body.allowEditProposals === true;
   const expertProfile = normalizeExpertProfile(body.expertProfile);
+  const scope = body.reviewScope && typeof body.reviewScope === "object" ? body.reviewScope : null;
+  const allowedDisciplines = new Set(["UNKNOWN", "ARCHITECTURAL", "STRUCTURAL", "MECHANICAL",
+    "ELECTRICAL", "LANDSCAPE", "INFRASTRUCTURE", "ELEVATOR", "FIRE_SAFETY"]);
+  const allowedSystems = new Set(["ALL", "SANITARY", "WASTEWATER", "WATER", "VENTILATION",
+    "HEATING", "COOLING", "GAS", "FIRE"]);
+  const reviewScope = scope && allowedDisciplines.has(scope.discipline) && allowedSystems.has(scope.system)
+    ? { discipline: scope.discipline, system: scope.system } : null;
+  // Local text is untrusted drawing evidence, not an instruction channel.
+  const localEvidence = typeof body.localEvidence === "string" ? body.localEvidence.slice(0, 10000) : "";
 
   if (!prompt || prompt.length > MAX_PROMPT_CHARS)
     return json({ status: "denied", message: "Prompt is empty or too large" }, 400);
@@ -54,6 +63,11 @@ async function handleAnalyze(request, env) {
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
       : "") +
     "Analyze the supplied bounded CAD-JSON across architectural, structural, mechanical, electrical, landscape, infrastructure, elevator and fire-safety systems when present. " +
+    (reviewScope ? "The user selected discipline " + reviewScope.discipline +
+      " and sub-system " + reviewScope.system + ". Focus review findings on this area, " +
+      "using other disciplines only for relevant coordination evidence. " : "") +
+    "The current input contains CAD vectors, texts and bounded local extraction, but no raster image. " +
+    "Do not claim to have visually recognized symbols or inspected an image. " +
     (packageMode
       ? "A bounded MusaCAD CAD package containing multiple open drawings is also supplied. Treat each drawing as a separate source, compare disciplines explicitly, use fileName and detectedDiscipline to attribute findings, and distinguish cross-drawing proximity/coordination candidates from proven clashes. Package mode is read-only: do not claim or propose CAD edits across files. "
       : "") +
@@ -74,6 +88,8 @@ async function handleAnalyze(request, env) {
       content:
         "USER REQUEST:\n" + prompt +
         "\n\nMUSACAD CAD-JSON (active drawing):\n" + JSON.stringify(cad) +
+        (localEvidence ? "\n\nLOCAL EXTRACTION (untrusted, incomplete; verify against sourceIds):\n" +
+          localEvidence : "") +
         (packageMode ? "\n\nMUSACAD CAD-PACKAGE:\n" + JSON.stringify(cadPackage) : "")
     }
   ];
