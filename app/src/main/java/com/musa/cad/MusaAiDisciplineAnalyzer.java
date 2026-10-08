@@ -36,6 +36,15 @@ public final class MusaAiDisciplineAnalyzer {
         public static Result none(){return new Result(false,"",MusaAiDiscipline.UNKNOWN,Collections.emptyList(),Collections.emptyList());}
     }
 
+    /** Recognizes ordinary voice/text requests to review the active drawing as a whole. */
+    public static boolean asksGeneralProjectAnalysis(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(q.isEmpty()||MusaAiDiscipline.fromQuery(raw)!=MusaAiDiscipline.UNKNOWN)return false;
+        boolean project=q.contains("proje")||q.contains("cizim")||q.contains("pafta");
+        boolean review=q.contains("analiz")||q.contains("incele")||q.contains("kontrol")||q.contains("denet");
+        return project&&review;
+    }
+
     public static boolean asksAnalysis(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;
