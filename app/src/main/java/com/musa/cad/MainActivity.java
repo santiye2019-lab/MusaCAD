@@ -882,7 +882,7 @@ public class MainActivity extends AppCompatActivity {
         String aiControl=MusaAiDrawingIndex.normalize(raw);
         if((MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)||
             MusaAiEngineeringReview.asksReview(raw))&&!MusaAiCloudPolicy.shouldUseCloud(raw)){
-            runMusaAiGeneralProjectAnalysis(reply);
+            runMusaAiGeneralProjectAnalysis(raw,reply);
             return;
         }
         if(isGandalfUndoCommand(aiControl)){
@@ -1059,6 +1059,17 @@ public class MainActivity extends AppCompatActivity {
                     "\n\nÇıktı: “Raporu Word olarak çıkar” veya “Raporu PDF olarak çıkar”.");
                 return;
             }
+        }
+
+        // Free-form spoken review: cloud analysis first; preserve the explicit
+        // offline path, specialized local calculations and manual CAD commands.
+        if(MusaAiReviewScope.asksAnalysis(raw)&&MusaAiCloudPolicy.shouldUseCloud(raw)){
+            if(currentProject==null){
+                reply.send("Gandalf analizine başlamadan önce bir DWG veya DXF projesi açın.");
+                return;
+            }
+            handleMusaAiCloudPrompt(raw,reply);
+            return;
         }
 
         if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
@@ -1315,7 +1326,7 @@ public class MainActivity extends AppCompatActivity {
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
     }
 
-    private void runMusaAiGeneralProjectAnalysis(MusaAiPanel.Reply reply){
+    private void runMusaAiGeneralProjectAnalysis(String raw,MusaAiPanel.Reply reply){
         final DxfParser.Result drawing=activeDxf;
         final ProjectSession project=currentProject;
         final String drawingName=currentDisplayName;
@@ -1357,7 +1368,9 @@ public class MainActivity extends AppCompatActivity {
                         QUICK_REVIEW_MAX_ITEMS,QUICK_REVIEW_MAX_SCANNED);
                     if(Thread.currentThread().isInterrupted())return;
                     reply.progress("Gandalf • Cihaz değerleri, boru çapları, kanal ölçüleri ve metraj değerlendiriliyor…");
-                    MusaAiEngineeringReview.Result report=MusaAiEngineeringReview.analyze(index,drawingName);
+                    MusaAiReviewScope localScope=MusaAiReviewScope.parse(raw);
+                    MusaAiDrawingIndex scopedIndex=localScope==null?index:localScope.filteredIndex(index);
+                    MusaAiEngineeringReview.Result report=MusaAiEngineeringReview.analyze(scopedIndex,drawingName);
                     if(Thread.currentThread().isInterrupted())return;
                     runOnUiThread(()->{
                         if(!finished.compareAndSet(false,true))return;
@@ -1367,9 +1380,9 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                         lastAiReport=report.text;
-                        lastAiReportTitle="Gandalf • Kaynaklı Mühendislik Ön İncelemesi";
+                        lastAiReportTitle="Gandalf • "+(localScope==null?"Kaynaklı Mühendislik Ön İncelemesi":localScope.label+" Ön İncelemesi");
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
-                        reply.send(report.text+
+                        reply.send((localScope==null?"":"İstenen kapsam: "+localScope.label+"\n")+report.text+
                             "\n\nOkunan: "+report.equipmentLabels+" cihaz/ekipman etiketi, "+
                             report.dimensions+" çap/kanal boyutu, "+report.measuredRuns+" ölçülebilir merkez hat parçası."+
                             "\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
@@ -1485,13 +1498,17 @@ public class MainActivity extends AppCompatActivity {
                         :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
                     if(!cloud.ok()){
                         reply.progress("Bulut AI tamamlanamadı. Yerel proje kontrolüne geçiliyor…");
-                        MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
+                        MusaAiReviewScope scope=MusaAiReviewScope.parse(raw);
+                        MusaAiDisciplineAnalyzer.Result localFallback=scope==null
+                            ?MusaAiDisciplineAnalyzer.analyzeAll(snapshot)
+                            :MusaAiDisciplineAnalyzer.Result.none();
+                        String localText=scope==null?localFallback.text:scope.localEvidence(snapshot,displayName);
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
-                        if(localFallback.matched){
+                        if(!localText.isEmpty()){
                             reply.send(reason+
                                 "\n\nGandalf yerel araçlarla devam etti:\n"+
-                                localFallback.text+
-                                "\n\nNot: Bu yedek analiz güncel web/kaynak taraması kullanmaz.");
+                                localText+
+                                "\n\nNot: Bu yedek analiz güncel web/kaynak taraması veya görsel sembol tanıma kullanmaz.");
                         }else{
                             reply.send(reason+" Yerel Gandalf araçları da bu isteği eşleştiremedi.");
                         }
@@ -1499,6 +1516,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                     pendingAiActions=cloud.actions;
                     StringBuilder out=new StringBuilder();
+                    MusaAiReviewScope requestedScope=MusaAiReviewScope.parse(raw);
+                    if(requestedScope!=null)
+                        out.append("İstenen mühendislik kapsamı: ").append(requestedScope.label).append("\n");
                     if(MusaAiSessionService.developerCached())
                         out.append("Gandalf Developer • Yönetici modu aktif\n\n");
                     if(packageMode)
