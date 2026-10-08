@@ -1555,6 +1555,8 @@ public class MainActivity extends AppCompatActivity {
                         else
                             out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
                     }
+                    if(!packageMode&&snapshot!=null)
+                        out.append(MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList()).report);
                     lastAiReport=out.toString();
                     lastAiReportTitle="Gandalf • "+(hybridVisual?"Hibrit ":"")+
                         MusaAiAnalysisIntent.label(requestedScope)+" Proje Analiz Raporu";
@@ -1668,6 +1670,7 @@ public class MainActivity extends AppCompatActivity {
         report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
         report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
         report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
+        report.append(MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList()).report);
         String completeReport=report.toString();
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
