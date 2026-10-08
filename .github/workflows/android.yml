@@ -649,6 +649,10 @@ jobs:
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
       - name: Build approved installable MusaCAD APK
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]')) }}
+        env:
+          # Optional public HTTPS endpoints, NEVER provider API keys.
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
         run: |
           ./gradlew --no-daemon assembleDirectDebug
           cp app/build/outputs/apk/direct/debug/app-direct-debug.apk /tmp/MusaCAD-latest.apk
