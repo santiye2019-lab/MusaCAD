@@ -3900,8 +3900,14 @@ public class MainActivity extends AppCompatActivity {
 
                 if(loaded.dxf){
                     runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Vektör çizim hazırlanıyor…");});
-                    loaded.parsed=DxfParser.render(loaded.file);loaded.workingDxf=loaded.file;loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
-                    if(loaded.bitmap==null)throw new IOException("Desteklenen DXF geometrisi bulunamadı");
+                    // Full raster preview of every entity duplicates the costly first
+                    // paint. Large DXF files open directly as authoritative vectors.
+                    boolean largeDxf=loaded.file.length()>6L*1024L*1024L;
+                    loaded.parsed=DxfParser.render(loaded.file,!largeDxf);
+                    loaded.workingDxf=loaded.file;
+                    loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
+                    if(loaded.parsed==null||loaded.parsed.entityCount<=0)
+                        throw new IOException("Desteklenen DXF geometrisi bulunamadı");
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
@@ -3912,13 +3918,54 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // Do not expose the provisional native DWG scene to the user.
-                // Its partial color semantics could make the first visible frame blue
-                // and then change after DXF handoff. Keep the loading surface visible
-                // until the authoritative vector model is ready so the first drawing
-                // frame already has the final CAD colors.
-                runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText("DWG vektör model hazırlanıyor…");});
+                // Progressive DWG opening: show the native scene immediately while
+                // the full editable DXF is converted in the loader thread.
+                // Unlike a bitmap handoff, the preview retains native geometry.
+                runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())
+                    task.progress.setText("DWG hızlı görünüm hazırlanıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
+                    FileTransfer.checkCancelled();
+                    NativeScene provisional=null;
+                    try{provisional=engine.fastScene();}catch(Exception ignored){}
+                    if(provisional!=null&&!Thread.currentThread().isInterrupted()){
+                        final NativeScene nativePreview=provisional;
+                        final java.util.concurrent.CountDownLatch uiHandoff=
+                            new java.util.concurrent.CountDownLatch(1);
+                        final AtomicBoolean allowHandoff=new AtomicBoolean(true);
+                        runOnUiThread(()->{
+                            try{
+                                if(!allowHandoff.get()||activeLoad!=task||isFinishing()||isDestroyed())
+                                    return;
+                                ProjectSession project=new ProjectSession();
+                                project.sourceUri=loaded.sourceUri;
+                                project.file=loaded.file;
+                                project.name=loaded.name;
+                                project.dxf=false;
+                                project.nativeScene=nativePreview;
+                                project.preparingEditor=true;
+                                project.prepareTask=task;
+                                project.lastAccessMs=System.currentTimeMillis();
+                                project.persistedImages.addAll(loaded.imageOverlays);
+                                loaded.nativeScene=nativePreview;
+                                loaded.project=project;
+                                loaded.handedOff=true;
+                                projects.add(project);
+                                activeLoad=null;
+                                if(task.dialog!=null)task.dialog.dismiss();
+                                activateProject(project);
+                                result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
+                                    "Önizleme renkleri nihai değildir.");
+                                scheduleRecentNativeRecord(uri,loaded.name,nativePreview);
+                            }finally{uiHandoff.countDown();}
+                        });
+                        try{
+                            if(!uiHandoff.await(8,TimeUnit.SECONDS))allowHandoff.set(false);
+                        }catch(InterruptedException interrupted){
+                            allowHandoff.set(false);
+                            Thread.currentThread().interrupt();
+                            throw new IOException("DWG açılışı kullanıcı tarafından kesildi.",interrupted);
+                        }
+                    }
                     FileTransfer.checkCancelled();
                     File converted=File.createTempFile("MusaCAD_donusen_",".dxf",getCacheDir());boolean keep=false;
                     try{
@@ -3927,7 +3974,12 @@ public class MainActivity extends AppCompatActivity {
                         // Always build the authoritative DXF-rendered navigation preview.
                         // Native first paint is only a loading bridge; pinch/pan after the full
                         // model is ready must never fall back to re-rendering the whole DWG.
-                        DxfParser.Result parsed=DxfParser.render(converted,true);if(parsed==null)throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");parsed.conversionWarnings=status;
+                        // Rendering a 1200px bitmap of every CAD entity before open
+                        // doubles work for large projects; direct vectors are authoritative.
+                        DxfParser.Result parsed=DxfParser.render(converted,false);
+                        if(parsed==null||parsed.entityCount<=0)
+                            throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
+                        parsed.conversionWarnings=status;
                         loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
                     }finally{if(!keep)converted.delete();}
                 }
@@ -3955,7 +4007,8 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                if(loaded.bitmap==null)throw new IOException("DWG içinde görüntülenebilir geometri bulunamadı");
+                if(loaded.parsed==null||loaded.parsed.entityCount<=0)
+                    throw new IOException("DWG içinde görüntülenebilir geometri bulunamadı");
                 Bitmap recentPreview=loaded.bitmap;
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
