@@ -282,5 +282,65 @@ public final class MusaAiYfk2025Library {
             "2025 özel kütüphanesi değiştirilmedi.");
         return result.toString();
     }
+    /**
+     * Optional material dictionary bridge. Returns review candidates only;
+     * never mutates a project, selects an official position or applies a rate.
+     */
+    public static String suggestForTakeoff(Context c,MusaAiCsbEstimate.Result measured) {
+        if(!status(c).installed)return "2025 kullanıcı kataloğu henüz bu cihazda kurulu değil.";
+        if(measured==null||measured.rows.isEmpty())
+            return "2025 poz adayları için doğrulanmış çizim metraj kalemi bulunamadı.";
+        StringBuilder out=new StringBuilder(
+            "2025 ÇŞİDB • METRAJ/MALZEME SÖZLÜĞÜ ADAYLARI (ÇEVRİM DIŞI)");
+        int shown=0;
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(target(c,DB).getAbsolutePath(),
+                null,SQLiteDatabase.OPEN_READONLY)){
+            for(MusaAiCsbEstimate.Row row:measured.rows){
+                if(shown++>=8){out.append("\nDiğer çizim kalemleri bu ön izlemede gösterilmedi.");break;}
+                String description=row.description;
+                String term=materialToken(MusaAiYfk2025Parser.fold(description));
+                out.append("\n\n• Çizim: ").append(description).append(" / ")
+                    .append(row.quantity).append(" ").append(row.unit);
+                if(term.isEmpty()){
+                    out.append("\nTeknik malzeme türü yeterince belirgin değil; poz atanmadı.");
+                    continue;
+                }
+                String sql="SELECT code,description,unit,price_2025,page FROM items "+
+                    "WHERE folded LIKE ? ESCAPE '\\' AND code LIKE '25.%' "+
+                    "ORDER BY code LIMIT 3";
+                int hits=0;
+                try(Cursor cur=db.rawQuery(sql,
+                    new String[]{"%"+escapeLike(term)+"%"})){
+                    while(cur.moveToNext()){
+                        hits++;
+                        out.append("\n  • ADAY ").append(cur.getString(0))
+                            .append(" • sayfa ").append(cur.getInt(4));
+                        String candidate=cur.getString(1);
+                        if(candidate!=null&&!candidate.isEmpty())
+                            out.append(" • ").append(candidate.substring(0,Math.min(140,candidate.length())));
+                        String unit=cur.getString(2);
+                        if(unit!=null&&!unit.isEmpty())out.append(" [birim ").append(unit).append("]");
+                        String old=cur.getString(3);
+                        if(old!=null&&!old.isEmpty())out.append(" [2025: ").append(old).append(" TL]");
+                    }
+                }
+                if(hits==0)out.append("\n  Bu malzeme adına ait 2025 sayfa adayı bulunamadı.");
+            }
+        }catch(Exception e){return "2025 poz sözlüğü okunamadı.";}
+        out.append("\n\nDİKKAT: Bunlar yalnız anahtar kelime üzerinden kaynak adaylarıdır. ")
+            .append("DN/PN, boru malzemesi, imalat tanımı, ölçü birimi, kapsam, ")
+            .append("kat/kesit metrajı ve mükerrerlik kontrolü yapılmadan resmi poz sayılmaz. ")
+            .append("2025 tarihli fiyat güncel proje toplamına aktarılmaz.");
+        return out.toString();
+    }
+    private static String materialToken(String desc) {
+        for(String token:new String[]{"hidrofor","boyler","klozet","lavabo",
+            "pisuvar","batarya","evye","suzgec","pprc","polipropilen",
+            "pvc","polietilen","celik","bakir","yangin pompasi","hava kanali",
+            "boru","vana","radiator","fan coil","klima"})
+            if(desc.contains(token))return token;
+        return "";
+    }
+
     private MusaAiYfk2025Library(){}
 }
