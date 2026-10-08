@@ -94,6 +94,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiYfkCatalogQuery.java tests/MusaAiYfkCatalogQueryTest.java
           java -cp /tmp/musacad-tests MusaAiYfkCatalogQueryTest
+      - name: Test 2025 device-private price book parser and historical unit price separation
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiYfk2025Parser.java tests/MusaAiYfk2025ParserTest.java
+          java -cp /tmp/musacad-tests MusaAiYfk2025ParserTest
       - name: Test official mechanical poz taxonomy and analysis commands
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiYfkTechnicalSources.java tests/MusaAiYfkTechnicalSourcesTest.java
