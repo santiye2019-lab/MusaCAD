@@ -141,7 +141,7 @@ public final class MusaAiVisualEvidence {
         return new Result(payload,images.length(),regions.size(),renderedTiles,complete);
     }
 
-    private static JSONArray bounds(double a,double b,double c,double d){
+    private static JSONArray bounds(double a,double b,double c,double d) throws org.json.JSONException{
         JSONArray out=new JSONArray();out.put(a).put(b).put(c).put(d);return out;
     }
     private static boolean finite(RectF r){
