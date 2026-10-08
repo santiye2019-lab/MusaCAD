@@ -24,7 +24,8 @@ public final class MusaAiAnalysisIntent {
         boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
             "pis su","atik su","yangin","havalandirma","klima","isitma","statik",
             "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
-            "hidrofor","pompa","sprinkler","hepsini");
+            "hidrofor","pompa","sprinkler","hepsini","kesit","vaziyet",
+            "kot","kat plani","cati plani","bodrum","zemin kat","gorunus");
         return operation&&topic;
     }
 
