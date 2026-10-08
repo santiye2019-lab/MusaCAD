@@ -39,6 +39,9 @@ public final class MusaAiPanel {
     public interface Host {
         String contextLabel();
         void onPrompt(String prompt,Reply reply);
+        default void onPrompt(String prompt,String recentContext,Reply reply){
+            onPrompt(prompt,reply);
+        }
         default void onViewPdf(String answer,Reply reply) {
             reply.send("PDF görüntüleme bu sürümde yapılandırılmadı.");
         }
@@ -62,7 +65,11 @@ public final class MusaAiPanel {
         TextView title=text(activity,developer?"Gandalf • Developer":"Gandalf • MusaCAD AI",20f,Color.WHITE,true);
         header.addView(title,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
-        TextView state=text(activity,developer?"DEV":"AI",10f,0xFFBFFAF4,true);
+        boolean cloudAllowed=activity.getSharedPreferences("musacad_ai_privacy",Activity.MODE_PRIVATE)
+            .getBoolean("cloud_cad_json_v1",false);
+        boolean cloudConfigured=BuildConfig.AI_API_URL!=null&&!BuildConfig.AI_API_URL.trim().isEmpty();
+        String mode=developer?"DEV":cloudConfigured&&cloudAllowed?"Bulut izinli":"Yerel + bulut";
+        TextView state=text(activity,mode,10f,0xFFBFFAF4,true);
         state.setGravity(Gravity.CENTER);
         state.setPadding(dp(activity,10),dp(activity,5),dp(activity,10),dp(activity,5));
         state.setBackground(round(activity,0xFF0C594F,16,0xFF16B8A6));
@@ -201,7 +208,7 @@ public final class MusaAiPanel {
                     });
                 }
             };
-            try{host.onPrompt(prompt,requestReply);}
+            try{host.onPrompt(prompt,previousTurns.toString(),requestReply);}
             catch(Exception e){requestReply.send("Gandalf komutu işlenirken hata oluştu. Tekrar deneyin.");}
         };
 
