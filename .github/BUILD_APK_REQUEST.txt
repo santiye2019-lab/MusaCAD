@@ -1,5 +1,4 @@
-MusaCAD Gandalf conversational hybrid AI deployment request — 2026-10-09.
-Includes GitHub PR #200: ChatGPT-like free-form Turkish prompts, PDF as-viewed latest Gandalf answer, bounded in-session chat context, local CAD engineering evidence, multi-sheet hybrid vision, protected opt-in cloud and offline fallback.
-Retains 2025 user-imported offline ÇŞİDB price/poz catalog and 2026 technical reference library.
-IMPORTANT: Do not distribute copyrighted YFK books in APK or GitHub. Book remains user-imported in app-private storage.
-This main commit requests one installable test APK plus the configured signed Gandalf Cloud production workflow.
+MusaCAD Gandalf visual engineering + heavy DWG performance release request (2026-10-09).
+Merge PR #201 successfully: consented full-sheet 3x3 images and section closeup cloud AI, structured eight-part real engineering audit, local 2025 YFK poz candidate lookup, dedicated user PDF price book import, actual online/model success LED, always-visible chat scroll thumb, progressive native first paint, direct complete DXF vector upgrade, gesture LOD without deleting geometry.
+Privacy: YFK original PDF must NOT be added to public GitHub/APK; user imports own copy to app-private storage.
+Deploy the server-side visual analysis instructions and build signed Gandalf Cloud production Android APK. Run quality gate and signed distribution.
