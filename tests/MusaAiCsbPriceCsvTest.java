@@ -24,8 +24,12 @@ public final class MusaAiCsbPriceCsvTest {
                 "",10d,Double.NaN)),"m");
         check(MusaAiCsbEstimate.analyze(drawing,draft.rates).pricedRows==0,
             "draft prices must not alter the report");
-        check(MusaAiCsbEstimate.analyze(drawing,accepted).pricedRows==1,
+        MusaAiCsbEstimate.Result priced=MusaAiCsbEstimate.analyze(drawing,accepted);
+        check(priced.pricedRows==1,
             "approved exact source and installed scope can price known item");
+        check(priced.report.contains("poz eşleştirme anahtarı: BORU|Pis su | PVC | DN100"),
+            "user must see the exact item mapping key");
+        check(priced.report.contains(YFK),"official source URL must appear with priced amount");
         check(MusaAiCsbPriceCsv.parse(HEADER+"\n"+
             row("TEST","123,00","2026-10","https://yfk.csb.gov.tr.evil.test/abc","m","malzeme+montaj"))
             .rates.isEmpty(),"lookalike official domain rejected");
