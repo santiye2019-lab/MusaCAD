@@ -15,9 +15,10 @@ public final class MusaAiAnalysisIntent {
         if(q.startsWith("mekai ")||q.startsWith("gmekai ")||
            q.startsWith("statikai ")||q.startsWith("gstatikai ")||
            q.startsWith("elkai ")||q.startsWith("gelkai "))return false;
-        if(contains(q,"onerileri uygula","onerileri onizle","degistir","duzelt","sil",
+        if(contains(q,"onerileri uygula","onerileri onizle","degistir","duzelt",
             "dosya kaydet","metraj cikar","kesif olustur","kesif yukle",
-            "raporu pdf","raporu word","revizyon","secili alani"))return false;
+            "raporu pdf","raporu word","revizyon","secili alani")||
+            (" "+q+" ").contains(" sil "))return false;
         boolean operation=contains(q,"analiz","incele","denetle","kontrol et","proje kontrolu",
             "proje incele","teknik rapor hazirla");
         boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
@@ -25,6 +26,13 @@ public final class MusaAiAnalysisIntent {
             "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
             "hidrofor","pompa","sprinkler","hepsini");
         return operation&&topic;
+    }
+
+    /** Keep explicit offline/yerel requests on-device; never ask for cloud consent. */
+    public static boolean isLocalOnly(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return contains(q,"yerel","cevrimdisi","cevrim disi","internetsiz",
+            "offline","internet kullanma","buluta gonderme","sunucu kullanma");
     }
 
     public static String scope(String raw){
