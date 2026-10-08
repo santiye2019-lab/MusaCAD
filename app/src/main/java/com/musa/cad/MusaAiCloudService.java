@@ -5,6 +5,7 @@ import org.json.*;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URL;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -157,6 +158,8 @@ public final class MusaAiCloudService {
             if(text.isEmpty()&&!actions.isEmpty())text="Gandalf AI "+actions.size()+" adet çizim işlemi önerdi.";
             if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
             return new Result(Status.OK,text,"",actions,sources,webUsed);
+        }catch(SocketTimeoutException e){
+            return new Result(Status.NETWORK_ERROR,"","Gandalf AI sunucusundan süresi içinde yanıt alınamadı. Yerel analiz kullanılacak.",null,false);
         }catch(IOException e){
             return new Result(Status.NETWORK_ERROR,"","Gandalf AI için internet bağlantısını kontrol edin",null,false);
         }catch(Exception e){
