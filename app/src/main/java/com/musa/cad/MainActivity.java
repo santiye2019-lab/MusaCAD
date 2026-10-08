@@ -23,6 +23,7 @@ import java.util.concurrent.*;
 public class MainActivity extends AppCompatActivity {
     private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
     private static final int MAX_OPEN_PROJECTS=4;
+    private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1";
     private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
@@ -90,6 +91,13 @@ public class MainActivity extends AppCompatActivity {
     private static final class RevisionCandidate {
         final MusaAiDrawingIndex index;final String name;
         RevisionCandidate(MusaAiDrawingIndex index,String name){this.index=index;this.name=name==null?"Referans":name;}
+    }
+
+    private static final class AiCloudProjectSource {
+        final String name;final DxfParser.Result parsed;final MusaAiBoq.Model boq;
+        AiCloudProjectSource(String name,DxfParser.Result parsed,MusaAiBoq.Model boq){
+            this.name=name==null?"cizim.dwg":name;this.parsed=parsed;this.boq=boq;
+        }
     }
 
     private CheckBox snapToggle;
@@ -1320,69 +1328,111 @@ public class MainActivity extends AppCompatActivity {
             .show();
     }
 
+    private List<AiCloudProjectSource> currentAiCloudProjectSources(){
+        ArrayList<AiCloudProjectSource> out=new ArrayList<>();
+        for(ProjectSession p:projects){
+            if(p==null)continue;
+            DxfParser.Result parsed=(p==currentProject&&activeDxf!=null)?activeDxf:p.parsed;
+            if(parsed==null)continue;
+            String name=p==currentProject?currentDisplayName:p.name;
+            out.add(new AiCloudProjectSource(name,parsed,p.boqModel));
+            if(out.size()>=MusaAiCadPackageJson.MAX_DRAWINGS)break;
+        }
+        return Collections.unmodifiableList(out);
+    }
+
     private void runMusaAiCloud(String raw,MusaAiPanel.Reply reply){
-        final MusaAiDrawingIndex snapshot=currentAiDrawingIndex();
+        // Capture only cheap immutable references on the UI thread. The expensive
+        // CAD-to-AI projection is built below on MusaCAD-cloud-ai so large drawings
+        // can never trigger Android's "uygulama yanıt vermiyor" watchdog.
+        final DxfParser.Result activeSnapshot=activeDxf;
         final String displayName=currentDisplayName;
         final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
-        final List<MusaAiProjectPackage.Drawing> packageDrawings=packageMode
-            ?Collections.unmodifiableList(new ArrayList<>(currentAiProjectPackageDrawings()))
-            :Collections.emptyList();
-        if(snapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
-        aiExecutor.submit(()->{
-            MusaAiCloudService.Result cloud=packageMode
-                ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
-                :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
-            if(!cloud.ok()){
-                MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
-                String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
-                if(localFallback.matched){
-                    reply.send(reason+
-                        "\n\nGandalf yerel araçlarla devam etti:\n"+
-                        localFallback.text+
-                        "\n\nNot: Bu yedek analiz güncel web/kaynak taraması kullanmaz.");
-                }else{
-                    reply.send(reason+" Yerel Gandalf araçları da bu isteği eşleştiremedi.");
+        final List<AiCloudProjectSource> packageSources=packageMode
+            ?currentAiCloudProjectSources():Collections.emptyList();
+        if(activeSnapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
+
+        try{
+            aiExecutor.submit(()->{
+                try{
+                    MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                    List<MusaAiProjectPackage.Drawing> packageDrawings=Collections.emptyList();
+                    if(packageMode){
+                        ArrayList<MusaAiProjectPackage.Drawing> built=new ArrayList<>();
+                        for(AiCloudProjectSource source:packageSources){
+                            if(source==null||source.parsed==null)continue;
+                            MusaAiDrawingIndex index=source.parsed==activeSnapshot
+                                ?snapshot:source.parsed.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                            built.add(new MusaAiProjectPackage.Drawing(source.name,index,source.boq));
+                            if(built.size()>=MusaAiCadPackageJson.MAX_DRAWINGS)break;
+                        }
+                        packageDrawings=Collections.unmodifiableList(built);
+                    }
+
+                    MusaAiCloudService.Result cloud=packageMode
+                        ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
+                        :MusaAiCloudService.analyze(getApplicationContext(),snapshot,displayName,raw);
+                    if(!cloud.ok()){
+                        MusaAiDisciplineAnalyzer.Result localFallback=MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
+                        String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
+                        if(localFallback.matched){
+                            reply.send(reason+
+                                "\n\nGandalf yerel araçlarla devam etti:\n"+
+                                localFallback.text+
+                                "\n\nNot: Bu yedek analiz güncel web/kaynak taraması kullanmaz.");
+                        }else{
+                            reply.send(reason+" Yerel Gandalf araçları da bu isteği eşleştiremedi.");
+                        }
+                        return;
+                    }
+                    pendingAiActions=cloud.actions;
+                    StringBuilder out=new StringBuilder();
+                    if(MusaAiSessionService.developerCached())
+                        out.append("Gandalf Developer • Yönetici modu aktif\n\n");
+                    if(packageMode)
+                        out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
+                    out.append(cloud.text);
+                    if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
+                    if(!cloud.sources.isEmpty()){
+                        out.append("\n\nKaynaklar:");
+                        int sourceCount=0;
+                        for(MusaAiCloudService.Source source:cloud.sources){
+                            if(sourceCount++>=8){out.append("\n• … +").append(cloud.sources.size()-8).append(" kaynak");break;}
+                            out.append("\n• ");
+                            if(!source.title.isEmpty())out.append(source.title).append(" — ");
+                            out.append(source.url);
+                        }
+                    }
+                    if(packageMode&&!cloud.actions.isEmpty()){
+                        pendingAiActions=Collections.emptyList();
+                        out.append("\n\n• Güvenlik: Proje Paketi modunda gelen çizim işlem önerileri uygulanmadı.");
+                    }else if(!cloud.actions.isEmpty()){
+                        out.append("\n\nÖnerilen çizim işlemleri (henüz uygulanmadı):");
+                        int shown=0;
+                        for(MusaAiCloudService.Action action:cloud.actions){
+                            if(shown++>=8){out.append("\n• … +").append(cloud.actions.size()-8).append(" işlem");break;}
+                            out.append("\n• ").append(action.name);
+                            if(!action.reason.isEmpty())out.append(" — ").append(action.reason);
+                        }
+                        if(MusaAiSessionService.developerCached())
+                            out.append("\n\nGandalf Developer: “Önerileri önizle” veya “Önerileri uygula” diyebilirsiniz. Hiçbir değişiklik açık onay olmadan çizime işlenmez.");
+                        else
+                            out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
+                    }
+                    reply.send(out.toString());
+                    if(!packageMode&&!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
+                        runOnUiThread(()->showPendingGandalfActions(reply,false));
+                }catch(OutOfMemoryError e){
+                    reply.send("Gandalf CAD-JSON hazırlığı sırasında bellek sınırına ulaşıldı. Çizim açık kalacak; daha küçük ve sınırlı bir AI özetiyle yeniden deneyin.");
+                }catch(Exception e){
+                    String message=e.getMessage()==null||e.getMessage().trim().isEmpty()
+                        ?"Gandalf AI isteği hazırlanamadı.":e.getMessage().trim();
+                    reply.send("Gandalf AI isteği hazırlanamadı: "+message);
                 }
-                return;
-            }
-            pendingAiActions=cloud.actions;
-            StringBuilder out=new StringBuilder();
-            if(MusaAiSessionService.developerCached())
-                out.append("Gandalf Developer • Yönetici modu aktif\n\n");
-            if(packageMode)
-                out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
-            out.append(cloud.text);
-            if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
-            if(!cloud.sources.isEmpty()){
-                out.append("\n\nKaynaklar:");
-                int sourceCount=0;
-                for(MusaAiCloudService.Source source:cloud.sources){
-                    if(sourceCount++>=8){out.append("\n• … +").append(cloud.sources.size()-8).append(" kaynak");break;}
-                    out.append("\n• ");
-                    if(!source.title.isEmpty())out.append(source.title).append(" — ");
-                    out.append(source.url);
-                }
-            }
-            if(packageMode&&!cloud.actions.isEmpty()){
-                pendingAiActions=Collections.emptyList();
-                out.append("\n\n• Güvenlik: Proje Paketi modunda gelen çizim işlem önerileri uygulanmadı.");
-            }else if(!cloud.actions.isEmpty()){
-                out.append("\n\nÖnerilen çizim işlemleri (henüz uygulanmadı):");
-                int shown=0;
-                for(MusaAiCloudService.Action action:cloud.actions){
-                    if(shown++>=8){out.append("\n• … +").append(cloud.actions.size()-8).append(" işlem");break;}
-                    out.append("\n• ").append(action.name);
-                    if(!action.reason.isEmpty())out.append(" — ").append(action.reason);
-                }
-                if(MusaAiSessionService.developerCached())
-                    out.append("\n\nGandalf Developer: “Önerileri önizle” veya “Önerileri uygula” diyebilirsiniz. Hiçbir değişiklik açık onay olmadan çizime işlenmez.");
-                else
-                    out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
-            }
-            reply.send(out.toString());
-            if(!packageMode&&!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
-                runOnUiThread(()->showPendingGandalfActions(reply,false));
-        });
+            });
+        }catch(RejectedExecutionException e){
+            reply.send("Gandalf AI işlemi şu anda başlatılamıyor. Uygulamayı yeniden açıp tekrar deneyin.");
+        }
     }
 
     private static boolean isGandalfPreviewCommand(String q){
