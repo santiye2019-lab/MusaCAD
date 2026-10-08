@@ -32,7 +32,7 @@ public final class MusaAiCsbEstimate {
     }
 
     public static final class Row {
-        public final String type,itemKey,description,unit,matchedPoz,pricePeriod;
+        public final String type,itemKey,description,unit,matchedPoz,pricePeriod,priceSource;
         public final double quantity,unitPrice,amount;
         public final List<Integer> sourceIds;
         public final boolean priced,verifiedSpecification;
@@ -46,6 +46,7 @@ public final class MusaAiCsbEstimate {
                 norm(rate.itemKey).equals(norm(itemKey))&&unit.equalsIgnoreCase(rate.unit);
             this.matchedPoz=priced?rate.code:"";
             this.pricePeriod=priced?rate.period:"";
+            this.priceSource=priced?rate.source:"";
             this.unitPrice=priced?rate.installedUnitPrice:Double.NaN;
             this.amount=priced?quantity*unitPrice:Double.NaN;
         }
@@ -169,11 +170,13 @@ public final class MusaAiCsbEstimate {
         for(int i=0;i<Math.min(40,rows.size());i++){
             Row r=rows.get(i);
             s.append("\n• ").append(r.description).append(" = ").append(fmt(r.quantity))
-                .append(" ").append(r.unit);
+                .append(" ").append(r.unit)
+                .append(" [poz eşleştirme anahtarı: ").append(r.itemKey).append("]");
             if(!r.sourceIds.isEmpty())s.append(" [DWG kaynak ").append(r.sourceIds.get(0)).append("]");
             if(!r.verifiedSpecification)s.append(" [teknik özellik/poz eşleştirmesi teyitsiz]");
             if(r.priced)s.append(" • Poz ").append(r.matchedPoz).append(" (").append(r.pricePeriod)
-                .append(") × ").append(fmt(r.unitPrice)).append(" TL = ").append(fmt(r.amount)).append(" TL");
+                .append(") × ").append(fmt(r.unitPrice)).append(" TL = ").append(fmt(r.amount))
+                .append(" TL [resmî kaynak: ").append(r.priceSource).append("]");
             else s.append(" • ÇŞİDB poz ve fiyatı doğrulanmadı");
         }
         if(rows.size()>40)s.append("\n• Diğer kalemler çıktı sınırı nedeniyle burada gösterilmedi.");
