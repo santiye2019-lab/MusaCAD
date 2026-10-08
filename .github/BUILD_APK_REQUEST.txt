@@ -1,3 +1,5 @@
-MusaCAD Direct Debug APK build request (2026-10-09).
-Include merged user-selected 2025 YFK PDF offline poz and historical price catalog, 2025/2026 new-code comparison, 2026 mechanical technical library, and the existing CAD/Gandalf modules.
-The YFK book PDF itself must not be packaged in public APK assets. Users import their personal copy via '2025 kitabını yükle'.
+MusaCAD Gandalf conversational hybrid AI deployment request — 2026-10-09.
+Includes GitHub PR #200: ChatGPT-like free-form Turkish prompts, PDF as-viewed latest Gandalf answer, bounded in-session chat context, local CAD engineering evidence, multi-sheet hybrid vision, protected opt-in cloud and offline fallback.
+Retains 2025 user-imported offline ÇŞİDB price/poz catalog and 2026 technical reference library.
+IMPORTANT: Do not distribute copyrighted YFK books in APK or GitHub. Book remains user-imported in app-private storage.
+This main commit requests one installable test APK plus the configured signed Gandalf Cloud production workflow.
