@@ -28,7 +28,9 @@ public final class UiResponsivenessContractTest {
         require(view,"mode==Mode.PAN){settleFastNavigation();requestNavigationFrame();return true;}","pan release settles once");
         require(view,"drawVectorNavigation(c,imageMatrix","sharp vector navigation");
 
-        require(main,"DWG vektör model hazırlanıyor","authoritative DWG first frame");
+        require(main,"DWG hızlı önizleme açık","progressive native DWG first-paint");
+        require(main,"engine.fastScene()","native DWG preflight");
+        require(main,"DxfParser.render(converted,false)","avoid expensive full-DWG thumbnail redraw");
         if(main.contains("currentProject.parsed.bitmap.recycle()"))throw new AssertionError("Responsiveness regression: open-tab navigation preview is recycled");
         require(parser,"public void drawVectorNavigation","sharp vector navigation renderer");
         require(nativeScene,"navigationFast&&visible!=null&&offsets.length>50000","native LOD only during active navigation");
@@ -86,7 +88,8 @@ public final class UiResponsivenessContractTest {
         require(visual,"drawing.drawVectorForPrint(","full-sheet CAD projection independent of phone viewport");
         require(visual,"contentBounds","coordinate-mapped visual evidence");
         require(visual,"drawingBounds","same-world-space relationship to vector centers");
-        require(panel,"PDF olarak görüntüle","simplified PDF-first conversation UI");
+        require(panel,"PDF görüntüle","simplified PDF-first conversation UI");
+        require(panel,"Poz kitabı yükle","separate 2025 YFK book button");
         if(main.indexOf("runMusaAiGeneralProjectAnalysis(reply);")>main.indexOf("if(MusaAiProjectPackage.asksPackageReview(raw))"))
             throw new AssertionError("Local voice analysis must be routed before expensive full-project logic");
 

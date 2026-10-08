@@ -29,7 +29,8 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"MusaAiEngineeringReview.analyze(snapshot,displayName)","source-based local Gandalf cloud-failure fallback");
         require(panel,"pdfPreview.setOnClickListener","Chat-first panel PDF preview control");
         require(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)","Gandalf conversation continuity");
-        require(panel,"Yerel + bulut","Hybrid AI state label");
+        require(panel,"MusaAiCloudHealth.check","live gateway readiness");
+        require(panel,"AI bağlı","response-verified AI state");
         require(main,"MusaAiConversationalIntent.canonical","safe paraphrase router");
         require(main,"MusaAiConversationalIntent.shouldCloudInterpret","cloud fallback on unrecognized free-form questions");
         require(cloud,"body.put(\"previousChat\"","bounded recent turns");

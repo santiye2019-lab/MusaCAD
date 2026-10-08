@@ -19,6 +19,8 @@ import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Toast;
+import android.os.Build;
 import android.widget.TextView;
 import androidx.core.widget.TextViewCompat;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -34,6 +36,8 @@ public final class MusaAiPanel {
     public interface Reply {
         void send(String text);
         default void progress(String text){}
+        /** Reports a successful/failed actual cloud model answer, not just /health. */
+        default void cloudStatus(boolean modelAnswered){}
     }
 
     public interface Host {
@@ -44,6 +48,9 @@ public final class MusaAiPanel {
         }
         default void onViewPdf(String answer,Reply reply) {
             reply.send("PDF görüntüleme bu sürümde yapılandırılmadı.");
+        }
+        default void onImportPriceBook(Reply reply){
+            reply.send("Poz kitabı seçimi bu sürümde yapılandırılmadı.");
         }
     }
 
@@ -65,15 +72,19 @@ public final class MusaAiPanel {
         TextView title=text(activity,developer?"Gandalf • Developer":"Gandalf • MusaCAD AI",20f,Color.WHITE,true);
         header.addView(title,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
 
-        boolean cloudAllowed=activity.getSharedPreferences("musacad_ai_privacy",Activity.MODE_PRIVATE)
-            .getBoolean("cloud_cad_json_v1",false);
-        boolean cloudConfigured=BuildConfig.AI_API_URL!=null&&!BuildConfig.AI_API_URL.trim().isEmpty();
-        String mode=developer?"DEV":cloudConfigured&&cloudAllowed?"Bulut izinli":"Yerel + bulut";
-        TextView state=text(activity,mode,10f,0xFFBFFAF4,true);
+        // An actual /health HTTP 200 is required before showing the online LED.
+        // A configured URL, developer role, or stale consent is not connectivity.
+        final boolean cloudConfigured=MusaAiCloudHealth.configured();
+        final AtomicBoolean modelVerified=new AtomicBoolean(false);
+        TextView state=text(activity,cloudConfigured?"● Denetleniyor":"● AI ayarsız",10f,
+            cloudConfigured?0xFFFFD184:0xFFB0BDC6,true);
         state.setGravity(Gravity.CENTER);
-        state.setPadding(dp(activity,10),dp(activity,5),dp(activity,10),dp(activity,5));
-        state.setBackground(round(activity,0xFF0C594F,16,0xFF16B8A6));
+        state.setPadding(dp(activity,8),dp(activity,5),dp(activity,8),dp(activity,5));
+        state.setBackground(round(activity,0xFF233541,16,0));
         header.addView(state,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        state.setOnClickListener(v->Toast.makeText(activity,
+            "Bu LED yalnız MusaCAD AI sunucusunun erişilebilirliğini gösterir. "+
+            "Modelin gerçek yanıtı ve lisansı ayrıca doğrulanır.",Toast.LENGTH_LONG).show());
         root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView context=text(activity,host.contextLabel(),11f,0xFF9FC1D1,false);
@@ -81,22 +92,44 @@ public final class MusaAiPanel {
         context.setMaxLines(2);
         root.addView(context,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // One deliberate report action at the top; natural-language chat is
-        // the primary navigation instead of dozens of rigid command chips.
+        // Separate explicit book import from free-form Gandalf prompts and PDF view.
+        LinearLayout topActions=new LinearLayout(activity);
+        topActions.setOrientation(LinearLayout.HORIZONTAL);
         Button pdfPreview=new Button(activity);
-        pdfPreview.setText("PDF olarak görüntüle");
+        pdfPreview.setText("PDF görüntüle");
         pdfPreview.setAllCaps(false);
         pdfPreview.setTextColor(Color.WHITE);
-        pdfPreview.setTextSize(12f);
-        pdfPreview.setMinHeight(dp(activity,40));
+        pdfPreview.setTextSize(11f);
+        pdfPreview.setMinHeight(dp(activity,44));
         pdfPreview.setBackground(round(activity,0xFF0C594F,12,0xFF16B8A6));
-        LinearLayout.LayoutParams pdfLp=new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,dp(activity,42));
-        pdfLp.bottomMargin=dp(activity,5);
-        root.addView(pdfPreview,pdfLp);
+        LinearLayout.LayoutParams pdfLp=new LinearLayout.LayoutParams(0,dp(activity,44),1f);
+        topActions.addView(pdfPreview,pdfLp);
+        Button importBook=new Button(activity);
+        importBook.setText("Poz kitabı yükle");
+        importBook.setAllCaps(false);
+        importBook.setTextColor(Color.WHITE);
+        importBook.setTextSize(11f);
+        importBook.setMinHeight(dp(activity,44));
+        importBook.setBackground(round(activity,0xFF12384C,12,0xFF246C88));
+        LinearLayout.LayoutParams bookLp=new LinearLayout.LayoutParams(0,dp(activity,44),1f);
+        bookLp.setMarginStart(dp(activity,7));
+        topActions.addView(importBook,bookLp);
+        LinearLayout.LayoutParams actionsLp=new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+        actionsLp.bottomMargin=dp(activity,5);
+        root.addView(topActions,actionsLp);
 
         ScrollView messagesScroll=new ScrollView(activity);
         messagesScroll.setFillViewport(true);
+        messagesScroll.setVerticalScrollBarEnabled(true);
+        messagesScroll.setScrollbarFadingEnabled(false);
+        messagesScroll.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+        if(Build.VERSION.SDK_INT>=29){
+            GradientDrawable scrollbar=new GradientDrawable();
+            scrollbar.setColor(0xFF27BEBC);
+            scrollbar.setCornerRadius(dp(activity,3));
+            messagesScroll.setVerticalScrollbarThumbDrawable(scrollbar);
+        }
         LinearLayout messages=new LinearLayout(activity);
         messages.setOrientation(LinearLayout.VERTICAL);
         messages.setPadding(0,dp(activity,8),0,dp(activity,8));
@@ -204,6 +237,14 @@ public final class MusaAiPanel {
                         scrollBottom(messagesScroll);
                     });
                 }
+                @Override public void cloudStatus(boolean answered){
+                    activity.runOnUiThread(()->{
+                        modelVerified.set(answered);
+                        state.setText(answered?"● AI bağlı":"● AI erişilemedi");
+                        state.setTextColor(answered?0xFF78F2C7:0xFFFFA7A7);
+                        state.setBackground(round(activity,answered?0xFF15493F:0xFF4C2428,16,0));
+                    });
+                }
                 @Override public void progress(String text){
                     activity.runOnUiThread(()->{
                         if(completed.get())return;
@@ -221,6 +262,25 @@ public final class MusaAiPanel {
             catch(Exception e){requestReply.send("Gandalf komutu işlenirken hata oluştu. Tekrar deneyin.");}
         };
 
+        importBook.setOnClickListener(v->{
+            TextView statusBubble=appendBubble(activity,messages,false,
+                "2025 ÇŞİDB poz kitabı seçiliyor…");
+            scrollBottom(messagesScroll);
+            host.onImportPriceBook(new Reply(){
+                @Override public void send(String message){
+                    activity.runOnUiThread(()->{
+                        statusBubble.setText(message==null?"Dosya seçme işlemi tamamlandı.":message);
+                        scrollBottom(messagesScroll);
+                    });
+                }
+                @Override public void progress(String message){
+                    activity.runOnUiThread(()->{
+                        if(message!=null&&!message.trim().isEmpty())statusBubble.setText(message);
+                        scrollBottom(messagesScroll);
+                    });
+                }
+            });
+        });
         pdfPreview.setOnClickListener(v->{
             String latest=latestAssistantAnswer[0];
             if(latest==null||latest.trim().isEmpty()){
@@ -279,7 +339,30 @@ public final class MusaAiPanel {
             }
             if(sheet.getWindow()!=null)sheet.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         });
-        sheet.setOnDismissListener(d->MusaAiVoiceInput.clear(voiceCallback));
+        final Handler connectionHandler=new Handler(Looper.getMainLooper());
+        final AtomicBoolean connectionClosed=new AtomicBoolean(false);
+        final AtomicBoolean connectionCheckRunning=new AtomicBoolean(false);
+        final Runnable[] connectionProbe=new Runnable[1];
+        connectionProbe[0]=()->{
+            if(connectionClosed.get()||!cloudConfigured||!connectionCheckRunning.compareAndSet(false,true))
+                return;
+            MusaAiCloudHealth.check(online->{
+                connectionCheckRunning.set(false);
+                if(connectionClosed.get()||activity.isFinishing()||activity.isDestroyed())return;
+                if(!online)modelVerified.set(false);
+                state.setText(online?
+                    (modelVerified.get()?"● AI bağlı":"● Çevrimiçi"):"● Erişim yok");
+                state.setTextColor(online?0xFF78F2C7:0xFFFFA7A7);
+                state.setBackground(round(activity,online?0xFF15493F:0xFF4C2428,16,0));
+                connectionHandler.postDelayed(connectionProbe[0],20_000L);
+            });
+        };
+        if(cloudConfigured)connectionHandler.post(connectionProbe[0]);
+        sheet.setOnDismissListener(d->{
+            connectionClosed.set(true);
+            connectionHandler.removeCallbacks(connectionProbe[0]);
+            MusaAiVoiceInput.clear(voiceCallback);
+        });
         sheet.show();
     }
 

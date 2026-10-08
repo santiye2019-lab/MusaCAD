@@ -12,7 +12,7 @@ public final class MusaAiAutoReportContractTest {
         require(main,"lastAiReport","last report state");
         require(main,"shareAiReport","report TXT sharing");
         require(main,"setAiHighlightedSources(report.sourceIds)","report finding highlights");
-        require(panel,"PDF olarak görüntüle","PDF report access in chat UI");
+        require(panel,"PDF görüntüle","PDF report access in chat UI");
         require(engine,"MusaAiQuantityTakeoff.answer","takeoff section");
         require(engine,"MusaAiProjectControl.analyze","CAD quality section");
         require(engine,"MusaAiRevisionCompare.compare","revision section");
