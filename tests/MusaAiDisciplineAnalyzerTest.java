@@ -55,6 +55,20 @@ public final class MusaAiDisciplineAnalyzerTest {
         MusaAiDisciplineAnalyzer.Result all=MusaAiDisciplineAnalyzer.analyze(index(),"Tam proje denetimi yap");
         has(all.text,"ÇOK DİSİPLİNLİ PROJE DENETİMİ");
         has(all.text,"ASANSÖR");has(all.text,"YANGIN VE CAN GÜVENLİĞİ");
+        String[] generalVoice={
+            "projeye analiz yap","Projeyi analiz et","Bu çizimi analiz et",
+            "Çizimi incele","Proje kontrolü yap","paftayı denetle"
+        };
+        for(String command:generalVoice){
+            if(!MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(command))
+                throw new AssertionError("general project voice command not recognized: "+command);
+        }
+        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis("Bu projede metraj çıkar"))
+            throw new AssertionError("metraj must not trigger project analysis");
+        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis("Mekanik projeyi analiz et"))
+            throw new AssertionError("focused mechanical command must keep its expert route");
+        if(!MusaAiDisciplineAnalyzer.analyzeAll(index()).matched)
+            throw new AssertionError("general voice route must have a real local analysis");
         System.out.println("MusaAiDisciplineAnalyzerTest OK");
     }
 }

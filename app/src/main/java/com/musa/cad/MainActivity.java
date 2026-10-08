@@ -1044,6 +1044,19 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // Android voice recognition commonly returns "projeye analiz yap" or
+        // "projeyi analiz et". This is a full-project command, not an unknown
+        // drawing question. Keep the opt-in cloud policy intact.
+        if(MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)
+            &&!MusaAiCloudPolicy.shouldUseCloud(raw)){
+            if(activeDxf==null){
+                reply.send("Genel proje analizi için DWG/DXF tam vektör modeli henüz hazır değil. Çizim yüklemesi tamamlandığında yeniden 'Projeyi analiz et' deyin.");
+                return;
+            }
+            runMusaAiGeneralProjectAnalysis(reply);
+            return;
+        }
+
         if(MusaAiDisciplineAnalyzer.asksAnalysis(raw)){
             MusaAiDiscipline requested=MusaAiDiscipline.fromQuery(raw);
             boolean full=aiControl.contains("tam proje")||aiControl.contains("tum disiplin")||aiControl.contains("disiplinler arasi");
@@ -1296,6 +1309,47 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         reply.send("Bu soruyu yerel çizim analizinde henüz eşleştiremedim. Şu anda nesne türleri, katmanlar, çizim metinleri ve doğal dil CAD komutları destekleniyor.");
+    }
+
+    private void runMusaAiGeneralProjectAnalysis(MusaAiPanel.Reply reply){
+        final DxfParser.Result drawing=activeDxf;
+        final ProjectSession project=currentProject;
+        final String drawingName=currentDisplayName;
+        if(drawing==null){
+            reply.send("Proje analizi için tam vektör çizim modelinin hazırlanması gerekiyor.");
+            return;
+        }
+        // Building a CAD index or inspecting every entity on the main thread
+        // can trigger Android's ANR dialog for large DWG files.
+        try{
+            aiExecutor.submit(()->{
+                try{
+                    MusaAiDrawingIndex index=drawing.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                    MusaAiDisciplineAnalyzer.Result report=MusaAiDisciplineAnalyzer.analyzeAll(index);
+                    runOnUiThread(()->{
+                        if(currentProject!=project||activeDxf!=drawing){
+                            reply.send("Analiz sırasında aktif proje değişti. Yeni proje için tekrar 'Projeyi analiz et' deyin.");
+                            return;
+                        }
+                        lastAiReport=report.text;
+                        lastAiReportTitle="Gandalf • Genel Proje Ön Analizi";
+                        lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
+                        int shown=report.sourceIds.isEmpty()?0:cad.setAiHighlightedSources(report.sourceIds);
+                        if(report.sourceIds.isEmpty())cad.clearAiHighlights();
+                        reply.send("Gandalf • "+drawingName+"\n"+report.text+
+                            (shown>0?"\n\nÇizimde vurgulanan inceleme adayı: "+shown:"")+
+                            "\n\nBu sonuç sınırlı CAD verisiyle yapılan yerel ön incelemedir. Derin bulut analizi için 'Bu projeyi derin analiz et' deyin."+
+                            "\nRapor çıktısı için 'Raporu PDF olarak çıkar' veya 'Raporu Word olarak çıkar' deyin.");
+                    });
+                }catch(OutOfMemoryError e){
+                    reply.send("Gandalf proje analizi bellek sınırına ulaştı. Çizim açık kalacak; daha küçük bir paftayla yeniden deneyin.");
+                }catch(Exception e){
+                    reply.send("Gandalf proje analizi başlatılamadı. Çizimi tekrar açıp yeniden deneyin.");
+                }
+            });
+        }catch(RejectedExecutionException e){
+            reply.send("Gandalf analiz kuyruğu şu an kullanılamıyor. Uygulamayı yeniden açıp tekrar deneyin.");
+        }
     }
 
     private void handleMusaAiCloudPrompt(String raw,MusaAiPanel.Reply reply){
