@@ -77,7 +77,7 @@ public final class UiResponsivenessContractTest {
         require(main,"MusaAiEngineeringReview.asksReview(raw)","engineering intent route");
         require(main,"MusaAiAnalysisIntent.isReview(raw)","free-speech online-first review");
         require(main,"MusaAiAnalysisIntent.isLocalOnly(raw)","respect explicit offline review without cloud");
-        require(main,"MusaAiVisualEvidence.render(activeSnapshot","bounded full-sheet visual preparation");
+        require(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","bounded full-sheet visual preparation");
         require(main,"K_CLOUD_VISUAL_CONSENT","separate consent for cloud images");
         require(main,"MusaAiCloudService.analyzeHybrid(","visual+CAD evidence network call");
         String visual=read("app/src/main/java/com/musa/cad/MusaAiVisualEvidence.java");
