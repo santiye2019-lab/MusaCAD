@@ -64,6 +64,7 @@ public final class UiResponsivenessContractTest {
         require(main,"MusaAiDisciplineAnalyzer.asksGeneralProjectAnalysis(raw)","voice command routing");
         require(general,"localAiExecutor.submit","general CAD analysis uses dedicated local executor");
         require(general,"drawing.aiDrawingIndexQuickReview(","fast bounded local analysis projection");
+        require(general,"MusaAiEngineeringReview.analyze(index,drawingName)","source-grounded engineering evidence output");
         require(general,"localAiHandler.postDelayed(deadline,QUICK_REVIEW_TIMEOUT_MS)","strict local watchdog");
         require(general,"finished.compareAndSet(false,true)","at most one local terminal reply");
         require(general,"reply.progress","visible local analysis progress");
@@ -72,6 +73,8 @@ public final class UiResponsivenessContractTest {
         require(parser,"public MusaAiDrawingIndex aiDrawingIndexQuickReview(","bounded light review projection");
         require(parser,"maxEntitiesToVisit","bounded entity visit count");
         require(main,"localAiExecutor.shutdownNow()","dedicated local executor shutdown");
+        require(main,"MusaAiEngineeringReview.asksReview(raw)","engineering intent route");
+        require(panel,"Mühendislik Analizi","engineer review quick action");
         if(main.indexOf("runMusaAiGeneralProjectAnalysis(reply);")>main.indexOf("if(MusaAiProjectPackage.asksPackageReview(raw))"))
             throw new AssertionError("Local voice analysis must be routed before expensive full-project logic");
 
