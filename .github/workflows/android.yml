@@ -541,8 +541,9 @@ jobs:
           from pathlib import Path
           src=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
           open_start=src.index("private void startLoad(Uri uri)")
-          export=src.index("engine.exportDxf(converted)",open_start)
-          before_export=src[open_start:export]
+          dwg_start=src.index("// Do not expose the provisional native DWG scene",open_start)
+          export=src.index("engine.exportDxf(converted)",dwg_start)
+          before_export=src[dwg_start:export]
           assert "engine.fastScene()" not in before_export
           assert "activateProject(project)" not in before_export
           assert "DWG vektör model hazırlanıyor" in before_export
