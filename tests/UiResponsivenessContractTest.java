@@ -79,14 +79,14 @@ public final class UiResponsivenessContractTest {
         require(main,"MusaAiAnalysisIntent.isLocalOnly(raw)","respect explicit offline review without cloud");
         require(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","bounded full-sheet visual preparation");
         require(main,"K_CLOUD_VISUAL_CONSENT","separate consent for cloud images");
-        require(main,"MusaAiCloudService.analyzeHybrid(","visual+CAD evidence network call");
+        require(main,"MusaAiCloudService.analyzeHybridWithContext(","visual+CAD+chat evidence network call");
         String visual=read("app/src/main/java/com/musa/cad/MusaAiVisualEvidence.java");
         require(visual,"MAX_TILES=5","visual tile count cap");
         require(visual,"MAX_BASE64_CHARS=1_650_000","visual payload cap");
         require(visual,"drawing.drawVectorForPrint(","full-sheet CAD projection independent of phone viewport");
         require(visual,"contentBounds","coordinate-mapped visual evidence");
         require(visual,"drawingBounds","same-world-space relationship to vector centers");
-        require(panel,"Mühendislik Analizi","engineer review quick action");
+        require(panel,"PDF olarak görüntüle","simplified PDF-first conversation UI");
         if(main.indexOf("runMusaAiGeneralProjectAnalysis(reply);")>main.indexOf("if(MusaAiProjectPackage.asksPackageReview(raw))"))
             throw new AssertionError("Local voice analysis must be routed before expensive full-project logic");
 

@@ -12,7 +12,7 @@ public final class MusaAiProjectPackageContractTest {
         has(main,"p.boqModel");
         has(main,"lastAiReportSourceIds=Collections.emptyList()");
         has(main,"openVectorProjectCount");
-        has(panel,"Tam proje denetim raporu oluştur");
+        has(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)");
         int pkg=main.indexOf("MusaAiProjectPackage.asksPackageReview");
         int single=main.indexOf("MusaAiDetailedReport.asksDetailedReport");
         if(pkg<0||single<0||pkg>single)throw new AssertionError("package audit must route before single-file detailed report");

@@ -42,9 +42,15 @@ public final class MusaAiCloudPolicy {
     public static boolean allowEditProposals(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(MusaAiMechanicalExpert.isCloudExpertCommand(raw)||MusaAiDisciplineExpert.isCloudExpertCommand(raw))return true;
-        return q.contains("duzelt")||q.contains("degistir")||q.contains("ekle")||
-            q.contains("sil")||q.contains("tasi")||q.contains("ciz")||
-            q.contains("revize")||q.contains("uygula");
+        // Whole-word approval intent only: the place name "Silivrikapı"
+        // must never enable a destructive CAD tool merely because it
+        // begins with "sil". All returned actions still require approval.
+        String padded=" "+q+" ";
+        for(String edit:new String[]{"duzelt","degistir","ekle","sil",
+                "tasi","ciz","revize","uygula"}){
+            if(padded.contains(" "+edit+" "))return true;
+        }
+        return false;
     }
 
     private MusaAiCloudPolicy(){}

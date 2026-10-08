@@ -17,8 +17,8 @@ public final class MusaAiDisciplineExpertContractTest {
         has(worker,"electrical_power");
         has(worker,"fire_safety_full");
         has(worker,"disciplineExpertInstructions");
-        has(panel,"STATIKAI_FULL");
-        has(panel,"GSTATIKAI_FULL");
+        has(panel,"Gandalf\'a yazın veya sesli komut verin");
+        has(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)");
         System.out.println("MusaAiDisciplineExpertContractTest OK");
     }
 }

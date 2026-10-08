@@ -15,7 +15,7 @@ public final class MusaAiBoqContractTest {
         require(main,"MusaAiBoq.compare","project/BOQ compare");
         require(main,"PDF sayısal","PDF review warning");
         require(main,"MusaAiBoq.Model boqModel","per-project BOQ state");
-        require(panel,"{\"Keşif\",\"Keşif yükle\"}","AI panel BOQ shortcut");
+        require(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)","natural BOQ commands via chat");
         require(engine,"PROJE – KEŞİF KARŞILAŞTIRMASI","comparison output");
         require(engine,"%1 yalnız raporlama eşiğidir","tolerance disclaimer");
         System.out.println("MusaAiBoqContractTest OK");

@@ -29,12 +29,13 @@ public final class MusaAiPanelContractTest {
         require(panel,"interface Host","future model host abstraction");
         require(panel,"interface Reply","async reply abstraction");
         require(panel,"SOFT_INPUT_ADJUST_RESIZE","keyboard-safe AI panel");
-        require(panel,"Çizime sor","drawing-question quick prompt");
-        require(panel,"Metraj","takeoff quick prompt");
-        require(panel,"{\"MEKAI\",\"MEKAI_FULL\"}","local mechanical expert quick prompt");
-        require(panel,"\"G-MEKAI\"","developer mechanical expert quick prompt");
-        require(panel,"Kontrol","inspection quick prompt");
-        require(panel,"addQuickPromptAuto","one-tap Gandalf quick action");
+        require(panel,"PDF olarak görüntüle","PDF preview top button");
+        require(panel,"onViewPdf","PDF preview host callback");
+        require(panel,"previousTurns.toString()","conversation context");
+        require(panel,"recentTurns.addLast","bounded chat turns");
+        require(panel,"Yerel + bulut","honest local/cloud status");
+        if(panel.contains("addQuickPromptAuto")||panel.contains("String[][] prompts"))
+            throw new AssertionError("Legacy command chips must not replace natural conversation");
         require(panel,"Gandalf dinliyor","Gandalf voice status");
         require(icon,"<vector","AI vector icon");
         require(panel,"timeoutHandler.postDelayed(timeout,75_000L)","Gandalf request never stays processing indefinitely");

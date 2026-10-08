@@ -27,8 +27,13 @@ public final class MusaAiCloudIntegrationContractTest {
         require(main,"aiExecutor","background network execution");
         require(main,"pendingAiActions","pending edit proposals");
         require(main,"MusaAiEngineeringReview.analyze(snapshot,displayName)","source-based local Gandalf cloud-failure fallback");
-        require(panel,"addQuickPromptAuto(activity,quickRow,input,\"Gandalf\"","Gandalf one-tap action");
-        require(panel,"\"Bu projeyi tüm disiplinlerde kontrol et, önemli bulguları ve yapılacakları raporla\"","Gandalf local-first prompt");
+        require(panel,"pdfPreview.setOnClickListener","Chat-first panel PDF preview control");
+        require(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)","Gandalf conversation continuity");
+        require(panel,"Yerel + bulut","Hybrid AI state label");
+        require(main,"MusaAiConversationalIntent.canonical","safe paraphrase router");
+        require(main,"MusaAiConversationalIntent.shouldCloudInterpret","cloud fallback on unrecognized free-form questions");
+        require(cloud,"body.put(\"previousChat\"","bounded recent turns");
+        require(cloud,"body.put(\"localEvidence\"","local CAD evidence transport");
         require(cloud,"setRequestProperty(\"Authorization\",\"Bearer \"+session.token)","short-lived bearer auth");
         require(cloud,"MusaAiCadJson.build","CAD-JSON request");
         require(session,"LicenseManager.cloudEntitlementProof","license proof exchange");
