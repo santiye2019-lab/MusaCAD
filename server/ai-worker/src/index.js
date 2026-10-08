@@ -91,7 +91,7 @@ async function handleAnalyze(request, env) {
 
   if (visualEvidence) {
     input[0].content += "\n\nVISUAL CAD REGIONS: " + JSON.stringify(visualEvidence.regions) +
-      "\nEvery image is a separate region of the same loaded DWG. Match only supported region labels and drawing-content coordinates against CAD source IDs; never claim a match based on mere proximity alone.";
+      "\nEvery image is a separate region of the same loaded DWG. contentBounds are rendered viewport-content coordinates, while drawingBounds are DWG world coordinates shared with vector item.centerX/centerY. Use drawingBounds when correlating a visual finding with CAD items; never claim a sourceId match from proximity alone.";
   }
 
   const maxOutputTokens = positiveInt(env.AI_MAX_OUTPUT_TOKENS || env.OPENAI_MAX_OUTPUT_TOKENS, 3200, 512, 12000);
@@ -241,12 +241,16 @@ function validateVisualEvidence(value) {
         !Array.isArray(img.contentBounds) || img.contentBounds.length !== 4 ||
         !img.contentBounds.every(n => typeof n === "number" && Number.isFinite(n)) ||
         img.contentBounds[2] <= img.contentBounds[0] ||
-        img.contentBounds[3] <= img.contentBounds[1]) return null;
+        img.contentBounds[3] <= img.contentBounds[1] ||
+        !Array.isArray(img.drawingBounds) || img.drawingBounds.length !== 4 ||
+        !img.drawingBounds.every(n => typeof n === "number" && Number.isFinite(n)) ||
+        img.drawingBounds[2] <= img.drawingBounds[0] ||
+        img.drawingBounds[3] <= img.drawingBounds[1]) return null;
     total += img.base64.length;
     if (total > 1650000) return null;
     images.push({ base64: img.base64 });
     regions.push({ label: img.label, contentBounds: img.contentBounds,
-      width: img.width, height: img.height });
+      drawingBounds: img.drawingBounds, width: img.width, height: img.height });
   }
   if (images[0] && value.images[0].label !== "full-sheet-overview") return null;
   return { images, regions, complete: value.complete === true && images.length === 5 };
