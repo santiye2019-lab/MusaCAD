@@ -588,23 +588,25 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/ResponsiveEntryLicenseUiContractTest.java
           java -cp /tmp/musacad-tests ResponsiveEntryLicenseUiContractTest
-      - name: Test DWG first-open critical path
+      - name: Test progressive native DWG first-frame and complete editor handoff
         run: |
           python3 - <<'PY'
           from pathlib import Path
           src=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
           open_start=src.index("private void startLoad(Uri uri)")
-          dwg_start=src.index("// Do not expose the provisional native DWG scene",open_start)
-          export=src.index("engine.exportDxf(converted)",dwg_start)
-          before_export=src[dwg_start:export]
-          assert "engine.fastScene()" not in before_export
-          assert "activateProject(project)" not in before_export
-          assert "DWG vektör model hazırlanıyor" in before_export
+          native_start=src.index("// Progressive DWG opening:",open_start)
+          export=src.index("engine.exportDxf(converted)",native_start)
+          before_export=src[native_start:export]
+          assert "engine.fastScene()" in before_export, "Native first-paint bridge missing"
+          assert "loaded.handedOff=true" in before_export, "Native handoff not registered"
+          assert "project.preparingEditor=true" in before_export, "Full vector preparation not tracked"
+          assert "activateProject(project)" in before_export, "Preview never reaches UI before export"
+          assert "DWG hızlı önizleme açık" in before_export, "Temporary native mode not clearly labeled"
           after_export=src[export:]
-          assert "DxfParser.render(converted,true)" in after_export
-          assert "activateProject(project)" in after_export
+          assert "DxfParser.render(converted,false)" in after_export, "Unnecessary all-geometry bitmap render"
+          assert "cad.upgradeNativeDrawing(parsed)" in after_export, "Complete editable model handoff missing"
           assert "recentExecutor.shutdownNow()" in src
-          print("DWG authoritative first-frame regression checks passed")
+          print("DWG progressive native preview and authoritative vector handoff passed")
           PY
       - name: Test large DXF streaming under bounded heap
         run: |
