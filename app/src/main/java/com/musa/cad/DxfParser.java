@@ -11,22 +11,23 @@ public final class DxfParser {
     private interface Entity{void bounds(RectF b);void draw(Canvas c,Paint p,Matrix m);}
 
     private static final class Line implements Entity{
-        final float x1,y1,x2,y2;Line(float a,float b,float c,float d){x1=a;y1=b;x2=c;y2=d;}
-        public void bounds(RectF b){add(b,x1,y1);add(b,x2,y2);}public void draw(Canvas c,Paint p,Matrix m){float[]v={x1,y1,x2,y2};m.mapPoints(v);c.drawLine(v[0],v[1],v[2],v[3],p);}
+        final float x1,y1,x2,y2;final float[]v=new float[4];Line(float a,float b,float c,float d){x1=a;y1=b;x2=c;y2=d;}
+        public void bounds(RectF b){add(b,x1,y1);add(b,x2,y2);}public void draw(Canvas c,Paint p,Matrix m){v[0]=x1;v[1]=y1;v[2]=x2;v[3]=y2;m.mapPoints(v);c.drawLine(v[0],v[1],v[2],v[3],p);}
     }
     private static final class XLine implements Entity{
-        final float x,y,dx,dy;XLine(float x,float y,float dx,float dy){this.x=x;this.y=y;float len=(float)Math.hypot(dx,dy);this.dx=len<1e-6f?1f:dx/len;this.dy=len<1e-6f?0f:dy/len;}
+        final float x,y,dx,dy;final float[]v=new float[4];XLine(float x,float y,float dx,float dy){this.x=x;this.y=y;float len=(float)Math.hypot(dx,dy);this.dx=len<1e-6f?1f:dx/len;this.dy=len<1e-6f?0f:dy/len;}
         public void bounds(RectF b){add(b,x-1f,y-1f);add(b,x+1f,y+1f);}
-        public void draw(Canvas c,Paint p,Matrix m){float[]v={x,y,x+dx,y+dy};m.mapPoints(v);float sx=v[2]-v[0],sy=v[3]-v[1],len=(float)Math.hypot(sx,sy);if(len<1e-6f)return;sx/=len;sy/=len;float reach=(float)Math.hypot(c.getWidth(),c.getHeight())*2f;c.drawLine(v[0]-sx*reach,v[1]-sy*reach,v[0]+sx*reach,v[1]+sy*reach,p);}
+        public void draw(Canvas c,Paint p,Matrix m){v[0]=x;v[1]=y;v[2]=x+dx;v[3]=y+dy;m.mapPoints(v);float sx=v[2]-v[0],sy=v[3]-v[1],len=(float)Math.hypot(sx,sy);if(len<1e-6f)return;sx/=len;sy/=len;float reach=(float)Math.hypot(c.getWidth(),c.getHeight())*2f;c.drawLine(v[0]-sx*reach,v[1]-sy*reach,v[0]+sx*reach,v[1]+sy*reach,p);}
     }
     private static final class Ray implements Entity{
-        final float x,y,dx,dy;Ray(float x,float y,float dx,float dy){this.x=x;this.y=y;this.dx=dx;this.dy=dy;}
+        final float x,y,dx,dy;final float[]v=new float[4];Ray(float x,float y,float dx,float dy){this.x=x;this.y=y;this.dx=dx;this.dy=dy;}
         public void bounds(RectF b){add(b,x,y);add(b,x+dx,y+dy);}
-        public void draw(Canvas c,Paint p,Matrix m){float[]v={x,y,x+dx,y+dy};m.mapPoints(v);float sx=v[2]-v[0],sy=v[3]-v[1],len=(float)Math.hypot(sx,sy);if(len<1e-6f)return;sx/=len;sy/=len;float reach=(float)Math.hypot(c.getWidth(),c.getHeight())*2f;c.drawLine(v[0],v[1],v[0]+sx*reach,v[1]+sy*reach,p);}
+        public void draw(Canvas c,Paint p,Matrix m){v[0]=x;v[1]=y;v[2]=x+dx;v[3]=y+dy;m.mapPoints(v);float sx=v[2]-v[0],sy=v[3]-v[1],len=(float)Math.hypot(sx,sy);if(len<1e-6f)return;sx/=len;sy/=len;float reach=(float)Math.hypot(c.getWidth(),c.getHeight())*2f;c.drawLine(v[0],v[1],v[0]+sx*reach,v[1]+sy*reach,p);}
     }
     private static final class Poly implements Entity{
-        final ArrayList<PointF>pts,snapPts;final boolean closed;Poly(ArrayList<PointF>p,boolean c){this(p,c,p);}Poly(ArrayList<PointF>p,boolean c,ArrayList<PointF>snap){pts=p;closed=c;snapPts=snap==null?p:snap;}
-        public void bounds(RectF b){for(PointF p:pts)add(b,p.x,p.y);}public void draw(Canvas c,Paint p,Matrix m){if(pts.size()<2)return;Path q=new Path();float[]v={pts.get(0).x,pts.get(0).y};m.mapPoints(v);q.moveTo(v[0],v[1]);for(int i=1;i<pts.size();i++){v[0]=pts.get(i).x;v[1]=pts.get(i).y;m.mapPoints(v);q.lineTo(v[0],v[1]);}if(closed)q.close();c.drawPath(q,p);}
+        final ArrayList<PointF>pts,snapPts;final boolean closed;final Path sourcePath=new Path(),screenPath=new Path();
+        Poly(ArrayList<PointF>p,boolean c){this(p,c,p);}Poly(ArrayList<PointF>p,boolean c,ArrayList<PointF>snap){pts=p;closed=c;snapPts=snap==null?p:snap;if(!pts.isEmpty()){sourcePath.moveTo(pts.get(0).x,pts.get(0).y);for(int i=1;i<pts.size();i++)sourcePath.lineTo(pts.get(i).x,pts.get(i).y);if(closed)sourcePath.close();}}
+        public void bounds(RectF b){for(PointF p:pts)add(b,p.x,p.y);}public void draw(Canvas c,Paint p,Matrix m){if(pts.size()<2)return;sourcePath.transform(m,screenPath);c.drawPath(screenPath,p);}
     }
     private static final class EntityGroup implements Entity{
         final List<Entity>children;EntityGroup(List<Entity>children){this.children=children;}
@@ -34,17 +35,18 @@ public final class DxfParser {
         public void draw(Canvas c,Paint p,Matrix m){for(Entity e:children)e.draw(c,p,m);}
     }
     private static final class Circle implements Entity{
-        final float x,y,r,start,sweep;Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;}
-        public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}public void draw(Canvas c,Paint p,Matrix m){Path path=new Path();path.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);path.transform(m);c.drawPath(path,p);}
+        final float x,y,r,start,sweep;final Path sourcePath=new Path(),screenPath=new Path();Circle(float a,float b,float c,float d,float e){x=a;y=b;r=c;start=d;sweep=e;sourcePath.addArc(new RectF(x-r,y-r,x+r,y+r),start,sweep);}
+        public void bounds(RectF b){add(b,x-r,y-r);add(b,x+r,y+r);}public void draw(Canvas c,Paint p,Matrix m){sourcePath.transform(m,screenPath);c.drawPath(screenPath,p);}
     }
     private static final class Marker implements Entity{
-        final float x,y,size;Marker(float x,float y,float size){this.x=x;this.y=y;this.size=size;}
-        public void bounds(RectF b){add(b,x-size,y-size);add(b,x+size,y+size);}public void draw(Canvas c,Paint p,Matrix m){float[]v={x-size,y,x+size,y,x,y-size,x,y+size};m.mapPoints(v);c.drawLine(v[0],v[1],v[2],v[3],p);c.drawLine(v[4],v[5],v[6],v[7],p);}
+        final float x,y,size;final float[]v=new float[8];Marker(float x,float y,float size){this.x=x;this.y=y;this.size=size;}
+        public void bounds(RectF b){add(b,x-size,y-size);add(b,x+size,y+size);}public void draw(Canvas c,Paint p,Matrix m){v[0]=x-size;v[1]=y;v[2]=x+size;v[3]=y;v[4]=x;v[5]=y-size;v[6]=x;v[7]=y+size;m.mapPoints(v);c.drawLine(v[0],v[1],v[2],v[3],p);c.drawLine(v[4],v[5],v[6],v[7],p);}
     }
     private static final class EllipseCurve implements Entity{
-        final float cx,cy,mx,my,ratio,start,end;EllipseCurve(float cx,float cy,float mx,float my,float ratio,float start,float end){this.cx=cx;this.cy=cy;this.mx=mx;this.my=my;this.ratio=Math.abs(ratio);this.start=start;this.end=end;}
+        final float cx,cy,mx,my,ratio,start,end;final Path sourcePath=new Path(),screenPath=new Path();
+        EllipseCurve(float cx,float cy,float mx,float my,float ratio,float start,float end){this.cx=cx;this.cy=cy;this.mx=mx;this.my=my;this.ratio=Math.abs(ratio);this.start=start;this.end=end;double sw=sweep();for(int i=0;i<=96;i++){PointF q=at(start+sw*i/96d);if(i==0)sourcePath.moveTo(q.x,q.y);else sourcePath.lineTo(q.x,q.y);}}
         private PointF at(double t){double co=Math.cos(t),si=Math.sin(t);return new PointF((float)(cx+mx*co-my*ratio*si),(float)(cy+my*co+mx*ratio*si));}private double sweep(){double s=end-start;while(s<=0)s+=Math.PI*2;return Math.min(s,Math.PI*2);}
-        public void bounds(RectF b){double sw=sweep();for(int i=0;i<=96;i++){PointF q=at(start+sw*i/96d);add(b,q.x,q.y);}}public void draw(Canvas c,Paint p,Matrix m){double sw=sweep();Path path=new Path();for(int i=0;i<=96;i++){PointF q=at(start+sw*i/96d);float[]v={q.x,q.y};m.mapPoints(v);if(i==0)path.moveTo(v[0],v[1]);else path.lineTo(v[0],v[1]);}c.drawPath(path,p);}
+        public void bounds(RectF b){double sw=sweep();for(int i=0;i<=96;i++){PointF q=at(start+sw*i/96d);add(b,q.x,q.y);}}public void draw(Canvas c,Paint p,Matrix m){sourcePath.transform(m,screenPath);c.drawPath(screenPath,p);}
     }
 
     private static final class HatchEntity implements Entity{
@@ -97,14 +99,14 @@ public final class DxfParser {
     }
 
     private static final class ViewportEntity implements Entity{
-        final DxfViewport.View viewport;ViewportEntity(DxfViewport.View viewport){this.viewport=viewport;}
+        final DxfViewport.View viewport;final float[]v=new float[4];ViewportEntity(DxfViewport.View viewport){this.viewport=viewport;}
         public void bounds(RectF b){add(b,(float)viewport.left(),(float)viewport.bottom());add(b,(float)viewport.right(),(float)viewport.top());}
-        public void draw(Canvas c,Paint p,Matrix m){if(viewport.id<=1)return;float[]v={(float)viewport.left(),(float)viewport.bottom(),(float)viewport.right(),(float)viewport.top()};m.mapPoints(v);Paint.Style old=p.getStyle();p.setStyle(Paint.Style.STROKE);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),p);p.setStyle(old);}
+        public void draw(Canvas c,Paint p,Matrix m){if(viewport.id<=1)return;v[0]=(float)viewport.left();v[1]=(float)viewport.bottom();v[2]=(float)viewport.right();v[3]=(float)viewport.top();m.mapPoints(v);Paint.Style old=p.getStyle();p.setStyle(Paint.Style.STROKE);c.drawRect(Math.min(v[0],v[2]),Math.min(v[1],v[3]),Math.max(v[0],v[2]),Math.max(v[1],v[3]),p);p.setStyle(old);}
     }
 
     private static final class Transformed implements Entity{
-        final Entity entity;final Matrix matrix;Transformed(Entity entity,DxfBlocks.Transform t)throws IOException{this.entity=entity;float[]v={(float)t.a,(float)t.c,(float)t.x,(float)t.b,(float)t.d,(float)t.y,0,0,1};for(float n:v)if(!Float.isFinite(n))throw new IOException("DXF blok dönüşümü sınır dışında");matrix=new Matrix();matrix.setValues(v);}
-        public void bounds(RectF b){RectF local=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);entity.bounds(local);if(local.left>local.right||local.top>local.bottom)return;matrix.mapRect(local);add(b,local.left,local.top);add(b,local.right,local.bottom);}public void draw(Canvas c,Paint p,Matrix view){Matrix combined=new Matrix();combined.setConcat(view,matrix);entity.draw(c,p,combined);}
+        final Entity entity;final Matrix matrix,combined=new Matrix();Transformed(Entity entity,DxfBlocks.Transform t)throws IOException{this.entity=entity;float[]v={(float)t.a,(float)t.c,(float)t.x,(float)t.b,(float)t.d,(float)t.y,0,0,1};for(float n:v)if(!Float.isFinite(n))throw new IOException("DXF blok dönüşümü sınır dışında");matrix=new Matrix();matrix.setValues(v);}
+        public void bounds(RectF b){RectF local=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);entity.bounds(local);if(local.left>local.right||local.top>local.bottom)return;matrix.mapRect(local);add(b,local.left,local.top);add(b,local.right,local.bottom);}public void draw(Canvas c,Paint p,Matrix view){combined.setConcat(view,matrix);entity.draw(c,p,combined);}
     }
 
     public static final class SourceEntity{
@@ -115,7 +117,7 @@ public final class DxfParser {
 
     public static final class Result{
         public final Bitmap bitmap;public final float[] snapPoints;public final int entityCount,layerCount,skippedCount,oleObjectCount,olePreviewCount,oleMissingPreviewCount;public int conversionWarnings;public final Set<String>layerNames,visibleLayers,layoutNames,fontFallbacks,oleTypes;public final String activeLayout;public final boolean externalShapeFallback;
-        private final List<Entity>document;private final float[] modelExtents;private final List<LayerEntity>visibleDocument;private final SpatialIndex spatialIndex;private final Matrix view;private final RectF contentBounds;private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<LayerEntity>editableSourceLayers;private final android.util.SparseArray<LayerEntity>sourceLayerById;private final Set<String>visibleLayerKeys;private final List<DxfBlocks.BlockInsertion>blockInsertions;
+        private final List<Entity>document;private final float[] modelExtents;private final List<LayerEntity>visibleDocument;private final SpatialIndex spatialIndex;private final Matrix view;private final RectF contentBounds;private final Paint navigationPaint=new Paint(Paint.ANTI_ALIAS_FLAG);private final Matrix navigationCombined=new Matrix(),navigationInverse=new Matrix();private final Rect navigationClip=new Rect();private final RectF navigationVisibleWorld=new RectF();private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<LayerEntity>editableSourceLayers;private final android.util.SparseArray<LayerEntity>sourceLayerById;private final Set<String>visibleLayerKeys;private final List<DxfBlocks.BlockInsertion>blockInsertions;
         Result(Bitmap b,int e,int skipped,float[]points,List<Entity>document,Matrix view,Set<String>all,Set<String>visible,Set<String>layouts,String activeLayout,RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,Map<String,DxfLineStyle.Pattern>lineTypes,float[] modelExtents,List<DxfBlocks.BlockInsertion>blockInsertions){bitmap=b;this.modelExtents=modelExtents==null?null:modelExtents.clone();entityCount=e;skippedCount=skipped;snapPoints=points;this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));this.blockInsertions=Collections.unmodifiableList(new ArrayList<>(blockInsertions==null?Collections.emptyList():blockInsertions));layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(canonicalVisible(all,visible)));visibleLayerKeys=Collections.unmodifiableSet(DxfLayerState.normalized(visibleLayers));layoutNames=Collections.unmodifiableSet(new LinkedHashSet<>(layouts));this.activeLayout=activeLayout;layerCount=all.size();ArrayList<LayerEntity>visibleList=new ArrayList<>();for(Entity wrapped:document){LayerEntity layer=(LayerEntity)wrapped;if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys))visibleList.add(layer);}visibleDocument=Collections.unmodifiableList(visibleList);spatialIndex=new SpatialIndex(visibleList);ArrayList<LayerEntity>sourceList=new ArrayList<>();android.util.SparseArray<LayerEntity>sourceMap=new android.util.SparseArray<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;sourceList.add(layer);sourceMap.put(layer.sourceId,layer);}editableSourceLayers=Collections.unmodifiableList(sourceList);sourceLayerById=sourceMap;LinkedHashSet<String>fallbacks=new LinkedHashSet<>();for(Entity wrapped:document){Entity raw=((LayerEntity)wrapped).entity;if(raw instanceof Transformed)raw=((Transformed)raw).entity;if(raw instanceof Label){DxfTextStyle.Style st=((Label)raw).style;String ref=st.fontFile.isEmpty()?st.familyHint():st.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,st.usesShx()))fallbacks.add(ref);}else if(raw instanceof MTextLabel){MTextLabel mt=(MTextLabel)raw;String ref=mt.style.fontFile.isEmpty()?mt.style.familyHint():mt.style.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,mt.style.usesShx()))fallbacks.add(ref);for(DxfMText.Run run:mt.rich.runs){String rf=run.font==null?"":run.font.trim();if(!rf.isEmpty()&&!CadFontManager.isAvailable(rf,run.usesShxFont()))fallbacks.add(rf);}}}fontFallbacks=Collections.unmodifiableSet(fallbacks);boolean shape=false;for(DxfLineStyle.Pattern p:lineTypes.values())if(p!=null&&p.requiresExternalShape()){shape=true;break;}externalShapeFallback=shape;
             int oleCount=0,olePreview=0;LinkedHashSet<String>types=new LinkedHashSet<>();
             for(Entity wrapped:document){
@@ -137,11 +139,15 @@ public final class DxfParser {
             return sourceEntity(found);
         }
         public void drawVector(Canvas canvas,Matrix imageMatrix){drawVector(canvas,imageMatrix,Collections.emptySet());}
-        public void drawVector(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){
-            Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);Matrix combined=new Matrix();combined.setConcat(imageMatrix,view);
-            drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayerKeys,false,false,globalLineTypeScale);
-            Rect clip=canvas.getClipBounds();RectF visibleWorld=new RectF(clip);Matrix inverse=new Matrix();if(!combined.invert(inverse))visibleWorld=null;else {inverse.mapRect(visibleWorld);if(clip.width()>0&&clip.height()>0){float worldPerPixel=Math.max(visibleWorld.width()/clip.width(),visibleWorld.height()/clip.height());float pad=worldPerPixel*24f;visibleWorld.inset(-pad,-pad);}}
-            spatialIndex.draw(canvas,paint,combined,visibleWorld,hiddenIds,globalLineTypeScale);
+        public void drawVector(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){drawVectorInternal(canvas,imageMatrix,hiddenIds,false);}
+        public void drawVectorNavigation(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){drawVectorInternal(canvas,imageMatrix,hiddenIds,true);}
+        private void drawVectorInternal(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds,boolean navigation){
+            navigationPaint.reset();navigationPaint.setAntiAlias(true);navigationPaint.setStyle(Paint.Style.STROKE);navigationCombined.setConcat(imageMatrix,view);
+            drawViewportModels(canvas,navigationPaint,navigationCombined,document,activeLayout,visibleLayerKeys,false,false,globalLineTypeScale);
+            canvas.getClipBounds(navigationClip);navigationVisibleWorld.set(navigationClip);
+            RectF visibleWorld=navigationVisibleWorld;
+            if(!navigationCombined.invert(navigationInverse))visibleWorld=null;else{navigationInverse.mapRect(navigationVisibleWorld);if(navigationClip.width()>0&&navigationClip.height()>0){float worldPerPixel=Math.max(navigationVisibleWorld.width()/navigationClip.width(),navigationVisibleWorld.height()/navigationClip.height());float pad=worldPerPixel*(navigation?12f:24f);navigationVisibleWorld.inset(-pad,-pad);}}
+            spatialIndex.draw(canvas,navigationPaint,navigationCombined,visibleWorld,hiddenIds,globalLineTypeScale);
         }
         public void drawPreview(Canvas canvas,Matrix contentToScreen,Paint paint){
             if(bitmap==null||bitmap.isRecycled())return;Matrix bitmapToContent=new Matrix();bitmapToContent.setScale(SIZE/(float)bitmap.getWidth(),SIZE/(float)bitmap.getHeight());Matrix target=new Matrix();target.setConcat(contentToScreen,bitmapToContent);canvas.drawBitmap(bitmap,target,paint);
@@ -388,18 +394,18 @@ public final class DxfParser {
 
     private static int paperColor(int color){int r=Color.red(color),g=Color.green(color),b=Color.blue(color);return r>=245&&g>=245&&b>=245?Color.BLACK:Color.rgb(r,g,b);}
     private static final class Label implements Entity{
-        final float x,y,height,angle,widthFactor,oblique,offsetX,offsetY;final int generationFlags,mtextAttachment;final String text;final String[]rows;final DxfTextStyle.Style style;
+        final float x,y,height,angle,widthFactor,oblique,offsetX,offsetY;final int generationFlags,mtextAttachment;final String text;final String[]rows;final DxfTextStyle.Style style;private Path cachedShape;private final Path screenShape=new Path();
         Label(float x,float y,float h,float angle,String text,DxfTextStyle.Style style,float width,float oblique,int flags,float x2,float y2,boolean hasSecond,int horizontal,int vertical,int attachment){
             this.text=text;this.style=style==null?DxfTextStyle.defaultStyle():style;generationFlags=flags;mtextAttachment=attachment;rows=text.split("\n",-1);float baseWidth=Math.max(.01f,width),baseHeight=Math.max(.01f,h);Paint measure=new Paint(Paint.ANTI_ALIAS_FLAG);measure.setTypeface(typeface(this.style));measure.setTextSize(baseHeight);measure.setTextScaleX(baseWidth);measure.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));float measured=.0001f;for(String row:rows)measured=Math.max(measured,measure.measureText(row));DxfTextAlign.Result aligned=DxfTextAlign.resolve(x,y,x2,y2,hasSecond,horizontal,vertical,angle,measured,baseHeight);this.x=aligned.x;this.y=aligned.y;this.angle=aligned.angleDegrees;height=baseHeight*aligned.heightScale;widthFactor=Math.max(.01f,baseWidth*aligned.widthScale/aligned.heightScale);this.oblique=oblique;offsetX=aligned.localOffsetX;offsetY=aligned.localOffsetY;
         }
         private static Typeface typeface(DxfTextStyle.Style style){String hint=style.fontFile.isEmpty()?style.androidFamilyHint():style.fontFile;return CadFontManager.resolveTypeface(hint,style.usesShx(),Typeface.NORMAL);}private Typeface typeface(){return typeface(style);}
         private float[] baseline(){float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f,lx=offsetX*sx,ly=offsetY*sy;double r=Math.toRadians(angle),co=Math.cos(r),si=Math.sin(r);return new float[]{(float)(x+lx*co-ly*si),(float)(y+lx*si+ly*co)};}
-        private Path shape(){Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(typeface());tp.setTextSize(height);tp.setTextScaleX(widthFactor);tp.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();tp.getTextPath(rows[i],0,rows[i].length(),offsetX,offsetY+i*height*1.3f,line);shape.addPath(line);}float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f;Matrix mirror=new Matrix();mirror.setScale(sx,sy);shape.transform(mirror);if(mtextAttachment>=1&&mtextAttachment<=9){RectF bounds=new RectF();shape.computeBounds(bounds,true);if(!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(mtextAttachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);shape.transform(anchor);}}Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);shape.transform(placement);return shape;}public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);}
+        private Path shape(){if(cachedShape!=null)return cachedShape;Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);tp.setTypeface(typeface());tp.setTextSize(height);tp.setTextScaleX(widthFactor);tp.setTextSkewX((float)-Math.tan(Math.toRadians(oblique)));Path shape=new Path();for(int i=0;i<rows.length;i++){Path line=new Path();tp.getTextPath(rows[i],0,rows[i].length(),offsetX,offsetY+i*height*1.3f,line);shape.addPath(line);}float sx=(generationFlags&2)!=0?-1f:1f,sy=(generationFlags&4)!=0?1f:-1f;Matrix mirror=new Matrix();mirror.setScale(sx,sy);shape.transform(mirror);if(mtextAttachment>=1&&mtextAttachment<=9){RectF bounds=new RectF();shape.computeBounds(bounds,true);if(!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(mtextAttachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);shape.transform(anchor);}}Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);shape.transform(placement);cachedShape=shape;return cachedShape;}public void bounds(RectF b){RectF r=new RectF();shape().computeBounds(r,true);add(b,r.left,r.top);add(b,r.right,r.bottom);}public void draw(Canvas c,Paint p,Matrix m){shape().transform(m,screenShape);p.setStyle(Paint.Style.FILL);c.drawPath(screenShape,p);p.setStyle(Paint.Style.STROKE);}
     }
 
 
     private static final class MTextLabel implements Entity{
-        final float x,y,height,angle,widthFactor,oblique;final int attachment;final DxfTextStyle.Style style;final DxfMText.Result rich;
+        final float x,y,height,angle,widthFactor,oblique;final int attachment;final DxfTextStyle.Style style;final DxfMText.Result rich;private Path cachedShape;private final Path screenShape=new Path();
         MTextLabel(float x,float y,float h,float angle,DxfMText.Result rich,DxfTextStyle.Style style,float width,float oblique,int attachment){
             this.x=x;this.y=y;height=Math.max(.01f,h);this.angle=angle;this.rich=rich;this.style=style==null?DxfTextStyle.defaultStyle():style;widthFactor=Math.max(.01f,width);this.oblique=oblique;this.attachment=attachment;
         }
@@ -411,6 +417,7 @@ public final class DxfParser {
             return CadFontManager.resolveTypeface(hint,shx,faceStyle);
         }
         private Path shape(){
+            if(cachedShape!=null)return cachedShape;
             Path all=new Path();float cursorX=0f,cursorY=0f,lineMax=height;
             for(DxfMText.Run run:rich.runs){
                 String[]parts=run.text.split("\\n",-1);
@@ -434,10 +441,10 @@ public final class DxfParser {
             Matrix glyphToWorld=new Matrix();glyphToWorld.setScale(1f,-1f);all.transform(glyphToWorld);
             RectF bounds=new RectF();all.computeBounds(bounds,true);
             if(attachment>=1&&attachment<=9&&!bounds.isEmpty()){float[]shift=DxfTextAlign.mtextOffset(attachment,bounds.left,bounds.top,bounds.right,bounds.bottom);Matrix anchor=new Matrix();anchor.setTranslate(shift[0],shift[1]);all.transform(anchor);}
-            Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);all.transform(placement);return all;
+            Matrix placement=new Matrix();placement.setRotate(angle);placement.postTranslate(x,y);all.transform(placement);cachedShape=all;return cachedShape;
         }
         public void bounds(RectF b){Path p=shape();RectF r=new RectF();p.computeBounds(r,true);if(!r.isEmpty()){add(b,r.left,r.top);add(b,r.right,r.bottom);}}
-        public void draw(Canvas c,Paint p,Matrix m){Path path=shape();path.transform(m);Paint.Style old=p.getStyle();p.setStyle(Paint.Style.FILL);c.drawPath(path,p);p.setStyle(old);}
+        public void draw(Canvas c,Paint p,Matrix m){shape().transform(m,screenShape);Paint.Style old=p.getStyle();p.setStyle(Paint.Style.FILL);c.drawPath(screenShape,p);p.setStyle(old);}
     }
 
     private static String str(List<String>a,int from,int to,int code,String fallback){for(int i=from;i+1<to;i+=2)if(intOf(a.get(i))==code)return a.get(i+1);return fallback;}
