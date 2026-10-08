@@ -147,7 +147,15 @@ public final class DxfParser {
             canvas.getClipBounds(navigationClip);navigationVisibleWorld.set(navigationClip);
             RectF visibleWorld=navigationVisibleWorld;
             if(!navigationCombined.invert(navigationInverse))visibleWorld=null;else{navigationInverse.mapRect(navigationVisibleWorld);if(navigationClip.width()>0&&navigationClip.height()>0){float worldPerPixel=Math.max(navigationVisibleWorld.width()/navigationClip.width(),navigationVisibleWorld.height()/navigationClip.height());float pad=worldPerPixel*(navigation?12f:24f);navigationVisibleWorld.inset(-pad,-pad);}}
-            spatialIndex.draw(canvas,navigationPaint,navigationCombined,visibleWorld,hiddenIds,globalLineTypeScale);
+            float subpixelLimit=0f;
+            if(navigation&&navigationClip.width()>0&&navigationClip.height()>0&&visibleWorld!=null){
+                float worldPerScreenPixel=Math.max(visibleWorld.width()/navigationClip.width(),
+                    visibleWorld.height()/navigationClip.height());
+                subpixelLimit=CadNavigationPolicy.movingMinWorldSpan(
+                    visibleDocument.size(),worldPerScreenPixel);
+            }
+            spatialIndex.draw(canvas,navigationPaint,navigationCombined,visibleWorld,hiddenIds,
+                globalLineTypeScale,subpixelLimit);
         }
         public void drawPreview(Canvas canvas,Matrix contentToScreen,Paint paint){
             if(bitmap==null||bitmap.isRecycled())return;Matrix bitmapToContent=new Matrix();bitmapToContent.setScale(SIZE/(float)bitmap.getWidth(),SIZE/(float)bitmap.getHeight());Matrix target=new Matrix();target.setConcat(contentToScreen,bitmapToContent);canvas.drawBitmap(bitmap,target,paint);
@@ -455,15 +463,38 @@ public final class DxfParser {
             bounds=new RectF(total);grid=all.size()>=20000?48:32;cellW=Math.max(1e-6f,bounds.width()/grid);cellH=Math.max(1e-6f,bounds.height()/grid);cells=(ArrayList<LayerEntity>[])new ArrayList[grid*grid];
             for(LayerEntity layer:all){if(layer.unbounded||!layer.ensureBounds())continue;int x0=cellX(layer.boundLeft),x1=cellX(layer.boundRight),y0=cellY(layer.boundTop),y1=cellY(layer.boundBottom);int span=(x1-x0+1)*(y1-y0+1);if(span>MAX_CELLS_PER_ENTITY){overflow.add(layer);continue;}for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++){int at=y*grid+x;ArrayList<LayerEntity>bucket=cells[at];if(bucket==null)cells[at]=bucket=new ArrayList<>();bucket.add(layer);}}
         }
-        void draw(Canvas canvas,Paint paint,Matrix combined,RectF visible,Set<Integer>hiddenIds,double global){
+        void draw(Canvas canvas,Paint paint,Matrix combined,RectF visible,Set<Integer>hiddenIds,
+                  double global,float subpixelLimit){
             Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;
-            if(cells==null||visible==null){for(LayerEntity layer:all)if(!hidden.contains(layer.sourceId)&&(visible==null||layer.intersects(visible)))layer.drawStyled(canvas,paint,combined,false,false,global);return;}
-            long mark=nextMark();drawCandidates(overflow,canvas,paint,combined,visible,hidden,global,mark);
+            if(cells==null||visible==null){
+                for(LayerEntity layer:all)
+                    if(!hidden.contains(layer.sourceId)&&(visible==null||layer.intersects(visible))&&
+                        !culledDuringMotion(layer,subpixelLimit))
+                        layer.drawStyled(canvas,paint,combined,false,false,global);
+                return;
+            }
+            long mark=nextMark();drawCandidates(overflow,canvas,paint,combined,visible,hidden,global,mark,subpixelLimit);
             if(!RectF.intersects(bounds,visible))return;int x0=cellX(visible.left),x1=cellX(visible.right),y0=cellY(visible.top),y1=cellY(visible.bottom);
-            for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++)drawCandidates(cells[y*grid+x],canvas,paint,combined,visible,hidden,global,mark);
+            for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++)drawCandidates(cells[y*grid+x],canvas,paint,combined,visible,hidden,global,mark,subpixelLimit);
         }
         private static synchronized long nextMark(){if(nextQueryMark==Long.MAX_VALUE)nextQueryMark=1L;return ++nextQueryMark;}
-        private void drawCandidates(List<LayerEntity>list,Canvas canvas,Paint paint,Matrix combined,RectF visible,Set<Integer>hidden,double global,long mark){if(list==null)return;for(LayerEntity layer:list){if(layer.queryMark==mark)continue;layer.queryMark=mark;if(hidden.contains(layer.sourceId)||!layer.intersects(visible))continue;layer.drawStyled(canvas,paint,combined,false,false,global);}}
+        private static boolean culledDuringMotion(LayerEntity layer,float subpixelLimit){
+            if(subpixelLimit<=0f||layer.unbounded||!layer.ensureBounds())return false;
+            return CadNavigationPolicy.isSubpixelBothAxes(
+                layer.boundRight-layer.boundLeft,layer.boundBottom-layer.boundTop,subpixelLimit);
+        }
+        private void drawCandidates(List<LayerEntity>list,Canvas canvas,Paint paint,Matrix combined,
+                                    RectF visible,Set<Integer>hidden,double global,long mark,
+                                    float subpixelLimit){
+            if(list==null)return;
+            for(LayerEntity layer:list){
+                if(layer.queryMark==mark)continue;
+                layer.queryMark=mark;
+                if(hidden.contains(layer.sourceId)||!layer.intersects(visible)||
+                    culledDuringMotion(layer,subpixelLimit))continue;
+                layer.drawStyled(canvas,paint,combined,false,false,global);
+            }
+        }
         private int cellX(float x){return Math.max(0,Math.min(grid-1,(int)((x-bounds.left)/cellW)));}
         private int cellY(float y){return Math.max(0,Math.min(grid-1,(int)((y-bounds.top)/cellH)));}
     }
