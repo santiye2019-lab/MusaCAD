@@ -36,6 +36,8 @@ public final class MusaAiPanel {
     public interface Reply {
         void send(String text);
         default void progress(String text){}
+        /** Reports a successful/failed actual cloud model answer, not just /health. */
+        default void cloudStatus(boolean modelAnswered){}
     }
 
     public interface Host {
@@ -73,6 +75,7 @@ public final class MusaAiPanel {
         // An actual /health HTTP 200 is required before showing the online LED.
         // A configured URL, developer role, or stale consent is not connectivity.
         final boolean cloudConfigured=MusaAiCloudHealth.configured();
+        final AtomicBoolean modelVerified=new AtomicBoolean(false);
         TextView state=text(activity,cloudConfigured?"● Denetleniyor":"● AI ayarsız",10f,
             cloudConfigured?0xFFFFD184:0xFFB0BDC6,true);
         state.setGravity(Gravity.CENTER);
@@ -234,6 +237,14 @@ public final class MusaAiPanel {
                         scrollBottom(messagesScroll);
                     });
                 }
+                @Override public void cloudStatus(boolean answered){
+                    activity.runOnUiThread(()->{
+                        modelVerified.set(answered);
+                        state.setText(answered?"● AI bağlı":"● AI erişilemedi");
+                        state.setTextColor(answered?0xFF78F2C7:0xFFFFA7A7);
+                        state.setBackground(round(activity,answered?0xFF15493F:0xFF4C2428,16,0));
+                    });
+                }
                 @Override public void progress(String text){
                     activity.runOnUiThread(()->{
                         if(completed.get())return;
@@ -338,7 +349,9 @@ public final class MusaAiPanel {
             MusaAiCloudHealth.check(online->{
                 connectionCheckRunning.set(false);
                 if(connectionClosed.get()||activity.isFinishing()||activity.isDestroyed())return;
-                state.setText(online?"● Çevrimiçi":"● Erişim yok");
+                if(!online)modelVerified.set(false);
+                state.setText(online?
+                    (modelVerified.get()?"● AI bağlı":"● Çevrimiçi"):"● Erişim yok");
                 state.setTextColor(online?0xFF78F2C7:0xFFFFA7A7);
                 state.setBackground(round(activity,online?0xFF15493F:0xFF4C2428,16,0));
                 connectionHandler.postDelayed(connectionProbe[0],20_000L);
