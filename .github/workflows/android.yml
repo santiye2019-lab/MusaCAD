@@ -126,6 +126,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiPanelContractTest.java
           java -cp /tmp/musacad-tests MusaAiPanelContractTest
+      - name: Test MusaCAD visual AI performance and poz import integration
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaCadVisualPerformanceContractTest.java
+          java -cp /tmp/musacad-tests MusaCadVisualPerformanceContractTest
       - name: Test MusaCAD AI natural-language command routing
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiCommandRouter.java tests/MusaAiCommandRouterTest.java
