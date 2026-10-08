@@ -86,6 +86,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java tests/MusaAiAnalysisIntentTest.java
           java -cp /tmp/musacad-tests MusaAiAnalysisIntentTest
+      - name: Test Gandalf material list versus sanitary DWG metraj
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCsbEstimate.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiCsbMaterialCompare.java tests/MusaAiCsbMaterialCompareTest.java
+          java -cp /tmp/musacad-tests MusaAiCsbMaterialCompareTest
       - name: Test Gandalf sanitary source-linked CSB takeoff safety
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCsbEstimate.java tests/MusaAiCsbEstimateTest.java

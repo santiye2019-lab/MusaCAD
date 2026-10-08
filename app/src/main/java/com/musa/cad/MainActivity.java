@@ -983,7 +983,11 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
             MusaAiBoq.Comparison comparison=MusaAiBoq.compare(currentProject.boqModel,generated);
-            reply.send(comparison.text);
+            MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
+                currentAiDrawingIndex(),Collections.emptyList());
+            MusaAiCsbMaterialCompare.Result actual=
+                MusaAiCsbMaterialCompare.compare(currentProject.boqModel,measured);
+            reply.send(comparison.text+actual.report);
             return;
         }
         if(isBoqGenerateCommand(aiControl)){
@@ -992,7 +996,9 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
-            reply.send("ÇİZİMDEN OTOMATİK KEŞİF\n"+MusaAiBoq.summary(generated));
+            reply.send("ÇİZİMDEN OTOMATİK KEŞİF\n"+MusaAiBoq.summary(generated)+
+                MusaAiCsbEstimate.analyze(currentAiDrawingIndex(),
+                    Collections.emptyList()).report);
             return;
         }
         if(isBoqSummaryCommand(aiControl)){
@@ -1555,8 +1561,14 @@ public class MainActivity extends AppCompatActivity {
                         else
                             out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
                     }
-                    if(!packageMode&&snapshot!=null)
-                        out.append(MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList()).report);
+                    if(!packageMode&&snapshot!=null){
+                        MusaAiCsbEstimate.Result measured=
+                            MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList());
+                        out.append(measured.report);
+                        if(currentProject!=null&&currentProject.boqModel!=null)
+                            out.append(MusaAiCsbMaterialCompare.compare(
+                                currentProject.boqModel,measured).report);
+                    }
                     lastAiReport=out.toString();
                     lastAiReportTitle="Gandalf • "+(hybridVisual?"Hibrit ":"")+
                         MusaAiAnalysisIntent.label(requestedScope)+" Proje Analiz Raporu";
@@ -1759,7 +1771,12 @@ public class MainActivity extends AppCompatActivity {
         report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
         report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
         report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
-        report.append(MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList()).report);
+        MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
+            snapshot,Collections.emptyList());
+        report.append(measured.report);
+        if(currentProject!=null&&currentProject.boqModel!=null)
+            report.append(MusaAiCsbMaterialCompare.compare(
+                currentProject.boqModel,measured).report);
         String completeReport=report.toString();
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
@@ -1818,8 +1835,10 @@ public class MainActivity extends AppCompatActivity {
             q.equals("yuklu kesfi sil");
     }
     private static boolean isBoqCompareCommand(String q){
-        return (q.contains("kesif")||q.contains("boq"))&&
-            (q.contains("karsilastir")||q.contains("uyum")||q.contains("fark"));
+        return (q.contains("kesif")||q.contains("boq")||q.contains("malzeme listesi")||
+            q.contains("malzeme cetveli"))&&
+            (q.contains("karsilastir")||q.contains("uyum")||q.contains("fark")||
+             q.contains("metrajla"));
     }
     private static boolean isBoqGenerateCommand(String q){
         return (q.contains("kesif")||q.contains("metraj tablosu"))&&
