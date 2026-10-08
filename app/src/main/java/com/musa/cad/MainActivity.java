@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3";
@@ -87,6 +87,8 @@ public class MainActivity extends AppCompatActivity {
         final ArrayList<CadImageOverlay> persistedImages=new ArrayList<>();
         MusaAiBoq.Model boqModel;
         String boqName="";
+        List<MusaAiCsbEstimate.Rate> csbRates=Collections.emptyList();
+        String csbRatePeriod="";
         MusaAiStructuralCalc.Model structuralCalcModel;
         String structuralCalcName="";
         String defaultLayer="0";
@@ -139,6 +141,8 @@ public class MainActivity extends AppCompatActivity {
     private List<Integer> lastAiReportSourceIds=Collections.emptyList();
     private MusaAiPanel.Reply pendingBoqReply;
     private ProjectSession pendingBoqProject;
+    private MusaAiPanel.Reply pendingCsbRateReply;
+    private ProjectSession pendingCsbRateProject;
     private MusaAiPanel.Reply pendingStructuralCalcReply;
     private ProjectSession pendingStructuralCalcProject;
     private volatile List<MusaAiCloudService.Action> pendingAiActions=Collections.emptyList();
@@ -956,6 +960,25 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if(isCsbRateLoadCommand(aiControl)){
+            if(currentProject==null){
+                reply.send("Önce sıhhi tesisat DWG/DXF projesini açın.");
+                return;
+            }
+            pendingCsbRateReply=reply;
+            pendingCsbRateProject=currentProject;
+            pickCsbPriceDocument();
+            reply.send("ÇŞİDB poz eşleştirme CSV dosyasını seçin. Her satırda MusaCAD malzeme anahtarı, resmî poz, tarif, birim, fiyat dönemi ve resmî kaynak URL'si bulunmalıdır. YFK'nin ham PDF/XLS dosyası doğrudan bu biçim değildir. Dosya incelendikten sonra ayrıca açık fiyat onayınız istenir.");
+            return;
+        }
+        if(isCsbRateClearCommand(aiControl)){
+            if(currentProject!=null){
+                currentProject.csbRates=Collections.emptyList();
+                currentProject.csbRatePeriod="";
+            }
+            reply.send("Bu çizim için onaylı fiyat eşleştirme listesi sıfırlandı.");
+            return;
+        }
         if(isBoqLoadCommand(aiControl)){
             if(currentProject==null){
                 reply.send("Keşif yüklemek için önce ilgili DWG/DXF projesini açın.");
@@ -983,8 +1006,8 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
             MusaAiBoq.Comparison comparison=MusaAiBoq.compare(currentProject.boqModel,generated);
-            MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
-                currentAiDrawingIndex(),Collections.emptyList());
+            MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(currentAiDrawingIndex(),
+                currentProject==null?Collections.emptyList():currentProject.csbRates);
             MusaAiCsbMaterialCompare.Result actual=
                 MusaAiCsbMaterialCompare.compare(currentProject.boqModel,measured);
             reply.send(comparison.text+actual.report);
@@ -998,7 +1021,7 @@ public class MainActivity extends AppCompatActivity {
             MusaAiBoq.Model generated=MusaAiBoq.generate(currentAiDrawingIndex(),currentDisplayName+" • otomatik proje metrajı");
             reply.send("ÇİZİMDEN OTOMATİK KEŞİF\n"+MusaAiBoq.summary(generated)+
                 MusaAiCsbEstimate.analyze(currentAiDrawingIndex(),
-                    Collections.emptyList()).report);
+                    currentProject==null?Collections.emptyList():currentProject.csbRates).report);
             return;
         }
         if(isBoqSummaryCommand(aiControl)){
@@ -1563,7 +1586,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                     if(!packageMode&&snapshot!=null){
                         MusaAiCsbEstimate.Result measured=
-                            MusaAiCsbEstimate.analyze(snapshot,Collections.emptyList());
+                            MusaAiCsbEstimate.analyze(snapshot,
+                            currentProject==null?Collections.emptyList():currentProject.csbRates);
                         out.append(measured.report);
                         if(currentProject!=null&&currentProject.boqModel!=null)
                             out.append(MusaAiCsbMaterialCompare.compare(
@@ -1771,8 +1795,8 @@ public class MainActivity extends AppCompatActivity {
         report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
         report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
         report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
-        MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(
-            snapshot,Collections.emptyList());
+        MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
+                            currentProject==null?Collections.emptyList():currentProject.csbRates);
         report.append(measured.report);
         if(currentProject!=null&&currentProject.boqModel!=null)
             report.append(MusaAiCsbMaterialCompare.compare(
@@ -1826,6 +1850,15 @@ public class MainActivity extends AppCompatActivity {
             q.equals("yuklu statik hesap raporu")||q.equals("statik modeli goster");
     }
 
+    private static boolean isCsbRateLoadCommand(String q){
+        return (q.contains("csb")||q.contains("csidb")||
+            q.contains("yfk")||q.contains("birim fiyat"))&&
+            q.contains("fiyat")&&(q.contains("yukle")||q.contains("ice aktar"));
+    }
+    private static boolean isCsbRateClearCommand(String q){
+        return (q.contains("csb")||q.contains("csidb")||q.contains("yfk"))&&
+            q.contains("fiyat")&&(q.contains("temizle")||q.contains("sil"));
+    }
     private static boolean isBoqLoadCommand(String q){
         return q.equals("kesif yukle")||q.equals("boq yukle")||q.equals("metraj dosyasi yukle")||
             q.equals("kesif dosyasi yukle")||q.equals("kesfi yukle");
@@ -2361,6 +2394,69 @@ public class MainActivity extends AppCompatActivity {
                     result.setText(message);
                     if(reply!=null)reply.send(message);else Toast.makeText(this,message,Toast.LENGTH_LONG).show();
                 });
+            }
+        });
+    }
+
+    private void pickCsbPriceDocument(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"text/csv","text/plain",
+            "application/csv","application/vnd.ms-excel"});
+        startActivityForResult(intent,PICK_CSB_RATES);
+    }
+
+    private void handleCsbPricePicked(Uri uri){
+        final MusaAiPanel.Reply reply=pendingCsbRateReply;
+        final ProjectSession target=pendingCsbRateProject;
+        pendingCsbRateReply=null;
+        pendingCsbRateProject=null;
+        if(uri==null||target==null)return;
+        final String name=nameOf(uri);
+        if(name!=null&&!name.toLowerCase(Locale.ROOT).endsWith(".csv")&&
+           !name.toLowerCase(Locale.ROOT).endsWith(".txt")){
+            if(reply!=null)reply.send("Poz eşleştirme dosyası UTF-8 CSV olmalı. YFK XLS/PDF belgesi önce ayrı bir eşleştirme listesine dönüştürülmelidir.");
+            return;
+        }
+        aiExecutor.submit(()->{
+            try(InputStream stream=getContentResolver().openInputStream(uri)){
+                if(stream==null)throw new IOException("Fiyat CSV dosyası açılamadı");
+                ByteArrayOutputStream out=new ByteArrayOutputStream();
+                byte[] buf=new byte[8192];int count;
+                while((count=stream.read(buf))!=-1){
+                    if(out.size()+count>350000)throw new IOException("CSV güvenli boyut sınırını aştı");
+                    out.write(buf,0,count);
+                }
+                MusaAiCsbPriceCsv.Draft draft=MusaAiCsbPriceCsv.parse(
+                    new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8));
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed())return;
+                    if(draft.rates.isEmpty()){
+                        if(reply!=null)reply.send(draft.summary);
+                        return;
+                    }
+                    new AlertDialog.Builder(this)
+                        .setTitle("ÇŞİDB fiyat eşleştirmesini doğrula")
+                        .setMessage(draft.summary+"\n\nBu pozları ve "+draft.period+
+                            " fiyatlarını resmî kaynakla karşılaştırıp onaylıyor musunuz?")
+                        .setPositiveButton("Kontrol ettim, kullan",(dialog,which)->{
+                            target.csbRates=draft.approve();
+                            target.csbRatePeriod=draft.period;
+                            if(reply!=null)reply.send("Fiyat eşleştirme listesi onaylandı: "+
+                                target.csbRates.size()+" kalem, dönem "+draft.period+
+                                ". Projeyi analiz ederek yalnız tam poz/birim eşleşmelerini fiyatlandırabilirsiniz.");
+                        })
+                        .setNegativeButton("Onaylamıyorum",(dialog,which)->{
+                            if(reply!=null)reply.send("Poz fiyatları onaylanmadı; hesaplamaya dahil edilmedi.");
+                        })
+                        .show();
+                });
+            }catch(Exception e){
+                final String error="ÇŞİDB fiyat CSV dosyası okunamadı: "+
+                    (e.getMessage()==null?"geçersiz dosya":e.getMessage());
+                runOnUiThread(()->{if(reply!=null)reply.send(error);});
             }
         });
     }
@@ -3344,6 +3440,12 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==PICK_CSB_RATES&&c!=RESULT_OK){
+            MusaAiPanel.Reply reply=pendingCsbRateReply;
+            pendingCsbRateReply=null;pendingCsbRateProject=null;
+            if(reply!=null)reply.send("ÇŞİDB poz/fiyat yükleme iptal edildi.");
+            return;
+        }
         if(r==PICK_BOQ&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingBoqReply;pendingBoqReply=null;pendingBoqProject=null;
             if(reply!=null)reply.send("Keşif yükleme iptal edildi.");
@@ -3361,6 +3463,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_AUDIO||r==PICK_IMAGE||r==PICK_VIDEO){handleMediaPicked(r,data.getData());return;}
         if(r==PICK_FONT){handleFontPicked(data.getData());return;}
         if(r==PICK_DOCUMENT){handleDocumentPicked(data.getData());return;}
+        if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
