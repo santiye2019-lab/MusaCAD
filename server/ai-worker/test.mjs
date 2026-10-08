@@ -649,3 +649,80 @@ test("Malformed or unauthorized visual payload is rejected before provider call"
   assert.equal(res.status,400);
   assert.equal(invoked,false);
 });
+
+
+test("last 3x3 sweep batch with one detailed tile sends mapped vision to Gemini",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const img=(label,from,to)=>({
+    mime:"image/jpeg",base64:jpeg,label,width:1200,height:1200,
+    contentBounds:[from,from,to,to],drawingBounds:[1000+from,2000+from,1000+to,2000+to]
+  });
+  let sent;
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{
+      authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Projeyi analiz et",analysisScope:"all",
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:41,type:"TEXT",text:"DN100"}]},
+      visualEvidence:{
+        schema:"musacad-visual-evidence/v1",sweepSchema:"musacad-visual-sweep/v1",
+        sweepBatch:3,sweepBatchCount:3,totalDetailedTiles:9,firstTile:9,lastTile:9,
+        rawDrawingIncluded:false,complete:true,
+        images:[img("full-sheet-overview",0,300),img("sheet-tile-9",200,300)]
+      }
+    })
+  });
+  const response=await worker.fetch(req,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"stub",GEMINI_MODEL:"gemini-test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({choices:[{message:{content:"sheet-tile-9: DN100 görünüyor."}}]}),
+        {status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  assert.equal(response.status,200);
+  const output=await response.json();
+  assert.equal(output.status,"ok");
+  assert.equal(output.visualRegionCount,2);
+  assert.equal(output.visualCoverageComplete,true);
+  assert.match(sent.messages[1].content[0].text,/sheet-tile-9/);
+  assert.match(sent.messages[1].content[0].text,/VISUAL SWEEP BATCH: 3/);
+  assert.equal(sent.messages[1].content[2].type,"image_url");
+});
+
+test("sweep rejects skipped tile identity or fabricated full coverage before provider",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const frame=label=>({
+    mime:"image/jpeg",base64:jpeg,label,width:640,height:640,
+    contentBounds:[0,0,100,100],drawingBounds:[0,0,100,100]
+  });
+  for(const [labels,complete] of [
+    [["full-sheet-overview","sheet-tile-2"],false],
+    [["full-sheet-overview","sheet-tile-1"],true],
+    [["full-sheet-overview","sheet-tile-1","sheet-tile-1"],false]
+  ]){
+    let upstream=false;
+    const req=new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{
+        authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+        "content-type":"application/json"},
+      body:JSON.stringify({
+        prompt:"Projeyi analiz et",cad:{schema:"musacad-cad-json/v1",items:[]},
+        visualEvidence:{schema:"musacad-visual-evidence/v1",sweepSchema:"musacad-visual-sweep/v1",
+          sweepBatch:1,sweepBatchCount:3,totalDetailedTiles:9,firstTile:1,lastTile:4,
+          complete,rawDrawingIncluded:false,images:labels.map(frame)}
+      })
+    });
+    const res=await worker.fetch(req,{
+      AI_PROVIDER:"gemini",GEMINI_API_KEY:"stub",GEMINI_MODEL:"test",
+      MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{upstream=true;throw Error("must not call upstream");}
+    });
+    assert.equal(res.status,400);
+    assert.equal(upstream,false);
+  }
+});
