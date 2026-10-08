@@ -20,6 +20,10 @@ public final class MusaAiCloudPolicyTest {
         no(MusaAiCloudPolicy.allowWeb("Gandalf, çizimi analiz et"),"web should be explicit");
         yes(MusaAiCloudPolicy.allowEditProposals("Gandalf, bu hattı düzelt"),"edit proposal intent");
         no(MusaAiCloudPolicy.allowEditProposals("Gandalf, raporla"),"report should not expose edit tools");
+        no(MusaAiCloudPolicy.allowEditProposals("Silivrikapı projesini analiz et"),
+            "Place-name substring must not unlock destructive tools");
+        yes(MusaAiCloudPolicy.allowEditProposals("Bu çizgiyi sil"),
+            "Explicit deletion may propose actions but still needs approval");
         String prompt=MusaAiCloudPolicy.promptForCloud("Gandalf, pis su projesini incele");
         if(!"pis su projesini incele".equals(prompt))throw new AssertionError("prefix strip: "+prompt);
         System.out.println("MusaAiCloudPolicyTest OK");
