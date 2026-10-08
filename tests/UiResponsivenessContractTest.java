@@ -43,6 +43,19 @@ public final class UiResponsivenessContractTest {
         require(main,"makeDialogButtonsReadable(projectCloseDialog)","readable save/close actions");
         require(main,"button.setTextColor(Color.WHITE)","white close dialog actions");
 
-        System.out.println("UI responsiveness contract OK: authoritative first-frame color, sharp vector pinch/pan, reduced hot-frame allocations, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
+        int cloudStart=main.indexOf("private void runMusaAiCloud");
+        int cloudEnd=main.indexOf("private static boolean isGandalfPreviewCommand",cloudStart);
+        if(cloudStart<0||cloudEnd<=cloudStart)throw new AssertionError("Responsiveness/UI regression: Gandalf cloud handler not found");
+        String cloud=main.substring(cloudStart,cloudEnd);
+        require(cloud,"aiExecutor.submit","Gandalf cloud background execution");
+        require(cloud,"activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)","bounded background CAD-JSON projection");
+        if(cloud.indexOf("activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS)")<cloud.indexOf("aiExecutor.submit"))
+            throw new AssertionError("Responsiveness/UI regression: CAD-JSON projection moved back onto UI thread");
+        if(cloud.contains("currentAiDrawingIndex()"))
+            throw new AssertionError("Responsiveness/UI regression: cloud handler must not build the full AI index on UI thread");
+        require(parser,"public MusaAiDrawingIndex aiDrawingIndex(int maxItems)","bounded AI drawing index");
+        require(main,"CLOUD_AI_INDEX_MAX_ITEMS=5000","bounded Gandalf projection budget");
+
+        System.out.println("UI responsiveness contract OK: authoritative first-frame color, sharp vector pinch/pan, bounded background Gandalf CAD-JSON, reduced hot-frame allocations, immediate commands, asynchronous print preview and readable responsive actions are guarded.");
     }
 }
