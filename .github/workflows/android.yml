@@ -540,15 +540,17 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           src=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
-          start=src.index("// Recent-file thumbnail generation is deliberately off the critical DWG path.")
-          export=src.index("engine.exportDxf(converted)",start)
-          critical=src[start:export]
-          assert "scheduleRecentNativeRecord" in critical
-          assert ".thumbnail(360,240)" not in critical
-          assert "RecentFileStore.record(" not in critical
-          assert "THREAD_PRIORITY_BACKGROUND" in src
+          open_start=src.index("private void startLoad(Uri uri)")
+          export=src.index("engine.exportDxf(converted)",open_start)
+          before_export=src[open_start:export]
+          assert "engine.fastScene()" not in before_export
+          assert "activateProject(project)" not in before_export
+          assert "DWG vektör model hazırlanıyor" in before_export
+          after_export=src[export:]
+          assert "DxfParser.render(converted,true)" in after_export
+          assert "activateProject(project)" in after_export
           assert "recentExecutor.shutdownNow()" in src
-          print("DWG critical-path regression checks passed")
+          print("DWG authoritative first-frame regression checks passed")
           PY
       - name: Test large DXF streaming under bounded heap
         run: |
