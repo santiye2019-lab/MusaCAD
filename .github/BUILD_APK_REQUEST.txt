@@ -1,2 +1,3 @@
-MusaCAD APK build request for current main branch.
-Includes stable debug signing, 12-character Serial + 12-character license code flow, updated 3D tools, 3D geometry support, and fixed second-screen animation.
+MusaCAD Direct Debug APK build request (2026-10-09).
+Include merged user-selected 2025 YFK PDF offline poz and historical price catalog, 2025/2026 new-code comparison, 2026 mechanical technical library, and the existing CAD/Gandalf modules.
+The YFK book PDF itself must not be packaged in public APK assets. Users import their personal copy via '2025 kitabını yükle'.
