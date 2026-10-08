@@ -42,7 +42,7 @@ public final class FinalReleaseReadinessTest {
 
         String[] gates={
             "Test Group 1 full-screen aspect preservation",
-            "Test DWG first-open critical path",
+            "Test progressive native DWG first-frame and complete editor handoff",
             "Test CAD navigation zoom and culling policy",
             "Test DXF layer visibility rules",
             "Test DXF color palette",
