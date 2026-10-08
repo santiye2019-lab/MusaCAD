@@ -1759,12 +1759,14 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if(hybridVisual){
-                        runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,requestedScope,reply);
+                        runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,
+                            requestedScope,reply,recentContext);
                         return;
                     }
                     reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
                     MusaAiCloudService.Result cloud=packageMode
-                        ?MusaAiCloudService.analyzePackage(getApplicationContext(),snapshot,displayName,packageDrawings,raw)
+                        ?MusaAiCloudService.analyzePackageWithContext(getApplicationContext(),snapshot,
+                            displayName,packageDrawings,raw,recentContext,localContextEvidence(snapshot))
                         :MusaAiCloudService.analyzeWithContext(getApplicationContext(),snapshot,displayName,
                             raw,recentContext,localContextEvidence(snapshot));
                     if(!cloud.ok()){
@@ -1854,7 +1856,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void runMusaAiWholeSheetVision(DxfParser.Result drawing,
                                            MusaAiDrawingIndex snapshot,String fileName,
-                                           String raw,String scope,MusaAiPanel.Reply reply){
+                                           String raw,String scope,MusaAiPanel.Reply reply,
+                                           String recentContext){
+        final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
         int acceptedTiles=0,acceptedBatches=0;
         String issue="";
@@ -1903,8 +1907,9 @@ public class MainActivity extends AppCompatActivity {
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
-            MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybrid(
-                getApplicationContext(),snapshot,fileName,task,scope,rendered.json);
+            MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybridWithContext(
+                getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
+                recentContext,evidenceSummary);
             if(!cloud.ok()){
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
                     (cloud.message.isEmpty()?"Sunucu isteği başarısız.":cloud.message);
@@ -1961,8 +1966,9 @@ public class MainActivity extends AppCompatActivity {
                     " ve şebeke bağlantılarındaki uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
                     " Her bulguda görünüm etiketi, okunan değeri, kaynak ve belirsizliği belirt."+
                     " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
-                MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybrid(
-                    getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json);
+                MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybridWithContext(
+                    getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json,
+                    recentContext,evidenceSummary);
                 if(!detailed.ok()){
                     focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
                         (detailed.message.isEmpty()?"AI hizmeti yanıt vermedi.":detailed.message);
