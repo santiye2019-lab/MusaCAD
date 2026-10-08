@@ -36,7 +36,7 @@ public final class MusaAiCloudHealth {
             URL parsed=new URL(url);
             return "https".equalsIgnoreCase(parsed.getProtocol()) &&
                 parsed.getHost()!=null&&!parsed.getHost().trim().isEmpty()&&
-                parsed.getUserInfo()==null;
+                new java.net.URI(url).getUserInfo()==null;
         }catch(Exception ignored){return false;}
     }
 
