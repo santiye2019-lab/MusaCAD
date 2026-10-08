@@ -177,6 +177,7 @@ public final class MusaAiEngineeringReview {
             for(Integer id:run.ids){if(evidenceIds.size()>=80)break;evidenceIds.add(id);}
         }
         if(measured==0)report.append("\n• Ölçülebilir tesisat merkez hattı bulunamadı.");
+        report.append(MusaAiSheetZones.analyze(index).text);
         report.append("\n\nMÜHENDİSLİK KONTROL ADAYLARI");
         int missing=0;
         for(Equipment e:equipment){
