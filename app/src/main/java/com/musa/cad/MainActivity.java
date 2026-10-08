@@ -1668,7 +1668,7 @@ public class MainActivity extends AppCompatActivity {
                 if(Thread.currentThread().isInterrupted()||drawing!=activeDxf){
                     focusedIssue="Görünüm yakın-plan taraması kesildi veya çizim değiştirildi.";break;
                 }
-                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>190_000L){
+                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>145_000L){
                     focusedIssue="Çoklu pafta taraması güvenli süre sınırına ulaştı.";break;
                 }
                 MusaAiVisualEvidence.Result closeups;
@@ -1684,7 +1684,7 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
                     (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
                     "/"+focusedRequested+" yakın-plan adayı işlendi…");
-                String focusPrompt=raw+
+                String focusPrompt=raw+"\n"+viewCatalog.report+
                     "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
                     " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
                     " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
