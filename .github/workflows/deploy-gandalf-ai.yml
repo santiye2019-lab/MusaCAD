@@ -88,6 +88,7 @@ jobs:
 
           [vars]
           AI_PROVIDER = "gemini"
+          GEMINI_API_MODE = "native"
           GEMINI_MODEL = "gemini-3.8-flash"
           AI_MAX_OUTPUT_TOKENS = "3200"
           EOF
@@ -194,7 +195,7 @@ jobs:
             echo "- AI Worker: $GANDALF_WORKER_BASE"
             echo "- Analyze endpoint: $MUSACAD_AI_API_URL"
             echo "- Session endpoint: $MUSACAD_AI_SESSION_URL"
-            echo '- Provider: Gemini Free Tier'
+            echo '- Provider: Gemini native generateContent (Free Tier)'
             echo '- Model: gemini-3.8-flash'
             echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.2'
             echo '- Gemini API key remains server-side only'
