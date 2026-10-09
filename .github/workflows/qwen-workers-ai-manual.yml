@@ -48,14 +48,14 @@ jobs:
           image='data:image/png;base64,'+base64.b64encode(png).decode('ascii')
           model='@cf/qwen/qwen3.8-27b'
           cases={
-            'text': {'model':model,'messages':[{'role':'system','content':'Answer briefly in Turkish.'},{'role':'user','content':'Merhaba. Bir CAD projesi için hangi kanıt olmadan kesin teknik hata diyemezsin?'}],'max_completion_tokens':256,'stream':False},
-            'vision': {'model':model,'messages':[{'role':'system','content':'Bu yalnızca sentetik test görüntüsüdür; uydurma mühendislik hata raporu verme. Türkçe kısa cevap ver.'},{'role':'user','content':[{'type':'text','text':'Bu sentetik çizimde gördüğün renkli şekilleri ve yaklaşık konumlarını tarif et. Bu gerçek bir DWG paftası değildir.'},{'type':'image_url','image_url':{'url':image}}]}],'max_completion_tokens':256,'stream':False}
+            'text': {'model':model,'messages':[{'role':'system','content':'Answer briefly in Turkish.'},{'role':'user','content':'Merhaba. Bir CAD projesi için hangi kanıt olmadan kesin teknik hata diyemezsin?'}],'reasoning_effort':'low','max_completion_tokens':1536,'stream':False},
+            'vision': {'model':model,'messages':[{'role':'system','content':'Bu yalnızca sentetik test görüntüsüdür; uydurma mühendislik hata raporu verme. Türkçe kısa cevap ver.'},{'role':'user','content':[{'type':'text','text':'Bu sentetik çizimde gördüğün renkli şekilleri ve yaklaşık konumlarını tarif et. Bu gerçek bir DWG paftası değildir.'},{'type':'image_url','image_url':{'url':image}}]}],'reasoning_effort':'low','max_completion_tokens':1536,'stream':False}
           }
           for name,body in cases.items():
               with open('/tmp/qwen_'+name+'_request.json','w') as f:json.dump(body,f)
           print('Synthetic vision fixture created. No customer DWG sent.')
           PY
-      - name: Make bounded text and vision calls using existing Cloudflare secret
+      - name: Probe Qwen text and synthetic image with bounded low reasoning
         shell: bash
         run: |
           set -euo pipefail
@@ -75,10 +75,20 @@ jobs:
           import json,os
           name=os.environ['CASE_NAME']
           with open('/tmp/qwen_'+name+'_response.json') as f: data=json.load(f)
-          choices=data.get('choices') or []
-          text=(choices[0].get('message',{}).get('content') if choices else '')
+          # Cloudflare can wrap OpenAI-compatible answers in a result object.
+          payload=data.get('result') if isinstance(data,dict) and isinstance(data.get('result'),dict) and not data.get('choices') else data
+          choices=payload.get('choices') or []
+          msg=choices[0].get('message',{}) if choices else {}
+          text=msg.get('content') or ''
           if isinstance(text,list): text=' '.join(x.get('text','') for x in text if isinstance(x,dict))
-          if not isinstance(text,str) or not text.strip():raise SystemExit('Qwen '+name+' returned no usable assistant text')
+          if not isinstance(text,str):text=''
+          usage=payload.get('usage') or {}
+          print('RESPONSE_SHAPE_'+name.upper()+': '+','.join(sorted(payload.keys()))[:250])
+          print('REASON_'+name.upper()+': '+str(choices[0].get('finish_reason'))[:40] if choices else 'no choices')
+          print('USAGE_'+name.upper()+': prompt='+str(usage.get('prompt_tokens','n/a'))+
+                ', completion='+str(usage.get('completion_tokens','n/a')))
+          if not text.strip():
+              raise SystemExit('Qwen '+name+' returned no usable assistant text even with low reasoning and 1536 tokens')
           print(name.upper()+'_PASS; received nonempty Turkish response ('+str(len(text))+' chars).')
           print('RESPONSE_'+name.upper()+': '+text.strip()[:500].replace('\n',' '))
           PY
