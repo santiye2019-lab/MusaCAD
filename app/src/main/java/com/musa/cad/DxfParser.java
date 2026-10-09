@@ -207,6 +207,28 @@ public final class DxfParser {
          * visited document, rather than just the first unrelated CAD lines.
          * Deliberately excludes expensive geometry keys/polygon overlays.
          */
+/**
+         * Use world-space entity bounds when an imported DWG object has no
+         * editable CadEdit prototype. This is a location candidate only:
+         * bounding-box centers are never pipe endpoints, lengths or evidence
+         * of a connection. Ignore unbounded XLINEs and invalid bounds.
+         */
+        private static double[] aiIndexedCenter(LayerEntity layer){
+            if(layer==null)return new double[]{Double.NaN,Double.NaN};
+            CadEdit editable=layer.sourceEditWorld;
+            if(editable!=null){
+                double x=editable.centerX(),y=editable.centerY();
+                if(Double.isFinite(x)&&Double.isFinite(y))return new double[]{x,y};
+            }
+            if(layer.unbounded||!layer.ensureBounds())
+                return new double[]{Double.NaN,Double.NaN};
+            double x=((double)layer.boundLeft+(double)layer.boundRight)*0.5d;
+            double y=((double)layer.boundTop+(double)layer.boundBottom)*0.5d;
+            if(!Double.isFinite(x)||!Double.isFinite(y))
+                return new double[]{Double.NaN,Double.NaN};
+            return new double[]{x,y};
+        }
+
         public MusaAiDrawingIndex aiDrawingIndexQuickReview(int maxItems,int maxEntitiesToVisit){
             final int itemLimit=Math.max(1,Math.min(6000,maxItems));
             final int visitLimit=Math.max(itemLimit,Math.min(120000,maxEntitiesToVisit));
@@ -228,10 +250,9 @@ public final class DxfParser {
                     if(annotations.size()>=textLimit)continue;
                     String note=analysisText(layer.entity);
                     if(note.length()>320)note=note.substring(0,320);
-                    CadEdit e=layer.sourceEditWorld;
+                    double[] center=aiIndexedCenter(layer);
                     annotations.add(new MusaAiDrawingIndex.Item(layer.sourceId,type,layer.layer,note,
-                        Double.NaN,Double.NaN,false,false,"",
-                        e==null?Double.NaN:e.centerX(),e==null?Double.NaN:e.centerY()));
+                        Double.NaN,Double.NaN,false,false,"",center[0],center[1]));
                     continue;
                 }
                 if(lines.size()>=itemLimit-textLimit)continue;
@@ -287,12 +308,12 @@ public final class DxfParser {
                 LayerEntity layer=(LayerEntity)wrapped;
                 if(!activeLayout.equals(layer.layout)||!layer.isVisible(visibleLayerKeys)||"MUSACAD_BLANK".equals(layer.sourceType))continue;
                 CadEdit measure=layer.sourceEditWorld;
+                double[] center=aiIndexedCenter(layer);
                 boolean topologyKnown=measure!=null&&measure.type==CadEdit.Type.POLYLINE;
                 items.add(new MusaAiDrawingIndex.Item(
                     layer.sourceId,layer.sourceType,layer.layer,analysisText(layer.entity),
                     aiLength(measure),aiArea(measure),topologyKnown,topologyKnown&&measure.closed,
-                    aiGeometryKey(measure,layer.sourceType),
-                    measure==null?Double.NaN:measure.centerX(),measure==null?Double.NaN:measure.centerY()));
+                    aiGeometryKey(measure,layer.sourceType),center[0],center[1]));
                 if(!bounded){
                     Entity raw=layer.entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
                     if(raw instanceof OleFrameEntity){
