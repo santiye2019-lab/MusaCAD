@@ -14,7 +14,8 @@ public final class MusaAiRevisionCompareContractTest {
         require(main,"MusaAiRevisionCompare.compare","revision compare bridge");
         require(main,"findOtherRevisionCandidate","two-open-project fallback");
         require(main,"setAiHighlightedSources(revision.sourceIds)","revision highlights");
-        require(parser,"measure==null?Double.NaN:measure.centerX()","revision center indexing");
+        require(parser,"double[] center=aiIndexedCenter(layer)","revision world-space center indexing");
+        require(parser,"center[0],center[1]","revision center metadata projection");
         require(index,"centerX,centerY","revision center metadata");
         require(engine,"Değişen / taşınan","revision report");
         require(engine,"Yeni katman","layer delta");
