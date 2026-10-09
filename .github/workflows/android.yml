@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      release_approved:
+        description: "Final acceptance complete and APK creation explicitly approved"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: musacad-${{ github.workflow }}-${{ github.ref }}
@@ -679,8 +685,14 @@ jobs:
           PY
           mkdir -p app/src/main/assets
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
+      # Development, push and PR checks never create an installable APK.
+      # Final release requires an explicit manual approval input.
+      - name: Enforce explicit final-release approval before any APK build
+        run: |
+          javac -d /tmp/musacad-tests tests/ApkReleaseApprovalContractTest.java
+          java -cp /tmp/musacad-tests ApkReleaseApprovalContractTest
       - name: Build approved installable MusaCAD APK
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]')) }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         env:
           # Optional public HTTPS endpoints, NEVER provider API keys.
           MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
@@ -690,7 +702,7 @@ jobs:
           cp app/build/outputs/apk/direct/debug/app-direct-debug.apk /tmp/MusaCAD-latest.apk
           test -s /tmp/MusaCAD-latest.apk
       - name: Upload approved MusaCAD APK
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]')) }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         uses: actions/upload-artifact@v4
         with:
           name: MusaCAD-installable-apk

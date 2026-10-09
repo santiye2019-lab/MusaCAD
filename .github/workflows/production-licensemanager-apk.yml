@@ -2,6 +2,12 @@ name: Production License Manager APK
 
 on:
   workflow_dispatch:
+    inputs:
+      release_approved:
+        description: "Final acceptance complete and APK creation explicitly approved"
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [ main ]
 
@@ -10,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build-production-manager]') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
     runs-on: ubuntu-latest
     env:
       MUSACAD_MANAGER_PRODUCTION_RELEASE: "true"

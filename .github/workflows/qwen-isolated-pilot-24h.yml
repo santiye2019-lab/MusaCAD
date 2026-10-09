@@ -11,6 +11,11 @@ on:
         options:
           - deploy
           - remove
+      release_approved:
+        description: "Final acceptance complete and APK creation explicitly approved"
+        type: boolean
+        required: false
+        default: false
       build_pilot_apk:
         description: "Optional signed 24h APK; installing may replace your current MusaCAD"
         type: boolean
@@ -150,7 +155,7 @@ jobs:
 
   pilot-apk:
     needs: deploy
-    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true
+    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true && inputs.release_approved == true
     runs-on: ubuntu-latest
     env:
       MUSACAD_PRODUCTION_RELEASE: "true"
