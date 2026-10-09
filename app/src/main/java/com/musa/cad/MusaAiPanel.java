@@ -38,6 +38,8 @@ public final class MusaAiPanel {
         default void progress(String text){}
         /** Reports a successful/failed actual cloud model answer, not just /health. */
         default void cloudStatus(boolean modelAnswered){}
+        /** Recent failure reason for the LED; no secrets, tokens or CAD are logged. */
+        default void cloudFailure(String reason){cloudStatus(false);}
     }
 
     public interface Host {
@@ -76,6 +78,7 @@ public final class MusaAiPanel {
         // A configured URL, developer role, or stale consent is not connectivity.
         final boolean cloudConfigured=MusaAiCloudHealth.configured();
         final AtomicBoolean modelVerified=new AtomicBoolean(false);
+        final String[] lastCloudFailure={""};
         TextView state=text(activity,cloudConfigured?"● Denetleniyor":"● AI ayarsız",10f,
             cloudConfigured?0xFFFFD184:0xFFB0BDC6,true);
         state.setGravity(Gravity.CENTER);
@@ -83,8 +86,10 @@ public final class MusaAiPanel {
         state.setBackground(round(activity,0xFF233541,16,0));
         header.addView(state,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
         state.setOnClickListener(v->Toast.makeText(activity,
-            "Bu LED yalnız MusaCAD AI sunucusunun erişilebilirliğini gösterir. "+
-            "Modelin gerçek yanıtı ve lisansı ayrıca doğrulanır.",Toast.LENGTH_LONG).show());
+            lastCloudFailure[0].isEmpty()
+                ?"Çevrimiçi: Sunucuya erişilebiliyor. AI bağlı: Model gerçekten yanıt verdi. "+
+                 "Lisans ve kota ayrı kontrol edilir."
+                :lastCloudFailure[0],Toast.LENGTH_LONG).show());
         root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView context=text(activity,host.contextLabel(),11f,0xFF9FC1D1,false);
@@ -240,9 +245,28 @@ public final class MusaAiPanel {
                 @Override public void cloudStatus(boolean answered){
                     activity.runOnUiThread(()->{
                         modelVerified.set(answered);
+                        if(answered)lastCloudFailure[0]="";
                         state.setText(answered?"● AI bağlı":"● AI erişilemedi");
                         state.setTextColor(answered?0xFF78F2C7:0xFFFFA7A7);
                         state.setBackground(round(activity,answered?0xFF15493F:0xFF4C2428,16,0));
+                    });
+                }
+                @Override public void cloudFailure(String reason){
+                    activity.runOnUiThread(()->{
+                        modelVerified.set(false);
+                        String diagnostic=reason==null?"AI isteği başarısız.":reason.trim();
+                        if(diagnostic.length()>280)diagnostic=diagnostic.substring(0,280);
+                        lastCloudFailure[0]=diagnostic;
+                        String lowered=diagnostic.toLowerCase(new java.util.Locale("tr","TR"));
+                        String stateName=lowered.contains("kota")||lowered.contains("429")
+                            ?"● AI kota doldu":lowered.contains("oturum")||lowered.contains("lisans")||
+                                lowered.contains("401")||lowered.contains("403")
+                            ?"● AI oturum hatası":lowered.contains("süre")||lowered.contains("zaman")||
+                                lowered.contains("504")
+                            ?"● AI zaman aşımı":"● AI erişilemedi";
+                        state.setText(stateName);
+                        state.setTextColor(0xFFFFA7A7);
+                        state.setBackground(round(activity,0xFF4C2428,16,0));
                     });
                 }
                 @Override public void progress(String text){
@@ -350,10 +374,18 @@ public final class MusaAiPanel {
                 connectionCheckRunning.set(false);
                 if(connectionClosed.get()||activity.isFinishing()||activity.isDestroyed())return;
                 if(!online)modelVerified.set(false);
-                state.setText(online?
-                    (modelVerified.get()?"● AI bağlı":"● Çevrimiçi"):"● Erişim yok");
-                state.setTextColor(online?0xFF78F2C7:0xFFFFA7A7);
-                state.setBackground(round(activity,online?0xFF15493F:0xFF4C2428,16,0));
+                if(!online){
+                    state.setText("● Erişim yok");
+                }else if(!lastCloudFailure[0].isEmpty()){
+                    // Keep the model failure visible even if /health still says OK.
+                    // A green health LED must never masquerade as a model success.
+                }else{
+                    state.setText(modelVerified.get()?"● AI bağlı":"● Çevrimiçi");
+                }
+                state.setTextColor(online&&lastCloudFailure[0].isEmpty()
+                    ?0xFF78F2C7:0xFFFFA7A7);
+                state.setBackground(round(activity,
+                    online&&lastCloudFailure[0].isEmpty()?0xFF15493F:0xFF4C2428,16,0));
                 connectionHandler.postDelayed(connectionProbe[0],20_000L);
             });
         };

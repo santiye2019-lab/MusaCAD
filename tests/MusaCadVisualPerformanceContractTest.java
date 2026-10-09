@@ -29,7 +29,8 @@ public final class MusaCadVisualPerformanceContractTest {
         has(health,"musacad-ai-worker","expected health service identity");
         has(ui,"modelVerified.get()","connection LED distinguished from real model");
         has(main,"reply.cloudStatus(true)","real cloud model success callback");
-        has(main,"reply.cloudStatus(false)","real cloud model failure callback");
+        has(main,"reply.cloudFailure(cloud.message)","real cloud failure reason reaches status UI");
+        has(main,"reply.cloudFailure(detailed.message)","detailed visual failure reason reaches status UI");
 
         has(main,"engine.fastScene()","native DWG first paint");
         has(main,"loaded.handedOff=true","progressive handoff");
