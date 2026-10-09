@@ -81,7 +81,7 @@ public final class MusaAiCloudIntegrationContractTest {
         require(worker,"image_url","Gemini vision message construction");
         require(worker,"AI_UPSTREAM_TIMEOUT_MS","bounded server AI provider call");
         require(worker,"Promise.race","AI gateway request deadline");
-        require(main,"Yerel proje kontrolüne geçiliyor","automatic local fallback after cloud error");
+        require(main,"Yerel vektör kontrolüne geçiliyor","automatic local CAD fallback after cloud error");
         forbid(cloud,"OPENAI_API_KEY","OpenAI secret in Android client");
         forbid(gradle,"sk-proj-","hardcoded API key");
         System.out.println("MusaAiCloudIntegrationContractTest OK");
