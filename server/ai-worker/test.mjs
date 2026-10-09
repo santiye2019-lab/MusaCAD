@@ -1125,7 +1125,7 @@ test("self-hosted Qwen accepts signed developer session and consensual CAD image
 
 test("self-hosted provider refuses unencrypted, private and malformed endpoints",async()=>{
   const keys=sessionPair();
-  const request=new Request("https://ai.musacad.test/v1/analyze",{
+  const request=()=>new Request("https://ai.musacad.test/v1/analyze",{
     method:"POST",headers:{
       authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
       "content-type":"application/json"},
@@ -1139,7 +1139,7 @@ test("self-hosted provider refuses unencrypted, private and malformed endpoints"
     "https://user:pass@private.example.com/v1/chat/completions",
     "https://private.example.com/v1/chat/completions?token=leak"]){
     let called=false;
-    const response=await worker.fetch(request,{
+    const response=await worker.fetch(request(),{
       AI_PROVIDER:"selfhosted",SELFHOSTED_AI_ENDPOINT:endpoint,
       SELFHOSTED_AI_API_KEY:"secret",SELFHOSTED_MODEL:"qwen3.5:4b",
       MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
@@ -1272,7 +1272,7 @@ test("Cloudflare Qwen accepts signed MusaCAD session with visual and vector CAD 
 
 test("Cloudflare Qwen cannot be selected without server-side account and AI token",async()=>{
   const keys=sessionPair();
-  const req=new Request("https://musacad.test/v1/analyze",{
+  const req=()=>new Request("https://musacad.test/v1/analyze",{
     method:"POST",headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
       "content-type":"application/json"},
     body:JSON.stringify({prompt:"Kontrol et",cad:{schema:"musacad-cad-json/v1",items:[]}})
@@ -1284,7 +1284,7 @@ test("Cloudflare Qwen cannot be selected without server-side account and AI toke
       CLOUDFLARE_AI_API_TOKEN:""}
   ]){
     let calls=0;
-    const res=await worker.fetch(req,{
+    const res=await worker.fetch(req(),{
       AI_PROVIDER:"cloudflare",GEMINI_API_KEY:"other",GEMINI_MODEL:"other",
       ...config,MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
       __fetch:async()=>{calls++;throw Error("should not call upstream")}
