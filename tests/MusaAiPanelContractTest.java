@@ -36,6 +36,13 @@ public final class MusaAiPanelContractTest {
         require(panel,"recentTurns.addLast","bounded chat turns");
         require(panel,"MusaAiCloudHealth.check","real server health probe");
         require(panel,"AI bağlı","real model response indicator");
+        require(panel,"cloudFailure(String reason)","explain actual model failure reason");
+        require(panel,"lastCloudFailure","preserve diagnostic through /health");
+        require(panel,"AI kota doldu","quota error state");
+        require(panel,"AI oturum hatası","session and license rejection state");
+        require(panel,"AI zaman aşımı","multimodal timeout state");
+        require(panel,"state.setOnClickListener","tap LED for actionable reason");
+
         require(panel,"setScrollbarFadingEnabled(false)","always-visible message scrollbar");
         require(panel,"onImportPriceBook","explicit YFK book import callback");
         if(panel.contains("addQuickPromptAuto")||panel.contains("String[][] prompts"))
