@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "AI motoru (selfhosted için hazır özel sunucu gerekir)"
+        description: "Gandalf sağlayıcısı: Gemini / Cloudflare Qwen / özel Qwen sunucusu"
         type: choice
         required: true
         default: gemini
         options:
           - gemini
+          - cloudflare
           - selfhosted
   push:
     branches: [ main ]
@@ -24,6 +25,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_AI_API_TOKEN: ${{ secrets.CLOUDFLARE_AI_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       SELFHOSTED_AI_ENDPOINT: ${{ secrets.MUSACAD_SELFHOSTED_AI_ENDPOINT }}
       SELFHOSTED_AI_API_KEY: ${{ secrets.MUSACAD_SELFHOSTED_AI_API_KEY }}
@@ -56,6 +58,13 @@ jobs:
             gemini)
               if [ -z "${GEMINI_API_KEY:-}" ]; then
                 echo "::error::Gemini provider requires GEMINI_API_KEY secret"
+                missing=1
+              fi
+              ;;
+            cloudflare)
+              if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]] ||
+                 [ -z "${CLOUDFLARE_AI_API_TOKEN:-}" ]; then
+                echo "::error::Cloudflare Qwen requires 32-hex Cloudflare account ID and the separate CLOUDFLARE_AI_API_TOKEN secret"
                 missing=1
               fi
               ;;
@@ -133,6 +142,44 @@ jobs:
           fi
           echo "Self-hosted Qwen responded to a bounded text completion probe."
 
+      - name: Preflight Cloudflare Qwen before changing the production Worker
+        shell: bash
+        if: env.AI_PROVIDER_SELECTED == 'cloudflare'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          with open('/tmp/musacad-cf-qwen-preflight.json','w') as f:
+              json.dump({
+                "model":"@cf/qwen/qwen3.8-27b",
+                "messages":[{"role":"user","content":"Türkçe yalnız OK yaz."}],
+                "reasoning_effort":"low",
+                "max_completion_tokens":1536,
+                "stream":False
+              },f)
+          PY
+          status="$(curl --silent --show-error --max-time 75 \
+            --output /tmp/musacad-cf-qwen-preflight-response.json --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $CLOUDFLARE_AI_API_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data-binary @/tmp/musacad-cf-qwen-preflight.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/v1/chat/completions" || true)"
+          if [ "$status" != "200" ]; then
+            echo "::error::Cloudflare Qwen preflight failed (HTTP $status); the production Worker has NOT been modified."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          data=json.load(open('/tmp/musacad-cf-qwen-preflight-response.json'))
+          payload=data.get('result') if isinstance(data.get('result'),dict) and not data.get('choices') else data
+          choices=payload.get('choices') or []
+          answer=choices[0].get('message',{}).get('content','') if choices else ''
+          if not isinstance(answer,str) or not answer.strip():
+              raise SystemExit('Qwen returned no visible response; production Worker was not modified.')
+          print('Cloudflare Qwen preflight successful; response text redacted.')
+          PY
+
       - name: Prepare Gandalf Worker config
         shell: bash
         working-directory: server/ai-worker
@@ -146,6 +193,16 @@ jobs:
           [vars]
           AI_PROVIDER = "selfhosted"
           SELFHOSTED_MODEL = "$SELFHOSTED_MODEL"
+          AI_MAX_OUTPUT_TOKENS = "3200"
+          EOF
+          elif [ "$AI_PROVIDER_SELECTED" = "cloudflare" ]; then
+            cat > wrangler.toml <<EOF
+          name = "musacad-ai"
+          main = "src/index.js"
+          compatibility_date = "2026-09-01"
+          [vars]
+          AI_PROVIDER = "cloudflare"
+          CLOUDFLARE_AI_ACCOUNT_ID = "$CLOUDFLARE_ACCOUNT_ID"
           AI_MAX_OUTPUT_TOKENS = "3200"
           EOF
           else
@@ -184,6 +241,8 @@ jobs:
           if [ "$AI_PROVIDER_SELECTED" = "selfhosted" ]; then
             printf '%s' "$SELFHOSTED_AI_ENDPOINT" | npx --yes wrangler@latest secret put SELFHOSTED_AI_ENDPOINT --name musacad-ai
             printf '%s' "$SELFHOSTED_AI_API_KEY" | npx --yes wrangler@latest secret put SELFHOSTED_AI_API_KEY --name musacad-ai
+          elif [ "$AI_PROVIDER_SELECTED" = "cloudflare" ]; then
+            printf '%s' "$CLOUDFLARE_AI_API_TOKEN" | npx --yes wrangler@latest secret put CLOUDFLARE_AI_API_TOKEN --name musacad-ai
           else
             printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@latest secret put GEMINI_API_KEY --name musacad-ai
           fi
@@ -271,6 +330,8 @@ jobs:
             echo "- Provider selected: $AI_PROVIDER_SELECTED"
             if [ "$AI_PROVIDER_SELECTED" = "selfhosted" ]; then
               echo "- Model: $SELFHOSTED_MODEL (operator-hosted, capacity-limited, no Gemini API quota)"
+            elif [ "$AI_PROVIDER_SELECTED" = "cloudflare" ]; then
+              echo '- Model: @cf/qwen/qwen3.8-27b (Workers AI Neuron quota applies)'
             else
               echo '- Model: gemini-3.8-flash'
             fi
