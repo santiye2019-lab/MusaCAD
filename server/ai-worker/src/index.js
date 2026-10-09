@@ -172,7 +172,9 @@ async function handleAnalyze(request, env) {
   }
 
   const fetcher = typeof env.__fetch === "function" ? env.__fetch : fetch;
-  const upstreamTimeoutMs = positiveInt(env.AI_UPSTREAM_TIMEOUT_MS, 24000, 50, 25000);
+  // Engineering visual sheets may require longer multimodal inference than chat.
+  // The Android client has a 90 s read budget; the worker remains below it.
+  const upstreamTimeoutMs = positiveInt(env.AI_UPSTREAM_TIMEOUT_MS, 65000, 1000, 75000);
   const controller = new AbortController();
   let timeoutId;
   const deadline = new Promise((_, reject) => {
@@ -196,7 +198,7 @@ async function handleAnalyze(request, env) {
       }), deadline]);
     } catch (_) {
       if (controller.signal.aborted)
-        return json({ status: "timeout", message: "Gandalf AI modeli süresi içinde yanıt vermedi. Yerel proje analizi kullanılabilir." }, 504);
+        return json({ status: "timeout", message: "Gandalf görsel AI modeli bekleme süresini aştı. Raporun bu görüntü grubu analiz edilmedi; yerel proje incelemesi kullanılabilir." }, 504);
       return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed" }, 503);
     }
 
@@ -204,7 +206,7 @@ async function handleAnalyze(request, env) {
       data = await Promise.race([upstream.json(), deadline]);
     } catch (_) {
       if (controller.signal.aborted)
-        return json({ status: "timeout", message: "Gandalf AI yanıtı gecikti. Yerel proje analizi kullanılabilir." }, 504);
+        return json({ status: "timeout", message: "Gandalf görsel AI yanıtı bekleme süresini aştı. Görsel grup doğrulanmadı." }, 504);
       return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
     }
   } finally {
@@ -214,7 +216,7 @@ async function handleAnalyze(request, env) {
     if (upstream.status === 429 && aiProvider.name === "gemini") {
       return json({
         status: "quota_exhausted",
-        message: "Gemini ücretsiz kullanım kotası şu anda dolu. Kota yenilendiğinde Gandalf otomatik olarak yeniden çalışır."
+        message: "Gemini API istek kotası doldu veya hız sınırına ulaşıldı. Kota yenilendiğinde yeniden deneyin; Gandalf kendiliğinden arka planda tarama yapmaz."
       }, 429);
     }
     const upstreamMessage = data && data.error && data.error.message
