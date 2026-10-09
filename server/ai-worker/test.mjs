@@ -1197,3 +1197,143 @@ test("self-hosted Qwen empty answer is an error, never fabricated success",async
   assert.equal(res.status,502);
   assert.equal((await res.json()).status,"server_error");
 });
+
+
+test("Cloudflare Qwen accepts signed MusaCAD session with visual and vector CAD evidence",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  const jpeg="/9j/"+("A".repeat(120));
+  const accountId="1234567890abcdef1234567890abcdef";
+  let sent=null, calls=0;
+  const request=new Request("https://musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Sıhhi tesisat paftasında boru çapını kontrol et",
+      analysisScope:"sanitary",allowWeb:true,allowEditProposals:true,
+      cad:{schema:"musacad-cad-json/v1",fileName:"tesisat.dwg",
+        items:[{sourceId:16,type:"TEXT",text:"DN100",layer:"PIS_SU",
+          centerX:33,centerY:50}]},
+      visualEvidence:{schema:"musacad-visual-evidence/v1",
+        rawDrawingIncluded:false,complete:false,images:[{
+          mime:"image/jpeg",base64:jpeg,label:"full-sheet-overview",
+          width:800,height:800,contentBounds:[0,0,100,100],
+          drawingBounds:[0,0,100,100]}]}
+    })
+  });
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"cloudflare",
+    CLOUDFLARE_AI_ACCOUNT_ID:accountId,
+    CLOUDFLARE_AI_API_TOKEN:"private-cloudflare-ai-token",
+    GEMINI_API_KEY:"must-not-be-used",
+    GEMINI_MODEL:"gemini-other",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,options)=>{
+      calls++;
+      assert.equal(String(url),"https://api.cloudflare.com/client/v4/accounts/"+
+        accountId+"/ai/v1/chat/completions");
+      assert.equal(options.headers.authorization,"Bearer private-cloudflare-ai-token");
+      sent=JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        choices:[{message:{
+          content:"DN100 yazısı okunuyor; borunun malzemesi doğrulanmadı.",
+          tool_calls:[{function:{name:"cad_highlight_entities",arguments:JSON.stringify({
+            sourceIds:[16],reason:"DN teyidi"})}}]
+        },finish_reason:"stop"}],
+        usage:{prompt_tokens:301,completion_tokens:300,total_tokens:601}
+      }),{status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  const payload=await response.json();
+  assert.equal(calls,1);
+  assert.equal(response.status,200);
+  assert.equal(payload.status,"ok");
+  assert.equal(payload.provider,"cloudflare");
+  assert.equal(payload.providerApi,"cloudflare-workers-ai-chat");
+  assert.equal(payload.model,"@cf/qwen/qwen3.8-27b");
+  assert.equal(payload.accessMode,"developer");
+  assert.equal(payload.analysisScope,"sanitary");
+  assert.equal(payload.visualRegionCount,1);
+  assert.match(payload.reply,/DN100/);
+  assert.equal(payload.actions[0].name,"cad_highlight_entities");
+  assert.equal(payload.webUsed,false);
+  assert.equal(payload.usage.totalTokens,601);
+  assert.equal(sent.stream,false);
+  assert.equal(sent.reasoning_effort,"low");
+  assert.ok(sent.max_completion_tokens>=1536);
+  assert.equal(sent.model,"@cf/qwen/qwen3.8-27b");
+  assert.match(sent.messages[0].content,/does not have live web search/i);
+  assert.match(sent.messages[1].content[0].text,/MUSACAD CAD-JSON/);
+  assert.match(sent.messages[1].content[0].text,/"sourceId":16/);
+  assert.equal(sent.messages[1].content[1].image_url.url,
+    "data:image/jpeg;base64,"+jpeg);
+  assert.ok(sent.tools.some(t=>t.function.name==="cad_highlight_entities"));
+  assert.equal(JSON.stringify(payload).includes("private-cloudflare-ai-token"),false);
+});
+
+test("Cloudflare Qwen cannot be selected without server-side account and AI token",async()=>{
+  const keys=sessionPair();
+  const req=new Request("https://musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Kontrol et",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  for(const config of [
+    {CLOUDFLARE_AI_ACCOUNT_ID:"1234567890abcdef1234567890abcdef"},
+    {CLOUDFLARE_AI_ACCOUNT_ID:"../evil",CLOUDFLARE_AI_API_TOKEN:"fake"},
+    {CLOUDFLARE_AI_ACCOUNT_ID:"1234567890abcdef1234567890abcdef",
+      CLOUDFLARE_AI_API_TOKEN:""}
+  ]){
+    let calls=0;
+    const res=await worker.fetch(req,{
+      AI_PROVIDER:"cloudflare",GEMINI_API_KEY:"other",GEMINI_MODEL:"other",
+      ...config,MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{calls++;throw Error("should not call upstream")}
+    });
+    assert.equal(res.status,503);
+    assert.equal(calls,0);
+  }
+});
+
+test("Cloudflare Qwen quota and blank reasoning never become a successful visual audit",async()=>{
+  const keys=sessionPair();
+  const auth="Bearer "+sessionToken(keys.privateKey,Date.now()+600000);
+  const req=()=>new Request("https://musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:auth,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  let calls=0;
+  const env={
+    AI_PROVIDER:"cloudflare",CLOUDFLARE_AI_ACCOUNT_ID:"1234567890abcdef1234567890abcdef",
+    CLOUDFLARE_AI_API_TOKEN:"test-token",MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem
+  };
+  const quota=await worker.fetch(req(),{...env,__fetch:async()=>{
+    calls++;return new Response(JSON.stringify({error:{message:"Private token: test-token"}}),{status:429});
+  }});
+  assert.equal(quota.status,429);
+  const quotaBody=await quota.json();
+  assert.equal(quotaBody.status,"quota_exhausted");
+  assert.match(quotaBody.message,/Cloudflare Workers AI/);
+  assert.equal(JSON.stringify(quotaBody).includes("Private token"),false);
+  assert.equal(calls,1);
+  const blank=await worker.fetch(req(),{...env,__fetch:async()=>
+    new Response(JSON.stringify({choices:[{message:{content:"",reasoning_content:"thinking..."}}]}),
+      {status:200})});
+  assert.equal(blank.status,502);
+  assert.equal((await blank.json()).status,"server_error");
+  assert.equal(calls,1);
+});
+
+test("Cloudflare Qwen denies unsigned prompt before external AI is contacted",async()=>{
+  let contacted=false;
+  const res=await worker.fetch(new Request("https://musacad.test/v1/analyze",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  }),{
+    AI_PROVIDER:"cloudflare",CLOUDFLARE_AI_ACCOUNT_ID:"1234567890abcdef1234567890abcdef",
+    CLOUDFLARE_AI_API_TOKEN:"test-token",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:"fake-pem",
+    __fetch:async()=>{contacted=true;throw Error("bad auth")}
+  });
+  assert.equal(res.status,401);
+  assert.equal(contacted,false);
+});

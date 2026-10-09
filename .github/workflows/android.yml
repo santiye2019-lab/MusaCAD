@@ -180,6 +180,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiSelfHostedProviderContractTest.java
           java -cp /tmp/musacad-tests MusaAiSelfHostedProviderContractTest
+      - name: Test Cloudflare Qwen AI authenticated CAD image integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiCloudflareQwenContractTest.java
+          java -cp /tmp/musacad-tests MusaAiCloudflareQwenContractTest
       - name: Test MusaCAD Gandalf project-package integration contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCloudPackageContractTest.java

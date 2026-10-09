@@ -126,6 +126,7 @@ async function handleAnalyze(request, env) {
   const useGeminiNative = aiProvider.name === "gemini" &&
     String(env.GEMINI_API_MODE || "chat").trim().toLowerCase() === "native";
   const useSelfHosted = aiProvider.name === "selfhosted";
+  const useCloudflareQwen = aiProvider.name === "cloudflare";
 
   if (aiProvider.name === "gemini") {
     const geminiTools = tools
@@ -176,6 +177,36 @@ async function handleAnalyze(request, env) {
       upstreamUrl = GEMINI_CHAT_COMPLETIONS_URL;
     }
     upstreamKey = String(env.GEMINI_API_KEY);
+  } else if (useCloudflareQwen) {
+    // Cloudflare Workers AI: a fixed, server-controlled account endpoint.
+    // The token is distinct from the Worker deployment token and Android app.
+    // The model already passed an independent live Turkish + synthetic-image test.
+    const cfInstructions = instructions + (allowWeb
+      ? " This Cloudflare Workers AI route does not have live web search. Do not claim current regulations or websites were checked; explicitly state that live verification is unavailable. "
+      : "");
+    const proposedTools = tools.filter(tool => tool && tool.type === "function")
+      .map(toChatCompletionsTool);
+    requestBody = {
+      model: aiProvider.model,
+      stream: false,
+      reasoning_effort: "low",
+      max_completion_tokens: Math.max(1536, maxOutputTokens),
+      messages: [
+        { role: "system", content: cfInstructions },
+        { role: "user", content: visualEvidence
+          ? [{ type: "text", text: input[0].content },
+             ...visualEvidence.images.map(frame => ({
+               type: "image_url", image_url: {
+                 url: "data:image/jpeg;base64," + frame.base64
+               }
+             }))]
+          : input[0].content }
+      ]
+    };
+    // Every CAD edit remains a proposal subject to explicit Android approval.
+    if (proposedTools.length) requestBody.tools = proposedTools;
+    upstreamUrl = aiProvider.endpoint;
+    upstreamKey = String(env.CLOUDFLARE_AI_API_TOKEN);
   } else if (useSelfHosted) {
     // OpenAI-compatible chat API hosted by the MusaCAD operator (e.g. Ollama).
     // The endpoint and bearer token are server-side secrets, never Android input.
@@ -270,8 +301,9 @@ async function handleAnalyze(request, env) {
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI modeli bekleme süresini aştı. Raporun bu görüntü grubu analiz edilmedi; yerel proje incelemesi kullanılabilir." }, 504);
       return json({ status: "server_error", message:
-        useSelfHosted ? "Özel AI sunucusuna HTTPS bağlantısı kurulamadı. Sunucu erişimini kontrol edin." :
-        (aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed") }, 503);
+        useCloudflareQwen ? "Cloudflare Qwen yapay zekâ servisine bağlanılamadı; bu görsel grup denetlenmedi." :
+        (useSelfHosted ? "Özel AI sunucusuna HTTPS bağlantısı kurulamadı. Sunucu erişimini kontrol edin." :
+        (aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed")) }, 503);
     }
 
     try {
@@ -280,7 +312,9 @@ async function handleAnalyze(request, env) {
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI yanıtı bekleme süresini aştı. Görsel grup doğrulanmadı." }, 504);
       if (!upstream.ok) data = {}; // Some provider errors have empty or non-JSON bodies.
-      else return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
+      else return json({ status: "server_error", message: useCloudflareQwen
+        ? "Qwen geçerli JSON yanıtı üretmedi; görsel denetim tamamlanmadı."
+        : (aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON") }, 502);
     }
   } finally {
     clearTimeout(timeoutId);
@@ -299,6 +333,15 @@ async function handleAnalyze(request, env) {
         message: "Gemini sağlayıcısı HTTP " + upstream.status + " hatası verdi. Gandalf iki kısa yeniden deneme yaptı, fakat bulut servisi yanıt veremedi. Biraz sonra tekrar deneyin; yerel vektör kontrolü kullanılabilir."
       }, 503);
     }
+    if (useCloudflareQwen) {
+      if (upstream.status === 429)
+        return json({ status: "quota_exhausted", message:
+          "Cloudflare Workers AI ücretsiz Neuron kotası veya hız/kapasite sınırına ulaştı (HTTP 429). İncelenmeyen paftalar tamamlanmış sayılamaz." }, 429);
+      return json({ status: "server_error", message:
+        "Cloudflare Qwen sunucusu HTTP " + upstream.status +
+        " hatası verdi; canlı Gemini'ye otomatik geçilmedi. Görsel grup denetlenmedi."
+      }, upstream.status >= 500 ? 503 : 502);
+    }
     if (useSelfHosted) {
       // Don't forward arbitrary reverse-proxy errors, internal URLs or tokens.
       if (upstream.status === 429)
@@ -316,10 +359,13 @@ async function handleAnalyze(request, env) {
 
   const parsedOutput = aiProvider.name === "gemini"
     ? (useGeminiNative ? parseGeminiNativeOutput(data) : parseGeminiChatOutput(data))
-    : (useSelfHosted ? parseGeminiChatOutput(data) : parseOpenAiOutput(data));
-  if (useSelfHosted && !parsedOutput.reply && !parsedOutput.actions.length)
+    : ((useSelfHosted || useCloudflareQwen)
+      ? parseGeminiChatOutput(data) : parseOpenAiOutput(data));
+  if ((useSelfHosted || useCloudflareQwen) && !parsedOutput.reply && !parsedOutput.actions.length)
     return json({ status: "server_error", message:
-      "Özel AI modeli boş yanıt üretti. Modelin sohbet/görsel desteğini ve sunucu kapasitesini kontrol edin." }, 502);
+      (useCloudflareQwen
+        ? "Qwen görünür metin veya araç önerisi üretmedi; pafta incelenmiş sayılmadı."
+        : "Özel AI modeli boş yanıt üretti. Modelin sohbet/görsel desteğini ve sunucu kapasitesini kontrol edin.") }, 502);
   const reply = parsedOutput.reply || (parsedOutput.actions.length
     ? "Gandalf AI çizim için " + parsedOutput.actions.length + " adet düzenleme önerisi hazırladı. Bu işlemler henüz uygulanmadı."
     : "Gandalf AI yanıt üretemedi.");
@@ -336,8 +382,9 @@ async function handleAnalyze(request, env) {
     packageMode,
     provider: aiProvider.name,
     model: aiProvider.model,
-    providerApi: useSelfHosted ? "selfhosted-chat-compatible" :
-      (useGeminiNative ? "gemini-native" : (aiProvider.name === "gemini" ? "gemini-chat-compatible" : "openai-responses")),
+    providerApi: useCloudflareQwen ? "cloudflare-workers-ai-chat" :
+      (useSelfHosted ? "selfhosted-chat-compatible" :
+      (useGeminiNative ? "gemini-native" : (aiProvider.name === "gemini" ? "gemini-chat-compatible" : "openai-responses"))),
     analysisScope,
     visualRegionCount: visualEvidence ? visualEvidence.images.length : 0,
     visualCoverageComplete: visualEvidence ? visualEvidence.complete : false,
@@ -931,6 +978,19 @@ function selectAiProvider(env) {
     if (!env.GEMINI_API_KEY || !env.GEMINI_MODEL)
       return { ok: false, message: "Gemini AI worker is not fully configured" };
     return { ok: true, name: "gemini", model: String(env.GEMINI_MODEL) };
+  }
+  if (requested === "cloudflare") {
+    const accountId = String(env.CLOUDFLARE_AI_ACCOUNT_ID || "").trim();
+    const key = String(env.CLOUDFLARE_AI_API_TOKEN || "").trim();
+    // Account ID is an identifier, not an arbitrary upstream URL.
+    if (!/^[0-9a-fA-F]{32}$/.test(accountId) || !key)
+      return { ok: false, message: "Cloudflare Workers AI hesabı veya gizli erişim anahtarı yapılandırılmamış" };
+    return {
+      ok: true, name: "cloudflare",
+      model: "@cf/qwen/qwen3.8-27b",
+      endpoint: "https://api.cloudflare.com/client/v4/accounts/" +
+        accountId + "/ai/v1/chat/completions"
+    };
   }
   if (requested === "selfhosted") {
     const endpoint = safeSelfHostedEndpoint(env.SELFHOSTED_AI_ENDPOINT);
