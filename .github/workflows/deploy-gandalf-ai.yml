@@ -6,7 +6,7 @@ on:
       release_approved:
         description: "Final acceptance complete and APK creation explicitly approved"
         type: boolean
-        required: true
+        required: false
         default: false
       provider:
         description: "Gandalf sağlayıcısı: Gemini / Cloudflare Qwen / özel Qwen sunucusu"
