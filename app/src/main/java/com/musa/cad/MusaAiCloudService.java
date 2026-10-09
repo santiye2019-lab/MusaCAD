@@ -71,6 +71,14 @@ public final class MusaAiCloudService {
         public boolean ok(){return status==Status.OK;}
     }
 
+    /** Sends no project DWG or user chat history; a real, session-authorized model completion proves connectivity. */
+    public static Result verifySelectedProvider(Context context){
+        MusaAiDrawingIndex empty=new MusaAiDrawingIndex("",0,0,
+            Collections.emptyList(),Collections.emptyList(),Collections.emptyList(),"");
+        return analyzeInternal(context,empty,"AI model bağlantı kontrolü",
+            "Bağlantı testine yalnız HAZIR yanıtını ver; proje analizi yapma.",null,null,"all","","");
+    }
+
     public static Result analyze(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt){
         return analyzeInternal(context,index,fileName,rawPrompt,null,null,"all");
     }
@@ -143,6 +151,7 @@ public final class MusaAiCloudService {
             return new Result(mapped,"",session.message,null,false);
         }
 
+        String selectedProvider=MusaAiProviderChoice.selected(context);
         String prompt=MusaAiCloudPolicy.promptForCloud(rawPrompt);
         boolean allowWeb=MusaAiCloudPolicy.allowWeb(rawPrompt);
         boolean allowEditProposals=MusaAiCloudPolicy.allowEditProposals(rawPrompt);
@@ -159,6 +168,7 @@ public final class MusaAiCloudService {
 
             JSONObject body=new JSONObject();
             body.put("prompt",prompt);
+            if(!selectedProvider.isEmpty())body.put("providerPreference",selectedProvider);
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
             body.put("analysisScope",scope==null?"all":scope);
@@ -248,8 +258,15 @@ public final class MusaAiCloudService {
             boolean webUsed=json.optBoolean("webUsed",false);
             if(text.isEmpty()&&!actions.isEmpty())text="Gandalf AI "+actions.size()+" adet çizim işlemi önerdi.";
             if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
+            // A 200 from a gateway is not proof that the explicitly chosen model was used.
+            String actualProvider=json.optString("provider","");
+            if(!selectedProvider.isEmpty()&&!selectedProvider.equals(actualProvider))
+                return new Result(Status.INVALID_RESPONSE,"",
+                    "Seçilen "+MusaAiProviderChoice.label(selectedProvider)+
+                    " yerine farklı veya doğrulanmamış AI motoru yanıtladı. Bağlantı doğrulanmadı.",
+                    actions,sources,webUsed);
             return new Result(Status.OK,text,"",actions,sources,webUsed,
-                json.optString("provider",""),json.optString("model",""));
+                actualProvider,json.optString("model",""));
         }catch(SocketTimeoutException e){
             return new Result(Status.MODEL_TIMEOUT,"",
                 "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+
