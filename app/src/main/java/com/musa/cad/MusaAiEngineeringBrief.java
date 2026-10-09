@@ -86,6 +86,23 @@ public final class MusaAiEngineeringBrief {
         }
         return out.toString();
     }
+    /** Local-only evidence is not described as a visual AI inspection. */
+    public static String localSummary(String project,String layout,String sourceText){
+        StringBuilder out=new StringBuilder("MUSACAD • YEREL MÜHENDİSLİK ÖN KONTROLÜ");
+        out.append("\nProje: ").append(project==null?"":project);
+        out.append("\nPafta/Layout: ").append(layout==null?"":layout);
+        out.append("\nKaynak: Telefon üzerinde okunabilen DWG vektör metinleri ve hat geometrileri.");
+        out.append("\n\n1. OKUNAN TEKNİK ETİKETLER VE HAT BİLGİLERİ");
+        String highlights=technicalLocalHighlights(sourceText);
+        if(highlights.isEmpty())
+            out.append("\n• Bu sınırlı örneklemde ölçü/ekipman kanıtı ayrıştırılamadı.");
+        else out.append("\n").append(highlights);
+        out.append("\n\n2. İLAVE PROJE KONTROLÜ");
+        out.append("\n• Etiketlenen cihazların kapasite ve besleme uygunluğu, ilgili hesap ve mahal listeleriyle karşılaştırılmalı.");
+        out.append("\n• Kot, bağlantı, devamlılık ve şartname uygunluğu ilgili kat planı, kesit ve sistem şeması ile doğrulanmalı.");
+        out.append("\n• Bu ön kontrol yalnız vektör veriye dayanır; çevrim içi görsel AI taraması yapılmadı.");
+        return out.toString();
+    }
     private static String compact(String input,int max){
         String value=input.trim();
         return value.length()<=max?value:value.substring(0,max)+"… (devamı ayrı inceleme gerektirir)";
