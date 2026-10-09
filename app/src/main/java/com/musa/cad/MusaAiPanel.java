@@ -85,11 +85,53 @@ public final class MusaAiPanel {
         state.setPadding(dp(activity,8),dp(activity,5),dp(activity,8),dp(activity,5));
         state.setBackground(round(activity,0xFF233541,16,0));
         header.addView(state,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        state.setOnClickListener(v->Toast.makeText(activity,
-            lastCloudFailure[0].isEmpty()
-                ?"Çevrimiçi: Sunucuya erişilebiliyor. AI bağlı: Model gerçekten yanıt verdi. "+
-                 "Lisans ve kota ayrı kontrol edilir."
-                :lastCloudFailure[0],Toast.LENGTH_LONG).show());
+        state.setOnClickListener(v->{
+            String failure=lastCloudFailure[0];
+            boolean entitlementMissing=failure.toLowerCase(java.util.Locale.ROOT)
+                .contains("entitlement not found") ||
+                failure.toLowerCase(new java.util.Locale("tr","TR"))
+                    .contains("bulut ai kullanım yetkisi");
+            String explanation=failure.isEmpty()
+                ?"● Çevrimiçi: MusaCAD AI ağ geçidine erişim doğrulandı. "+
+                 "● AI bağlı: Bu oturumda model gerçekten yanıt verdi. "+
+                 "Bunlar lisans yetkisinin yerine geçmez."
+                :failure;
+            if(entitlementMissing)
+                explanation+="\n\nBu cihazın bulut AI lisansı veya kayıtlı geliştirici yetkisi "+
+                    "sunucuda bulunmadı. Uygulama geliştiricisi olsanız bile "+
+                    "bu yetki Android tarafında otomatik verilmez. "+
+                    "Yönetici, cihazın TAM MusaCAD Güvenli Lisans Kimliğini "+
+                    "lisans sunucusundaki yetkili cihaz listesine eklemelidir. "+
+                    "12 karakterli kısa seri numarası kullanılmaz.";
+            final String id=LicenseManager.installationId(activity);
+            new androidx.appcompat.app.AlertDialog.Builder(activity)
+                .setTitle("Gandalf • AI bağlantı / yetki durumu")
+                .setMessage(explanation+"\n\nGüvenli cihaz kimliğinizi yalnızca "+
+                    "yetkili yönetim paneline aktarın. Bu kimliği herkese açık "+
+                    "mesajlarda veya GitHub issue'larında paylaşmayın.")
+                .setNeutralButton("KİMLİĞİ KOPYALA",(dialog,which)->{
+                    android.content.ClipboardManager clipboard=
+                        (android.content.ClipboardManager)activity.getSystemService(
+                            android.content.Context.CLIPBOARD_SERVICE);
+                    if(clipboard==null){
+                        Toast.makeText(activity,"Pano erişilemiyor.",Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    android.content.ClipData clip=android.content.ClipData.newPlainText(
+                        "MusaCAD Güvenli Lisans Kimliği",id);
+                    if(Build.VERSION.SDK_INT>=33){
+                        android.os.PersistableBundle extras=new android.os.PersistableBundle();
+                        extras.putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE,true);
+                        clip.getDescription().setExtras(extras);
+                    }
+                    clipboard.setPrimaryClip(clip);
+                    Toast.makeText(activity,"Cihaz kimliği panoya kopyalandı. "+
+                        "Yalnızca yetkili yönetim paneline yapıştırın.",
+                        Toast.LENGTH_LONG).show();
+                })
+                .setPositiveButton("KAPAT",null)
+                .show();
+        });
         root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView context=text(activity,host.contextLabel(),11f,0xFF9FC1D1,false);
