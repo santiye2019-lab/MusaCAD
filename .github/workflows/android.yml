@@ -176,6 +176,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCloudIntegrationContractTest.java
           java -cp /tmp/musacad-tests MusaAiCloudIntegrationContractTest
+      - name: Test MusaCAD Qwen self-hosted vision and deployment safety contract
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiSelfHostedProviderContractTest.java
+          java -cp /tmp/musacad-tests MusaAiSelfHostedProviderContractTest
       - name: Test MusaCAD Gandalf project-package integration contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCloudPackageContractTest.java
