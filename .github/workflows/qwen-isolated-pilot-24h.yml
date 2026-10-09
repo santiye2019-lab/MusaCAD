@@ -101,10 +101,24 @@ jobs:
           if [ -z "$base" ] || [[ "$base" != https://musacad-qwen-pilot.*.workers.dev ]]; then
             echo "::error::Expected separate pilot Worker URL not found"; exit 1
           fi
-          health="$(curl -sS --max-time 20 -o /tmp/pilot-health.json -w '%{http_code}' "$base/health" || true)"
-          denied="$(curl -sS --max-time 20 -o /tmp/pilot-deny.json -w '%{http_code}'             -X POST -H 'Content-Type: application/json' -d '{}' "$base/v1/analyze" || true)"
+          # Cloudflare may need a short time to propagate a new Worker and
+          # newly uploaded secrets. Never weaken either safety assertion.
+          health="000"
+          denied="000"
+          for attempt in $(seq 1 18); do
+            health="$(curl -sS --connect-timeout 5 --max-time 12 -o /tmp/pilot-health.json -w '%{http_code}' "$base/health" 2>/dev/null || true)"
+            denied="$(curl -sS --connect-timeout 5 --max-time 12 -o /tmp/pilot-deny.json -w '%{http_code}' \
+              -X POST -H 'Content-Type: application/json' -d '{}' "$base/v1/analyze" 2>/dev/null || true)"
+            echo "Readiness attempt $attempt/18: health HTTP ${health:-000}, unauthorized analyze HTTP ${denied:-000}"
+            if [ "$health" = 200 ] && [ "$denied" = 401 ]; then
+              break
+            fi
+            if [ "$attempt" -lt 18 ]; then sleep 5; fi
+          done
           if [ "$health" != 200 ] || [ "$denied" != 401 ]; then
-            echo "::error::Pilot health or auth check failed"; exit 1
+            echo "::error::Pilot readiness failed: health HTTP ${health:-000} (expected 200), unauthorized analyze HTTP ${denied:-000} (expected 401)"
+            echo "::error::HTTP 000 indicates DNS/connectivity trouble; 403 may mean workers.dev access is disabled; 503 can mean missing or not-yet-propagated AI/session secrets."
+            exit 1
           fi
           echo "ai_url=$base/v1/analyze" >> "$GITHUB_OUTPUT"
           {
