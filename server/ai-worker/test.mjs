@@ -1261,7 +1261,7 @@ test("Cloudflare Qwen accepts signed MusaCAD session with visual and vector CAD 
   assert.equal(sent.reasoning_effort,"low");
   assert.ok(sent.max_completion_tokens>=1536);
   assert.equal(sent.model,"@cf/qwen/qwen3.8-27b");
-  assert.match(sent.messages[0].content,/no live web search/i);
+  assert.match(sent.messages[0].content,/does not have live web search/i);
   assert.match(sent.messages[1].content[0].text,/MUSACAD CAD-JSON/);
   assert.match(sent.messages[1].content[0].text,/"sourceId":16/);
   assert.equal(sent.messages[1].content[1].image_url.url,
