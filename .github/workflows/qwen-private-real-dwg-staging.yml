@@ -1,0 +1,162 @@
+name: Private Qwen real-DWG pilot (Developer only, expires)
+on:
+  push:
+    branches: [test/private-qwen-real-dwg-staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-qwen-real-dwg-pilot
+  cancel-in-progress: false
+
+jobs:
+  qwen-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_AI_API_TOKEN: ${{ secrets.CLOUDFLARE_AI_API_TOKEN }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+      MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_PRODUCTION_RELEASE: "true"
+      MUSACAD_KEYSTORE_FILE: /tmp/musacad-qwen-pilot-release.jks
+      MUSACAD_RELEASE_KEYSTORE_B64: ${{ secrets.MUSACAD_RELEASE_KEYSTORE_B64 }}
+      MUSACAD_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_KEYSTORE_PASSWORD }}
+      MUSACAD_KEY_ALIAS: ${{ secrets.MUSACAD_KEY_ALIAS }}
+      MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
+      STAGE_WORKER: musacad-qwen-pilot-${{ github.run_id }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate pilot inputs without logging secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_AI_API_TOKEN MUSACAD_TRIAL_API_URL MUSACAD_TRIAL_PUBLIC_KEY_PEM MUSACAD_RELEASE_KEYSTORE_B64 MUSACAD_KEYSTORE_PASSWORD MUSACAD_KEY_ALIAS MUSACAD_KEY_PASSWORD; do
+            if [ -z "\${!name:-}" ]; then echo "::error::Missing required secret: $name"; exit 1; fi
+          done
+          [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9A-Fa-f]{32}$ ]] || { echo "::error::Invalid Cloudflare account ID"; exit 1; }
+          case "$MUSACAD_TRIAL_API_URL" in https://*/v1/trial/start) ;; *) echo "::error::License trial endpoint must be HTTPS and end in /v1/trial/start"; exit 1 ;; esac
+          echo "MUSACAD_AI_SESSION_URL=\${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session" >> "$GITHUB_ENV"
+          echo "STAGE_EXPIRES_MS=$(( ($(date +%s) + 86400) * 1000 ))" >> "$GITHUB_ENV"
+      - name: Test Qwen model readiness before creating pilot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          json.dump({"model":"@cf/qwen/qwen3.8-27b",
+            "messages":[{"role":"user","content":"Türkçe kısa bir selamlama yaz."}],
+            "reasoning_effort":"low","max_completion_tokens":1536,"stream":False},
+            open("/tmp/qwen-pilot-preflight.json","w"))
+          PY
+          http="$(curl -sS --max-time 90 --output /tmp/qwen-pilot-preflight-response.json --write-out '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_AI_API_TOKEN" -H "Content-Type: application/json" \
+            --data-binary @/tmp/qwen-pilot-preflight.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/v1/chat/completions" || true)"
+          if [ "$http" != "200" ]; then echo "::error::Qwen preflight HTTP $http (no production changes)"; exit 1; fi
+          python3 - <<'PY'
+          import json
+          d=json.load(open("/tmp/qwen-pilot-preflight-response.json"))
+          o=d.get("result") if isinstance(d.get("result"),dict) and not d.get("choices") else d
+          c=o.get("choices") or []
+          txt=c[0].get("message",{}).get("content","") if c else ""
+          if not isinstance(txt,str) or not txt.strip():
+              raise SystemExit("Qwen did not generate visible text; no Worker created.")
+          print("Qwen model preflight passed.")
+          PY
+      - name: Run authenticated Gandalf worker regression tests
+        working-directory: server/ai-worker
+        run: npm test
+      - name: Configure isolated short-lived Qwen pilot Worker
+        working-directory: server/ai-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > wrangler.toml <<EOF
+          name = "$STAGE_WORKER"
+          main = "src/index.js"
+          compatibility_date = "2026-09-01"
+          workers_dev = true
+
+          [vars]
+          AI_PROVIDER = "cloudflare"
+          CLOUDFLARE_AI_ACCOUNT_ID = "$CLOUDFLARE_ACCOUNT_ID"
+          AI_MAX_OUTPUT_TOKENS = "1900"
+          MUSACAD_QWEN_STAGING = "true"
+          MUSACAD_QWEN_STAGING_UNTIL_MS = "$STAGE_EXPIRES_MS"
+          EOF
+          # A probe Worker uses the verified code but has no production name.
+          npx --yes wrangler@latest deploy --name "$STAGE_WORKER" > /tmp/qwen-pilot-deploy.log 2>&1 || {
+            echo "::error::Isolated Qwen pilot deployment failed."
+            tail -15 /tmp/qwen-pilot-deploy.log
+            exit 1
+          }
+          BASE="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/qwen-pilot-deploy.log | tail -1 || true)"
+          if [ -z "$BASE" ]; then echo "::error::Pilot Worker URL missing"; exit 1; fi
+          echo "MUSACAD_AI_API_URL=$BASE/v1/analyze" >> "$GITHUB_ENV"
+          echo "QWEN_PILOT_BASE=$BASE" >> "$GITHUB_ENV"
+          echo "Isolated Qwen Worker created; signed Developer session required and 24h hard expiry."
+      - name: Install pilot-only AI token and existing public verification key
+        shell: bash
+        working-directory: server/ai-worker
+        run: |
+          set -euo pipefail
+          printf '%s' "$CLOUDFLARE_AI_API_TOKEN" | npx --yes wrangler@latest secret put CLOUDFLARE_AI_API_TOKEN --name "$STAGE_WORKER" >/tmp/qwen-pilot-secret-ai.log
+          printf '%s' "$MUSACAD_TRIAL_PUBLIC_KEY_PEM" | npx --yes wrangler@latest secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM --name "$STAGE_WORKER" >/tmp/qwen-pilot-secret-license.log
+          http="$(curl -sS --max-time 20 -o /tmp/qwen-pilot-health.json -w '%{http_code}' "$QWEN_PILOT_BASE/health" || true)"
+          test "$http" = "200" || { echo "::error::Pilot Worker unhealthy (HTTP $http)"; exit 1; }
+          unauth="$(curl -sS --max-time 20 -o /tmp/qwen-pilot-unauth.json -w '%{http_code}' \
+            -H 'content-type: application/json' --data '{"prompt":"hello","cad":{"schema":"musacad-cad-json/v1","items":[]}}' "$MUSACAD_AI_API_URL" || true)"
+          test "$unauth" = "401" || { echo "::error::Unsigned requests not blocked (HTTP $unauth)"; exit 1; }
+          echo 'Qwen pilot health and unsigned-access security probes passed.'
+      - name: Fetch pinned LibreDWG native converter dependency
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare official MusaCAD release signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MUSACAD_RELEASE_KEYSTORE_B64" | base64 -d > "$MUSACAD_KEYSTORE_FILE"
+          chmod 600 "$MUSACAD_KEYSTORE_FILE"
+          keytool -list -keystore "$MUSACAD_KEYSTORE_FILE" -storepass "$MUSACAD_KEYSTORE_PASSWORD" -alias "$MUSACAD_KEY_ALIAS" >/dev/null
+      - name: Build signed Qwen Developer pilot APK pointing ONLY to staging Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectRelease
+          apk=app/build/outputs/apk/direct/release/app-direct-release.apk
+          test -s "$apk"
+          cp "$apk" /tmp/MusaCAD-Qwen-Developer-Pilot.apk
+          sha256sum /tmp/MusaCAD-Qwen-Developer-Pilot.apk > /tmp/MusaCAD-Qwen-Developer-Pilot.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Qwen-Developer-Pilot-24h
+          path: |
+            /tmp/MusaCAD-Qwen-Developer-Pilot.apk
+            /tmp/MusaCAD-Qwen-Developer-Pilot.sha256
+          retention-days: 3
+          if-no-files-found: error
+      - name: Pilot download instructions and expiration
+        run: |
+          {
+            echo '## Qwen real DWG pilot (NOT production)'
+            echo "- Worker: $QWEN_PILOT_BASE"
+            echo "- Qwen expires (Unix ms): $STAGE_EXPIRES_MS"
+            echo '- Requires signed **Developer** session and current private project file on the phone.'
+            echo '- Signed APK has the **same Android package and release certificate** as production. Installing it replaces the installed app; back up app data first.'
+            echo '- Does not send raw DWG file: MusaCAD submits bounded vector evidence and manually triggered visual crops only.'
+            echo '- This staging Worker is not the production musacad-ai Worker. It stops processing after 24 hours. Delete it later using Cloudflare Dashboard.'
+            echo '- Cloudflare free Neuron quota still applies; no guaranteed unlimited inference.'
+          } >> "$GITHUB_STEP_SUMMARY"
