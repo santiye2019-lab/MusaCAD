@@ -807,6 +807,27 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onViewPdf(String answer,MusaAiPanel.Reply reply){
                 viewGandalfAnswerPdf(answer,reply);
             }
+            @Override public void onVerifyProvider(MusaAiPanel.Reply reply){
+                try{
+                    aiExecutor.submit(()->{
+                        MusaAiCloudService.Result check=MusaAiCloudService.verifySelectedProvider(
+                            getApplicationContext());
+                        if(check.ok()){
+                            reply.modelInfo(check.provider,check.model);
+                            reply.cloudStatus(true);
+                            reply.send("✓ "+MusaAiEngineLabel.display(check.provider,check.model)+
+                                " modelinden gerçek yanıt alındı. Çevrimiçi bağlantı doğrulandı.");
+                        }else{
+                            reply.cloudFailure(check.message);
+                            reply.send("Seçilen AI motoruna bağlanılamadı: "+check.message+
+                                "\nDiğer motoru seçip yeniden bağlanabilirsiniz.");
+                        }
+                    });
+                }catch(RejectedExecutionException e){
+                    reply.cloudFailure("AI ağ isteği kuyruğa alınamadı.");
+                    reply.send("AI bağlantı kontrolü başlatılamadı.");
+                }
+            }
             @Override public String priceBookStatus(){
                 return MusaAiYfk2025Library.statusText(MainActivity.this);
             }
