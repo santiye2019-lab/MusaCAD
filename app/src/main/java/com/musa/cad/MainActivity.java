@@ -1984,6 +1984,7 @@ public class MainActivity extends AppCompatActivity {
         final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
         int acceptedTiles=0,acceptedBatches=0;
+        MusaAiEngineeringBrief engineeringBrief=new MusaAiEngineeringBrief();
         reply.sweepProgress(0,total,"Pafta bölge taraması başlatıldı");
         String verifiedModel="Doğrulanmış görsel AI yanıtı yok";
         String issue="";
@@ -2035,7 +2036,7 @@ public class MainActivity extends AppCompatActivity {
             }
             reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
-            String task=raw+"\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
+            String task=raw+"\nSen bir MAKİNE MÜHENDİSİ teknik proje kontrolörüsün. Yalnız İŞE YARAYAN mühendislik bulgularını bildir; CAD nesne/katman sayısı, genel açıklama, tekrar, yazılım tanıtımı yazma. En fazla 5 somut bulgu ver. Her biri TAM OLARAK şu formatta olmalı: BULGU | ÖNCELİK: kritik/orta/düşük | PAFTA: görülen plan/kesit/alan | TESPİT: somut hata/uyumsuzluk | KANIT: görsel bölge kimliği + okunan teknik etiket/değer | İŞLEM: yükleniciden istenecek teknik düzeltme veya sahada doğrulama. Delil veya ölçü okunmuyorsa BULGU uydurma, bunun yerine KONTROL | KANIT: okunamayan veri | İŞLEM: hangi proje detayı istenmeli yaz. Bulgular yoksa BULGU YOK yaz. Çap/kot/debi/mesafe uydurma. Başlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
@@ -2054,6 +2055,7 @@ public class MainActivity extends AppCompatActivity {
             reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
+            engineeringBrief.addRegion("Görsel grup "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT,cloud.text);
             reply.sweepProgress(acceptedTiles,total,
                 "AI yanıtı doğrulandı • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+" grup");
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
@@ -2098,7 +2100,7 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
                     (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
                     "/"+focusedRequested+" yakın-plan adayı işlendi…");
-                String focusPrompt=raw+"\n"+viewCatalog.report+
+                String focusPrompt=raw+"\nYalnız öncelikli mühendislik eksiklerini raporla. Her bulgu için BULGU | ÖNCELİK: ... | PAFTA: ... | TESPİT: ... | KANIT: ... | İŞLEM: ... formatını kullan. Genel CAD sayımları, öneri dışı yazılım açıklamaları ve tekrar olmasın. Görülmeyen kot, boru çapı, malzeme veya kesin kusur uydurma.\n"+viewCatalog.report+
                     "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
                     " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
                     " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
@@ -2116,6 +2118,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
                 reply.modelInfo(detailed.provider,detailed.model);
+                engineeringBrief.addRegion("Yakın plan "+(group+1)+"/"+focusBatchCount,detailed.text);
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
@@ -2211,7 +2214,13 @@ public class MainActivity extends AppCompatActivity {
             "\nBu rapor gerçekten gönderilmiş görsel bölgeleri ve çizimdeki vektör"+
             " kanıtlarını ayrı bölümlerde içerir; görülmeyen pafta, okunamayan kot"+
             " veya belirsiz çap tespit edilmiş gibi gösterilmez.\n\n";
-        String completeReport=cover+report.toString();
+        MusaAiEngineeringReview.Result localBriefEvidence=MusaAiEngineeringReview.analyze(snapshot,fileName);
+        String priceBookSummary=MusaAiYfk2025Library.status(this).installed
+            ?"2025 resmî poz kitabı cihazda kayıtlı. Eşleşmeler metraj, çap, birim ve tarif doğrulanmadan kesin kabul edilmez."
+            :"Resmî 2025 poz kitabı bu cihazda yüklü değil; 'Poz kitabı yükle' düğmesiyle telefondan PDF seçilmelidir.";
+        String completeReport=engineeringBrief.build(fileName,snapshot.layout,verifiedModel,
+            acceptedTiles,total,focusedReviewed,focusedEligible,
+            issue.isEmpty()?focusedIssue:issue,localBriefEvidence.text,measured.report,priceBookSummary);
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()?" Çoklu Görünüm ":" Kısmi ")+"Görsel Proje İncelemesi";
