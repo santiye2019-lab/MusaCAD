@@ -186,9 +186,9 @@ async function handleAnalyze(request, env) {
   let upstream, data;
   try {
     try {
-      // Gemini may briefly return 503 (capacity unavailable). Retry only this
-      // transient status with bounded exponential backoff within the same
-      // 65-second upstream deadline; never retry 429 quota responses.
+      // Gemini may briefly return 5xx errors. Retry transient upstream
+      // statuses only, under the existing 65-second deadline. Do not retry
+      // client errors or quota 429 responses.
       for (let attempt = 0; ; attempt++) {
         upstream = await Promise.race([fetcher(upstreamUrl, {
           method: "POST",
@@ -200,7 +200,7 @@ async function handleAnalyze(request, env) {
           body: JSON.stringify(requestBody),
           signal: controller.signal
         }), deadline]);
-        if (aiProvider.name !== "gemini" || upstream.status !== 503 || attempt >= 2) break;
+        if (aiProvider.name !== "gemini" || upstream.status < 500 || upstream.status > 504 || attempt >= 2) break;
         await Promise.race([
           new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt))),
           deadline
@@ -230,10 +230,11 @@ async function handleAnalyze(request, env) {
         message: "Gemini API istek kotası doldu veya hız sınırına ulaşıldı. Kota yenilendiğinde yeniden deneyin; Gandalf kendiliğinden arka planda tarama yapmaz."
       }, 429);
     }
-    if (aiProvider.name === "gemini" && upstream.status === 503) {
+    if (aiProvider.name === "gemini" && upstream.status >= 500 && upstream.status <= 504) {
       return json({
         status: "server_error",
-        message: "Gemini HTTP 503 hatası verdi. Gandalf iki kısa yeniden deneme yaptı ancak bulut servisi hâlâ yanıt veremedi. Biraz sonra tekrar deneyin; yerel vektör kontrolü kullanılabilir."
+        providerHttpStatus: upstream.status,
+        message: "Gemini sağlayıcısı HTTP " + upstream.status + " hatası verdi. Gandalf iki kısa yeniden deneme yaptı, fakat bulut servisi yanıt veremedi. Biraz sonra tekrar deneyin; yerel vektör kontrolü kullanılabilir."
       }, 503);
     }
     const upstreamMessage = data && data.error && data.error.message
