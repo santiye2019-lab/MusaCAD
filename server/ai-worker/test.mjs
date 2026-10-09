@@ -1070,7 +1070,7 @@ test("self-hosted Qwen accepts signed developer session and consensual CAD image
       cad:{schema:"musacad-cad-json/v1",items:[{sourceId:77,type:"LINE",layer:"PIS_SU"}]},
       visualEvidence:{
         schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,
-        complete:false,images:[{mime:"image/jpeg",base64:img,label:"overview",
+        complete:false,images:[{mime:"image/jpeg",base64:img,label:"full-sheet-overview",
           width:800,height:800,contentBounds:[0,0,100,100],drawingBounds:[0,0,100,100]}]
       }
     })
