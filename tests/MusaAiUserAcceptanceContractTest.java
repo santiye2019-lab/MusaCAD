@@ -21,6 +21,8 @@ public final class MusaAiUserAcceptanceContractTest {
         need(panel,"modelVerified.set(false)","switch resets stale online state");
         need(panel,"online&&modelVerified.get()","health alone never turns online LED green");
         need(main,"MusaAiCloudService.verifySelectedProvider(","no-DWG connection verification");
+        need(main,"selectedVisualProvider=MusaAiProviderChoice.selected(this)","one AI choice per nine-tile job");
+        need(main,"recentContext,evidenceSummary,selectedVisualProvider)","all visual batches pinned to one provider");
         String client=read("app/src/main/java/com/musa/cad/MusaAiCloudService.java");
         need(client,"body.put(\"providerPreference\",selectedProvider)","backend receives user choice");
         need(client,"selectedProvider.equals(actualProvider)","selected model response verified");
