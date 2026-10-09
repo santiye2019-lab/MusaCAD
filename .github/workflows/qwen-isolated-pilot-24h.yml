@@ -11,6 +11,10 @@ on:
         options:
           - deploy
           - remove
+      build_pilot_apk:
+        description: "Optional signed 24h APK; installing may replace your current MusaCAD"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,6 +27,8 @@ jobs:
   deploy:
     if: inputs.operation == 'deploy'
     runs-on: ubuntu-latest
+    outputs:
+      ai_url: ${{ steps.pilot_deploy.outputs.ai_url }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -69,6 +75,7 @@ jobs:
         working-directory: server/ai-worker
         run: npm test
       - name: Deploy DIFFERENT Worker with expiring access
+        id: pilot_deploy
         shell: bash
         working-directory: server/ai-worker
         run: |
@@ -99,6 +106,7 @@ jobs:
           if [ "$health" != 200 ] || [ "$denied" != 401 ]; then
             echo "::error::Pilot health or auth check failed"; exit 1
           fi
+          echo "ai_url=$base/v1/analyze" >> "$GITHUB_OUTPUT"
           {
             echo "## Qwen pilot available (no production Worker modified)"
             echo "- Pilot URL: $base/v1/analyze"
@@ -125,3 +133,78 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           npx --yes wrangler@latest delete --name musacad-qwen-pilot --force
+
+  pilot-apk:
+    needs: deploy
+    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true
+    runs-on: ubuntu-latest
+    env:
+      MUSACAD_PRODUCTION_RELEASE: "true"
+      MUSACAD_KEYSTORE_FILE: /tmp/musacad-pilot-release.jks
+      MUSACAD_RELEASE_KEYSTORE_B64: ${{ secrets.MUSACAD_RELEASE_KEYSTORE_B64 }}
+      MUSACAD_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_KEYSTORE_PASSWORD }}
+      MUSACAD_KEY_ALIAS: ${{ secrets.MUSACAD_KEY_ALIAS }}
+      MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+      MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+      MUSACAD_AI_API_URL: ${{ needs.deploy.outputs.ai_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm pilot endpoint and release credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in MUSACAD_RELEASE_KEYSTORE_B64 MUSACAD_KEYSTORE_PASSWORD MUSACAD_KEY_ALIAS MUSACAD_KEY_PASSWORD MUSACAD_TRIAL_API_URL MUSACAD_TRIAL_PUBLIC_KEY_PEM MUSACAD_AI_API_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required signing or pilot value: $name"; exit 1
+            fi
+          done
+          if [[ "$MUSACAD_AI_API_URL" != https://musacad-qwen-pilot.*.workers.dev/v1/analyze ]]; then
+            echo "::error::Refusing APK with an unexpected AI host"; exit 1
+          fi
+          case "$MUSACAD_TRIAL_API_URL" in
+            https://*/v1/trial/start) ;;
+            *) echo "::error::Invalid license service URL"; exit 1 ;;
+          esac
+          echo "MUSACAD_AI_SESSION_URL=${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session" >> "$GITHUB_ENV"
+          printf '%s' "$MUSACAD_RELEASE_KEYSTORE_B64" | base64 -d > "$MUSACAD_KEYSTORE_FILE"
+          chmod 600 "$MUSACAD_KEYSTORE_FILE"
+          keytool -list -keystore "$MUSACAD_KEYSTORE_FILE" -storepass "$MUSACAD_KEYSTORE_PASSWORD" -alias "$MUSACAD_KEY_ALIAS" >/dev/null
+      - uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build signed PILOT APK (not released)
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectRelease
+          apk="app/build/outputs/apk/direct/release/app-direct-release.apk"
+          test -s "$apk"
+          cp "$apk" /tmp/MusaCAD-Qwen-pilot-24h.apk
+          sha256sum /tmp/MusaCAD-Qwen-pilot-24h.apk > /tmp/MusaCAD-Qwen-pilot-24h.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Qwen-24h-PILOT-signed
+          path: |
+            /tmp/MusaCAD-Qwen-pilot-24h.apk
+            /tmp/MusaCAD-Qwen-pilot-24h.sha256
+          retention-days: 2
+          if-no-files-found: error
+      - name: Warn about installation
+        shell: bash
+        run: |
+          {
+            echo '## Signed Qwen PILOT APK – test only'
+            echo '- This APK uses the same package ID as production MusaCAD.'
+            echo '- Installing can replace your installed MusaCAD. Back up local data first.'
+            echo '- Its Qwen endpoint expires 24h after pilot deployment, then returns denied.'
+            echo '- Reinstall the stable APK when the test finishes.'
+            echo '- Nothing was automatically installed or published.'
+          } >> "$GITHUB_STEP_SUMMARY"
