@@ -253,6 +253,9 @@ public final class MusaAiPanel {
                         modelVerified.set(answered);
                         if(answered){
                             lastCloudFailure[0]="";
+                            // A real model response supersedes earlier failed health probes.
+                            lastHealthOk.set(true);
+                            failedHealthChecks.set(0);
                             // The session was refreshed by this successful model call.
                             title.setText(MusaAiSessionService.developerCached()
                                 ?"Gandalf • Developer":"Gandalf • MusaCAD AI");
