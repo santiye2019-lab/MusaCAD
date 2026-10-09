@@ -7,6 +7,16 @@ public final class ProductionPreflightContractTest {
     private static void need(String s,String n,String area){if(!s.contains(n))throw new AssertionError(area+" missing "+n);}
     public static void main(String[] args)throws Exception{
         String wf=read(".github/workflows/production-preflight.yml");
+        String productionApk=read(".github/workflows/production-apk.yml");
+        need(productionApk,"MUSACAD_AI_API_URL: https://musacad-ai.musacad2019.workers.dev/v1/analyze","actual Gandalf AI gateway URL");
+        need(productionApk,"MUSACAD_AI_SESSION_URL=$SESSION_URL","session route derived from trial backend");
+        need(productionApk,"Verify Gandalf Cloud endpoints reject unauthenticated requests","Cloud AI preflight probe");
+        need(productionApk,".message == \"Active cloud-AI entitlement not found\"","reject inactive session");
+        need(productionApk,".service == \"musacad-ai-worker\"","health probe checks real worker");
+        need(productionApk,"gateway_status","AI gateway access-control probe");
+        if(productionApk.contains("secrets.MUSACAD_AI_SESSION_URL"))
+            throw new AssertionError("Signed Cloud APK must not silently disable its AI session when optional endpoint secrets are unset");
+
         String ps=read("tools/production/setup-production-secrets.ps1");
         String docs=read("PRODUCTION_SETUP.md");
         String cloudflare=read("tools/production/deploy-cloudflare.ps1");
