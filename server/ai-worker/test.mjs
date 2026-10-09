@@ -847,3 +847,107 @@ test("view-focus rejects invented view extents or skipped view references",async
     assert.equal(called,false,entry.title);
   }
 });
+
+
+test("Gemini transient 503 retries twice and then completes visual AI request",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      if(calls<3) return new Response("",{status:503});
+      return new Response(JSON.stringify({choices:[{message:{content:"Bölge analizi tamamlandı."}}]}),{
+        status:200,headers:{"content-type":"application/json"}
+      });
+    }
+  });
+  const body=await result.json();
+  assert.equal(calls,3);
+  assert.equal(result.status,200);
+  assert.equal(body.status,"ok");
+  assert.equal(body.reply,"Bölge analizi tamamlandı.");
+});
+
+test("Gemini persistent 503 returns useful message after only two retries",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      return new Response(JSON.stringify({error:{message:"Service Unavailable"}}),{
+        status:503,headers:{"content-type":"application/json"}
+      });
+    }
+  });
+  const body=await result.json();
+  assert.equal(calls,3);
+  assert.equal(result.status,503);
+  assert.equal(body.status,"server_error");
+  assert.equal(body.providerHttpStatus,503);
+  assert.match(body.message,/HTTP 503/);
+  assert.match(body.message,/yeniden deneme/);
+});
+
+test("Gemini quota 429 is never retried",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      return new Response(JSON.stringify({error:{message:"Quota exceeded"}}),{
+        status:429,headers:{"content-type":"application/json"}
+      });
+    }
+  });
+  assert.equal(calls,1);
+  assert.equal(result.status,429);
+});
+
+
+test("Gemini upstream 502 is distinguishable from the gateway 503 and safely retried",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Merhaba",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      return new Response("",{status:502});
+    }
+  });
+  const body=await result.json();
+  assert.equal(calls,3);
+  assert.equal(result.status,503);
+  assert.equal(body.providerHttpStatus,502);
+  assert.match(body.message,/HTTP 502/);
+});
