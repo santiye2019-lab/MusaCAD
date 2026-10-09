@@ -19,14 +19,30 @@ public final class MusaAiAnalysisIntent {
             "dosya kaydet","metraj cikar","kesif olustur","kesif yukle",
             "raporu pdf","raporu word","revizyon","secili alani")||
             (" "+q+" ").contains(" sil "))return false;
+        // Natural Turkish review language: keep the entire original prompt for
+        // the model. This local check chooses a READ-ONLY visual workflow only.
+        // It must not interpret ambiguous natural language as a CAD edit.
         boolean operation=contains(q,"analiz","incele","denetle","kontrol et","proje kontrolu",
-            "proje incele","teknik rapor hazirla");
+            "proje incele","teknik rapor hazirla","gozden gecir","bir bak",
+            "bakabilir misin","bakar misin","degerlendir","tarama yap","taramak",
+            "bastan sona bak","eksikleri bul","hatalari bul","sorunlari bul",
+            "uygun mu","uyumlu mu","sorun var mi","eksik var mi","hata var mi","ne dersin",
+            "neler yanlis","yanlislar","teknik sorun","tum paftalari tara","butun paftalari tara");
         boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
             "pis su","atik su","yangin","havalandirma","klima","isitma","statik",
             "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
             "hidrofor","pompa","sprinkler","hepsini","kesit","vaziyet",
-            "kot","kat plani","cati plani","bodrum","zemin kat","gorunus");
+            "kot","kat plani","cati plani","bodrum","zemin kat","gorunus",
+            "katlar","kolon","dosya","planlar","burada","burayi","bunda","bunlari");
         return operation&&topic;
+    }
+
+    /** A request for all views in the drawing, not proof that every frame is known. */
+    public static boolean wantsAllViews(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return contains(q,"tum pafta","butun pafta","paftalarin hepsi",
+            "paftalarin tamami","tum katlar","butun katlar","tum kesitler",
+            "bastan sona","projenin tamami","projenin hepsi","her pafta");
     }
 
     /** Keep explicit offline/yerel requests on-device; never ask for cloud consent. */

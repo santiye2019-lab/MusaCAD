@@ -26,6 +26,28 @@ public final class MusaAiAnalysisIntentTest {
         scope("Kotları denetle","all");
         scope("Çatı planını analiz et","all");
         scope("Bodrum katı incele","all");
+        scope("Şu paftaya bir bakabilir misin?","all");
+        scope("Bu DWG dosyasını baştan sona değerlendir","all");
+        scope("Bütün paftaları gözden geçir","all");
+        scope("Kesitler ve kat planları uyumlu mu?","all");
+        scope("Buradaki teknik sorunları bul","all");
+        scope("Çizimde hata var mı?","all");
+        scope("Tesisattaki eksikleri bul","mechanical");
+        scope("Mutfak havalandırmasında sorun var mı?","ventilation");
+        scope("Bu projedeki yanlışlar neler?","all");
+        if(!MusaAiAnalysisIntent.wantsAllViews("Tüm paftaları incele"))
+            throw new AssertionError("all-pafta request scope missed");
+        if(!MusaAiAnalysisIntent.wantsAllViews("Bu dosyayı baştan sona gözden geçir"))
+            throw new AssertionError("whole DWG request scope missed");
+        if(MusaAiAnalysisIntent.wantsAllViews("Sadece pis su paftasını incele"))
+            throw new AssertionError("single pafta must not count as all views");
+        if(MusaAiAnalysisIntent.isReview("Bu çerçeveyi değiştir ve çizimi incele"))
+            throw new AssertionError("explicit edit cannot become read-only inspection");
+        if(MusaAiAnalysisIntent.isReview("Poz 25.100.1005 fiyatını ara"))
+            throw new AssertionError("catalog lookup cannot become visual review");
+        if(MusaAiAnalysisIntent.isReview("Merhaba, nasılsın?"))
+            throw new AssertionError("casual chat cannot trigger CAD review");
+
         if(MusaAiAnalysisIntent.isReview("Önerileri uygula"))
             throw new AssertionError("Unapproved edit route hijacked");
         if(MusaAiAnalysisIntent.isReview("Raporu PDF olarak çıkar"))

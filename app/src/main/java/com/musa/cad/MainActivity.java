@@ -1779,6 +1779,13 @@ public class MainActivity extends AppCompatActivity {
                 ?"Gandalf, açık DWG için genel görüntü ve 9 ayrıntı bölgesi yanında kat planı, kesit, vaziyet ve çatı gibi DWG başlıklarından tanınan en fazla 12 görünüm çevresinin ek yakın-plan görüntülerini oluşturur. Bu ek görüntüler yaklaşık alanlardır; gerçek pafta sınırları doğrulanmış değildir. Toplam en fazla 6 AI istek grubu ve grup başına en fazla 5 JPEG, sınırlı katman/metin/ölçü CAD-JSON verileriyle birlikte MusaCAD sunucusu üzerinden model sağlayıcısına aktarılır. Görseller gizli proje bilgileri taşıyabilir ve ek AI kotası kullanır."
                 :"Aktif çizimin sınırlı CAD-JSON özeti, yerel mühendislik ön tespitleri "+
                     "ve bu oturumdaki son dört kısa soru-yanıt çevrim içi AI sunucusuna gönderilir.";
+        // Explicit all-pafta phrasing should not promise that a single
+        // active-DWG 3×3 sweep covers every other open DWG/layout.
+        if(hybridVisual&&MusaAiAnalysisIntent.wantsAllViews(raw)){
+            scope+=" Bu ilk aşamada yalnız aktif DWG düzenindeki bölgeler ve bulunan"+
+                " başlık çevreleri görüntülenir; farklı DWG dosyaları, diğer layout'lar"+
+                " ve gerçek pafta sınırları tümüyle doğrulanmış sayılmaz.";
+        }
         String edit=packageMode
             ?" Proje Paketi modunda farklı dosyalardaki kimlikler karışmasın diye bulut çizim-değiştirme araçları kapalıdır."
             :" Çizim değişikliği önerileri kullanıcı onayı olmadan uygulanmaz.";
@@ -1974,7 +1981,13 @@ public class MainActivity extends AppCompatActivity {
         report.append("\nProje: ").append(fileName);
         report.append("\nLayout: ").append(snapshot.layout);
         report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
-        report.append("\nYöntem: tüm açık yerleşimde 3×3 tarama + yazıdan bulunan kat planı, kesit, vaziyet ve çatı adaylarına yakın görsel inceleme.");
+        report.append("\nKullanıcı isteği: ").append(raw.length()>300?raw.substring(0,300)+"…":raw);
+        report.append("\nYöntem: aktif DWG düzeninde 3×3 tarama + yazıdan bulunan kat planı, kesit, vaziyet ve çatı adaylarına yakın görsel inceleme.");
+        if(MusaAiAnalysisIntent.wantsAllViews(raw)){
+            report.append("\nİstenen kapsam: TÜM PAFTALAR. Gerçekleşen kapsam: yalnız aktif"+
+                " DWG düzeninde incelenen bölgeler; diğer açık dosyalar/layout'lar"+
+                " ayrı değerlendirme gerektirir. Başlık adayı, tam pafta sınırı değildir.");
+        }
         pendingAiActions=Collections.emptyList();
         final long inspectionStarted=android.os.SystemClock.elapsedRealtime();
         reply.progress("Gandalf • Kat, kesit, vaziyet ve kot başlıkları taranıyor…");
