@@ -27,7 +27,7 @@ jobs:
       MUSACAD_KEYSTORE_PASSWORD: ${{ secrets.MUSACAD_KEYSTORE_PASSWORD }}
       MUSACAD_KEY_ALIAS: ${{ secrets.MUSACAD_KEY_ALIAS }}
       MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
-      STAGE_WORKER: musacad-qwen-pilot-${{ github.run_id }}
+      STAGE_WORKER: musacad-qwen-pilot-37971834440
       WRANGLER_SEND_METRICS: "false"
     steps:
       - uses: actions/checkout@v4
@@ -107,11 +107,29 @@ jobs:
           set -euo pipefail
           printf '%s' "$CLOUDFLARE_AI_API_TOKEN" | npx --yes wrangler@latest secret put CLOUDFLARE_AI_API_TOKEN --name "$STAGE_WORKER" >/tmp/qwen-pilot-secret-ai.log
           printf '%s' "$MUSACAD_TRIAL_PUBLIC_KEY_PEM" | npx --yes wrangler@latest secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM --name "$STAGE_WORKER" >/tmp/qwen-pilot-secret-license.log
+          # Exactly as in the proven production workflow: redeploy once after
+          # injecting secrets so the final environment exposes every binding.
+          npx --yes wrangler@latest deploy --name "$STAGE_WORKER" >/tmp/qwen-pilot-redeploy.log 2>&1
           http="$(curl -sS --max-time 20 -o /tmp/qwen-pilot-health.json -w '%{http_code}' "$QWEN_PILOT_BASE/health" || true)"
           test "$http" = "200" || { echo "::error::Pilot Worker unhealthy (HTTP $http)"; exit 1; }
-          unauth="$(curl -sS --max-time 20 -o /tmp/qwen-pilot-unauth.json -w '%{http_code}' \
-            -H 'content-type: application/json' --data '{"prompt":"hello","cad":{"schema":"musacad-cad-json/v1","items":[]}}' "$MUSACAD_AI_API_URL" || true)"
-          test "$unauth" = "401" || { echo "::error::Unsigned requests not blocked (HTTP $unauth)"; exit 1; }
+          unauth=000
+          for attempt in 1 2 3 4 5 6; do
+            unauth="$(curl -sS --max-time 20 -o /tmp/qwen-pilot-unauth.json -w '%{http_code}' \
+              -H 'content-type: application/json' --data '{"prompt":"hello","cad":{"schema":"musacad-cad-json/v1","items":[]}}' "$MUSACAD_AI_API_URL" || true)"
+            if [ "$unauth" = "401" ]; then break; fi
+            sleep 2
+          done
+          if [ "$unauth" != "401" ]; then
+            echo "::error::Pilot unsigned-access safety check failed (HTTP $unauth)"
+            python3 - <<'PY'
+          import json
+          try:
+            d=json.load(open("/tmp/qwen-pilot-unauth.json"))
+            print("Only status/code of pilot failure:",d.get("status"),d.get("code"))
+          except Exception: pass
+          PY
+            exit 1
+          fi
           echo 'Qwen pilot health and unsigned-access security probes passed.'
       - name: Fetch pinned LibreDWG native converter dependency
         uses: actions/checkout@v4
