@@ -19,8 +19,16 @@ async function handleAnalyze(request, env) {
   if (!aiProvider.ok || !env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
     return json({ status: "server_error", message: aiProvider.message || "AI worker is not fully configured" }, 503);
 
+  // Qwen staging is opt-in and expires automatically. Production omits this.
+  if (env.MUSACAD_QWEN_STAGING === "true") {
+    const until = Number(env.MUSACAD_QWEN_STAGING_UNTIL_MS);
+    if (!Number.isFinite(until) || until <= Date.now())
+      return json({ status: "denied", message: "Qwen deneme bağlantısının süresi doldu" }, 410);
+  }
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
+  if (env.MUSACAD_QWEN_STAGING === "true" && session.mode !== "developer")
+    return json({ status: "denied", message: "Qwen deneme sunucusu yalnız Developer oturumuna açıktır" }, 403);
 
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
