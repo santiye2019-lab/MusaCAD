@@ -1,0 +1,96 @@
+name: Qwen Cloudflare Workers AI smoke test (no deployment)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test/cloudflare-qwen-probe
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qwen-workers-ai-smoke-test
+  cancel-in-progress: true
+
+jobs:
+  test-qwen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_AI_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      QWEN_MODEL: "@cf/qwen/qwen3.8-27b"
+    steps:
+      - name: Ensure credentials exist without displaying them
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${CF_AI_TOKEN:-}" ]; then
+            echo "::error::Cloudflare credentials are missing. No inference was attempted."
+            exit 1
+          fi
+      - name: Build synthetic CAD-like image and tiny natural-Turkish test prompts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,base64,struct,zlib
+          w,h=384,384
+          rows=[]
+          for y in range(h):
+              row=bytearray()
+              for x in range(w):
+                  blue=(38<=x<=350 and abs(y-292)<=5)
+                  red=(85<=x<=220 and 75<=y<=197 and (abs(x-85)<7 or abs(x-220)<7 or abs(y-75)<7 or abs(y-197)<7))
+                  col=(40,90,220) if blue else ((215,38,38) if red else (248,248,248))
+                  row.extend(col)
+              rows.append(b'\x00'+bytes(row))
+          def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data)&0xffffffff)
+          png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b''.join(rows),9))+chunk(b'IEND',b'')
+          image='data:image/png;base64,'+base64.b64encode(png).decode('ascii')
+          model='@cf/qwen/qwen3.8-27b'
+          cases={
+            'text': {'model':model,'messages':[{'role':'system','content':'Answer briefly in Turkish.'},{'role':'user','content':'Merhaba. Bir CAD projesi için hangi kanıt olmadan kesin teknik hata diyemezsin?'}],'max_completion_tokens':256,'stream':False},
+            'vision': {'model':model,'messages':[{'role':'system','content':'Bu yalnızca sentetik test görüntüsüdür; uydurma mühendislik hata raporu verme. Türkçe kısa cevap ver.'},{'role':'user','content':[{'type':'text','text':'Bu sentetik çizimde gördüğün renkli şekilleri ve yaklaşık konumlarını tarif et. Bu gerçek bir DWG paftası değildir.'},{'type':'image_url','image_url':{'url':image}}]}],'max_completion_tokens':256,'stream':False}
+          }
+          for name,body in cases.items():
+              with open('/tmp/qwen_'+name+'_request.json','w') as f:json.dump(body,f)
+          print('Synthetic vision fixture created. No customer DWG sent.')
+          PY
+      - name: Make bounded text and vision calls using existing Cloudflare secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/ai/v1/chat/completions"
+          for case in text vision; do
+            status="$(curl --silent --show-error --max-time 110 \
+              --output "/tmp/qwen_${case}_response.json" --write-out '%{http_code}' \
+              --request POST "$endpoint" \
+              --header "Authorization: Bearer $CF_AI_TOKEN" \
+              --header 'Content-Type: application/json' \
+              --data-binary "@/tmp/qwen_${case}_request.json" || true)"
+            if [ "$status" != "200" ]; then
+              echo "::error::Qwen $case test failed (HTTP $status). Check Workers AI authorization, available free Neurons or model capacity."
+              exit 1
+            fi
+            CASE_NAME="$case" python3 - <<'PY'
+          import json,os
+          name=os.environ['CASE_NAME']
+          with open('/tmp/qwen_'+name+'_response.json') as f: data=json.load(f)
+          choices=data.get('choices') or []
+          text=(choices[0].get('message',{}).get('content') if choices else '')
+          if isinstance(text,list): text=' '.join(x.get('text','') for x in text if isinstance(x,dict))
+          if not isinstance(text,str) or not text.strip():raise SystemExit('Qwen '+name+' returned no usable assistant text')
+          print(name.upper()+'_PASS; received nonempty Turkish response ('+str(len(text))+' chars).')
+          print('RESPONSE_'+name.upper()+': '+text.strip()[:500].replace('\n',' '))
+          PY
+          done
+      - name: Document result and protection
+        if: success()
+        run: |
+          echo '### Qwen Cloudflare test succeeded' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Model: @cf/qwen/qwen3.8-27b' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Text and synthetic image prompts returned nonempty results.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- No production Worker, APK, license, database or secrets were modified.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- This is an API smoke test, NOT an engineering-quality DWG review.' >> "$GITHUB_STEP_SUMMARY"
