@@ -53,14 +53,34 @@ public final class MusaAiEngineeringBrief {
             out.append("\n• Görsel inceleme KISMİ. ")
                .append(limitation==null?"Eksik bölgeler ayrıca incelenmelidir.":limitation);
         else out.append("\n• Planlanan 3×3 bölgeler yanıtlandı; bu durum tüm tesisat detaylarının doğrulandığı anlamına gelmez.");
-        if(localEvidence!=null&&!localEvidence.trim().isEmpty())
-            out.append("\n• Yerel DWG kanıtları (görsel AI değil): ")
-               .append(compact(localEvidence,1000));
+        String verifiedLocal=technicalLocalHighlights(localEvidence);
+        if(!verifiedLocal.isEmpty())
+            out.append("\n• Yerel DWG kanıtları (görsel AI değil):\n")
+               .append(verifiedLocal);
         if(estimate!=null&&!estimate.trim().isEmpty())
             out.append("\n\n4. METRAJ / KEŞİF ÖN KONTROLÜ\n").append(compact(estimate,2200));
         if(bookHint!=null&&!bookHint.trim().isEmpty())
             out.append("\n\n5. RESMÎ POZ KAYNAĞI\n").append(compact(bookHint,1200));
         out.append("\n\nNot: Çap, uzunluk, debi, kot ve poz kodu yalnız açıkça okunmuş CAD/pafta kanıtıyla doğrulanır; belirsiz ölçü uydurulmaz.");
+        return out.toString();
+    }
+    /** Keep equipment/diameter/flow labels, never boilerplate CAD entity counts. */
+    private static String technicalLocalHighlights(String raw){
+        if(raw==null||raw.isEmpty())return "";
+        StringBuilder out=new StringBuilder();
+        int accepted=0;
+        for(String line:raw.split("\\r?\\n")){
+            String value=line.trim();
+            if(!value.startsWith("• ")||value.length()>320)continue;
+            String upper=value.toUpperCase(Locale.ROOT);
+            if(!(upper.contains("DN")||upper.contains("Ø")||upper.contains("POMPA")||
+                upper.contains("HAT")||upper.contains("KANAL")||upper.contains("M³")||
+                upper.contains("DEBİ")||upper.contains("KAYNAK ")||
+                upper.contains("DOĞRULANA")||upper.contains("Q/H")))continue;
+            if(accepted++>=10)break;
+            if(out.length()>0)out.append("\\n");
+            out.append(value);
+        }
         return out.toString();
     }
     private static String compact(String input,int max){
