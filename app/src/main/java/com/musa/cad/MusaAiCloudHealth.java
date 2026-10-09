@@ -52,8 +52,8 @@ public final class MusaAiCloudHealth {
                 connection=(HttpURLConnection)health.openConnection();
                 connection.setInstanceFollowRedirects(false);
                 connection.setRequestMethod("GET");
-                connection.setConnectTimeout(2500);
-                connection.setReadTimeout(2500);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
                 connection.setRequestProperty("Accept","application/json");
                 if(connection.getResponseCode()==200){
                     try(InputStream input=connection.getInputStream()){

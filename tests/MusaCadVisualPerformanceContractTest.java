@@ -25,7 +25,7 @@ public final class MusaCadVisualPerformanceContractTest {
         has(ui,"setScrollbarFadingEnabled(false)","always-visible long answer scrollbar");
         has(ui,"setVerticalScrollbarThumbDrawable","contrasting scrollbar thumb");
         has(ui,"MusaAiCloudHealth.check","server health probe");
-        has(health,"setConnectTimeout(2500)","bounded remote probe");
+        has(health,"setConnectTimeout(5000)","bounded remote probe with transient network tolerance");
         has(health,"musacad-ai-worker","expected health service identity");
         has(ui,"modelVerified.get()","connection LED distinguished from real model");
         has(main,"reply.cloudStatus(true)","real cloud model success callback");
