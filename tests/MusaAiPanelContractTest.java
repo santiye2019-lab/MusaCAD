@@ -42,6 +42,12 @@ public final class MusaAiPanelContractTest {
         require(panel,"AI oturum hatası","session and license rejection state");
         require(panel,"AI zaman aşımı","multimodal timeout state");
         require(panel,"state.setOnClickListener","tap LED for actionable reason");
+        require(panel,"LicenseManager.installationId(activity)","display correct full device identity");
+        require(panel,"KİMLİĞİ KOPYALA","authorized opt-in device ID copy");
+        require(panel,"ClipDescription.EXTRA_IS_SENSITIVE","sensitive Android clipboard metadata");
+        require(panel,"12 karakterli kısa seri numarası kullanılmaz","full ID distinguished from short serial");
+
+        require(panel,"entitlement not found","server rejection is recognized");
 
         require(panel,"setScrollbarFadingEnabled(false)","always-visible message scrollbar");
         require(panel,"onImportPriceBook","explicit YFK book import callback");
