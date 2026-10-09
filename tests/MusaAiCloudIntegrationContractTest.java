@@ -30,7 +30,8 @@ public final class MusaAiCloudIntegrationContractTest {
         require(panel,"pdfPreview.setOnClickListener","Chat-first panel PDF preview control");
         require(panel,"host.onPrompt(prompt,previousTurns.toString(),requestReply)","Gandalf conversation continuity");
         require(panel,"MusaAiCloudHealth.check","live gateway readiness");
-        require(panel,"AI bağlı","response-verified AI state");
+        require(panel,"MusaAiProviderChoice.label(chosenProvider[0])+\" çevrimiçi\"","selected provider verified online state");
+        require(panel,"online&&modelVerified.get()","gateway health alone must not claim model connected");
         require(main,"MusaAiConversationalIntent.canonical","safe paraphrase router");
         require(main,"MusaAiConversationalIntent.shouldCloudInterpret","cloud fallback on unrecognized free-form questions");
         require(cloud,"body.put(\"previousChat\"","bounded recent turns");
