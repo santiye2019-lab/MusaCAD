@@ -21,9 +21,10 @@ Secrets:
 Variables:
 - `AI_PROVIDER=gemini`
 - `GEMINI_MODEL=gemini-3.8-flash`
+- `GEMINI_API_MODE=native` (recommended for production)
 - optional `AI_MAX_OUTPUT_TOKENS=3200`
 
-The Gemini route uses Google's OpenAI-compatible Chat Completions endpoint so MusaCAD can retain its bounded CAD function-calling surface.
+The production deployment uses Google's **native Gemini generateContent API** (`GEMINI_API_MODE=native`), which supports image evidence and function declarations. It avoids failures observed on the OpenAI-compatible Chat Completions endpoint while keeping CAD edits as explicit proposals only. The older Chat Completions integration remains available with `GEMINI_API_MODE=chat` for compatibility.
 
 When Gemini Free Tier returns HTTP 429, the gateway returns `quota_exhausted` with a clear message. No paid provider is invoked automatically.
 
