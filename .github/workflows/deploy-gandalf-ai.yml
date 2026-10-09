@@ -3,6 +3,11 @@ name: Deploy Gandalf AI and build APK
 on:
   workflow_dispatch:
     inputs:
+      release_approved:
+        description: "Final acceptance complete and APK creation explicitly approved"
+        type: boolean
+        required: true
+        default: false
       provider:
         description: "Gandalf sağlayıcısı: Gemini / Cloudflare Qwen / özel Qwen sunucusu"
         type: choice
@@ -298,7 +303,9 @@ jobs:
           chmod 600 "$MUSACAD_KEYSTORE_FILE"
           keytool -list -keystore "$MUSACAD_KEYSTORE_FILE" -storepass "$MUSACAD_KEYSTORE_PASSWORD" -alias "$MUSACAD_KEY_ALIAS" >/dev/null
 
+      # Worker deployment can be tested without producing a premature APK.
       - name: Build Gandalf-enabled production APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         shell: bash
         run: |
           set -euo pipefail
@@ -310,6 +317,7 @@ jobs:
           sha256sum /tmp/MusaCAD-v1.2.2-Gandalf-Cloud-production.apk | tee /tmp/MusaCAD-v1.2.2-Gandalf-Cloud-production.sha256
 
       - name: Upload Gandalf-enabled APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         uses: actions/upload-artifact@v4
         with:
           name: MusaCAD-Gandalf-Cloud-production-v1.2.2
@@ -335,6 +343,10 @@ jobs:
             else
               echo '- Model: gemini-3.8-flash'
             fi
-            echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.2'
+            if [ "${{ inputs.release_approved }}" = "true" ]; then
+              echo '- APK: MusaCAD-Gandalf-Cloud-production-v1.2.2'
+            else
+              echo '- APK not built; final acceptance approval was not given.'
+            fi
             echo '- Gemini API key remains server-side only'
           } >> "$GITHUB_STEP_SUMMARY"
