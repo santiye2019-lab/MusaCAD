@@ -1,0 +1,182 @@
+name: MusaCAD License Worker — guarded production repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "inspect = verify and dry-run only; deploy = update production license code"
+        required: true
+        type: choice
+        default: inspect
+        options:
+          - inspect
+          - deploy
+      confirmation:
+        description: "For deploy, type exactly DEPLOY_MUSACAD_TRIAL (leave blank to inspect)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musacad-license-worker-production
+  cancel-in-progress: false
+
+jobs:
+  inspect-or-deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
+      OPERATION: ${{ inputs.operation }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      WORKER: musacad-trial-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate source and explicit deployment selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$OPERATION" != "inspect" ] && [ "$OPERATION" != "deploy" ]; then
+            echo "::error::Only inspect or deploy operations are accepted."
+            exit 1
+          fi
+          if [ "$OPERATION" = "deploy" ] && [ "$CONFIRMATION" != "DEPLOY_MUSACAD_TRIAL" ]; then
+            echo "::error::Production deployment requires the exact typed confirmation."
+            exit 1
+          fi
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID MUSACAD_TRIAL_API_URL; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing GitHub secret: $key"
+              exit 1
+            fi
+          done
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          u=urlparse(os.environ["MUSACAD_TRIAL_API_URL"])
+          if (u.scheme != "https" or u.port is not None or u.username is not None or
+              u.hostname != "musacad-trial-api.musacad2019.workers.dev" or
+              u.path != "/v1/trial/start" or u.query or u.fragment):
+              raise SystemExit("BLOCKED: Repository trial URL does not match the intended MusaCAD license Worker")
+          print("PASS: GitHub trial URL points to the expected production license Worker.")
+          PY
+          grep -Fq 'url.pathname === "/v1/ai/session"' server/trial-worker/src/index.js
+          grep -Fq 'MUSACAD_DEVELOPER_DEVICE_IDS' server/trial-worker/src/index.js
+          grep -Fq 'isDeveloperDevice' server/trial-worker/src/index.js
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test current license Worker and deployment guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix server/trial-worker test
+          python3 -m unittest discover -s tests -p 'test_trial_worker_deploy_guard.py' -v
+
+      - name: Read production bindings safely (no secret or device values in logs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/settings"
+          curl --fail --silent --show-error --max-time 25 \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Accept: application/json" \
+            --output /tmp/musacad-license-settings-before.json \
+            "$SETTINGS_URL"
+          python3 scripts/trial_worker_deploy_guard.py \
+            --settings /tmp/musacad-license-settings-before.json \
+            --output server/trial-worker/wrangler.toml
+          # No device IDs, variable values, or private key material are printed.
+
+      - name: Compile license Worker without deploying
+        working-directory: server/trial-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.42.0 deploy --dry-run --keep-vars \
+            --name musacad-trial-api --outdir /tmp/musacad-license-dryrun
+          echo "PASS: license Worker code compiled in dry-run mode; production was not modified."
+
+      - name: Deploy only after explicit typed confirmation
+        if: ${{ inputs.operation == 'deploy' }}
+        working-directory: server/trial-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRMATION" != "DEPLOY_MUSACAD_TRIAL" ]; then
+            echo "::error::Explicit confirmation missing"
+            exit 1
+          fi
+          # --keep-vars preserves dashboard-created plain text variables.
+          # Wrangler also retains encrypted secrets during code deployments.
+          # The existing DB binding comes from verified production settings,
+          # and no D1 migration, deletion or database creation is run.
+          npx --yes wrangler@4.42.0 deploy --keep-vars --name musacad-trial-api
+
+      - name: Verify production bindings were retained
+        if: ${{ inputs.operation == 'deploy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/settings"
+          curl --fail --silent --show-error --max-time 25 \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Accept: application/json" \
+            --output /tmp/musacad-license-settings-after.json \
+            "$SETTINGS_URL"
+          python3 scripts/trial_worker_deploy_guard.py \
+            --settings /tmp/musacad-license-settings-before.json \
+            --compare /tmp/musacad-license-settings-after.json
+
+      - name: Verify live AI-session route without using any real device ID
+        if: ${{ inputs.operation == 'deploy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SESSION_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session"
+          success=0
+          for attempt in $(seq 1 10); do
+            status="$(curl --silent --show-error --max-time 20 \
+              --output /tmp/musacad-license-probe.json --write-out '%{http_code}' \
+              --request POST --header 'Content-Type: application/json' \
+              --data '{"deviceId":"MC-00000000-00000000-00000000","packageName":"com.musa.cad","entitlementProof":""}' \
+              "$SESSION_URL" || true)"
+            if [ "$status" = "403" ] && \
+              jq -e '.message == "Active cloud-AI entitlement not found"' /tmp/musacad-license-probe.json >/dev/null 2>&1; then
+              success=1
+              break
+            fi
+            sleep 3
+          done
+          if [ "$success" -ne 1 ]; then
+            echo "::error::The live license route failed the synthetic-device safety probe."
+            exit 1
+          fi
+          echo "PASS: Current /v1/ai/session route executes and rejects an unlicensed synthetic device."
+
+      - name: Results
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          {
+            echo "## MusaCAD production license Worker"
+            echo "- Operation: $OPERATION"
+            echo "- Worker: musacad-trial-api"
+            echo "- All bindings and developer variable validated without logging their values"
+            echo "- D1 database and trial signing secret preserved"
+            if [ "$OPERATION" = "inspect" ]; then
+              echo "- No production modification; dry run only"
+            else
+              echo "- Code deployed after explicit confirmation"
+              echo "- Production bindings verified unchanged"
+              echo "- Synthetic unauthorized session request was correctly denied"
+              echo "- A real authorized phone must still test its developer login"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

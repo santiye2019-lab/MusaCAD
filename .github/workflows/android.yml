@@ -26,6 +26,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Test guarded production trial Worker deployment invariants
+        run: |
+          python3 -m unittest discover -s tests -p 'test_trial_worker_deploy_guard.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          old=Path('.github/workflows/deploy-gandalf-ai.yml').read_text()
+          new=Path('.github/workflows/deploy-license-worker-safe.yml').read_text()
+          assert 'refreshing the existing trial Worker' not in old
+          assert "Use the dedicated guarded license Worker workflow" in old
+          for expected in ('--keep-vars', '--dry-run', 'DEPLOY_MUSACAD_TRIAL',
+                           'trial_worker_deploy_guard.py', 'musacad-trial-api'):
+              assert expected in new, expected
+          print('PASS: License Worker deployment is explicit and guarded.')
+          PY
       - name: Test Gandalf AI Worker including provider timeout
         run: |
           node --check server/ai-worker/src/index.js
