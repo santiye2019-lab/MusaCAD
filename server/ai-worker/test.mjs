@@ -1125,7 +1125,7 @@ test("self-hosted Qwen accepts signed developer session and consensual CAD image
 
 test("self-hosted provider refuses unencrypted, private and malformed endpoints",async()=>{
   const keys=sessionPair();
-  const request=new Request("https://ai.musacad.test/v1/analyze",{
+  const request=()=>new Request("https://ai.musacad.test/v1/analyze",{
     method:"POST",headers:{
       authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
       "content-type":"application/json"},
@@ -1139,7 +1139,7 @@ test("self-hosted provider refuses unencrypted, private and malformed endpoints"
     "https://user:pass@private.example.com/v1/chat/completions",
     "https://private.example.com/v1/chat/completions?token=leak"]){
     let called=false;
-    const response=await worker.fetch(request,{
+    const response=await worker.fetch(request(),{
       AI_PROVIDER:"selfhosted",SELFHOSTED_AI_ENDPOINT:endpoint,
       SELFHOSTED_AI_API_KEY:"secret",SELFHOSTED_MODEL:"qwen3.5:4b",
       MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
@@ -1272,7 +1272,7 @@ test("Cloudflare Qwen accepts signed MusaCAD session with visual and vector CAD 
 
 test("Cloudflare Qwen cannot be selected without server-side account and AI token",async()=>{
   const keys=sessionPair();
-  const req=new Request("https://musacad.test/v1/analyze",{
+  const req=()=>new Request("https://musacad.test/v1/analyze",{
     method:"POST",headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
       "content-type":"application/json"},
     body:JSON.stringify({prompt:"Kontrol et",cad:{schema:"musacad-cad-json/v1",items:[]}})
@@ -1284,7 +1284,7 @@ test("Cloudflare Qwen cannot be selected without server-side account and AI toke
       CLOUDFLARE_AI_API_TOKEN:""}
   ]){
     let calls=0;
-    const res=await worker.fetch(req,{
+    const res=await worker.fetch(req(),{
       AI_PROVIDER:"cloudflare",GEMINI_API_KEY:"other",GEMINI_MODEL:"other",
       ...config,MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
       __fetch:async()=>{calls++;throw Error("should not call upstream")}
@@ -1386,4 +1386,71 @@ test("24-hour Qwen pilot is developer-only, expires and fails closed before infe
   assert.equal(answer.provider,"cloudflare");
   assert.match(answer.reply,/Zemin kat ön inceleme/);
   assert.equal(calls,1);
+});
+
+test("MusaCAD model switch routes Gemini default and explicit Qwen with the same signed session",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  const accountId="1234567890abcdef1234567890abcdef";
+  const upstream=[];
+  const env={
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"gemini-only-server-key",GEMINI_MODEL:"gemini-test",
+    CLOUDFLARE_AI_ACCOUNT_ID:accountId,
+    CLOUDFLARE_AI_API_TOKEN:"qwen-only-server-key",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,options)=>{
+      upstream.push({url:String(url),authorization:options.headers.authorization});
+      if(String(url).includes("cloudflare.com"))
+        return new Response(JSON.stringify({choices:[{message:{content:"Qwen hazır"}}]}),{status:200});
+      return new Response(JSON.stringify({choices:[{message:{content:"Gemini hazır"}}]}),{status:200});
+    }
+  };
+  const ask=async(providerPreference)=>{
+    const body={prompt:"Bağlantı testi",cad:{schema:"musacad-cad-json/v1",items:[]}};
+    if(providerPreference!==undefined)body.providerPreference=providerPreference;
+    const response=await worker.fetch(new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+      body:JSON.stringify(body)
+    }),env);
+    return {response,body:await response.json()};
+  };
+  const a=await ask();
+  assert.equal(a.response.status,200);
+  assert.equal(a.body.provider,"gemini");
+  const b=await ask("cloudflare");
+  assert.equal(b.response.status,200);
+  assert.equal(b.body.provider,"cloudflare");
+  assert.equal(b.body.model,"@cf/qwen/qwen3.8-27b");
+  const c=await ask("gemini");
+  assert.equal(c.body.provider,"gemini");
+  assert.equal(upstream.length,3);
+  assert.equal(upstream[0].authorization,"Bearer gemini-only-server-key");
+  assert.equal(upstream[1].authorization,"Bearer qwen-only-server-key");
+  assert.equal(upstream[2].authorization,"Bearer gemini-only-server-key");
+  assert.equal(JSON.stringify([a.body,b.body,c.body]).includes("server-key"),false);
+});
+
+test("Unconfigured or unsupported selected AI never silently falls back to Gemini",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  let called=0;
+  const env={
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"secret",GEMINI_MODEL:"gemini-test",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{called++;throw Error("No upstream should be reached");}
+  };
+  const ask=async(value)=>{
+    const r=await worker.fetch(new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+      body:JSON.stringify({prompt:"Bağlan",providerPreference:value,
+        cad:{schema:"musacad-cad-json/v1",items:[]}})
+    }),env);
+    return {status:r.status,body:await r.json()};
+  };
+  let result=await ask("cloudflare");
+  assert.equal(result.status,503);
+  assert.match(result.body.message,/Cloudflare/);
+  result=await ask("https://my-evil-endpoint.test/v1/chat/completions");
+  assert.equal(result.status,400);
+  assert.equal(called,0);
 });

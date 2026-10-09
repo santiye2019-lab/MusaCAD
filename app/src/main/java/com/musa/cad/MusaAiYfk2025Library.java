@@ -57,7 +57,7 @@ public final class MusaAiYfk2025Library {
     public static String statusText(Context c){
         Status s=status(c);
         if(!s.installed)return "2025 ÇŞİDB kitabı çevrim dışı kurulu değil. "+
-            "“2025 kitabını yükle” diyerek PDF'yi bu telefonda seçin.";
+            "Gandalf panelindeki “Poz kitabı yükle” düğmesiyle telefonunuzdan PDF seçin.";
         return "2025 ÇŞİDB KİTABI ÇEVRİM DIŞI HAZIR"+
             "\nPDF sayfa sayısı: "+s.pages+
             "\nPoz/rayiç kayıt sayısı: "+s.items+

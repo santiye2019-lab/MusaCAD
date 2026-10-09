@@ -807,6 +807,30 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onViewPdf(String answer,MusaAiPanel.Reply reply){
                 viewGandalfAnswerPdf(answer,reply);
             }
+            @Override public void onVerifyProvider(MusaAiPanel.Reply reply){
+                try{
+                    aiExecutor.submit(()->{
+                        MusaAiCloudService.Result check=MusaAiCloudService.verifySelectedProvider(
+                            getApplicationContext());
+                        if(check.ok()){
+                            reply.modelInfo(check.provider,check.model);
+                            reply.cloudStatus(true);
+                            reply.send("✓ "+MusaAiEngineLabel.display(check.provider,check.model)+
+                                " modelinden gerçek yanıt alındı. Çevrimiçi bağlantı doğrulandı.");
+                        }else{
+                            reply.cloudFailure(check.message);
+                            reply.send("Seçilen AI motoruna bağlanılamadı: "+check.message+
+                                "\nDiğer motoru seçip yeniden bağlanabilirsiniz.");
+                        }
+                    });
+                }catch(RejectedExecutionException e){
+                    reply.cloudFailure("AI ağ isteği kuyruğa alınamadı.");
+                    reply.send("AI bağlantı kontrolü başlatılamadı.");
+                }
+            }
+            @Override public String priceBookStatus(){
+                return MusaAiYfk2025Library.statusText(MainActivity.this);
+            }
             @Override public void onImportPriceBook(MusaAiPanel.Reply reply){
                 chooseYfk2025Book(reply);
             }
@@ -820,9 +844,9 @@ public class MainActivity extends AppCompatActivity {
         }
         MusaAiYfk2025Library.Status installed=MusaAiYfk2025Library.status(this);
         if(installed.installed){
-            if(reply!=null)reply.send(MusaAiYfk2025Library.statusText(this)+
-                "\n2025 poz kitabı zaten cihazda kurulu. Başka yılın yeni pozları"+
-                " '2025 2026 yeni pozları tara' komutuyla karşılaştırılabilir.");
+            if(reply!=null)reply.send("✓ 2025 poz kitabı zaten yüklü. "+
+                installed.items+" poz/rayiç, "+installed.pages+
+                " sayfa cihazın özel alanında hazır; tekrar yüklemeye gerek yok.");
             return;
         }
         pendingYfk2025Reply=reply;
@@ -1616,6 +1640,7 @@ public class MainActivity extends AppCompatActivity {
             "\nLayout: "+drawing.activeLayout+
             "\nToplam CAD nesnesi: "+drawing.entityCount+
             "\nKatman: "+drawing.layerCount;
+        reply.modelInfo("local","");
         reply.progress("Gandalf • DWG paftasındaki cihaz ve tesisat etiketleri taranıyor…");
         final Runnable deadline=()->{
             if(!finished.compareAndSet(false,true))return;
@@ -1647,13 +1672,13 @@ public class MainActivity extends AppCompatActivity {
                             reply.send("Analiz sırasında aktif proje değişti. Yeni proje için tekrar deneyin.");
                             return;
                         }
-                        lastAiReport=report.text;
+                        String engineeringSummary=MusaAiEngineeringBrief.localSummary(
+                            drawingName,drawing.activeLayout,report.text);
+                        lastAiReport=engineeringSummary;
                         lastAiReportTitle="Gandalf • Kaynaklı Mühendislik Ön İncelemesi";
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
-                        reply.send(report.text+
-                            "\n\nOkunan: "+report.equipmentLabels+" cihaz/ekipman etiketi, "+
-                            report.dimensions+" çap/kanal boyutu, "+report.measuredRuns+" ölçülebilir merkez hat parçası."+
-                            "\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
+                        reply.send(engineeringSummary+
+                            "\n\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
                         // Keep viewport work after terminal reply, and cap highlights.
                         if(!report.sourceIds.isEmpty()){
                             int count=0;
@@ -1726,6 +1751,7 @@ public class MainActivity extends AppCompatActivity {
                 MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
                     getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
                 if(cloud.ok()){
+                    reply.modelInfo(cloud.provider,cloud.model);
                     reply.cloudStatus(true);
                     pendingAiActions=Collections.emptyList();
                     reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
@@ -1886,6 +1912,7 @@ public class MainActivity extends AppCompatActivity {
                             (cloud.message.isEmpty()?cloud.status.toString():cloud.message)+
                             "\nYerel vektör kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
+                        reply.modelInfo("local","");
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
                         String fallbackReport=reason+
                             "\n\nGandalf yerel vektör analiziyle devam etti (görsel AI sonucu değildir):\n"+
@@ -1898,6 +1925,7 @@ public class MainActivity extends AppCompatActivity {
                         reply.send(fallbackReport+"\n\nRaporu Word/PDF olarak dışa aktarabilirsiniz.");
                         return;
                     }
+                    reply.modelInfo(cloud.provider,cloud.model);
                     reply.cloudStatus(true);
                     pendingAiActions=cloud.actions;
                     StringBuilder out=new StringBuilder();
@@ -1982,7 +2010,11 @@ public class MainActivity extends AppCompatActivity {
                                            String recentContext){
         final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
+        final String selectedVisualProvider=MusaAiProviderChoice.selected(this);
         int acceptedTiles=0,acceptedBatches=0;
+        MusaAiEngineeringBrief engineeringBrief=new MusaAiEngineeringBrief();
+        reply.sweepProgress(0,total,"Pafta bölge taraması başlatıldı");
+        String verifiedModel="Doğrulanmış görsel AI yanıtı yok";
         String issue="";
         StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
@@ -2032,13 +2064,13 @@ public class MainActivity extends AppCompatActivity {
             }
             reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
-            String task=raw+"\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
+            String task=raw+"\nSen bir MAKİNE MÜHENDİSİ teknik proje kontrolörüsün. Yalnız İŞE YARAYAN mühendislik bulgularını bildir; CAD nesne/katman sayısı, genel açıklama, tekrar, yazılım tanıtımı yazma. En fazla 5 somut bulgu ver. Her biri TAM OLARAK şu formatta olmalı: BULGU | ÖNCELİK: kritik/orta/düşük | PAFTA: görülen plan/kesit/alan | TESPİT: somut hata/uyumsuzluk | KANIT: görsel bölge kimliği + okunan teknik etiket/değer | İŞLEM: yükleniciden istenecek teknik düzeltme veya sahada doğrulama. Delil veya ölçü okunmuyorsa BULGU uydurma, bunun yerine KONTROL | KANIT: okunamayan veri | İŞLEM: hangi proje detayı istenmeli yaz. Bulgular yoksa BULGU YOK yaz. Çap/kot/debi/mesafe uydurma. Başlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
             MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybridWithContext(
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
-                recentContext,evidenceSummary);
+                recentContext,evidenceSummary,selectedVisualProvider);
             if(!cloud.ok()){
                 reply.cloudFailure(cloud.message);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
@@ -2046,9 +2078,14 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
                 break;
             }
+            verifiedModel=MusaAiEngineLabel.display(cloud.provider,cloud.model);
+            reply.modelInfo(cloud.provider,cloud.model);
             reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
+            engineeringBrief.addRegion("Görsel grup "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT,cloud.text);
+            reply.sweepProgress(acceptedTiles,total,
+                "AI yanıtı doğrulandı • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+" grup");
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
@@ -2091,7 +2128,7 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
                     (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
                     "/"+focusedRequested+" yakın-plan adayı işlendi…");
-                String focusPrompt=raw+"\n"+viewCatalog.report+
+                String focusPrompt=raw+"\nYalnız öncelikli mühendislik eksiklerini raporla. Her bulgu için BULGU | ÖNCELİK: ... | PAFTA: ... | TESPİT: ... | KANIT: ... | İŞLEM: ... formatını kullan. Genel CAD sayımları, öneri dışı yazılım açıklamaları ve tekrar olmasın. Görülmeyen kot, boru çapı, malzeme veya kesin kusur uydurma.\n"+viewCatalog.report+
                     "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
                     " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
                     " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
@@ -2100,7 +2137,7 @@ public class MainActivity extends AppCompatActivity {
                     " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
                 MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybridWithContext(
                     getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json,
-                    recentContext,evidenceSummary);
+                    recentContext,evidenceSummary,selectedVisualProvider);
                 if(!detailed.ok()){
                     reply.cloudFailure(detailed.message);
                     focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
@@ -2108,6 +2145,8 @@ public class MainActivity extends AppCompatActivity {
                     reply.progress("Gandalf • Yakın-plan AI analizi durdu. "+focusedIssue);
                     break;
                 }
+                reply.modelInfo(detailed.provider,detailed.model);
+                engineeringBrief.addRegion("Yakın plan "+(group+1)+"/"+focusBatchCount,detailed.text);
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
@@ -2141,6 +2180,7 @@ public class MainActivity extends AppCompatActivity {
             " Kot tutarsızlığı ancak ortak referanslar, okunabilir ölçüler ve mühendislik doğrulamasıyla teyit edilir.");
 
         if(acceptedBatches==0){
+            reply.modelInfo("local","");
             MusaAiEngineeringReview.Result fallback=MusaAiEngineeringReview.analyze(snapshot,fileName);
             report.append("\n\nGÖRSEL ANALİZ GERÇEKLEŞMEDİ");
             if(!issue.isEmpty())report.append("\nNeden: ").append(issue);
@@ -2153,6 +2193,9 @@ public class MainActivity extends AppCompatActivity {
             lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(local.sourceIds));
         }
 
+        reply.sweepProgress(acceptedTiles,total,
+            acceptedTiles==total&&issue.isEmpty()?"9/9 bölge tamamlandı":
+                "KISMİ • "+(issue.isEmpty()?"eksik görüntüler var":issue));
         boolean visualComplete=acceptedTiles==total&&
             acceptedBatches==MusaAiVisualSweepPlan.BATCH_COUNT&&issue.isEmpty();
         report.append("\n\n6. GÖRSEL KAPSAM / VERİ GÜVENİLİRLİĞİ");
@@ -2191,6 +2234,7 @@ public class MainActivity extends AppCompatActivity {
         String cover="GÖRSEL PROJE ANALİZİ • İNCELEME ÖZETİ"+
             "\nProje: "+fileName+" • Layout: "+snapshot.layout+
             "\nDisiplin: "+MusaAiAnalysisIntent.label(scope)+
+            "\nGörsel AI motoru: "+verifiedModel+
             "\nGörsel AI tarafından yanıtlanan bölge: "+acceptedTiles+"/"+total+
             "\nYakından incelenen görünüm adayı: "+focusedReviewed+"/"+focusedEligible+
             "\nRapor niteliği: "+
@@ -2199,7 +2243,13 @@ public class MainActivity extends AppCompatActivity {
             "\nBu rapor gerçekten gönderilmiş görsel bölgeleri ve çizimdeki vektör"+
             " kanıtlarını ayrı bölümlerde içerir; görülmeyen pafta, okunamayan kot"+
             " veya belirsiz çap tespit edilmiş gibi gösterilmez.\n\n";
-        String completeReport=cover+report.toString();
+        MusaAiEngineeringReview.Result localBriefEvidence=MusaAiEngineeringReview.analyze(snapshot,fileName);
+        String priceBookSummary=MusaAiYfk2025Library.status(this).installed
+            ?"2025 resmî poz kitabı cihazda kayıtlı. Eşleşmeler metraj, çap, birim ve tarif doğrulanmadan kesin kabul edilmez."
+            :"Resmî 2025 poz kitabı bu cihazda yüklü değil; 'Poz kitabı yükle' düğmesiyle telefondan PDF seçilmelidir.";
+        String completeReport=engineeringBrief.build(fileName,snapshot.layout,verifiedModel,
+            acceptedTiles,total,focusedReviewed,focusedEligible,
+            issue.isEmpty()?focusedIssue:issue,localBriefEvidence.text,measured.report,priceBookSummary);
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()?" Çoklu Görünüm ":" Kısmi ")+"Görsel Proje İncelemesi";
@@ -2838,7 +2888,7 @@ public class MainActivity extends AppCompatActivity {
             if(reply!=null)reply.send("YFK arşivi şu anda meşgul; yeniden deneyin.");
             return;
         }
-        if(reply!=null)reply.progress("2025 ÇŞİDB kitabı cihazda hazırlanıyor…");
+        if(reply!=null)reply.progress("2025 ÇŞİDB kitabı dosyadan okunuyor ve yerel poz kataloğuna aktarılıyor…");
         yfkCatalogExecutor.submit(()->{
             try{
                 MusaAiYfk2025Library.Status installed=
@@ -2846,10 +2896,11 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(()->{
                             if(!isFinishing()&&!isDestroyed()&&result!=null)
                                 result.setText("2025 YFK • "+message);
+                            if(reply!=null)reply.progress(message);
                         }));
                 runOnUiThread(()->{
                     if(reply!=null)reply.send(
-                        "2025 ÇŞİDB kitabı çevrim dışı kuruldu: "+installed.items+
+                        "✓ PDF alındı. 2025 ÇŞİDB kitabı çevrim dışı kuruldu: "+installed.items+
                         " poz/rayiç, "+installed.pages+" sayfa.\n"+
                         "Örnek: '2025 poz 25.100.1005' • "+
                         "'2025 katalog durumu' • '2025 2026 yeni pozları tara'.\n"+

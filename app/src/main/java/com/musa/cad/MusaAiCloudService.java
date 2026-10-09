@@ -71,6 +71,20 @@ public final class MusaAiCloudService {
         public boolean ok(){return status==Status.OK;}
     }
 
+    /** Sends no project DWG or user chat history; a real, session-authorized model completion proves connectivity. */
+    public static Result verifySelectedProvider(Context context){
+        MusaAiDrawingIndex empty=new MusaAiDrawingIndex("",0,0,
+            Collections.emptyList(),Collections.emptyList(),Collections.emptyList(),"");
+        Result result=analyzeInternal(context,empty,"AI model bağlantı kontrolü",
+            "Bu yalnız teknik bağlantı testidir; CAD projesi yoktur. Sadece MUSACAD_AI_OK yaz, başka metin yazma.",
+            null,null,"all","","");
+        if(result.ok()&&!result.text.toUpperCase(Locale.ROOT).contains("MUSACAD_AI_OK"))
+            return new Result(Status.INVALID_RESPONSE,"",
+                "AI yanıt verdi ancak model bağlantı doğrulama kodunu döndürmedi. Yeniden deneyin.",
+                null,false);
+        return result;
+    }
+
     public static Result analyze(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt){
         return analyzeInternal(context,index,fileName,rawPrompt,null,null,"all");
     }
@@ -115,6 +129,15 @@ public final class MusaAiCloudService {
             recentTurns,localEvidence);
     }
 
+    /** The provider is fixed for every tile of a whole-sheet sweep, even if the UI is reopened. */
+    public static Result analyzeHybridWithContext(Context context,MusaAiDrawingIndex index,
+                                                  String fileName,String rawPrompt,String scope,
+                                                  JSONObject visualEvidence,String recentTurns,
+                                                  String localEvidence,String providerForThisSweep){
+        return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope,
+            recentTurns,localEvidence,MusaAiProviderChoice.normalize(providerForThisSweep));
+    }
+
     public static Result analyzeHybrid(Context context,MusaAiDrawingIndex index,String fileName,
                                       String rawPrompt,String scope,JSONObject visualEvidence){
         return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope);
@@ -128,6 +151,12 @@ public final class MusaAiCloudService {
     private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
                                           String rawPrompt,String packageJson,JSONObject visualEvidence,String scope,
                                           String recentTurns,String localEvidence){
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson,visualEvidence,scope,
+            recentTurns,localEvidence,null);
+    }
+    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
+                                          String rawPrompt,String packageJson,JSONObject visualEvidence,String scope,
+                                          String recentTurns,String localEvidence,String fixedProvider){
         if(context==null||index==null)return new Result(Status.INVALID_RESPONSE,"","Çizim bağlamı hazırlanamadı",null,false);
 
         String endpoint=BuildConfig.AI_API_URL==null?"":BuildConfig.AI_API_URL.trim();
@@ -143,6 +172,7 @@ public final class MusaAiCloudService {
             return new Result(mapped,"",session.message,null,false);
         }
 
+        String selectedProvider=fixedProvider==null?MusaAiProviderChoice.selected(context):fixedProvider;
         String prompt=MusaAiCloudPolicy.promptForCloud(rawPrompt);
         boolean allowWeb=MusaAiCloudPolicy.allowWeb(rawPrompt);
         boolean allowEditProposals=MusaAiCloudPolicy.allowEditProposals(rawPrompt);
@@ -159,6 +189,7 @@ public final class MusaAiCloudService {
 
             JSONObject body=new JSONObject();
             body.put("prompt",prompt);
+            if(!selectedProvider.isEmpty())body.put("providerPreference",selectedProvider);
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
             body.put("analysisScope",scope==null?"all":scope);
@@ -248,8 +279,15 @@ public final class MusaAiCloudService {
             boolean webUsed=json.optBoolean("webUsed",false);
             if(text.isEmpty()&&!actions.isEmpty())text="Gandalf AI "+actions.size()+" adet çizim işlemi önerdi.";
             if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
+            // A 200 from a gateway is not proof that the explicitly chosen model was used.
+            String actualProvider=json.optString("provider","");
+            if(!selectedProvider.isEmpty()&&!selectedProvider.equals(actualProvider))
+                return new Result(Status.INVALID_RESPONSE,"",
+                    "Seçilen "+MusaAiProviderChoice.label(selectedProvider)+
+                    " yerine farklı veya doğrulanmamış AI motoru yanıtladı. Bağlantı doğrulanmadı.",
+                    actions,sources,webUsed);
             return new Result(Status.OK,text,"",actions,sources,webUsed,
-                json.optString("provider",""),json.optString("model",""));
+                actualProvider,json.optString("model",""));
         }catch(SocketTimeoutException e){
             return new Result(Status.MODEL_TIMEOUT,"",
                 "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+

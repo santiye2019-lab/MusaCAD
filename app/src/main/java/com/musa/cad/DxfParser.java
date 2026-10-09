@@ -459,6 +459,10 @@ public final class DxfParser {
         private static final ThreadLocal<RectF> BOUNDS_SCRATCH=ThreadLocal.withInitial(RectF::new);
         final Entity entity;final String layer,layout;final int color;final String lineType;final DxfLineStyle.Pattern linePattern;final double lineTypeScale,blockScale;final int lineWeight,sourceId;final SourceRange sourceRange;final String sourceType;final CadEdit sourceEditWorld;final boolean unbounded;final String[] visibilityLayerKeys;
         private float boundLeft,boundTop,boundRight,boundBottom;private boolean boundsReady,boundsValid;long queryMark;
+        // Reuse identical dash effects while panning: the screen zoom is unchanged.
+        // Print rendering bypasses this cache so printer-scale dashes remain exact.
+        private double cachedScreenScale=Double.NaN,cachedGlobal=Double.NaN;
+        private android.graphics.PathEffect cachedScreenEffect;
         LayerEntity(Entity e,String layer,String layout,int color,String lineType,DxfLineStyle.Pattern pattern,double scale,int weight,double blockScale,int sourceId,SourceRange range,String type,CadEdit edit,String[] visibilityLayerKeys){entity=e;this.layer=layer;this.layout=layout;this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);linePattern=pattern;lineTypeScale=safeLineTypeScale(scale);lineWeight=weight;this.blockScale=blockScale;this.sourceId=sourceId;sourceRange=range;sourceType=type;sourceEditWorld=edit;unbounded=isUnboundedEntity(e);this.visibilityLayerKeys=visibilityLayerKeys==null?new String[]{DxfLayerState.key(layer)}:visibilityLayerKeys.clone();}
         boolean isVisible(Set<String>selectedLayerKeys){return DxfLayerState.allVisible(visibilityLayerKeys,selectedLayerKeys);}
         private boolean ensureBounds(){
@@ -467,7 +471,18 @@ public final class DxfParser {
             if(boundsValid){boundLeft=r.left;boundTop=r.top;boundRight=r.right;boundBottom=r.bottom;}return boundsValid;
         }
         boolean intersects(RectF visible){if(unbounded||visible==null)return true;if(!ensureBounds())return true;return boundRight>=visible.left&&visible.right>=boundLeft&&boundBottom>=visible.top&&visible.bottom>=boundTop;}
-        public void bounds(RectF b){if(!ensureBounds())return;add(b,boundLeft,boundTop);add(b,boundRight,boundBottom);}public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean mono,double global){if(drawWipeoutMask(c,p,m,entity,print))return;p.setColor(mono?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));DxfLineStyle.Dash dash=linePattern==null?null:linePattern.dash(matrixScale(m),global,lineTypeScale,blockScale);p.setPathEffect(dash==null?null:new DashPathEffect(dash.intervals,dash.phase));entity.draw(c,p,m);p.setPathEffect(null);drawComplexLineText(c,p,m,entity,linePattern,global,lineTypeScale,blockScale);}
+        public void bounds(RectF b){if(!ensureBounds())return;add(b,boundLeft,boundTop);add(b,boundRight,boundBottom);}public void draw(Canvas c,Paint p,Matrix m){drawStyled(c,p,m,false,false,1d);}void drawStyled(Canvas c,Paint p,Matrix m,boolean print,boolean mono,double global){if(drawWipeoutMask(c,p,m,entity,print))return;p.setColor(mono?Color.BLACK:(print?paperColor(color):color));p.setStrokeWidth(print?DxfLineStyle.printStrokePoints(lineWeight):DxfLineStyle.screenStroke(lineWeight));android.graphics.PathEffect effect=null;
+            if(linePattern!=null){
+                double drawScale=matrixScale(m);
+                if(!print&&Double.compare(drawScale,cachedScreenScale)==0&&
+                    Double.compare(global,cachedGlobal)==0){effect=cachedScreenEffect;}
+                else{
+                    DxfLineStyle.Dash dash=linePattern.dash(drawScale,global,lineTypeScale,blockScale);
+                    effect=dash==null?null:new DashPathEffect(dash.intervals,dash.phase);
+                    if(!print){cachedScreenScale=drawScale;cachedGlobal=global;cachedScreenEffect=effect;}
+                }
+            }
+            p.setPathEffect(effect);entity.draw(c,p,m);p.setPathEffect(null);drawComplexLineText(c,p,m,entity,linePattern,global,lineTypeScale,blockScale);}
     }
 
 
@@ -670,7 +685,21 @@ public final class DxfParser {
     }
 
     private static void drawViewportModels(Canvas canvas,Paint paint,Matrix paperMatrix,List<Entity>document,String activeLayout,Set<String>visibleLayerKeys,boolean print,boolean mono,double global){
-        if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(activeLayout))return;ArrayList<LayerEntity>model=new ArrayList<>();ArrayList<ViewportEntity>viewports=new ArrayList<>();for(Entity e:document){LayerEntity layer=(LayerEntity)e;if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layer.layout)&&layer.isVisible(visibleLayerKeys))model.add(layer);if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys)){ViewportEntity vp=viewportOf(layer);if(vp!=null&&vp.viewport.active2d())viewports.add(vp);}}if(model.isEmpty()||viewports.isEmpty())return;for(ViewportEntity viewportEntity:viewports){if(Thread.currentThread().isInterrupted())return;DxfViewport.View vp=viewportEntity.viewport;float scale=(float)vp.scale();if(!Float.isFinite(scale)||scale<=0f)continue;Matrix modelToPaper=new Matrix();modelToPaper.postTranslate((float)-vp.modelCenterX(),(float)-vp.modelCenterY());modelToPaper.postRotate((float)-vp.twistDegrees);modelToPaper.postScale(scale,scale);modelToPaper.postTranslate((float)vp.paperCenterX,(float)vp.paperCenterY);Matrix combined=new Matrix();combined.setConcat(paperMatrix,modelToPaper);RectF clip=new RectF((float)vp.left(),(float)vp.bottom(),(float)vp.right(),(float)vp.top());paperMatrix.mapRect(clip);int save=canvas.save();canvas.clipRect(clip);for(LayerEntity layer:model)layer.drawStyled(canvas,paint,combined,print,mono,global);canvas.restoreToCount(save);}}
+        if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(activeLayout))return;ArrayList<LayerEntity>model=new ArrayList<>();ArrayList<ViewportEntity>viewports=new ArrayList<>();for(Entity e:document){LayerEntity layer=(LayerEntity)e;if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layer.layout)&&layer.isVisible(visibleLayerKeys))model.add(layer);if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys)){ViewportEntity vp=viewportOf(layer);if(vp!=null&&vp.viewport.active2d())viewports.add(vp);}}if(model.isEmpty()||viewports.isEmpty())return;for(ViewportEntity viewportEntity:viewports){if(Thread.currentThread().isInterrupted())return;DxfViewport.View vp=viewportEntity.viewport;float scale=(float)vp.scale();if(!Float.isFinite(scale)||scale<=0f)continue;Matrix modelToPaper=new Matrix();modelToPaper.postTranslate((float)-vp.modelCenterX(),(float)-vp.modelCenterY());modelToPaper.postRotate((float)-vp.twistDegrees);modelToPaper.postScale(scale,scale);modelToPaper.postTranslate((float)vp.paperCenterX,(float)vp.paperCenterY);Matrix combined=new Matrix();combined.setConcat(paperMatrix,modelToPaper);RectF clip=new RectF((float)vp.left(),(float)vp.bottom(),(float)vp.right(),(float)vp.top());paperMatrix.mapRect(clip);int save=canvas.save();canvas.clipRect(clip);
+        // Paper-space viewports can contain tens of thousands of model entities.
+        // Cull by the actual clipped screen region BEFORE drawing, not after.
+        Rect screenClip=canvas.getClipBounds();RectF visibleWorld=null;Matrix inv=new Matrix();
+        if(combined.invert(inv)&&screenClip.width()>0&&screenClip.height()>0){
+            visibleWorld=new RectF(screenClip);inv.mapRect(visibleWorld);
+            float worldPad=Math.max(visibleWorld.width()/screenClip.width(),
+                visibleWorld.height()/screenClip.height())*CadNavigationPolicy.EDGE_PAD_PIXELS;
+            visibleWorld.inset(-worldPad,-worldPad);
+        }
+        for(LayerEntity layer:model){
+            if(visibleWorld==null||layer.intersects(visibleWorld))
+                layer.drawStyled(canvas,paint,combined,print,mono,global);
+        }
+        canvas.restoreToCount(save);}}
     private static ViewportEntity viewportOf(LayerEntity layer){Entity e=layer.entity;if(e instanceof Transformed)e=((Transformed)e).entity;return e instanceof ViewportEntity?(ViewportEntity)e:null;}
     private static Set<String> canonicalVisible(Set<String>all,Set<String>selected){LinkedHashSet<String>out=new LinkedHashSet<>();Set<String>keys=DxfLayerState.normalized(selected);if(all!=null)for(String layer:all)if(keys.contains(DxfLayerState.key(layer)))out.add(layer);return out;}
     private static String findLayout(Set<String>layouts,String requested){if(layouts==null||layouts.isEmpty())return DxfBlocks.MODEL_LAYOUT;if(requested!=null)for(String l:layouts)if(l.equalsIgnoreCase(requested.trim()))return l;if(layouts.contains(DxfBlocks.MODEL_LAYOUT))return DxfBlocks.MODEL_LAYOUT;return layouts.iterator().next();}

@@ -15,9 +15,8 @@ export default {
 
 async function handleAnalyze(request, env) {
   if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
-  const aiProvider = selectAiProvider(env);
-  if (!aiProvider.ok || !env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
-    return json({ status: "server_error", message: aiProvider.message || "AI worker is not fully configured" }, 503);
+  if (!env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
+    return json({ status: "server_error", message: "AI session validation key is not configured" }, 503);
 
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
@@ -37,6 +36,13 @@ async function handleAnalyze(request, env) {
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body || {};
+  // Only named, server-configured providers may be requested; never accept an upstream URL or token.
+  const requestedProvider = body.providerPreference == null ? "" : body.providerPreference;
+  if (typeof requestedProvider !== "string" || !["", "gemini", "cloudflare"].includes(requestedProvider))
+    return json({ status: "denied", message: "Unsupported AI provider selection" }, 400);
+  const aiProvider = selectAiProvider(env, requestedProvider);
+  if (!aiProvider.ok)
+    return json({ status: "server_error", message: aiProvider.message }, 503);
   const prompt = String(body.prompt || "").trim();
   const cad = body.cad;
   const cadPackage = body.cadPackage;
@@ -95,7 +101,7 @@ async function handleAnalyze(request, env) {
     disciplineExpertInstructions(expertProfile) +
     "If visualEvidence contains a viewBatch, the individual visual regions are candidate close-ups around labels for floors, sections, elevations and site plans. These candidate crops ARE NOT verified full view boundaries. For each supplied named view, separately inspect its visible engineering components and elevation/kot marks; compare floor–section elevations, vertical stacks, roof ventilation and site sewer/water entry only when both matching views have actually been provided with legible marks and a common datum. Never infer a clash or numeric discrepancy from title text or spatial proximity alone. Explicitly state views not reviewed. " +
     "If visualEvidence contains a sweepBatch, analyze ONLY those named regions and the overview; never imply that other high-resolution regions were scanned. State each finding with its visible region label, observed component, supporting drawing annotation/geometry when present, degree of confidence, and what needs verification. Separate confirmed visible observations, plausible candidates, and unverified design checks. A visual match to a CAD sourceId requires actual spatial and textual/graph evidence, not proximity alone. " +
-    "For visual engineering review, write a REAL inspection record in Turkish, not a generic draft or invented example. For each distinct visible finding supply: [Bulgudan kimlik] [Pafta/görsel bölgesi] [Görülen teknik unsur ve okunabilir etiket] [Doğrulanan/olası/bilinmiyor] [Mühendislik etkisi] [Kontrol/düzeltme önerisi]. If no verifiable finding in a region, say 'Bu bölgede doğrulanabilir teknik bulgu yok' instead of inventing issues. Name explicit readable DN/PN/Q/H/diameter/slope/elevation values only when shown; do not assume pipe type or material from an arbitrary block name. Do not claim floor-to-floor inspection when only one view is supplied. For quantity/keşif, provide material + dimension + documented unit + drawing quantity only when CAD and image evidence are mutually consistent; suggest a 2025 YFK poz only when a verified local catalog entry is supplied, otherwise say 'poz doğrulanmadı'. " +
+    "For visual engineering review, write a REAL inspection record in Turkish, not a generic draft or invented example. Put actionable engineering issues FIRST; never pad reports with CAD entity counts, layer statistics, lengthy introductions or repeated disclaimers. Each concrete visual finding MUST fit on ONE LINE: BULGU | ÖNCELİK: kritik/orta/düşük | PAFTA: recognized view name | TESPİT: precise engineering nonconformity | KANIT: supplied sheet-tile or view label plus actual readable annotation | İŞLEM: targeted corrective action or verification. For an unresolved engineering question rather than a verified defect use ONE LINE: KONTROL | PAFTA: ... | KANIT: missing/unreadable specific datum | İŞLEM: exact supporting section, schedule, calculation or field check needed. Do not promote uncertain evidence into a definite nonconformity. If no verifiable finding in a region, say 'BULGU YOK' instead of inventing issues. Restrict each vision batch to five most significant findings. Name explicit readable DN/PN/Q/H/diameter/slope/elevation values only when shown; do not assume pipe type or material from an arbitrary block name. Do not claim floor-to-floor inspection when only one view is supplied. For quantity/keşif, provide material + dimension + documented unit + drawing quantity only when CAD and image evidence are mutually consistent; suggest a 2025 YFK poz only when a verified local catalog entry is supplied, otherwise say 'poz doğrulanmadı'. " +
     "Separate observations from assumptions and recommendations. Never claim a drawing is code-compliant, safe, or approved merely from this data. " +
     "Call out missing information and confidence limits. " +
     "If edit tools are available, tool calls are PROPOSALS ONLY. They are not executed automatically and require explicit user approval in MusaCAD. " +
@@ -984,8 +990,10 @@ function toChatCompletionsTool(tool) {
   };
 }
 
-function selectAiProvider(env) {
-  const requested = String(env.AI_PROVIDER || "").trim().toLowerCase();
+function selectAiProvider(env, clientPreference = "") {
+  // The client may only override the provider with Gemini or Cloudflare Qwen.
+  // All credentials, models and upstream endpoints remain trusted Worker config.
+  const requested = clientPreference || String(env.AI_PROVIDER || "").trim().toLowerCase();
   if (requested === "gemini" || (!requested && env.GEMINI_API_KEY)) {
     if (!env.GEMINI_API_KEY || !env.GEMINI_MODEL)
       return { ok: false, message: "Gemini AI worker is not fully configured" };
