@@ -1,123 +1,39 @@
-name: Qwen Workers AI binding smoke (ephemeral no production changes)
+name: Cleanup temporary Qwen test Worker
 on:
-  workflow_dispatch:
   push:
     branches: [test/cloudflare-qwen-binding-smoke]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  qwen-binding-smoke:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 4
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WORKER_NAME: musacad-qwen-smoke-${{ github.run_id }}
-      WRANGLER_SEND_METRICS: "false"
     steps:
-      - name: Create temporary authenticated Workers AI test
+      - name: Safely delete only named temporary worker via Cloudflare API
+        shell: bash
         run: |
           set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
-          mkdir -p /tmp/qwen-binding
-          cat > /tmp/qwen-binding/wrangler.toml <<EOF
-          name = "$WORKER_NAME"
-          main = "index.js"
-          compatibility_date = "2026-09-01"
-          workers_dev = true
-          [ai]
-          binding = "AI"
-          EOF
-          cat > /tmp/qwen-binding/index.js <<'JS'
-          export default {
-            async fetch(req,env) {
-              if(!env.SMOKE_AUTH || req.headers.get('x-musa-smoke')!==env.SMOKE_AUTH)
-                return new Response('Not found',{status:404});
-              if(req.method!=='POST'||new URL(req.url).pathname!=='/probe')
-                return new Response('Not found',{status:404});
-              const v=await req.json();
-              const vision=v.vision===true;
-              if(vision && (typeof v.image!=='string'||v.image.length>100000))
-                return new Response('Bad image',{status:400});
-              const userContent=vision
-                ? [{type:'text',text:'Bu sentetik çizimde hangi renkli geometriler var? Türkçe kısa cevap ver; gerçek DWG incelemesi iddiasında bulunma.'},
-                   {type:'image_url',image_url:{url:'data:image/png;base64,'+v.image}}]
-                : 'Türkçe cevapla: DWG paftasında boru çapı okunmuyorsa güvenilir mühendislik raporunda nasıl açıklarsın?';
-              const r=await env.AI.run('@cf/qwen/qwen3.8-27b',{
-                messages:[
-                  {role:'system',content:'Sen MusaCAD icin test motorusun. Olmayan proje hatasi uydurma.'},
-                  {role:'user',content:userContent}
-                ],
-                max_completion_tokens:220,
-                stream:false
-              });
-              const t=r?.response??r?.choices?.[0]?.message?.content??'';
-              return Response.json({ok:true,reply:typeof t==='string'?t:JSON.stringify(t),
-                keys:Object.keys(r||{}).slice(0,10)});
-            }
-          };
-          JS
-          SECRET="$(openssl rand -hex 32)"
-          echo "::add-mask::$SECRET"
-          printf 'SMOKE_AUTH=%s\n' "$SECRET" >> "$GITHUB_ENV"
-      - name: Deploy only unique short-lived test Worker
-        working-directory: /tmp/qwen-binding
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@latest deploy --name "$WORKER_NAME" > /tmp/qwen-deploy.log 2>&1 || {
-            echo "::error::Temporary Worker deployment failed; production untouched"
-            tail -12 /tmp/qwen-deploy.log
-            exit 1
-          }
-          BASE="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/qwen-deploy.log | tail -1 || true)"
-          test -n "$BASE"
-          echo "QWEN_PROBE_URL=$BASE/probe" >> "$GITHUB_ENV"
-          printf '%s' "$SMOKE_AUTH" | npx --yes wrangler@latest secret put SMOKE_AUTH --name "$WORKER_NAME" > /tmp/qwen-secret.log 2>&1
-          echo 'Temporary test Worker ready; original MusaCAD Worker unchanged.'
-      - name: Create synthetic CAD image, then test text and vision
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import struct,zlib,base64,json
-          n=320;rows=[]
-          for y in range(n):
-              row=bytearray(b'\0')
-              for x in range(n):
-                  red=70<=x<=186 and 55<=y<=174 and (x<78 or x>178 or y<63 or y>166)
-                  blue=25<=x<=289 and abs(y-259)<6
-                  row.extend((218,30,30) if red else ((25,68,225) if blue else (248,248,248)))
-              rows.append(bytes(row))
-          def chunk(t,v):return struct.pack('>I',len(v))+t+v+struct.pack('>I',zlib.crc32(t+v)&0xffffffff)
-          image=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',n,n,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b''.join(rows),9))+chunk(b'IEND',b'')
-          json.dump({'vision':True,'image':base64.b64encode(image).decode()},open('/tmp/qwen-vision.json','w'))
-          json.dump({'vision':False},open('/tmp/qwen-text.json','w'))
-          print('Only synthetic drawing is used; no real DWG leaves this test.')
-          PY
-          for mode in text vision; do
-            code="$(curl --silent --show-error --max-time 110 -o "/tmp/qwen-$mode-result.json" -w '%{http_code}' \
-              "$QWEN_PROBE_URL" -H "x-musa-smoke: $SMOKE_AUTH" -H 'content-type: application/json' \
-              --data-binary "@/tmp/qwen-$mode.json" || true)"
-            if [ "$code" != "200" ]; then
-              echo "::error::Workers AI $mode smoke failed HTTP $code"
-              exit 1
-            fi
-            MODE="$mode" python3 - <<'PY'
-          import os,json
-          m=os.environ['MODE']; d=json.load(open('/tmp/qwen-'+m+'-result.json'))
-          text=d.get('reply','')
-          if not d.get('ok') or not isinstance(text,str) or not text.strip():
-              raise SystemExit('Empty or invalid '+m+' answer: '+str(d.get('keys')))
-          print(m.upper()+'_PASS; '+text.replace('\n',' ')[:320])
-          PY
-          done
-      - name: Delete only ephemeral Worker
-        if: always()
-        working-directory: /tmp/qwen-binding
-        run: |
-          if [ -f wrangler.toml ]; then
-            printf 'y\n' | npx --yes wrangler@latest delete --name "$WORKER_NAME" > /tmp/qwen-delete.log 2>&1 || {
-              echo "::warning::Temporary Worker removal needs review: $WORKER_NAME"
-              exit 1
-            }
-            echo 'Ephemeral Worker deleted; production untouched.'
+          name="musacad-qwen-smoke-37958927717"
+          url="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$name"
+          code="$(curl --silent --show-error --max-time 25 \
+            --request DELETE --output /tmp/musacad-qwen-cleanup-response.json \
+            --write-out '%{http_code}' \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$url" || true)"
+          echo "Cleanup API status: HTTP $code"
+          if [ "$code" = 404 ] || [ "$code" = 200 ] || [ "$code" = 204 ]; then
+            echo "Temporary Worker absent or successfully deleted."
+            exit 0
           fi
+          python3 - <<'PY'
+          import json
+          try:
+              data=json.load(open('/tmp/musacad-qwen-cleanup-response.json'))
+              print('Cloudflare error codes:',[v.get('code') for v in data.get('errors',[])])
+          except Exception: print('No readable Cloudflare cleanup error payload')
+          PY
+          echo "::error::Temporary Worker cleanup unconfirmed."
+          exit 1
