@@ -1,4 +1,5 @@
-MusaCAD Gandalf visual engineering + heavy DWG performance release request (2026-10-09).
-Merge PR #201 successfully: consented full-sheet 3x3 images and section closeup cloud AI, structured eight-part real engineering audit, local 2025 YFK poz candidate lookup, dedicated user PDF price book import, actual online/model success LED, always-visible chat scroll thumb, progressive native first paint, direct complete DXF vector upgrade, gesture LOD without deleting geometry.
-Privacy: YFK original PDF must NOT be added to public GitHub/APK; user imports own copy to app-private storage.
-Deploy the server-side visual analysis instructions and build signed Gandalf Cloud production Android APK. Run quality gate and signed distribution.
+MusaCAD Gandalf AI connection diagnostic release, October 9 2026.
+Merged PR #202: visual scan preflights signed AI session before costly image rasterization; cloud model wait extended to 90 s on Android and 65 s server-side; differentiates HTTP 429 quota, HTTP 401/403 session/license, HTTP 504 model timeout and 502/503 provider availability.
+UI red AI LED shows recent failure details on tap, and gateway /health cannot clear a failed model result.
+No project imagery sent until consent; 2025 YFK PDF remains device-private and is not included in APK.
+Deploy current server worker and build signed production Gandalf Cloud APK. Validate worker smoke and signed artifact.
