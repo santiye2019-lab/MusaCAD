@@ -35,7 +35,8 @@ public final class MusaAiPanelContractTest {
         require(panel,"previousTurns.toString()","conversation context");
         require(panel,"recentTurns.addLast","bounded chat turns");
         require(panel,"MusaAiCloudHealth.check","real server health probe");
-        require(panel,"AI bağlı","real model response indicator");
+        require(panel,"MusaAiProviderChoice.label(chosenProvider[0])+\" çevrimiçi\"","real selected model response indicator");
+        require(panel,"online&&modelVerified.get()","green LED needs real upstream completion");
         require(panel,"cloudFailure(String reason)","explain actual model failure reason");
         require(panel,"lastCloudFailure","preserve diagnostic through /health");
         require(panel,"failedHealthChecks.incrementAndGet()","bounded, repeated health check failure before marking unreachable");
