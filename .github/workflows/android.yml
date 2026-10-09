@@ -311,6 +311,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiReportEvidenceContractTest.java
           java -cp /tmp/musacad-tests MusaAiReportEvidenceContractTest
+      - name: Test MusaCAD user engineering acceptance and preserved CAD capabilities
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiUserAcceptanceContractTest.java
+          java -cp /tmp/musacad-tests MusaAiUserAcceptanceContractTest
       - name: Test concise engineering report and verified Qwen/Gemini labels
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiEngineeringBrief.java app/src/main/java/com/musa/cad/MusaAiEngineLabel.java tests/MusaAiEngineeringBriefTest.java
