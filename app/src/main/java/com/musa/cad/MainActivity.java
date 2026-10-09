@@ -2010,6 +2010,7 @@ public class MainActivity extends AppCompatActivity {
                                            String recentContext){
         final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
+        final String selectedVisualProvider=MusaAiProviderChoice.selected(this);
         int acceptedTiles=0,acceptedBatches=0;
         MusaAiEngineeringBrief engineeringBrief=new MusaAiEngineeringBrief();
         reply.sweepProgress(0,total,"Pafta bölge taraması başlatıldı");
@@ -2069,7 +2070,7 @@ public class MainActivity extends AppCompatActivity {
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
             MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybridWithContext(
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
-                recentContext,evidenceSummary);
+                recentContext,evidenceSummary,selectedVisualProvider);
             if(!cloud.ok()){
                 reply.cloudFailure(cloud.message);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
@@ -2136,7 +2137,7 @@ public class MainActivity extends AppCompatActivity {
                     " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
                 MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybridWithContext(
                     getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json,
-                    recentContext,evidenceSummary);
+                    recentContext,evidenceSummary,selectedVisualProvider);
                 if(!detailed.ok()){
                     reply.cloudFailure(detailed.message);
                     focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
