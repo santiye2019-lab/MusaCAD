@@ -951,3 +951,107 @@ test("Gemini upstream 502 is distinguishable from the gateway 503 and safely ret
   assert.equal(body.providerHttpStatus,502);
   assert.match(body.message,/HTTP 502/);
 });
+
+
+test("Gemini native generateContent returns verified short answer without compatible chat",async()=>{
+  const keys=sessionPair();
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Merhaba",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  let requestBody=null;
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_MODE:"native",
+    GEMINI_API_KEY:"secret",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      assert.equal(String(url),"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
+      assert.equal(init.headers["x-goog-api-key"],"secret");
+      assert.equal(init.headers.authorization,undefined);
+      requestBody=JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        candidates:[{content:{role:"model",parts:[{text:"Merhaba! Projenizi inceleyebilirim."}]}}],
+        usageMetadata:{promptTokenCount:100,candidatesTokenCount:15,totalTokenCount:115}
+      }),{status:200});
+    }
+  });
+  const body=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(body.reply,"Merhaba! Projenizi inceleyebilirim.");
+  assert.equal(body.providerApi,"gemini-native");
+  assert.equal(body.usage.totalTokens,115);
+  assert.equal(requestBody.contents[0].parts[0].text.includes("Merhaba"),true);
+  assert.ok(requestBody.systemInstruction.parts[0].text.includes("Gandalf AI"));
+});
+
+test("Gemini native visual CAD evidence and edit tools stay proposals",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Sıhhi tesisatı incele ve şüpheli boruyu işaretlemeyi öner",
+      allowEditProposals:true,analysisScope:"sanitary",
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:7,layer:"SIHHI",type:"LINE"}]},
+      visualEvidence:{schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,
+        complete:false,images:[{mime:"image/jpeg",base64:jpeg,label:"full-sheet-overview",
+          width:800,height:800,contentBounds:[0,0,100,100],drawingBounds:[1000,2000,1100,2100]}]}
+    })
+  });
+  let sent=null;
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_MODE:"native",
+    GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,init)=>{
+      sent=JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        candidates:[{content:{role:"model",parts:[
+          {text:"SIHHI layer boru çapı doğrulanmalı."},
+          {functionCall:{name:"cad_highlight_entities",args:{sourceIds:[7],reason:"Çap teyidi"}}}
+        ]}}],
+        usageMetadata:{promptTokenCount:200,candidatesTokenCount:30,totalTokenCount:230}
+      }),{status:200});
+    }
+  });
+  const body=await result.json();
+  assert.equal(result.status,200);
+  assert.equal(body.status,"ok");
+  assert.equal(body.analysisScope,"sanitary");
+  assert.equal(body.visualRegionCount,1);
+  assert.match(body.reply,/boru çapı/);
+  assert.equal(body.actions.length,1);
+  assert.equal(body.actions[0].name,"cad_highlight_entities");
+  assert.equal(body.actions[0].arguments.sourceIds[0],7);
+  assert.equal(body.actions[0].reason,"Çap teyidi");
+  assert.equal(sent.contents[0].parts[1].inlineData.mimeType,"image/jpeg");
+  assert.equal(sent.contents[0].parts[1].inlineData.data,jpeg);
+  assert.equal(sent.tools[0].functionDeclarations.some(t=>t.name==="cad_highlight_entities"),true);
+  assert.equal(sent.systemInstruction.parts[0].text.includes("primary discipline scope: sanitary"),true);
+});
+
+test("Gemini native 429 is not retried and retains clear quota error",async()=>{
+  const keys=sessionPair();
+  let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Merhaba",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const result=await worker.fetch(request,{
+    AI_PROVIDER:"gemini",GEMINI_API_MODE:"native",
+    GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      return new Response(JSON.stringify({error:{code:429,message:"Quota"}}),{status:429});
+    }
+  });
+  assert.equal(result.status,429);
+  assert.equal(calls,1);
+});
