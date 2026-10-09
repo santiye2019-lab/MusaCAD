@@ -1,6 +1,7 @@
 package com.musa.cad;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.os.Handler;
 import android.os.Looper;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -56,6 +57,11 @@ public final class MusaAiPanel {
             reply.send("PDF görüntüleme bu sürümde yapılandırılmadı.");
         }
         default String priceBookStatus(){return "Poz kitabı: cihazda kontrol edilmedi";}
+        /** A real model completion must be obtained before indicating connected. */
+        default void onVerifyProvider(Reply reply){
+            reply.cloudFailure("AI bağlantı doğrulaması henüz yapılandırılmadı.");
+            reply.send("Seçilen model yanıtı doğrulanamadı.");
+        }
         default void onImportPriceBook(Reply reply){
             reply.send("Poz kitabı seçimi bu sürümde yapılandırılmadı.");
         }
@@ -108,8 +114,30 @@ public final class MusaAiPanel {
         context.setMaxLines(2);
 
         root.addView(context,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView engineLabel=text(activity,"AI motoru: Henüz model yanıtı alınmadı",10f,0xFFBDD0DC,false);
+        final String[] chosenProvider={MusaAiProviderChoice.selected(activity)};
+        TextView engineLabel=text(activity,
+            "Seçili motor: "+MusaAiProviderChoice.label(chosenProvider[0])+" • bağlantı doğrulanmadı",
+            10f,0xFFBDD0DC,false);
         root.addView(engineLabel,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        final AtomicBoolean analyzing=new AtomicBoolean(false);
+        final AtomicBoolean connecting=new AtomicBoolean(false);
+        LinearLayout providerActions=new LinearLayout(activity);
+        providerActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button providerChoice=new Button(activity);
+        providerChoice.setText("Motor: "+MusaAiProviderChoice.label(chosenProvider[0]));
+        providerChoice.setAllCaps(false);providerChoice.setTextColor(Color.WHITE);
+        providerChoice.setTextSize(11f);providerChoice.setMinHeight(dp(activity,44));
+        providerChoice.setBackground(round(activity,0xFF12384C,12,0xFF246C88));
+        providerActions.addView(providerChoice,new LinearLayout.LayoutParams(0,dp(activity,44),2f));
+        Button connectProvider=new Button(activity);
+        connectProvider.setText("Bağlan");connectProvider.setAllCaps(false);
+        connectProvider.setTextColor(Color.WHITE);connectProvider.setTextSize(11f);
+        connectProvider.setMinHeight(dp(activity,44));
+        connectProvider.setBackground(round(activity,0xFF09574C,12,0xFF16B8A6));
+        LinearLayout.LayoutParams connectLp=new LinearLayout.LayoutParams(0,dp(activity,44),1f);
+        connectLp.setMarginStart(dp(activity,6));providerActions.addView(connectProvider,connectLp);
+        root.addView(providerActions,new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView sweepStatus=text(activity,"",11f,0xFF8EE8C8,true);
         sweepStatus.setVisibility(View.GONE);
         root.addView(sweepStatus,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -231,6 +259,11 @@ public final class MusaAiPanel {
         Runnable submit=()->{
             String prompt=input.getText().toString().trim();
             if(prompt.isEmpty())return;
+            if(connecting.get()||!analyzing.compareAndSet(false,true)){
+                Toast.makeText(activity,"Önceki AI isteği sürüyor; motor değişimi bekletildi.",Toast.LENGTH_SHORT).show();
+                return;
+            }
+            providerChoice.setEnabled(false);connectProvider.setEnabled(false);
             input.setText("");
             appendBubble(activity,messages,true,prompt);
             TextView pending=appendBubble(activity,messages,false,"İşleniyor…");
@@ -246,6 +279,8 @@ public final class MusaAiPanel {
             final long maxRequestMs=240_000L;
             final Runnable timeout=()->{
                 if(!completed.compareAndSet(false,true))return;
+                analyzing.set(false);
+                providerChoice.setEnabled(true);connectProvider.setEnabled(true);
                 pending.setText("Gandalf isteği ilerleme veya toplam süre sınırına ulaştı. Çizime müdahale edilmedi. İsteği yeniden başlatabilir ya da yerel analiz kullanabilirsiniz.");
                 scrollBottom(messagesScroll);
             };
@@ -254,6 +289,8 @@ public final class MusaAiPanel {
                 @Override public void send(String text){
                     activity.runOnUiThread(()->{
                         if(!completed.compareAndSet(false,true))return;
+                        analyzing.set(false);
+                        providerChoice.setEnabled(true);connectProvider.setEnabled(true);
                         timeoutHandler.removeCallbacks(timeout);
                         String answer=text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim();
                         pending.setText(answer);
@@ -295,7 +332,7 @@ public final class MusaAiPanel {
                             title.setText(MusaAiSessionService.developerCached()
                                 ?"Gandalf • Developer":"Gandalf • MusaCAD AI");
                         }
-                        state.setText(answered?"● AI bağlı":"● AI erişilemedi");
+                        state.setText(answered?"● "+MusaAiProviderChoice.label(chosenProvider[0])+" çevrimiçi":"● AI erişilemedi");
                         state.setTextColor(answered?0xFF78F2C7:0xFFFFA7A7);
                         state.setBackground(round(activity,answered?0xFF15493F:0xFF4C2428,16,0));
                     });
@@ -334,6 +371,88 @@ public final class MusaAiPanel {
             try{host.onPrompt(prompt,previousTurns.toString(),requestReply);}
             catch(Exception e){requestReply.send("Gandalf komutu işlenirken hata oluştu. Tekrar deneyin.");}
         };
+
+        providerChoice.setOnClickListener(v->{
+            if(analyzing.get()||connecting.get())return;
+            String[] names={"Sunucu varsayılanı","Gemini","Qwen (Cloudflare)"};
+            String[] codes={MusaAiProviderChoice.DEFAULT,MusaAiProviderChoice.GEMINI,
+                MusaAiProviderChoice.QWEN};
+            int initial=MusaAiProviderChoice.GEMINI.equals(chosenProvider[0])?1:
+                MusaAiProviderChoice.QWEN.equals(chosenProvider[0])?2:0;
+            new AlertDialog.Builder(activity)
+                .setTitle("Çevrim içi yapay zekâ motoru")
+                .setSingleChoiceItems(names,initial,(dialog,which)->{
+                    String next=codes[which];
+                    if(!next.equals(chosenProvider[0])){
+                        chosenProvider[0]=next;
+                        MusaAiProviderChoice.select(activity,next);
+                        modelVerified.set(false);
+                        lastCloudFailure[0]="";
+                        engineLabel.setText("Seçili motor: "+MusaAiProviderChoice.label(next)+
+                            " • Bağlan ile doğrulayın");
+                        providerChoice.setText("Motor: "+MusaAiProviderChoice.label(next));
+                        state.setText("● Bağlanmadı");
+                        state.setTextColor(0xFFFFD184);
+                        state.setBackground(round(activity,0xFF4A3A21,16,0));
+                    }
+                    dialog.dismiss();
+                }).setNegativeButton("İptal",null).show();
+        });
+        connectProvider.setOnClickListener(v->{
+            if(analyzing.get()||!connecting.compareAndSet(false,true))return;
+            providerChoice.setEnabled(false);connectProvider.setEnabled(false);
+            modelVerified.set(false);lastCloudFailure[0]="";
+            state.setText("● "+MusaAiProviderChoice.label(chosenProvider[0])+" bağlanıyor…");
+            state.setTextColor(0xFFFFD184);
+            state.setBackground(round(activity,0xFF4A3A21,16,0));
+            TextView statusBubble=appendBubble(activity,messages,false,
+                "Seçilen modelden gerçek bağlantı yanıtı bekleniyor…");
+            scrollBottom(messagesScroll);
+            try{
+                host.onVerifyProvider(new Reply(){
+                    @Override public void modelInfo(String provider,String model){
+                        activity.runOnUiThread(()->engineLabel.setText(
+                            "AI motoru: "+MusaAiEngineLabel.display(provider,model)));
+                    }
+                    @Override public void cloudStatus(boolean answered){
+                        activity.runOnUiThread(()->{
+                            modelVerified.set(answered);
+                            if(answered){lastHealthOk.set(true);lastCloudFailure[0]="";}
+                            state.setText(answered?
+                                "● "+MusaAiProviderChoice.label(chosenProvider[0])+" çevrimiçi":
+                                "● Bağlanamadı");
+                            state.setTextColor(answered?0xFF78F2C7:0xFFFFA7A7);
+                            state.setBackground(round(activity,
+                                answered?0xFF15493F:0xFF4C2428,16,0));
+                        });
+                    }
+                    @Override public void cloudFailure(String reason){
+                        activity.runOnUiThread(()->{
+                            modelVerified.set(false);
+                            lastCloudFailure[0]=reason==null?"Bağlantı başarısız.":reason;
+                            state.setText(lastCloudFailure[0].contains("kota")||
+                                lastCloudFailure[0].contains("429")?
+                                "● Kota doldu":"● Bağlanamadı");
+                            state.setTextColor(0xFFFFA7A7);
+                            state.setBackground(round(activity,0xFF4C2428,16,0));
+                        });
+                    }
+                    @Override public void send(String response){
+                        activity.runOnUiThread(()->{
+                            connecting.set(false);
+                            providerChoice.setEnabled(true);connectProvider.setEnabled(true);
+                            statusBubble.setText(response==null?"AI yanıtı alınamadı.":response);
+                            scrollBottom(messagesScroll);
+                        });
+                    }
+                });
+            }catch(Exception error){
+                connecting.set(false);
+                providerChoice.setEnabled(true);connectProvider.setEnabled(true);
+                statusBubble.setText("Bağlantı testi başlatılamadı.");
+                state.setText("● Bağlanamadı");
+            }
+        });
 
         importBook.setOnClickListener(v->{
             TextView statusBubble=appendBubble(activity,messages,false,
@@ -440,13 +559,13 @@ public final class MusaAiPanel {
                     state.setText(failed>=3?"● Bağlantı denetlenemedi":
                         modelVerified.get()?"● Son AI yanıtı başarılı":"● Bağlantı denetleniyor");
                 }else{
-                    state.setText(modelVerified.get()?"● AI bağlı":"● Çevrimiçi");
+                    state.setText(modelVerified.get()?"● "+MusaAiProviderChoice.label(chosenProvider[0])+" çevrimiçi":"● Sunucu erişilebilir");
                 }
                 boolean actualError=!lastCloudFailure[0].isEmpty();
                 int indicatorColor=actualError||(!online&&failed>=3)
-                    ?0xFFFFA7A7:online?0xFF78F2C7:0xFFFFD184;
+                    ?0xFFFFA7A7:online&&modelVerified.get()?0xFF78F2C7:0xFFFFD184;
                 int indicatorBackground=actualError||(!online&&failed>=3)
-                    ?0xFF4C2428:online?0xFF15493F:0xFF4A3A21;
+                    ?0xFF4C2428:online&&modelVerified.get()?0xFF15493F:0xFF4A3A21;
                 state.setTextColor(indicatorColor);
                 state.setBackground(round(activity,indicatorBackground,16,0));
                 connectionHandler.postDelayed(connectionProbe[0],20_000L);
