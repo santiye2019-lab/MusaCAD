@@ -40,7 +40,8 @@ jobs:
           done
           [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9A-Fa-f]{32}$ ]] || { echo "::error::Invalid Cloudflare account ID"; exit 1; }
           case "$MUSACAD_TRIAL_API_URL" in https://*/v1/trial/start) ;; *) echo "::error::License trial endpoint must be HTTPS and end in /v1/trial/start"; exit 1 ;; esac
-          echo "MUSACAD_AI_SESSION_URL=\${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session" >> "$GITHUB_ENV"
+          TRIAL_BASE="${MUSACAD_TRIAL_API_URL%/v1/trial/start}"
+          printf "MUSACAD_AI_SESSION_URL=%s/v1/ai/session\n" "$TRIAL_BASE" >> "$GITHUB_ENV"
           echo "STAGE_EXPIRES_MS=$(( ($(date +%s) + 86400) * 1000 ))" >> "$GITHUB_ENV"
       - name: Test Qwen model readiness before creating pilot
         shell: bash
