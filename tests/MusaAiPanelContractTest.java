@@ -38,6 +38,17 @@ public final class MusaAiPanelContractTest {
         require(panel,"AI bağlı","real model response indicator");
         require(panel,"cloudFailure(String reason)","explain actual model failure reason");
         require(panel,"lastCloudFailure","preserve diagnostic through /health");
+        require(panel,"failedHealthChecks.incrementAndGet()","bounded, repeated health check failure before marking unreachable");
+        require(panel,"failed>=3","avoid transient health misses masquerading as lost access");
+        require(panel,"Son AI yanıtı başarılı","retain successful answer context after health probe miss");
+        require(panel,"lastHealthOk.set(online)","separate gateway probe from actual model result");
+        require(panel,"MusaAiSessionService.developerCached()","show refreshed developer role after successful AI response");
+        if(panel.contains("state.setText(\"● Erişim yok\")"))
+            throw new AssertionError("One transient health probe must not declare AI access lost");
+        String probeBlock=panel.substring(panel.indexOf("connectionProbe[0]=()->"));
+        if(probeBlock.contains("if(!online)modelVerified.set(false)"))
+            throw new AssertionError("Health probe must not erase a verified AI model answer");
+
         require(panel,"AI kota doldu","quota error state");
         require(panel,"AI oturum hatası","session and license rejection state");
         require(panel,"AI zaman aşımı","multimodal timeout state");
