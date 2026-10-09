@@ -26,6 +26,17 @@ def payload():
 
 
 class DeployGuardTests(unittest.TestCase):
+    def test_inspect_keeps_mismatched_url_read_only(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / ".github/workflows/deploy-license-worker-safe.yml").read_text()
+        self.assertIn('if os.environ.get("OPERATION") != "inspect":', source)
+        self.assertIn("SAFE INSPECT ONLY", source)
+        self.assertIn("Production deployment requires the exact intended Worker endpoint", source)
+        self.assertIn("Worker hostname differs", source)
+        self.assertIn("trial path differs", source)
+        # Never print the full Actions secret URL in public GitHub logs.
+        self.assertNotIn('print(os.environ["MUSACAD_TRIAL_API_URL"])', source)
+
     def test_existing_bindings_are_accepted(self):
         result, db = settings_bindings(payload())
         self.assertEqual(db, D1)
