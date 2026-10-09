@@ -123,6 +123,15 @@ public final class MusaAiCloudService {
             recentTurns,localEvidence);
     }
 
+    /** The provider is fixed for every tile of a whole-sheet sweep, even if the UI is reopened. */
+    public static Result analyzeHybridWithContext(Context context,MusaAiDrawingIndex index,
+                                                  String fileName,String rawPrompt,String scope,
+                                                  JSONObject visualEvidence,String recentTurns,
+                                                  String localEvidence,String providerForThisSweep){
+        return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope,
+            recentTurns,localEvidence,MusaAiProviderChoice.normalize(providerForThisSweep));
+    }
+
     public static Result analyzeHybrid(Context context,MusaAiDrawingIndex index,String fileName,
                                       String rawPrompt,String scope,JSONObject visualEvidence){
         return analyzeInternal(context,index,fileName,rawPrompt,null,visualEvidence,scope);
@@ -136,6 +145,12 @@ public final class MusaAiCloudService {
     private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
                                           String rawPrompt,String packageJson,JSONObject visualEvidence,String scope,
                                           String recentTurns,String localEvidence){
+        return analyzeInternal(context,index,fileName,rawPrompt,packageJson,visualEvidence,scope,
+            recentTurns,localEvidence,null);
+    }
+    private static Result analyzeInternal(Context context,MusaAiDrawingIndex index,String fileName,
+                                          String rawPrompt,String packageJson,JSONObject visualEvidence,String scope,
+                                          String recentTurns,String localEvidence,String fixedProvider){
         if(context==null||index==null)return new Result(Status.INVALID_RESPONSE,"","Çizim bağlamı hazırlanamadı",null,false);
 
         String endpoint=BuildConfig.AI_API_URL==null?"":BuildConfig.AI_API_URL.trim();
@@ -151,7 +166,7 @@ public final class MusaAiCloudService {
             return new Result(mapped,"",session.message,null,false);
         }
 
-        String selectedProvider=MusaAiProviderChoice.selected(context);
+        String selectedProvider=fixedProvider==null?MusaAiProviderChoice.selected(context):fixedProvider;
         String prompt=MusaAiCloudPolicy.promptForCloud(rawPrompt);
         boolean allowWeb=MusaAiCloudPolicy.allowWeb(rawPrompt);
         boolean allowEditProposals=MusaAiCloudPolicy.allowEditProposals(rawPrompt);
