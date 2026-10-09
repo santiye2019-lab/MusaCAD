@@ -35,6 +35,17 @@ public final class ResponsiveEntryLicenseUiContractTest {
         require(licenseLayout,"android:scaleType=\"centerCrop\"","full-bleed decorative background");
         forbid(licenseLayout,"android:id=\"@+id/artworkStage\"","fixed hotspot license stage");
 
+        String main=read("app/src/main/java/com/musa/cad/MainActivity.java");
+        require(main,"menu.add(0,MENU_MY_LICENSE,9,\"Lisans Bilgilerim\")","license menu visible in CAD");
+        require(main,"case MENU_MY_LICENSE:showMyLicenseInfo();return true;","license menu opens status");
+        require(main,"LicenseManager.installationId(this)","actual device-bound secure ID");
+        require(main,"setNeutralButton(\"KİMLİĞİ KOPYALA\"","secure ID copying");
+        require(main,"MusaAiSessionService.get(getApplicationContext())","server-backed developer check");
+        require(main,"if(session.developer())","developer role is authenticated, not inferred");
+        require(main,"new Thread(()->{","developer status checked off UI thread");
+        require(main,"if(!isFinishing()&&!isDestroyed()&&dialog.isShowing())","dismissed dialog not updated");
+        require(main,"Kimliği herkese açık ortamlarda paylaşmayın.","identity sharing warning");
+
         require(license,"buildResponsiveLicenseUi()","responsive license builder");
         require(license,"Güvenli MC1 Lisansı","production MC1 wording");
         require(license,"GÜVENLİ KİMLİĞİ KOPYALA","visible secure identity action");
