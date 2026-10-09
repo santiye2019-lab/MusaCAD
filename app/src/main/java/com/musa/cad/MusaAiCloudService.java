@@ -16,10 +16,10 @@ import java.util.*;
  * configured MusaCAD HTTPS gateway using a short-lived session token.
  */
 public final class MusaAiCloudService {
-    private static final int TIMEOUT_MS=30000;
+    private static final int TIMEOUT_MS=90000;
     private static final int MAX_RESPONSE_BYTES=512*1024;
 
-    public enum Status { OK, NOT_CONFIGURED, ACCESS_REQUIRED, NETWORK_ERROR, DENIED, INVALID_RESPONSE }
+    public enum Status { OK, NOT_CONFIGURED, ACCESS_REQUIRED, NETWORK_ERROR, QUOTA_EXHAUSTED, MODEL_TIMEOUT, UPSTREAM_UNAVAILABLE, DENIED, INVALID_RESPONSE }
 
     public static final class Action {
         public final String name,arguments,reason;
@@ -180,9 +180,25 @@ public final class MusaAiCloudService {
             JSONObject json=new JSONObject(response);
             if(code==401||code==403){
                 MusaAiSessionService.clearCache();
-                return new Result(Status.DENIED,"",json.optString("message","Gandalf AI erişimi reddedildi"),null,false);
+                return new Result(Status.DENIED,"","AI oturumu reddedildi (HTTP "+code+"): "+
+                    reason(json,"Giriş/lisans yetkisini kontrol edin."),null,false);
             }
-            if(code<200||code>=300)return new Result(Status.INVALID_RESPONSE,"",json.optString("message","Gandalf AI isteği tamamlanamadı"),null,false);
+            if(code==429)
+                return new Result(Status.QUOTA_EXHAUSTED,"",
+                    "AI kota sınırına ulaşıldı (HTTP 429). "+reason(json,
+                    "Kota yenilenince tekrar deneyin; bu sırada çevrim dışı CAD analizi kullanılabilir."),null,false);
+            if(code==504||code==408)
+                return new Result(Status.MODEL_TIMEOUT,"",
+                    "AI görsel yanıt süresi aşıldı (HTTP "+code+"). "+
+                    reason(json,"Daha küçük görsel gruplarla yeniden deneyin."),null,false);
+            if(code==502||code==503)
+                return new Result(Status.UPSTREAM_UNAVAILABLE,"",
+                    "AI sağlayıcısına erişilemiyor (HTTP "+code+"). "+
+                    reason(json,"AI sunucusunu ve sağlayıcı durumunu kontrol edin."),null,false);
+            if(code<200||code>=300)
+                return new Result(Status.INVALID_RESPONSE,"",
+                    "AI isteği reddedildi (HTTP "+code+"): "+
+                    reason(json,"Sunucu isteği doğrulayamadı."),null,false);
             if(!"ok".equalsIgnoreCase(json.optString("status","")))
                 return new Result(Status.INVALID_RESPONSE,"",json.optString("message","Gandalf AI yanıtı geçersiz"),null,false);
 
@@ -209,12 +225,21 @@ public final class MusaAiCloudService {
             if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
             return new Result(Status.OK,text,"",actions,sources,webUsed);
         }catch(SocketTimeoutException e){
-            return new Result(Status.NETWORK_ERROR,"","Gandalf AI sunucusundan süresi içinde yanıt alınamadı. Yerel analiz kullanılacak.",null,false);
+            return new Result(Status.MODEL_TIMEOUT,"",
+                "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+
+                " saniyelik sınırı aştı. Sunucu veya model gecikmesi olabilir; görsel analiz tamamlanmadı.",null,false);
         }catch(IOException e){
-            return new Result(Status.NETWORK_ERROR,"","Gandalf AI için internet bağlantısını kontrol edin",null,false);
+            return new Result(Status.NETWORK_ERROR,"",
+                "Gandalf AI ağ bağlantısı kurulamadı veya kesildi. İnternet, HTTPS ve sunucu erişimini kontrol edin.",null,false);
         }catch(Exception e){
             return new Result(Status.INVALID_RESPONSE,"","Gandalf AI yanıtı işlenemedi",null,false);
         }finally{if(connection!=null)connection.disconnect();}
+    }
+
+    private static String reason(JSONObject error,String fallback){
+        String msg=error.optString("message","").trim();
+        if(msg.isEmpty())msg=fallback;
+        return msg.substring(0,Math.min(240,msg.length()));
     }
 
     private static String readLimited(InputStream in)throws IOException{
