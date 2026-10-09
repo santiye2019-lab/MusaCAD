@@ -26,8 +26,8 @@ public final class MusaAiAnalysisIntent {
             "proje incele","teknik rapor hazirla","gozden gecir","bir bak",
             "bakabilir misin","bakar misin","degerlendir","tarama yap","taramak",
             "bastan sona bak","eksikleri bul","hatalari bul","sorunlari bul",
-            "uygun mu","sorun var mi","eksik var mi","hata var mi","ne dersin",
-            "neler yanlis","teknik sorun","tum paftalari tara","butun paftalari tara");
+            "uygun mu","uyumlu mu","sorun var mi","eksik var mi","hata var mi","ne dersin",
+            "neler yanlis","yanlislar","teknik sorun","tum paftalari tara","butun paftalari tara");
         boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
             "pis su","atik su","yangin","havalandirma","klima","isitma","statik",
             "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
