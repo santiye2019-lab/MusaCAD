@@ -1905,6 +1905,13 @@ public class MainActivity extends AppCompatActivity {
                         out.append("Gandalf Developer • Yönetici modu aktif\n\n");
                     if(packageMode)
                         out.append("Gandalf Proje Paketi • ").append(packageDrawings.size()).append(" açık vektör çizim\n\n");
+                    // Show the actual responding engine so a self-hosted
+                    // model is never mislabeled as Gemini or a generic local CAD result.
+                    if(!cloud.provider.isEmpty())
+                        out.append("Çevrim içi AI motoru: ")
+                            .append(cloud.provider.equals("selfhosted")?"Özel sunucu":cloud.provider)
+                            .append(cloud.model.isEmpty()?"":" • "+cloud.model)
+                            .append("\n\n");
                     out.append(cloud.text);
                     if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
                     if(!cloud.sources.isEmpty()){

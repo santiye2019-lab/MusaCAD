@@ -125,6 +125,7 @@ async function handleAnalyze(request, env) {
   let upstreamKey;
   const useGeminiNative = aiProvider.name === "gemini" &&
     String(env.GEMINI_API_MODE || "chat").trim().toLowerCase() === "native";
+  const useSelfHosted = aiProvider.name === "selfhosted";
 
   if (aiProvider.name === "gemini") {
     const geminiTools = tools
@@ -175,6 +176,37 @@ async function handleAnalyze(request, env) {
       upstreamUrl = GEMINI_CHAT_COMPLETIONS_URL;
     }
     upstreamKey = String(env.GEMINI_API_KEY);
+  } else if (useSelfHosted) {
+    // OpenAI-compatible chat API hosted by the MusaCAD operator (e.g. Ollama).
+    // The endpoint and bearer token are server-side secrets, never Android input.
+    const proposedTools = tools.filter(tool => tool && tool.type === "function")
+      .map(toChatCompletionsTool);
+    const selfHostedInstructions = instructions +
+      (allowWeb
+        ? " This self-hosted route has NO built-in live web search. Do not claim that current web sources were checked. Explicitly state that live web verification is unavailable. "
+        : "");
+    requestBody = {
+      model: aiProvider.model,
+      stream: false,
+      messages: [
+        { role: "system", content: selfHostedInstructions },
+        {
+          role: "user",
+          content: visualEvidence
+            ? [{ type: "text", text: input[0].content },
+               ...visualEvidence.images.map(frame => ({
+                 type: "image_url", image_url: {
+                   url: "data:image/jpeg;base64," + frame.base64
+                 }
+               }))]
+            : input[0].content
+        }
+      ],
+      max_tokens: maxOutputTokens
+    };
+    if (proposedTools.length) requestBody.tools = proposedTools;
+    upstreamUrl = aiProvider.endpoint;
+    upstreamKey = String(env.SELFHOSTED_AI_API_KEY);
   } else {
     requestBody = {
       model: aiProvider.model,
@@ -237,7 +269,9 @@ async function handleAnalyze(request, env) {
     } catch (_) {
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI modeli bekleme süresini aştı. Raporun bu görüntü grubu analiz edilmedi; yerel proje incelemesi kullanılabilir." }, 504);
-      return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed" }, 503);
+      return json({ status: "server_error", message:
+        useSelfHosted ? "Özel AI sunucusuna HTTPS bağlantısı kurulamadı. Sunucu erişimini kontrol edin." :
+        (aiProvider.name === "gemini" ? "Gemini connection failed" : "OpenAI connection failed") }, 503);
     }
 
     try {
@@ -265,6 +299,15 @@ async function handleAnalyze(request, env) {
         message: "Gemini sağlayıcısı HTTP " + upstream.status + " hatası verdi. Gandalf iki kısa yeniden deneme yaptı, fakat bulut servisi yanıt veremedi. Biraz sonra tekrar deneyin; yerel vektör kontrolü kullanılabilir."
       }, 503);
     }
+    if (useSelfHosted) {
+      // Don't forward arbitrary reverse-proxy errors, internal URLs or tokens.
+      if (upstream.status === 429)
+        return json({ status: "quota_exhausted", message:
+          "Özel AI sunucusu kapasite veya hız sınırına ulaştı (HTTP 429). Sunucu kapasitesini kontrol edip daha sonra tekrar deneyin." }, 429);
+      return json({ status: "server_error", message:
+        "Özel AI sunucusu isteği tamamlayamadı (HTTP " + upstream.status +
+        "). Sunucu ve model günlüklerini kontrol edin." }, upstream.status >= 500 ? 503 : 502);
+    }
     const upstreamMessage = data && data.error && data.error.message
       ? String(data.error.message)
       : (aiProvider.name === "gemini" ? "Gemini request failed" : "OpenAI request failed");
@@ -273,7 +316,10 @@ async function handleAnalyze(request, env) {
 
   const parsedOutput = aiProvider.name === "gemini"
     ? (useGeminiNative ? parseGeminiNativeOutput(data) : parseGeminiChatOutput(data))
-    : parseOpenAiOutput(data);
+    : (useSelfHosted ? parseGeminiChatOutput(data) : parseOpenAiOutput(data));
+  if (useSelfHosted && !parsedOutput.reply && !parsedOutput.actions.length)
+    return json({ status: "server_error", message:
+      "Özel AI modeli boş yanıt üretti. Modelin sohbet/görsel desteğini ve sunucu kapasitesini kontrol edin." }, 502);
   const reply = parsedOutput.reply || (parsedOutput.actions.length
     ? "Gandalf AI çizim için " + parsedOutput.actions.length + " adet düzenleme önerisi hazırladı. Bu işlemler henüz uygulanmadı."
     : "Gandalf AI yanıt üretemedi.");
@@ -290,7 +336,8 @@ async function handleAnalyze(request, env) {
     packageMode,
     provider: aiProvider.name,
     model: aiProvider.model,
-    providerApi: useGeminiNative ? "gemini-native" : (aiProvider.name === "gemini" ? "gemini-chat-compatible" : "openai-responses"),
+    providerApi: useSelfHosted ? "selfhosted-chat-compatible" :
+      (useGeminiNative ? "gemini-native" : (aiProvider.name === "gemini" ? "gemini-chat-compatible" : "openai-responses")),
     analysisScope,
     visualRegionCount: visualEvidence ? visualEvidence.images.length : 0,
     visualCoverageComplete: visualEvidence ? visualEvidence.complete : false,
@@ -885,12 +932,38 @@ function selectAiProvider(env) {
       return { ok: false, message: "Gemini AI worker is not fully configured" };
     return { ok: true, name: "gemini", model: String(env.GEMINI_MODEL) };
   }
+  if (requested === "selfhosted") {
+    const endpoint = safeSelfHostedEndpoint(env.SELFHOSTED_AI_ENDPOINT);
+    const model = String(env.SELFHOSTED_MODEL || "").trim();
+    if (!endpoint || !model || model.length > 100 ||
+        !env.SELFHOSTED_AI_API_KEY)
+      return { ok: false, message:
+        "Özel Qwen AI kurulumu eksik: HTTPS endpoint, model ve gizli sunucu anahtarı gereklidir." };
+    return { ok: true, name: "selfhosted", model, endpoint };
+  }
   if (requested === "openai" || (!requested && env.OPENAI_API_KEY)) {
     if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL)
       return { ok: false, message: "OpenAI AI worker is not fully configured" };
     return { ok: true, name: "openai", model: String(env.OPENAI_MODEL) };
   }
   return { ok: false, message: "No AI provider is configured" };
+}
+
+// Only a server-administrator-provisioned absolute HTTPS endpoint is accepted.
+// Never accept a client-provided destination, localhost or a plain HTTP tunnel.
+function safeSelfHostedEndpoint(value) {
+  try {
+    const parsed = new URL(String(value || ""));
+    const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol !== "https:" || !host || parsed.username || parsed.password ||
+        parsed.search || parsed.hash || parsed.pathname !== "/v1/chat/completions" ||
+        host === "localhost" || host.endsWith(".localhost") ||
+        host.endsWith(".local") || host === "127.0.0.1" ||
+        host === "0.0.0.0" || host === "::1" ||
+        host.startsWith("10.") || host.startsWith("192.168.") ||
+        host.startsWith("169.254.") || /^172\\.(1[6-9]|2[0-9]|3[01])\\./.test(host)) return "";
+    return parsed.href;
+  } catch (_) { return ""; }
 }
 
 function safeTokenCount(value) {

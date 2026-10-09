@@ -1055,3 +1055,145 @@ test("Gemini native 429 is not retried and retains clear quota error",async()=>{
   assert.equal(result.status,429);
   assert.equal(calls,1);
 });
+
+
+test("self-hosted Qwen accepts signed developer session and consensual CAD images",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  const img="/9j/"+("A".repeat(120));
+  let sent=null, calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      prompt:"Mekanik çizimi ve pis su hattını incele",
+      analysisScope:"wastewater",allowWeb:true,allowEditProposals:true,
+      cad:{schema:"musacad-cad-json/v1",items:[{sourceId:77,type:"LINE",layer:"PIS_SU"}]},
+      visualEvidence:{
+        schema:"musacad-visual-evidence/v1",rawDrawingIncluded:false,
+        complete:false,images:[{mime:"image/jpeg",base64:img,label:"full-sheet-overview",
+          width:800,height:800,contentBounds:[0,0,100,100],drawingBounds:[0,0,100,100]}]
+      }
+    })
+  });
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"selfhosted",
+    SELFHOSTED_AI_ENDPOINT:"https://private-ai.example.com/v1/chat/completions",
+    SELFHOSTED_AI_API_KEY:"server-only-secret",
+    SELFHOSTED_MODEL:"qwen3.5:4b",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async(url,options)=>{
+      calls++;
+      assert.equal(String(url),"https://private-ai.example.com/v1/chat/completions");
+      assert.equal(options.headers.authorization,"Bearer server-only-secret");
+      sent=JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        choices:[{message:{
+          content:"Görülen pis su hattı adaydır; çap teyidi gerekir.",
+          tool_calls:[{function:{name:"cad_highlight_entities",
+            arguments:JSON.stringify({sourceIds:[77],reason:"Yerinde kontrol"})}}]
+        }}],usage:{prompt_tokens:300,completion_tokens:80,total_tokens:380}
+      }),{status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  const payload=await response.json();
+  assert.equal(calls,1);
+  assert.equal(response.status,200);
+  assert.equal(payload.status,"ok");
+  assert.equal(payload.provider,"selfhosted");
+  assert.equal(payload.model,"qwen3.5:4b");
+  assert.equal(payload.providerApi,"selfhosted-chat-compatible");
+  assert.equal(payload.accessMode,"developer");
+  assert.equal(payload.analysisScope,"wastewater");
+  assert.equal(payload.visualRegionCount,1);
+  assert.match(payload.reply,/pis su hattı/);
+  assert.equal(payload.actions.length,1);
+  assert.equal(payload.actions[0].name,"cad_highlight_entities");
+  assert.equal(payload.usage.totalTokens,380);
+  assert.equal(sent.model,"qwen3.5:4b");
+  assert.equal(sent.stream,false);
+  assert.equal(sent.messages[0].role,"system");
+  assert.match(sent.messages[0].content,/NO built-in live web search/);
+  assert.match(sent.messages[1].content[0].text,/MUSACAD CAD-JSON/);
+  assert.equal(sent.messages[1].content[1].type,"image_url");
+  assert.equal(sent.messages[1].content[1].image_url.url,
+    "data:image/jpeg;base64,"+img);
+  assert.ok(sent.tools.some(t=>t.function.name==="cad_highlight_entities"));
+  assert.equal(sent.tool_choice,undefined);
+  assert.equal(payload.webUsed,false);
+  assert.equal(JSON.stringify(payload).includes("server-only-secret"),false);
+});
+
+test("self-hosted provider refuses unencrypted, private and malformed endpoints",async()=>{
+  const keys=sessionPair();
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{
+      authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Merhaba",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  for(const endpoint of ["http://public.example.com/v1/chat/completions",
+    "https://localhost/v1/chat/completions",
+    "https://127.0.0.1/v1/chat/completions",
+    "https://192.168.1.5/v1/chat/completions",
+    "https://private.example.com/v1/other",
+    "https://user:pass@private.example.com/v1/chat/completions",
+    "https://private.example.com/v1/chat/completions?token=leak"]){
+    let called=false;
+    const response=await worker.fetch(request,{
+      AI_PROVIDER:"selfhosted",SELFHOSTED_AI_ENDPOINT:endpoint,
+      SELFHOSTED_AI_API_KEY:"secret",SELFHOSTED_MODEL:"qwen3.5:4b",
+      MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{called=true;throw Error("must never contact malformed endpoint");}
+    });
+    assert.equal(response.status,503,endpoint);
+    assert.equal(called,false,endpoint);
+  }
+});
+
+test("self-hosted Qwen 429 stays local and does not fall back to Gemini",async()=>{
+  const keys=sessionPair();let calls=0;
+  const request=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{
+      authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const response=await worker.fetch(request,{
+    AI_PROVIDER:"selfhosted",
+    SELFHOSTED_AI_ENDPOINT:"https://private.example.com/v1/chat/completions",
+    SELFHOSTED_AI_API_KEY:"server-only-secret",SELFHOSTED_MODEL:"qwen3.5:4b",
+    GEMINI_API_KEY:"not-used",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>{
+      calls++;
+      return new Response(JSON.stringify({error:{message:"private error token=secret"}}),{status:429});
+    }
+  });
+  const body=await response.json();
+  assert.equal(calls,1);
+  assert.equal(response.status,429);
+  assert.equal(body.status,"quota_exhausted");
+  assert.match(body.message,/kapasite/);
+  assert.equal(JSON.stringify(body).includes("private error"),false);
+});
+
+test("self-hosted Qwen empty answer is an error, never fabricated success",async()=>{
+  const keys=sessionPair();
+  const req=new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",headers:{
+      authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+      "content-type":"application/json"},
+    body:JSON.stringify({prompt:"Merhaba",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  });
+  const res=await worker.fetch(req,{
+    AI_PROVIDER:"selfhosted",
+    SELFHOSTED_AI_ENDPOINT:"https://private.example.com/v1/chat/completions",
+    SELFHOSTED_AI_API_KEY:"secret",SELFHOSTED_MODEL:"qwen3.5:4b",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>new Response(JSON.stringify({
+      choices:[{message:{content:""}}]
+    }),{status:200})
+  });
+  assert.equal(res.status,502);
+  assert.equal((await res.json()).status,"server_error");
+});
