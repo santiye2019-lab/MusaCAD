@@ -22,7 +22,7 @@ jobs:
             console.error('::error::GEMINI_API_KEY secret is missing.');
             process.exit(1);
           }
-          const model = 'gemini-3.8-flash';
+          // No credentials or provider response bodies are printed.
           const brief = (label, response, json) => {
             const providerCode = json?.error?.code ?? 'none';
             const providerStatus = json?.error?.status ?? 'none';
@@ -33,38 +33,68 @@ jobs:
           const getJson = async response => {
             try { return await response.json(); } catch { return null; }
           };
+          const url = 'https://generativelanguage.googleapis.com/v1beta';
+          const modelQuery = async model => {
+            const response = await fetch(url + '/models/' + model, {
+              headers: {'x-goog-api-key': key},
+              signal: AbortSignal.timeout(20000)
+            });
+            brief(model + ' metadata', response, await getJson(response));
+            return response.ok;
+          };
+          const chatProbe = async model => {
+            const response = await fetch(url + '/openai/chat/completions', {
+              method: 'POST',
+              headers: {'Authorization': 'Bearer ' + key, 'Content-Type':'application/json'},
+              body: JSON.stringify({
+                model,
+                messages:[{role:'user',content:'Say OK.'}],
+                max_tokens:64
+              }),
+              signal: AbortSignal.timeout(30000)
+            });
+            brief(model + ' chat completion', response, await getJson(response));
+            return response.ok;
+          };
+          const nativeProbe = async model => {
+            const response = await fetch(url + '/models/' + model + ':generateContent', {
+              method:'POST',
+              headers: {'x-goog-api-key':key, 'Content-Type':'application/json'},
+              body: JSON.stringify({
+                contents:[{parts:[{text:'Say OK.'}]}],
+                generationConfig:{maxOutputTokens:64}
+              }),
+              signal: AbortSignal.timeout(30000)
+            });
+            brief(model + ' native generateContent', response, await getJson(response));
+            return response.ok;
+          };
           try {
-            const modelResponse = await fetch(
-              'https://generativelanguage.googleapis.com/v1beta/models/' + model,
-              { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(20000) }
-            );
-            brief('Model availability', modelResponse, await getJson(modelResponse));
-            const completionResponse = await fetch(
-              'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + key,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  model,
-                  messages: [{role: 'user',content: 'Say OK.'}],
-                  max_tokens: 64
-                }),
-                signal: AbortSignal.timeout(30000)
-              }
-            );
-            const completion = await getJson(completionResponse);
-            brief('Minimal AI completion', completionResponse, completion);
-            if (!completionResponse.ok) {
-              console.error('::error::Gemini provider refused a minimal request. Check the HTTP status and provider error category above.');
-              process.exitCode = 1;
+            const primary = 'gemini-3.8-flash';
+            const fallback = 'gemini-3.5-flash-lite';
+            await modelQuery(primary);
+            const primaryOk = await chatProbe(primary);
+            let alternativeOk = false;
+            if (!primaryOk) {
+              console.log('Primary provider failure; checking a free-tier fallback (no deployment).');
+              await modelQuery(fallback);
+              alternativeOk = await chatProbe(fallback);
+              // Helps distinguish Gemini capacity from an OpenAI-compatible gateway issue.
+              await nativeProbe(primary);
+            }
+            if (primaryOk) {
+              console.log('PASS: Current production model accepts short completions.');
+            } else if (alternativeOk) {
+              console.log('FALLBACK CANDIDATE: gemini-3.5-flash-lite responded; production still uses gemini-3.8-flash.');
             } else {
-              console.log('PASS: Gemini provider accepted a minimal request. Diagnose large CAD payload separately.');
+              console.log('No validated replacement yet. Review account access and Google provider capacity.');
+            }
+            if (!primaryOk) {
+              console.error('::error::Current production Gemini model failed minimal completion; no deployment was performed.');
+              process.exitCode = 1;
             }
           } catch(err) {
-            console.error('::error::Gemini network test failed: ' + String(err?.name ?? 'network-error'));
+            console.error('::error::Gemini provider test failed: ' + String(err?.name ?? 'network-error'));
             process.exitCode = 1;
           }
           NODE
