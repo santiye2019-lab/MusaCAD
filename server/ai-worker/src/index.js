@@ -15,9 +15,8 @@ export default {
 
 async function handleAnalyze(request, env) {
   if (request.method !== "POST") return json({ status: "method_not_allowed" }, 405, { Allow: "POST" });
-  const aiProvider = selectAiProvider(env);
-  if (!aiProvider.ok || !env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
-    return json({ status: "server_error", message: aiProvider.message || "AI worker is not fully configured" }, 503);
+  if (!env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
+    return json({ status: "server_error", message: "AI session validation key is not configured" }, 503);
 
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
@@ -37,6 +36,13 @@ async function handleAnalyze(request, env) {
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body || {};
+  // Only named, server-configured providers may be requested; never accept an upstream URL or token.
+  const requestedProvider = body.providerPreference == null ? "" : body.providerPreference;
+  if (typeof requestedProvider !== "string" || !["", "gemini", "cloudflare"].includes(requestedProvider))
+    return json({ status: "denied", message: "Unsupported AI provider selection" }, 400);
+  const aiProvider = selectAiProvider(env, requestedProvider);
+  if (!aiProvider.ok)
+    return json({ status: "server_error", message: aiProvider.message }, 503);
   const prompt = String(body.prompt || "").trim();
   const cad = body.cad;
   const cadPackage = body.cadPackage;
@@ -984,8 +990,10 @@ function toChatCompletionsTool(tool) {
   };
 }
 
-function selectAiProvider(env) {
-  const requested = String(env.AI_PROVIDER || "").trim().toLowerCase();
+function selectAiProvider(env, clientPreference = "") {
+  // The client may only override the provider with Gemini or Cloudflare Qwen.
+  // All credentials, models and upstream endpoints remain trusted Worker config.
+  const requested = clientPreference || String(env.AI_PROVIDER || "").trim().toLowerCase();
   if (requested === "gemini" || (!requested && env.GEMINI_API_KEY)) {
     if (!env.GEMINI_API_KEY || !env.GEMINI_MODEL)
       return { ok: false, message: "Gemini AI worker is not fully configured" };
