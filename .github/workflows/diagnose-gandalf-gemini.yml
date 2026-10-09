@@ -1,0 +1,70 @@
+name: Diagnose Gandalf Gemini API (safe, no deploy)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Check Gemini model access and one tiny completion
+        shell: bash
+        run: |
+          node <<'NODE'
+          const key = process.env.GEMINI_API_KEY;
+          if (!key) {
+            console.error('::error::GEMINI_API_KEY secret is missing.');
+            process.exit(1);
+          }
+          const model = 'gemini-3.8-flash';
+          const brief = (label, response, json) => {
+            const providerCode = json?.error?.code ?? 'none';
+            const providerStatus = json?.error?.status ?? 'none';
+            console.log(label + ': HTTP ' + response.status +
+              '; providerErrorCode=' + providerCode +
+              '; providerErrorStatus=' + providerStatus);
+          };
+          const getJson = async response => {
+            try { return await response.json(); } catch { return null; }
+          };
+          try {
+            const modelResponse = await fetch(
+              'https://generativelanguage.googleapis.com/v1beta/models/' + model,
+              { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(20000) }
+            );
+            brief('Model availability', modelResponse, await getJson(modelResponse));
+            const completionResponse = await fetch(
+              'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + key,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model,
+                  messages: [{role: 'user',content: 'Say OK.'}],
+                  max_tokens: 64
+                }),
+                signal: AbortSignal.timeout(30000)
+              }
+            );
+            const completion = await getJson(completionResponse);
+            brief('Minimal AI completion', completionResponse, completion);
+            if (!completionResponse.ok) {
+              console.error('::error::Gemini provider refused a minimal request. Check the HTTP status and provider error category above.');
+              process.exitCode = 1;
+            } else {
+              console.log('PASS: Gemini provider accepted a minimal request. Diagnose large CAD payload separately.');
+            }
+          } catch(err) {
+            console.error('::error::Gemini network test failed: ' + String(err?.name ?? 'network-error'));
+            process.exitCode = 1;
+          }
+          NODE
