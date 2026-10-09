@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -3775,8 +3775,73 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_ABOUT,9,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+    }
+
+    /** Read-only licensing status from any CAD screen, without reactivating a trial. */
+    private void showMyLicenseInfo(){
+        final String secureId=LicenseManager.installationId(this);
+        final LicenseManager.State state=LicenseManager.state(this);
+        String licenseStatus;
+        switch(state){
+            case LICENSED:licenseStatus="Lisanslı";break;
+            case TRIAL_ACTIVE:licenseStatus="Ücretsiz deneme aktif";break;
+            case TRIAL_AVAILABLE:licenseStatus="Ücretsiz deneme kullanılabilir";break;
+            case TRIAL_EXPIRED:licenseStatus="Deneme süresi doldu";break;
+            case CLOCK_ERROR:licenseStatus="Cihaz saati tutarsız";break;
+            default:licenseStatus="Bilinmiyor";
+        }
+        StringBuilder detailsText=new StringBuilder("Lisans durumu: ").append(licenseStatus)
+            .append("\nSeri numarası: ").append(LicenseManager.serialId(this))
+            .append("\n\nGüvenli Lisans Kimliği:\n").append(secureId);
+        if(state==LicenseManager.State.TRIAL_ACTIVE)
+            detailsText.append("\n\n").append(LicenseManager.remainingLabel(this));
+        detailsText.append("\n\nKimliği herkese açık ortamlarda paylaşmayın.");
+        final String baseText=detailsText.toString();
+        final TextView details=new TextView(this);
+        details.setText(baseText+"\n\nGandalf geliştirici yetkisi: Kontrol ediliyor...");
+        details.setTextColor(Color.WHITE);
+        details.setTextSize(14f);
+        details.setTextIsSelectable(true);
+        details.setPadding(dp(18),dp(14),dp(18),dp(16));
+        final ScrollView scroll=new ScrollView(this);
+        scroll.addView(details);
+        final AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("Lisans Bilgilerim")
+            .setView(scroll)
+            .setNeutralButton("KİMLİĞİ KOPYALA",(d,w)->{
+                ClipboardManager clipboard=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+                if(clipboard!=null){
+                    clipboard.setPrimaryClip(ClipData.newPlainText("MusaCAD Güvenli Lisans Kimliği",secureId));
+                    Toast.makeText(this,"Güvenli kimlik kopyalandı",Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setPositiveButton("KAPAT",null)
+            .create();
+        dialog.setOnShowListener(d->makeDialogButtonsReadable(dialog));
+        dialog.show();
+
+        // Remote entitlement is checked off the UI thread. Never infer developer
+        // rights from local paid/trial state or expose session tokens in the dialog.
+        new Thread(()->{
+            MusaAiSessionService.Result session=MusaAiSessionService.get(getApplicationContext());
+            String developerStatus;
+            if(session.developer())developerStatus="Etkin — sunucu geliştirici yetkisini doğruladı";
+            else if(session.active())developerStatus="Standart AI erişimi etkin (geliştirici değil)";
+            else if(session.status==MusaAiSessionService.Status.DENIED)
+                developerStatus="Reddedildi — cihaz izin listesi veya lisans kanıtı kontrol edilmeli";
+            else if(session.status==MusaAiSessionService.Status.NETWORK_ERROR)
+                developerStatus="Kontrol edilemedi — internet bağlantısını kontrol edin";
+            else if(session.status==MusaAiSessionService.Status.NOT_CONFIGURED)
+                developerStatus="Kontrol edilemedi — AI oturum servisi yapılandırılmamış";
+            else developerStatus="Kontrol edilemedi — oturum doğrulanamadı";
+            final String statusText=developerStatus;
+            runOnUiThread(()->{
+                if(!isFinishing()&&!isDestroyed()&&dialog.isShowing())
+                    details.setText(baseText+"\n\nGandalf geliştirici yetkisi: "+statusText);
+            });
+        },"MusaCAD-LicenseInfoCheck").start();
     }
 
     private void showDrawingInfo(){
