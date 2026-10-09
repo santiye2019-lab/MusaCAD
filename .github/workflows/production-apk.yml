@@ -21,8 +21,9 @@ jobs:
       MUSACAD_KEY_PASSWORD: ${{ secrets.MUSACAD_KEY_PASSWORD }}
       MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
       MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
-      MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
-      MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
+      # Public Cloudflare endpoint, not an API key. Secrets stay on the server.
+      # Never silently publish a production APK with missing Gandalf connectivity.
+      MUSACAD_AI_API_URL: https://musacad-ai.musacad2019.workers.dev/v1/analyze
 
     steps:
       - uses: actions/checkout@v4
@@ -53,20 +54,18 @@ jobs:
             https://*) ;;
             *) echo "::error::MUSACAD_TRIAL_API_URL must be HTTPS"; exit 1 ;;
           esac
-          if [ -n "${MUSACAD_AI_API_URL:-}" ] || [ -n "${MUSACAD_AI_SESSION_URL:-}" ]; then
-            if [ -z "${MUSACAD_AI_API_URL:-}" ] || [ -z "${MUSACAD_AI_SESSION_URL:-}" ]; then
-              echo "::error::MUSACAD_AI_API_URL and MUSACAD_AI_SESSION_URL must be configured together"
-              exit 1
-            fi
-            case "$MUSACAD_AI_API_URL" in
-              https://*) ;;
-              *) echo "::error::MUSACAD_AI_API_URL must be HTTPS"; exit 1 ;;
-            esac
-            case "$MUSACAD_AI_SESSION_URL" in
-              https://*) ;;
-              *) echo "::error::MUSACAD_AI_SESSION_URL must be HTTPS"; exit 1 ;;
-            esac
+          # The trial URL is supplied privately by GitHub Actions; derive its
+          # sibling AI session route. Never commit signing keys or real device IDs.
+          if [ "$MUSACAD_TRIAL_API_URL" != "https://musacad-trial-api.musacad2019.workers.dev/v1/trial/start" ]; then
+            echo "::error::Unexpected trial Worker host; update and verify the production configuration before building Cloud AI."
+            exit 1
           fi
+          SESSION_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session"
+          if [ "$MUSACAD_AI_API_URL" != "https://musacad-ai.musacad2019.workers.dev/v1/analyze" ]; then
+            echo "::error::Unexpected AI Worker endpoint."
+            exit 1
+          fi
+          echo "MUSACAD_AI_SESSION_URL=$SESSION_URL" >> "$GITHUB_ENV"
 
       - name: Prepare production signing keystore
         shell: bash
@@ -86,6 +85,30 @@ jobs:
             cat /tmp/musacad-trial-probe.json || true
             exit 1
           fi
+
+      - name: Verify Gandalf Cloud endpoints reject unauthenticated requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These probes never use any user's real license ID or project data.
+          SESSION_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session"
+          session_status="$(curl --fail-with-body --silent --show-error --max-time 20             --output /tmp/musacad-ai-session-probe.json --write-out '%{http_code}'             -X POST -H 'Content-Type: application/json'             --data '{"deviceId":"MC-00000000-00000000-00000000","packageName":"com.musa.cad","entitlementProof":""}'             "$SESSION_URL" || true)"
+          if [ "$session_status" != "403" ] ||              ! jq -e '.message == "Active cloud-AI entitlement not found"' /tmp/musacad-ai-session-probe.json >/dev/null 2>&1; then
+            echo "::error::The current license AI-session service did not reject an unlicensed test device as expected (HTTP $session_status)."
+            exit 1
+          fi
+          AI_BASE="${MUSACAD_AI_API_URL%/v1/analyze}"
+          health_status="$(curl --silent --show-error --max-time 20 --output /tmp/musacad-ai-health.json --write-out '%{http_code}' "$AI_BASE/health" || true)"
+          if [ "$health_status" != "200" ] ||              ! jq -e '.status == "ok" and .service == "musacad-ai-worker"' /tmp/musacad-ai-health.json >/dev/null 2>&1; then
+            echo "::error::Gandalf AI health check failed (HTTP $health_status)."
+            exit 1
+          fi
+          gateway_status="$(curl --silent --show-error --max-time 20             --output /tmp/musacad-ai-denied.json --write-out '%{http_code}'             -X POST -H 'Content-Type: application/json' --data '{}'             "$MUSACAD_AI_API_URL" || true)"
+          if [ "$gateway_status" != "401" ] ||              ! jq -e '.status == "denied"' /tmp/musacad-ai-denied.json >/dev/null 2>&1; then
+            echo "::error::Gandalf AI gateway is not configured or did not deny an unauthenticated request (HTTP $gateway_status)."
+            exit 1
+          fi
+          echo "PASS: Cloud AI and license session endpoints are available; authorization is enforced."
 
       - name: Build production signed direct APK
         shell: bash
@@ -115,11 +138,7 @@ jobs:
             echo "- Debuggable: false"
             echo "- Signing: production keystore"
             echo "- Trial backend: production HTTPS endpoint"
-            if [ -n "${MUSACAD_AI_API_URL:-}" ]; then
-              echo "- Gandalf: local tools + Cloud AI"
-            else
-              echo "- Gandalf: local tools active; Cloud AI not configured"
-            fi
+            echo "- Gandalf: local tools + Cloud AI (analyze/session routes verified)"
             echo "- SHA-256:"
             echo '  `'$(cut -d' ' -f1 /tmp/MusaCAD-v1.2.2-direct-production.sha256)'`'
           } >> "$GITHUB_STEP_SUMMARY"
