@@ -822,8 +822,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         MusaAiYfk2025Library.Status installed=MusaAiYfk2025Library.status(this);
-        if(installed.installed&&reply!=null)
-            reply.progress("2025 kitabı zaten kurulu. Telefonda farklı bir 2025 PDF seçerseniz mevcut katalog güncellenir.");
+        if(installed.installed){
+            if(reply!=null)reply.send("✓ 2025 poz kitabı zaten yüklü. "+
+                installed.items+" poz/rayiç, "+installed.pages+
+                " sayfa cihazın özel alanında hazır; tekrar yüklemeye gerek yok.");
+            return;
+        }
         pendingYfk2025Reply=reply;
         Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         picker.addCategory(Intent.CATEGORY_OPENABLE);
