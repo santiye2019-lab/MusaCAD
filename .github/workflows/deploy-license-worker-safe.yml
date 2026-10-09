@@ -59,11 +59,27 @@ jobs:
           import os
           from urllib.parse import urlparse
           u=urlparse(os.environ["MUSACAD_TRIAL_API_URL"])
-          if (u.scheme != "https" or u.port is not None or u.username is not None or
-              u.hostname != "musacad-trial-api.musacad2019.workers.dev" or
-              u.path != "/v1/trial/start" or u.query or u.fragment):
-              raise SystemExit("BLOCKED: Repository trial URL does not match the intended MusaCAD license Worker")
-          print("PASS: GitHub trial URL points to the expected production license Worker.")
+          issues=[]
+          if u.scheme != "https":
+              issues.append("HTTPS scheme differs")
+          if u.hostname != "musacad-trial-api.musacad2019.workers.dev":
+              issues.append("Worker hostname differs")
+          if u.path != "/v1/trial/start":
+              issues.append("trial path differs (a trailing slash also matters)")
+          if u.port is not None or u.username is not None or u.password is not None:
+              issues.append("unexpected credentials or port")
+          if u.query or u.fragment:
+              issues.append("unexpected URL query or fragment")
+          if issues:
+              # Do NOT print the actual repository secret URL. It may contain
+              # different or private origin information. Instead give a useful
+              # category for correcting the GitHub Actions secret.
+              print("::warning::Repository MUSACAD_TRIAL_API_URL mismatch: "+", ".join(issues))
+              if os.environ.get("OPERATION") != "inspect":
+                  raise SystemExit("BLOCKED: Production deployment requires the exact intended Worker endpoint")
+              print("SAFE INSPECT ONLY: proceeding with read-only Cloudflare checks. No deploy.")
+          else:
+              print("PASS: GitHub trial URL matches the intended production license Worker.")
           PY
           grep -Fq 'url.pathname === "/v1/ai/session"' server/trial-worker/src/index.js
           grep -Fq 'MUSACAD_DEVELOPER_DEVICE_IDS' server/trial-worker/src/index.js
