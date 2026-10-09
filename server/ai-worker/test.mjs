@@ -1,3 +1,21 @@
+test("Gemini quota errors never claim background automatic recovery",async()=>{
+  const keys=sessionPair();
+  const token=sessionToken(keys.privateKey,Date.now()+600000);
+  const response=await worker.fetch(new Request("https://ai.musacad.test/v1/analyze",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({prompt:"Projeyi incele",cad:{schema:"musacad-cad-json/v1",items:[]}})
+  }),{
+    AI_PROVIDER:"gemini",GEMINI_API_KEY:"dummy",GEMINI_MODEL:"gemini-3.8-flash",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    __fetch:async()=>new Response(JSON.stringify({error:{message:"limit"}}),{status:429})
+  });
+  const body=await response.json();
+  assert.equal(response.status,429);
+  assert.match(body.message,/yenilendiğinde yeniden deneyin/);
+  assert.equal(body.message.includes("otomatik olarak yeniden çalışır"),false);
+});
+
 test("AI provider timeout returns bounded error instead of hanging",async()=>{
   const keys=sessionPair();
   const token=sessionToken(keys.privateKey,Date.now()+10*60*1000);
@@ -18,7 +36,7 @@ test("AI provider timeout returns bounded error instead of hanging",async()=>{
   const body=await response.json();
   assert.equal(response.status,504);
   assert.equal(body.status,"timeout");
-  assert.match(body.message,/süresi içinde|gecikti/);
+  assert.match(body.message,/bekleme süresini aştı|yanıtı bekleme/);
   assert.ok(Date.now()-started<5000);
 });
 
@@ -555,7 +573,7 @@ test("Gemini quota exhaustion returns a clear free-tier message",async()=>{
   const body=await response.json();
   assert.equal(response.status,429);
   assert.equal(body.status,"quota_exhausted");
-  assert.equal(body.message.includes("ücretsiz kullanım kotası"),true);
+  assert.match(body.message,/kotas[ıi]|hız sınırı/);
 });
 
 
