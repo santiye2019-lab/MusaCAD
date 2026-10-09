@@ -2147,6 +2147,11 @@ public class MainActivity extends AppCompatActivity {
         report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
         report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
         report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
+        // User-facing per-sheet evidence register: all candidate titles are shown,
+        // but no title is misleadingly marked visually inspected by a 3x3 sweep.
+        report.append(MusaAiPaftaCoverage.build(snapshot,viewCatalog,
+            acceptedTiles,total,focusedReviewed,focusedEligible,
+            issue.isEmpty()?focusedIssue:issue));
         MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
                             currentProject==null?Collections.emptyList():currentProject.csbRates);
         report.append("\n\n7. TEKNİK ÖN METRAJ / KEŞİF KONTROLÜ");
