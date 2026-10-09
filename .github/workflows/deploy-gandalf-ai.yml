@@ -60,6 +60,10 @@ jobs:
               fi
               ;;
             selfhosted)
+              if ! [[ "$SELFHOSTED_MODEL" =~ ^[A-Za-z0-9._:/-]{1,100}$ ]]; then
+                echo "::error::Selfhosted model ID contains unsupported characters"
+                missing=1
+              fi
               if [ -z "${SELFHOSTED_AI_ENDPOINT:-}" ] || [ -z "${SELFHOSTED_AI_API_KEY:-}" ]; then
                 echo "::error::Selfhosted provider requires both MUSACAD_SELFHOSTED_AI_ENDPOINT and MUSACAD_SELFHOSTED_AI_API_KEY secrets"
                 missing=1
