@@ -186,16 +186,26 @@ async function handleAnalyze(request, env) {
   let upstream, data;
   try {
     try {
-      upstream = await Promise.race([fetcher(upstreamUrl, {
-        method: "POST",
-        headers: {
-          authorization: "Bearer " + upstreamKey,
-          "content-type": "application/json",
-          accept: "application/json"
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      }), deadline]);
+      // Gemini may briefly return 503 (capacity unavailable). Retry only this
+      // transient status with bounded exponential backoff within the same
+      // 65-second upstream deadline; never retry 429 quota responses.
+      for (let attempt = 0; ; attempt++) {
+        upstream = await Promise.race([fetcher(upstreamUrl, {
+          method: "POST",
+          headers: {
+            authorization: "Bearer " + upstreamKey,
+            "content-type": "application/json",
+            accept: "application/json"
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        }), deadline]);
+        if (aiProvider.name !== "gemini" || upstream.status !== 503 || attempt >= 2) break;
+        await Promise.race([
+          new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt))),
+          deadline
+        ]);
+      }
     } catch (_) {
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI modeli bekleme süresini aştı. Raporun bu görüntü grubu analiz edilmedi; yerel proje incelemesi kullanılabilir." }, 504);
@@ -207,7 +217,8 @@ async function handleAnalyze(request, env) {
     } catch (_) {
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI yanıtı bekleme süresini aştı. Görsel grup doğrulanmadı." }, 504);
-      return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
+      if (!upstream.ok) data = {}; // Some provider errors have empty or non-JSON bodies.
+      else return json({ status: "server_error", message: aiProvider.name === "gemini" ? "Gemini returned invalid JSON" : "OpenAI returned invalid JSON" }, 502);
     }
   } finally {
     clearTimeout(timeoutId);
@@ -218,6 +229,12 @@ async function handleAnalyze(request, env) {
         status: "quota_exhausted",
         message: "Gemini API istek kotası doldu veya hız sınırına ulaşıldı. Kota yenilendiğinde yeniden deneyin; Gandalf kendiliğinden arka planda tarama yapmaz."
       }, 429);
+    }
+    if (aiProvider.name === "gemini" && upstream.status === 503) {
+      return json({
+        status: "server_error",
+        message: "Gemini HTTP 503 hatası verdi. Gandalf iki kısa yeniden deneme yaptı ancak bulut servisi hâlâ yanıt veremedi. Biraz sonra tekrar deneyin; yerel vektör kontrolü kullanılabilir."
+      }, 503);
     }
     const upstreamMessage = data && data.error && data.error.message
       ? String(data.error.message)
