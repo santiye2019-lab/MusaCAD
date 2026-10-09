@@ -38,6 +38,10 @@ public final class MusaAiPanel {
         default void progress(String text){}
         /** Reports a successful/failed actual cloud model answer, not just /health. */
         default void cloudStatus(boolean modelAnswered){}
+        /** Provider/model from a real model answer; /health alone cannot set it. */
+        default void modelInfo(String provider,String model){}
+        /** Persistent region progress; completed means a successful provider response. */
+        default void sweepProgress(int completed,int total,String stage){}
         /** Recent failure reason for the LED; no secrets, tokens or CAD are logged. */
         default void cloudFailure(String reason){cloudStatus(false);}
     }
@@ -51,6 +55,7 @@ public final class MusaAiPanel {
         default void onViewPdf(String answer,Reply reply) {
             reply.send("PDF görüntüleme bu sürümde yapılandırılmadı.");
         }
+        default String priceBookStatus(){return "Poz kitabı: cihazda kontrol edilmedi";}
         default void onImportPriceBook(Reply reply){
             reply.send("Poz kitabı seçimi bu sürümde yapılandırılmadı.");
         }
@@ -101,7 +106,18 @@ public final class MusaAiPanel {
         TextView context=text(activity,host.contextLabel(),11f,0xFF9FC1D1,false);
         context.setPadding(0,dp(activity,3),0,dp(activity,8));
         context.setMaxLines(2);
+
         root.addView(context,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView engineLabel=text(activity,"AI motoru: Henüz model yanıtı alınmadı",10f,0xFFBDD0DC,false);
+        root.addView(engineLabel,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView sweepStatus=text(activity,"",11f,0xFF8EE8C8,true);
+        sweepStatus.setVisibility(View.GONE);
+        root.addView(sweepStatus,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
+        android.widget.ProgressBar sweepBar=new android.widget.ProgressBar(activity,null,android.R.attr.progressBarStyleHorizontal);
+        sweepBar.setMax(MusaAiVisualSweepPlan.TILE_COUNT);
+        sweepBar.setProgress(0);
+        sweepBar.setVisibility(View.GONE);
+        root.addView(sweepBar,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(activity,5)));
 
         // Separate explicit book import from free-form Gandalf prompts and PDF view.
         LinearLayout topActions=new LinearLayout(activity);
@@ -129,6 +145,9 @@ public final class MusaAiPanel {
             ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
         actionsLp.bottomMargin=dp(activity,5);
         root.addView(topActions,actionsLp);
+        TextView bookStatus=text(activity,host.priceBookStatus(),10f,0xFFB7E4D8,false);
+        bookStatus.setMaxLines(2);
+        root.addView(bookStatus,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         ScrollView messagesScroll=new ScrollView(activity);
         messagesScroll.setFillViewport(true);
@@ -248,6 +267,22 @@ public final class MusaAiPanel {
                         scrollBottom(messagesScroll);
                     });
                 }
+                @Override public void modelInfo(String provider,String model){
+                    activity.runOnUiThread(()->{
+                        String value=MusaAiEngineLabel.display(provider,model);
+                        engineLabel.setText("AI motoru: "+value);
+                    });
+                }
+                @Override public void sweepProgress(int completed,int total,String stage){
+                    activity.runOnUiThread(()->{
+                        int maximum=Math.max(1,total);
+                        sweepBar.setMax(maximum);
+                        sweepBar.setProgress(Math.max(0,Math.min(maximum,completed)));
+                        sweepBar.setVisibility(View.VISIBLE);
+                        sweepStatus.setVisibility(View.VISIBLE);
+                        sweepStatus.setText("Görsel tarama: "+completed+"/"+total+" bölge • "+(stage==null?"":stage));
+                    });
+                }
                 @Override public void cloudStatus(boolean answered){
                     activity.runOnUiThread(()->{
                         modelVerified.set(answered);
@@ -302,18 +337,23 @@ public final class MusaAiPanel {
 
         importBook.setOnClickListener(v->{
             TextView statusBubble=appendBubble(activity,messages,false,
-                "2025 ÇŞİDB poz kitabı seçiliyor…");
+                "Telefonunuzdan ÇŞİDB 2025 PDF kitabını seçin…");
+            bookStatus.setText("Poz kitabı: Dosya seçimi açılıyor…");
             scrollBottom(messagesScroll);
             host.onImportPriceBook(new Reply(){
                 @Override public void send(String message){
                     activity.runOnUiThread(()->{
                         statusBubble.setText(message==null?"Dosya seçme işlemi tamamlandı.":message);
+                        bookStatus.setText("Poz kitabı: "+(message==null?"durum kontrol ediliyor":message));
                         scrollBottom(messagesScroll);
                     });
                 }
                 @Override public void progress(String message){
                     activity.runOnUiThread(()->{
-                        if(message!=null&&!message.trim().isEmpty())statusBubble.setText(message);
+                        if(message!=null&&!message.trim().isEmpty()){
+                            statusBubble.setText(message);
+                            bookStatus.setText("Poz kitabı: "+message);
+                        }
                         scrollBottom(messagesScroll);
                     });
                 }
