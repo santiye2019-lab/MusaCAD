@@ -14,7 +14,7 @@ on:
       release_approved:
         description: "Final acceptance complete and APK creation explicitly approved"
         type: boolean
-        required: true
+        required: false
         default: false
       build_pilot_apk:
         description: "Optional signed 24h APK; installing may replace your current MusaCAD"
