@@ -2,8 +2,6 @@ name: Qwen Workers AI manual smoke with separate AI token
 
 on:
   workflow_dispatch:
-  push:
-    branches: [test/qwen-cloudflare-reasoning-budget-fix]
 
 permissions:
   contents: read
