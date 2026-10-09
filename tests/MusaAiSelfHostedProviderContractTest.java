@@ -21,7 +21,7 @@ public final class MusaAiSelfHostedProviderContractTest {
         check(worker.contains("verifySession"),"Existing license session authentication preserved");
         check(worker.contains("data:image/jpeg;base64,"),"Multimodal image sent via chat-compatible API");
         check(worker.contains("parseGeminiChatOutput(data)"),"Chat-compatible response parser shared");
-        check(worker.contains("if (useSelfHosted && !parsedOutput.reply"),
+        check(worker.contains("(useSelfHosted || useCloudflareQwen) && !parsedOutput.reply"),
             "Empty AI answer never reported as success");
         check(workflow.contains("provider:"),"Operator explicitly chooses provider");
         check(workflow.contains("default: gemini"),"Existing live Gemini default retained");
