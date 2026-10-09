@@ -23,7 +23,7 @@ public final class MusaAiConnectionFailureContractTest {
         has(service,"reason(json");
         has(activity,"MusaAiSessionService.get(getApplicationContext())");
         has(activity,"ÇEVRİM İÇİ GÖRSEL ANALİZ BAŞLATILAMADI");
-        has(activity,"Görsel AI başarısız");
+        has(activity,"AI sonucu alınamadı:");
         has(activity,"Çevrim içi görsel analiz durdu");
         has(activity,"Bulut AI tamamlanamadı:");
         has(worker,"AI_UPSTREAM_TIMEOUT_MS, 65000");
