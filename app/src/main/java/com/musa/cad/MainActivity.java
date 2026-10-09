@@ -807,6 +807,9 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onViewPdf(String answer,MusaAiPanel.Reply reply){
                 viewGandalfAnswerPdf(answer,reply);
             }
+            @Override public String priceBookStatus(){
+                return MusaAiYfk2025Library.statusText(MainActivity.this);
+            }
             @Override public void onImportPriceBook(MusaAiPanel.Reply reply){
                 chooseYfk2025Book(reply);
             }
@@ -819,12 +822,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         MusaAiYfk2025Library.Status installed=MusaAiYfk2025Library.status(this);
-        if(installed.installed){
-            if(reply!=null)reply.send(MusaAiYfk2025Library.statusText(this)+
-                "\n2025 poz kitabı zaten cihazda kurulu. Başka yılın yeni pozları"+
-                " '2025 2026 yeni pozları tara' komutuyla karşılaştırılabilir.");
-            return;
-        }
+        if(installed.installed&&reply!=null)
+            reply.progress("2025 kitabı zaten kurulu. Telefonda farklı bir 2025 PDF seçerseniz mevcut katalog güncellenir.");
         pendingYfk2025Reply=reply;
         Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         picker.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1726,6 +1725,7 @@ public class MainActivity extends AppCompatActivity {
                 MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
                     getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
                 if(cloud.ok()){
+                    reply.modelInfo(cloud.provider,cloud.model);
                     reply.cloudStatus(true);
                     pendingAiActions=Collections.emptyList();
                     reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
@@ -1898,6 +1898,7 @@ public class MainActivity extends AppCompatActivity {
                         reply.send(fallbackReport+"\n\nRaporu Word/PDF olarak dışa aktarabilirsiniz.");
                         return;
                     }
+                    reply.modelInfo(cloud.provider,cloud.model);
                     reply.cloudStatus(true);
                     pendingAiActions=cloud.actions;
                     StringBuilder out=new StringBuilder();
@@ -1983,6 +1984,8 @@ public class MainActivity extends AppCompatActivity {
         final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
         int acceptedTiles=0,acceptedBatches=0;
+        reply.sweepProgress(0,total,"Pafta bölge taraması başlatıldı");
+        String verifiedModel="Doğrulanmış görsel AI yanıtı yok";
         String issue="";
         StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
@@ -2046,9 +2049,13 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
                 break;
             }
+            verifiedModel=MusaAiEngineLabel.display(cloud.provider,cloud.model);
+            reply.modelInfo(cloud.provider,cloud.model);
             reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
+            reply.sweepProgress(acceptedTiles,total,
+                "AI yanıtı doğrulandı • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+" grup");
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
@@ -2108,6 +2115,7 @@ public class MainActivity extends AppCompatActivity {
                     reply.progress("Gandalf • Yakın-plan AI analizi durdu. "+focusedIssue);
                     break;
                 }
+                reply.modelInfo(detailed.provider,detailed.model);
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
@@ -2153,6 +2161,9 @@ public class MainActivity extends AppCompatActivity {
             lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(local.sourceIds));
         }
 
+        reply.sweepProgress(acceptedTiles,total,
+            acceptedTiles==total&&issue.isEmpty()?"9/9 bölge tamamlandı":
+                "KISMİ • "+(issue.isEmpty()?"eksik görüntüler var":issue));
         boolean visualComplete=acceptedTiles==total&&
             acceptedBatches==MusaAiVisualSweepPlan.BATCH_COUNT&&issue.isEmpty();
         report.append("\n\n6. GÖRSEL KAPSAM / VERİ GÜVENİLİRLİĞİ");
@@ -2191,6 +2202,7 @@ public class MainActivity extends AppCompatActivity {
         String cover="GÖRSEL PROJE ANALİZİ • İNCELEME ÖZETİ"+
             "\nProje: "+fileName+" • Layout: "+snapshot.layout+
             "\nDisiplin: "+MusaAiAnalysisIntent.label(scope)+
+            "\nGörsel AI motoru: "+verifiedModel+
             "\nGörsel AI tarafından yanıtlanan bölge: "+acceptedTiles+"/"+total+
             "\nYakından incelenen görünüm adayı: "+focusedReviewed+"/"+focusedEligible+
             "\nRapor niteliği: "+
@@ -2838,7 +2850,7 @@ public class MainActivity extends AppCompatActivity {
             if(reply!=null)reply.send("YFK arşivi şu anda meşgul; yeniden deneyin.");
             return;
         }
-        if(reply!=null)reply.progress("2025 ÇŞİDB kitabı cihazda hazırlanıyor…");
+        if(reply!=null)reply.progress("2025 ÇŞİDB kitabı dosyadan okunuyor ve yerel poz kataloğuna aktarılıyor…");
         yfkCatalogExecutor.submit(()->{
             try{
                 MusaAiYfk2025Library.Status installed=
@@ -2849,7 +2861,7 @@ public class MainActivity extends AppCompatActivity {
                         }));
                 runOnUiThread(()->{
                     if(reply!=null)reply.send(
-                        "2025 ÇŞİDB kitabı çevrim dışı kuruldu: "+installed.items+
+                        "✓ PDF alındı. 2025 ÇŞİDB kitabı çevrim dışı kuruldu: "+installed.items+
                         " poz/rayiç, "+installed.pages+" sayfa.\n"+
                         "Örnek: '2025 poz 25.100.1005' • "+
                         "'2025 katalog durumu' • '2025 2026 yeni pozları tara'.\n"+
