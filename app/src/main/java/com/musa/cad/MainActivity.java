@@ -1619,6 +1619,7 @@ public class MainActivity extends AppCompatActivity {
             "\nLayout: "+drawing.activeLayout+
             "\nToplam CAD nesnesi: "+drawing.entityCount+
             "\nKatman: "+drawing.layerCount;
+        reply.modelInfo("local","");
         reply.progress("Gandalf • DWG paftasındaki cihaz ve tesisat etiketleri taranıyor…");
         final Runnable deadline=()->{
             if(!finished.compareAndSet(false,true))return;
@@ -1650,13 +1651,13 @@ public class MainActivity extends AppCompatActivity {
                             reply.send("Analiz sırasında aktif proje değişti. Yeni proje için tekrar deneyin.");
                             return;
                         }
-                        lastAiReport=report.text;
+                        String engineeringSummary=MusaAiEngineeringBrief.localSummary(
+                            drawingName,drawing.activeLayout,report.text);
+                        lastAiReport=engineeringSummary;
                         lastAiReportTitle="Gandalf • Kaynaklı Mühendislik Ön İncelemesi";
                         lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(report.sourceIds));
-                        reply.send(report.text+
-                            "\n\nOkunan: "+report.equipmentLabels+" cihaz/ekipman etiketi, "+
-                            report.dimensions+" çap/kanal boyutu, "+report.measuredRuns+" ölçülebilir merkez hat parçası."+
-                            "\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
+                        reply.send(engineeringSummary+
+                            "\n\nRaporu PDF veya Word olarak dışa aktarabilirsiniz.");
                         // Keep viewport work after terminal reply, and cap highlights.
                         if(!report.sourceIds.isEmpty()){
                             int count=0;
@@ -1890,6 +1891,7 @@ public class MainActivity extends AppCompatActivity {
                             (cloud.message.isEmpty()?cloud.status.toString():cloud.message)+
                             "\nYerel vektör kontrolüne geçiliyor…");
                         MusaAiEngineeringReview.Result localFallback=MusaAiEngineeringReview.analyze(snapshot,displayName);
+                        reply.modelInfo("local","");
                         String reason=cloud.message.isEmpty()?"Gandalf Cloud AI kullanılamadı.":cloud.message;
                         String fallbackReport=reason+
                             "\n\nGandalf yerel vektör analiziyle devam etti (görsel AI sonucu değildir):\n"+
@@ -2156,6 +2158,7 @@ public class MainActivity extends AppCompatActivity {
             " Kot tutarsızlığı ancak ortak referanslar, okunabilir ölçüler ve mühendislik doğrulamasıyla teyit edilir.");
 
         if(acceptedBatches==0){
+            reply.modelInfo("local","");
             MusaAiEngineeringReview.Result fallback=MusaAiEngineeringReview.analyze(snapshot,fileName);
             report.append("\n\nGÖRSEL ANALİZ GERÇEKLEŞMEDİ");
             if(!issue.isEmpty())report.append("\nNeden: ").append(issue);
