@@ -8,6 +8,7 @@ import java.util.Locale;
 /** Evidence-first report: only actionable engineering observations reach the main output. */
 public final class MusaAiEngineeringBrief {
     private final LinkedHashSet<String> findings=new LinkedHashSet<>();
+    private final LinkedHashSet<String> dedupeKeys=new LinkedHashSet<>();
     private final List<String> unstructured=new ArrayList<>();
     public void addRegion(String region,String response){
         String label=region==null?"Bölge":region.trim();
@@ -21,8 +22,10 @@ public final class MusaAiEngineeringBrief {
             // A model's unsupported generic claim is not promoted to a finding.
             if(value.length()<24||!upper.contains("KANIT:")||!upper.contains("İŞLEM:"))continue;
             if(findings.size()>=45)break;
-            findings.add(label+" • "+value);
-            accepted++;
+            if(dedupeKeys.add(value.toLowerCase(Locale.ROOT))){
+                findings.add(label+" • "+value);
+                accepted++;
+            }
         }
         if(accepted==0&&unstructured.size()<3)
             unstructured.add(label+": "+response.trim().replaceAll("\\s+"," ").substring(
@@ -78,7 +81,7 @@ public final class MusaAiEngineeringBrief {
                 upper.contains("DEBİ")||upper.contains("KAYNAK ")||
                 upper.contains("DOĞRULANA")||upper.contains("Q/H")))continue;
             if(accepted++>=10)break;
-            if(out.length()>0)out.append("\\n");
+            if(out.length()>0)out.append("\n");
             out.append(value);
         }
         return out.toString();
