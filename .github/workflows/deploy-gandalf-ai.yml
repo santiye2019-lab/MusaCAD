@@ -60,54 +60,18 @@ jobs:
           }
 
           status="$(probe_session)"
+          # Never mutate the license database/Worker as a side effect of an
+          # AI/APK release. Older license Workers may return 403 while still
+          # lacking current developer-allowlist code; status alone is not a
+          # version or binding-preservation check.
           if [ "$status" = "404" ]; then
-            echo "AI session route is missing; refreshing the existing trial Worker with current repository code."
-
-            WORKER_HOST="${BASE_URL#https://}"
-            WORKER_HOST="${WORKER_HOST%%/*}"
-            WORKER_NAME="${WORKER_HOST%%.*}"
-            if [ -z "$WORKER_NAME" ]; then
-              echo "::error::Could not determine trial Worker name from MUSACAD_TRIAL_API_URL."
-              exit 1
-            fi
-
-            SETTINGS_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/settings"
-            curl --fail --silent --show-error               --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               --header "Accept: application/json"               "$SETTINGS_URL" > /tmp/trial-worker-settings.json
-
-            D1_ID="$(jq -r '.result.bindings[]? | select(.type=="d1" and .name=="DB") | (.id // .database_id // .namespace_id // empty)' /tmp/trial-worker-settings.json | head -1)"
-            if [ -z "$D1_ID" ]; then
-              echo "::error::Could not read the existing DB D1 binding for $WORKER_NAME."
-              cat /tmp/trial-worker-settings.json || true
-              exit 1
-            fi
-
-            cat > server/trial-worker/wrangler.toml <<EOF
-          name = "$WORKER_NAME"
-          main = "src/index.js"
-          compatibility_date = "2026-09-01"
-
-          [[d1_databases]]
-          binding = "DB"
-          database_name = "musacad-trials"
-          database_id = "$D1_ID"
-          EOF
-
-            (
-              cd server/trial-worker
-              npx --yes wrangler@latest deploy --keep-vars --name "$WORKER_NAME"
-            )
-
-            for attempt in $(seq 1 12); do
-              status="$(probe_session)"
-              if [ "$status" = "403" ] || [ "$status" = "400" ]; then break; fi
-              echo "Session endpoint not ready yet (HTTP $status), retry $attempt/12..."
-              sleep 5
-            done
+            echo "::error::License AI-session route is absent. Use the dedicated guarded license Worker workflow in inspect mode, then explicit deploy mode."
+            exit 1
           fi
 
           if [ "$status" != "403" ] && [ "$status" != "400" ]; then
             echo "::error::MusaCAD license Worker does not expose a healthy /v1/ai/session endpoint (HTTP $status)."
-            cat /tmp/gandalf-session-probe.json || true
+            # Do not echo remote content from production auth services into public build logs.
             exit 1
           fi
           echo "MUSACAD_AI_SESSION_URL=$SESSION_URL" >> "$GITHUB_ENV"
