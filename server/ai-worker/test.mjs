@@ -1337,3 +1337,53 @@ test("Cloudflare Qwen denies unsigned prompt before external AI is contacted",as
   assert.equal(res.status,401);
   assert.equal(contacted,false);
 });
+
+
+test("24-hour Qwen pilot is developer-only, expires and fails closed before inference", async () => {
+  const keys=sessionPair();
+  const base={
+    AI_PROVIDER:"cloudflare",
+    CLOUDFLARE_AI_ACCOUNT_ID:"a".repeat(32),
+    CLOUDFLARE_AI_API_TOKEN:"qwen-test-secret",
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_PILOT_DEVELOPER_ONLY:"true"
+  };
+  const body=JSON.stringify({prompt:"Zemin kat planını kontrol et",
+    cad:{schema:"musacad-cad-json/v1",items:[]}});
+  let calls=0;
+  const upstream=async()=>{
+    calls++;
+    return new Response(JSON.stringify({
+      choices:[{message:{role:"assistant",content:"Zemin kat ön inceleme: ölçü birimi doğrulanmalı."}}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  };
+  const run=async(token,expiry)=> {
+    return worker.fetch(new Request("https://qwen-pilot.test/v1/analyze", {
+      method:"POST",
+      headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+      body
+    }),{...base,MUSACAD_PILOT_EXPIRES_AT_MS:expiry,__fetch:upstream});
+  };
+  const active=Date.now()+86400000;
+  const tokenUntil=Date.now()+600000;
+  const licensed=await run(sessionToken(keys.privateKey,tokenUntil),String(active));
+  assert.equal(licensed.status,403);
+  assert.equal((await licensed.json()).status,"denied");
+  assert.equal(calls,0);
+
+  const developerToken=developerSessionToken(keys.privateKey,tokenUntil);
+  const expired=await run(developerToken,String(Date.now()-1000));
+  assert.equal(expired.status,403);
+  assert.equal(calls,0);
+
+  const missingExpiry=await run(developerToken,"");
+  assert.equal(missingExpiry.status,403);
+  assert.equal(calls,0);
+
+  const success=await run(developerToken,String(active));
+  const answer=await success.json();
+  assert.equal(success.status,200);
+  assert.equal(answer.provider,"cloudflare");
+  assert.match(answer.reply,/Zemin kat ön inceleme/);
+  assert.equal(calls,1);
+});

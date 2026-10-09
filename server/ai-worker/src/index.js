@@ -22,6 +22,18 @@ async function handleAnalyze(request, env) {
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
 
+  // Isolated 24-hour Qwen pilot. Never enable this flag on the production Worker.
+  // Expiration is enforced for every request, independently of GitHub Actions.
+  if (env.MUSACAD_PILOT_DEVELOPER_ONLY === "true") {
+    const expiresAtMs = Number(env.MUSACAD_PILOT_EXPIRES_AT_MS);
+    if (!Number.isSafeInteger(expiresAtMs) || Date.now() >= expiresAtMs)
+      return json({ status: "denied",
+        message: "Qwen pilot deneme süresi sona erdi veya geçersiz; canlı Gemini servisi etkilenmedi." }, 403);
+    if (session.mode !== "developer")
+      return json({ status: "denied",
+        message: "Qwen pilot yalnızca imzalı MusaCAD geliştirici oturumu ile kullanılabilir." }, 403);
+  }
+
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body || {};
