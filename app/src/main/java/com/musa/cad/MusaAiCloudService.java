@@ -75,8 +75,14 @@ public final class MusaAiCloudService {
     public static Result verifySelectedProvider(Context context){
         MusaAiDrawingIndex empty=new MusaAiDrawingIndex("",0,0,
             Collections.emptyList(),Collections.emptyList(),Collections.emptyList(),"");
-        return analyzeInternal(context,empty,"AI model bağlantı kontrolü",
-            "Bağlantı testine yalnız HAZIR yanıtını ver; proje analizi yapma.",null,null,"all","","");
+        Result result=analyzeInternal(context,empty,"AI model bağlantı kontrolü",
+            "Bu yalnız teknik bağlantı testidir; CAD projesi yoktur. Sadece MUSACAD_AI_OK yaz, başka metin yazma.",
+            null,null,"all","","");
+        if(result.ok()&&!result.text.toUpperCase(Locale.ROOT).contains("MUSACAD_AI_OK"))
+            return new Result(Status.INVALID_RESPONSE,"",
+                "AI yanıt verdi ancak model bağlantı doğrulama kodunu döndürmedi. Yeniden deneyin.",
+                null,false);
+        return result;
     }
 
     public static Result analyze(Context context,MusaAiDrawingIndex index,String fileName,String rawPrompt){
