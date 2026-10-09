@@ -2,6 +2,7 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const GEMINI_CHAT_COMPLETIONS_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_NATIVE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
 
 export default {
   async fetch(request, env) {
@@ -122,6 +123,8 @@ async function handleAnalyze(request, env) {
   let requestBody;
   let upstreamUrl;
   let upstreamKey;
+  const useGeminiNative = aiProvider.name === "gemini" &&
+    String(env.GEMINI_API_MODE || "chat").trim().toLowerCase() === "native";
 
   if (aiProvider.name === "gemini") {
     const geminiTools = tools
@@ -131,22 +134,46 @@ async function handleAnalyze(request, env) {
     if (allowWeb) {
       systemInstructions += " This Gemini Free Tier route has no live web-search tool. Do not claim that you searched the web or verified current sources; state that current web verification is unavailable when relevant.";
     }
-    requestBody = {
-      model: aiProvider.model,
-      messages: [
-        { role: "system", content: systemInstructions },
-        { role: "user", content: visualEvidence
-          ? [{ type: "text", text: input[0].content }, ...visualEvidence.images.map(
-              frame => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + frame.base64 } }))]
-          : input[0].content }
-      ],
-      max_tokens: maxOutputTokens
-    };
-    if (geminiTools.length) {
-      requestBody.tools = geminiTools;
-      requestBody.tool_choice = "auto";
+    if (useGeminiNative) {
+      // Gemini native generateContent, verified independently of the broken
+      // OpenAI-compatible Chat Completions provider route.
+      requestBody = {
+        systemInstruction: { parts: [{ text: systemInstructions }] },
+        contents: [{
+          role: "user",
+          parts: [
+            { text: input[0].content },
+            ...(visualEvidence ? visualEvidence.images.map(frame => ({
+              inlineData: { mimeType: "image/jpeg", data: frame.base64 }
+            })) : [])
+          ]
+        }],
+        generationConfig: { maxOutputTokens }
+      };
+      if (geminiTools.length) {
+        requestBody.tools = [{
+          functionDeclarations: geminiTools.map(tool => tool.function)
+        }];
+      }
+      upstreamUrl = GEMINI_NATIVE_BASE_URL + encodeURIComponent(aiProvider.model) + ":generateContent";
+    } else {
+      requestBody = {
+        model: aiProvider.model,
+        messages: [
+          { role: "system", content: systemInstructions },
+          { role: "user", content: visualEvidence
+            ? [{ type: "text", text: input[0].content }, ...visualEvidence.images.map(
+                frame => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + frame.base64 } }))]
+            : input[0].content }
+        ],
+        max_tokens: maxOutputTokens
+      };
+      if (geminiTools.length) {
+        requestBody.tools = geminiTools;
+        requestBody.tool_choice = "auto";
+      }
+      upstreamUrl = GEMINI_CHAT_COMPLETIONS_URL;
     }
-    upstreamUrl = GEMINI_CHAT_COMPLETIONS_URL;
     upstreamKey = String(env.GEMINI_API_KEY);
   } else {
     requestBody = {
@@ -193,7 +220,8 @@ async function handleAnalyze(request, env) {
         upstream = await Promise.race([fetcher(upstreamUrl, {
           method: "POST",
           headers: {
-            authorization: "Bearer " + upstreamKey,
+            ...(useGeminiNative ? { "x-goog-api-key": upstreamKey } :
+              { authorization: "Bearer " + upstreamKey }),
             "content-type": "application/json",
             accept: "application/json"
           },
@@ -243,7 +271,9 @@ async function handleAnalyze(request, env) {
     return json({ status: "server_error", message: upstreamMessage.slice(0, 300) }, upstream.status >= 500 ? 503 : 502);
   }
 
-  const parsedOutput = aiProvider.name === "gemini" ? parseGeminiChatOutput(data) : parseOpenAiOutput(data);
+  const parsedOutput = aiProvider.name === "gemini"
+    ? (useGeminiNative ? parseGeminiNativeOutput(data) : parseGeminiChatOutput(data))
+    : parseOpenAiOutput(data);
   const reply = parsedOutput.reply || (parsedOutput.actions.length
     ? "Gandalf AI çizim için " + parsedOutput.actions.length + " adet düzenleme önerisi hazırladı. Bu işlemler henüz uygulanmadı."
     : "Gandalf AI yanıt üretemedi.");
@@ -260,6 +290,7 @@ async function handleAnalyze(request, env) {
     packageMode,
     provider: aiProvider.name,
     model: aiProvider.model,
+    providerApi: useGeminiNative ? "gemini-native" : (aiProvider.name === "gemini" ? "gemini-chat-compatible" : "openai-responses"),
     analysisScope,
     visualRegionCount: visualEvidence ? visualEvidence.images.length : 0,
     visualCoverageComplete: visualEvidence ? visualEvidence.complete : false,
@@ -793,6 +824,45 @@ function parseGeminiChatOutput(data) {
       inputTokens: safeTokenCount(usage.prompt_tokens),
       outputTokens: safeTokenCount(usage.completion_tokens),
       totalTokens: safeTokenCount(usage.total_tokens)
+    }
+  };
+}
+
+// The Gemini native response shape differs from OpenAI-compatible chat.
+// CAD functions remain unexecuted proposals; Android must approve edits.
+function parseGeminiNativeOutput(data) {
+  const texts = [];
+  const actions = [];
+  const candidates = data && Array.isArray(data.candidates) ? data.candidates : [];
+  for (const candidate of candidates.slice(0, 1)) {
+    const parts = candidate && candidate.content && Array.isArray(candidate.content.parts)
+      ? candidate.content.parts : [];
+    for (const part of parts) {
+      if (!part || typeof part !== "object") continue;
+      if (typeof part.text === "string" && part.text.trim() && part.thought !== true)
+        texts.push(part.text.trim());
+      const call = part.functionCall;
+      if (!call || typeof call !== "object" || typeof call.name !== "string" || !call.name.trim())
+        continue;
+      const args = call.args && typeof call.args === "object" && !Array.isArray(call.args) ? call.args : {};
+      actions.push({
+        name: call.name.trim(),
+        arguments: args,
+        reason: typeof args.reason === "string" ? args.reason : ""
+      });
+    }
+  }
+  const usage = data && data.usageMetadata && typeof data.usageMetadata === "object"
+    ? data.usageMetadata : {};
+  return {
+    reply: texts.join("\n\n").trim(),
+    actions,
+    sources: [],
+    webUsed: false,
+    usage: {
+      inputTokens: safeTokenCount(usage.promptTokenCount),
+      outputTokens: safeTokenCount(usage.candidatesTokenCount),
+      totalTokens: safeTokenCount(usage.totalTokenCount)
     }
   };
 }
