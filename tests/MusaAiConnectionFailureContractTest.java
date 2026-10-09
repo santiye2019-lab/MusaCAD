@@ -21,6 +21,16 @@ public final class MusaAiConnectionFailureContractTest {
         has(service,"code==504||code==408");
         has(service,"code==401||code==403");
         has(service,"reason(json");
+        // Real outage category must survive the exported PDF instead of being
+        // flattened to one ambiguous "network failed" string.
+        has(service,"catch(UnknownHostException e)");
+        has(service,"catch(SSLException e)");
+        has(service,"catch(ConnectException e)");
+        has(service,"catch(SocketException e)");
+        has(service,"catch(OversizedResponseException e)");
+        has(service,"code==413||code==431");
+        has(service,"JSON olmayan yanıt");
+        has(service,"MAX_RESPONSE_BYTES");
         has(activity,"MusaAiSessionService.get(getApplicationContext())");
         has(activity,"ÇEVRİM İÇİ GÖRSEL ANALİZ BAŞLATILAMADI");
         has(activity,"AI sonucu alınamadı:");
