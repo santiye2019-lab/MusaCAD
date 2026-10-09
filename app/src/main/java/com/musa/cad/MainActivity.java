@@ -2871,6 +2871,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(()->{
                             if(!isFinishing()&&!isDestroyed()&&result!=null)
                                 result.setText("2025 YFK • "+message);
+                            if(reply!=null)reply.progress(message);
                         }));
                 runOnUiThread(()->{
                     if(reply!=null)reply.send(
