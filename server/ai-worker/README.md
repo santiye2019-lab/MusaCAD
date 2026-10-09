@@ -52,3 +52,44 @@ The Android build uses:
 - `MUSACAD_AI_API_URL=https://<ai-worker>/v1/analyze`
 
 The worker returns provider/model metadata and token usage when the upstream provider reports it. CAD editing tools are exposed only when the user's prompt explicitly asks to modify or revise the drawing.
+
+## Optional self-hosted Qwen vision provider (no Gemini API quota)
+
+This is **not** a free hosted AI API. A project owner must first provision and
+operate a computer/server with enough RAM/VRAM. The Qwen model software can
+run without per-request Gemini API charges; your compute, electricity and
+host capacity still have real costs and technical limits.
+
+Supported upstream shape: OpenAI-compatible `POST /v1/chat/completions` with
+text + data-URL JPEG images and optional tool proposals. Tested contract with
+Ollama's Qwen3.5-4B (`qwen3.5:4b`); other compatible visual models may work
+after testing. The Android app continues to send consented CAD-JSON and small
+visual crops through the existing authenticated MusaCAD Worker.
+
+When choosing **selfhosted** in GitHub Actions "Deploy Gandalf AI and build APK",
+supply repository secrets:
+
+- `MUSACAD_SELFHOSTED_AI_ENDPOINT`: external **HTTPS** URL ending exactly
+  `/v1/chat/completions` (a protected reverse-proxy/tunnel, not localhost)
+- `MUSACAD_SELFHOSTED_AI_API_KEY`: reverse-proxy **bearer credential**,
+  distinct from the existing license or Gemini secrets.
+
+Optional repository variable:
+`MUSACAD_SELFHOSTED_MODEL=qwen3.5:4b` (default).
+
+The workflow checks a tiny upstream completion **before** deploying to
+Cloudflare. If the server is unavailable, nothing is deployed. Selecting
+`gemini` retains the existing production Gemini path and is the default.
+The license DB and entitlement Worker are untouched. **Never expose an
+unauthenticated Ollama port (11434) to the internet.** Configure HTTPS,
+bearer validation, restrictive firewall and rate/concurrency controls on
+your own reverse proxy. The Cloudflare Worker verifies the existing signed
+license session before accessing the inference server.
+
+The cloud Worker accepts `AI_PROVIDER=selfhosted`, `SELFHOSTED_MODEL`,
+`SELFHOSTED_AI_ENDPOINT` (secret) and `SELFHOSTED_AI_API_KEY` (secret).
+No account, endpoint or authentication details are embedded in the APK.
+A `429` from the operator's own gateway is a *capacity/rate* limit, not
+Gemini Free Tier quota. Requests are never silently billed through Gemini.
+
+Operational and acceptance details: `docs/MUSACAD_QWEN_SELFHOSTED_AI.md`.
