@@ -41,6 +41,8 @@ public final class MusaAiCloudService {
     public static final class Result {
         public final Status status;
         public final String text,message;
+        /** Verified response provider, not an Android-selected untrusted URL. */
+        public final String provider,model;
         public final List<Action> actions;
         public final List<Source> sources;
         public final boolean webUsed;
@@ -48,7 +50,13 @@ public final class MusaAiCloudService {
             this(status,text,message,actions,null,webUsed);
         }
         Result(Status status,String text,String message,Collection<Action>actions,Collection<Source>sources,boolean webUsed){
+            this(status,text,message,actions,sources,webUsed,"","");
+        }
+        Result(Status status,String text,String message,Collection<Action>actions,Collection<Source>sources,
+               boolean webUsed,String provider,String model){
             this.status=status;
+            this.provider=provider==null?"":provider;
+            this.model=model==null?"":model;
             this.text=text==null?"":text;
             this.message=message==null?"":message;
             this.actions=Collections.unmodifiableList(new ArrayList<>(actions==null?Collections.emptyList():actions));
@@ -223,7 +231,8 @@ public final class MusaAiCloudService {
             boolean webUsed=json.optBoolean("webUsed",false);
             if(text.isEmpty()&&!actions.isEmpty())text="Gandalf AI "+actions.size()+" adet çizim işlemi önerdi.";
             if(text.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Gandalf AI boş yanıt döndürdü",actions,sources,webUsed);
-            return new Result(Status.OK,text,"",actions,sources,webUsed);
+            return new Result(Status.OK,text,"",actions,sources,webUsed,
+                json.optString("provider",""),json.optString("model",""));
         }catch(SocketTimeoutException e){
             return new Result(Status.MODEL_TIMEOUT,"",
                 "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+
