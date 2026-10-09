@@ -3,9 +3,13 @@ package com.musa.cad;
 import android.content.Context;
 import org.json.*;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLException;
 import java.io.*;
 import java.net.URL;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.net.ConnectException;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -18,6 +22,7 @@ import java.util.*;
 public final class MusaAiCloudService {
     private static final int TIMEOUT_MS=90000;
     private static final int MAX_RESPONSE_BYTES=512*1024;
+    private static final class OversizedResponseException extends IOException {}
 
     public enum Status { OK, NOT_CONFIGURED, ACCESS_REQUIRED, NETWORK_ERROR, QUOTA_EXHAUSTED, MODEL_TIMEOUT, UPSTREAM_UNAVAILABLE, DENIED, INVALID_RESPONSE }
 
@@ -182,10 +187,22 @@ public final class MusaAiCloudService {
 
             int code=connection.getResponseCode();
             if(code>=300&&code<400)return new Result(Status.DENIED,"","Gandalf AI sunucusu yönlendirme döndürdü",null,false);
+            // HTTP errors can be HTML or empty. Recognize request-size errors
+            // before JSON parsing so an oversized visual sweep is actionable.
+            if(code==413||code==431)return new Result(Status.INVALID_RESPONSE,"",
+                "Görsel/CAD isteği sunucu boyut sınırını aştı (HTTP "+code+
+                "). Daha az görsel içeren gruplarla yeniden deneyin.",null,false);
             String response=readLimited(code>=200&&code<300?connection.getInputStream():connection.getErrorStream());
-            if(response.isEmpty())return new Result(Status.INVALID_RESPONSE,"","Boş Gandalf AI yanıtı",null,false);
+            if(response.isEmpty())return new Result(Status.INVALID_RESPONSE,"",
+                "Gandalf AI sunucusu boş yanıt döndürdü (HTTP "+code+").",null,false);
 
-            JSONObject json=new JSONObject(response);
+            JSONObject json;
+            try{json=new JSONObject(response);}
+            catch(JSONException malformed){
+                return new Result(Status.INVALID_RESPONSE,"",
+                    "Gandalf AI sunucusu JSON olmayan yanıt döndürdü (HTTP "+code+
+                    "). Sunucu yönlendirmesi veya ağ geçidi yanıtı kontrol edilmeli.",null,false);
+            }
             if(code==401||code==403){
                 MusaAiSessionService.clearCache();
                 return new Result(Status.DENIED,"","AI oturumu reddedildi (HTTP "+code+"): "+
@@ -237,9 +254,25 @@ public final class MusaAiCloudService {
             return new Result(Status.MODEL_TIMEOUT,"",
                 "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+
                 " saniyelik sınırı aştı. Sunucu veya model gecikmesi olabilir; görsel analiz tamamlanmadı.",null,false);
+        }catch(OversizedResponseException e){
+            return new Result(Status.INVALID_RESPONSE,"",
+                "Gandalf AI sunucu yanıtı "+(MAX_RESPONSE_BYTES/1024)+
+                " KB güvenli sınırını aştı. Sunucudaki yanıt boyutu kontrol edilmeli.",null,false);
+        }catch(UnknownHostException e){
+            return new Result(Status.NETWORK_ERROR,"",
+                "Gandalf AI sunucu adı çözümlenemedi (DNS). AI API URL'sini ve DNS bağlantısını kontrol edin.",null,false);
+        }catch(SSLException e){
+            return new Result(Status.NETWORK_ERROR,"",
+                "Gandalf AI HTTPS/TLS bağlantısı kurulamadı. Sunucunun sertifikası, alan adı ve TLS yapılandırması kontrol edilmeli.",null,false);
+        }catch(ConnectException e){
+            return new Result(Status.NETWORK_ERROR,"",
+                "Gandalf AI sunucusu TCP bağlantısını kabul etmedi. Worker adresi ve sunucu erişimi kontrol edilmeli.",null,false);
+        }catch(SocketException e){
+            return new Result(Status.NETWORK_ERROR,"",
+                "Gandalf AI bağlantısı sunucu/ağ tarafından sıfırlandı veya kesildi. Görsel istek boyutunu ve sunucu günlüklerini kontrol edin.",null,false);
         }catch(IOException e){
             return new Result(Status.NETWORK_ERROR,"",
-                "Gandalf AI ağ bağlantısı kurulamadı veya kesildi. İnternet, HTTPS ve sunucu erişimini kontrol edin.",null,false);
+                "Gandalf AI veri gönderme/alma sırasında G/Ç hatası oluştu. Sunucu günlükleri ve ağ bağlantısı kontrol edilmeli.",null,false);
         }catch(Exception e){
             return new Result(Status.INVALID_RESPONSE,"","Gandalf AI yanıtı işlenemedi",null,false);
         }finally{if(connection!=null)connection.disconnect();}
@@ -256,7 +289,7 @@ public final class MusaAiCloudService {
         try(InputStream input=in;ByteArrayOutputStream out=new ByteArrayOutputStream()){
             byte[] b=new byte[8192];int n,total=0;
             while((n=input.read(b))!=-1){
-                total+=n;if(total>MAX_RESPONSE_BYTES)throw new IOException("response too large");
+                total+=n;if(total>MAX_RESPONSE_BYTES)throw new OversizedResponseException();
                 out.write(b,0,n);
             }
             return out.toString(StandardCharsets.UTF_8.name());
