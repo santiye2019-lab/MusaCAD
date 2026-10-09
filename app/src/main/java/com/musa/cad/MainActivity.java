@@ -1730,7 +1730,7 @@ public class MainActivity extends AppCompatActivity {
                     pendingAiActions=Collections.emptyList();
                     reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
                 }else{
-                    reply.cloudStatus(false);
+                    reply.cloudFailure(cloud.message);
                     reply.send("Bulut sohbeti kullanılamıyor: "+
                         (cloud.message.isEmpty()?"Sunucu yanıt vermedi.":cloud.message)+
                         "\nYeniden deneyin veya bir çizim açıp yerel CAD araçlarını kullanın.");
@@ -1835,10 +1835,10 @@ public class MainActivity extends AppCompatActivity {
                     MusaAiSessionService.Result preflight=
                         MusaAiSessionService.get(getApplicationContext());
                     if(!preflight.active()){
-                        reply.cloudStatus(false);
                         String message=preflight.message.isEmpty()?
                             "Bu cihaz için geçerli bir Gandalf AI oturumu alınamadı.":
                             preflight.message;
+                        reply.cloudFailure(message);
                         reply.send("ÇEVRİM İÇİ GÖRSEL ANALİZ BAŞLATILAMADI\n"+
                             "Neden: "+message+
                             "\nDurum: "+preflight.status+
@@ -1874,7 +1874,7 @@ public class MainActivity extends AppCompatActivity {
                         :MusaAiCloudService.analyzeWithContext(getApplicationContext(),snapshot,displayName,
                             raw,recentContext,localContextEvidence(snapshot));
                     if(!cloud.ok()){
-                        reply.cloudStatus(false);
+                        reply.cloudFailure(cloud.message);
                         reply.progress("Bulut AI tamamlanamadı: "+
                             (cloud.message.isEmpty()?cloud.status.toString():cloud.message)+
                             "\nYerel vektör kontrolüne geçiliyor…");
@@ -2020,7 +2020,7 @@ public class MainActivity extends AppCompatActivity {
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
                 recentContext,evidenceSummary);
             if(!cloud.ok()){
-                reply.cloudStatus(false);
+                reply.cloudFailure(cloud.message);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
                     (cloud.message.isEmpty()?"Sunucu isteği başarısız.":cloud.message);
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
@@ -2082,7 +2082,7 @@ public class MainActivity extends AppCompatActivity {
                     getApplicationContext(),snapshot,fileName,focusPrompt,scope,closeups.json,
                     recentContext,evidenceSummary);
                 if(!detailed.ok()){
-                    reply.cloudStatus(false);
+                    reply.cloudFailure(detailed.message);
                     focusedIssue=(group+1)+". yakın-plan AI grubunda yanıt alınamadı: "+
                         (detailed.message.isEmpty()?"AI hizmeti yanıt vermedi.":detailed.message);
                     reply.progress("Gandalf • Yakın-plan AI analizi durdu. "+focusedIssue);
