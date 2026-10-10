@@ -1855,6 +1855,29 @@ public class MainActivity extends AppCompatActivity {
                             "Proje görselleri modele gönderilmedi.");
                         return;
                     }
+                    // Verify the installed pilot Worker host from this device before
+                    // expensive DWG indexing/rendering. The license session uses a
+                    // separate host and therefore does not prove Worker reachability.
+                    if(hybridVisual){
+                        reply.progress("Gandalf • Qwen Worker DNS/HTTPS erişimi kontrol ediliyor…");
+                        MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseNow();
+                        if(!network.reachable){
+                            String notice="GÖRSEL PROJE ANALİZİ BAŞLATILAMADI"+
+                                "\nAI görsel bölgeleri: 0/9 — hiçbir görüntü AI tarafından incelenmedi."+
+                                "\nTelefon/Worker bağlantı tanısı ["+network.category+"]: "+
+                                network.message+
+                                "\nLisans oturumu kontrolü geçti; bu, ayrı Qwen Worker"+
+                                " alan adının erişilebilir olduğunu kanıtlamaz."+
+                                "\nBu hata DWG geometrisinin veya mekanik tesisatın"+
+                                " yanlış olduğu anlamına gelmez.";
+                            lastAiReport=notice;
+                            lastAiReportTitle="Gandalf • Qwen Bağlantı Tanılama Raporu";
+                            lastAiReportSourceIds=Collections.emptyList();
+                            reply.cloudFailure(network.message);
+                            reply.send(notice);
+                            return;
+                        }
+                    }
                     MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
                     List<MusaAiProjectPackage.Drawing> packageDrawings=Collections.emptyList();
                     if(packageMode){
@@ -2070,9 +2093,17 @@ public class MainActivity extends AppCompatActivity {
             MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybridWithContext(
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
                 recentContext,evidenceSummary);
-            // Retry the same bounded tile identities once, with reduced images.
-            // Do not repeat quota, authentication, pilot-expiry or validation failures.
-            if(!cloud.ok()&&canRetryCompactVisual(cloud)&&
+            final String firstTransferFailure=cloud.ok()?"":cloud.message;
+            // On a transport error, probe the same Worker host without a token,
+            // CAD payload or user prompts. Shrinking images cannot repair DNS.
+            MusaAiCloudHealth.Diagnostic afterFailure=
+                cloud.status==MusaAiCloudService.Status.NETWORK_ERROR
+                    ?MusaAiCloudHealth.diagnoseNow():null;
+            if(afterFailure!=null&&!afterFailure.reachable)
+                reply.progress("Gandalf • Qwen ağ tanısı: "+afterFailure.message);
+            // Retry only when the same HTTPS Worker remains reachable.
+            if(!cloud.ok()&&(afterFailure==null||afterFailure.reachable)&&
+                canRetryCompactVisual(cloud)&&
                 android.os.SystemClock.elapsedRealtime()-inspectionStarted<115_000L&&
                 !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
                 final String originalFailure=cloud.message;
@@ -2088,8 +2119,9 @@ public class MainActivity extends AppCompatActivity {
                         rendered=compact;
                         cloud=retry;
                         if(retry.ok())compactAcceptedBatches++;
-                        else report.append("\nKüçük görsel yeniden denemesi de başarısız. İlk neden: ")
-                            .append(originalFailure);
+                        else report.append("\nKüçük görsel yeniden denemesi de başarısız."+
+                            " İlk aktarım hatası: ").append(originalFailure)
+                            .append("\nSon aktarım hatası: ").append(retry.message);
                     }else{
                         report.append("\nDaha küçük görsel paketi eksik üretildi; yeniden gönderilmedi.");
                     }
@@ -2101,6 +2133,12 @@ public class MainActivity extends AppCompatActivity {
                 reply.cloudFailure(cloud.message);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
                     (cloud.message.isEmpty()?"Sunucu isteği başarısız.":cloud.message);
+                if(!firstTransferFailure.isEmpty()&&
+                    !firstTransferFailure.equals(cloud.message))
+                    issue+=" | İlk aktarım: "+firstTransferFailure;
+                if(afterFailure!=null)
+                    issue+=" | Worker sağlık kontrolü ["+afterFailure.category+
+                        "]: "+afterFailure.message;
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
                 break;
             }
