@@ -13,6 +13,9 @@ public final class MusaAiConversationalIntent {
         String q=MusaAiDrawingIndex.normalize(original);
         if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(original))return original;
         if(isPdfRequest(original))return "Raporu PDF olarak çıkar";
+        // Negated quantity commands are never executable BOQ requests.
+        // This must precede substring matching against "keşif oluştur".
+        if(MusaAiAnalysisIntent.prohibitsTakeoff(original))return original;
         // Keep full instructions for a hybrid visual CAD review WITH a BOQ.
         // Otherwise the following generic BOQ shortcut erases all 9 visual
         // regions and turns a requested review into an unrelated local report.
