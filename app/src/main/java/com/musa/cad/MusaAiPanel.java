@@ -224,18 +224,30 @@ public final class MusaAiPanel {
             }
             final Handler timeoutHandler=new Handler(Looper.getMainLooper());
             final long startedMs=android.os.SystemClock.elapsedRealtime();
-            final long maxRequestMs=240_000L;
-            final Runnable timeout=()->{
-                if(!completed.compareAndSet(false,true))return;
-                pending.setText("Gandalf isteği ilerleme veya toplam süre sınırına ulaştı. Çizime müdahale edilmedi. İsteği yeniden başlatabilir ya da yerel analiz kullanabilirsiniz.");
+            // One Qwen image call can legitimately take 90s, plus CAD rendering.
+            // An idle notification is NOT a terminal failure; accept a late reply.
+            final Runnable idleNotice=()->{
+                if(completed.get())return;
+                pending.setText("Gandalf • Yapay zekâ görüntü yanıtı bekleniyor. "+
+                    "İşlem arka planda sürüyor; analiz sonuçları henüz doğrulanmadı.");
                 scrollBottom(messagesScroll);
             };
-            timeoutHandler.postDelayed(timeout,75_000L);
+            final Runnable timeout=()->{
+                if(!completed.compareAndSet(false,true))return;
+                timeoutHandler.removeCallbacks(idleNotice);
+                pending.setText("Gandalf • 12 dakikalık toplam analiz sınırına ulaşıldı. "+
+                    "Bu mesaj 9/9 görsel incelemenin tamamlandığını göstermez. "+
+                    "Çizime müdahale edilmedi. Eksik bölgeler doğrulanmış kabul edilmez.");
+                scrollBottom(messagesScroll);
+            };
+            timeoutHandler.postDelayed(timeout,MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS);
+            timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
             Reply requestReply=new Reply(){
                 @Override public void send(String text){
                     activity.runOnUiThread(()->{
                         if(!completed.compareAndSet(false,true))return;
                         timeoutHandler.removeCallbacks(timeout);
+                        timeoutHandler.removeCallbacks(idleNotice);
                         String answer=text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim();
                         pending.setText(answer);
                         latestAssistantAnswer[0]=answer;
@@ -288,9 +300,10 @@ public final class MusaAiPanel {
                         if(completed.get())return;
                         // A multi-region vision sweep has bounded provider calls; restart
                         // the idle watchdog only on actual progress, with a hard total cap.
-                        long elapsed=android.os.SystemClock.elapsedRealtime()-startedMs;
-                        timeoutHandler.removeCallbacks(timeout);
-                        timeoutHandler.postDelayed(timeout,Math.max(1L,Math.min(75_000L,maxRequestMs-elapsed)));
+                        // Progress does not extend the hard deadline. It only
+                        // moves the nonterminal 'still waiting' notification.
+                        timeoutHandler.removeCallbacks(idleNotice);
+                        timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
                         if(text!=null&&!text.trim().isEmpty())pending.setText(text.trim());
                         scrollBottom(messagesScroll);
                     });
