@@ -49,10 +49,10 @@ public final class MusaAiProjectSync {
         }
         final long rev=revision;
         WORK.execute(()->{
-            if(rev!=newest.get()||!enabled(context))return;
+            if(rev!=newest.get())return;
             try{
                 MusaAiSessionService.Result session=MusaAiSessionService.get(context);
-                if(!session.active())return;
+                if(!session.active()||!enabled(context))return;
                 JSONArray ids=new JSONArray();for(Entry e:open)ids.put(e.id);
                 JSONObject body=new JSONObject().put("revision",rev).put("openProjectIds",ids);
                 post("/v1/projects/sync-open","POST",session.token,
