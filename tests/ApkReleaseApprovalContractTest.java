@@ -3,8 +3,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * No source push, PR, scheduled test, AI pilot, or default manual action may
- * produce an APK before a separate, affirmative final-release decision.
+ * Production APKs require affirmative FINAL acceptance.
+ * A 24-hour, developer-only pilot APK is NOT a production release:
+ * it requires separate, explicit signed TEST APK consent (default false).
+ * Neither source pushes nor PR tests can issue a signed pilot automatically.
  */
 public final class ApkReleaseApprovalContractTest {
     private static String read(String file)throws Exception{
@@ -34,10 +36,26 @@ public final class ApkReleaseApprovalContractTest {
         require(gandalf.contains("- name: Build Gandalf-enabled production APK\n        if: ${{ "+manual+" }}"),
             "AI deployment must not package APK unless explicitly approved");
         String pilot=read(".github/workflows/qwen-isolated-pilot-24h.yml");
-        guarded(".github/workflows/qwen-isolated-pilot-24h.yml",
-            "inputs.build_pilot_apk == true && inputs.release_approved == true");
-        require(pilot.contains("if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true && inputs.release_approved == true"),
-            "AI pilot APK must have its own final-acceptance gate");
+        require(pilot.contains("build_pilot_apk:"),
+            "AI pilot needs an explicit signed test APK approval input");
+        require(pilot.contains("I approve creating a signed 24h TEST APK only"),
+            "User must understand this is a test APK, not final acceptance");
+        require(pilot.contains("default: false"),
+            "AI pilot signed APK must be opt-in, never a default");
+        require(pilot.contains("if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true"),
+            "AI pilot must require manual deploy and explicit test APK consent");
+        require(!pilot.contains("inputs.release_approved == true"),
+            "Pilot testing must not assert that final engineering acceptance passed");
+        require(pilot.contains("name: MusaCAD-Qwen-24h-PILOT-signed") &&
+                pilot.contains("retention-days: 2"),
+            "Pilot must produce short-lived artifact rather than public release");
+        require(pilot.contains("MUSACAD_PILOT_DEVELOPER_ONLY = \"true\"") &&
+                pilot.contains("MUSACAD_PILOT_EXPIRES_AT_MS"),
+            "Pilot worker must remain developer-only and expire");
+        require(pilot.contains("Refusing APK with an unexpected AI host"),
+            "Pilot APK must pin the correct isolated HTTPS endpoint");
+        require(!pilot.contains("google-play-release")&&!pilot.contains("playstore-upload"),
+            "A pilot workflow must never publish production artifacts");
         System.out.println("ApkReleaseApprovalContractTest OK");
     }
 }
