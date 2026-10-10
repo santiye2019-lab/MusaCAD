@@ -76,6 +76,12 @@ async function handleAnalyze(request, env) {
   const accessMode = session.mode === "developer" ? "developer" : "licensed";
   const instructions =
     "You are Gandalf AI inside MusaCAD, an engineering CAD assistant. " +
+    "Your configured runtime provider is " + aiProvider.name +
+    " and your exact model identifier is " + aiProvider.model +
+    ". If asked your identity or provider, use this runtime information only; " +
+    "do not claim to be Claude, ChatGPT, Gemini or another model unless the " +
+    "configured identifier explicitly says so. Do not infer your identity " +
+    "from the user's previous conversation. " +
     "Current access mode: " + accessMode + ". " +
     (accessMode === "developer"
       ? "Developer mode may use the full bounded analysis and proposal surface, but drawing edits still require explicit user approval. "
