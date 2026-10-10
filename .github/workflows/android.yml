@@ -46,6 +46,9 @@ jobs:
               assert expected in new, expected
           print('PASS: License Worker deployment is explicit and guarded.')
           PY
+      - name: Test Qwen synthetic vision preflight and 3-region backward compatibility
+        run: |
+          python3 -m unittest discover -s tests -p 'test_qwen_pilot_vision_preflight.py' -v
       - name: Test Gandalf AI Worker including provider timeout
         run: |
           node --check server/ai-worker/src/index.js
