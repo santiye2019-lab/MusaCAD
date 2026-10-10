@@ -76,6 +76,56 @@ jobs:
           if not answer.strip(): raise SystemExit("Empty Qwen answer; no deployment.")
           print("Qwen readiness PASS (response redacted).")
           PY
+      - name: Live Qwen synthetic-image readiness probe (no user drawing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json
+          from pathlib import Path
+          fixture=Path("tests/fixtures/qwen-vision-smoke-jpeg.b64").read_text().strip()
+          jpg=base64.b64decode(fixture,validate=True)
+          assert jpg.startswith(b"\xff\xd8") and jpg.endswith(b"\xff\xd9")
+          assert len(jpg) < 12000
+          body={
+            "model":"@cf/qwen/qwen3.8-27b",
+            "messages":[{
+              "role":"user","content":[
+                {"type":"text","text":"Görselde soldaki ve sağdaki büyük renklerin Türkçe adlarını yaz. Başka metin ekleme."},
+                {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,"+fixture}}
+              ]
+            }],
+            "reasoning_effort":"low",
+            "max_completion_tokens":2048,
+            "stream":False
+          }
+          Path("/tmp/qwen-pilot-vision-preflight.json").write_text(json.dumps(body))
+          PY
+          status="$(curl --silent --show-error --connect-timeout 10 --max-time 75 \
+            -o /tmp/qwen-pilot-vision-response.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $CLOUDFLARE_AI_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/qwen-pilot-vision-preflight.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/v1/chat/completions" || true)"
+          if [ "$status" != 200 ]; then
+            echo "::error::Qwen synthetic-image preflight HTTP $status; no deployment"; exit 1
+          fi
+          python3 - <<'PY'
+          import json,re,unicodedata
+          data=json.load(open("/tmp/qwen-pilot-vision-response.json"))
+          result=data.get("result") or data
+          choices=result.get("choices") or []
+          message=choices[0].get("message",{}) if choices else {}
+          content=message.get("content")
+          answer=content if isinstance(content,str) else (
+              " ".join(x.get("text","") for x in content if isinstance(x,dict))
+              if isinstance(content,list) else "")
+          plain=unicodedata.normalize("NFD",answer.lower())
+          plain="".join(ch for ch in plain if unicodedata.category(ch)!="Mn")
+          if not (re.search(r"kirmizi|red",plain) and re.search(r"mavi|blue",plain)):
+              raise SystemExit("Qwen did not identify both synthetic image colors; no deployment.")
+          print("Qwen synthetic-image readiness PASS; response redacted, no user CAD uploaded.")
+          PY
       - name: Verify Worker test suite
         working-directory: server/ai-worker
         run: npm test

@@ -675,6 +675,55 @@ test("Malformed or unauthorized visual payload is rejected before provider call"
 });
 
 
+test("three-detail-tile Qwen sweep protocol covers all 9 regions in three batches",async()=>{
+  const keys=sessionPair();
+  const jpeg="/9j/"+("A".repeat(120));
+  const frame=label=>({
+    mime:"image/jpeg",base64:jpeg,label,width:896,height:896,
+    contentBounds:[0,0,100,100],drawingBounds:[0,0,100,100]
+  });
+  let total=0;
+  for(let batch=1;batch<=3;batch++){
+    const first=(batch-1)*3+1, last=first+2;
+    const labels=["full-sheet-overview",
+      ...Array.from({length:3},(_,i)=>"sheet-tile-"+(first+i))];
+    const req=new Request("https://ai.musacad.test/v1/analyze",{
+      method:"POST",headers:{
+        authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000),
+        "content-type":"application/json"},
+      body:JSON.stringify({
+        prompt:"Analyze only the supplied image regions",analysisScope:"mechanical",
+        cad:{schema:"musacad-cad-json/v1",items:[]},
+        visualEvidence:{
+          schema:"musacad-visual-evidence/v1",
+          sweepSchema:"musacad-visual-sweep/v1",
+          sweepBatch:batch,sweepBatchCount:3,totalDetailedTiles:9,
+          firstTile:first,lastTile:last,
+          rawDrawingIncluded:false,complete:true,images:labels.map(frame)
+        }
+      })
+    });
+    let providerCalls=0;
+    const res=await worker.fetch(req,{
+      AI_PROVIDER:"gemini",GEMINI_API_KEY:"stub",GEMINI_MODEL:"gemini-test",
+      MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+      __fetch:async()=>{
+        providerCalls++;
+        return new Response(JSON.stringify({choices:[{message:{content:labels.join(" ")}}]}),
+          {status:200,headers:{"content-type":"application/json"}});
+      }
+    });
+    assert.equal(res.status,200);
+    const payload=await res.json();
+    assert.equal(payload.status,"ok");
+    assert.equal(payload.visualRegionCount,labels.length);
+    assert.equal(payload.visualCoverageComplete,true);
+    assert.equal(providerCalls,1);
+    total+=labels.length-1;
+  }
+  assert.equal(total,9);
+});
+
 test("last 3x3 sweep batch with one detailed tile sends mapped vision to Gemini",async()=>{
   const keys=sessionPair();
   const jpeg="/9j/"+("A".repeat(120));

@@ -13,7 +13,7 @@ import java.util.List;
 public final class MusaAiVisualSweepPlan {
     public static final int GRID=3;
     public static final int TILE_COUNT=GRID*GRID;
-    public static final int TILES_PER_BATCH=4;
+    public static final int TILES_PER_BATCH=3;
     public static final int BATCH_COUNT=(TILE_COUNT+TILES_PER_BATCH-1)/TILES_PER_BATCH;
     private static final double OVERLAP=0.015d;
 
