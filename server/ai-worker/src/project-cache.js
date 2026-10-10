@@ -6,6 +6,9 @@ import { planProjectRetention, compareManifestRevision, MAX_OPEN_PROJECTS }
 const CHUNK_BYTES=1024*1024;
 const MAX_FILE_BYTES=512*1024*1024;
 const MAX_PROJECTS=12;
+const MAX_INDEX_PAGES=80;
+const MAX_INDEX_PAGE_BYTES=512*1024;
+const INDEX_PAGE_ITEMS=500;
 const ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA=/^[0-9a-f]{64}$/i;
 const json=(data,status=200)=>new Response(JSON.stringify(data),{
@@ -117,7 +120,9 @@ export class MusaCadProjectCoordinator {
           openProjectIds:catalog.openProjectIds,
           projects:Object.values(catalog.projects).map(x=>({
             id:x.id,status:x.status,receivedParts:Object.keys(x.parts).map(Number),
-            partCount:x.partCount,sizeBytes:x.sizeBytes,sha256:x.sha256
+            partCount:x.partCount,sizeBytes:x.sizeBytes,sha256:x.sha256,
+            indexReady:x.indexReady===true,indexPages:x.indexPageCount||0,
+            indexItems:x.indexItemCount||0,indexCoverageComplete:x.indexCoverageComplete===true
           }))});
       if(path==="/v1/projects/init"&&request.method==="POST"){
         const data=await readBody(request);
@@ -195,6 +200,104 @@ export class MusaCadProjectCoordinator {
         await this.drainDeletes(catalog,prefix);
         return json({status:"ok",projectId:id,complete:true,
           verifiedParts:p.partCount,verifiedBytes:p.sizeBytes});
+      }
+      const indexInit=/^\/v1\/projects\/([0-9a-f-]{36})\/index\/init$/i.exec(path);
+      if(indexInit&&request.method==="POST"){
+        const id=indexInit[1].toLowerCase();const p=catalog.projects[id];
+        if(!p||p.status!=="complete"||!catalog.openProjectIds.includes(id))
+          return error(409,"doğrulanmış açık DWG gerekli");
+        const body=await readBody(request);
+        if(!Number.isSafeInteger(body.pageCount)||body.pageCount<1||
+           body.pageCount>MAX_INDEX_PAGES||
+           !Number.isSafeInteger(body.itemCount)||body.itemCount<0||
+           body.itemCount>body.pageCount*INDEX_PAGE_ITEMS||
+           (body.coverageComplete!==true&&body.coverageComplete!==false))
+          return error(400,"geçersiz CAD indeksi bildirimi");
+        if(p.indexPageCount!==undefined&&
+           (p.indexPageCount!==body.pageCount||
+            p.indexItemCount!==body.itemCount||
+            p.indexCoverageComplete!==body.coverageComplete))
+          return error(409,"farklı indeks sürümü için yeni proje kimliği gerekir");
+        if(p.indexPageCount===undefined){
+          p.indexPageCount=body.pageCount;p.indexItemCount=body.itemCount;
+          p.indexCoverageComplete=body.coverageComplete;
+          p.indexParts={};p.indexReady=false;
+          await this.state.storage.put("catalog",catalog);
+        }
+        return json({status:"ok",pageCount:p.indexPageCount,
+          receivedPages:Object.keys(p.indexParts).map(Number),ready:p.indexReady===true});
+      }
+      const indexPage=/^\/v1\/projects\/([0-9a-f-]{36})\/index\/pages\/(\d{1,2})$/i.exec(path);
+      if(indexPage&&request.method==="PUT"){
+        const id=indexPage[1].toLowerCase(),page=Number(indexPage[2]);
+        const p=catalog.projects[id];
+        if(!p||p.status!=="complete"||!catalog.openProjectIds.includes(id)||
+           p.indexPageCount===undefined)
+          return error(409,"indeks başlatılmadı");
+        if(page<0||page>=p.indexPageCount)return error(400,"indeks sayfası geçersiz");
+        if(p.indexReady)return error(409,"indeks zaten tamam");
+        const checksum=String(request.headers.get("x-page-sha256")||"").toLowerCase();
+        if(!SHA.test(checksum))return error(400,"sayfa SHA-256 eksik");
+        const payload=await readBounded(request,MAX_INDEX_PAGE_BYTES);
+        if(!payload.length||await shaBytes(payload)!==checksum)
+          return error(422,"CAD sayfa özeti uyuşmuyor");
+        let pageData;
+        try{pageData=JSON.parse(new TextDecoder().decode(payload));}
+        catch(_){return error(400,"CAD sayfası JSON değil");}
+        if(!pageData||pageData.schema!=="musacad-index-page/v1"||
+           pageData.pageIndex!==page||
+           pageData.pageCount!==p.indexPageCount||
+           pageData.projectId!==id||
+           !pageData.cad||pageData.cad.schema!=="musacad-cad-json/v1"||
+           !Array.isArray(pageData.cad.items)||
+           pageData.cad.items.length>INDEX_PAGE_ITEMS||
+           !Number.isSafeInteger(pageData.cad.itemsIncluded)||
+           pageData.cad.itemsIncluded!==pageData.cad.items.length)
+          return error(400,"geçersiz sayısal pafta indeksi");
+        if(p.indexParts[page]===checksum)
+          return json({status:"ok",page,received:true,reused:true});
+        await this.env.MUSACAD_PROJECT_BUCKET.put(
+          prefix+"projects/"+id+"/"+p.uploadId+"/index/"+page,payload);
+        p.indexParts[page]=checksum;
+        await this.state.storage.put("catalog",catalog);
+        return json({status:"ok",page,received:true});
+      }
+      const indexComplete=/^\/v1\/projects\/([0-9a-f-]{36})\/index\/complete$/i.exec(path);
+      if(indexComplete&&request.method==="POST"){
+        const id=indexComplete[1].toLowerCase();const p=catalog.projects[id];
+        if(!p||p.status!=="complete"||!catalog.openProjectIds.includes(id)||
+           !p.indexPageCount)return error(409,"CAD indeksi başlatılmadı");
+        if(Object.keys(p.indexParts).length!==p.indexPageCount)
+          return error(409,"CAD indeks sayfaları eksik");
+        if(!p.indexReady){
+          for(let i=0;i<p.indexPageCount;i++)
+            if(!SHA.test(p.indexParts[i]||""))return error(409,"eksik indeks sayfası");
+          p.indexReady=true;
+          await this.state.storage.put("catalog",catalog);
+        }
+        return json({status:"ok",ready:true,pageCount:p.indexPageCount,
+          itemCount:p.indexItemCount,coverageComplete:p.indexCoverageComplete});
+      }
+      if(path==="/v1/projects/open-context"&&request.method==="GET"){
+        const drawings=[];
+        for(const id of catalog.openProjectIds){
+          const p=catalog.projects[id];
+          if(!p||p.status!=="complete"||!p.indexReady)continue;
+          const record=await this.env.MUSACAD_PROJECT_BUCKET.get(
+            prefix+"projects/"+id+"/"+p.uploadId+"/index/0");
+          if(!record)continue;
+          const bytes=await record.arrayBuffer();
+          if(bytes.byteLength>MAX_INDEX_PAGE_BYTES)continue;
+          const hash=await shaBytes(bytes);
+          if(hash!==p.indexParts[0])continue;
+          const data=JSON.parse(new TextDecoder().decode(bytes));
+          drawings.push({projectId:id,fileName:p.fileName,indexItems:p.indexItemCount,
+            indexPages:p.indexPageCount,coverageComplete:p.indexCoverageComplete,
+            cadPreview:{...data.cad,items:data.cad.items.slice(0,100),
+              itemsIncluded:Math.min(100,data.cad.items.length),truncated:true}});
+        }
+        return json({status:"ok",drawingCount:drawings.length,drawings,
+          previewOnly:true,notice:"Bu veri kayıtlı CAD sayfa-0 önizlemesidir; bütün proje görsel denetimi değildir"});
       }
       return error(404,"proje işlemi bulunamadı");
     }catch(e){
