@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_AUTOSYNC=12;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -87,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final class ProjectSession {
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        final String cloudId=java.util.UUID.randomUUID().toString();
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
@@ -164,6 +165,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
+        new Thread(()->{MusaAiCloudHealth.diagnoseNow();MusaAiSessionService.get(getApplicationContext());},"MusaCAD-Gandalf-startup").start();
         getOnBackPressedDispatcher().addCallback(this,new androidx.activity.OnBackPressedCallback(true){
             @Override public void handleOnBackPressed(){handleBackNavigation();}
         });
@@ -3529,7 +3531,7 @@ public class MainActivity extends AppCompatActivity {
             String dxf="0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n";
             try(OutputStream out=new FileOutputStream(base)){out.write(dxf.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
             ProjectSession project=new ProjectSession();project.file=base;project.workingDxf=base;project.parsed=DxfParser.blankDrawing();project.name=name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
-            projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+            projects.add(project);activateProject(project);scheduleProjectCloudSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
             result.setText("Yeni boş çizim hazır • Çizgi, Daire, Dikdörtgen veya diğer araçları seçin");
         }catch(Exception e){error(e);}
     }
@@ -3957,8 +3959,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_AUTOSYNC,11,"Otomatik proje yükle").setCheckable(true).setChecked(MusaAiProjectSync.enabled(this));
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_AUTOSYNC:MusaAiProjectSync.setEnabled(this,!MusaAiProjectSync.enabled(this));scheduleProjectCloudSync();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4212,7 +4214,7 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleProjectCloudSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4253,6 +4255,7 @@ public class MainActivity extends AppCompatActivity {
                                 activeLoad=null;
                                 if(task.dialog!=null)task.dialog.dismiss();
                                 activateProject(project);
+                                scheduleProjectCloudSync();
                                 result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
                                     "Önizleme renkleri nihai değildir.");
                                 // NativeScene owns mutable Canvas/Paint scratch buffers;
@@ -4315,7 +4318,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleProjectCloudSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
@@ -4478,7 +4481,7 @@ public class MainActivity extends AppCompatActivity {
                     project.sourceUri=record.sourceUri==null||record.sourceUri.trim().isEmpty()?null:Uri.parse(record.sourceUri);
                     project.file=recovered;project.workingDxf=recovered;project.bitmap=parsed.bitmap;project.parsed=parsed;project.name=record.displayName;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
                     project.recoveryId=record.id;project.recoveryFingerprint=record.fingerprint;
-                    projects.add(project);activateProject(project);
+                    projects.add(project);activateProject(project);scheduleProjectCloudSync();
                     project.savedFingerprint=Long.MIN_VALUE;project.baselineSet=true;project.dirty=true;
                     refreshProjectTabs();
                     result.setText("Kurtarılan çalışma • Kaydet / DXF dışa aktar ile kalıcı dosya oluşturun");
@@ -4620,6 +4623,17 @@ public class MainActivity extends AppCompatActivity {
         makeDialogButtonsReadable(projectCloseDialog);
     }
 
+    private void scheduleProjectCloudSync(){
+        ArrayList<MusaAiProjectSync.Entry> opened=new ArrayList<>();
+        for(ProjectSession p:projects)
+            opened.add(new MusaAiProjectSync.Entry(p.cloudId,
+                p.name==null?"cizim.dwg":p.name,p.file));
+        MusaAiProjectSync.submit(getApplicationContext(),opened,(id,pct,message)->runOnUiThread(()->{
+            if(isFinishing()||isDestroyed()||currentProject==null)return;
+            if(currentProject.cloudId.equals(id))result.setText(message);
+        }));
+    }
+
     private void closeProjectNow(ProjectSession project){
         if(project==null)return;
         if(projectCloseDialog!=null&&projectCloseDialog.isShowing())projectCloseDialog.dismiss();
@@ -4627,6 +4641,7 @@ public class MainActivity extends AppCompatActivity {
         clearRecovery(project);
         boolean active=project==currentProject;
         projects.remove(project);
+        scheduleProjectCloudSync();
         if(active){
             cad.restoreSessionState(null,null,null);currentProject=null;currentFile=null;editingBaseDxf=null;activeDxf=null;currentDisplayName="cizim.dwg";
         }
