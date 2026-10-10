@@ -4500,6 +4500,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onResume(){
         super.onResume();
+        if(!projects.isEmpty())scheduleProjectCloudSync();
         recoveryHandler.removeCallbacks(recoveryTicker);
         recoveryHandler.postDelayed(recoveryTicker,RECOVERY_INTERVAL_MS);
     }
