@@ -241,3 +241,44 @@ test("CAD pages may not claim more or fewer entities than declared",async()=>{
     method:"PUT",data:new Uint8Array(bytes),headers:{"x-page-sha256":hex(bytes)}})).code,400);
   assert.equal((await s.send("/v1/projects/"+A+"/index/complete")).code,409);
 });
+
+test("Gandalf inference receives only a bounded signed-device stored CAD preview",async()=>{
+  const s=setup();await s.sync([A]);await s.upload(A,"sanitary raw drawing");
+  const page={
+    schema:"musacad-index-page/v1",projectId:A,pageIndex:0,pageCount:1,
+    cad:{schema:"musacad-cad-json/v1",layout:"Model",
+      fileName:"sihhi-tesisat.dwg",entityCount:1,indexedItemCount:1,
+      itemsIncluded:1,truncated:false,
+      items:[{sourceId:22,type:"TEXT",layer:"Sıhhi",text:"DN160"}]}
+  };
+  const bytes=Buffer.from(JSON.stringify(page));
+  assert.equal((await s.send("/v1/projects/"+A+"/index/init",{data:{
+    pageCount:1,itemCount:1,coverageComplete:true}})).code,200);
+  assert.equal((await s.send("/v1/projects/"+A+"/index/pages/0",{
+    method:"PUT",data:new Uint8Array(bytes),headers:{"x-page-sha256":hex(bytes)}})).code,200);
+  assert.equal((await s.send("/v1/projects/"+A+"/index/complete")).code,200);
+  let observed="";
+  Object.assign(s.env,{AI_PROVIDER:"openai",OPENAI_API_KEY:"unit-key",
+    OPENAI_MODEL:"unit-model",__fetch:async(_url,options)=>{
+      const submitted=JSON.parse(options.body);
+      observed=submitted.input[0].content;
+      return new Response(JSON.stringify({output:[{
+        type:"message",content:[{type:"output_text",text:"Ön inceleme kaydı."}]
+      }]}),{status:200});
+    }});
+  const analyzed=await s.send("/v1/analyze",{data:{
+    prompt:"Açık projeleri birlikte kontrol et",
+    useStoredOpenProjects:true,cad:{schema:"musacad-cad-json/v1",items:[]}
+  }});
+  assert.equal(analyzed.code,200);
+  assert.equal(analyzed.body.reply,"Ön inceleme kaydı.");
+  assert.match(observed,/SIGNED-DEVICE STORED OPEN PROJECT CAD PREVIEW/);
+  assert.match(observed,/DN160/);
+  assert.match(observed,/FIRST-PAGE SAMPLE ONLY/);
+  const other=await s.send("/v1/analyze",{device:DEVICE2,data:{
+    prompt:"Açık projeleri birlikte kontrol et",
+    useStoredOpenProjects:true,cad:{schema:"musacad-cad-json/v1",items:[]}
+  }});
+  assert.equal(other.code,200);
+  assert.ok(!observed.includes("DN160"));
+});
