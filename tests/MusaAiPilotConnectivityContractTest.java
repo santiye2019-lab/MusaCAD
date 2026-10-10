@@ -55,7 +55,7 @@ public final class MusaAiPilotConnectivityContractTest {
         has(cloud,"catch(SSLException e)");
         has(cloud,"catch(SocketException e)");
         has(pilot,"MUSACAD_PILOT_DEVELOPER_ONLY = \"true\"");
-        has(pilot,"denied\" =");
+        has(pilot,"if [ \"$health\" != 200 ] || [ \"$denied\" != 401 ]; then");
         System.out.println("MusaAiPilotConnectivityContractTest OK");
     }
 }
