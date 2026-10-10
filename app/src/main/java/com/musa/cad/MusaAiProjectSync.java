@@ -106,6 +106,7 @@ public final class MusaAiProjectSync {
                 int part=done.optInt(i,-1);if(part>=0&&part<count)received.add(part);
             }
             byte[] chunk=new byte[CHUNK_BYTES];long confirmed=0;
+            MessageDigest transmittedDigest=MessageDigest.getInstance("SHA-256");
             for(int part:received)confirmed+=Math.min(CHUNK_BYTES,size-(long)part*CHUNK_BYTES);
             try(InputStream in=new FileInputStream(e.file)){
                 for(int part=0;part<count;part++){
@@ -115,6 +116,7 @@ public final class MusaAiProjectSync {
                         int n=in.read(chunk,pos,amount-pos);
                         if(n<0)throw new EOFException("DWG changed");pos+=n;
                     }
+                    transmittedDigest.update(chunk,0,amount);
                     if(!received.contains(part)){
                         byte[] payload=Arrays.copyOf(chunk,amount);
                         String hash=hex(MessageDigest.getInstance("SHA-256").digest(payload));
@@ -127,6 +129,8 @@ public final class MusaAiProjectSync {
                 }
             }
             if(rev!=newest.get())return;
+            if(!hex(transmittedDigest.digest()).equals(manifest.getString("sha256")))
+                throw new IOException("project changed during transfer");
             JSONObject complete=post("/v1/projects/"+e.id+"/complete","POST",
                 token,new byte[0],null);
             if(!complete.optBoolean("complete")||complete.optLong("verifiedBytes",-1)!=size)
