@@ -918,6 +918,13 @@ public class MainActivity extends AppCompatActivity {
         String raw=MusaAiConversationalIntent.canonical(prompt);
         String q=raw.toLowerCase(new java.util.Locale("tr","TR"));
         if(q.isEmpty()){reply.send("Bir soru veya komut yazın.");return;}
+        // Strongest explicit read-only intent wins: Qwen visual review first,
+        // then local CAD synthesis and optional export. Do not let a long
+        // instruction's "PDF", "keşif", or "yerel" clause hijack the route.
+        if(MusaAiAnalysisIntent.isVisionFirstReview(prompt)){
+            handleMusaAiCloudPrompt(prompt.trim(),reply,recentContext);
+            return;
+        }
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
             reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu, hesap raporu/model çıktısı ↔ DWG karşılaştırması ve Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
@@ -1123,10 +1130,12 @@ public class MainActivity extends AppCompatActivity {
         String aiControl=MusaAiDrawingIndex.normalize(raw);
         // General and discipline-scoped engineering speech uses hybrid
         // vision + CAD by default, with separate consent and offline fallback.
-        if(MusaAiAnalysisIntent.isReview(raw)||
+        if(MusaAiAnalysisIntent.isVisionFirstReview(raw)||
+           MusaAiAnalysisIntent.isReview(raw)||
            MusaAiAnalysisIntent.isCombinedVisualReview(raw)){
             // An explicit "yerel/çevrim dışı" command must not enter cloud consent/network flows.
-            if(MusaAiAnalysisIntent.isLocalOnly(raw))
+            if(MusaAiAnalysisIntent.isLocalOnly(raw)&&
+                !MusaAiAnalysisIntent.isVisionFirstReview(raw))
                 runMusaAiGeneralProjectAnalysis(reply);
             else
                 handleMusaAiCloudPrompt(raw,reply,recentContext);
@@ -1765,9 +1774,13 @@ public class MainActivity extends AppCompatActivity {
             reply.send("Gandalf AI için tam vektör DWG/DXF çiziminin hazırlanması gerekiyor.");
             return;
         }
-        boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
+        boolean visionFirst=MusaAiAnalysisIntent.isVisionFirstReview(raw);
+        // Requested 9-region sweep of the OPEN drawing must not be replaced
+        // by a text-only multi-project package review.
+        boolean packageMode=!visionFirst&&MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&
+            openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
-        boolean hybridVisual=(MusaAiAnalysisIntent.isReview(raw)||
+        boolean hybridVisual=(visionFirst||MusaAiAnalysisIntent.isReview(raw)||
             MusaAiAnalysisIntent.isCombinedVisualReview(raw))&&!packageMode;
         String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:
             hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT;
@@ -1906,6 +1919,22 @@ public class MainActivity extends AppCompatActivity {
                         :MusaAiCloudService.analyzeWithContext(getApplicationContext(),snapshot,displayName,
                             raw,recentContext,localContextEvidence(snapshot));
                     if(!cloud.ok()){
+                        // A requested Qwen visual review must never silently
+                        // become a text-only/local engineering report.
+                        if(MusaAiAnalysisIntent.isVisionFirstReview(raw)){
+                            reply.cloudFailure(cloud.message);
+                            String notice="GÖRSEL DENETİM BAŞARISIZ — 0/9"+
+                                "\nQwen görsel gruplarından doğrulanmış yanıt alınamadı."+
+                                "\nBağlantı: "+(cloud.message.isEmpty()?
+                                    cloud.status.toString():cloud.message)+
+                                "\nYerel CAD ön incelemesi görsel AI yerine"+
+                                " kullanılmadı. DWG dosyası değiştirilmedi.";
+                            lastAiReport=notice;
+                            lastAiReportTitle="Gandalf • Başarısız Görsel Denetim";
+                            lastAiReportSourceIds=Collections.emptyList();
+                            reply.send(notice);
+                            return;
+                        }
                         reply.cloudFailure(cloud.message);
                         reply.progress("Bulut AI tamamlanamadı: "+
                             (cloud.message.isEmpty()?cloud.status.toString():cloud.message)+
