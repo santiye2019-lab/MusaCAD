@@ -121,7 +121,9 @@ export class MusaCadProjectCoordinator {
           }))});
       if(path==="/v1/projects/init"&&request.method==="POST"){
         const data=await readBody(request);
-        if(!goodId(data.projectId)||!validName(data.fileName)||!SHA.test(String(data.sha256||""))||
+        if(!goodId(data.projectId)||!validName(data.fileName)||
+          !SHA.test(String(data.sha256||""))||
+          !SHA.test(String(data.chunkRootSha256||""))||
           !Number.isSafeInteger(data.sizeBytes)||data.sizeBytes<1||data.sizeBytes>MAX_FILE_BYTES)
           return error(400,"geçersiz proje meta verisi");
         const id=data.projectId.toLowerCase();
@@ -130,11 +132,15 @@ export class MusaCadProjectCoordinator {
           return error(429,"cihaz proje kotası dolu");
         let existing=catalog.projects[id];
         if(existing){
-          if(existing.sha256!==data.sha256.toLowerCase()||existing.sizeBytes!==data.sizeBytes)
+          if(existing.sha256!==data.sha256.toLowerCase()||
+             existing.chunkRootSha256!==data.chunkRootSha256.toLowerCase()||
+             existing.sizeBytes!==data.sizeBytes)
             return error(409,"değişen proje için yeni yükleme kimliği gerekir");
         }else{
           existing={id,fileName:data.fileName,sizeBytes:data.sizeBytes,
-            sha256:data.sha256.toLowerCase(),uploadId:crypto.randomUUID(),
+            sha256:data.sha256.toLowerCase(),
+            chunkRootSha256:data.chunkRootSha256.toLowerCase(),
+            uploadId:crypto.randomUUID(),
             partCount:Math.ceil(data.sizeBytes/CHUNK_BYTES),parts:{},
             status:"uploading",completedAtMs:0};
           catalog.projects[id]=existing;
@@ -170,11 +176,18 @@ export class MusaCadProjectCoordinator {
       if(complete&&request.method==="POST"){
         const id=complete[1].toLowerCase();const p=catalog.projects[id];
         if(!p||!catalog.openProjectIds.includes(id))return error(404,"aktif proje bulunamadı");
-        if(p.status==="complete")return json({status:"ok",projectId:id,complete:true});
+        if(p.status==="complete")return json({status:"ok",projectId:id,complete:true,
+          verifiedParts:p.partCount,verifiedBytes:p.sizeBytes});
         if(Object.keys(p.parts).length!==p.partCount)
           return error(409,"doğrulanmamış veri parçaları var");
-        for(let i=0;i<p.partCount;i++)if(!SHA.test(p.parts[i]||""))
-          return error(409,"eksik parça SHA-256");
+        const hashes=new Uint8Array(p.partCount*32);
+        for(let i=0;i<p.partCount;i++){
+          const partHash=p.parts[i];
+          if(!SHA.test(partHash||""))return error(409,"eksik parça SHA-256");
+          for(let j=0;j<32;j++)hashes[32*i+j]=parseInt(partHash.slice(2*j,2*j+2),16);
+        }
+        if(await shaBytes(hashes)!==p.chunkRootSha256)
+          return error(422,"proje paketinin toplam parça özeti uyuşmuyor");
         p.status="complete";p.completedAtMs=Math.max(Date.now(),
           ...Object.values(catalog.projects).map(x=>Number(x.completedAtMs)||0).map(x=>x+1));
         await this.cleanup(catalog);
