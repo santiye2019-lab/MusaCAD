@@ -171,7 +171,10 @@ public final class MusaAiCloudService {
             String expertProfile=MusaAiMechanicalExpert.cloudProfile(rawPrompt);
             if(expertProfile.isEmpty())expertProfile=MusaAiDisciplineExpert.cloudProfile(rawPrompt);
             if(!expertProfile.isEmpty())body.put("expertProfile",expertProfile);
-            body.put("cad",new JSONObject(MusaAiCadJson.build(index,fileName)));
+            // Visual batches already carry region images and spatial evidence:
+            // avoid repeating an unnecessarily large CAD sample on every image request.
+            int cadItemLimit=visualEvidence==null?MusaAiCadJson.DEFAULT_MAX_ITEMS:650;
+            body.put("cad",new JSONObject(MusaAiCadJson.build(index,fileName,cadItemLimit)));
             if(packageJson!=null&&!packageJson.trim().isEmpty())
                 body.put("cadPackage",new JSONObject(packageJson));
             JSONObject client=new JSONObject();
