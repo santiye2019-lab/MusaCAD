@@ -55,6 +55,7 @@ jobs:
           node --check server/ai-worker/src/index.js
           node --test server/ai-worker/test.mjs
           node --test server/ai-worker/project-retention.test.mjs
+          node --test server/ai-worker/project-cache.test.mjs
       - name: Test DXF attribute visibility
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfAttributeVisibility.java tests/DxfAttributeVisibilityTest.java
