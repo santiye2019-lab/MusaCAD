@@ -61,7 +61,14 @@ public final class MusaAiProjectSync {
                     if(rev!=newest.get())return;
                     if(e.file!=null&&e.file.isFile())upload(e,session.token,rev,listener);
                 }
-            }catch(Exception ignored){}
+            }catch(Exception error){
+                if(rev==newest.get()&&!open.isEmpty()&&listener!=null){
+                    String message=String.valueOf(error.getMessage()).contains("HTTP 503")
+                        ?"Gandalf proje deposu sunucuda henüz etkin değil"
+                        :"Gandalf bulut eşitlemesi başarısız • yeniden denenecek";
+                    listener.status(open.get(0).id,-1,message);
+                }
+            }
         });
     }
     private static void status(Listener l,Entry e,int percent,String msg){
@@ -126,8 +133,12 @@ public final class MusaAiProjectSync {
                 throw new IOException("server verification failed");
             status(listener,e,100,"Gandalf sunucusunda hazır • %100");
         }catch(Exception ex){
-            if(rev==newest.get())
-                status(listener,e,-1,"Aktarım tamamlanamadı • bağlantıyı kontrol edin");
+            if(rev==newest.get()){
+                String message=String.valueOf(ex.getMessage()).contains("HTTP 503")
+                    ?"Gandalf proje deposu sunucuda henüz etkin değil"
+                    :"Aktarım tamamlanamadı • bağlantıyı kontrol edin";
+                status(listener,e,-1,message);
+            }
         }
     }
     private static String hex(byte[] src){
