@@ -19,7 +19,9 @@ public final class MusaAiCloudflareQwenContractTest {
         check(worker.contains("^[0-9a-fA-F]{32}$"),"Fixed account ID validation");
         check(worker.contains("verifySession"),"Signed developer/license session preserved");
         check(worker.contains("reasoning_effort: \"low\""),"Bounded reasoning");
-        check(worker.contains("max_completion_tokens: Math.max(1536, maxOutputTokens)"),"Visible output room");
+        check(worker.contains("max_completion_tokens: visualEvidence"),"Distinct visual generation budget");
+        check(worker.contains("Math.max(1536, Math.min(2048, maxOutputTokens))"),"Bounded multimodal output room");
+        check(worker.contains(": Math.max(1536, maxOutputTokens)"),"Chat output budget unaffected");
         check(worker.contains("data:image/jpeg;base64,"),"JPEG images are supplied");
         check(worker.contains("!parsedOutput.reply && !parsedOutput.actions.length"),"Empty reply guard");
         check(worker.contains("Cloudflare Workers AI ücretsiz Neuron kotası"),"Accurate quota errors");

@@ -96,6 +96,8 @@ jobs:
           AI_PROVIDER = "cloudflare"
           CLOUDFLARE_AI_ACCOUNT_ID = "$CLOUDFLARE_ACCOUNT_ID"
           AI_MAX_OUTPUT_TOKENS = "3200"
+          # Pilot only; stay below the Android client's 90-second socket budget.
+          AI_UPSTREAM_TIMEOUT_MS = "72000"
           MUSACAD_PILOT_DEVELOPER_ONLY = "true"
           MUSACAD_PILOT_EXPIRES_AT_MS = "$expiry_ms"
           EOF

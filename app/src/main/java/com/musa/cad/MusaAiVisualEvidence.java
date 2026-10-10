@@ -24,6 +24,11 @@ public final class MusaAiVisualEvidence {
 
     private static final int TILE_SIDE=1200;
     private static final int OVERVIEW_SIDE=640;
+    // Retry only: preserve the same drawing coordinates/regions while lowering
+    // transport size when Cloudflare or the phone drops a large visual request.
+    private static final int COMPACT_TILE_SIDE=896;
+    private static final int COMPACT_OVERVIEW_SIDE=512;
+    private static final int COMPACT_BASE64_CHARS=1_000_000;
     private static final int MAX_TILES=5;
     private static final int MAX_BASE64_CHARS=1_650_000;
     private static final long MAX_RENDER_MS=25000L;
@@ -46,6 +51,16 @@ public final class MusaAiVisualEvidence {
 
     /** One overview + up to four disjoint-in-index detailed tiles per batch. */
     public static Result renderBatch(DxfParser.Result drawing,int batch,Progress progress)throws Exception{
+        return renderBatchInternal(drawing,batch,progress,false);
+    }
+
+    /** Single bounded retry payload; same nine-region coverage, less data. */
+    public static Result renderBatchCompact(DxfParser.Result drawing,int batch,Progress progress)throws Exception{
+        return renderBatchInternal(drawing,batch,progress,true);
+    }
+
+    private static Result renderBatchInternal(DxfParser.Result drawing,int batch,
+                                              Progress progress,boolean compact)throws Exception{
         if(drawing==null)throw new IllegalArgumentException("Vektör çizim hazır değil");
         if(batch<0||batch>=MusaAiVisualSweepPlan.BATCH_COUNT)
             throw new IllegalArgumentException("Geçersiz pafta tarama grubu");
@@ -78,7 +93,8 @@ public final class MusaAiVisualEvidence {
             if(progress!=null)progress.onProgress("Gandalf • Görsel pafta taranıyor: grup "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+", bölge "+i+"/"+(regions.size()-1));
             RectF roi=regions.get(i);
-            int side=i==0?OVERVIEW_SIDE:TILE_SIDE;
+            int side=i==0?(compact?COMPACT_OVERVIEW_SIDE:OVERVIEW_SIDE)
+                :(compact?COMPACT_TILE_SIDE:TILE_SIDE);
             Bitmap bitmap=null;
             byte[] jpg;
             try{
@@ -94,13 +110,14 @@ public final class MusaAiVisualEvidence {
                 drawing.drawVectorForPrint(canvas,fromContent,false);
                 canvas.restoreToCount(saved);
                 ByteArrayOutputStream out=new ByteArrayOutputStream(128000);
-                if(!bitmap.compress(Bitmap.CompressFormat.JPEG,i==0?48:56,out))break;
+                int quality=compact?(i==0?42:45):(i==0?48:56);
+                if(!bitmap.compress(Bitmap.CompressFormat.JPEG,quality,out))break;
                 jpg=out.toByteArray();
             }finally{if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();}
             if(jpg.length==0)break;
             String encoded=Base64.encodeToString(jpg,Base64.NO_WRAP);
             if(encoded.length()>MAX_SINGLE_BASE64_CHARS||
-               totalChars+encoded.length()>MAX_BASE64_CHARS)break;
+               totalChars+encoded.length()>(compact?COMPACT_BASE64_CHARS:MAX_BASE64_CHARS))break;
             totalChars+=encoded.length();
             JSONObject one=new JSONObject();
             one.put("mime","image/jpeg");
@@ -137,6 +154,7 @@ public final class MusaAiVisualEvidence {
         payload.put("fullSheetIncluded",images.length()>0);
         boolean complete=renderedTiles==end-begin&&images.length()==regions.size();
         payload.put("complete",complete);
+        payload.put("reducedResolution",compact);
         payload.put("rawDrawingIncluded",false);
         return new Result(payload,images.length(),regions.size(),renderedTiles,complete);
     }
