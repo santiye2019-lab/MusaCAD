@@ -158,6 +158,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiViewCatalog.java app/src/main/java/com/musa/cad/MusaAiPaftaCoverage.java tests/MusaAiPaftaCoverageTest.java
           java -cp /tmp/musacad-tests MusaAiPaftaCoverageTest
+      - name: Test Qwen visual sweep wait/timeout budgets
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiVisionTimeBudget.java tests/MusaAiVisionTimeBudgetTest.java
+          java -cp /tmp/musacad-tests MusaAiVisionTimeBudgetTest
       - name: Test MusaCAD AI panel contract
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiPanelContractTest.java
