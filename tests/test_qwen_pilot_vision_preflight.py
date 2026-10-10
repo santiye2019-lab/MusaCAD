@@ -14,7 +14,7 @@ class QwenVisionPreflightGuardTest(unittest.TestCase):
         self.assertLess(len(raw), 12000)
         self.assertGreater(len(raw), 150)
 
-    def test_signed_pilot_still_requires_release_approval_and_live_vision(self):
+    def test_signed_pilot_requires_explicit_test_apk_checkbox_and_live_vision(self):
         workflow = (ROOT / ".github/workflows/qwen-isolated-pilot-24h.yml").read_text()
         self.assertIn("name: Live Qwen synthetic-image readiness probe", workflow)
         self.assertIn("data:image/jpeg;base64,", workflow)
@@ -23,8 +23,13 @@ class QwenVisionPreflightGuardTest(unittest.TestCase):
         self.assertIn("no user drawing", workflow)
         self.assertIn("if [ \"$status\" != 200 ]; then", workflow)
         self.assertIn("no deployment", workflow)
-        self.assertIn("inputs.release_approved == true", workflow)
+        self.assertNotIn("inputs.release_approved == true", workflow)
+        self.assertNotIn("Final acceptance complete", workflow)
+        self.assertIn("I approve creating a signed 24h TEST APK only", workflow)
+        self.assertIn("python3 scripts/validate_qwen_vision_result.py", workflow)
         self.assertIn("inputs.build_pilot_apk == true", workflow)
+        self.assertIn("inputs.operation == 'deploy'", workflow)
+        self.assertIn('if: inputs.operation == \'deploy\' && inputs.build_pilot_apk == true', workflow)
         self.assertIn("MUSACAD_PILOT_DEVELOPER_ONLY = \"true\"", workflow)
         self.assertIn("MUSACAD_PILOT_EXPIRES_AT_MS", workflow)
         # No image/CAD data is embedded in CI output or sent to third-party logs.
