@@ -9,16 +9,46 @@ package com.musa.cad;
 public final class MusaAiAnalysisIntent {
     private MusaAiAnalysisIntent(){}
 
+
+    /**
+     * "Keşif oluşturma" and "metraj çıkarma" can be negative imperatives.
+     * Never interpret those words as authorization to generate a BOQ.
+     * Includes explicit "don't" phrases; deliberately conservative for
+     * ambiguous Turkish suffixes, since takeoff is not an edit-free chat.
+     */
+    public static boolean prohibitsTakeoff(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return contains(q,"kesif olusturma","kesif hazirlama","kesif cikarma",
+            "kesif yapma","metraj cikarma","metraj cikartma","metraj yapma",
+            "metraj hesaplama","kesif istemiyorum","metraj istemiyorum",
+            "kesif gerek yok","metraj gerek yok","kesif uretme",
+            "metraj uretme","metraj hazirlama");
+    }
+
+    private static String withoutTakeoffProhibitions(String q){
+        if(!prohibitsTakeoff(q))return q;
+        for(String negation:new String[]{"kesif olusturma","kesif hazirlama",
+            "kesif cikarma","kesif yapma","metraj cikarma","metraj cikartma",
+            "metraj yapma","metraj hesaplama","kesif istemiyorum",
+            "metraj istemiyorum","kesif gerek yok","metraj gerek yok",
+            "kesif uretme","metraj uretme","metraj hazirlama"})
+            q=q.replace(negation," ");
+        return q.replaceAll("\\s+"," ").trim();
+    }
+
     public static boolean isReview(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;
+        // Strip only negative takeoff instructions for review detection.
+        // "Keşif oluşturma" must not match the positive "keşif oluştur" veto.
+        String forReview=withoutTakeoffProhibitions(q);
         if(q.startsWith("mekai ")||q.startsWith("gmekai ")||
            q.startsWith("statikai ")||q.startsWith("gstatikai ")||
            q.startsWith("elkai ")||q.startsWith("gelkai "))return false;
-        if(contains(q,"onerileri uygula","onerileri onizle","degistir","duzelt",
+        if(contains(forReview,"onerileri uygula","onerileri onizle","degistir","duzelt",
             "dosya kaydet","metraj cikar","kesif olustur","kesif yukle",
             "raporu pdf","raporu word","revizyon","secili alani")||
-            (" "+q+" ").contains(" sil "))return false;
+            (" "+forReview+" ").contains(" sil "))return false;
         // Natural Turkish review language: keep the entire original prompt for
         // the model. This local check chooses a READ-ONLY visual workflow only.
         // It must not interpret ambiguous natural language as a CAD edit.
