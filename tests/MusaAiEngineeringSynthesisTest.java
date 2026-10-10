@@ -51,7 +51,7 @@ public final class MusaAiEngineeringSynthesisTest {
         contains(out,"Kaynak 99999: DWG örnekleminde bulunamadı");
         contains(out,"YEREL DWG ÇAPRAZ KONTROLÜ • QWEN'DEN SONRA");
         contains(out,"Hidrofor [kaynak 184]");
-        contains(out,"Birim");
+        contains(out,"Ölçü birimi: belirsiz");
         contains(out,"AI yanıtı doğrulanan genel görüntü bölgesi: 4/9");
         contains(out,"Kullanıcı bu çalışmada metraj/keşif istemedi");
         notContains(out,"MALZEME METRAJ / ÇŞİDB POZ KEŞİF ÖN RAPORU");
