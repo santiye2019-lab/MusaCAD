@@ -1123,7 +1123,8 @@ public class MainActivity extends AppCompatActivity {
         String aiControl=MusaAiDrawingIndex.normalize(raw);
         // General and discipline-scoped engineering speech uses hybrid
         // vision + CAD by default, with separate consent and offline fallback.
-        if(MusaAiAnalysisIntent.isReview(raw)){
+        if(MusaAiAnalysisIntent.isReview(raw)||
+           MusaAiAnalysisIntent.isCombinedVisualReview(raw)){
             // An explicit "yerel/çevrim dışı" command must not enter cloud consent/network flows.
             if(MusaAiAnalysisIntent.isLocalOnly(raw))
                 runMusaAiGeneralProjectAnalysis(reply);
@@ -1766,7 +1767,8 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
-        boolean hybridVisual=MusaAiAnalysisIntent.isReview(raw)&&!packageMode;
+        boolean hybridVisual=(MusaAiAnalysisIntent.isReview(raw)||
+            MusaAiAnalysisIntent.isCombinedVisualReview(raw))&&!packageMode;
         String consentKey=packageMode?K_CLOUD_PACKAGE_CONSENT:
             hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT;
         if(prefs.getBoolean(consentKey,false)){

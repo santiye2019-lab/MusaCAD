@@ -118,6 +118,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCompactVisionRetryContractTest.java
           java -cp /tmp/musacad-tests MusaAiCompactVisionRetryContractTest
+      - name: Test combined 9-region Qwen visual review and BOQ intent routing
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiCombinedVisualTakeoffRouteTest.java
+          java -cp /tmp/musacad-tests MusaAiCombinedVisualTakeoffRouteTest
       - name: Test Gandalf natural-language hybrid discipline intent
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java tests/MusaAiAnalysisIntentTest.java
