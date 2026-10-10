@@ -130,6 +130,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiNegatedTakeoffRouteTest.java
           java -cp /tmp/musacad-tests MusaAiNegatedTakeoffRouteTest
+      - name: Test full Qwen-first visual then local then PDF intent
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiVisionFirstRoutingTest.java
+          java -cp /tmp/musacad-tests MusaAiVisionFirstRoutingTest
       - name: Test combined 9-region Qwen visual review and BOQ intent routing
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiCombinedVisualTakeoffRouteTest.java
