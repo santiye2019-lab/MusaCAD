@@ -2,7 +2,9 @@
 
 **Kullanıcı tercihi, 11.10.2026:** Açılan her DWG/DXF projesi için tekrar izin penceresi açılmadan, sunucuya otomatik aktarım yapılacak. Aynı anda açılan farklı disiplin çizimleri sunucuda birlikte tutulacak. Bu ayar ilk kez kullanıcı tarafından açıkça talep edilmiştir; kullanıcıya **Otomatik proje aktarımı** için kapatma ve sunucu kopyalarını temizleme kontrolü sunulmalıdır.
 
-**Bu dalın durumu:** Retention (saklama/temizleme) kuralı ve birim testleri eklendi. Bu belge mimari sözleşmedir. **Gerçek otomatik yükleme, R2 kurulumu, Android bağlantısı ve canlı veri aktarımı henüz uygulanmadı.** Sadece retention yordamının bulunması çalışan yükleme servisi anlamına gelmez.
+**Bu dalın güncel durumu (kodlandı, canlıya alınmadı):** Android `MusaAiProjectSync`, Worker `/v1/projects/*` API'si, 1 MiB SHA-256 doğrulamalı parçalı ham DWG/DXF yükleme, per-device Durable Object seri katalogu ve R2 silme mekanizması geliştirildi. Testler PR kalite kapısından geçirilmektedir. **Gerçek R2 bucket/DO binding kurulmadı; `MUSACAD_AUTOUPLOAD_ENABLED=false` kaldığı sürece hiçbir çizim buluta yüklenemez.** APK/üretim sunucusu değiştirilmedi.
+
+**Henüz eksik parçalar:** Sunucuya yüklenen ham DWG/DXF verisini AI analizine bağlayan tam sayısal CAD-JSON indeksleme, yüksek çözünürlüklü pafta/görsel ekleri, modelin sunucudaki paketlerden analiz gerçekleştirmesi, görsel analiz yüzde kapsamı, gerçek telefon/R2 saha testi. Halihazırdaki `/v1/analyze` yine anlık istemci CAD-JSON ve görsel isteğine bağlıdır. Otomatik aktarımın %100 olması **AI analizi tamamlandı** demek değildir.
 
 ## Kullanıcı davranışı
 
@@ -52,3 +54,21 @@
 - Sunucu 413/429/503, zaman aşımı, paket SHA uyumsuzluğu veya yetkisiz istek döndürürse yanlış %100 veya çizim silinmesi yok.
 - Analiz %100 ancak gerçekten incelenen paftalar/bölgeler kanıtlandıysa söylenir; %100 **dosya aktarımı** ve %100 **mühendislik incelemesi** farklı durumdur.
 - Uygulama kapatılıp geri açıldığında yeni oturumun açık proje revizyonu, önceki eski eşzamanlı bildirimlerden daha güçlüdür.
+
+## Uygulanan ilk aktarım API'si (PR #233)
+
+- `POST /v1/projects/sync-open`: monoton `revision` ve `openProjectIds[]` ile aktif dört sekmeyi bildirir; eski revizyon reddedilir.
+- `POST /v1/projects/init`: UUID, DWG/DXF dosya adı, byte boyutu ve dosya SHA-256; sunucu daha önce doğruladığı parça numaralarını iade eder.
+- `PUT /v1/projects/{uuid}/chunks/{index}`: en fazla 1 MiB, parça SHA-256 kontrolü ve özel R2 depolama; parça onayı alınmadıkça yüzde ilerlemez.
+- `POST /v1/projects/{uuid}/complete`: tüm parçaların sunucu tarafından doğrulandığını kontrol eder ve tam aktarımı işaretler. Toplam dosya SHA-256 Android tarafından hesaplanmıştır; sunucu parçaların SHA-256'larını ayrı ayrı doğrular, tamamlanmış dosyayı tek seferde RAM'e alıp yeniden hashlemez.
+- `GET /v1/projects/status`: aynı imzalı oturum için açık sekmeleri ve alınan parça listesini gösterir; diğer cihazın projesi görünmez.
+
+`MUSACAD_AUTOUPLOAD_ENABLED` sunucuda yalnız `true` ve private `MUSACAD_PROJECT_BUCKET` ile `MUSACAD_PROJECT_COORDINATOR` bağlandığında açılır. Bu önkoşullar sağlanmadan sunucu HTTP 503 döndürür. Worker günlüklerine dosya içeriği/özel kimlik yazılmaz.
+
+### Önemli ayrıntılar
+
+- Android geliştirici yetkisi sunucuda doğrulanmışsa otomatik yükleme varsayılan olarak açık; normal kullanıcılar için menüde **Otomatik proje yükle** tercihiyle açılır. Her DWG için tekrar popup gösterilmez.
+- Aynı anda 4 projeyi tutmak hâlihazırdaki Android `MAX_OPEN_PROJECTS=4` sınırıyla uyumludur.
+- Taslakta gerçek R2 bağlantısı yok ve hiçbir veri canlıya yüklenmedi; sunucu altyapısı kurulmadan üretime alınmamalıdır.
+- Kullanıcının menüden yüklemeyi kapatması yeni yüklemeleri durdurur; **buluttaki tüm kopyaları isteğe bağlı silme** arayüzü ayrıca uygulanmalıdır. Otomatik kapanan sekme temizliği ve manuel tümünü silme birbirinden farklıdır.
+- Sürekli mobil arka plan aktarımı, yeni ağ bağlantısında otomatik devam (WorkManager/ConnectivityManager), dosya değişikliği sürümleme ve tam vektör metadata parçaları saha sonraki iterasyonda ele alınmalıdır. Bu özellikler tamamlanmış gibi gösterilmemelidir.
