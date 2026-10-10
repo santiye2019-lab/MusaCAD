@@ -118,6 +118,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCompactVisionRetryContractTest.java
           java -cp /tmp/musacad-tests MusaAiCompactVisionRetryContractTest
+      - name: Test Qwen-first local engineering evidence synthesis and optional metraj
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiEngineeringSynthesis.java tests/MusaAiEngineeringSynthesisTest.java
+          java -cp /tmp/musacad-tests MusaAiEngineeringSynthesisTest
+      - name: Test Turkish no-keşif intent does not bypass visual AI
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiNegatedTakeoffRouteTest.java
+          java -cp /tmp/musacad-tests MusaAiNegatedTakeoffRouteTest
       - name: Test combined 9-region Qwen visual review and BOQ intent routing
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiCombinedVisualTakeoffRouteTest.java
