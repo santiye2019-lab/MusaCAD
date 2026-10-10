@@ -15,7 +15,7 @@ public final class MusaAiVisualSweepPlanTest {
         for(int batch=0;batch<MusaAiVisualSweepPlan.BATCH_COUNT;batch++){
             int first=MusaAiVisualSweepPlan.firstTile(batch);
             int end=MusaAiVisualSweepPlan.lastExclusive(batch);
-            check(end>first&&end-first<=4,"batch bounded");
+            check(end>first&&end-first==3,"three detailed regions per batch");
             total+=end-first;
             for(int k=first;k<end;k++){
                 MusaAiVisualSweepPlan.Tile t=tiles.get(k);
