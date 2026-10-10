@@ -1977,6 +1977,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** Only transient upload/HTTP/timeout errors may trigger one compact retry.
+     * Quota, expired pilot, missing license and malformed CAD must never retry.
+     */
+    private static boolean canRetryCompactVisual(MusaAiCloudService.Result response){
+        if(response==null)return false;
+        switch(response.status){
+            case NETWORK_ERROR:
+            case MODEL_TIMEOUT:
+            case UPSTREAM_UNAVAILABLE:
+                return true;
+            case INVALID_RESPONSE:
+                return response.message.contains("HTTP 413")||
+                    response.message.contains("HTTP 431");
+            default:
+                return false;
+        }
+    }
+
     /**
      * Whole-sheet visual review on the existing dedicated cloud worker.
      * Each request carries an overview and up to four 1200px region images.
@@ -1989,7 +2007,7 @@ public class MainActivity extends AppCompatActivity {
                                            String recentContext){
         final String evidenceSummary=localContextEvidence(snapshot);
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
-        int acceptedTiles=0,acceptedBatches=0;
+        int acceptedTiles=0,acceptedBatches=0,compactAcceptedBatches=0;
         String issue="";
         StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
@@ -2046,6 +2064,32 @@ public class MainActivity extends AppCompatActivity {
             MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeHybridWithContext(
                 getApplicationContext(),snapshot,fileName,task,scope,rendered.json,
                 recentContext,evidenceSummary);
+            // Retry the same bounded tile identities once, with reduced images.
+            // Do not repeat quota, authentication, pilot-expiry or validation failures.
+            if(!cloud.ok()&&canRetryCompactVisual(cloud)&&
+                !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
+                final String originalFailure=cloud.message;
+                reply.progress("Gandalf • Görsel aktarım başarısız; "+(batch+1)+
+                    ". grup daha küçük görüntülerle bir kez yeniden deneniyor…");
+                try{
+                    MusaAiVisualEvidence.Result compact=
+                        MusaAiVisualEvidence.renderBatchCompact(drawing,batch,reply::progress);
+                    if(compact.complete&&compact.renderedTiles>=rendered.renderedTiles){
+                        MusaAiCloudService.Result retry=MusaAiCloudService.analyzeHybridWithContext(
+                            getApplicationContext(),snapshot,fileName,task,scope,compact.json,
+                            recentContext,evidenceSummary);
+                        rendered=compact;
+                        cloud=retry;
+                        if(retry.ok())compactAcceptedBatches++;
+                        else report.append("\nKüçük görsel yeniden denemesi de başarısız. İlk neden: ")
+                            .append(originalFailure);
+                    }else{
+                        report.append("\nDaha küçük görsel paketi eksik üretildi; yeniden gönderilmedi.");
+                    }
+                }catch(Exception compactError){
+                    report.append("\nKüçültülmüş görüntüler üretilemedi; ilk hata korundu.");
+                }
+            }
             if(!cloud.ok()){
                 reply.cloudFailure(cloud.message);
                 issue=(batch+1)+". grupta AI sonucu alınamadı: "+
@@ -2166,6 +2210,8 @@ public class MainActivity extends AppCompatActivity {
         report.append("\nAI yanıtı alınan ayrıntı bölgesi: ").append(acceptedTiles).append("/").append(total);
         report.append("\nGrup: ").append(acceptedBatches).append("/")
             .append(MusaAiVisualSweepPlan.BATCH_COUNT);
+        report.append("\nBağlantı sonrası daha küçük görüntüyle tamamlanan grup: ")
+            .append(compactAcceptedBatches);
         report.append("\nGörsel tarama: ").append(visualComplete?
             "Tüm planlanan 9 ayrıntı bölgesinin görüntüleri AI tarafından işlendi.":
             "KISMİ — eksik bölgeler hakkında sonuç çıkarılamaz.");
