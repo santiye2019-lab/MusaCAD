@@ -72,3 +72,22 @@
 - Taslakta gerçek R2 bağlantısı yok ve hiçbir veri canlıya yüklenmedi; sunucu altyapısı kurulmadan üretime alınmamalıdır.
 - Kullanıcının menüden yüklemeyi kapatması yeni yüklemeleri durdurur; **buluttaki tüm kopyaları isteğe bağlı silme** arayüzü ayrıca uygulanmalıdır. Otomatik kapanan sekme temizliği ve manuel tümünü silme birbirinden farklıdır.
 - Sürekli mobil arka plan aktarımı, yeni ağ bağlantısında otomatik devam (WorkManager/ConnectivityManager), dosya değişikliği sürümleme ve tam vektör metadata parçaları saha sonraki iterasyonda ele alınmalıdır. Bu özellikler tamamlanmış gibi gösterilmemelidir.
+
+## Sayısal indeks ve Gandalf bağlamı — ek geliştirme
+
+- Android `MusaAiProjectSync.Entry` artık parse edilmiş DWG/DXF `DxfParser.Result` referansını da taşıyabilir. Kaynak DWG tamamlanınca `aiDrawingIndex(40001)` yalnızca **aktif layout** üzerinden bir AI vektör projeksiyonu üretir. İlk **40.000 CAD indeks öğesi** küçük 500 öğelik JSON sayfalarına ayrılarak `PUT /v1/projects/{id}/index/pages/{page}` ile gönderilir. Öğeler 40.001 veya fazlaysa **kapsam kısmi** olarak işaretlenir; tüm kat planı, kesit ve layout'ların bittiği iddia edilmez.
+- Worker'da `POST /index/init`, `PUT /index/pages/:page`, `POST /index/complete`: sayfa sayısı, öğe sayısı, UUID, parça SHA-256 ve sayfa bazlı öğe kardinalitesini doğrular. R2 indeks verisi ham DWG'nin aynı UUID+uploadId dizininin altında saklanır. Kapanmış projede klasörün tamamı silinir; ham DWG parçası ve CAD indeksi geride kalmaz.
+- `GET /v1/projects/open-context`: yalnızca aynı imzalı cihazın **açık ve indekslemesi doğrulanmış** projelerinden birer 100 nesnelik ilk sayfa önizlemesi verir. Bu, tam sayısal veya görsel mühendislik denetimi değildir.
+- `/v1/analyze` isteğinde `useStoredOpenProjects=true` seçildiyse Worker, yetki onaylı açık proje metadata ve **her proje için en fazla 25 sayfa-0 öğesini** ayrı, açıkça *partial* olarak işaretlenmiş bağlam olarak sunar. Depo 503 veya boşsa mevcut yerel CAD + görsel istemiyle devam eder; hiçbir gizli giriş anahtarı veya ham DWG dosyası model istemine eklenmez.
+- Modelin ek bağlamı görsel olarak incelenmiş pafta, tüm layout kapsamı, bağlantısı doğrulanmış boru hatları veya mevzuata uygunluk ispatı olarak göstermesi yasaktır. Kullanıcı yalnız aktarım yüzdesi %100 oldu diye AI tarafından proje incelendiğini varsaymamalıdır.
+
+### Üretim öncesi kalanlar (zorunlu)
+
+1. Canlı özel Cloudflare R2 bucket + Durable Object namespace, güvenli bütçe/kota ve açık saklama politikası bağlantısı.
+2. Android derlemesi + gerçek telefon testi, kesinti/yeniden başlatma, 413/429/503, büyük DWG ve birden fazla layout sahne testi.
+3. Çizim revizyonları için sürümleme; ham DWG'nin mevcut sahne düzenlemeleriyle eşleştiğinin kontrolü.
+4. Görsel pafta, plan, kesit, görünüş, kot ve detayların **doğrulanmış kapsamlı görsel** paketleri; şu anki sunucu yalnız sayısal örnek depolar.
+5. Proje indekslerinin R2'den tamamı üzerinde güvenli sunucu analizi ve çoklu disiplin karşılaştırması; şu anda Gandalf'a yalnız sınırlı ilk sayfa örneği aktarılır.
+6. Sunucudaki **tüm proje kopyalarını sil** ve otomatik yükleme tercihlerini değiştirme arayüzünün tamamlanması.
+
+**Bu taslak dağıtım değildir.** Canlı Worker bayrağı `false` ve R2/DO binding hazırlanmadan yeni API test ortamı dışında dosya kabul etmez.
