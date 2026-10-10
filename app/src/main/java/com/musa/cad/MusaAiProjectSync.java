@@ -25,8 +25,10 @@ public final class MusaAiProjectSync {
     public interface Listener{void status(String id,int percent,String message);}
     public static final class Entry{
         public final String id,name; public final File file;
-        public Entry(String id,String name,File file){
-            this.id=id;this.name=name;this.file=file;
+        public final DxfParser.Result parsed;
+        public Entry(String id,String name,File file){this(id,name,file,null);}
+        public Entry(String id,String name,File file,DxfParser.Result parsed){
+            this.id=id;this.name=name;this.file=file;this.parsed=parsed;
         }
     }
     public static boolean enabled(Context app){
@@ -101,7 +103,9 @@ public final class MusaAiProjectSync {
             JSONObject init=post("/v1/projects/init","POST",token,
                 manifest.toString().getBytes(StandardCharsets.UTF_8),null);
             if(init.optBoolean("complete",false)){
-                status(listener,e,100,"Gandalf sunucusunda hazır • %100");return;
+                status(listener,e,100,"DWG sunucuda hazır • %100");
+                uploadNumericIndex(e,token,rev,listener);
+                return;
             }
             int count=(int)((size+CHUNK_BYTES-1)/CHUNK_BYTES);
             if(init.optInt("chunkBytes")!=CHUNK_BYTES||init.optInt("partCount")!=count)
@@ -139,7 +143,8 @@ public final class MusaAiProjectSync {
                 token,new byte[0],null);
             if(!complete.optBoolean("complete")||complete.optLong("verifiedBytes",-1)!=size)
                 throw new IOException("server verification failed");
-            status(listener,e,100,"Gandalf sunucusunda hazır • %100");
+            status(listener,e,100,"DWG sunucuda hazır • %100");
+            uploadNumericIndex(e,token,rev,listener);
         }catch(Exception ex){
             if(rev==newest.get()){
                 String message=String.valueOf(ex.getMessage()).contains("HTTP 503")
@@ -162,6 +167,72 @@ public final class MusaAiProjectSync {
         }
         return offset;
     }
+    /**
+     * Bounded numerical companion to the complete raw DWG/DXF upload.
+     * Reports partial coverage honestly if the CAD item cap is reached.
+     * Full high-resolution visual sheet packs are a separate task.
+     */
+    private static void uploadNumericIndex(Entry e,String token,long rev,Listener listener){
+        if(e.parsed==null||rev!=newest.get())return;
+        try{
+            status(listener,e,0,"Gandalf sayısal CAD indeksi hazırlanıyor");
+            MusaAiDrawingIndex index=e.parsed.aiDrawingIndex(40001);
+            if(rev!=newest.get())return;
+            int actual=index.items().size(),count=Math.min(40000,actual);
+            boolean completeCoverage=actual<40001;
+            int pages=Math.max(1,(count+499)/500);
+            JSONObject init=new JSONObject().put("pageCount",pages)
+                .put("itemCount",count).put("coverageComplete",completeCoverage);
+            JSONObject remote=post("/v1/projects/"+e.id+"/index/init","POST",token,
+                init.toString().getBytes(StandardCharsets.UTF_8),null);
+            if(remote.optBoolean("ready",false)){
+                status(listener,e,100,completeCoverage
+                    ?"DWG ve sayısal CAD indeksi hazır"
+                    :"DWG hazır • CAD indeksi kısmi (40.000 nesne sınırı)");
+                return;
+            }
+            Set<Integer> received=new HashSet<>();
+            JSONArray prior=remote.optJSONArray("receivedPages");
+            if(prior!=null)for(int i=0;i<prior.length();i++){
+                int n=prior.optInt(i,-1);if(n>=0&&n<pages)received.add(n);
+            }
+            for(int page=0;page<pages;page++){
+                if(rev!=newest.get())return;
+                if(!received.contains(page)){
+                    int first=page*500,last=Math.min(count,first+500);
+                    MusaAiDrawingIndex slice=new MusaAiDrawingIndex(
+                        index.layout,index.entityCount,index.oleObjectCount,
+                        index.allLayers,index.visibleLayers,
+                        index.items().subList(first,last),index.unitName);
+                    JSONObject json=new JSONObject()
+                        .put("schema","musacad-index-page/v1").put("projectId",e.id)
+                        .put("pageIndex",page).put("pageCount",pages)
+                        .put("cad",new JSONObject(MusaAiCadJson.build(slice,e.name,500)));
+                    byte[] body=json.toString().getBytes(StandardCharsets.UTF_8);
+                    if(body.length>512*1024)
+                        throw new IOException("CAD numeric page too large");
+                    String checksum=hex(MessageDigest.getInstance("SHA-256").digest(body));
+                    JSONObject response=post("/v1/projects/"+e.id+"/index/pages/"+page,
+                        "PUT",token,body,checksum);
+                    if(!response.optBoolean("received",false))
+                        throw new IOException("CAD page not acknowledged");
+                }
+                int percentage=Math.min(99,100*(page+1)/pages);
+                status(listener,e,percentage,"Sayısal CAD indeks aktarımı • %"+percentage);
+            }
+            JSONObject done=post("/v1/projects/"+e.id+"/index/complete",
+                "POST",token,new byte[0],null);
+            if(!done.optBoolean("ready",false))
+                throw new IOException("CAD index verification failed");
+            status(listener,e,100,completeCoverage
+                ?"DWG ve sayısal CAD indeksi hazır"
+                :"DWG hazır • CAD indeksi kısmi (40.000 nesne sınırı)");
+        }catch(Exception ex){
+            if(rev==newest.get())
+                status(listener,e,-1,"DWG aktarıldı; sayısal CAD indeksi tamamlanamadı");
+        }
+    }
+
     private static String hex(byte[] src){
         StringBuilder sb=new StringBuilder();
         for(byte b:src)sb.append(String.format(Locale.ROOT,"%02x",b&255));
@@ -179,7 +250,9 @@ public final class MusaAiProjectSync {
             c.setRequestProperty("Authorization","Bearer "+token);
             c.setRequestProperty("Content-Type",
                 digest==null?"application/json":"application/octet-stream");
-            if(digest!=null)c.setRequestProperty("X-Chunk-SHA256",digest);
+            if(digest!=null)c.setRequestProperty(
+                path.contains("/index/pages/")?"X-Page-SHA256":"X-Chunk-SHA256",
+                digest);
             c.setDoOutput(true);c.setFixedLengthStreamingMode(bytes.length);
             try(OutputStream out=c.getOutputStream())out.write(bytes);
             if(c.getResponseCode()!=200)throw new IOException("HTTP "+c.getResponseCode());
