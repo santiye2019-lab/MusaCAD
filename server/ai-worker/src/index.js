@@ -442,9 +442,21 @@ function validateVisualEvidence(value) {
     if (value.sweepBatchCount !== 3 || value.totalDetailedTiles !== 9 ||
         !Number.isInteger(value.sweepBatch) || value.sweepBatch < 1 || value.sweepBatch > 3 ||
         !Number.isInteger(value.firstTile) || !Number.isInteger(value.lastTile)) return null;
-    first = (value.sweepBatch - 1) * 4 + 1;
-    last = Math.min(9,first+3);
-    if (value.firstTile !== first || value.lastTile !== last) return null;
+    // The current phone submits three detail tiles per batch (1–3, 4–6,
+    // 7–9). Accept the earlier 4/4/1 protocol too: users may still have
+    // a previously signed pilot APK installed during migration. No other
+    // first/last combinations are accepted.
+    const expectedThreeFirst = (value.sweepBatch - 1) * 3 + 1;
+    const expectedThreeLast = Math.min(9, expectedThreeFirst + 2);
+    const expectedLegacyFirst = (value.sweepBatch - 1) * 4 + 1;
+    const expectedLegacyLast = Math.min(9, expectedLegacyFirst + 3);
+    const threeTileProtocol =
+      value.firstTile === expectedThreeFirst && value.lastTile === expectedThreeLast;
+    const legacyProtocol =
+      value.firstTile === expectedLegacyFirst && value.lastTile === expectedLegacyLast;
+    if (!threeTileProtocol && !legacyProtocol) return null;
+    first = value.firstTile;
+    last = value.lastTile;
   }
 
   let total = 0;
