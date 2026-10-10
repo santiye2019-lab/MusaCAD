@@ -327,7 +327,7 @@ export class MusaCadProjectCoordinator {
     for(const id of remove){
       const p=catalog.projects[id];
       if(!p)continue;
-      catalog.pendingDeletes.push("projects/"+p.id+"/"+p.uploadId+"/parts/");
+      catalog.pendingDeletes.push("projects/"+p.id+"/"+p.uploadId+"/");
       delete catalog.projects[id];
     }
   }
