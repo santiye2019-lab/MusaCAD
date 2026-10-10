@@ -1,3 +1,6 @@
+import { handleProjectCache, MusaCadProjectCoordinator } from "./project-cache.js";
+export { MusaCadProjectCoordinator };
+
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -9,6 +12,8 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ status: "ok", service: "musacad-ai-worker" });
     if (url.pathname === "/v1/analyze") return handleAnalyze(request, env);
+    if (url.pathname.startsWith("/v1/projects/"))
+      return handleProjectCache(request, env, verifySession);
     return json({ status: "not_found" }, 404);
   }
 };
