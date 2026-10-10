@@ -4,9 +4,27 @@ compatibility_date = "2026-09-01"
 
 [vars]
 AI_PROVIDER = "gemini"
+MUSACAD_AUTOUPLOAD_ENABLED = "false"
 GEMINI_MODEL = "gemini-3.8-flash"
 AI_MAX_OUTPUT_TOKENS = "3200"
 
 # Add with:
 # wrangler secret put GEMINI_API_KEY
 # wrangler secret put MUSACAD_AI_SESSION_PUBLIC_KEY_PEM
+
+# Enable only AFTER provisioning a private bucket and DO namespace.
+# Replace the bucket name with the real bucket name in your account.
+# [[r2_buckets]]
+# binding = "MUSACAD_PROJECT_BUCKET"
+# bucket_name = "musacad-private-projects"
+#
+# [[durable_objects.bindings]]
+# name = "MUSACAD_PROJECT_COORDINATOR"
+# class_name = "MusaCadProjectCoordinator"
+#
+# [[migrations]]
+# tag = "v1_project_catalog"
+# new_sqlite_classes = ["MusaCadProjectCoordinator"]
+#
+# Then set MUSACAD_AUTOUPLOAD_ENABLED = "true", deploy the Worker,
+# and run the end-to-end signed-device R2 acceptance tests.
