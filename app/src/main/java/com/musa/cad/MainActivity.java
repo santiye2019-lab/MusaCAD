@@ -4306,6 +4306,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         if(oldPreview!=null&&oldPreview!=parsed.bitmap&&!oldPreview.isRecycled())oldPreview.recycle();
                         if(activeLoad==task)activeLoad=null;refreshProjectTabs();
+                        scheduleProjectCloudSync();
                         // Metadata/thumbnail persistence is secondary to showing the complete model.
                         scheduleRecentMetadataRecord(uri,loaded.name);
                     });
@@ -4628,7 +4629,7 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<MusaAiProjectSync.Entry> opened=new ArrayList<>();
         for(ProjectSession p:projects)
             opened.add(new MusaAiProjectSync.Entry(p.cloudId,
-                p.name==null?"cizim.dwg":p.name,p.file));
+                p.name==null?"cizim.dwg":p.name,p.file,p.parsed));
         MusaAiProjectSync.submit(getApplicationContext(),opened,(id,pct,message)->runOnUiThread(()->{
             if(isFinishing()||isDestroyed()||currentProject==null)return;
             if(currentProject.cloudId.equals(id))result.setText(message);
