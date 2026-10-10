@@ -27,6 +27,10 @@ const jwt=(privateKey,device=DEVICE)=>{
 class Bucket {
   constructor(){this.objects=new Map();}
   async put(key,contents){this.objects.set(key,Buffer.from(contents));}
+  async get(key){
+    const value=this.objects.get(key);
+    return value?{arrayBuffer:async()=>new Uint8Array(value).buffer}:null;
+  }
   async list({prefix,limit=1000,cursor}){
     const names=[...this.objects.keys()].filter(k=>k.startsWith(prefix)).sort();
     const from=cursor?names.findIndex(k=>k===cursor)+1:0;
@@ -185,4 +189,55 @@ test("wrong aggregate digest refuses completion and keeps last verified older co
   assert.equal(status.body.projects.find(p=>p.id===D).status,"uploading");
   assert.equal(status.body.projects.find(p=>p.id===A).status,"complete");
   assert.equal(s.bucket.objects.size,2);
+});
+
+test("numeric CAD page uploads are verified and previewed only for signed open projects",async()=>{
+  const s=setup();
+  await s.sync([A,B]);
+  assert.equal((await s.upload(A,"mechanical DWG payload")).code,200);
+  assert.equal((await s.upload(B,"architecture DWG payload")).code,200);
+  const page={
+    schema:"musacad-index-page/v1",projectId:A,pageIndex:0,pageCount:1,
+    cad:{schema:"musacad-cad-json/v1",layout:"Model",fileName:"mekanik.dwg",
+      entityCount:2,indexedItemCount:2,itemsIncluded:2,truncated:false,
+      items:[{sourceId:12,type:"LINE",layer:"PIS_SU",length:12.5},
+        {sourceId:14,type:"TEXT",layer:"PIS_SU",text:"DN100"}]}
+  };
+  const body=Buffer.from(JSON.stringify(page));
+  let result=await s.send("/v1/projects/"+A+"/index/init",{data:{
+    pageCount:1,itemCount:2,coverageComplete:true}});
+  assert.equal(result.code,200);
+  result=await s.send("/v1/projects/"+A+"/index/pages/0",{
+    method:"PUT",data:new Uint8Array(body),headers:{"x-page-sha256":hex(body)}});
+  assert.equal(result.code,200);
+  result=await s.send("/v1/projects/"+A+"/index/complete");
+  assert.equal(result.code,200);
+  assert.equal(result.body.ready,true);
+  assert.equal(result.body.itemCount,2);
+  const open=await s.send("/v1/projects/open-context",{method:"GET"});
+  assert.equal(open.code,200);
+  assert.equal(open.body.drawingCount,1);
+  assert.deepEqual(open.body.drawings[0].cadPreview.items,page.cad.items);
+  assert.equal(open.body.drawings[0].indexScope,"active-layout-only");
+  assert.equal(open.body.previewOnly,true);
+  const outsider=await s.send("/v1/projects/open-context",{
+    method:"GET",device:DEVICE2});
+  assert.equal(outsider.body.drawingCount,0);
+  await s.sync([B],2);
+  assert.equal((await s.send("/v1/projects/open-context",{method:"GET"})).body.drawingCount,0);
+  assert.equal(s.bucket.objects.size,1);
+});
+test("CAD pages may not claim more or fewer entities than declared",async()=>{
+  const s=setup();await s.sync([A]);await s.upload(A,"raw DWG");
+  assert.equal((await s.send("/v1/projects/"+A+"/index/init",{data:{
+    pageCount:2,itemCount:1,coverageComplete:true}})).code,400);
+  assert.equal((await s.send("/v1/projects/"+A+"/index/init",{data:{
+    pageCount:1,itemCount:1,coverageComplete:false}})).code,200);
+  const wrong={
+    schema:"musacad-index-page/v1",projectId:A,pageIndex:0,pageCount:1,
+    cad:{schema:"musacad-cad-json/v1",items:[],itemsIncluded:0}};
+  const bytes=Buffer.from(JSON.stringify(wrong));
+  assert.equal((await s.send("/v1/projects/"+A+"/index/pages/0",{
+    method:"PUT",data:new Uint8Array(bytes),headers:{"x-page-sha256":hex(bytes)}})).code,400);
+  assert.equal((await s.send("/v1/projects/"+A+"/index/complete")).code,409);
 });
