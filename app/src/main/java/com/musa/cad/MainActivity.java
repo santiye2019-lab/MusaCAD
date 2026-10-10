@@ -2030,9 +2030,18 @@ public class MainActivity extends AppCompatActivity {
                                            MusaAiDrawingIndex snapshot,String fileName,
                                            String raw,String scope,MusaAiPanel.Reply reply,
                                            String recentContext){
-        final String evidenceSummary=localContextEvidence(snapshot);
+        // Stage 1 is Qwen's image review. No independent local engineering
+        // judgement is performed before the image batches return.
+        // Only index metadata/annotations are supplied as spatial context.
+        final String evidenceSummary="Düzen: "+snapshot.layout+
+            "; DWG yerel kayıt: "+snapshot.entityCount+
+            "; örneklenen CAD nesnesi: "+snapshot.items().size()+
+            "; birim: "+snapshot.unitName+
+            ". CAD etiketi tek başına görsel doğrulama değildir.";
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
         int acceptedTiles=0,acceptedBatches=0,compactAcceptedBatches=0;
+        final ArrayList<MusaAiEngineeringSynthesis.VisualGroup> visualRecords=
+            new ArrayList<>();
         String issue="";
         StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
@@ -2152,6 +2161,13 @@ public class MainActivity extends AppCompatActivity {
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
+            // Retain actual returned Qwen observations by their submitted image
+            // group. No response means no visual record and no inspected region.
+            visualRecords.add(new MusaAiEngineeringSynthesis.VisualGroup(
+                "Qwen genel görsel grup "+(batch+1)+"/"+
+                    MusaAiVisualSweepPlan.BATCH_COUNT,
+                cloud.text,MusaAiVisualSweepPlan.firstTile(batch)+1,
+                MusaAiVisualSweepPlan.firstTile(batch)+rendered.renderedTiles,false));
             if(!cloud.sources.isEmpty()){
                 report.append("\nKaynak bağlantıları:");
                 for(int i=0;i<Math.min(4,cloud.sources.size());i++){
@@ -2214,6 +2230,11 @@ public class MainActivity extends AppCompatActivity {
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
                     .append(group+1).append("/").append(focusBatchCount)
                     .append(" ==========\n").append(detailed.text);
+                visualRecords.add(new MusaAiEngineeringSynthesis.VisualGroup(
+                    "Qwen başlık çevresi yakın-plan "+(group+1)+"/"+focusBatchCount,
+                    detailed.text,group*MusaAiVisualEvidence.FOCUSED_BATCH_SIZE+1,
+                    group*MusaAiVisualEvidence.FOCUSED_BATCH_SIZE+closeups.renderedTiles,
+                    true));
                 if(!closeups.complete){
                     focusedIssue="Bazı görünüm çevresi görüntüleri hazırlanamadı.";break;
                 }
