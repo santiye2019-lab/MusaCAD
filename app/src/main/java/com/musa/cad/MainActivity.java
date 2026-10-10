@@ -2063,9 +2063,10 @@ public class MainActivity extends AppCompatActivity {
         int focusedReviewed=0,focusedBatches=0;
         String focusedIssue="";
         for(int batch=0;batch<MusaAiVisualSweepPlan.BATCH_COUNT;batch++){
-            // Leave time for the next render + 90-second Android network read
-            // before the AI panel's 240-second total watchdog.
-            if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>115_000L){
+            // Three image groups plus optional focused views may exceed 2 min.
+            // Leave enough room before the panel's absolute 12-min hard deadline.
+            if(!MusaAiVisionTimeBudget.mayStartNextBatch(
+                android.os.SystemClock.elapsedRealtime()-inspectionStarted)){
                 issue="Çoklu görsel tarama güvenli toplam süre sınırına yaklaştı; "+
                     "kalan bölgeler incelenmedi.";break;
             }
@@ -2104,7 +2105,8 @@ public class MainActivity extends AppCompatActivity {
             // Retry only when the same HTTPS Worker remains reachable.
             if(!cloud.ok()&&(afterFailure==null||afterFailure.reachable)&&
                 canRetryCompactVisual(cloud)&&
-                android.os.SystemClock.elapsedRealtime()-inspectionStarted<115_000L&&
+                MusaAiVisionTimeBudget.mayRetryBatch(
+                    android.os.SystemClock.elapsedRealtime()-inspectionStarted)&&
                 !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
                 final String originalFailure=cloud.message;
                 reply.progress("Gandalf • Görsel aktarım başarısız; "+(batch+1)+
@@ -2171,7 +2173,8 @@ public class MainActivity extends AppCompatActivity {
                 if(Thread.currentThread().isInterrupted()||drawing!=activeDxf){
                     focusedIssue="Görünüm yakın-plan taraması kesildi veya çizim değiştirildi.";break;
                 }
-                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>115_000L){
+                if(!MusaAiVisionTimeBudget.mayStartNextBatch(
+                    android.os.SystemClock.elapsedRealtime()-inspectionStarted)){
                     focusedIssue="Çoklu pafta taraması güvenli süre sınırına ulaştı.";break;
                 }
                 MusaAiVisualEvidence.Result closeups;
