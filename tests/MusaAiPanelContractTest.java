@@ -60,7 +60,10 @@ public final class MusaAiPanelContractTest {
             throw new AssertionError("Legacy command chips must not replace natural conversation");
         require(panel,"Gandalf dinliyor","Gandalf voice status");
         require(icon,"<vector","AI vector icon");
-        require(panel,"timeoutHandler.postDelayed(timeout,75_000L)","Gandalf request never stays processing indefinitely");
+        require(panel,"timeoutHandler.postDelayed(timeout,MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS)","Hard deadline always ends abandoned requests");
+        require(panel,"timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS)","Long Qwen inference remains nonterminal");
+        require(panel,"timeoutHandler.removeCallbacks(idleNotice)","Cleanup of idle notices on completion");
+        require(panel,"if(completed.get())return;","Idle notice must not override completed responses");
         require(panel,"completed.compareAndSet(false,true)","only first terminal reply can update request");
         require(panel,"@Override public void progress","intermediate cloud state visible to user");
 
