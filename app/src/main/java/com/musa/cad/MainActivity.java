@@ -2397,6 +2397,9 @@ public class MainActivity extends AppCompatActivity {
              q.contains("metrajla"));
     }
     private static boolean isBoqGenerateCommand(String q){
+        // Turkish "-ma/-me" negates the following action: do not turn
+        // "keşif oluşturma" into a positive local quantity/price request.
+        if(MusaAiAnalysisIntent.prohibitsTakeoff(q))return false;
         return (q.contains("kesif")||q.contains("metraj tablosu"))&&
             (q.contains("olustur")||q.contains("uret")||q.contains("cikar"))&&
             (q.contains("proje")||q.contains("cizim")||q.contains("otomatik"));
