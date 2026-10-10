@@ -50,7 +50,8 @@ public final class MusaAiCompactVisionRetryContractTest {
         contains(main,"acceptedTiles==total");
         contains(main,"MusaAiVisionTimeBudget.mayStartNextBatch(");
         contains(main,"MusaAiVisionTimeBudget.mayRetryBatch(");
-        contains(main,"KISMİ — eksik bölgeler hakkında sonuç çıkarılamaz.");
+        String synthesis=read("app/src/main/java/com/musa/cad/MusaAiEngineeringSynthesis.java");
+        contains(synthesis,"KISMİ; eksik bölgeler hakkında teknik çıkarım yapılmadı.");
 
         contains(client,"visualEvidence==null?MusaAiCadJson.DEFAULT_MAX_ITEMS:650");
         contains(worker,"Math.max(1536, Math.min(2048, maxOutputTokens))");
