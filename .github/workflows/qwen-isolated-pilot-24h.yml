@@ -11,13 +11,8 @@ on:
         options:
           - deploy
           - remove
-      release_approved:
-        description: "Final acceptance complete and APK creation explicitly approved"
-        type: boolean
-        required: false
-        default: false
       build_pilot_apk:
-        description: "Optional signed 24h APK; installing may replace your current MusaCAD"
+        description: "I approve creating a signed 24h TEST APK only (not final acceptance); installing may replace MusaCAD"
         type: boolean
         default: false
 
@@ -110,22 +105,7 @@ jobs:
           if [ "$status" != 200 ]; then
             echo "::error::Qwen synthetic-image preflight HTTP $status; no deployment"; exit 1
           fi
-          python3 - <<'PY'
-          import json,re,unicodedata
-          data=json.load(open("/tmp/qwen-pilot-vision-response.json"))
-          result=data.get("result") or data
-          choices=result.get("choices") or []
-          message=choices[0].get("message",{}) if choices else {}
-          content=message.get("content")
-          answer=content if isinstance(content,str) else (
-              " ".join(x.get("text","") for x in content if isinstance(x,dict))
-              if isinstance(content,list) else "")
-          plain=unicodedata.normalize("NFD",answer.lower())
-          plain="".join(ch for ch in plain if unicodedata.category(ch)!="Mn")
-          if not (re.search(r"kirmizi|red",plain) and re.search(r"mavi|blue",plain)):
-              raise SystemExit("Qwen did not identify both synthetic image colors; no deployment.")
-          print("Qwen synthetic-image readiness PASS; response redacted, no user CAD uploaded.")
-          PY
+          python3 scripts/validate_qwen_vision_result.py /tmp/qwen-pilot-vision-response.json
       - name: Verify Worker test suite
         working-directory: server/ai-worker
         run: npm test
@@ -207,7 +187,9 @@ jobs:
 
   pilot-apk:
     needs: deploy
-    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true && inputs.release_approved == true
+    # Explicit pilot-only approval is the signed test APK checkbox. This
+    # workflow never publishes to Play, and no final field acceptance is claimed.
+    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true
     runs-on: ubuntu-latest
     env:
       MUSACAD_PRODUCTION_RELEASE: "true"
