@@ -43,7 +43,8 @@ public final class MusaCadVisualPerformanceContractTest {
         has(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","actual exported project images");
         has(main,"MusaAiCloudService.analyzeHybridWithContext(","online visual+CAD model call");
         has(main,"GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU","engineering report title");
-        has(main,"2025 RESMÎ POZ ADAYLARI","offline YFK candidate check");
+        has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)","offline YFK candidate check after visual AI");
+        has(main,"synthesis.includeTakeoff","metraj only on explicit request");
         has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)",
             "local 2025 poz dictionary source");
         has(server,"write a REAL inspection record in Turkish","visual evidence requirement");
