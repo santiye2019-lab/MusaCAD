@@ -161,6 +161,8 @@ public final class MusaAiCloudService {
             body.put("prompt",prompt);
             body.put("allowWeb",allowWeb);
             body.put("allowEditProposals",allowEditProposals);
+            // Request only per-device archived CAD summaries, never raw bytes in AI body.
+            body.put("useStoredOpenProjects",MusaAiProjectSync.enabled(context));
             body.put("analysisScope",scope==null?"all":scope);
             // Include only bounded, consented conversation continuity.
             if(recentTurns!=null&&!recentTurns.trim().isEmpty())
