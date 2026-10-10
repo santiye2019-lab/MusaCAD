@@ -11,6 +11,14 @@ const D="00000000-0000-4000-8000-00000000000d";
 const DEVICE="MC-12345678-90ABCDEF-12345678";
 const DEVICE2="MC-22222222-33333333-44444444";
 const hex=x=>createHash("sha256").update(x).digest("hex");
+const root=bytes=>{
+  const data=Buffer.from(bytes);
+  const pieces=[];
+  for(let i=0;i<data.length;i+=1024*1024){
+    pieces.push(createHash("sha256").update(data.subarray(i,i+1024*1024)).digest());
+  }
+  return hex(Buffer.concat(pieces));
+};
 const jwt=(privateKey,device=DEVICE)=>{
   const body=Buffer.from("MAI1|"+device+"|"+(Date.now()+600000));
   const signature=sign("RSA-SHA256",body,privateKey);
@@ -61,7 +69,7 @@ function setup(){
   const upload=async(id,data,revision=1,device=DEVICE)=>{
     const bytes=Buffer.from(data);
     const meta=await send("/v1/projects/init",{device,data:{
-      projectId:id,fileName:"proje.dwg",sizeBytes:bytes.length,sha256:hex(bytes)}});
+      projectId:id,fileName:"proje.dwg",sizeBytes:bytes.length,sha256:hex(bytes),chunkRootSha256:root(bytes)}});
     if(meta.code!==200)return meta;
     const step=meta.body.chunkBytes;
     for(let part=0;part<Math.ceil(bytes.length/step);part++){
@@ -117,7 +125,7 @@ test("digest mismatch never counts as received or completes",async()=>{
   const s=setup();await s.sync([A]);
   const bytes=Buffer.from("test-data");
   assert.equal((await s.send("/v1/projects/init",{data:{
-    projectId:A,fileName:"test.dwg",sizeBytes:bytes.length,sha256:hex(bytes)}})).code,200);
+    projectId:A,fileName:"test.dwg",sizeBytes:bytes.length,sha256:hex(bytes),chunkRootSha256:root(bytes)}})).code,200);
   assert.equal((await s.send("/v1/projects/"+A+"/chunks/0",{method:"PUT",
     data:new Uint8Array(bytes),headers:{"x-chunk-sha256":hex("wrong")}})).code,422);
   assert.equal((await s.send("/v1/projects/"+A+"/complete")).code,409);
@@ -126,13 +134,13 @@ test("missing final chunk blocks completion, client may resume",async()=>{
   const s=setup();await s.sync([A]);
   const bytes=Buffer.alloc(1024*1024+5,17);
   assert.equal((await s.send("/v1/projects/init",{data:{
-    projectId:A,fileName:"heavy.dwg",sizeBytes:bytes.length,sha256:hex(bytes)}})).code,200);
+    projectId:A,fileName:"heavy.dwg",sizeBytes:bytes.length,sha256:hex(bytes),chunkRootSha256:root(bytes)}})).code,200);
   const first=bytes.subarray(0,1024*1024);
   assert.equal((await s.send("/v1/projects/"+A+"/chunks/0",{method:"PUT",
     data:new Uint8Array(first),headers:{"x-chunk-sha256":hex(first)}})).code,200);
   assert.equal((await s.send("/v1/projects/"+A+"/complete")).code,409);
   const init=await s.send("/v1/projects/init",{data:{
-    projectId:A,fileName:"heavy.dwg",sizeBytes:bytes.length,sha256:hex(bytes)}});
+    projectId:A,fileName:"heavy.dwg",sizeBytes:bytes.length,sha256:hex(bytes),chunkRootSha256:root(bytes)}});
   assert.deepEqual(init.body.receivedParts,[0]);
   assert.equal((await s.send("/v1/projects/"+A+"/chunks/1",{method:"PUT",
     data:new Uint8Array(bytes.subarray(1024*1024)),
@@ -157,5 +165,24 @@ test("invalid UUID and excessive tabs rejected",async()=>{
   assert.equal((await s.sync([A,B,C,D,"00000000-0000-4000-8000-00000000000e"])).code,400);
   assert.equal((await s.sync([A,A])).code,400);
   assert.equal((await s.send("/v1/projects/init",{data:{
-    projectId:"../override",fileName:"bad.dwg",sizeBytes:2,sha256:hex("hi")}})).code,400);
+    projectId:"../override",fileName:"bad.dwg",sizeBytes:2,sha256:hex("hi"),chunkRootSha256:root("hi")}})).code,400);
+});
+
+test("wrong aggregate digest refuses completion and keeps last verified older copy",async()=>{
+  const s=setup();
+  await s.sync([A]);assert.equal((await s.upload(A,"verified backup")).code,200);
+  await s.sync([D],2);
+  const bytes=Buffer.from("new payload");
+  const init=await s.send("/v1/projects/init",{data:{
+    projectId:D,fileName:"replace.dwg",sizeBytes:bytes.length,sha256:hex(bytes),
+    chunkRootSha256:hex("wrong aggregate")}});
+  assert.equal(init.code,200);
+  assert.equal((await s.send("/v1/projects/"+D+"/chunks/0",{method:"PUT",
+    data:new Uint8Array(bytes),headers:{"x-chunk-sha256":hex(bytes)}})).code,200);
+  const finished=await s.send("/v1/projects/"+D+"/complete");
+  assert.equal(finished.code,422);
+  const status=await s.send("/v1/projects/status",{method:"GET"});
+  assert.equal(status.body.projects.find(p=>p.id===D).status,"uploading");
+  assert.equal(status.body.projects.find(p=>p.id===A).status,"complete");
+  assert.equal(s.bucket.objects.size,2);
 });
