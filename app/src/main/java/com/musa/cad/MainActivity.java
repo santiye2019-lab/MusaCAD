@@ -2040,6 +2040,12 @@ public class MainActivity extends AppCompatActivity {
         int focusedReviewed=0,focusedBatches=0;
         String focusedIssue="";
         for(int batch=0;batch<MusaAiVisualSweepPlan.BATCH_COUNT;batch++){
+            // Leave time for the next render + 90-second Android network read
+            // before the AI panel's 240-second total watchdog.
+            if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>115_000L){
+                issue="Çoklu görsel tarama güvenli toplam süre sınırına yaklaştı; "+
+                    "kalan bölgeler incelenmedi.";break;
+            }
             if(Thread.currentThread().isInterrupted()){
                 issue="Tarama işlemi kesildi.";break;
             }
@@ -2067,6 +2073,7 @@ public class MainActivity extends AppCompatActivity {
             // Retry the same bounded tile identities once, with reduced images.
             // Do not repeat quota, authentication, pilot-expiry or validation failures.
             if(!cloud.ok()&&canRetryCompactVisual(cloud)&&
+                android.os.SystemClock.elapsedRealtime()-inspectionStarted<115_000L&&
                 !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
                 final String originalFailure=cloud.message;
                 reply.progress("Gandalf • Görsel aktarım başarısız; "+(batch+1)+
@@ -2126,7 +2133,7 @@ public class MainActivity extends AppCompatActivity {
                 if(Thread.currentThread().isInterrupted()||drawing!=activeDxf){
                     focusedIssue="Görünüm yakın-plan taraması kesildi veya çizim değiştirildi.";break;
                 }
-                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>145_000L){
+                if(android.os.SystemClock.elapsedRealtime()-inspectionStarted>115_000L){
                     focusedIssue="Çoklu pafta taraması güvenli süre sınırına ulaştı.";break;
                 }
                 MusaAiVisualEvidence.Result closeups;
