@@ -49,7 +49,7 @@ public final class MusaAiVisualEvidence {
         return renderBatch(drawing,0,progress);
     }
 
-    /** One overview + up to four disjoint-in-index detailed tiles per batch. */
+    /** One overview + three disjoint-in-index detailed tiles per batch. */
     public static Result renderBatch(DxfParser.Result drawing,int batch,Progress progress)throws Exception{
         return renderBatchInternal(drawing,batch,progress,false);
     }
