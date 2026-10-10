@@ -2262,71 +2262,72 @@ public class MainActivity extends AppCompatActivity {
             " bir kat veya kesitin tamamının yakın-plandan incelendiği varsayılmamalıdır."+
             " Kot tutarsızlığı ancak ortak referanslar, okunabilir ölçüler ve mühendislik doğrulamasıyla teyit edilir.");
 
-        if(acceptedBatches==0){
-            MusaAiEngineeringReview.Result fallback=MusaAiEngineeringReview.analyze(snapshot,fileName);
-            report.append("\n\nGÖRSEL ANALİZ GERÇEKLEŞMEDİ");
-            if(!issue.isEmpty())report.append("\nNeden: ").append(issue);
-            report.append("\nYalnız yerel vektör incelemesi:\n").append(fallback.text);
-            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(fallback.sourceIds));
-        }else{
-            MusaAiEngineeringReview.Result local=MusaAiEngineeringReview.analyze(snapshot,fileName);
-            report.append("\n\n5. BAĞIMSIZ DWG VEKTÖR / ÖLÇÜ KANITLARI");
-            report.append("\n").append(local.text);
-            lastAiReportSourceIds=Collections.unmodifiableList(new ArrayList<>(local.sourceIds));
-        }
-
+        // STAGE 2 • Do not perform local engineering analysis, quantities or
+        // price lookup before successful online Qwen visual observations.
         boolean visualComplete=acceptedTiles==total&&
             acceptedBatches==MusaAiVisualSweepPlan.BATCH_COUNT&&issue.isEmpty();
-        report.append("\n\n6. GÖRSEL KAPSAM / VERİ GÜVENİLİRLİĞİ");
-        report.append("\nAI yanıtı alınan ayrıntı bölgesi: ").append(acceptedTiles).append("/").append(total);
-        report.append("\nGrup: ").append(acceptedBatches).append("/")
-            .append(MusaAiVisualSweepPlan.BATCH_COUNT);
-        report.append("\nBağlantı sonrası daha küçük görüntüyle tamamlanan grup: ")
-            .append(compactAcceptedBatches);
-        report.append("\nGörsel tarama: ").append(visualComplete?
-            "Tüm planlanan 9 ayrıntı bölgesinin görüntüleri AI tarafından işlendi.":
-            "KISMİ — eksik bölgeler hakkında sonuç çıkarılamaz.");
-        if(!issue.isEmpty())report.append("\nSınırlama: ").append(issue);
-        report.append("\nUYARI: Bu işlem her paftanın her detayını mühendisçe doğruladığını göstermez.");
-        report.append(" Düşük okunabilirlik, eksik diğer paftalar ve disiplin hesapları ayrıca kontrol edilmelidir.");
-        report.append(" Görsel sınıflandırma adayları kesin boru/cihaz veya mevzuat uygunluğu kanıtı değildir.");
-        report.append(" Öneriler DWG dosyasına uygulanmamıştır; her düzeltme açık kullanıcı onayı gerektirir.");
-        // User-facing per-sheet evidence register: all candidate titles are shown,
-        // but no title is misleadingly marked visually inspected by a 3x3 sweep.
-        report.append(MusaAiPaftaCoverage.build(snapshot,viewCatalog,
-            acceptedTiles,total,focusedReviewed,focusedEligible,
-            issue.isEmpty()?focusedIssue:issue));
-        MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
-                            currentProject==null?Collections.emptyList():currentProject.csbRates);
-        report.append("\n\n7. TEKNİK ÖN METRAJ / KEŞİF KONTROLÜ");
-        report.append(measured.report);
-        if(MusaAiYfk2025Library.status(this).installed){
-            report.append("\n\n8. 2025 RESMÎ POZ ADAYLARI (ÇEVRİM DIŞI KİTAP)");
-            report.append("\nKaynak kodları ve aday tarifler yalnız cihazdaki 2025 kitabından gelir. "+
-                "Malzeme/çap/sınıf/ölçü birimi ve montaj kapsamı eşleşmeden keşfe kesin poz atanmaz.\n");
-            report.append(MusaAiYfk2025Library.suggestForTakeoff(this,measured));
+        MusaAiEngineeringSynthesis.Input synthesis=new MusaAiEngineeringSynthesis.Input();
+        synthesis.project=fileName;
+        synthesis.layout=snapshot.layout;
+        synthesis.discipline=MusaAiAnalysisIntent.label(scope);
+        synthesis.reviewedTiles=acceptedTiles;
+        synthesis.plannedTiles=total;
+        synthesis.reviewedCloseups=focusedReviewed;
+        synthesis.plannedCloseups=focusedEligible;
+        synthesis.visualIssue=issue;
+        synthesis.closeupIssue=focusedIssue;
+        synthesis.viewInventory=viewCatalog.report;
+        synthesis.visualGroups.addAll(visualRecords);
+        synthesis.includeTakeoff=!MusaAiAnalysisIntent.prohibitsTakeoff(raw)&&
+            MusaAiReplyPolicy.wantsTakeoff(raw);
+
+        if(acceptedBatches>0){
+            reply.progress("Gandalf • Qwen görsel incelemesi bitti; yerel DWG"+
+                " kaynaklarıyla eşleştiriliyor ve mühendislik raporu hazırlanıyor…");
+            synthesis.addCadSources(snapshot);
+            MusaAiEngineeringReview.Result local=
+                MusaAiEngineeringReview.analyze(snapshot,fileName);
+            synthesis.localVectorEvidence=local.text;
+            lastAiReportSourceIds=Collections.unmodifiableList(
+                new ArrayList<>(local.sourceIds));
+
+            // Local takeoff/official poz checks occur after Qwen only when
+            // requested. These estimates must not be called approved quantities.
+            if(synthesis.includeTakeoff){
+                reply.progress("Gandalf • Görsel bulgular sonrası yerel metraj"+
+                    " ve kaynaklı poz adayları kontrol ediliyor…");
+                MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
+                    currentProject==null?Collections.emptyList():currentProject.csbRates);
+                synthesis.quantityEvidence=measured.report;
+                if(MusaAiYfk2025Library.status(this).installed){
+                    synthesis.priceCandidates="2025 resmî kitap adayları:"+
+                        "\nKaynak tarifi, birim ve montaj kapsamı teyit edilmeden"+
+                        " poz kodu kesin sayılmaz.\n"+
+                        MusaAiYfk2025Library.suggestForTakeoff(this,measured);
+                }else{
+                    synthesis.priceCandidates="2025 resmî poz kitabı bu telefonda"+
+                        " kurulu değil; doğrulanmış poz eşleştirmesi yapılamadı.";
+                }
+                if(currentProject!=null&&currentProject.boqModel!=null)
+                    synthesis.priceCandidates+="\n"+
+                        MusaAiCsbMaterialCompare.compare(
+                            currentProject.boqModel,measured).report;
+            }
         }else{
-            report.append("\n\n8. POZ KAYNAĞI: 2025 kitabı bu telefona yüklenmemiş. "+
-                "Gandalf panelindeki 'Poz kitabı yükle' düğmesini kullanın.");
+            // A Qwen outage is never misrepresented as a local visual report.
+            lastAiReportSourceIds=Collections.emptyList();
+            reply.progress("Gandalf • Qwen görsel yanıtı alınamadı; yerel mühendislik"+
+                " raporu görsel rapor yerine oluşturulmadı.");
         }
-        if(currentProject!=null&&currentProject.boqModel!=null)
-            report.append(MusaAiCsbMaterialCompare.compare(
-                currentProject.boqModel,measured).report);
-        String cover="GÖRSEL PROJE ANALİZİ • İNCELEME ÖZETİ"+
-            "\nProje: "+fileName+" • Layout: "+snapshot.layout+
-            "\nDisiplin: "+MusaAiAnalysisIntent.label(scope)+
-            "\nGörsel AI tarafından yanıtlanan bölge: "+acceptedTiles+"/"+total+
-            "\nYakından incelenen görünüm adayı: "+focusedReviewed+"/"+focusedEligible+
-            "\nRapor niteliği: "+
-            (visualComplete&&focusedIssue.isEmpty()?"Planlanan bölge taraması tamamlandı.":
-                "KISMİ / KONTROL GEREKTİRİYOR.")+
-            "\nBu rapor gerçekten gönderilmiş görsel bölgeleri ve çizimdeki vektör"+
-            " kanıtlarını ayrı bölümlerde içerir; görülmeyen pafta, okunamayan kot"+
-            " veya belirsiz çap tespit edilmiş gibi gösterilmez.\n\n";
-        String completeReport=cover+report.toString();
+        synthesis.coverageRegister=MusaAiPaftaCoverage.build(snapshot,viewCatalog,
+            acceptedTiles,total,focusedReviewed,focusedEligible,
+            issue.isEmpty()?focusedIssue:issue);
+        String completeReport=MusaAiEngineeringSynthesis.compose(synthesis);
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
-            (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()?" Çoklu Görünüm ":" Kısmi ")+"Görsel Proje İncelemesi";
+            (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()
+                ?" Görsel + Yerel Mühendislik Denetimi"
+                :" Kısmi Görsel + Yerel Mühendislik Ön Denetimi");
         reply.send(completeReport+"\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
     }
 
