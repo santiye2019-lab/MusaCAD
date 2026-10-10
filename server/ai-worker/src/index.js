@@ -208,7 +208,12 @@ async function handleAnalyze(request, env) {
       model: aiProvider.model,
       stream: false,
       reasoning_effort: "low",
-      max_completion_tokens: Math.max(1536, maxOutputTokens),
+      // A 3x3 sweep runs in several independently evidenced batches.
+      // Cap each visual reply to keep one multi-image call inside the
+      // Android/Worker deadlines; normal chat retains the configured budget.
+      max_completion_tokens: visualEvidence
+        ? Math.max(1536, Math.min(2048, maxOutputTokens))
+        : Math.max(1536, maxOutputTokens),
       messages: [
         { role: "system", content: cfInstructions },
         { role: "user", content: visualEvidence
