@@ -36,6 +36,33 @@ public final class MusaAiAnalysisIntent {
         return q.replaceAll("\\s+"," ").trim();
     }
 
+    /**
+     * An explicit Qwen/visual CAD review takes precedence over unrelated
+     * instructions to format the eventual report as PDF/Word or to use the
+     * phone's LOCAL CAD engine AFTER the online image analysis.
+     *
+     * This only chooses the existing consent-gated, read-only image workflow.
+     * It never approves editing a drawing or an untrusted web call.
+     */
+    public static boolean isVisionFirstReview(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        boolean vision=contains(q,"qwen","gorsel analiz","gorsel incele",
+            "gorsel yapay zeka","gorsel bolge","9 bolge","3x3",
+            "3 x 3","cevrim ici gorsel","cevrimici gorsel");
+        boolean inspect=contains(q,"analiz","incele","denet","kontrol",
+            "tara","tarama","degerlendir","inceleme","gozden gecir");
+        boolean drawing=contains(q,"dwg","cizim","proje","pafta","tesisat",
+            "mekanik","kat plan","kesit","vaziyet");
+        if(!vision||!inspect||!drawing)return false;
+        if(contains(q,"qwen kullanma","gorsel analiz yapma",
+            "gorsel inceleme yapma","gorsel analiz istemiyorum",
+            "cevrimici analiz yapma","cevrim ici analiz yapma"))return false;
+        return !contains(q,"onerileri uygula","nesneyi sil",
+            "cizimi sil","cizimi degistir","cizimi duzelt",
+            "duzeltmeleri uygula","revizyon uygula",
+            "secileni sil","dosya kaydet");
+    }
+
     public static boolean isReview(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty())return false;

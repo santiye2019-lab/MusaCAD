@@ -12,6 +12,11 @@ public final class MusaAiConversationalIntent {
         String original=raw.trim();
         String q=MusaAiDrawingIndex.normalize(original);
         if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(original))return original;
+        // Preserve the full engineering instruction when report export,
+        // offline CAD verification, and visual Qwen review appear together.
+        // PDF formatting is a downstream output request, not a replacement
+        // for the requested 9-region image review.
+        if(MusaAiAnalysisIntent.isVisionFirstReview(original))return original;
         if(isPdfRequest(original))return "Raporu PDF olarak çıkar";
         // Negated quantity commands are never executable BOQ requests.
         // This must precede substring matching against "keşif oluştur".
