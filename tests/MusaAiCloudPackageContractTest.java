@@ -12,7 +12,8 @@ public final class MusaAiCloudPackageContractTest {
         has(main,"K_CLOUD_PACKAGE_CONSENT");
         has(main,"packageMode?K_CLOUD_PACKAGE_CONSENT:");
         has(main,"hybridVisual?K_CLOUD_VISUAL_CONSENT:K_CLOUD_CONSENT");
-        has(main,"boolean hybridVisual=(MusaAiAnalysisIntent.isReview(raw)||");
+        has(main,"boolean packageMode=!visionFirst&&MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&");
+        has(main,"boolean hybridVisual=(visionFirst||MusaAiAnalysisIntent.isReview(raw)||");
         has(main,"MusaAiAnalysisIntent.isCombinedVisualReview(raw))&&!packageMode;");
         has(main,"MusaAiCloudService.analyzePackage");
         has(main,"Gandalf Proje Paketi");
