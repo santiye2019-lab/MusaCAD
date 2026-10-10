@@ -110,6 +110,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiReplyPolicy.java tests/MusaAiReplyPolicyTest.java
           java -cp /tmp/musacad-tests MusaAiReplyPolicyTest
+      - name: Test device-side pilot Worker DNS and HTTPS preflight
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaAiPilotConnectivityContractTest.java
+          java -cp /tmp/musacad-tests MusaAiPilotConnectivityContractTest
       - name: Test bounded Qwen visual retry and honest coverage reporting
         run: |
           javac -d /tmp/musacad-tests tests/MusaAiCompactVisionRetryContractTest.java
