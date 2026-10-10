@@ -106,6 +106,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiConversationalIntentTest.java
           java -cp /tmp/musacad-tests MusaAiConversationalIntentTest
+      - name: Test trusted Qwen model identity and opt-in metraj replies
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiReplyPolicy.java tests/MusaAiReplyPolicyTest.java
+          java -cp /tmp/musacad-tests MusaAiReplyPolicyTest
       - name: Test Gandalf natural-language hybrid discipline intent
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java tests/MusaAiAnalysisIntentTest.java
