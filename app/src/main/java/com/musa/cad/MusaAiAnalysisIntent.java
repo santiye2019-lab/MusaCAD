@@ -37,6 +37,30 @@ public final class MusaAiAnalysisIntent {
         return operation&&topic;
     }
 
+    /**
+     * A single compound instruction may request both real visual CAD review
+     * and a read-only metraj/BOQ appendix. The original prompt must be kept:
+     * converting it to "Projeden keşif oluştur" would bypass the 3x3 AI sweep.
+     * Standalone takeoff commands are deliberately not matched here.
+     */
+    public static boolean isCombinedVisualReview(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        boolean explicitVisual=contains(q,"gorsel analiz","gorsel incele",
+            "gorsel ve sayisal","9 bolge","9 gorsel bolge",
+            "3x3 tarama","3x3 gorunum","3 x 3 tarama");
+        boolean review=contains(q,"analiz","incele","denetle","kontrol et",
+            "tara","tarama","degerlendir");
+        boolean drawing=contains(q,"proje","dwg","cizim","pafta","tesisat",
+            "mekanik");
+        boolean quantities=contains(q,"kesif","metraj","poz","malzeme listesi",
+            "maliyet");
+        if(!explicitVisual||!review||!drawing||!quantities)return false;
+        // Never reinterpret a drawing edit as a read-only inspection.
+        return !contains(q,"onerileri uygula","nesneyi sil","cizimi sil",
+            "cizimi degistir","cizimi duzelt","duzeltmeleri uygula",
+            "dosya kaydet","revizyon uygula","secileni sil");
+    }
+
     /** A request for all views in the drawing, not proof that every frame is known. */
     public static boolean wantsAllViews(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
