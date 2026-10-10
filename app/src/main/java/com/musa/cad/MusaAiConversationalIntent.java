@@ -13,7 +13,13 @@ public final class MusaAiConversationalIntent {
         String q=MusaAiDrawingIndex.normalize(original);
         if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(original))return original;
         if(isPdfRequest(original))return "Raporu PDF olarak çıkar";
-        // Recognize safe high-level document/BOQ intent before edit guards.
+        // Keep full instructions for a hybrid visual CAD review WITH a BOQ.
+        // Otherwise the following generic BOQ shortcut erases all 9 visual
+        // regions and turns a requested review into an unrelated local report.
+        if(MusaAiAnalysisIntent.isCombinedVisualReview(original)||
+           (MusaAiAnalysisIntent.isReview(original)&&isGenericBoq(q)))
+            return original;
+        // Standalone document/BOQ commands still use the established route.
         if(isGenericBoq(q))return "Projeden keşif oluştur";
         if(editLike(q))return original;
         // Keep the user's discipline and detailed measurements intact.
