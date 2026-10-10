@@ -1912,7 +1912,12 @@ public class MainActivity extends AppCompatActivity {
                             .append(cloud.provider.equals("selfhosted")?"Özel sunucu":cloud.provider)
                             .append(cloud.model.isEmpty()?"":" • "+cloud.model)
                             .append("\n\n");
-                    out.append(cloud.text);
+                    // The model can hallucinate its own vendor/name; use the
+                    // signed gateway metadata for explicit identity questions.
+                    final boolean identityQuestion=MusaAiReplyPolicy.asksModelIdentity(raw);
+                    out.append(identityQuestion
+                        ?MusaAiReplyPolicy.verifiedModelAnswer(cloud.provider,cloud.model)
+                        :cloud.text);
                     if(cloud.webUsed)out.append("\n\n• Bu yanıtta güncel web araması kullanıldı.");
                     if(!cloud.sources.isEmpty()){
                         out.append("\n\nKaynaklar:");
@@ -1940,7 +1945,9 @@ public class MainActivity extends AppCompatActivity {
                         else
                             out.append("\n\nBu çizim işlemleri görüntülenebilir; doğrudan uygulama şu anda Gandalf Developer yetkisine ayrılmıştır.");
                     }
-                    if(!packageMode&&snapshot!=null){
+                    // Never append a material price/takeoff report to ordinary
+                    // chat, a model-identity check or a connection probe.
+                    if(!packageMode&&snapshot!=null&&MusaAiReplyPolicy.wantsTakeoff(raw)){
                         MusaAiCsbEstimate.Result measured=
                             MusaAiCsbEstimate.analyze(snapshot,
                             currentProject==null?Collections.emptyList():currentProject.csbRates);
@@ -1954,7 +1961,7 @@ public class MainActivity extends AppCompatActivity {
                         MusaAiAnalysisIntent.label(requestedScope)+" Proje Analiz Raporu";
                     lastAiReportSourceIds=Collections.emptyList();
                     reply.send(out.toString()+
-                        "\n\nÇıktı: 'Raporu Word olarak çıkar' veya 'Raporu PDF olarak çıkar'.");
+                        (identityQuestion?"":"\n\nÇıktı: 'Raporu Word olarak çıkar' veya 'Raporu PDF olarak çıkar'."));
                     if(!packageMode&&!cloud.actions.isEmpty()&&MusaAiSessionService.developerCached())
                         runOnUiThread(()->showPendingGandalfActions(reply,false));
                 }catch(OutOfMemoryError e){
