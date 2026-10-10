@@ -48,6 +48,8 @@ public final class MusaAiCompactVisionRetryContractTest {
         contains(main,"if(retry.ok())compactAcceptedBatches++");
         contains(main,"acceptedTiles+=rendered.renderedTiles");
         contains(main,"acceptedTiles==total");
+        contains(main,"inspectionStarted>115_000L");
+        contains(main,"inspectionStarted<115_000L");
         contains(main,"KISMİ — eksik bölgeler hakkında sonuç çıkarılamaz.");
 
         contains(client,"visualEvidence==null?MusaAiCadJson.DEFAULT_MAX_ITEMS:650");
