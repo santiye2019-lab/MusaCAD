@@ -211,6 +211,7 @@ export class MusaCadProjectCoordinator {
            body.pageCount>MAX_INDEX_PAGES||
            !Number.isSafeInteger(body.itemCount)||body.itemCount<0||
            body.itemCount>body.pageCount*INDEX_PAGE_ITEMS||
+           body.pageCount!==Math.max(1,Math.ceil(body.itemCount/INDEX_PAGE_ITEMS))||
            (body.coverageComplete!==true&&body.coverageComplete!==false))
           return error(400,"geçersiz CAD indeksi bildirimi");
         if(p.indexPageCount!==undefined&&
@@ -221,7 +222,7 @@ export class MusaCadProjectCoordinator {
         if(p.indexPageCount===undefined){
           p.indexPageCount=body.pageCount;p.indexItemCount=body.itemCount;
           p.indexCoverageComplete=body.coverageComplete;
-          p.indexParts={};p.indexReady=false;
+          p.indexParts={};p.indexCounts={};p.indexReady=false;
           await this.state.storage.put("catalog",catalog);
         }
         return json({status:"ok",pageCount:p.indexPageCount,
@@ -250,7 +251,8 @@ export class MusaCadProjectCoordinator {
            pageData.projectId!==id||
            !pageData.cad||pageData.cad.schema!=="musacad-cad-json/v1"||
            !Array.isArray(pageData.cad.items)||
-           pageData.cad.items.length>INDEX_PAGE_ITEMS||
+           pageData.cad.items.length!==
+             Math.max(0,Math.min(INDEX_PAGE_ITEMS,p.indexItemCount-page*INDEX_PAGE_ITEMS))||
            !Number.isSafeInteger(pageData.cad.itemsIncluded)||
            pageData.cad.itemsIncluded!==pageData.cad.items.length)
           return error(400,"geçersiz sayısal pafta indeksi");
@@ -259,6 +261,7 @@ export class MusaCadProjectCoordinator {
         await this.env.MUSACAD_PROJECT_BUCKET.put(
           prefix+"projects/"+id+"/"+p.uploadId+"/index/"+page,payload);
         p.indexParts[page]=checksum;
+        p.indexCounts[page]=pageData.cad.itemsIncluded;
         await this.state.storage.put("catalog",catalog);
         return json({status:"ok",page,received:true});
       }
@@ -267,7 +270,8 @@ export class MusaCadProjectCoordinator {
         const id=indexComplete[1].toLowerCase();const p=catalog.projects[id];
         if(!p||p.status!=="complete"||!catalog.openProjectIds.includes(id)||
            !p.indexPageCount)return error(409,"CAD indeksi başlatılmadı");
-        if(Object.keys(p.indexParts).length!==p.indexPageCount)
+        if(Object.keys(p.indexParts).length!==p.indexPageCount||
+           Object.values(p.indexCounts||{}).reduce((sum,n)=>sum+n,0)!==p.indexItemCount)
           return error(409,"CAD indeks sayfaları eksik");
         if(!p.indexReady){
           for(let i=0;i<p.indexPageCount;i++)
@@ -293,6 +297,7 @@ export class MusaCadProjectCoordinator {
           const data=JSON.parse(new TextDecoder().decode(bytes));
           drawings.push({projectId:id,fileName:p.fileName,indexItems:p.indexItemCount,
             indexPages:p.indexPageCount,coverageComplete:p.indexCoverageComplete,
+            indexScope:"active-layout-only",
             cadPreview:{...data.cad,items:data.cad.items.slice(0,100),
               itemsIncluded:Math.min(100,data.cad.items.length),truncated:true}});
         }
