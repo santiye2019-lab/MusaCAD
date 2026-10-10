@@ -254,7 +254,7 @@ public final class MusaAiProjectSync {
                 path.contains("/index/pages/")?"X-Page-SHA256":"X-Chunk-SHA256",
                 digest);
             c.setDoOutput(true);c.setFixedLengthStreamingMode(bytes.length);
-            try(OutputStream out=c.getOutputStream())out.write(bytes);
+            try(OutputStream out=c.getOutputStream()){out.write(bytes);}
             if(c.getResponseCode()!=200)throw new IOException("HTTP "+c.getResponseCode());
             try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
                 byte[] b=new byte[2048];int n;
