@@ -82,16 +82,22 @@ public final class MusaAiProjectSync {
             }
             status(listener,e,0,"Gandalf paketi hazırlanıyor");
             MessageDigest fileDigest=MessageDigest.getInstance("SHA-256");
-            byte[] block=new byte[65536];
+            MessageDigest chunkRootDigest=MessageDigest.getInstance("SHA-256");
+            byte[] block=new byte[CHUNK_BYTES];
             try(InputStream in=new FileInputStream(e.file)){
-                int n;while((n=in.read(block))!=-1){
+                int n;
+                while((n=readPart(in,block))>0){
                     if(rev!=newest.get())return;
                     fileDigest.update(block,0,n);
+                    MessageDigest each=MessageDigest.getInstance("SHA-256");
+                    each.update(block,0,n);
+                    chunkRootDigest.update(each.digest());
                 }
             }
             JSONObject manifest=new JSONObject().put("projectId",e.id)
                 .put("fileName",e.name).put("sizeBytes",size)
-                .put("sha256",hex(fileDigest.digest()));
+                .put("sha256",hex(fileDigest.digest()))
+                .put("chunkRootSha256",hex(chunkRootDigest.digest()));
             JSONObject init=post("/v1/projects/init","POST",token,
                 manifest.toString().getBytes(StandardCharsets.UTF_8),null);
             if(init.optBoolean("complete",false)){
@@ -112,10 +118,8 @@ public final class MusaAiProjectSync {
                 for(int part=0;part<count;part++){
                     if(rev!=newest.get())return;
                     int amount=(int)Math.min(CHUNK_BYTES,size-(long)part*CHUNK_BYTES);
-                    int pos=0;while(pos<amount){
-                        int n=in.read(chunk,pos,amount-pos);
-                        if(n<0)throw new EOFException("DWG changed");pos+=n;
-                    }
+                    int countRead=readPart(in,chunk,amount);
+                    if(countRead!=amount)throw new EOFException("DWG changed");
                     transmittedDigest.update(chunk,0,amount);
                     if(!received.contains(part)){
                         byte[] payload=Arrays.copyOf(chunk,amount);
@@ -144,6 +148,19 @@ public final class MusaAiProjectSync {
                 status(listener,e,-1,message);
             }
         }
+    }
+    private static int readPart(InputStream in,byte[] buffer)throws IOException{
+        return readPart(in,buffer,buffer.length);
+    }
+    private static int readPart(InputStream in,byte[] buffer,int limit)throws IOException{
+        int offset=0;
+        while(offset<limit){
+            int n=in.read(buffer,offset,limit-offset);
+            if(n<0)break;
+            if(n==0)continue;
+            offset+=n;
+        }
+        return offset;
     }
     private static String hex(byte[] src){
         StringBuilder sb=new StringBuilder();
