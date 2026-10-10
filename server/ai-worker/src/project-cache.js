@@ -175,7 +175,8 @@ export class MusaCadProjectCoordinator {
           return error(409,"doğrulanmamış veri parçaları var");
         for(let i=0;i<p.partCount;i++)if(!SHA.test(p.parts[i]||""))
           return error(409,"eksik parça SHA-256");
-        p.status="complete";p.completedAtMs=Date.now();
+        p.status="complete";p.completedAtMs=Math.max(Date.now(),
+          ...Object.values(catalog.projects).map(x=>Number(x.completedAtMs)||0).map(x=>x+1));
         await this.cleanup(catalog);
         await this.state.storage.put("catalog",catalog);
         await this.drainDeletes(catalog,prefix);
