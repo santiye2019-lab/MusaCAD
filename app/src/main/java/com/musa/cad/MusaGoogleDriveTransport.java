@@ -38,6 +38,45 @@ final class MusaGoogleDriveTransport {
         c.setRequestProperty("Authorization","Bearer "+token);
         return c;
     }
+    /** Verify cached upload against private Drive metadata, never trusting local preferences. */
+    static boolean verified(String token,String id,File local)throws Exception {
+        if(id==null||!id.matches("[A-Za-z0-9_-]{10,200}")||local==null||!local.isFile())
+            return false;
+        URL url=new URL("https://www.googleapis.com/drive/v3/files/"+id+
+            "?fields=id,size,md5Checksum,trashed");
+        HttpsURLConnection c=(HttpsURLConnection)url.openConnection();
+        try {
+            c.setInstanceFollowRedirects(false);
+            c.setConnectTimeout(TIMEOUT);c.setReadTimeout(TIMEOUT);
+            c.setRequestProperty("Authorization","Bearer "+token);
+            int status=c.getResponseCode();
+            if(status==404||status==410)return false;
+            if(status!=200)throw new IOException("Drive metadata HTTP "+status);
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+            try(InputStream in=c.getInputStream()){
+                byte[] buf=new byte[2048];int n;
+                while((n=in.read(buf))!=-1){
+                    if(bytes.size()+n>16384)throw new IOException("Drive metadata too large");
+                    bytes.write(buf,0,n);
+                }
+            }
+            JSONObject info=new JSONObject(bytes.toString("UTF-8"));
+            if(!id.equals(info.optString("id"))||info.optBoolean("trashed",false)||
+                info.optLong("size",-1)!=local.length())return false;
+            String remoteHash=info.optString("md5Checksum","");
+            if(remoteHash.isEmpty())return false;
+            java.security.MessageDigest md=java.security.MessageDigest.getInstance("MD5");
+            long beforeSize=local.length(),beforeModified=local.lastModified();
+            try(InputStream in=new FileInputStream(local)){
+                byte[] buf=new byte[65536];int n;
+                while((n=in.read(buf))!=-1)md.update(buf,0,n);
+            }
+            if(beforeSize!=local.length()||beforeModified!=local.lastModified())return false;
+            StringBuilder hex=new StringBuilder();
+            for(byte value:md.digest())hex.append(String.format(java.util.Locale.ROOT,"%02x",value&255));
+            return remoteHash.equalsIgnoreCase(hex.toString());
+        }finally{c.disconnect();}
+    }
     static String begin(String token,String name,long length,String parentId)throws Exception {
         if(name==null||name.isEmpty()||name.length()>240||length<1)
             throw new IOException("Invalid DWG file");
