@@ -73,7 +73,16 @@ final class MusaGoogleDriveSync {
                         if(MusaGoogleDriveTransport.verified(token,
                             pref.getString("file_"+entry.id,""),file)){
                             if(revision!=LATEST.get()||!enabled(app))return;
-                            notify(listener,entry,100,"Google Drive dosyası doğrulandı");
+                            String companionId=pref.getString("dxf_"+entry.id,"");
+                            if(!file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg") ||
+                                (companionId!=null&&companionId.matches("[A-Za-z0-9_-]{10,200}")&&
+                                 pref.getString("dxf_source_"+entry.id,"").equals(fingerprint))){
+                                notify(listener,entry,100,"Google Drive dosyası doğrulandı");
+                                continue;
+                            }
+                            notify(listener,entry,99,"DWG doğrulandı; analiz DXF yeniden hazırlanıyor");
+                            // Preserve the verified original; do not upload it again.
+                            prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
                             continue;
                         }
                         if(revision!=LATEST.get()||!enabled(app))return;
@@ -98,9 +107,23 @@ final class MusaGoogleDriveSync {
                     pref.edit().putString("done_"+entry.id,fingerprint)
                         .putString("file_"+entry.id,result.id).apply();
                     notify(listener,entry,100,"Google Drive DWG doğrulandı");
-                    // Decode DWG with the existing native engine on the phone.
-                    // Upload a private, verified DXF companion for server extraction.
-                    if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg")){
+                    prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
+                }
+            }catch(UserRecoverableAuthException ex){
+                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
+                    "Google Drive erişimi için hesap izni yeniden gerekli");
+            }catch(Exception ex){
+                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
+                    "Google Drive aktarımı başarısız; tekrar deneyin");
+            }finally{
+                token=null;
+            }
+        });
+    }
+    private static void prepareCompanion(Context app,MusaAiProjectSync.Entry entry,File file,
+            String token,SharedPreferences pref,long revision,String fingerprint,
+            MusaAiProjectSync.Listener listener){
+        if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg")){
                         File companion=null;
                         try{
                             companion=File.createTempFile("musacad_drive_cad_",".dxf",app.getCacheDir());
@@ -118,7 +141,8 @@ final class MusaGoogleDriveSync {
                             if(dx.size!=companion.length()||
                                !MusaGoogleDriveTransport.verified(token,dx.id,companion))
                                 throw new java.io.IOException("Companion DXF not verified");
-                            pref.edit().putString("dxf_"+entry.id,dx.id).apply();
+                            pref.edit().putString("dxf_"+entry.id,dx.id)
+                                .putString("dxf_source_"+entry.id,fingerprint).apply();
                             notify(listener,entry,100,"DWG ve analiz DXF Drive'da doğrulandı");
                         }catch(Exception conversionError){
                             notify(listener,entry,100,"DWG Drive'da; analiz DXF hazırlanamadı");
@@ -126,17 +150,6 @@ final class MusaGoogleDriveSync {
                             if(companion!=null)companion.delete();
                         }
                     }
-                }
-            }catch(UserRecoverableAuthException ex){
-                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
-                    "Google Drive erişimi için hesap izni yeniden gerekli");
-            }catch(Exception ex){
-                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
-                    "Google Drive aktarımı başarısız; tekrar deneyin");
-            }finally{
-                token=null;
-            }
-        });
     }
     private static void notify(MusaAiProjectSync.Listener listener,
                                MusaAiProjectSync.Entry entry,int percent,String message){
