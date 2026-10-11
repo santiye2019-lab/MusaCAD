@@ -105,7 +105,8 @@ final class MusaGoogleDriveSync {
                         try{
                             companion=File.createTempFile("musacad_drive_cad_",".dxf",app.getCacheDir());
                             try(NativeCadEngine engine=NativeCadEngine.open(file)){
-                                engine.exportDxf(companion);
+                                int result=engine.exportDxf(companion);
+                                if(result<0)throw new java.io.IOException("Native DXF export failed");
                             }
                             if(companion.length()<1||companion.length()>512L*1024*1024)
                                 throw new java.io.IOException("Converted DXF exceeds upload limit");
