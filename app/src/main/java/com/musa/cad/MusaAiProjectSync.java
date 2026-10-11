@@ -41,11 +41,12 @@ public final class MusaAiProjectSync {
     public static void submit(Context app,List<Entry> entries,Listener listener){
         final Context context=app.getApplicationContext();
         final List<Entry> open=new ArrayList<>(entries);
-        if(MusaGoogleDriveSync.enabled(context)){
-            MusaGoogleDriveSync.submit(context,open,listener);
-            return;
-        }
         if(open.size()>4)return;
+        // Drive is the user's file archive; Gandalf's authenticated project
+        // endpoint receives a separate engineering analysis copy/index.
+        // Never forward a Google OAuth token to the Gandalf server.
+        if(MusaGoogleDriveSync.enabled(context))
+            MusaGoogleDriveSync.submit(context,open,listener);
         SharedPreferences pref=context.getSharedPreferences(PREF,0);
         long revision;
         synchronized(MusaAiProjectSync.class){
