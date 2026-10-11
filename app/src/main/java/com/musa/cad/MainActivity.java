@@ -4658,6 +4658,11 @@ public class MainActivity extends AppCompatActivity {
             if(isFinishing()||isDestroyed()||currentProject==null)return;
             if(currentProject.cloudId.equals(id))result.setText(message);
         }));
+        MusaGoogleDriveSync.submit(getApplicationContext(),opened,(id,pct,message)->runOnUiThread(()->{
+            if(isFinishing()||isDestroyed()||currentProject==null)return;
+            if(currentProject.cloudId.equals(id))result.setText(message);
+        }));
+
     }
 
     private void closeProjectNow(ProjectSession project){
