@@ -738,7 +738,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         env:
           # Optional public HTTPS endpoints, NEVER provider API keys.
-          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_API_URL: ${{ vars.MUSACAD_AI_API_URL || secrets.MUSACAD_AI_API_URL }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
         run: |
           ./gradlew --no-daemon assembleDirectDebug
@@ -754,7 +754,7 @@ jobs:
       - name: Build in-place MusaCAD development update APK
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true) || (github.event_name == 'pull_request' && github.head_ref == 'feature/gandalf-autoupload-retention-20261011') }}
         env:
-          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_API_URL: ${{ vars.MUSACAD_AI_API_URL || secrets.MUSACAD_AI_API_URL }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
           MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
         run: |
