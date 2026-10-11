@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "check": "node --check src/index.js && node --check src/drive-upload.js && node --check src/drive-reader.js && node --check src/drive-grant.js && node --check src/cad-extract.js",
-    "test": "node --test test.mjs src/drive-upload.test.mjs src/drive-reader.test.mjs src/cad-extract.test.mjs"
+    "test": "node --test test.mjs src/drive-upload.test.mjs src/drive-reader.test.mjs src/cad-extract.test.mjs src/drive-grant.test.mjs"
   }
 }
