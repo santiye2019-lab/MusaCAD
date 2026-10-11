@@ -1,6 +1,18 @@
 name: Gandalf AI staging validation
 on:
+  push:
+    branches:
+      - 'feature/gandalf-autoupload-retention-20261011'
+    paths:
+      - 'server/ai-worker/**'
+      - 'app/src/main/java/com/musa/cad/MusaGoogleDriveSync.java'
+      - '.github/workflows/gandalf-ai-staging.yml'
   workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: "Deploy isolated staging Worker after tests (never production)"
+        type: boolean
+        default: false
   pull_request:
     branches: [main]
     paths:
@@ -23,7 +35,7 @@ jobs:
           npm test
   staging-deploy:
     needs: verify
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_staging == 'true'
     runs-on: ubuntu-latest
     environment: gandalf-staging
     steps:
