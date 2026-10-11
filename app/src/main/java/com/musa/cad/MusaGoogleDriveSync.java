@@ -30,6 +30,15 @@ final class MusaGoogleDriveSync {
     static void setEnabled(Context context,boolean enabled){
         context.getSharedPreferences(PREF,0).edit().putBoolean("enabled",enabled).apply();
     }
+    /** Verified Drive reference for a project, never an authorization grant. */
+    static String verifiedFileId(Context context,String projectId){
+        if(context==null||projectId==null||projectId.isEmpty())return "";
+        SharedPreferences prefs=context.getSharedPreferences(PREF,0);
+        String id=prefs.getString("file_"+projectId,"");
+        String fingerprint=prefs.getString("done_"+projectId,"");
+        return id!=null&&id.matches("[A-Za-z0-9_-]{10,200}")&&
+            fingerprint!=null&&fingerprint.startsWith(projectId+":")?id:"";
+    }
     static void submit(Context context,List<MusaAiProjectSync.Entry> projects,
                        MusaAiProjectSync.Listener listener){
         if(!enabled(context)||projects==null||projects.isEmpty()||projects.size()>4)return;
