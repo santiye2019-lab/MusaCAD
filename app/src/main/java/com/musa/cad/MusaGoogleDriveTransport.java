@@ -4,6 +4,7 @@ import org.json.JSONObject;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.function.BooleanSupplier;
 import javax.net.ssl.HttpsURLConnection;
 
 /**
@@ -82,15 +83,21 @@ final class MusaGoogleDriveTransport {
         }finally{c.disconnect();}
     }
     static Upload send(String token,String session,File file,Progress progress)throws Exception {
+        return send(token,session,file,progress,()->false);
+    }
+    static Upload send(String token,String session,File file,Progress progress,
+                       BooleanSupplier cancelled)throws Exception {
         if(file==null||!file.isFile()||file.length()<1)
             throw new IOException("Invalid local DWG");
         long total=file.length();
         long modified=file.lastModified();
+        if(cancelled.getAsBoolean())throw new IOException("Drive upload superseded");
         long offset=serverOffset(token,session,total);
         if(offset==total)throw new IOException("Completed session requires Drive file metadata");
         byte[] buffer=new byte[CHUNK];
         try(RandomAccessFile in=new RandomAccessFile(file,"r")){
             while(offset<total){
+                if(cancelled.getAsBoolean())throw new IOException("Drive upload superseded");
                 if(file.length()!=total||file.lastModified()!=modified)
                     throw new IOException("DWG changed during Drive upload");
                 int length=(int)Math.min(CHUNK,total-offset);
