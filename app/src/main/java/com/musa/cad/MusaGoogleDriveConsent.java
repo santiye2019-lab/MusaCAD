@@ -49,5 +49,19 @@ final class MusaGoogleDriveConsent {
             return false;
         }
     }
+    static String errorMessage(Intent data,int resultCode) {
+        if(data==null)return "Google hesabı bağlantısı sonuç vermedi (sonuç: "+resultCode+").";
+        try {
+            GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException.class);
+            return "Google hesabı bağlandı ancak Drive dosya izni alınamadı.";
+        }catch(ApiException error){
+            int code=error.getStatusCode();
+            if(code==10)return "Google OAuth yapılandırma hatası (kod 10): com.musa.cad.sandbox paket adı ve APK imza SHA-1 değerini Google Cloud'da doğrulayın.";
+            if(code==12501)return "Google bağlantısı iptal edildi (kod 12501).";
+            return "Google Drive hesap bağlantısı başarısız (Google kodu: "+code+").";
+        }catch(Exception error){
+            return "Google bağlantısı sonucu işlenemedi.";
+        }
+    }
     private MusaGoogleDriveConsent(){}
 }
