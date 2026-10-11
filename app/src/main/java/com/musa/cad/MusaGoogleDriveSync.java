@@ -97,7 +97,34 @@ final class MusaGoogleDriveSync {
                     // No local file is ever deleted. Avoid saving OAuth tokens or upload session URLs.
                     pref.edit().putString("done_"+entry.id,fingerprint)
                         .putString("file_"+entry.id,result.id).apply();
-                    notify(listener,entry,100,"Google Drive'a aktarıldı; AI sunucu indeksi ayrı");
+                    notify(listener,entry,100,"Google Drive DWG doğrulandı");
+                    // Decode DWG with the existing native engine on the phone.
+                    // Upload a private, verified DXF companion for server extraction.
+                    if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg")){
+                        File companion=null;
+                        try{
+                            companion=File.createTempFile("musacad_drive_cad_",".dxf",app.getCacheDir());
+                            try(NativeCadEngine engine=NativeCadEngine.open(file)){
+                                engine.exportDxf(companion);
+                            }
+                            if(companion.length()<1||companion.length()>512L*1024*1024)
+                                throw new java.io.IOException("Converted DXF exceeds upload limit");
+                            String sessionDxf=MusaGoogleDriveTransport.begin(token,
+                                entry.name+".analysis.dxf",companion.length(),null);
+                            MusaGoogleDriveTransport.Upload dx=MusaGoogleDriveTransport.send(
+                                token,sessionDxf,companion,p->{},
+                                ()->revision!=LATEST.get()||!enabled(app));
+                            if(dx.size!=companion.length()||
+                               !MusaGoogleDriveTransport.verified(token,dx.id,companion))
+                                throw new java.io.IOException("Companion DXF not verified");
+                            pref.edit().putString("dxf_"+entry.id,dx.id).apply();
+                            notify(listener,entry,100,"DWG ve analiz DXF Drive'da doğrulandı");
+                        }catch(Exception conversionError){
+                            notify(listener,entry,100,"DWG Drive'da; analiz DXF hazırlanamadı");
+                        }finally{
+                            if(companion!=null)companion.delete();
+                        }
+                    }
                 }
             }catch(UserRecoverableAuthException ex){
                 if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
