@@ -170,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void handleOnBackPressed(){handleBackNavigation();}
         });
         View root=findViewById(R.id.mainRoot);
+        root.post(()->promptDriveConsentOnce());
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
@@ -4126,6 +4127,22 @@ public class MainActivity extends AppCompatActivity {
         if(directPicker)intent.putExtra(RecentFilesActivity.EXTRA_PICK_IMMEDIATELY,true);
         startActivityForResult(intent,OPEN);
     }
+    private void promptDriveConsentOnce(){
+        android.content.SharedPreferences pref=getSharedPreferences("musacad_drive_consent_ui_v1",MODE_PRIVATE);
+        if(pref.getBoolean("prompted",false)||MusaGoogleDriveSync.enabled(this))return;
+        pref.edit().putBoolean("prompted",true).apply();
+        new AlertDialog.Builder(this)
+            .setTitle("Google Drive otomatik aktarım")
+            .setMessage("Açık DWG/DXF projelerini Google Drive hesabınıza otomatik yüklemek ister misiniz? Google hesabınızın dosya izni istenir. Yerel çizimler silinmez. Bu işlem Gandalf AI sunucu analizini etkinleştirmez.")
+            .setNegativeButton("Şimdi değil",null)
+            .setPositiveButton("Onayla",(dialog,which)->{
+                if(MusaGoogleDriveConsent.hasScope(this)){
+                    MusaGoogleDriveSync.setEnabled(this,true);
+                    scheduleProjectCloudSync();
+                    Toast.makeText(this,"Google Drive otomatik aktarımı etkin",Toast.LENGTH_SHORT).show();
+                }else MusaGoogleDriveConsent.request(this);
+            }).show();
+    }
     private void showDriveConsent(){
         if(MusaGoogleDriveConsent.hasScope(this)){
             new AlertDialog.Builder(this).setTitle("Google Drive")
@@ -4139,7 +4156,7 @@ public class MainActivity extends AppCompatActivity {
                 }).show();
         }else{
             new AlertDialog.Builder(this).setTitle("Google Drive izni")
-                .setMessage("MusaCAD tarafından oluşturulan Drive dosyalarına erişim izni istenecek. Bu izin tek başına otomatik yüklemeyi başlatmaz.")
+                .setMessage("MusaCAD tarafından oluşturulan Drive dosyalarına erişim izni istenecek. İzin verirseniz otomatik aktarım etkinleşir; yerel dosyalar silinmez.")
                 .setNegativeButton("Vazgeç",null)
                 .setPositiveButton("Google hesabını bağla",(dialog,which)->MusaGoogleDriveConsent.request(this))
                 .show();
