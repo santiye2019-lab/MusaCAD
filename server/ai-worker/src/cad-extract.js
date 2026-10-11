@@ -5,7 +5,7 @@ export function extractCadEvidence(bytes,{maxEntities=5000}={}){
     throw new Error("unsupported_cad_size");
   if(bytes.length>=6&&String.fromCharCode(...bytes.slice(0,6))==="AutoCA")
     throw new Error("binary_dxf_unsupported");
-  if(bytes.length>=6&&String.fromCharCode(...bytes.slice(0,6))==="AC10")
+  if(bytes.length>=6&&String.fromCharCode(...bytes.slice(0,4))==="AC10")
     throw new Error("binary_dwg_decoder_required");
   const raw=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
   if(!raw.includes("SECTION")||!raw.includes("ENTITIES"))
