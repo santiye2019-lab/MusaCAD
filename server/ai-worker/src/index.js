@@ -1,3 +1,9 @@
+import { handleProjectCache, MusaCadProjectCoordinator } from "./project-cache.js";
+import { readAuthorizedDriveDrawing } from "./drive-reader.js";
+import { resolveDriveGrant } from "./drive-grant.js";
+import { extractCadEvidence } from "./cad-extract.js";
+export { MusaCadProjectCoordinator };
+
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -8,7 +14,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ status: "ok", service: "musacad-ai-worker" });
-    if (url.pathname === "/v1/analyze") return handleAnalyze(request, env);
+    if (url.pathname === "/v1/analyze" || (url.pathname === "/" && request.method === "POST")) return handleAnalyze(request, env);
+    if (url.pathname.startsWith("/v1/projects/"))
+      return handleProjectCache(request, env, verifySession);
     return json({ status: "not_found" }, 404);
   }
 };
@@ -37,9 +45,75 @@ async function handleAnalyze(request, env) {
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body || {};
+  // Drive-backed analysis is opt-in and disabled until a trusted per-device
+  // OAuth broker is bound. Never accept Drive tokens or arbitrary URLs from APKs.
+  if(body.driveProject != null){
+    if(!env.MUSACAD_DRIVE_TOKEN_BROKER)
+      return json({status:"unavailable",message:"Drive AI access broker is not configured"},503);
+    const ref=body.driveProject;
+    if(!ref||typeof ref!=="object"||
+       !/^[A-Za-z0-9_-]{10,200}$/.test(ref.fileId||"")||
+       !/^[A-Za-z0-9_-]{1,128}$/.test(ref.projectId||"")||
+       !Number.isSafeInteger(ref.size)||ref.size<1||ref.size>512*1024*1024||
+       !/^[a-f0-9]{32}$/i.test(ref.md5||"")||
+       !/^[a-f0-9]{64}$/i.test(ref.sha256||""))
+      return json({status:"denied",message:"Invalid Drive project reference"},400);
+    // The broker MUST independently bind the file to the verified device and
+    // account; a file ID supplied by the client is never proof of ownership.
+    let accessToken;
+    try{
+      accessToken=await resolveDriveGrant(env.MUSACAD_DRIVE_TOKEN_BROKER,{
+        deviceId:session.deviceId,projectId:ref.projectId,fileId:ref.fileId
+      });
+    }catch(_){
+      return json({status:"denied",message:"Drive project authorization unavailable"},403);
+    }
+    try{
+      const bytes=await readAuthorizedDriveDrawing({
+        fileId:ref.fileId,accessToken,
+        expectedSize:ref.size,expectedMd5:ref.md5,expectedSha256:ref.sha256
+      });
+      let evidence;
+      try{evidence=extractCadEvidence(bytes);}
+      catch(error){
+        return json({status:"unsupported",message:String(error.message||"CAD extraction unavailable")},422);
+      }finally{bytes.fill(0);}
+      return json({status:"ok",source:"authorized_google_drive",
+        projectId:ref.projectId,fileId:ref.fileId,
+        analysisReady:false,evidence,
+        message:"DXF evidence extracted; full DWG visual analysis requires a binary decoder"},200);
+    }catch(_){
+      return json({status:"unavailable",message:"Drive read or verification failed"},503);
+    }
+  }
   const prompt = String(body.prompt || "").trim();
   const cad = body.cad;
   const cadPackage = body.cadPackage;
+  let storedProjectPreview = null;
+  // Optional, signed-device-only supplement: bounded first-page CAD context.
+  // The mobile snapshot remains authoritative when the R2 store is unavailable.
+  if(body.useStoredOpenProjects===true&&
+     env.MUSACAD_AUTOUPLOAD_ENABLED==="true"&&
+     env.MUSACAD_PROJECT_BUCKET&&env.MUSACAD_PROJECT_COORDINATOR){
+    try{
+      const contextUrl=new URL("/v1/projects/open-context",request.url);
+      const stored=await handleProjectCache(new Request(contextUrl,{
+        method:"GET",headers:{"authorization":request.headers.get("authorization")||""}
+      }),env,verifySession);
+      if(stored.status===200){
+        const found=await stored.json();
+        if(found.status==="ok"&&Array.isArray(found.drawings)&&found.drawings.length){
+          storedProjectPreview=found.drawings.slice(0,4).map(one=>({
+            projectId:one.projectId,fileName:one.fileName,
+            indexItems:one.indexItems,indexPages:one.indexPages,
+            coverageComplete:one.coverageComplete,indexScope:one.indexScope,
+            layout:one.cadPreview?.layout,
+            indexedItemSample:(one.cadPreview?.items||[]).slice(0,25)
+          }));
+        }
+      }
+    }catch(_){storedProjectPreview=null;}
+  }
   if ((body.previousChat != null &&
        (typeof body.previousChat !== "string" || body.previousChat.length > 3000)) ||
       (body.localEvidence != null &&
@@ -97,6 +171,9 @@ async function handleAnalyze(request, env) {
     (packageMode
       ? "A bounded MusaCAD CAD package containing multiple open drawings is also supplied. Treat each drawing as a separate source, compare disciplines explicitly, use fileName and detectedDiscipline to attribute findings, and distinguish cross-drawing proximity/coordination candidates from proven clashes. Package mode is read-only: do not claim or propose CAD edits across files. "
       : "") +
+    (storedProjectPreview
+      ? "Additional signed-device cloud archive metadata is included from up to four OPEN drawings; it contains ONLY the first sampled CAD index page (maximum 25 items per project), not complete sheet or visual evidence. Never describe this partial sample as an exhaustive comparison, visually inspected project, or verified engineering clash. The actual files remain in a private cache. "
+      : "") +
     mechanicalExpertInstructions(expertProfile) +
     disciplineExpertInstructions(expertProfile) +
     "If visualEvidence contains a viewBatch, the individual visual regions are candidate close-ups around labels for floors, sections, elevations and site plans. These candidate crops ARE NOT verified full view boundaries. For each supplied named view, separately inspect its visible engineering components and elevation/kot marks; compare floor–section elevations, vertical stacks, roof ventilation and site sewer/water entry only when both matching views have actually been provided with legible marks and a common datum. Never infer a clash or numeric discrepancy from title text or spatial proximity alone. Explicitly state views not reviewed. " +
@@ -121,7 +198,10 @@ async function handleAnalyze(request, env) {
         (localEvidence ? "\n\nLOCAL DEVICE ENGINEERING OBSERVATIONS (preliminary, not an approved BOQ):\n" +
             JSON.stringify(localEvidence) : "") +
         "\n\nMUSACAD CAD-JSON (active drawing):\n" + JSON.stringify(cad) +
-        (packageMode ? "\n\nMUSACAD CAD-PACKAGE:\n" + JSON.stringify(cadPackage) : "")
+        (packageMode ? "\n\nMUSACAD CAD-PACKAGE:\n" + JSON.stringify(cadPackage) : "") +
+        (storedProjectPreview ?
+          "\n\nSIGNED-DEVICE STORED OPEN PROJECT CAD PREVIEW (FIRST-PAGE SAMPLE ONLY):\n" +
+          JSON.stringify(storedProjectPreview) : "")
     }
   ];
 

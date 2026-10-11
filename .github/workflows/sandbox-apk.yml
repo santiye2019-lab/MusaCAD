@@ -1,0 +1,51 @@
+name: MusaCAD isolated test APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_approved:
+        description: "Build a separate sandbox app; existing MusaCAD is not replaced"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    if: ${{ inputs.test_approved == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build separately installable sandbox APK
+        env:
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectSandbox
+          apk=app/build/outputs/apk/direct/sandbox/app-direct-sandbox.apk
+          test -s "$apk"
+          cp "$apk" /tmp/MusaCAD-sandbox.apk
+          sha256sum "$apk" > /tmp/MusaCAD-sandbox.sha256
+      - name: Upload isolated APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-sandbox-installable-apk
+          path: |
+            /tmp/MusaCAD-sandbox.apk
+            /tmp/MusaCAD-sandbox.sha256
+          if-no-files-found: error
+          retention-days: 14

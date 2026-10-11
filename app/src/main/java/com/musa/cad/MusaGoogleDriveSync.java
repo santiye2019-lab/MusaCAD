@@ -1,0 +1,161 @@
+package com.musa.cad;
+
+import android.accounts.Account;
+import android.content.Context;
+import android.content.SharedPreferences;
+import com.google.android.gms.auth.GoogleAuthUtil;
+import com.google.android.gms.auth.UserRecoverableAuthException;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import java.io.File;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Explicitly opt-in Drive-only transport. Does not claim Gandalf server indexing.
+ * Google authorization must have been granted interactively first.
+ * OAuth access tokens are held in memory for the duration of a transfer only.
+ */
+final class MusaGoogleDriveSync {
+    private static final String PREF="musacad_drive_sync_v1";
+    private static final AtomicLong LATEST=new AtomicLong();
+    private static final ExecutorService QUEUE=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-drive-sync");t.setPriority(Thread.MIN_PRIORITY);return t;
+    });
+    static boolean enabled(Context context){
+        return context.getSharedPreferences(PREF,0).getBoolean("enabled",false);
+    }
+    static void setEnabled(Context context,boolean enabled){
+        context.getSharedPreferences(PREF,0).edit().putBoolean("enabled",enabled).apply();
+    }
+    /** Verified Drive reference for a project, never an authorization grant. */
+    static String verifiedFileId(Context context,String projectId){
+        if(context==null||projectId==null||projectId.isEmpty())return "";
+        SharedPreferences prefs=context.getSharedPreferences(PREF,0);
+        String id=prefs.getString("file_"+projectId,"");
+        String fingerprint=prefs.getString("done_"+projectId,"");
+        return id!=null&&id.matches("[A-Za-z0-9_-]{10,200}")&&
+            fingerprint!=null&&fingerprint.startsWith(projectId+":")?id:"";
+    }
+    static void submit(Context context,List<MusaAiProjectSync.Entry> projects,
+                       MusaAiProjectSync.Listener listener){
+        if(!enabled(context)||projects==null||projects.isEmpty()||projects.size()>4)return;
+        Context app=context.getApplicationContext();
+        List<MusaAiProjectSync.Entry> snapshot=new java.util.ArrayList<>(projects);
+        final long revision=LATEST.incrementAndGet();
+        QUEUE.execute(()->{
+            if(revision!=LATEST.get()||!enabled(app))return;
+            GoogleSignInAccount signed=GoogleSignIn.getLastSignedInAccount(app);
+            Account account=signed==null?null:signed.getAccount();
+            if(account==null||!GoogleSignIn.hasPermissions(signed,
+                new com.google.android.gms.common.api.Scope(MusaGoogleDriveTransport.SCOPE))){
+                notify(listener,snapshot.get(0),-1,"Google Drive izni gerekli");return;
+            }
+            String token=null;
+            try{
+                token=GoogleAuthUtil.getToken(app,account,"oauth2:"+MusaGoogleDriveTransport.SCOPE);
+                SharedPreferences pref=app.getSharedPreferences(PREF,0);
+                for(MusaAiProjectSync.Entry entry:snapshot){
+                    if(!enabled(app)||revision!=LATEST.get())return;
+                    File file=entry.file;
+                    if(file==null||!file.isFile())continue;
+                    long size=file.length();
+                    long modified=file.lastModified();
+                    if(size<1||size>512L*1024*1024){
+                        notify(listener,entry,-1,"Drive aktarımı için dosya boyutu uygun değil");continue;
+                    }
+                    String fingerprint=entry.id+":"+size+":"+modified;
+                    if(fingerprint.equals(pref.getString("done_"+entry.id,null))
+                        &&!pref.getString("file_"+entry.id,"").isEmpty()){
+                        notify(listener,entry,99,"Google Drive dosyası doğrulanıyor");
+                        if(MusaGoogleDriveTransport.verified(token,
+                            pref.getString("file_"+entry.id,""),file)){
+                            if(revision!=LATEST.get()||!enabled(app))return;
+                            String companionId=pref.getString("dxf_"+entry.id,"");
+                            if(!file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg") ||
+                                (companionId!=null&&companionId.matches("[A-Za-z0-9_-]{10,200}")&&
+                                 pref.getString("dxf_source_"+entry.id,"").equals(fingerprint))){
+                                notify(listener,entry,100,"Google Drive dosyası doğrulandı");
+                                continue;
+                            }
+                            notify(listener,entry,99,"DWG doğrulandı; analiz DXF yeniden hazırlanıyor");
+                            // Preserve the verified original; do not upload it again.
+                            prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
+                            continue;
+                        }
+                        if(revision!=LATEST.get()||!enabled(app))return;
+                        notify(listener,entry,0,"Drive dosyası eksik veya değişmiş; yeniden yükleniyor");
+                    }
+                    notify(listener,entry,0,"Google Drive aktarımı hazırlanıyor");
+                    String session=MusaGoogleDriveTransport.begin(token,entry.name,size,null);
+                    MusaGoogleDriveTransport.Upload result=MusaGoogleDriveTransport.send(
+                        token,session,file,p->{
+                            if(revision==LATEST.get()&&enabled(app))
+                                notify(listener,entry,Math.min(99,p),"Google Drive yükleme • %"+Math.min(99,p));
+                        },()->revision!=LATEST.get()||!enabled(app));
+                    if(result.size!=size)throw new java.io.IOException("Drive size mismatch");
+                    if(file.length()!=size||file.lastModified()!=modified)
+                        throw new java.io.IOException("Local drawing changed during upload");
+                    if(revision!=LATEST.get()||!enabled(app))return;
+                    notify(listener,entry,99,"Google Drive sunucusunda dosya doğrulanıyor");
+                    if(!MusaGoogleDriveTransport.verified(token,result.id,file))
+                        throw new java.io.IOException("Drive upload verification failed");
+                    if(revision!=LATEST.get()||!enabled(app))return;
+                    // No local file is ever deleted. Avoid saving OAuth tokens or upload session URLs.
+                    pref.edit().putString("done_"+entry.id,fingerprint)
+                        .putString("file_"+entry.id,result.id).apply();
+                    notify(listener,entry,99,"Google Drive DWG doğrulandı; analiz dosyası hazırlanıyor");
+                    if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg"))
+                        prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
+                    else notify(listener,entry,100,"Google Drive dosyası doğrulandı");
+                }
+            }catch(UserRecoverableAuthException ex){
+                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
+                    "Google Drive erişimi için hesap izni yeniden gerekli");
+            }catch(Exception ex){
+                if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
+                    "Google Drive aktarımı başarısız; tekrar deneyin");
+            }finally{
+                token=null;
+            }
+        });
+    }
+    private static void prepareCompanion(Context app,MusaAiProjectSync.Entry entry,File file,
+            String token,SharedPreferences pref,long revision,String fingerprint,
+            MusaAiProjectSync.Listener listener){
+        if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg")){
+                        File companion=null;
+                        try{
+                            companion=File.createTempFile("musacad_drive_cad_",".dxf",app.getCacheDir());
+                            try(NativeCadEngine engine=NativeCadEngine.open(file)){
+                                int result=engine.exportDxf(companion);
+                                if(result<0)throw new java.io.IOException("Native DXF export failed");
+                            }
+                            if(companion.length()<1||companion.length()>512L*1024*1024)
+                                throw new java.io.IOException("Converted DXF exceeds upload limit");
+                            String sessionDxf=MusaGoogleDriveTransport.begin(token,
+                                entry.name+".analysis.dxf",companion.length(),null);
+                            MusaGoogleDriveTransport.Upload dx=MusaGoogleDriveTransport.send(
+                                token,sessionDxf,companion,p->{},
+                                ()->revision!=LATEST.get()||!enabled(app));
+                            if(dx.size!=companion.length()||
+                               !MusaGoogleDriveTransport.verified(token,dx.id,companion))
+                                throw new java.io.IOException("Companion DXF not verified");
+                            pref.edit().putString("dxf_"+entry.id,dx.id)
+                                .putString("dxf_source_"+entry.id,fingerprint).apply();
+                            notify(listener,entry,100,"DWG ve analiz DXF Drive'da doğrulandı");
+                        }catch(Exception conversionError){
+                            notify(listener,entry,99,"DWG Drive'da; analiz DXF hazırlanamadı");
+                        }finally{
+                            if(companion!=null)companion.delete();
+                        }
+                    }
+    }
+    private static void notify(MusaAiProjectSync.Listener listener,
+                               MusaAiProjectSync.Entry entry,int percent,String message){
+        if(listener!=null)listener.status(entry.id,percent,message);
+    }
+    private MusaGoogleDriveSync(){}
+}

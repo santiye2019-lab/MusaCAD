@@ -1,0 +1,60 @@
+name: Gandalf AI production deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/ai-worker/src/**'
+      - '.github/workflows/gandalf-ai-production.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gandalf-ai-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: gandalf-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test Worker
+        working-directory: server/ai-worker
+        run: |
+          npm run check
+          npm test
+      - name: Validate production credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+      - name: Preserve live Worker bindings and settings
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,urllib.request,json
+          url="https://api.cloudflare.com/client/v4/accounts/"+os.environ["CLOUDFLARE_ACCOUNT_ID"]+"/workers/scripts/musacad-ai/settings"
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["CLOUDFLARE_API_TOKEN"]})
+          with urllib.request.urlopen(req) as resp: body=json.load(resp)
+          if not body.get("success"): raise SystemExit("Cannot read live Worker settings")
+          bindings=body.get("result",{}).get("bindings",[])
+          if bindings:
+              raise SystemExit("Production has bindings; bare wrangler deploy could erase them. Deployment blocked until binding-preserving configuration is implemented.")
+          print("No bindings found; safe for bare script deploy with --keep-vars")
+          PY
+      - name: Deploy production Worker (keep runtime vars)
+        working-directory: server/ai-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@3 deploy src/index.js --name musacad-ai --compatibility-date 2025-04-01 --keep-vars
+      - name: Verify live health
+        run: |
+          curl --fail --silent --show-error https://musacad-ai.musacad2019.workers.dev/health
