@@ -37,3 +37,19 @@ test("does not claim success on rejected upload", async () => {
     onProgress: p => progress.push(p), fetcher: async () => response(401) }), DriveUploadError);
   assert.deepEqual(progress, []);
 });
+
+test("rejects fake Google path even on legitimate host", async () => {
+  await assert.rejects(startDriveUpload({ token: "test", name: "a.dwg", size: 3,
+    fetcher: async () => response(200, { Location: "https://www.googleapis.com/upload/drive/v3/files-evil" }) }),
+    /invalid_session/);
+});
+test("rejects completion without verified size", async () => {
+  await assert.rejects(uploadDriveChunks({ token: "test", bytes: new Uint8Array(300000),
+    session: "https://www.googleapis.com/upload/drive/v3/files?upload_id=1",
+    fetcher: async () => response(200, {}, { id: "file-id" }) }), /unverified_completion/);
+});
+test("rejects completed resume without matching size", async () => {
+  await assert.rejects(queryDriveUpload({ token: "test", size: 10,
+    session: "https://www.googleapis.com/upload/drive/v3/files?upload_id=1",
+    fetcher: async () => response(200, {}, { id: "file-id", size: "9" }) }), /unverified_completion/);
+});
