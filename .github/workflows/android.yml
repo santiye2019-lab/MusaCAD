@@ -764,7 +764,7 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$AAPT" dump badging "$APK" | grep -F "package: name='com.musa.cad'" || exit 1
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/MusaCAD-update-signing.txt
-          grep -q 'Signer #1 certificate SHA-1 digest:' /tmp/MusaCAD-update-signing.txt
+          grep -Eq '(Signer #1|V2 Signer): certificate SHA-1 digest:' /tmp/MusaCAD-update-signing.txt
           cp "$APK" /tmp/MusaCAD-update.apk
           sha256sum /tmp/MusaCAD-update.apk > /tmp/MusaCAD-update.sha256
       - name: Upload in-place MusaCAD development update APK
