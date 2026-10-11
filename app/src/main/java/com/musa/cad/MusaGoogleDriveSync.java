@@ -60,8 +60,15 @@ final class MusaGoogleDriveSync {
                     String fingerprint=entry.id+":"+size+":"+modified;
                     if(fingerprint.equals(pref.getString("done_"+entry.id,null))
                         &&!pref.getString("file_"+entry.id,"").isEmpty()){
-                        notify(listener,entry,99,"Drive dosyası henüz yeniden doğrulanmadı");
-                        continue;
+                        notify(listener,entry,99,"Google Drive dosyası doğrulanıyor");
+                        if(MusaGoogleDriveTransport.verified(token,
+                            pref.getString("file_"+entry.id,""),file)){
+                            if(revision!=LATEST.get()||!enabled(app))return;
+                            notify(listener,entry,100,"Google Drive dosyası doğrulandı");
+                            continue;
+                        }
+                        if(revision!=LATEST.get()||!enabled(app))return;
+                        notify(listener,entry,0,"Drive dosyası eksik veya değişmiş; yeniden yükleniyor");
                     }
                     notify(listener,entry,0,"Google Drive aktarımı hazırlanıyor");
                     String session=MusaGoogleDriveTransport.begin(token,entry.name,size,null);
