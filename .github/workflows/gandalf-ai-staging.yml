@@ -2,7 +2,7 @@ name: Gandalf AI staging validation
 on:
   push:
     branches:
-      - 'feature/gandalf-autoupload-retention-20261011'
+      - 'feature/**'
     paths:
       - 'server/ai-worker/**'
       - 'app/src/main/java/com/musa/cad/MusaGoogleDriveSync.java'
