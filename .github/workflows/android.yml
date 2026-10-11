@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      sandbox_approved:
+        description: "Build separately installable sandbox APK without replacing MusaCAD"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: musacad-${{ github.workflow }}-${{ github.ref }}
@@ -746,6 +751,27 @@ jobs:
           name: MusaCAD-installable-apk
           path: /tmp/MusaCAD-latest.apk
           if-no-files-found: error
+      - name: Build approved separate sandbox APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
+        env:
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon assembleDirectSandbox
+          cp app/build/outputs/apk/direct/sandbox/app-direct-sandbox.apk /tmp/MusaCAD-sandbox.apk
+          test -s /tmp/MusaCAD-sandbox.apk
+          sha256sum /tmp/MusaCAD-sandbox.apk > /tmp/MusaCAD-sandbox.sha256
+      - name: Upload approved separate sandbox APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-sandbox-installable-apk
+          path: |
+            /tmp/MusaCAD-sandbox.apk
+            /tmp/MusaCAD-sandbox.sha256
+          if-no-files-found: error
+          retention-days: 14
       - name: Package corresponding source
         run: |
           tar --exclude='.git' --exclude='.cxx' --exclude='build' -czf /tmp/MusaCAD-source.tar.gz app licensemanager third_party tools tests server gradle gradlew build.gradle settings.gradle gradle.properties .github NATIVE_BUILD.md LICENSE README.md RELEASE_SIGNING.md DEVICE_FINAL_QA.md LICENSE_MANAGER.md PRODUCTION_SETUP.md
