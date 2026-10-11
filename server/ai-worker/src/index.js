@@ -1,4 +1,5 @@
 import { handleProjectCache, MusaCadProjectCoordinator } from "./project-cache.js";
+import { readAuthorizedDriveDrawing } from "./drive-reader.js";
 export { MusaCadProjectCoordinator };
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -42,6 +43,46 @@ async function handleAnalyze(request, env) {
   const parsed = await readJson(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body || {};
+  // Drive-backed analysis is opt-in and disabled until a trusted per-device
+  // OAuth broker is bound. Never accept Drive tokens or arbitrary URLs from APKs.
+  if(body.driveProject != null){
+    if(!env.MUSACAD_DRIVE_TOKEN_BROKER)
+      return json({status:"unavailable",message:"Drive AI access broker is not configured"},503);
+    const ref=body.driveProject;
+    if(!ref||typeof ref!=="object"||
+       !/^[A-Za-z0-9_-]{10,200}$/.test(ref.fileId||"")||
+       !/^[A-Za-z0-9_-]{1,128}$/.test(ref.projectId||"")||
+       !Number.isSafeInteger(ref.size)||ref.size<1||ref.size>512*1024*1024||
+       !/^[a-f0-9]{32}$/i.test(ref.md5||""))
+      return json({status:"denied",message:"Invalid Drive project reference"},400);
+    // The broker MUST independently bind the file to the verified device and
+    // account; a file ID supplied by the client is never proof of ownership.
+    const broker=await env.MUSACAD_DRIVE_TOKEN_BROKER.fetch(
+      new Request("https://drive-broker.internal/v1/resolve",{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({deviceId:session.deviceId,projectId:ref.projectId,fileId:ref.fileId})
+      }));
+    if(broker.status!==200)
+      return json({status:"denied",message:"Drive project authorization unavailable"},403);
+    const grant=await broker.json();
+    if(grant.deviceId!==session.deviceId||grant.fileId!==ref.fileId||
+       grant.projectId!==ref.projectId||!grant.accessToken)
+      return json({status:"denied",message:"Drive authorization mismatch"},403);
+    try{
+      const bytes=await readAuthorizedDriveDrawing({
+        fileId:ref.fileId,accessToken:grant.accessToken,
+        expectedSize:ref.size,expectedMd5:ref.md5
+      });
+      // The worker does not parse DWG binary. Do not pass unparsed bytes to
+      // the language model or pretend a full drawing inspection took place.
+      // The next stage requires a DWG parser/rendering worker and digest check.
+      bytes.fill(0);
+      return json({status:"unavailable",
+        message:"Drive file reached securely; DWG extraction pipeline not configured"},503);
+    }catch(_){
+      return json({status:"unavailable",message:"Drive read or verification failed"},503);
+    }
+  }
   const prompt = String(body.prompt || "").trim();
   const cad = body.cad;
   const cadPackage = body.cadPackage;
