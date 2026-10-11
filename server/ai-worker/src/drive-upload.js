@@ -22,7 +22,7 @@ function validatedSession(url) {
   let u;
   try { u = new URL(url); } catch (_) { throw new DriveUploadError("invalid_session"); }
   if (u.protocol !== "https:" || u.hostname !== "www.googleapis.com" ||
-      !u.pathname.startsWith("/upload/drive/v3/files"))
+      !/^\/upload\/drive\/v3\/files(?:\/|$)/.test(u.pathname))
     throw new DriveUploadError("invalid_session");
   return u.href;
 }
@@ -51,8 +51,13 @@ export async function queryDriveUpload({ token, session, size, fetcher = fetch }
   const response = await fetcher(validatedSession(session), {
     method: "PUT", headers: headers(token, { "Content-Range": "bytes */" + size })
   });
-  if (response.status === 200 || response.status === 201)
-    return { complete: true, file: await response.json() };
+  if (response.status === 200 || response.status === 201) {
+    const file = await response.json();
+    if (!file || typeof file.id !== "string" || !file.id ||
+        !Number.isSafeInteger(Number(file.size)) || Number(file.size) !== size)
+      throw new DriveUploadError("unverified_completion");
+    return { complete: true, file };
+  }
   await checked(response, [308]);
   const range = response.headers.get("Range");
   if (!range) return { complete: false, offset: 0 };
@@ -66,11 +71,17 @@ export async function uploadDriveChunks({
   token, session, bytes, startOffset = 0, chunkSize = 1024 * 1024,
   fetcher = fetch, onProgress = () => {}
 }) {
-  if (!(bytes instanceof Uint8Array) || !bytes.length ||
-      !Number.isSafeInteger(startOffset) || startOffset < 0 || startOffset >= bytes.length ||
+  if (!(bytes instanceof Uint8Array) ||
+      !Number.isSafeInteger(startOffset) || startOffset < 0 || (bytes.length > 0 && startOffset >= bytes.length) ||
       !Number.isSafeInteger(chunkSize) || chunkSize < CHUNK || chunkSize % CHUNK)
     throw new DriveUploadError("invalid_chunk");
   const url = validatedSession(session);
+  if (bytes.length === 0) {
+    const result = await queryDriveUpload({ token, session: url, size: 0, fetcher });
+    if (!result.complete) throw new DriveUploadError("unverified_completion");
+    onProgress(100);
+    return result.file;
+  }
   let offset = startOffset;
   while (offset < bytes.length) {
     const end = Math.min(bytes.length, offset + chunkSize);
@@ -82,7 +93,8 @@ export async function uploadDriveChunks({
     });
     if (response.status === 200 || response.status === 201) {
       const file = await response.json();
-      if (!file || !file.id || (file.size != null && Number(file.size) !== bytes.length))
+      if (!file || typeof file.id !== "string" || !file.id ||
+          !Number.isSafeInteger(Number(file.size)) || Number(file.size) !== bytes.length)
         throw new DriveUploadError("unverified_completion");
       onProgress(100);
       return file;
