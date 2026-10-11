@@ -53,7 +53,8 @@ async function handleAnalyze(request, env) {
        !/^[A-Za-z0-9_-]{10,200}$/.test(ref.fileId||"")||
        !/^[A-Za-z0-9_-]{1,128}$/.test(ref.projectId||"")||
        !Number.isSafeInteger(ref.size)||ref.size<1||ref.size>512*1024*1024||
-       !/^[a-f0-9]{32}$/i.test(ref.md5||""))
+       !/^[a-f0-9]{32}$/i.test(ref.md5||"")||
+       !/^[a-f0-9]{64}$/i.test(ref.sha256||""))
       return json({status:"denied",message:"Invalid Drive project reference"},400);
     // The broker MUST independently bind the file to the verified device and
     // account; a file ID supplied by the client is never proof of ownership.
@@ -71,7 +72,7 @@ async function handleAnalyze(request, env) {
     try{
       const bytes=await readAuthorizedDriveDrawing({
         fileId:ref.fileId,accessToken:grant.accessToken,
-        expectedSize:ref.size,expectedMd5:ref.md5
+        expectedSize:ref.size,expectedMd5:ref.md5,expectedSha256:ref.sha256
       });
       // The worker does not parse DWG binary. Do not pass unparsed bytes to
       // the language model or pretend a full drawing inspection took place.
