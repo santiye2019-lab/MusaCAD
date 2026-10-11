@@ -1,7 +1,7 @@
 // Authenticated server-side Drive reader primitive. Not exposed as a public route.
 // Call only after checking the AI session, account binding and project ownership.
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
-export async function readAuthorizedDriveDrawing({fileId,accessToken,expectedSize,expectedMd5,fetcher=fetch,maxBytes=512*1024*1024}){
+export async function readAuthorizedDriveDrawing({fileId,accessToken,expectedSize,expectedMd5,expectedSha256,fetcher=fetch,maxBytes=512*1024*1024}){
   if(!ID.test(fileId||""))throw new Error("invalid_drive_file_id");
   if(typeof accessToken!=="string"||!accessToken)throw new Error("drive_authorization_required");
   if(!Number.isSafeInteger(expectedSize)||expectedSize<1||expectedSize>maxBytes)throw new Error("invalid_expected_size");
@@ -34,7 +34,11 @@ export async function readAuthorizedDriveDrawing({fileId,accessToken,expectedSiz
   if(total!==expectedSize)throw new Error("drive_download_incomplete");
   const bytes=new Uint8Array(total);let pos=0;
   for(const chunk of chunks){bytes.set(chunk,pos);pos+=chunk.length;}
-  // Metadata checksum is checked above; caller must independently hash the bytes
-  // before using them for engineering analysis (WebCrypto or streaming digest).
+  if(!/^[a-f0-9]{64}$/i.test(expectedSha256||""))
+    throw new Error("drive_sha256_manifest_required");
+  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+  const actual=Array.from(digest,b=>b.toString(16).padStart(2,"0")).join("");
+  if(actual.toLowerCase()!==expectedSha256.toLowerCase())
+    throw new Error("drive_content_checksum_mismatch");
   return bytes;
 }
