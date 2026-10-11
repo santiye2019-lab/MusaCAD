@@ -69,7 +69,7 @@ final class MusaGoogleDriveSync {
                         token,session,file,p->{
                             if(revision==LATEST.get()&&enabled(app))
                                 notify(listener,entry,Math.min(99,p),"Google Drive yükleme • %"+Math.min(99,p));
-                        });
+                        },()->revision!=LATEST.get()||!enabled(app));
                     if(result.size!=size)throw new java.io.IOException("Drive size mismatch");
                     if(file.length()!=size||file.lastModified()!=modified)
                         throw new java.io.IOException("Local drawing changed during upload");
