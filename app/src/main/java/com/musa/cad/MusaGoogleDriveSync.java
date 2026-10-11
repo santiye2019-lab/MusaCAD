@@ -106,8 +106,10 @@ final class MusaGoogleDriveSync {
                     // No local file is ever deleted. Avoid saving OAuth tokens or upload session URLs.
                     pref.edit().putString("done_"+entry.id,fingerprint)
                         .putString("file_"+entry.id,result.id).apply();
-                    notify(listener,entry,100,"Google Drive DWG doğrulandı");
-                    prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
+                    notify(listener,entry,99,"Google Drive DWG doğrulandı; analiz dosyası hazırlanıyor");
+                    if(file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".dwg"))
+                        prepareCompanion(app,entry,file,token,pref,revision,fingerprint,listener);
+                    else notify(listener,entry,100,"Google Drive dosyası doğrulandı");
                 }
             }catch(UserRecoverableAuthException ex){
                 if(revision==LATEST.get())notify(listener,snapshot.get(0),-1,
