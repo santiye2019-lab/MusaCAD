@@ -1,0 +1,25 @@
+name: MusaCAD SHA-1 Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Show certificate SHA-1
+        run: |
+          keytool -list -v -keystore debug-signing/musacad-debug.keystore -alias androiddebugkey -storepass android | grep 'SHA1:'
+  
