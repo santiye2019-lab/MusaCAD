@@ -756,10 +756,15 @@ jobs:
         env:
           MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
+          MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL }}
         run: |
           set -euo pipefail
-          test -n "$MUSACAD_AI_API_URL" || { echo 'AI API URL missing'; exit 1; }
-          test -n "$MUSACAD_AI_SESSION_URL" || { echo 'AI session URL missing'; exit 1; }
+          if [ -z "$MUSACAD_AI_SESSION_URL" ] && [[ "$MUSACAD_TRIAL_API_URL" == https://*/v1/trial/start ]]; then
+            export MUSACAD_AI_SESSION_URL="${MUSACAD_TRIAL_API_URL%/v1/trial/start}/v1/ai/session"
+            echo "Derived AI session URL from configured trial gateway"
+          fi
+          [[ "$MUSACAD_AI_API_URL" == https://* ]] || { echo "::error::Set MUSACAD_AI_API_URL to the deployed HTTPS Gandalf AI endpoint"; exit 1; }
+          [[ "$MUSACAD_AI_SESSION_URL" == https://* ]] || { echo "::error::Set MUSACAD_AI_SESSION_URL or MUSACAD_TRIAL_API_URL"; exit 1; }
           ./gradlew --no-daemon assembleDirectDebug
           APK=app/build/outputs/apk/direct/debug/app-direct-debug.apk
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)"
