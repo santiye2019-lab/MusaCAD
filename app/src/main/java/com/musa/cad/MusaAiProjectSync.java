@@ -41,6 +41,10 @@ public final class MusaAiProjectSync {
     public static void submit(Context app,List<Entry> entries,Listener listener){
         final Context context=app.getApplicationContext();
         final List<Entry> open=new ArrayList<>(entries);
+        if(MusaGoogleDriveSync.enabled(context)){
+            MusaGoogleDriveSync.submit(context,open,listener);
+            return;
+        }
         if(open.size()>4)return;
         SharedPreferences pref=context.getSharedPreferences(PREF,0);
         long revision;
