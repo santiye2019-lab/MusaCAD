@@ -10,6 +10,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes;
 
 /**
  * Explicit user-consent gateway for the Google Drive file scope.
@@ -38,13 +39,21 @@ final class MusaGoogleDriveConsent {
         GoogleSignInAccount account=GoogleSignIn.getLastSignedInAccount(activity);
         return account!=null&&GoogleSignIn.hasPermissions(account,FILE_SCOPE);
     }
-    static boolean consentResult(@NonNull Intent data) {
+    static String consentResult(@NonNull Intent data) {
         try {
             Task<GoogleSignInAccount> task=GoogleSignIn.getSignedInAccountFromIntent(data);
             GoogleSignInAccount account=task.getResult(ApiException.class);
-            return account!=null&&GoogleSignIn.hasPermissions(account,FILE_SCOPE);
+            return account!=null&&GoogleSignIn.hasPermissions(account,FILE_SCOPE)
+                ? "Drive dosya izni alındı. Gerçek yükleme bağlantısı henüz etkin değil."
+                : "Google hesabı seçildi ancak Drive dosya izni verilmedi.";
         }catch(ApiException error){
-            return false;
+            int code=error.getStatusCode();
+            if(code==10)return "Google OAuth yapılandırma hatası (kod 10). Sandbox paket kimliği ve imza SHA-1 kaydını kontrol edin.";
+            if(code==12501||code==GoogleSignInStatusCodes.SIGN_IN_CANCELLED)
+                return "Google hesap bağlantısı iptal edildi (kod "+code+").";
+            return "Google hesap bağlantısı başarısız (kod "+code+").";
+        }catch(Exception error){
+            return "Google bağlantısı işlenemedi; uygulama kayıtlarını kontrol edin.";
         }
     }
     private MusaGoogleDriveConsent(){}
