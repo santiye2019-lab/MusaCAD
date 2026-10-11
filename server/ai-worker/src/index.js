@@ -1,5 +1,7 @@
 import { handleProjectCache, MusaCadProjectCoordinator } from "./project-cache.js";
 import { readAuthorizedDriveDrawing } from "./drive-reader.js";
+import { resolveDriveGrant } from "./drive-grant.js";
+import { extractCadEvidence } from "./cad-extract.js";
 export { MusaCadProjectCoordinator };
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -58,28 +60,28 @@ async function handleAnalyze(request, env) {
       return json({status:"denied",message:"Invalid Drive project reference"},400);
     // The broker MUST independently bind the file to the verified device and
     // account; a file ID supplied by the client is never proof of ownership.
-    const broker=await env.MUSACAD_DRIVE_TOKEN_BROKER.fetch(
-      new Request("https://drive-broker.internal/v1/resolve",{
-        method:"POST",headers:{"content-type":"application/json"},
-        body:JSON.stringify({deviceId:session.deviceId,projectId:ref.projectId,fileId:ref.fileId})
-      }));
-    if(broker.status!==200)
+    let accessToken;
+    try{
+      accessToken=await resolveDriveGrant(env.MUSACAD_DRIVE_TOKEN_BROKER,{
+        deviceId:session.deviceId,projectId:ref.projectId,fileId:ref.fileId
+      });
+    }catch(_){
       return json({status:"denied",message:"Drive project authorization unavailable"},403);
-    const grant=await broker.json();
-    if(grant.deviceId!==session.deviceId||grant.fileId!==ref.fileId||
-       grant.projectId!==ref.projectId||!grant.accessToken)
-      return json({status:"denied",message:"Drive authorization mismatch"},403);
+    }
     try{
       const bytes=await readAuthorizedDriveDrawing({
-        fileId:ref.fileId,accessToken:grant.accessToken,
+        fileId:ref.fileId,accessToken,
         expectedSize:ref.size,expectedMd5:ref.md5,expectedSha256:ref.sha256
       });
-      // The worker does not parse DWG binary. Do not pass unparsed bytes to
-      // the language model or pretend a full drawing inspection took place.
-      // The next stage requires a DWG parser/rendering worker and digest check.
-      bytes.fill(0);
-      return json({status:"unavailable",
-        message:"Drive file reached securely; DWG extraction pipeline not configured"},503);
+      let evidence;
+      try{evidence=extractCadEvidence(bytes);}
+      catch(error){
+        return json({status:"unsupported",message:String(error.message||"CAD extraction unavailable")},422);
+      }finally{bytes.fill(0);}
+      return json({status:"ok",source:"authorized_google_drive",
+        projectId:ref.projectId,fileId:ref.fileId,
+        analysisReady:false,evidence,
+        message:"DXF evidence extracted; full DWG visual analysis requires a binary decoder"},200);
     }catch(_){
       return json({status:"unavailable",message:"Drive read or verification failed"},503);
     }
