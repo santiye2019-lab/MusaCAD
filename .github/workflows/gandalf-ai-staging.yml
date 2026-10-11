@@ -44,8 +44,7 @@ jobs:
           npx --yes wrangler@3 deploy src/index.js \
             --name musacad-ai-staging \
             --compatibility-date 2025-04-01
-      - name: Verify staging health
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Staging status
         run: |
-          echo "Staging deployment complete. Check workers.dev route in Cloudflare."
+          echo "Staging Worker uploaded; runtime AI provider and Drive broker bindings are not configured by this workflow."
+          echo "Do not interpret deployment as a successful end-to-end analysis test."
