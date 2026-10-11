@@ -81,6 +81,10 @@ final class MusaGoogleDriveSync {
                     if(file.length()!=size||file.lastModified()!=modified)
                         throw new java.io.IOException("Local drawing changed during upload");
                     if(revision!=LATEST.get()||!enabled(app))return;
+                    notify(listener,entry,99,"Google Drive sunucusunda dosya doğrulanıyor");
+                    if(!MusaGoogleDriveTransport.verified(token,result.id,file))
+                        throw new java.io.IOException("Drive upload verification failed");
+                    if(revision!=LATEST.get()||!enabled(app))return;
                     // No local file is ever deleted. Avoid saving OAuth tokens or upload session URLs.
                     pref.edit().putString("done_"+entry.id,fingerprint)
                         .putString("file_"+entry.id,result.id).apply();
