@@ -14,7 +14,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ status: "ok", service: "musacad-ai-worker" });
-    if (url.pathname === "/v1/analyze") return handleAnalyze(request, env);
+    if (url.pathname === "/v1/analyze" || (url.pathname === "/" && request.method === "POST")) return handleAnalyze(request, env);
     if (url.pathname.startsWith("/v1/projects/"))
       return handleProjectCache(request, env, verifySession);
     return json({ status: "not_found" }, 404);
