@@ -758,6 +758,8 @@ jobs:
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
         run: |
           set -euo pipefail
+          test -n "$MUSACAD_AI_API_URL" || { echo 'AI API URL missing'; exit 1; }
+          test -n "$MUSACAD_AI_SESSION_URL" || { echo 'AI session URL missing'; exit 1; }
           ./gradlew --no-daemon assembleDirectDebug
           APK=app/build/outputs/apk/direct/debug/app-direct-debug.apk
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)"
