@@ -1,0 +1,46 @@
+name: Gandalf staging manual launcher
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: Deploy isolated staging Worker after tests
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gandalf-autoupload-retention-20261011
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate AI Worker
+        working-directory: server/ai-worker
+        run: |
+          npm run check
+          npm test
+  staging-deploy:
+    needs: verify
+    if: ${{ inputs.deploy_staging }}
+    runs-on: ubuntu-latest
+    environment: gandalf-staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gandalf-autoupload-retention-20261011
+          persist-credentials: false
+      - name: Deploy isolated staging Worker
+        working-directory: server/ai-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx --yes wrangler@3 deploy src/index.js --name musacad-ai-staging --compatibility-date 2026-09-01
