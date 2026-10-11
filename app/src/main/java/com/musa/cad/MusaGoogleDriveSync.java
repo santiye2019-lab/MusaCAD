@@ -145,7 +145,7 @@ final class MusaGoogleDriveSync {
                                 .putString("dxf_source_"+entry.id,fingerprint).apply();
                             notify(listener,entry,100,"DWG ve analiz DXF Drive'da doğrulandı");
                         }catch(Exception conversionError){
-                            notify(listener,entry,100,"DWG Drive'da; analiz DXF hazırlanamadı");
+                            notify(listener,entry,99,"DWG Drive'da; analiz DXF hazırlanamadı");
                         }finally{
                             if(companion!=null)companion.delete();
                         }
