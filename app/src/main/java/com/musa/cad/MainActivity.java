@@ -4129,8 +4129,14 @@ public class MainActivity extends AppCompatActivity {
     private void showDriveConsent(){
         if(MusaGoogleDriveConsent.hasScope(this)){
             new AlertDialog.Builder(this).setTitle("Google Drive")
-                .setMessage("Google hesabı için Drive dosya izni mevcut. Dosya aktarımı henüz etkinleştirilmedi; sunucu bağlantısı ve güvenli saklama kontrolleri tamamlanmalı.")
-                .setPositiveButton("Tamam",null).show();
+                .setMessage("Google Drive dosya izni mevcut. Drive yüklemesi: "+(MusaGoogleDriveSync.enabled(this)?"AÇIK":"KAPALI")+". Açık projeler özel Drive alanına yüklenir; Gandalf AI sunucu analizi bu aşamada bağlı değildir. Yerel DWG dosyaları silinmez.")
+                .setNegativeButton("Kapat",null)
+                .setPositiveButton(MusaGoogleDriveSync.enabled(this)?"Drive yüklemeyi kapat":"Drive yüklemeyi aç",(dialog,which)->{
+                    boolean enabled=!MusaGoogleDriveSync.enabled(this);
+                    MusaGoogleDriveSync.setEnabled(this,enabled);
+                    Toast.makeText(this,enabled?"Drive yüklemesi etkin":"Drive yüklemesi kapalı",Toast.LENGTH_SHORT).show();
+                    if(enabled)scheduleProjectCloudSync();
+                }).show();
         }else{
             new AlertDialog.Builder(this).setTitle("Google Drive izni")
                 .setMessage("MusaCAD tarafından oluşturulan Drive dosyalarına erişim izni istenecek. Bu izin tek başına otomatik yüklemeyi başlatmaz.")
@@ -4142,7 +4148,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         if(r==MusaGoogleDriveConsent.REQUEST_CODE){
             boolean authorized=c==RESULT_OK&&data!=null&&MusaGoogleDriveConsent.consentResult(data);
-            Toast.makeText(this,authorized?"Drive dosya izni alındı; yükleme henüz etkin değil":"Google Drive bağlantısı tamamlanmadı",Toast.LENGTH_LONG).show();
+            Toast.makeText(this,authorized?"Drive izni alındı; yüklemek için Google Drive bağlantısı menüsünden etkinleştirin":"Google Drive bağlantısı tamamlanmadı",Toast.LENGTH_LONG).show();
             return;
         }
         super.onActivityResult(r,c,data);
