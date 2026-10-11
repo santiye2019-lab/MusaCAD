@@ -4148,7 +4148,11 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         if(r==MusaGoogleDriveConsent.REQUEST_CODE){
             boolean authorized=data!=null&&MusaGoogleDriveConsent.consentResult(data);
-            Toast.makeText(this,authorized?"Drive izni alındı; yüklemek için Google Drive bağlantısı menüsünden etkinleştirin":MusaGoogleDriveConsent.errorMessage(data,c),Toast.LENGTH_LONG).show();
+            if(authorized){
+                MusaGoogleDriveSync.setEnabled(this,true);
+                scheduleProjectCloudSync();
+            }
+            Toast.makeText(this,authorized?"Google Drive bağlantısı kuruldu; açık projeler için otomatik aktarım etkin.":MusaGoogleDriveConsent.errorMessage(data,c),Toast.LENGTH_LONG).show();
             return;
         }
         super.onActivityResult(r,c,data);
