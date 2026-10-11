@@ -26,7 +26,7 @@ final class MusaGoogleDriveTransport {
     private static HttpsURLConnection connection(String target,String method,String token)
             throws IOException {
         URL u=new URL(target);
-        if(!"https".equals(u.getProtocol())||!"www.googleapis.com".equals(u.getHost())||
+        if(!"https".equals(u.getProtocol())||!"www.googleapis.com".equals(u.getHost())||u.getPort()!=-1||u.getUserInfo()!=null||u.getRef()!=null||
            !u.getPath().matches("/upload/drive/v3/files(?:/.*)?"))
             throw new IOException("Untrusted Google Drive upload endpoint");
         if(token==null||token.isEmpty())throw new IOException("Drive authorization required");
@@ -60,7 +60,7 @@ final class MusaGoogleDriveTransport {
             if(location==null)throw new IOException("Drive session location missing");
             // Validate redirect-free session location before ever sending bearer credentials.
             URL u=new URL(location);
-            if(!"https".equals(u.getProtocol())||!"www.googleapis.com".equals(u.getHost())||
+            if(!"https".equals(u.getProtocol())||!"www.googleapis.com".equals(u.getHost())||u.getPort()!=-1||u.getUserInfo()!=null||u.getRef()!=null||
                 !u.getPath().matches("/upload/drive/v3/files(?:/.*)?"))
                 throw new IOException("Untrusted Drive session");
             return location;
@@ -85,11 +85,14 @@ final class MusaGoogleDriveTransport {
         if(file==null||!file.isFile()||file.length()<1)
             throw new IOException("Invalid local DWG");
         long total=file.length();
+        long modified=file.lastModified();
         long offset=serverOffset(token,session,total);
         if(offset==total)throw new IOException("Completed session requires Drive file metadata");
         byte[] buffer=new byte[CHUNK];
         try(RandomAccessFile in=new RandomAccessFile(file,"r")){
             while(offset<total){
+                if(file.length()!=total||file.lastModified()!=modified)
+                    throw new IOException("DWG changed during Drive upload");
                 int length=(int)Math.min(CHUNK,total-offset);
                 in.seek(offset);in.readFully(buffer,0,length);
                 HttpsURLConnection c=connection(session,"PUT",token);
@@ -112,6 +115,8 @@ final class MusaGoogleDriveTransport {
                         String id=fileInfo.optString("id","");
                         if(id.isEmpty()||fileInfo.optLong("size",-1)!=total)
                             throw new IOException("Unverified Drive completion");
+                        if(file.length()!=total||file.lastModified()!=modified)
+                            throw new IOException("DWG changed during Drive upload");
                         if(progress!=null)progress.confirmed(100);
                         return new Upload(id,total);
                     }
