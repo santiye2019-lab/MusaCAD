@@ -132,6 +132,12 @@ android {
             debuggable true
             signingConfig signingConfigs.musacadDebug
         }
+        sandbox {
+            initWith debug
+            applicationIdSuffix ".sandbox"
+            versionNameSuffix "-sandbox"
+            matchingFallbacks = ['debug']
+        }
         release {
             debuggable false
             minifyEnabled false
