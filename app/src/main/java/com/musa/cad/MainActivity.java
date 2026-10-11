@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_AUTOSYNC=12;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_AUTOSYNC=12,MENU_DRIVE_CONSENT=13;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -3959,8 +3959,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_AUTOSYNC,11,"Otomatik proje yükle").setCheckable(true).setChecked(MusaAiProjectSync.enabled(this));
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_AUTOSYNC:MusaAiProjectSync.setEnabled(this,!MusaAiProjectSync.enabled(this));scheduleProjectCloudSync();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_AUTOSYNC,11,"Otomatik proje yükle").setCheckable(true).setChecked(MusaAiProjectSync.enabled(this));menu.add(0,MENU_DRIVE_CONSENT,12,"Google Drive bağlantısı");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_AUTOSYNC:MusaAiProjectSync.setEnabled(this,!MusaAiProjectSync.enabled(this));scheduleProjectCloudSync();return true;case MENU_DRIVE_CONSENT:showDriveConsent();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4126,7 +4126,25 @@ public class MainActivity extends AppCompatActivity {
         if(directPicker)intent.putExtra(RecentFilesActivity.EXTRA_PICK_IMMEDIATELY,true);
         startActivityForResult(intent,OPEN);
     }
+    private void showDriveConsent(){
+        if(MusaGoogleDriveConsent.hasScope(this)){
+            new AlertDialog.Builder(this).setTitle("Google Drive")
+                .setMessage("Google hesabı için Drive dosya izni mevcut. Dosya aktarımı henüz etkinleştirilmedi; sunucu bağlantısı ve güvenli saklama kontrolleri tamamlanmalı.")
+                .setPositiveButton("Tamam",null).show();
+        }else{
+            new AlertDialog.Builder(this).setTitle("Google Drive izni")
+                .setMessage("MusaCAD tarafından oluşturulan Drive dosyalarına erişim izni istenecek. Bu izin tek başına otomatik yüklemeyi başlatmaz.")
+                .setNegativeButton("Vazgeç",null)
+                .setPositiveButton("Google hesabını bağla",(dialog,which)->MusaGoogleDriveConsent.request(this))
+                .show();
+        }
+    }
     @Override protected void onActivityResult(int r,int c,Intent data){
+        if(r==MusaGoogleDriveConsent.REQUEST_CODE){
+            boolean authorized=c==RESULT_OK&&data!=null&&MusaGoogleDriveConsent.consentResult(data);
+            Toast.makeText(this,authorized?"Drive dosya izni alındı; yükleme henüz etkin değil":"Google Drive bağlantısı tamamlanmadı",Toast.LENGTH_LONG).show();
+            return;
+        }
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
