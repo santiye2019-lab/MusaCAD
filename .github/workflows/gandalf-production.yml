@@ -17,3 +17,18 @@ jobs:
           node-version: '22'
       - run: npm run check && npm test
         working-directory: server/ai-worker
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: gandalf-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy verified Gandalf Worker
+        working-directory: server/ai-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx --yes wrangler@3 deploy src/index.js --name musacad-ai --compatibility-date 2026-09-01 --keep-vars
