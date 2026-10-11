@@ -45,8 +45,13 @@ public final class MusaAiProjectSync {
         // Drive is the user's file archive; Gandalf's authenticated project
         // endpoint receives a separate engineering analysis copy/index.
         // Never forward a Google OAuth token to the Gandalf server.
-        if(MusaGoogleDriveSync.enabled(context))
+        // Google Drive is the selected archive. Do not also call the optional
+        // R2 project-cache API, which is deliberately disabled on this deployment.
+        // CAD evidence is sent separately through the authenticated AI request.
+        if(MusaGoogleDriveSync.enabled(context)){
             MusaGoogleDriveSync.submit(context,open,listener);
+            return;
+        }
         SharedPreferences pref=context.getSharedPreferences(PREF,0);
         long revision;
         synchronized(MusaAiProjectSync.class){
