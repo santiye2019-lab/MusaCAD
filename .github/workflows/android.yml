@@ -752,7 +752,7 @@ jobs:
           path: /tmp/MusaCAD-latest.apk
           if-no-files-found: error
       - name: Build approved separate sandbox APK
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true) || (github.event_name == 'pull_request' && github.head_ref == 'feature/gandalf-autoupload-retention-20261011') }}
         env:
           MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
@@ -763,7 +763,7 @@ jobs:
           test -s /tmp/MusaCAD-sandbox.apk
           sha256sum /tmp/MusaCAD-sandbox.apk > /tmp/MusaCAD-sandbox.sha256
       - name: Upload approved separate sandbox APK
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true) || (github.event_name == 'pull_request' && github.head_ref == 'feature/gandalf-autoupload-retention-20261011') }}
         uses: actions/upload-artifact@v4
         with:
           name: MusaCAD-sandbox-installable-apk
