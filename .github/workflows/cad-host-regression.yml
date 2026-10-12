@@ -181,7 +181,7 @@ jobs:
           import re
           from pathlib import Path
           log=Path('/tmp/musacad-history-ab-mesh.log').read_text()
-          match=re.search(r'ACIS_REAL_DXF_MESH bodies=(\\d+) mesh=(\\d+) complete=(\\d+) partial=(\\d+) faces=(\\d+) tessellated=(\\d+) unsupported=(\\d+) triangles=(\\d+) edges=(\\d+) dangling=(\\d+)',log)
+          match=re.search(r'ACIS_REAL_DXF_MESH bodies=(\d+) mesh=(\d+) complete=(\d+) partial=(\d+) faces=(\d+) tessellated=(\d+) unsupported=(\d+) triangles=(\d+) edges=(\d+) dangling=(\d+)',log)
           assert match, 'Experimental R2013 host B-Rep summary missing'
           bodies,meshed,complete,partial,faces,tess,unsupported,triangles,edges,dangling=map(int,match.groups())
           assert (bodies,meshed,faces)==(3,3,10), (bodies,meshed,faces)
