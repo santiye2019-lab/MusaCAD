@@ -58,7 +58,7 @@ public final class MusaAiPilotConnectivityContractTest {
         has(main,"cloud.status==MusaAiCloudService.Status.NETWORK_ERROR");
         has(main,"(afterFailure==null||afterFailure.reachable)");
         has(main,"if(!firstTransferFailure.isEmpty()");
-        has(main,"Worker sağlık kontrolü [");
+        has(main,"Worker /health testleri [");
         has(main,"acceptedTiles==total");
         has(cloud,"catch(UnknownHostException e)");
         has(cloud,"catch(SSLException e)");
