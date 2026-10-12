@@ -37,6 +37,7 @@ public final class Dxf3dMeshTest {
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
+        testMissingAcisBodyWithOtherVisibleGeometry();
     }
 
     private static void testLineAndPolyline() throws Exception {
@@ -135,6 +136,9 @@ public final class Dxf3dMeshTest {
             if(mesh.solidProxy)throw new AssertionError("valid ACIS SAT must not fall back to bounds proxy");
             if(mesh.acisSolids!=1)throw new AssertionError("ACIS solid must be marked read-only");
             if(mesh.unsupportedSolids!=0)throw new AssertionError("planar ACIS solid must resolve completely");
+            if(mesh.acisMissingGeometrySolids!=0||mesh.acisPartialGeometrySolids!=0||
+               mesh.acisFaces!=1||mesh.acisTessellatedFaces!=1||mesh.acisUnsupportedFaces!=0)
+                throw new AssertionError("Fully tessellated ACIS must report full face coverage");
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
                 throw new AssertionError("ACIS triangle must become real tessellated geometry");
             for(int line:mesh.sourceLines)if(line!=-1)throw new AssertionError("tessellated ACIS vertices are read-only");
@@ -156,10 +160,35 @@ public final class Dxf3dMeshTest {
             if(!mesh.solidProxy)throw new AssertionError("ACIS solid must use bounds proxy when no tessellation is available");
             if(mesh.acisSolids!=1)throw new AssertionError("fallback ACIS solid count");
             if(mesh.unsupportedSolids!=1)throw new AssertionError("ACIS solid count");
+            if(mesh.acisMissingGeometrySolids!=1||mesh.acisFaces!=0)
+                throw new AssertionError("No SAT topology means missing geometry, not a full ACIS body");
             if(mesh.xyz.length!=24||mesh.triangles.length!=0||mesh.edges.length!=24)
                 throw new AssertionError("solid proxy must be an 8-corner, 12-edge wire box");
             if(mesh.minZ!=3f||mesh.maxZ!=33f||mesh.flatPlan)throw new AssertionError("solid proxy Z bounds");
             for(int v:mesh.sourceLines)if(v!=-1)throw new AssertionError("solid proxy geometry must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMissingAcisBodyWithOtherVisibleGeometry()throws Exception{
+        // A visible LINE must not conceal a failed ACIS 3D body's absence.
+        File file=File.createTempFile("mesh3d-missing-face-", ".dxf");
+        try{
+            String sat="700 0 1 0 Missing ACIS\\n"
+                +"-0 face $-1 $-1 $-1 $-1 $999 $-1 $-1 $1 forward single #\\n"
+                +"-1 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #\\n";
+            String dxf="0\\nSECTION\\n2\\nENTITIES\\n"
+                +"0\\nLINE\\n10\\n0\\n20\\n0\\n30\\n0\\n11\\n2\\n21\\n0\\n31\\n0\\n"
+                +"0\\n3DSOLID\\n1\\n"+sat
+                +"0\\nENDSEC\\n0\\nEOF\\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.solidProxy||mesh.acisSolids!=1||mesh.unsupportedSolids!=1||
+               mesh.acisMissingGeometrySolids!=1||mesh.acisPartialGeometrySolids!=0)
+                throw new AssertionError("Unrenderable source ACIS body must be reported missing");
+            if(mesh.acisFaces!=1||mesh.acisTessellatedFaces!=0||mesh.acisUnsupportedFaces!=1)
+                throw new AssertionError("Unrendered ACIS face inventory was lost");
+            if(mesh.triangles.length!=0||mesh.edges.length!=2)
+                throw new AssertionError("Unrendered ACIS body must not produce imaginary geometry");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
