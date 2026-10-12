@@ -152,6 +152,20 @@ jobs:
           set -euo pipefail
           /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2013.dwg
           echo 'The source binary audit is diagnostic, not B-Rep fidelity certification.'
+      - name: Determine source AcDs layout in public R2018 DWG without exposing drawings
+        run: |
+          set -euo pipefail
+          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2018.dwg | tee /tmp/musacad-public-r2018-acds.log
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/musacad-public-r2018-acds.log').read_text().splitlines()
+          metadata=next((x for x in lines if x.startswith('ACDS_METADATA ')),None)
+          segments=next((x for x in lines if x.startswith('ACDS_SEGMENT_SUMMARY ')),None)
+          source=next((x for x in lines if x.startswith('SAB_SOURCE_SUMMARY ')),None)
+          assert metadata and segments and source, 'Missing read-only R2018 AcDs diagnostics'
+          assert source=='SAB_SOURCE_SUMMARY bodies=3 partial_or_missing=3', source
+          print('PASS: R2018 has three ACIS objects without usable direct SAB; AcDs layout classified')
+          PY
       - name: Verify native AcDs SAB-to-SAT conversion from real R2013 DWG
         run: |
           set -euo pipefail
