@@ -34,6 +34,9 @@ public final class MusaAiVisualDisciplineTest {
             "TESİSAT MUTFak.dwg",index("MEK-TEMIZ")),"architectural");
         equal(MusaAiVisualDiscipline.resolve("all","tüm disiplinleri analiz et",
             "TESİSAT.dwg",index("MEK-BORU")),"all");
+        equal(MusaAiVisualDiscipline.resolve("mechanical",
+            "Tüm disiplinleri, mekanik dahil, karşılaştır ve analiz et",
+            "TESİSAT.dwg",index("MEK-BORU")),"all");
         equal(MusaAiVisualDiscipline.resolve("all","projeyi incele",
             "proje_01.dwg",index("MEK-BORU","MEK-HIDROFOR","MEK-SU","MIM-KAPI")),"mechanical");
         equal(MusaAiVisualDiscipline.resolve("all","projeyi incele",
