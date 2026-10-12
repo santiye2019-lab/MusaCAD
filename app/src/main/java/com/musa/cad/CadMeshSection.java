@@ -56,6 +56,9 @@ public final class CadMeshSection {
         if(segments==null||segments.length%6!=0||segments.length==0||target==null)
             throw new IOException("Kaydedilecek 3B kesit çizgisi bulunamadı");
         try(BufferedWriter out=new BufferedWriter(new OutputStreamWriter(target,StandardCharsets.US_ASCII))){
+            out.write("0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n"+
+                "0\nLAYER\n2\nMUSACAD_SECTION\n70\n0\n62\n7\n6\nCONTINUOUS\n"+
+                "0\nENDTAB\n0\nENDSEC\n");
             out.write("0\nSECTION\n2\nENTITIES\n");
             for(int i=0;i<segments.length;i+=6){
                 FileTransfer.checkCancelled();
