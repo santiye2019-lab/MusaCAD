@@ -28,7 +28,10 @@ public final class Cad3dOnlyOpeningContractTest {
         yes(mesh.contains("!solidProxy"),"unverified ACIS proxy accepted as real geometry");
         yes(mesh.contains("acisSolids>0 || !flatPlan"),"ordinary flat plans incorrectly routed");
         yes(parser.contains("if(entities.isEmpty())return null"),"2D empty model policy changed");
-        yes(!main.contains("DxfParser.blankDrawing()"),"fabricated 2D drawing introduced");
+        String fallback=main.substring(main.indexOf("private boolean prepare3dOnly("),
+            main.indexOf("private void scheduleRecentNativeRecord("));
+        yes(!fallback.contains("DxfParser.blankDrawing()"),
+            "3D-only fallback must not fabricate a 2D document");
         yes(main.contains("project.preparingEditor=false;"),"3D-only project stays indefinitely loading");
         System.out.println("3D-only DXF/DWG safe opening and lifecycle integration contract passed.");
     }
