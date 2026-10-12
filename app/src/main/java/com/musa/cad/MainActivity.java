@@ -4034,6 +4034,7 @@ public class MainActivity extends AppCompatActivity {
             if(currentProject.colorDiagnostics!=null)
                 text+="\n\nİlk Native / DXF renk karşılaştırması (örneklem):\\n"+currentProject.colorDiagnostics;
         }
+        text+="\n\n"+cad.drawingCpuSummary();
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }
 
