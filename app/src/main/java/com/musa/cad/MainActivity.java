@@ -1973,7 +1973,7 @@ public class MainActivity extends AppCompatActivity {
                     // separate host and therefore does not prove Worker reachability.
                     if(hybridVisual){
                         reply.progress("Gandalf • Qwen Worker DNS/HTTPS erişimi kontrol ediliyor…");
-                        MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseNow();
+                        MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseStableNow();
                         if(!network.reachable){
                             String notice="GÖRSEL PROJE ANALİZİ BAŞLATILAMADI"+
                                 "\nAI görsel bölgeleri: 0/9 — hiçbir görüntü AI tarafından incelenmedi."+
@@ -2262,9 +2262,10 @@ public class MainActivity extends AppCompatActivity {
             // CAD payload or user prompts. Shrinking images cannot repair DNS.
             MusaAiCloudHealth.Diagnostic afterFailure=
                 cloud.status==MusaAiCloudService.Status.NETWORK_ERROR
-                    ?MusaAiCloudHealth.diagnoseNow():null;
+                    ?MusaAiCloudHealth.diagnoseStableNow():null;
             if(afterFailure!=null&&!afterFailure.reachable)
-                reply.progress("Gandalf • Qwen ağ tanısı: "+afterFailure.message);
+                reply.progress("Gandalf • Görsel aktarım başarısız oldu; "+
+                    "ardından yapılan HTTPS bağlantı testleri: "+afterFailure.message);
             // Retry only when the same HTTPS Worker remains reachable.
             if(!cloud.ok()&&(afterFailure==null||afterFailure.reachable)&&
                 canRetryCompactVisual(cloud)&&
@@ -2303,8 +2304,10 @@ public class MainActivity extends AppCompatActivity {
                     !firstTransferFailure.equals(cloud.message))
                     issue+=" | İlk aktarım: "+firstTransferFailure;
                 if(afterFailure!=null)
-                    issue+=" | Worker sağlık kontrolü ["+afterFailure.category+
-                        "]: "+afterFailure.message;
+                    issue+=" | İsteğin kesilmesinden SONRA yapılan bağımsız"+
+                        " Worker /health testleri ["+afterFailure.category+
+                        "]: "+afterFailure.message+
+                        " Bu testler ilk aktarım hatasının kesin nedenini kanıtlamaz.";
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
                 break;
             }
