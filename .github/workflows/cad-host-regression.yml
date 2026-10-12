@@ -19,6 +19,7 @@ on:
       - 'tests/audit_dwg_to_dxf.py'
       - 'tests/audit_acis_roundtrip.py'
       - 'tests/AcisDxfRoundTripProbe.java'
+      - 'tests/AcisSatMeshTest.java'
       - '.github/workflows/cad-host-regression.yml'
   workflow_dispatch:
 permissions:
@@ -200,6 +201,11 @@ jobs:
           mkdir -p /tmp/musacad-acis-diagnostic
           javac -d /tmp/musacad-acis-diagnostic app/src/main/java/com/musa/cad/DxfAcisCoverage.java app/src/main/java/com/musa/cad/AcisConversionDiagnostic.java tests/AcisConversionDiagnosticTest.java
           java -cp /tmp/musacad-acis-diagnostic AcisConversionDiagnosticTest
+      - name: Verify genuine SAT edge fallback when faces are unsupported
+        run: |
+          mkdir -p /tmp/musacad-acis-sat
+          javac -d /tmp/musacad-acis-sat app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisSatMeshTest.java
+          java -cp /tmp/musacad-acis-sat AcisSatMeshTest
       - name: Verify SOLID TRACE and 3DFACE geometry fidelity
         run: |
           mkdir -p /tmp/musacad-face
