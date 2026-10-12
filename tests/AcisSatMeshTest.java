@@ -77,7 +77,7 @@ public final class AcisSatMeshTest {
         if(!unsafe.hasGeometry()||unsafe.complete||unsafe.danglingReferences!=1)
             throw new AssertionError("A visible face must not certify a body with dangling SAB refs");
         String historyPayload=implicitSat(records).replace("End-of-ACIS-data",
-            "persubent-acadsolidhistory-attrib $999 $1000 #\\nEnd-of-ACIS-data");
+            "persubent-acadsolidhistory-attrib $999 $1000 #\nEnd-of-ACIS-data");
         AcisSatMesh.Result missingHistory=AcisSatMesh.parseDxfChunks(List.of(historyPayload));
         if(!missingHistory.hasGeometry()||missingHistory.complete||
            missingHistory.tessellatedFaces!=1||missingHistory.danglingReferences!=2||
