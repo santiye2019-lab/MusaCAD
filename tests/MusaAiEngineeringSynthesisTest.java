@@ -97,6 +97,9 @@ public final class MusaAiEngineeringSynthesisTest {
         noVisual.quantityEvidence="Sahte imalat metrajı 103 m";
         String missing=MusaAiEngineeringSynthesis.compose(noVisual);
         contains(missing,"GÖRSEL ANALİZ TAMAMLANMADI");
+        contains(missing,"GÖRSEL ANALİZ DOĞRULANAMADI — TEKNİK RAPOR DEĞİLDİR");
+        contains(missing,"Görsel olarak doğrulanan disiplin: YOK");
+        notContains(missing,"GANDALF • MEKANİK TESİSAT VE ALT SİSTEMLERİ GÖRSEL");
         contains(missing,"0/9");
         contains(missing,"Worker DNS çözümlenemedi");
         notContains(missing,"Sahte imalat");
