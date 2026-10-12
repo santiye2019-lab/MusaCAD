@@ -156,6 +156,29 @@ jobs:
           print('PASS: OLE2FRAME entity and payload retained')
           PY
 
+      - name: A/B diagnose R2013 history-drop condition in isolated CI runner
+        run: |
+          set -euo pipefail
+          # Patch a pinned dependency only in this disposable Linux Actions runner.
+          # This experiment neither updates the Git repo's pinned source nor
+          # modifies Android/APK production binaries. No user DWG data is logged.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('third_party/libredwg/src/out_dxf.c')
+          original=p.read_text()
+          old='if (dwg_version < R_2010)\n    has_history = 0;'
+          new='if (dwg_version < R_2010 && (!dwg || dwg->header.version < R_2010))\n    has_history = 0;'
+          assert original.count(old)==1, 'Pinned LibreDWG history conversion changed; abort'
+          p.write_text(original.replace(old,new))
+          print('TEST ONLY: preserve source R2013 SAB history flag during SAT conversion')
+          PY
+          trap 'git -C third_party/libredwg checkout -- src/out_dxf.c' EXIT
+          cmake --build /tmp/musacad-host --parallel 2
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-history-ab.dxf 2>/tmp/musacad-history-ab.log
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab.dxf --source-log /tmp/musacad-history-ab.log --require-source --require-external
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab.dxf
+          echo 'A/B TEST ONLY: do not promote this experimental converter to production'
+
   edit-regression:
     name: Android drawing and editing logic (no APK)
     runs-on: ubuntu-24.04
