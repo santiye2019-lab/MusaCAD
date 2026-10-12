@@ -47,9 +47,13 @@ An isolated R2013 host-only experiment changed the LibreDWG branch that clears
 the SAB `has_history` flag when the DXF writer downconverts a R2013+ DWG.
 The public example then yielded **3/3 mesh-bearing solids and 8/10
 triangulated faces (16 triangles)** instead of **1/3 and 1/10
-(2 triangles)**. The experimental output still has dangling references and
+(2 triangles)**. The recovered output still has dangling references and
 2 unsupported faces, so it is NOT a fully faithful or production-approved
-conversion. This A/B fix is restricted to a disposable GitHub runner.
+conversion. After an isolated host A/B test, the exact version-gated workaround
+was added to the **separate MusaCAD development branch** as a CMake switch
+(`MUSACAD_PRESERVE_R2013_SAB_HISTORY`). It is enabled for development
+native compilation and now passes host CAD regression; no production merge,
+APK release or real Android-device ACIS fidelity test has occurred.
 
 Cross-version risk: `example_2018.dwg` has 3 original external-AcDs ACIS
 entity records, but the pinned LibreDWG reader exposes **no binary SAB
@@ -67,5 +71,10 @@ LibreDWG issue [#1411](https://github.com/LibreDWG/libredwg/issues/1411) documen
 - If SAB content is absent, investigate a dedicated AcDs importer or licensed, reliable alternate conversion path; never silently replace B-Rep geometry with the header extents.
 - Add independent gold-standard face/edge checks and large-drawing phone rendering benchmarks before APK promotion.
 - Keep Android 2D CAD rendering, original colors, zoom/pan and currently working AI behavior unchanged until regression tests and real-phone smoke tests pass.
+
+The native history workaround is applied at configure time to the pinned
+third-party LibreDWG source checkout. For an unpatched build, use a **fresh**
+LibreDWG checkout with `-DMUSACAD_PRESERVE_R2013_SAB_HISTORY=OFF`; toggling
+OFF in a previously patched checkout does not by itself revert that checkout.
 
 No production deployment or APK promotion is authorized by these diagnostics.
