@@ -47,6 +47,28 @@ jobs:
           test -s /tmp/musacad-host-smoke.dxf
           grep -aq 'SECTION' /tmp/musacad-host-smoke.dxf
           grep -aq 'ENTITIES' /tmp/musacad-host-smoke.dxf
+      - name: DWG release compatibility matrix (2000–2018)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          versions=('2000','2004','2007','2010','2013','2018')
+          binary='/tmp/musacad-host/musacad_dwg_convert'
+          root=Path('third_party/libredwg/test/test-data')
+          for version in versions:
+              original=root/f'example_{version}.dwg'
+              output=Path(f'/tmp/musacad-version-{version}.dxf')
+              result=subprocess.run([binary,str(original),str(output)],
+                                    capture_output=True,text=True,timeout=90)
+              assert result.returncode==0, (f'DWG {version} convert failed: '
+                  +result.stderr[-1500:])
+              assert output.is_file() and output.stat().st_size>100, (
+                  f'DWG {version}: no usable DXF output')
+              data=output.read_bytes()
+              assert b'SECTION' in data and b'ENTITIES' in data and b'EOF' in data, (
+                  f'DWG {version}: DXF sections incomplete')
+              print(f'PASS: DWG {version} -> DXF ({output.stat().st_size} bytes)')
+          PY
       - name: Preserve embedded OLE object payload
         run: |
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
