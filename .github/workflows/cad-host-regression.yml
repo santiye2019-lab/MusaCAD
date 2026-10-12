@@ -155,3 +155,25 @@ jobs:
           javac -d /tmp/musacad-navigation-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/CadNavigationPolicyTest.java tests/RenderPathPolicyTest.java
           java -cp /tmp/musacad-navigation-tests CadNavigationPolicyTest
           java -cp /tmp/musacad-navigation-tests RenderPathPolicyTest
+      - name: Test blue-first-frame protection without an APK
+        run: |
+          mkdir -p /tmp/musacad-color-check
+          javac -d /tmp/musacad-color-check app/src/main/java/com/musa/cad/NativeFirstPaintColorGuard.java
+          jshell --class-path /tmp/musacad-color-check <<'EOF' | tee /tmp/color-results
+          import com.musa.cad.NativeFirstPaintColorGuard;
+          if (!NativeFirstPaintColorGuard.blueTint(0xff0000ff)) throw new RuntimeException("blue not recognized");
+          if (NativeFirstPaintColorGuard.blueTint(0xffff0000)) throw new RuntimeException("red mistaken for blue");
+          if (NativeFirstPaintColorGuard.blueTint(0xff00ff00)) throw new RuntimeException("green mistaken for blue");
+          if (!NativeFirstPaintColorGuard.shouldDefer(95,100)) throw new RuntimeException("blue flash not gated");
+          if (NativeFirstPaintColorGuard.shouldDefer(60,100)) throw new RuntimeException("colored scene blocked");
+          /exit
+          EOF
+          ! grep -F 'Exception' /tmp/color-results
+          python3 - <<'PY'
+          from pathlib import Path
+          scene=Path('app/src/main/java/com/musa/cad/NativeScene.java').read_text()
+          activity=Path('app/src/main/java/com/musa/cad/MainActivity.java').read_text()
+          assert 'public boolean hasSuspiciousBlueTint()' in scene
+          assert 'provisional.hasSuspiciousBlueTint()' in activity
+          print('PASS: suspicious blue first-frame stays hidden until true-color model')
+          PY
