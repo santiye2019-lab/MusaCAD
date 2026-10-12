@@ -53,6 +53,7 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.triangles.length!=0)throw new AssertionError("line-only model must not invent surfaces");
             if(mesh.xyz.length!=15)throw new AssertionError("LINE + 3D POLYLINE vertex count");
+            if(!mesh.canOpenWithout2d())throw new AssertionError("real non-planar 3D geometry can open without a 2D scene");
             if(mesh.edges.length!=8)throw new AssertionError("LINE + closed 3D POLYLINE edges");
             if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
                 throw new AssertionError("3D line/polyline Z coordinates");
@@ -105,6 +106,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(!mesh.flatPlan)throw new AssertionError("flat 2D plan must be detected");
+            if(mesh.canOpenWithout2d())throw new AssertionError("2D-only plan must not be routed as 3D-only");
             if(mesh.minZ!=0f||mesh.maxZ!=0f)throw new AssertionError("flat 2D Z range");
             if(mesh.solidProxy)throw new AssertionError("ordinary 2D plan must not be marked as solid proxy");
         }finally{Files.deleteIfExists(file.toPath());}
@@ -133,6 +135,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf.toString(),StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.solidProxy)throw new AssertionError("valid ACIS SAT must not fall back to bounds proxy");
+            if(!mesh.canOpenWithout2d())throw new AssertionError("verified ACIS solid-only DXF must open in 3D");
             if(mesh.acisSolids!=1)throw new AssertionError("ACIS solid must be marked read-only");
             if(mesh.unsupportedSolids!=0)throw new AssertionError("planar ACIS solid must resolve completely");
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
@@ -154,6 +157,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(!mesh.solidProxy)throw new AssertionError("ACIS solid must use bounds proxy when no tessellation is available");
+            if(mesh.canOpenWithout2d())throw new AssertionError("a fake bounds box is not a verified 3D-only model");
             if(mesh.acisSolids!=1)throw new AssertionError("fallback ACIS solid count");
             if(mesh.unsupportedSolids!=1)throw new AssertionError("ACIS solid count");
             if(mesh.xyz.length!=24||mesh.triangles.length!=0||mesh.edges.length!=24)

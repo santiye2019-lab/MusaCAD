@@ -68,6 +68,17 @@ public final class Dxf3dMesh {
         );
     }
 
+    /**
+     * A 3D-only drawing can bypass the 2D editor only when it contains real
+     * renderable geometry. Never treat synthetic bounds proxy wireboxes as
+     * evidence that an unsupported ACIS/SAB solid was successfully decoded.
+     */
+    public boolean canOpenWithout2d(){
+        return !solidProxy && xyz.length>=6
+            && (triangles.length>=3 || edges.length>=2)
+            && (acisSolids>0 || !flatPlan);
+    }
+
     private static final class Collector implements DxfBlocks.Sink {
         final FloatBuffer points=new FloatBuffer();
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
