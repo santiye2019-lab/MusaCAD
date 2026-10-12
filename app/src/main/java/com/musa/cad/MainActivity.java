@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39,SAVE_ATTR_DXF=40;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
@@ -141,6 +141,9 @@ public class MainActivity extends AppCompatActivity {
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
     private ProjectSession currentProject,pendingCloseAfterSave;
+    private CadDxfAttributePatch.Change pendingAttributePatch;
+    private File pendingAttributeSource;
+    private ProjectSession pendingAttributeProject;
     private AlertDialog projectCloseDialog;
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
@@ -2897,6 +2900,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Yinele",R.drawable.ic_rotate,()->{if(!cad.redo())result.setText("Yinele • İşlem yok");}),
             tool("Temizle",R.drawable.ic_clear,()->cad.clearMeasurement()),
             tool("Blok ekle",R.drawable.ic_open_file,this::showBlockLibrary),
+            tool("Blok niteliği (DXF)",R.drawable.ic_properties,this::showAttributePatchDialog),
             tool("Çizgi Tipi",R.drawable.ic_line,this::showSelectedLineType),
             tool("Özellik",R.drawable.ic_properties,this::showSelectedProperties),
             tool("Bulmak",R.drawable.ic_select,()->showEntitySearch(false)),
@@ -4128,6 +4132,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==SAVE_ATTR_DXF&&c!=RESULT_OK){clearPendingAttributePatch();return;}
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
             pendingYfk2025Reply=null;
@@ -4161,7 +4166,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
-        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
+        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());else if(r==SAVE_ATTR_DXF)saveAttributePatchedDxf(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
     private void showPendingHomeCategory(){
@@ -4744,14 +4749,162 @@ public class MainActivity extends AppCompatActivity {
     private void saveEditedDxf(Uri uri){
         if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
-                    CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
-                    if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
-                    FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
-                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",Toast.LENGTH_LONG).show();
+        task.future=loader.submit(()->{
+            File staged=null;
+            try{
+                // DXF generation and structural validation happen entirely in
+                // private cache BEFORE the SAF target is opened or truncated.
+                staged=CadDxfSaveStage.prepare(getCacheDir(),out->
+                    DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer));
+                FileTransfer.checkCancelled();
+                try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+                    if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");
+                    CadDxfSaveStage.publish(staged,out);
+                    out.flush();
+                }
+                FileTransfer.checkCancelled();
+                CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
+                if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))
+                    CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){
+                        currentProject.savedFingerprint=cad.editFingerprint();
+                        currentProject.baselineSet=true;currentProject.dirty=false;
+                        currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);
+                    }
+                    Toast.makeText(this,rasterCount==0
+                        ?"DXF kaydedildi • "+total+" düzenleme"
+                        :"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",
+                        Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);
+                });
+            }finally{
+                if(staged!=null&&!staged.delete()&&staged.exists())staged.deleteOnExit();
+            }
+        });
+    }
+
+
+    /**
+     * Narrow DXF attribute-copy export. Does not change the in-memory CAD scene,
+     * replace the source DWG, or silently combine unrelated unsaved CAD edits.
+     * Native DWG writing and interactive attribute picking require separate work.
+     */
+    private void showAttributePatchDialog(){
+        if(activeLoad!=null||!canEdit()||currentProject==null||editingBaseDxf==null||!editingBaseDxf.isFile()){
+            result.setText("Blok niteliği • Önce düzenlenebilir bir DWG/DXF açın ve yükleme işlemini bitirin");
+            return;
+        }
+        if(cad.editCount()>0||cad.sourceModifiedCount()>0){
+            new AlertDialog.Builder(this).setTitle("Önce mevcut değişiklikleri kaydedin")
+                .setMessage("Bu araç ayrı bir DXF kopyası üretir; çizim ekranındaki diğer bekleyen düzenlemeleri birleştirmez. Önce normal DXF kaydını tamamlayıp dosyayı yeniden açın.")
+                .setPositiveButton("TAMAM",null).show();
+            return;
+        }
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p=dp(16);box.setPadding(p,p,p,p);
+        TextView hint=new TextView(this);
+        hint.setText("INSERT nesnesinin DXF handle değeri ve ATTRIB etiketi gerekir. Sadece bu değer değiştirilerek yeni DXF kopyası hazırlanır. Orijinal DWG/DXF korunur; görünümü güncellemek için kopyayı yeniden açın.");
+        box.addView(hint);
+        EditText handle=new EditText(this);
+        handle.setSingleLine(true);handle.setHint("INSERT handle (örn. A1)");box.addView(handle);
+        EditText tag=new EditText(this);
+        tag.setSingleLine(true);tag.setHint("ATTRIB etiketi (örn. CODE)");box.addView(tag);
+        EditText value=new EditText(this);
+        value.setSingleLine(true);value.setHint("Yeni özellik değeri");box.addView(value);
+        AlertDialog dialog=new AlertDialog.Builder(this)
+            .setTitle("DXF blok özelliğini değiştir")
+            .setView(box)
+            .setNegativeButton("İPTAL",null)
+            .setPositiveButton("DXF KOPYASI KAYDET",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            if(handle.getText().toString().trim().isEmpty()){handle.setError("INSERT handle gerekli");return;}
+            if(tag.getText().toString().trim().isEmpty()){tag.setError("ATTRIB etiketi gerekli");return;}
+            if(value.getText().toString().isEmpty()){value.setError("Yeni değer gerekli");return;}
+            try {
+                CadDxfAttributePatch.Change change=new CadDxfAttributePatch.Change(
+                    handle.getText().toString(),tag.getText().toString(),value.getText().toString());
+                pendingAttributePatch=change;
+                pendingAttributeSource=editingBaseDxf;
+                pendingAttributeProject=currentProject;
+                Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/octet-stream");
+                String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");
+                intent.putExtra(Intent.EXTRA_TITLE,base+"_blok_niteligi.dxf");
+                try{startActivityForResult(intent,SAVE_ATTR_DXF);dialog.dismiss();}
+                catch(Exception failure){clearPendingAttributePatch();error(failure);}
+            }catch(IllegalArgumentException invalid){value.setError(invalid.getMessage());}
+        }));
+        dialog.show();
+    }
+
+    private void clearPendingAttributePatch(){
+        pendingAttributePatch=null;
+        pendingAttributeSource=null;
+        pendingAttributeProject=null;
+    }
+
+    private void saveAttributePatchedDxf(Uri uri){
+        final CadDxfAttributePatch.Change change=pendingAttributePatch;
+        final File base=pendingAttributeSource;
+        final ProjectSession project=pendingAttributeProject;
+        clearPendingAttributePatch();
+        if(change==null||base==null||!base.isFile()||project==null
+            ||currentProject!=project||activeLoad!=null||!canEdit()){
+            Toast.makeText(this,"DXF nitelik kaydı iptal edildi: proje veya kaynak değişti",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(project.sourceUri!=null&&project.sourceUri.equals(uri)){
+            Toast.makeText(this,"Orijinal dosyanın üzerine yazılmasına izin verilmiyor",Toast.LENGTH_LONG).show();
+            return;
+        }
+        LoadTask task=new LoadTask();activeLoad=task;
+        LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);
+        int p=dp(20);panel.setPadding(p,p,p,p);panel.addView(new ProgressBar(this));
+        task.progress=new TextView(this);task.progress.setText("ATTRIB değeri denetleniyor; hedef henüz açılmadı");
+        panel.addView(task.progress);
+        task.dialog=new AlertDialog.Builder(this).setTitle("DXF blok niteliği kopyası")
+            .setView(panel).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);
+        task.dialog.show();
+        task.future=loader.submit(()->{
+            File staged=null;
+            try{
+                // Prepare and validate the complete changed DXF before SAF truncation.
+                staged=CadDxfSaveStage.prepare(getCacheDir(),out->
+                    CadDxfAttributePatch.write(base,out,DxfWriter.charset(base),Collections.singletonList(change)));
+                FileTransfer.checkCancelled();
+                try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+                    if(out==null)throw new IOException("Hedef DXF açılamadı");
+                    CadDxfSaveStage.publish(staged,out);
+                    out.flush();
+                }
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();
+                    Toast.makeText(this,"ATTRIB düzenlenmiş DXF kopyası kaydedildi; yeni dosyayı açarak kontrol edin",Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();error(e);
+                });
+            }finally{
+                if(staged!=null&&!staged.delete()&&staged.exists())staged.deleteOnExit();
+            }
+        });
     }
 
     private void showShare(){
