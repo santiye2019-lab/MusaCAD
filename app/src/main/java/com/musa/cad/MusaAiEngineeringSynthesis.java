@@ -90,14 +90,6 @@ public final class MusaAiEngineeringSynthesis {
         out.append("\nProje: ").append(clean(data.project));
         out.append("\nDüzen: ").append(clean(data.layout));
         out.append("\nDisiplin: ").append(clean(data.discipline));
-        if(!clean(data.auditScopeList).isEmpty())
-            out.append("\n\n").append(clean(data.auditScopeList));
-        if(!clean(data.scope).isEmpty())
-            out.append("\nBu disiplin için kontrol odağı (bulgu değil): ")
-               .append(MusaAiVisualDiscipline.focus(data.scope));
-        out.append("\nİşlem sırası: 1) Qwen çevrim içi görsel inceleme → ")
-           .append("2) telefonda DWG kanıtlarıyla yerel çapraz kontrol → ")
-           .append("3) mühendislik raporu.");
         out.append("\nGörsel AI yanıtı alınan bölge: ").append(accepted)
             .append("/").append(total);
         out.append("\nBaşlık çevresi yakın-plan adayları: ")
@@ -114,6 +106,14 @@ public final class MusaAiEngineeringSynthesis {
                 .append("kontrol edin. Çizim değiştirilmedi.");
             return out.toString();
         }
+        // Only successful visual work warrants the planned subsystem checklist.
+        // When Qwen returns 0/9, report the failure, not eight unseen systems.
+        if(!clean(data.auditScopeList).isEmpty())
+            out.append("\n\n").append(clean(data.auditScopeList));
+        if(!clean(data.scope).isEmpty())
+            out.append("\nBu disiplin için kontrol odağı (bulgu değil): ")
+               .append(MusaAiVisualDiscipline.focus(data.scope));
+        out.append("\nYöntem: Qwen görsel inceleme → yerel DWG çapraz kontrol → mühendislik raporu.");
         boolean allTiles=accepted==total&&clean(data.visualIssue).isEmpty();
         out.append("\nDenetim seviyesi: ")
             .append(allTiles?"Planlanan "+total+" görsel bölgeye AI yanıtı alındı; mühendis onayı değildir."
