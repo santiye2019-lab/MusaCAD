@@ -150,7 +150,8 @@ public final class MusaAiDisciplinePlan {
         if(contains(q,"sprinkler","hidrant","yangin tesisati","yangin sondurme","yangin pompasi"))chosen.add("fire");
         if(contains(q,"otomasyon","bina yonetim sistemi","bms","ddc","scada",
                       "akilli bina","kontrol otomasyonu"))chosen.add("automation");
-        if(contains(q,"zayif akim","data tesisati","veri kablolama","yangin algilama",
+        if(contains(q,"zayif akim","zayif ve kuvvetli akim","elektrik zayif",
+                      "zayif akim ve kuvvetli","data tesisati","veri kablolama","yangin algilama",
                       "kamera sistemi","cctv","network tesisati","kartli gecis","seslendirme"))
             chosen.add("lowcurrent");
         if(contains(q,"kuvvetli akim","guc dagitim","enerji dagitim","elektrik panosu",
