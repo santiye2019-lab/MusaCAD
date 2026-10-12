@@ -813,6 +813,21 @@ jobs:
                   raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
           print('Both Gandalf AI endpoint configurations are present and URL-safe.')
           PY
+          # Same health path the actual Android indicator checks; checking
+          # it cannot change Cloudflare deployment or private license state.
+          health_url="$(python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit,urlunsplit
+          src=urlsplit(os.environ['MUSACAD_AI_API_URL'])
+          print(urlunsplit((src.scheme,src.netloc,'/health','','')))
+          PY
+          )"
+          status="$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "$health_url" || true)"
+          if [ "$status" != "200" ]; then
+            echo "::error::Existing Gandalf gateway /health returned HTTP $status. Test APK withheld."
+            exit 1
+          fi
+          echo "Existing Gandalf AI gateway health returned HTTP 200."
       - name: Build developer test APK with existing Gandalf configuration (no production deployment)
         env:
           MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL }}
