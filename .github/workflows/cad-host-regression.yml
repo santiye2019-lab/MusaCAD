@@ -150,7 +150,7 @@ jobs:
       - name: Audit original public R2013 SAB pointer inventory before DXF conversion
         run: |
           set -euo pipefail
-          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2013.dwg
+          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2013.dwg | tee /tmp/musacad-public-r2013-acds.log
           echo 'The source binary audit is diagnostic, not B-Rep fidelity certification.'
       - name: Determine source AcDs layout in public R2018 DWG without exposing drawings
         run: |
@@ -163,8 +163,19 @@ jobs:
           segments=next((x for x in lines if x.startswith('ACDS_SEGMENT_SUMMARY ')),None)
           source=next((x for x in lines if x.startswith('SAB_SOURCE_SUMMARY ')),None)
           assert metadata and segments and source, 'Missing read-only R2018 AcDs diagnostics'
+          def fields(line):
+              return dict(part.split('=',1) for part in line.split()[1:])
           assert source=='SAB_SOURCE_SUMMARY bodies=3 partial_or_missing=3', source
-          print('PASS: R2018 has three ACIS objects without usable direct SAB; AcDs layout classified')
+          v18=fields(metadata);s18=fields(segments)
+          assert (v18['version'],v18['sections'],v18['loaded'],v18['datastore_revision'])==('40','7','6','1'),v18
+          assert s18['data']=='1' and s18['search']=='1' and s18['blob']=='0',s18
+          prior=Path('/tmp/musacad-public-r2013-acds.log').read_text().splitlines()
+          v13=fields(next(line for line in prior if line.startswith('ACDS_METADATA ')))
+          summary13=next(line for line in prior if line.startswith('SAB_SOURCE_SUMMARY '))
+          assert (v13['version'],v13['sections'],v13['loaded'],v13['datastore_revision'])==('38','13','8','2'),v13
+          assert summary13=='SAB_SOURCE_SUMMARY bodies=3 partial_or_missing=0',summary13
+          print('PASS: both have AcDs sections; R2018 datastore is present, but its external binary SAB was not extracted')
+          print('R2013: datastore rev2 / 8 loaded segments / 3 SAB; R2018: rev1 / 6 segments / 0 extracted SAB')
           PY
       - name: Verify native AcDs SAB-to-SAT conversion from real R2013 DWG
         run: |
