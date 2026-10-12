@@ -45,6 +45,45 @@ if(MUSACAD_PRESERVE_R2013_SAB_HISTORY)
     message(FATAL_ERROR "Pinned LibreDWG SAB conversion changed; do not silently patch a different source")
   endif()
 endif()
+# Host-only diagnostic for public pinned R2013/R2018 fixtures.
+# Neither Android binaries nor normal production conversion are instrumented.
+# Marker counts only: no drawing bytes, coordinates, names or handles.
+if(NOT ANDROID)
+  option(MUSACAD_HOST_ACDS_SIGNATURE_AUDIT
+    "Count SAB markers in decoded public AcDs sections" OFF)
+  if(MUSACAD_HOST_ACDS_SIGNATURE_AUDIT)
+    set(_musa_acds_spec "${LIBREDWG_SOURCE}/src/acds.spec")
+    file(READ "${_musa_acds_spec}" _musa_acds_text)
+    set(_musa_acds_old "    num_acis_sab_data = 0;")
+    set(_musa_acds_probe [=[
+    size_t musa_starts = 0, musa_ends = 0;
+    const size_t musa_sl = strlen (start), musa_el = strlen (end);
+    for (size_t musa_i = 0; musa_i < dat->size; musa_i++)
+      {
+        if (musa_i + musa_sl <= dat->size &&
+            memcmp (&dat->chain[musa_i], start, musa_sl) == 0)
+          musa_starts++;
+        if (musa_i + musa_el <= dat->size &&
+            memcmp (&dat->chain[musa_i], end, musa_el) == 0)
+          musa_ends++;
+      }
+    fprintf (stderr,
+             "MUSACAD_PUBLIC_ACDS_MARKERS bytes=%zu starts=%zu ends=%zu\n",
+             (size_t)dat->size, musa_starts, musa_ends);
+    num_acis_sab_data = 0;
+]=])
+    string(FIND "${_musa_acds_text}" "${_musa_acds_old}" _musa_acds_pos)
+    string(FIND "${_musa_acds_text}" "MUSACAD_PUBLIC_ACDS_MARKERS" _musa_acds_done)
+    if(NOT _musa_acds_pos EQUAL -1)
+      string(REPLACE "${_musa_acds_old}" "${_musa_acds_probe}"
+        _musa_acds_patched "${_musa_acds_text}")
+      file(WRITE "${_musa_acds_spec}" "${_musa_acds_patched}")
+    elseif(_musa_acds_done EQUAL -1)
+      message(FATAL_ERROR "Pinned AcDs SAB scanner changed; host-only audit unavailable")
+    endif()
+  endif()
+endif()
+
 add_subdirectory("${LIBREDWG_SOURCE}" "libredwg")
 if(ANDROID)
   add_library(musacad_dwg SHARED dwg_bridge.c native_scene.c)
