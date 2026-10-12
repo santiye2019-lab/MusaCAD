@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_NATIVE_RETRY=12;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_NATIVE_RETRY=12,MENU_DRIVE_CONSENT=13;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -86,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static final class ProjectSession {
+        final String driveSessionId=java.util.UUID.randomUUID().toString();
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
@@ -168,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void handleOnBackPressed(){handleBackNavigation();}
         });
         View root=findViewById(R.id.mainRoot);
+        root.post(this::promptDriveConsentOnce);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
@@ -3668,7 +3670,7 @@ public class MainActivity extends AppCompatActivity {
             String dxf="0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n";
             try(OutputStream out=new FileOutputStream(base)){out.write(dxf.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
             ProjectSession project=new ProjectSession();project.file=base;project.workingDxf=base;project.parsed=DxfParser.blankDrawing();project.name=name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
-            projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+            projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
             result.setText("Yeni boş çizim hazır • Çizgi, Daire, Dikdörtgen veya diğer araçları seçin");
         }catch(Exception e){error(e);}
     }
@@ -4199,8 +4201,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");if(currentProject!=null&&currentProject.nativeScene!=null&&activeDxf==null){if(currentProject.preparingEditor)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör hazırlanıyor…").setEnabled(false);else if(currentProject.prepareError!=null)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör yüklemeyi yeniden dene");}menu.add(0,MENU_LAYERS,3,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_NATIVE_RETRY:retryNativeVectorLoad();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");if(currentProject!=null&&currentProject.nativeScene!=null&&activeDxf==null){if(currentProject.preparingEditor)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör hazırlanıyor…").setEnabled(false);else if(currentProject.prepareError!=null)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör yüklemeyi yeniden dene");}menu.add(0,MENU_LAYERS,3,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_DRIVE_CONSENT,10,"Google Drive • "+(MusaGoogleDriveSync.enabled(this)?"Otomatik yükleme açık":"Bağlantı / Ayarlar"));menu.add(0,MENU_ABOUT,11,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_NATIVE_RETRY:retryNativeVectorLoad();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_DRIVE_CONSENT:showDriveConsent();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4366,7 +4368,71 @@ public class MainActivity extends AppCompatActivity {
         if(directPicker)intent.putExtra(RecentFilesActivity.EXTRA_PICK_IMMEDIATELY,true);
         startActivityForResult(intent,OPEN);
     }
+
+    /** Ask once, respecting earlier account consent and future user disable. */
+    private void promptDriveConsentOnce(){
+        android.content.SharedPreferences p=getSharedPreferences("musacad_drive_consent_ui_v1",MODE_PRIVATE);
+        if(p.getBoolean("prompted",false)||MusaGoogleDriveSync.enabled(this))return;
+        p.edit().putBoolean("prompted",true).apply();
+        new AlertDialog.Builder(this)
+            .setTitle("Google Drive bağlantısı")
+            .setMessage("MusaCAD'de açtığınız DWG/DXF projelerini Google Drive hesabınıza otomatik yedeklemek ister misiniz? İlk kez hesap izni istenir, sonraki açılışlarda otomatik sürer. İstediğiniz zaman menüden kapatabilirsiniz. Yerel dosyalar silinmez.")
+            .setNegativeButton("Şimdi değil",null)
+            .setPositiveButton("Google Drive'a bağlan",(d,w)->connectDrive())
+            .show();
+    }
+    private void connectDrive(){
+        if(MusaGoogleDriveConsent.hasScope(this)){
+            MusaGoogleDriveSync.setEnabled(this,true);
+            scheduleDriveSync();
+            Toast.makeText(this,"Google Drive otomatik yükleme açık",Toast.LENGTH_LONG).show();
+        }else MusaGoogleDriveConsent.request(this);
+    }
+    private void showDriveConsent(){
+        boolean connected=MusaGoogleDriveConsent.hasScope(this);
+        boolean active=connected&&MusaGoogleDriveSync.enabled(this);
+        new AlertDialog.Builder(this)
+            .setTitle("Google Drive • Bağlantı / Ayarlar")
+            .setMessage("Hesap izni: "+(connected?"Mevcut":"Gerekli")+
+                "\nOtomatik proje yükleme: "+(active?"AÇIK":"KAPALI")+
+                "\n\nDrive proje depolama içindir; AI görsel analiz bağlantısı ayrı çalışır. Yerel çizimler silinmez.")
+            .setNegativeButton("Kapat",null)
+            .setPositiveButton(active?"Otomatik yüklemeyi kapat":connected?"Otomatik yüklemeyi aç":"Google hesabını bağla",(d,w)->{
+                if(active){MusaGoogleDriveSync.setEnabled(this,false);
+                    Toast.makeText(this,"Otomatik Drive yüklemesi kapalı",Toast.LENGTH_SHORT).show();
+                }else connectDrive();
+            })
+            .show();
+    }
+    private void scheduleDriveSync(){
+        if(!MusaGoogleDriveSync.enabled(this)||!MusaGoogleDriveConsent.hasScope(this))return;
+        ArrayList<MusaGoogleDriveSync.Entry> open=new ArrayList<>();
+        for(ProjectSession p:projects){
+            if(p.file!=null&&p.file.isFile())
+                open.add(new MusaGoogleDriveSync.Entry(p.driveSessionId,
+                    p.name==null?"cizim.dwg":p.name,p.file));
+        }
+        if(open.isEmpty())return;
+        MusaGoogleDriveSync.submit(getApplicationContext(),open,(id,percent,message)->
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||currentProject==null)return;
+                if(currentProject.driveSessionId.equals(id)&&result!=null)
+                    result.setText(message);
+            }));
+    }
+
     @Override protected void onActivityResult(int r,int c,Intent data){
+        if(r==MusaGoogleDriveConsent.REQUEST_CODE){
+            boolean granted=data!=null&&c==RESULT_OK&&MusaGoogleDriveConsent.consentResult(data);
+            if(granted){
+                MusaGoogleDriveSync.setEnabled(this,true);
+                scheduleDriveSync();
+            }
+            Toast.makeText(this,granted?
+                "Google Drive izni alındı; otomatik yükleme etkin.":
+                MusaGoogleDriveConsent.errorMessage(data,c),Toast.LENGTH_LONG).show();
+            return;
+        }
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
@@ -4454,7 +4520,7 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4494,7 +4560,7 @@ public class MainActivity extends AppCompatActivity {
                                 projects.add(project);
                                 activeLoad=null;
                                 if(task.dialog!=null)task.dialog.dismiss();
-                                activateProject(project);
+                                activateProject(project);scheduleDriveSync();
                                 result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
                                     "Önizleme renkleri nihai değildir.");
                                 // NativeScene owns mutable Canvas/Paint scratch buffers;
@@ -4557,7 +4623,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
@@ -4720,7 +4786,7 @@ public class MainActivity extends AppCompatActivity {
                     project.sourceUri=record.sourceUri==null||record.sourceUri.trim().isEmpty()?null:Uri.parse(record.sourceUri);
                     project.file=recovered;project.workingDxf=recovered;project.bitmap=parsed.bitmap;project.parsed=parsed;project.name=record.displayName;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
                     project.recoveryId=record.id;project.recoveryFingerprint=record.fingerprint;
-                    projects.add(project);activateProject(project);
+                    projects.add(project);activateProject(project);scheduleDriveSync();
                     project.savedFingerprint=Long.MIN_VALUE;project.baselineSet=true;project.dirty=true;
                     refreshProjectTabs();
                     result.setText("Kurtarılan çalışma • Kaydet / DXF dışa aktar ile kalıcı dosya oluşturun");
