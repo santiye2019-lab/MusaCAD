@@ -49,6 +49,7 @@ public final class MusaAiEngineeringSynthesis {
         public String project="",layout="",discipline="";
         /** Scope is resolved from explicit request or DWG metadata before Qwen. */
         public String scope="";
+        public String reportTitle="",auditScopeList="";
         public int reviewedTiles, plannedTiles=9, reviewedCloseups, plannedCloseups;
         public String visualIssue="", closeupIssue="", viewInventory="", coverageRegister="";
         public String localVectorEvidence="", quantityEvidence="", priceCandidates="";
@@ -80,12 +81,17 @@ public final class MusaAiEngineeringSynthesis {
         if(data==null)throw new IllegalArgumentException("Sentez verisi yok");
         int total=Math.max(1,data.plannedTiles);
         int accepted=Math.max(0,Math.min(total,data.reviewedTiles));
-        StringBuilder out=new StringBuilder("GANDALF • "+
-            (clean(data.scope).isEmpty()?"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU":
-                MusaAiVisualDiscipline.heading(data.scope)));
+        String caption=!clean(data.reportTitle).isEmpty()
+            ?clean(data.reportTitle).toUpperCase(new Locale("tr","TR"))+
+                " GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU"
+            :(clean(data.scope).isEmpty()?"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU":
+                MusaAiVisualDiscipline.heading(data.scope));
+        StringBuilder out=new StringBuilder("GANDALF • "+caption);
         out.append("\nProje: ").append(clean(data.project));
         out.append("\nDüzen: ").append(clean(data.layout));
         out.append("\nDisiplin: ").append(clean(data.discipline));
+        if(!clean(data.auditScopeList).isEmpty())
+            out.append("\n\n").append(clean(data.auditScopeList));
         if(!clean(data.scope).isEmpty())
             out.append("\nBu disiplin için kontrol odağı (bulgu değil): ")
                .append(MusaAiVisualDiscipline.focus(data.scope));
