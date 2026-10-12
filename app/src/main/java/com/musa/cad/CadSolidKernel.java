@@ -259,6 +259,21 @@ public final class CadSolidKernel {
             box.min[2],box.max[2]-box.min[2]);
     }
 
+    /** Transform any generated triangular model from an arbitrary UCS into WCS. */
+    public static Mesh inWorld(Mesh mesh,CadUcs3d ucs)throws IOException{
+        if(mesh==null||ucs==null)throw new IOException("UCS modeli veya koordinat sistemi bulunamadı");
+        float[] moved=new float[mesh.xyz.length];
+        for(int i=0;i<mesh.xyz.length;i+=3){
+            double[] p=ucs.toWorld(mesh.xyz[i],mesh.xyz[i+1],mesh.xyz[i+2]);
+            for(int j=0;j<3;j++){
+                if(!Double.isFinite(p[j])||Math.abs(p[j])>1e9)
+                    throw new IOException("UCS dönüşüm sonucu koordinat sınırı aşıldı");
+                moved[i+j]=(float)p[j];
+            }
+        }
+        return new Mesh(moved,mesh.triangles);
+    }
+
     public static void writeDxf(Mesh mesh,OutputStream output)throws IOException{
         if(mesh==null||output==null)throw new IOException("3B DXF hedefi eksik");
         try(BufferedWriter out=new BufferedWriter(new OutputStreamWriter(output,StandardCharsets.US_ASCII),65536)){
