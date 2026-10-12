@@ -129,6 +129,12 @@ jobs:
           mkdir -p /tmp/musacad-acis-probe
           javac -d /tmp/musacad-acis-probe app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisDxfRoundTripProbe.java
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-cone-acis.dxf
+      - name: Verify native AcDs SAB-to-SAT conversion from real R2013 DWG
+        run: |
+          set -euo pipefail
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-r2013-acds.dxf 2>/tmp/musacad-r2013-acds.log
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2013-acds.dxf --source-log /tmp/musacad-r2013-acds.log --require-source --require-external
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2013-acds.dxf
       - name: Preserve embedded OLE object payload
         run: |
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
