@@ -18,6 +18,7 @@ on:
       - 'tests/native_color_test.c'
       - 'tests/audit_dwg_to_dxf.py'
       - 'tests/audit_acis_roundtrip.py'
+      - 'tests/AcisDxfRoundTripProbe.java'
       - '.github/workflows/cad-host-regression.yml'
   workflow_dispatch:
 permissions:
@@ -122,7 +123,12 @@ jobs:
           python3 tests/audit_acis_roundtrip.py --self-test
           # Test a pinned upstream DWG, not just synthetic SAT text.
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-cone-acis.dxf 2>/tmp/musacad-cone-source.log
-          python3 tests/audit_acis_roundtrip.py /tmp/musacad-cone-acis.dxf --source-log /tmp/musacad-cone-source.log --require-source --debug-public-fixture
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-cone-acis.dxf --source-log /tmp/musacad-cone-source.log --require-source
+      - name: Probe actual ACIS surface mesh from native-converted DWG
+        run: |
+          mkdir -p /tmp/musacad-acis-probe
+          javac -d /tmp/musacad-acis-probe app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisDxfRoundTripProbe.java
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-cone-acis.dxf
       - name: Preserve embedded OLE object payload
         run: |
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
