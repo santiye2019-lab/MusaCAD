@@ -65,9 +65,14 @@ def audit(path: Path, source: int, external: int) -> dict:
     malformed = 0
     sat_hints = 0
     sab_hints = 0
+    text_entities = 0
+    sat_topology_hints = 0
+    sat_end_hints = 0
+    sat_header_hints = 0
 
     def finish_entity() -> None:
         nonlocal found, missing, malformed, sat_hints, sab_hints, buffered
+        nonlocal text_entities, sat_topology_hints, sat_end_hints, sat_header_hints
         if current_type not in ACIS_TYPES:
             return
         found += 1
@@ -82,6 +87,15 @@ def audit(path: Path, source: int, external: int) -> dict:
             malformed += 1
         if not has_text and not has_binary:
             missing += 1
+        if has_text:
+            text_entities += 1
+            candidates = (text, decode_sat(text))
+            if any(re.search(r"\\b(body|face|edge|vertex|shell|lump|point|surface)\\b", v.lower()) for v in candidates):
+                sat_topology_hints += 1
+            if any("end-of-acis" in v.lower() or "end-of-asm" in v.lower() for v in candidates):
+                sat_end_hints += 1
+            if any(re.search(r"^\\s*\\d{3,6}\\s+\\d+\\s+\\d+\\s+\\d+", v) for v in candidates):
+                sat_header_hints += 1
         if has_text and sat_markers(text):
             sat_hints += 1
         if has_binary and binary_valid:
@@ -137,6 +151,10 @@ def audit(path: Path, source: int, external: int) -> dict:
         "missing_payload_entities": missing,
         "malformed_hex_entities": malformed,
         "sat_structural_hints": sat_hints,
+        "sat_text_entities": text_entities,
+        "sat_topology_hints": sat_topology_hints,
+        "sat_terminal_hints": sat_end_hints,
+        "sat_header_hints": sat_header_hints,
         "hex_payload_entities": sab_hints,
     }
 
