@@ -20,7 +20,7 @@ public final class DxfXrefInventoryTest {
        +"0\nINSERT\n2\nLOCAL_SYMBOL\n"
        +"0\nENDSEC\n0\nEOF\n";
     private static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
-    private static void assertRefs(DxfBlocks.Result result){
+    private static void assertRefs(DxfBlocks.Result result,int renderedCount){
         check(result.externalReferences.size()==2,"two XREFs must be inventoried");
         DxfBlocks.ExternalReference a=result.externalReferences.get(0),b=result.externalReferences.get(1);
         check(a.name.equals("MEP_REFERENCE")&&a.path.equals("MEP/site.dwg")&&!a.overlay,
@@ -28,17 +28,18 @@ public final class DxfXrefInventoryTest {
         check(b.name.equals("STRUCTURE_OVERLAY")&&b.path.equals("STRUCT/structure.dwg")&&b.overlay,
             "overlay XREF name/path/flag");
         check(result.skipped>=1,"unresolved XREF must not be reported as drawn geometry");
-        check(result.placements.size()==1,"ordinary local block remains drawable");
+        check(renderedCount==1,"ordinary local block remains drawable");
     }
     public static void main(String[]args)throws Exception{
         DxfBlocks.Result direct=DxfBlocks.expand(Arrays.asList(CONTENT.split("\n")));
-        assertRefs(direct);
+        assertRefs(direct,direct.placements.size());
         File file=File.createTempFile("musacad-xref-", ".dxf");
         try{
             Files.writeString(file.toPath(),CONTENT,StandardCharsets.UTF_8);
+            java.util.ArrayList<DxfBlocks.Placement> rendered=new java.util.ArrayList<>();
             DxfBlocks.Result streamed=DxfBlocks.expand(file,StandardCharsets.UTF_8,
-                placement->{});
-            assertRefs(streamed);
+                rendered::add);
+            assertRefs(streamed,rendered.size());
         }finally{Files.deleteIfExists(file.toPath());}
         System.out.println("XREF attachment, overlay and local-block preservation passed");
     }
