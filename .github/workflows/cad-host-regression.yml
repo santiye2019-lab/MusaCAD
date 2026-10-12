@@ -67,9 +67,11 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
+          import json
           versions=('2000','2004','2007','2010','2013','2018')
           binary='/tmp/musacad-host/musacad_dwg_convert'
           root=Path('third_party/libredwg/test/test-data')
+          baseline_inventory=None
           for version in versions:
               original=root/f'example_{version}.dwg'
               output=Path(f'/tmp/musacad-version-{version}.dxf')
@@ -82,8 +84,18 @@ jobs:
               data=output.read_bytes()
               assert b'SECTION' in data and b'ENTITIES' in data and b'EOF' in data, (
                   f'DWG {version}: DXF sections incomplete')
-              subprocess.run(['python3','tests/audit_dwg_to_dxf.py',str(output)],check=True,timeout=30)
-              print(f'PASS: DWG {version} -> audited DXF ({output.stat().st_size} bytes)')
+              audit_output=subprocess.check_output(
+                  ['python3','tests/audit_dwg_to_dxf.py',str(output)],
+                  text=True,timeout=30)
+              inventory=json.loads(audit_output)['entity_types']
+              if baseline_inventory is None: baseline_inventory=inventory
+              else:
+                  assert inventory==baseline_inventory, (
+                      f'DWG {version} lost/gained an entity family vs DWG 2000: '
+                      f'{inventory} vs {baseline_inventory}')
+              print(f'PASS: DWG {version} -> audited DXF ({output.stat().st_size} bytes, '
+                    f'{sum(inventory.values())} entity records, {len(inventory)} entity families)')
+
           PY
       - name: Preserve embedded OLE object payload
         run: |
