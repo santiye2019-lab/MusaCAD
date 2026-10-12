@@ -137,7 +137,7 @@ public final class AcisSatMesh {
             return new Result(new float[0],new int[0],new int[0],false,
                 faces.size(),tessellated,unsupported,danglingReferences);
         }
-        boolean complete=!faces.isEmpty()&&tessellated==faces.size();
+        boolean complete=!faces.isEmpty()&&tessellated==faces.size()&&danglingReferences==0;
         return new Result(mesh.xyz(),mesh.triangles(),mesh.edges(),complete,faces.size(),tessellated,unsupported,danglingReferences);
     }
 
