@@ -116,7 +116,7 @@ public final class DxfParser {
     }
 
     public static final class Result{
-        public final Bitmap bitmap;public final float[] snapPoints;public final int entityCount,layerCount,skippedCount,oleObjectCount,olePreviewCount,oleMissingPreviewCount;public int conversionWarnings;public final Set<String>layerNames,visibleLayers,layoutNames,fontFallbacks,oleTypes;public final String activeLayout;public final boolean externalShapeFallback;
+        public final Bitmap bitmap;public final float[] snapPoints;public final int entityCount,layerCount,skippedCount,oleObjectCount,olePreviewCount,oleMissingPreviewCount;public int conversionWarnings;public final Set<String>layerNames,visibleLayers,layoutNames,fontFallbacks,oleTypes;public final String activeLayout;public final boolean externalShapeFallback;public List<DxfBlocks.ExternalReference> externalReferences=Collections.emptyList();
         private final List<Entity>document;private final float[] modelExtents;private final List<LayerEntity>visibleDocument;private final SpatialIndex spatialIndex;private final Matrix view;private final RectF contentBounds;private final Paint navigationPaint=new Paint(Paint.ANTI_ALIAS_FLAG);private final Matrix navigationCombined=new Matrix(),navigationInverse=new Matrix();private final Rect navigationClip=new Rect();private final RectF navigationVisibleWorld=new RectF();private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<LayerEntity>editableSourceLayers;private final android.util.SparseArray<LayerEntity>sourceLayerById;private final Set<String>visibleLayerKeys;private final List<DxfBlocks.BlockInsertion>blockInsertions;
         Result(Bitmap b,int e,int skipped,float[]points,List<Entity>document,Matrix view,Set<String>all,Set<String>visible,Set<String>layouts,String activeLayout,RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,Map<String,DxfLineStyle.Pattern>lineTypes,float[] modelExtents,List<DxfBlocks.BlockInsertion>blockInsertions){bitmap=b;this.modelExtents=modelExtents==null?null:modelExtents.clone();entityCount=e;skippedCount=skipped;snapPoints=points;this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));this.blockInsertions=Collections.unmodifiableList(new ArrayList<>(blockInsertions==null?Collections.emptyList():blockInsertions));layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(canonicalVisible(all,visible)));visibleLayerKeys=Collections.unmodifiableSet(DxfLayerState.normalized(visibleLayers));layoutNames=Collections.unmodifiableSet(new LinkedHashSet<>(layouts));this.activeLayout=activeLayout;layerCount=all.size();ArrayList<LayerEntity>visibleList=new ArrayList<>();for(Entity wrapped:document){LayerEntity layer=(LayerEntity)wrapped;if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys))visibleList.add(layer);}visibleDocument=Collections.unmodifiableList(visibleList);spatialIndex=new SpatialIndex(visibleList);ArrayList<LayerEntity>sourceList=new ArrayList<>();android.util.SparseArray<LayerEntity>sourceMap=new android.util.SparseArray<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;sourceList.add(layer);sourceMap.put(layer.sourceId,layer);}editableSourceLayers=Collections.unmodifiableList(sourceList);sourceLayerById=sourceMap;LinkedHashSet<String>fallbacks=new LinkedHashSet<>();for(Entity wrapped:document){Entity raw=((LayerEntity)wrapped).entity;if(raw instanceof Transformed)raw=((Transformed)raw).entity;if(raw instanceof Label){DxfTextStyle.Style st=((Label)raw).style;String ref=st.fontFile.isEmpty()?st.familyHint():st.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,st.usesShx()))fallbacks.add(ref);}else if(raw instanceof MTextLabel){MTextLabel mt=(MTextLabel)raw;String ref=mt.style.fontFile.isEmpty()?mt.style.familyHint():mt.style.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,mt.style.usesShx()))fallbacks.add(ref);for(DxfMText.Run run:mt.rich.runs){String rf=run.font==null?"":run.font.trim();if(!rf.isEmpty()&&!CadFontManager.isAvailable(rf,run.usesShxFont()))fallbacks.add(rf);}}}fontFallbacks=Collections.unmodifiableSet(fallbacks);boolean shape=false;for(DxfLineStyle.Pattern p:lineTypes.values())if(p!=null&&p.requiresExternalShape()){shape=true;break;}externalShapeFallback=shape;
             int oleCount=0,olePreview=0;LinkedHashSet<String>types=new LinkedHashSet<>();
@@ -126,8 +126,16 @@ public final class DxfParser {
             }
             oleObjectCount=oleCount;olePreviewCount=olePreview;oleMissingPreviewCount=oleCount-olePreview;oleTypes=Collections.unmodifiableSet(types);
         }
-        public Result withVisibleLayers(Set<String>selected)throws IOException{Set<String>visible=canonicalVisible(layerNames,selected);Result r=renderLayout(document,layerNames,visible,layoutNames,activeLayout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;return r;}
-        public Result withLayout(String selected)throws IOException{String layout=findLayout(layoutNames,selected);Result r=renderLayout(document,layerNames,visibleLayers,layoutNames,layout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;return r;}
+        /** Bounded screen-visible entity color sample, with no CAD content or text. */
+        public CadColorProfile colorProfile(){
+            CadColorProfile profile=new CadColorProfile();
+            int stride=Math.max(1,(visibleDocument.size()+CadColorProfile.MAX_SAMPLES-1)/CadColorProfile.MAX_SAMPLES);
+            for(int i=0;i<visibleDocument.size();i+=stride)
+                profile.add(visibleDocument.get(i).color);
+            return profile;
+        }
+        public Result withVisibleLayers(Set<String>selected)throws IOException{Set<String>visible=canonicalVisible(layerNames,selected);Result r=renderLayout(document,layerNames,visible,layoutNames,activeLayout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;r.externalReferences=externalReferences;return r;}
+        public Result withLayout(String selected)throws IOException{String layout=findLayout(layoutNames,selected);Result r=renderLayout(document,layerNames,visibleLayers,layoutNames,layout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;r.externalReferences=externalReferences;return r;}
         private SourceEntity sourceEntity(LayerEntity layer){if(layer==null||layer.sourceRange==null||layer.sourceEditWorld==null)return null;CadEdit content=mapEditToContent(layer.sourceEditWorld,view);return new SourceEntity(layer.sourceId,layer.sourceRange,layer.sourceType,layer.layer,layer.layout,layer.color,layer.lineType,layer.lineTypeScale,layer.lineWeight,content);}
         public int editableSourceCount(){int count=0;for(LayerEntity layer:editableSourceLayers)if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys))count++;return count;}
         public SourceEntity sourceById(int id){return sourceEntity(sourceLayerById.get(id));}
@@ -135,7 +143,15 @@ public final class DxfParser {
         public boolean isSourceVisible(int id){LayerEntity layer=sourceLayerById.get(id);return layer!=null&&activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys);}
         public SourceEntity findEditableSource(float x,float y,float tolerance,Set<Integer>hiddenIds){
             PointF world=drawingPointFromContent(x,y);float best=(float)drawingDistanceFromContent(Math.max(0f,tolerance));LayerEntity found=null;Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;
-            for(LayerEntity layer:editableSourceLayers){if(!activeLayout.equals(layer.layout)||hidden.contains(layer.sourceId)||!layer.isVisible(visibleLayerKeys))continue;float distance=layer.sourceEditWorld.hitDistance(world.x,world.y),allowed="TEXT".equals(layer.sourceType)?best*1.75f:best;if(distance<=allowed&&(found==null||distance<best)){best=distance;found=layer;}}
+            for(LayerEntity layer:editableSourceLayers){
+                if(!activeLayout.equals(layer.layout)||hidden.contains(layer.sourceId)||!layer.isVisible(visibleLayerKeys))continue;
+                float allowed="TEXT".equals(layer.sourceType)?best*1.75f:best;
+                // Cheap conservative bounds first. Keep the original exact
+                // hit-distance and nearest-object ordering unchanged.
+                if(!CadPickBounds.mightHit(layer.sourceEditWorld,world.x,world.y,allowed))continue;
+                float distance=layer.sourceEditWorld.hitDistance(world.x,world.y);
+                if(distance<=allowed&&(found==null||distance<best)){best=distance;found=layer;}
+            }
             return sourceEntity(found);
         }
         public void drawVector(Canvas canvas,Matrix imageMatrix){drawVector(canvas,imageMatrix,Collections.emptySet());}
@@ -647,10 +663,16 @@ public final class DxfParser {
             public void finish()throws IOException{flushPolyline();}
         }
         Collector collector=new Collector();DxfBlocks.Result expanded=DxfBlocks.expand(file,charset(file),collector);
-        if(entities.isEmpty())return null;layers.addAll(expanded.layerColors.keySet());if(layouts.isEmpty())layouts.addAll(expanded.layoutNames);if(layouts.isEmpty())layouts.add(DxfBlocks.MODEL_LAYOUT);
+        if(entities.isEmpty()){
+            if(!expanded.externalReferences.isEmpty())
+                throw new IOException("Çizim yalnızca harici XREF referansları içeriyor; bağlantılı DWG dosyalarının geometrisi mevcut dosyaya gömülü değil");
+            return null;
+        }layers.addAll(expanded.layerColors.keySet());if(layouts.isEmpty())layouts.addAll(expanded.layoutNames);if(layouts.isEmpty())layouts.add(DxfBlocks.MODEL_LAYOUT);
         LinkedHashSet<String>initialVisible=new LinkedHashSet<>();for(String layer:layers)if(expanded.layerInitiallyVisible(layer))initialVisible.add(layer);
         double mm=CadPrintMath.millimetersPerUnit(expanded.units);String unitName=CadPrintMath.unitName(expanded.units);String initial=findLayout(layouts,layouts.contains(DxfBlocks.MODEL_LAYOUT)?DxfBlocks.MODEL_LAYOUT:layouts.iterator().next());
-        return renderLayout(entities,layers,initialVisible,layouts,initial,expanded.skipped,mm,unitName,expanded.globalLineTypeScale,expanded.lineTypes,makePreview,expanded.modelExtents,expanded.blockInsertions);
+        Result ready=renderLayout(entities,layers,initialVisible,layouts,initial,expanded.skipped,mm,unitName,expanded.globalLineTypeScale,expanded.lineTypes,makePreview,expanded.modelExtents,expanded.blockInsertions);
+        ready.externalReferences=Collections.unmodifiableList(new ArrayList<>(expanded.externalReferences));
+        return ready;
     }
 
     private static Result renderLayout(List<Entity>document,Set<String>all,Set<String>visible,Set<String>layouts,String requested,int skipped,double mm,String unitName,double global,Map<String,DxfLineStyle.Pattern>lineTypes,boolean makePreview,float[] modelExtents,List<DxfBlocks.BlockInsertion>blockInsertions)throws IOException{
@@ -670,7 +692,24 @@ public final class DxfParser {
     }
 
     private static void drawViewportModels(Canvas canvas,Paint paint,Matrix paperMatrix,List<Entity>document,String activeLayout,Set<String>visibleLayerKeys,boolean print,boolean mono,double global){
-        if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(activeLayout))return;ArrayList<LayerEntity>model=new ArrayList<>();ArrayList<ViewportEntity>viewports=new ArrayList<>();for(Entity e:document){LayerEntity layer=(LayerEntity)e;if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layer.layout)&&layer.isVisible(visibleLayerKeys))model.add(layer);if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys)){ViewportEntity vp=viewportOf(layer);if(vp!=null&&vp.viewport.active2d())viewports.add(vp);}}if(model.isEmpty()||viewports.isEmpty())return;for(ViewportEntity viewportEntity:viewports){if(Thread.currentThread().isInterrupted())return;DxfViewport.View vp=viewportEntity.viewport;float scale=(float)vp.scale();if(!Float.isFinite(scale)||scale<=0f)continue;Matrix modelToPaper=new Matrix();modelToPaper.postTranslate((float)-vp.modelCenterX(),(float)-vp.modelCenterY());modelToPaper.postRotate((float)-vp.twistDegrees);modelToPaper.postScale(scale,scale);modelToPaper.postTranslate((float)vp.paperCenterX,(float)vp.paperCenterY);Matrix combined=new Matrix();combined.setConcat(paperMatrix,modelToPaper);RectF clip=new RectF((float)vp.left(),(float)vp.bottom(),(float)vp.right(),(float)vp.top());paperMatrix.mapRect(clip);int save=canvas.save();canvas.clipRect(clip);for(LayerEntity layer:model)layer.drawStyled(canvas,paint,combined,print,mono,global);canvas.restoreToCount(save);}}
+        if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(activeLayout))return;ArrayList<LayerEntity>model=new ArrayList<>();ArrayList<ViewportEntity>viewports=new ArrayList<>();for(Entity e:document){LayerEntity layer=(LayerEntity)e;if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layer.layout)&&layer.isVisible(visibleLayerKeys))model.add(layer);if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys)){ViewportEntity vp=viewportOf(layer);if(vp!=null&&vp.viewport.active2d())viewports.add(vp);}}if(model.isEmpty()||viewports.isEmpty())return;for(ViewportEntity viewportEntity:viewports){if(Thread.currentThread().isInterrupted())return;DxfViewport.View vp=viewportEntity.viewport;float scale=(float)vp.scale();if(!Float.isFinite(scale)||scale<=0f)continue;Matrix modelToPaper=new Matrix();modelToPaper.postTranslate((float)-vp.modelCenterX(),(float)-vp.modelCenterY());modelToPaper.postRotate((float)-vp.twistDegrees);modelToPaper.postScale(scale,scale);modelToPaper.postTranslate((float)vp.paperCenterX,(float)vp.paperCenterY);Matrix combined=new Matrix();combined.setConcat(paperMatrix,modelToPaper);RectF clip=new RectF((float)vp.left(),(float)vp.bottom(),(float)vp.right(),(float)vp.top());paperMatrix.mapRect(clip);// Invert the model-to-screen matrix and discard model entities whose complete
+            // bounds lie outside this paper viewport. Rotated/nonuniform view
+            // bounds are conservatively expanded by Matrix.mapRect; unbounded
+            // entities remain visible. Never remove entities from the document.
+            Matrix screenToModel=new Matrix();RectF visibleModel=null;
+            if(combined.invert(screenToModel)){
+                visibleModel=new RectF(clip);
+                screenToModel.mapRect(visibleModel);
+                // Allow a small border for CAD strokes/anti-aliasing.
+                visibleModel.inset(-Math.max(1e-6f,visibleModel.width()*.002f),
+                    -Math.max(1e-6f,visibleModel.height()*.002f));
+            }
+            int save=canvas.save();canvas.clipRect(clip);
+            for(LayerEntity layer:model){
+                if(visibleModel!=null&&!layer.intersects(visibleModel))continue;
+                layer.drawStyled(canvas,paint,combined,print,mono,global);
+            }
+            canvas.restoreToCount(save);}}
     private static ViewportEntity viewportOf(LayerEntity layer){Entity e=layer.entity;if(e instanceof Transformed)e=((Transformed)e).entity;return e instanceof ViewportEntity?(ViewportEntity)e:null;}
     private static Set<String> canonicalVisible(Set<String>all,Set<String>selected){LinkedHashSet<String>out=new LinkedHashSet<>();Set<String>keys=DxfLayerState.normalized(selected);if(all!=null)for(String layer:all)if(keys.contains(DxfLayerState.key(layer)))out.add(layer);return out;}
     private static String findLayout(Set<String>layouts,String requested){if(layouts==null||layouts.isEmpty())return DxfBlocks.MODEL_LAYOUT;if(requested!=null)for(String l:layouts)if(l.equalsIgnoreCase(requested.trim()))return l;if(layouts.contains(DxfBlocks.MODEL_LAYOUT))return DxfBlocks.MODEL_LAYOUT;return layouts.iterator().next();}
