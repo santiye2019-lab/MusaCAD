@@ -20,6 +20,32 @@ public final class CadProjectCloseBackContractTest {
         verify(source.contains("setNegativeButton(\"İPTAL\",null)"),"explicit cancel button retained");
         verify(source.contains("if(dirty)"),"dirty state distinguished");
         verify(source.contains("projectCloseDialog.setOnDismissListener("),"cancel/back cleans modal refs");
+        int close=source.indexOf("private void requestCloseProject(");
+        int click=source.indexOf("private void closeProjectNow(",close);
+        verify(close>=0&&click>close,"close request method exists");
+        String request=source.substring(close,click);
+        verify(request.contains("!projects.contains(project)"),"stale/closed project blocked");
+        verify(request.contains("if(activeLoad!=null)"),"busy CAD session cannot switch tabs for close");
+        verify(request.indexOf("projectCloseDialog!=null")<request.indexOf("activateProject(project)"),
+            "another confirmation modal prevents background tab switch");
+        verify(request.contains("if(currentProject!=project)"),"failed activation cannot close another tab");
+        verify(request.contains("project!=currentProject||activeLoad!=null||!canEdit()"),
+            "save-close verifies same editable project");
+        verify(request.contains("Telefonun Geri tuşu yalnızca bu uyarıyı kapatır."),
+            "unsaved close warning must not promise that Back discards work");
+        int requestSave=source.indexOf("private void requestEditedDxfSave(");
+        int publish=source.indexOf("private void saveEditedDxf(",requestSave);
+        verify(requestSave>=0&&publish>requestSave,"DXF export workflow exists");
+        String picker=source.substring(requestSave,publish);
+        verify(picker.contains("catch(Exception failure){pendingCloseAfterSave=null;"),
+            "document picker errors clear pending close");
+        String save=source.substring(publish,source.indexOf("private void showShare(",publish));
+        verify(save.contains("currentProject!=pendingCloseAfterSave"),
+            "stale picker result may not save another project's edits");
+        verify(save.contains("currentProject.sourceUri.equals(uri)"),
+            "original CAD source URI must not be truncated");
+        verify(save.contains("pendingCloseAfterSave=null;return;"),
+            "failure before export resets pending close flag");
         System.out.println("CAD multi-project close: Back cancels and does not discard unsaved work");
     }
 }
