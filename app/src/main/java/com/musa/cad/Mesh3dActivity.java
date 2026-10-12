@@ -1,6 +1,7 @@
 package com.musa.cad;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -24,10 +25,11 @@ public final class Mesh3dActivity extends Activity {
     public static final String MODE_ISO="iso",MODE_ORBIT="orbit",MODE_FRONT="front",MODE_TOP="top",
         MODE_RIGHT="right",MODE_WIREFRAME="wireframe",MODE_SURFACE="surface",
         MODE_MEASURE="measure",MODE_EDIT="edit";
-    private static final int SAVE_DXF=3103;
+    private static final int SAVE_DXF=3103,SAVE_GENERATED=3104;
     private volatile boolean closing;
     private boolean saving;
-    private Dxf3dMesh mesh;
+    private Dxf3dMesh mesh,importedMesh;
+    private CadSolidKernel.Mesh generatedSolid;
     private float[] original;
     private Mesh3dView meshView;
     @Override protected void onCreate(Bundle state){
@@ -39,15 +41,81 @@ public final class Mesh3dActivity extends Activity {
         new Thread(()->{
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
-                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
-                    TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+modelHint());
-                    hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
-                    addViewControls(root);
-                    if(MODE_EDIT.equals(requestedMode()))addEditControls(root);
+                runOnUiThread(()->{if(closing)return;importedMesh=loaded;original=Arrays.copyOf(loaded.xyz,loaded.xyz.length);
+                    installMesh(root,loaded);
                 });
             }catch(Exception e){runOnUiThread(()->{if(!closing)status.setText("3B görünüm açılamadı: "+e.getMessage());});}
         },"MusaCAD-3D-load").start();
     }
+    private void installMesh(FrameLayout root,Dxf3dMesh loaded){
+        mesh=loaded;meshView=new Mesh3dView(this,mesh);applyRequestedMode();
+        root.removeAllViews();
+        root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
+        TextView hint=new TextView(this);
+        hint.setText("← Geri  •  "+modeHint()+"  •  İki parmak: yakınlaştır\n"+
+            (generatedSolid==null?modelHint():"MusaCAD 3B ağ modelleme: "+generatedSolid.faceCount()+
+                " üçgen • kayıtta 3DFACE DXF üretilecek, orijinal DWG değiştirilmez"));
+        hint.setTextColor(Color.WHITE);hint.setTextSize(11);
+        hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);
+        root.addView(hint,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        addViewControls(root);
+        if(generatedSolid!=null)addGeneratedControls(root);
+        else if(MODE_EDIT.equals(requestedMode()))addEditControls(root);
+    }
+
+    private void showModelCommands(FrameLayout root){
+        final String[] commands={"BOX","EXTRUDE","REVOLVE","UNION","INTERSECTION","DIFFERENCE"};
+        final String[] suggestions={
+            "0,0,0,10,6,4",
+            "0,0;8,0;8,5;0,5|4",
+            "1,0;2,0;2,5;1,5|48|360",
+            "0,0,0,8,6,5|4,3,2,11,10,7",
+            "0,0,0,8,6,5|4,3,2,11,10,7",
+            "0,0,0,8,6,5|4,3,2,11,10,7"
+        };
+        new AlertDialog.Builder(this).setTitle("3B Modelleme • üçgen ağ / DXF")
+            .setItems(commands,(dialog,index)->{
+                EditText input=new EditText(this);
+                input.setText(suggestions[index]);input.setSelectAllOnFocus(true);
+                input.setTextColor(Color.WHITE);
+                input.setPadding(20,12,20,12);input.setSingleLine(false);
+                new AlertDialog.Builder(this).setTitle(commands[index]+" • parametreler")
+                    .setMessage("EXTRUDE: x,y;...|yükseklik  •  REVOLVE: r,z;...|dilim|açı\n"+
+                        "BOOLEAN yalnız eksene paralel iki kapalı kutu için; ACIS katı değildir.")
+                    .setView(input).setNegativeButton("İPTAL",null)
+                    .setPositiveButton("MODELİ OLUŞTUR",(d,button)->{
+                        try{
+                            CadSolidKernel.Mesh produced=CadSolidCommand.execute(commands[index],input.getText().toString());
+                            Dxf3dMesh preview=Dxf3dMesh.fromGenerated(produced);
+                            generatedSolid=produced;installMesh(root,preview);
+                        }catch(Exception error){
+                            android.widget.Toast.makeText(this,"3B modelleme: "+error.getMessage(),
+                                android.widget.Toast.LENGTH_LONG).show();
+                        }
+                    }).show();
+            }).setNegativeButton("KAPAT",null).show();
+    }
+
+    private void addGeneratedControls(FrameLayout root){
+        LinearLayout actions=new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);actions.setBackgroundColor(0xee07131d);
+        Button originalButton=new Button(this);originalButton.setText("ORİJİNAL");
+        actions.addView(originalButton,new LinearLayout.LayoutParams(0,-2,1f));
+        originalButton.setOnClickListener(v->{
+            if(importedMesh!=null){generatedSolid=null;installMesh(root,importedMesh);}
+        });
+        Button saveButton=new Button(this);saveButton.setText("3B DXF KAYDET");
+        actions.addView(saveButton,new LinearLayout.LayoutParams(0,-2,1f));
+        saveButton.setOnClickListener(v->{
+            if(saving||generatedSolid==null)return;
+            Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/dxf");
+            intent.putExtra(Intent.EXTRA_TITLE,"MusaCAD-3B-model-3DFACE.dxf");
+            startActivityForResult(intent,SAVE_GENERATED);
+        });
+        root.addView(actions,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+    }
+
     private String requestedMode(){
         String mode=getIntent().getStringExtra(EXTRA_MODE);
         return mode==null?MODE_ISO:mode;
@@ -117,7 +185,7 @@ public final class Mesh3dActivity extends Activity {
         LinearLayout bar=new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setBackgroundColor(0xee07131d);
-        String[] names={"ISO","ÖN","ÜST","SAĞ","TEL","YÜZEY"};
+        String[] names={"ISO","ÖN","ÜST","SAĞ","TEL","YÜZEY","MODEL"};
         for(String name:names){
             Button b=new Button(this);
             b.setText(name);
@@ -132,6 +200,7 @@ public final class Mesh3dActivity extends Activity {
                     case "SAĞ": meshView.setRightView(); break;
                     case "TEL": meshView.setWireframe(true); break;
                     case "YÜZEY": meshView.setWireframe(false); break;
+                    case "MODEL": showModelCommands(root); break;
                     default: meshView.setIsometricView(); break;
                 }
             });
@@ -168,7 +237,28 @@ public final class Mesh3dActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
-        if(request!=SAVE_DXF||result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
+        if(result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
+        if(request==SAVE_GENERATED){
+            final CadSolidKernel.Mesh generated=generatedSolid;
+            if(generated==null)return;
+            Uri uri=data.getData();saving=true;
+            new Thread(()->{
+                File staged=null;String message;
+                try{
+                    staged=CadDxfSaveStage.prepare(getCacheDir(),out->CadSolidKernel.writeDxf(generated,out));
+                    try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
+                        if(output==null)throw new java.io.IOException("Dosya açılamadı");
+                        CadDxfSaveStage.publish(staged,output);output.flush();
+                    }
+                    message="3B model 3DFACE DXF olarak kaydedildi (ACIS değildir)";
+                }catch(Exception e){message="3B model kaydı başarısız: "+e.getMessage();}
+                finally{if(staged!=null)staged.delete();}
+                final String resultMessage=message;
+                runOnUiThread(()->{saving=false;if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();});
+            },"MusaCAD-3D-mesh-save").start();
+            return;
+        }
+        if(request!=SAVE_DXF)return;
         Uri uri=data.getData();String path=getIntent().getStringExtra(EXTRA_DXF);saving=true;
         new Thread(()->{String message;
             try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
