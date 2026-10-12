@@ -20,6 +20,7 @@ public final class AcisSatMeshTest {
         testCylinderSide();
         testImplicitInvertedCoedgeLoop();
         testUnsupportedFaceWireframe();
+        testMissingAcisReferencesStillCountFaces();
 
         AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of("ACIS_PLACEHOLDER"));
         if(bad.hasGeometry())throw new AssertionError("invalid ACIS payload must not invent geometry");
@@ -74,6 +75,19 @@ public final class AcisSatMeshTest {
         StringBuilder out=new StringBuilder("700 0 1 0\nMusaCAD implicit SAT\n1 1e-06 1e-10\n");
         for(String record:records)out.append(record).append(" #\n");
         return out.append("End-of-ACIS-data\n").toString();
+    }
+
+    private static void testMissingAcisReferencesStillCountFaces(){
+        // Broken SAB->SAT linkage is not proof of a non-existent 3D body.
+        // Mesh is absent, but the declared face must stay visible in audits.
+        String sat="700 0 1 0\nMusaCAD missing-face fixture\n1 1e-06 1e-10\n"
+            +"-0 face $-1 $-1 $-1 $-1 $999 $-1 $-1 $1 forward single #\n"
+            +"-1 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #\n"
+            +"End-of-ACIS-data\n";
+        AcisSatMesh.Result result=AcisSatMesh.parseDxfChunks(List.of(sat));
+        if(result.hasGeometry()||result.complete||result.faces!=1||
+           result.unsupportedFaces!=1||result.tessellatedFaces!=0)
+            throw new AssertionError("Missing ACIS geometry must retain its real face inventory");
     }
 
     private static void testUnsupportedFaceWireframe(){
