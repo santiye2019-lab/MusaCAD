@@ -61,6 +61,18 @@ public final class CadSolidCommand {
                 if(segment!=Math.rint(segment))throw new IOException("Dilim sayısı tam olmalı");
                 return CadSolidKernel.revolve(polygon(segments[0]),(int)segment,numbers(segments[2],1)[0]);
             }
+            case "LOFT":{
+                if(segments.length<4||segments.length%2!=0||segments.length>512)
+                    throw new IOException("LOFT: profil1|kot1|profil2|kot2[|profil3|kot3...]");
+                int count=segments.length/2;
+                double[][] shapes=new double[count][];
+                double[] heights=new double[count];
+                for(int k=0;k<count;k++){
+                    shapes[k]=polygon(segments[2*k]);
+                    heights[k]=numbers(segments[2*k+1],1)[0];
+                }
+                return CadSolidKernel.loft(shapes,heights);
+            }
             case "UNION":case "INTERSECTION":case "DIFFERENCE":{
                 if(segments.length!=2)
                     throw new IOException("BOOLEAN: ilk kutu|ikinci kutu");
