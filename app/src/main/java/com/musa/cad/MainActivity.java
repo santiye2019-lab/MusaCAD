@@ -1893,7 +1893,12 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                     }
-                    MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                    // Hybrid Qwen engineering review needs all visible local CAD evidence.
+                    // Keep legacy cloud/chat payload bounded; this runs on aiExecutor,
+                    // never on the UI thread, and does not change Qwen upload limits.
+                    if(hybridVisual)reply.progress("Gandalf • Tüm görünür DWG nesneleri indeksleniyor…");
+                    MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(
+                        hybridVisual?Integer.MAX_VALUE:CLOUD_AI_INDEX_MAX_ITEMS);
                     List<MusaAiProjectPackage.Drawing> packageDrawings=Collections.emptyList();
                     if(packageMode){
                         ArrayList<MusaAiProjectPackage.Drawing> built=new ArrayList<>();
