@@ -634,6 +634,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
           java -cp /tmp/musacad-tests FileTransferTest
+      - name: Guard Back key cancels unsaved multi-project close
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests tests/CadProjectCloseBackContractTest.java
+          java -cp /tmp/musacad-tests CadProjectCloseBackContractTest
       - name: Test automatic recovery snapshot store
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RecoveryStore.java tests/RecoveryStoreTest.java
