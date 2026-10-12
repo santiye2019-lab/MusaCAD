@@ -18,6 +18,7 @@ Pinned upstream drawing: `LibreDWG/libredwg/test/test-data/example_2013.dwg`.
 - Converted DXF: 3 ACIS records with data.
 - SAT reader: 10 face records, 1 tessellated face (2 triangles), 9 unsupported faces.
 - Source/reference check: 18 unresolved SAT node references.
+- A public-fixture SAT record parity audit confirmed record counts equal parsed nodes for all three bodies (27/27, 27/27, 126/126). No SAT records were silently dropped by the Java parser. Missing referenced node ids predate its node map.
 - Exact partial token `strai ght-curve` is repaired only when both tokens match. Other broken links remain unresolved.
 - `AcisSatMesh.Result.complete` is false if *any* SAT pointer is unresolved; nonempty triangle arrays alone do not establish full fidelity.
 - Java 3D viewer distinguishes visible, partial and absent source solids, and reports unresolved references.
@@ -32,7 +33,7 @@ LibreDWG issue [#1411](https://github.com/LibreDWG/libredwg/issues/1411) documen
 
 ## Next engineering work
 
-- Compare raw public SAB record count, decoded SAT record count and parsed node count before attempting any index re-assignment.
+- Compare source SAB record count versus converted SAT record count and missing node IDs; converted SAT record count versus Java node count is already verified equal. Do not reassign indices by guessing.
 - If SAB content is absent, investigate a dedicated AcDs importer or licensed, reliable alternate conversion path; never silently replace B-Rep geometry with the header extents.
 - Add independent gold-standard face/edge checks and large-drawing phone rendering benchmarks before APK promotion.
 - Keep Android 2D CAD rendering, original colors, zoom/pan and currently working AI behavior unchanged until regression tests and real-phone smoke tests pass.
