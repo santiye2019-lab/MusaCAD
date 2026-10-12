@@ -39,6 +39,21 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: third_party/libredwg
+      - name: Keep experimental SAB history fix out of Android APKs
+        run: |
+          set -euo pipefail
+          # Deliberately request the experimental patch in an Android configure.
+          # It must fail with the explicit safety gate (not a missing SDK error).
+          if cmake -S app/src/main/cpp -B /tmp/musacad-android-history-negative \
+              -DANDROID=ON -DMUSACAD_PRESERVE_R2013_SAB_HISTORY=ON \
+              >/tmp/musacad-android-history-negative.log 2>&1; then
+            echo 'FAIL: experimental ACIS conversion entered Android build' >&2
+            exit 1
+          fi
+          grep -q 'Experimental R2013 SAB history conversion cannot be included' \
+            /tmp/musacad-android-history-negative.log
+          grep -q 'set(_MUSACAD_SAB_HISTORY_DEFAULT OFF)' app/src/main/cpp/CMakeLists.txt
+          echo 'PASS: host-only ACIS experiment cannot enter Android APK'
       - name: Check host converter does not reject drawings on preview failure
         run: |
           python3 - <<'PY'
