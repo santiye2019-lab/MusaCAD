@@ -70,7 +70,7 @@ jobs:
           PY
       - name: Build Linux host CAD converter
         run: |
-          cmake -S app/src/main/cpp -B /tmp/musacad-host -DCMAKE_BUILD_TYPE=Release
+          cmake -S app/src/main/cpp -B /tmp/musacad-host -DCMAKE_BUILD_TYPE=Release -DMUSACAD_HOST_ACDS_SIGNATURE_AUDIT=ON
           cmake --build /tmp/musacad-host --parallel 2
           test -x /tmp/musacad-host/musacad_dwg_convert
       - name: Validate native color source semantics
@@ -177,10 +177,25 @@ jobs:
           print('PASS: both have AcDs sections; R2018 datastore is present, but its external binary SAB was not extracted')
           print('R2013: datastore rev2 / 8 loaded segments / 3 SAB; R2018: rev1 / 6 segments / 0 extracted SAB')
           PY
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2018.dwg /tmp/musacad-public-r2018-convert.dxf 2>/tmp/musacad-public-r2018-raw.log
+          python3 - <<'PY'
+          from pathlib import Path
+          log=Path('/tmp/musacad-public-r2018-raw.log').read_text(errors='replace')
+          markers=[x for x in log.splitlines() if x.startswith('MUSACAD_PUBLIC_ACDS_MARKERS ')]
+          assert len(markers)==1, 'Decoded public R2018 AcDs marker coverage missing'
+          print('PUBLIC R2018 '+markers[0])
+          PY
       - name: Verify native AcDs SAB-to-SAT conversion from real R2013 DWG
         run: |
           set -euo pipefail
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-r2013-acds.dxf 2>/tmp/musacad-r2013-acds.log
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/musacad-r2013-acds.log').read_text(errors='replace').splitlines()
+          markers=[x for x in lines if x.startswith('MUSACAD_PUBLIC_ACDS_MARKERS ')]
+          assert len(markers)==1, 'Public R2013 AcDs raw marker audit not reached'
+          print('PUBLIC R2013 '+markers[0])
+          PY
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2013-acds.dxf --source-log /tmp/musacad-r2013-acds.log --require-source --require-external
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2013-acds.dxf --public-fixture-debug
       - name: Preserve embedded OLE object payload
