@@ -90,6 +90,21 @@ public final class MusaAiDisciplinePlanTest {
         yes(MusaAiDisciplinePlan.wantsMultiOpenFiles("Tüm açık projeleri karşılaştır"),
             "Explicit multi-open-project intent is retained");
         has(main,"MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)");
+        MusaAiDisciplinePlan.Plan broad=MusaAiDisciplinePlan.resolve(
+            "Bu projeyi incele","mechanical");
+        MusaAiDisciplinePlan.Plan focused=MusaAiDisciplinePlan.focusOnDrawing(
+            "Bu projeyi incele",broad,index());
+        yes(focused.sections.size()<=3,"Generic mechanical requests must not list all 8 systems");
+        yes(focused.includes("cleanwater")&&focused.includes("wastewater"),
+            "DWG layer and label evidence should select plumbing disciplines");
+        yes(!focused.includes("heating"),"Unseen heating must not dominate a kitchen drawing");
+        MusaAiDisciplinePlan.Plan explicit=MusaAiDisciplinePlan.focusOnDrawing(
+            "Mekanik tesisatı tüm alt sistemleriyle kontrol et",
+            MusaAiDisciplinePlan.resolve("Mekanik tesisatı tüm alt sistemleriyle kontrol et","mechanical"),
+            index());
+        yes(explicit.includes("heating")&&explicit.includes("fire"),
+            "Explicit all-subsystem instruction must not be narrowed");
+        has(main,"MusaAiDisciplinePlan.focusOnDrawing(raw,reviewPlan,snapshot)");
         System.out.println("MusaAiDisciplinePlanTest OK");
     }
 }
