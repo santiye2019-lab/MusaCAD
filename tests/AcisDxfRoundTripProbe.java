@@ -24,6 +24,7 @@ public final class AcisDxfRoundTripProbe {
                 String decoded=AcisSatMeshDebug.decode(raw.toString().replace("^ ","^"));
                 java.util.TreeMap<String,Integer> types=new java.util.TreeMap<>();
                 for(String rec:decoded.split("#")){
+                    int ordinal=recordOrdinal++;
                     String[] words=rec.trim().split("\\s+");
                     if(words.length<2)continue;
                     String kind=words[0].matches("-\\d+")?words[1]:words[0];
@@ -31,6 +32,7 @@ public final class AcisDxfRoundTripProbe {
                         types.merge(kind,1,Integer::sum);
                 }
                 java.util.Map<String,Integer> sampleCounts=new java.util.HashMap<>();
+                int recordOrdinal=0;
                 for(String rec:decoded.split("#")){
                     String[] words=rec.trim().split("\\s+");
                     if(words.length<2)continue;
@@ -38,7 +40,7 @@ public final class AcisDxfRoundTripProbe {
                     if(!java.util.Arrays.asList("face","loop","coedge","edge","vertex","point","body","shell").contains(kind))continue;
                     int index=sampleCounts.getOrDefault(kind,0);sampleCounts.put(kind,index+1);
                     if(index<2&&(bodies==1||bodies==3))
-                        System.out.printf("ACIS_PUBLIC_REF kind=%s record=%s%n",kind,
+                        System.out.printf("ACIS_PUBLIC_REF ordinal=%d kind=%s record=%s%n",ordinal,kind,
                             rec.trim().substring(0,Math.min(220,rec.trim().length())).replaceAll("[^a-zA-Z0-9. $-]","_"));
                 }
 
