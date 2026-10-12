@@ -121,6 +121,14 @@ public final class MusaAiDisciplinePlan {
         }
     }
 
+    /** "All disciplines" is not synonymous with "all open DWG files". */
+    public static boolean wantsMultiOpenFiles(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        return contains(q,"proje paketi","tum acik proje","acik tum proje",
+            "tum acik cizim","acik tum cizim","acik dosyalarin hepsi",
+            "birden fazla acik proje");
+    }
+
     public static Plan resolve(String raw,String fallbackScope){
         String q=MusaAiDrawingIndex.normalize(raw);
         LinkedHashSet<String> chosen=new LinkedHashSet<>();
