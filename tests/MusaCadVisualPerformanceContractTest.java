@@ -42,7 +42,8 @@ public final class MusaCadVisualPerformanceContractTest {
         has(cad,"else vectorDrawing.drawVector(c,imageMatrix","settled full vector renderer");
         has(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","actual exported project images");
         has(main,"MusaAiCloudService.analyzeHybridWithContext(","online visual+CAD model call");
-        has(main,"MusaAiVisualDiscipline.heading(scope)","discipline-aware engineering report title");
+        has(main,"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU","discipline-aware engineering report title");
+        has(main,"plan.label","resolved natural scope is used in report title");
         has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)","offline YFK candidate check after visual AI");
         has(main,"synthesis.includeTakeoff","metraj only on explicit request");
         has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)",
