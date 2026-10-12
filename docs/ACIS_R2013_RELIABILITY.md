@@ -84,6 +84,24 @@ in both decoded structures. These facts localize the R2018 limitation to
 AcDs record extraction/association, not disappearance of the entire
 datastore section. They do **not** prove the underlying binary SAB is intact.
 History preservation cannot repair missing or unextracted raw data.
+
+Further **host-only, raw signature counts** on the pinned upstream samples showed:
+
+| Uncompressed AcDs envelope | Public R2013 | Public R2018 |
+|---|---:|---:|
+| `ACIS BinaryFile` start signatures | 3 | 0 |
+| `ASM BinaryFile` start signatures | 0 | 3 |
+| `End-of-ASM-data` end signatures | 3 | 3 |
+
+Thus the R2018 compressed-section decoder does expose **three
+alternative ASM envelopes**. The pinned LibreDWG `acds.spec` finder
+only searches for `ACIS BinaryFile`; its following SAB-to-SAT
+converter likewise only accepts that old start signature. This explains
+the missed association without assuming the R2018 3D geometry is
+otherwise compatible with legacy SAB binary record parsing. Correct
+header offset, version and record compatibility still require separate
+validation. The signature audit is explicitly host-only and never
+changes source drawings or Android shipping binaries.
 The older public R2000 `Cone.dwg` remains partially tessellated (34 triangles)
 in the A/B test.
 
