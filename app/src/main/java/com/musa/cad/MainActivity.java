@@ -1913,8 +1913,10 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if(hybridVisual){
+                        String reportScope=MusaAiVisualDiscipline.resolve(
+                            requestedScope,raw,displayName,snapshot);
                         runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,
-                            requestedScope,reply,recentContext);
+                            reportScope,reply,recentContext);
                         return;
                     }
                     reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
@@ -2077,7 +2079,7 @@ public class MainActivity extends AppCompatActivity {
         final ArrayList<MusaAiEngineeringSynthesis.VisualGroup> visualRecords=
             new ArrayList<>();
         String issue="";
-        StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
+        StringBuilder report=new StringBuilder("GANDALF • "+MusaAiVisualDiscipline.heading(scope));
         report.append("\nProje: ").append(fileName);
         report.append("\nLayout: ").append(snapshot.layout);
         report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
@@ -2132,7 +2134,8 @@ public class MainActivity extends AppCompatActivity {
             }
             reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
-            String task=raw+"\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
+            String task=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
+                "\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
@@ -2242,11 +2245,12 @@ public class MainActivity extends AppCompatActivity {
                 reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
                     (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
                     "/"+focusedRequested+" yakın-plan adayı işlendi…");
-                String focusPrompt=raw+"\n"+viewCatalog.report+
+                String focusPrompt=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
+                    "\n"+viewCatalog.report+
                     "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
                     " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
-                    " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
-                    " ve şebeke bağlantılarındaki uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
+                    " Plan–kesit kotları ve "+MusaAiVisualDiscipline.focus(scope)+
+                    " açısından uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
                     " Her bulguda görünüm etiketi, okunan değeri, kaynak ve belirsizliği belirt."+
                     " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
                 MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybridWithContext(
@@ -2304,6 +2308,7 @@ public class MainActivity extends AppCompatActivity {
         synthesis.project=fileName;
         synthesis.layout=snapshot.layout;
         synthesis.discipline=MusaAiAnalysisIntent.label(scope);
+        synthesis.scope=scope;
         synthesis.reviewedTiles=acceptedTiles;
         synthesis.plannedTiles=total;
         synthesis.reviewedCloseups=focusedReviewed;
@@ -2319,11 +2324,30 @@ public class MainActivity extends AppCompatActivity {
             reply.progress("Gandalf • Qwen görsel incelemesi bitti; yerel DWG"+
                 " kaynaklarıyla eşleştiriliyor ve mühendislik raporu hazırlanıyor…");
             synthesis.addCadSources(snapshot);
-            MusaAiEngineeringReview.Result local=
-                MusaAiEngineeringReview.analyze(snapshot,fileName);
-            synthesis.localVectorEvidence=local.text;
-            lastAiReportSourceIds=Collections.unmodifiableList(
-                new ArrayList<>(local.sourceIds));
+            if(MusaAiVisualDiscipline.mechanicalScope(scope)){
+                MusaAiEngineeringReview.Result local=
+                    MusaAiEngineeringReview.analyze(snapshot,fileName);
+                synthesis.localVectorEvidence=local.text;
+                lastAiReportSourceIds=Collections.unmodifiableList(
+                    new ArrayList<>(local.sourceIds));
+            }else{
+                MusaAiDisciplineAnalyzer.Result local="all".equals(scope)
+                    ?MusaAiDisciplineAnalyzer.analyzeAll(snapshot)
+                    :MusaAiDisciplineAnalyzer.analyzeDiscipline(
+                        snapshot,MusaAiVisualDiscipline.localDiscipline(scope));
+                // Deterministic local CAD checks are supplementary to Qwen, not
+                // visual conclusions or statutory engineering certification.
+                StringBuilder localText=new StringBuilder(local.text);
+                for(MusaAiDisciplineAnalyzer.Finding finding:local.findings){
+                    localText.append("\n• [").append(finding.id).append("] ")
+                        .append(finding.title).append(" — ").append(finding.detail);
+                    if(!finding.sourceIds.isEmpty())
+                        localText.append(" [kaynak ").append(finding.sourceIds.get(0)).append("]");
+                }
+                synthesis.localVectorEvidence=localText.toString();
+                lastAiReportSourceIds=Collections.unmodifiableList(
+                    new ArrayList<>(local.sourceIds));
+            }
 
             // Local takeoff/official poz checks occur after Qwen only when
             // requested. These estimates must not be called approved quantities.
