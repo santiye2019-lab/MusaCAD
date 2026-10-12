@@ -159,6 +159,14 @@ public final class AcisSatMesh {
             }
             if(at>=tokens.length)continue;
             String type=tokens[at].toLowerCase(Locale.ROOT);
+            // Pinned LibreDWG R2013 SAB-to-SAT emits "strai ght-curve"
+            // for one real straight-curve record. Repair this *exact*
+            // split identifier, not arbitrary source references or geometry.
+            if("strai".equals(type)&&at+1<tokens.length&&
+                    "ght-curve".equalsIgnoreCase(tokens[at+1])){
+                type="straight-curve";
+                at++;
+            }
             if(!looksLikeType(type))continue;
             if(out.size()>=MAX_NODES)throw new IllegalArgumentException("ACIS node limit");
             String[] body=Arrays.copyOfRange(tokens,at+1,tokens.length);
