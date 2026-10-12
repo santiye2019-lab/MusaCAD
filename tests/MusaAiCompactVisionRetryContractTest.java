@@ -44,9 +44,10 @@ public final class MusaAiCompactVisionRetryContractTest {
                 !retryPolicy.contains("case QUOTA_EXHAUSTED:"),
                 "Auth/quota errors must not retry");
         contains(main,"canRetryCompactVisual(cloud)");
-        contains(main,"renderBatchCompact(drawing,batch,reply::progress)");
+        contains(main,"renderBatchCompact(drawing,batch,visualProgress)");
         contains(main,"if(retry.ok())compactAcceptedBatches++");
         contains(main,"acceptedTiles+=rendered.renderedTiles");
+        contains(main,"reply.progressMeasured(\"Qwen yanıtı alınan genel bölgeler\"");
         contains(main,"acceptedTiles==total");
         contains(main,"MusaAiVisionTimeBudget.mayStartNextBatch(");
         contains(main,"MusaAiVisionTimeBudget.mayRetryBatch(");

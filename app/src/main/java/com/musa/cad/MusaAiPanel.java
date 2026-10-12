@@ -22,6 +22,7 @@ import android.widget.ScrollView;
 import android.widget.Toast;
 import android.os.Build;
 import android.widget.TextView;
+import android.widget.ProgressBar;
 import androidx.core.widget.TextViewCompat;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -36,6 +37,10 @@ public final class MusaAiPanel {
     public interface Reply {
         void send(String text);
         default void progress(String text){}
+        /** Report only measured units; never infer HTTP/model completion. */
+        default void progressMeasured(String task,int completed,int total){progress(task);}
+        /** Server/model response time cannot be measured as a percentage. */
+        default void progressWaiting(String task){progress(task);}
         /** Reports a successful/failed actual cloud model answer, not just /health. */
         default void cloudStatus(boolean modelAnswered){}
         /** Recent failure reason for the LED; no secrets, tokens or CAD are logged. */
@@ -215,6 +220,36 @@ public final class MusaAiPanel {
             input.setText("");
             appendBubble(activity,messages,true,prompt);
             TextView pending=appendBubble(activity,messages,false,"İşleniyor…");
+            // Each request owns its own progress view. Concurrent commands must
+            // never overwrite the stage or percentage of another request.
+            LinearLayout taskProgress=new LinearLayout(activity);
+            taskProgress.setOrientation(LinearLayout.VERTICAL);
+            taskProgress.setPadding(dp(activity,10),dp(activity,6),dp(activity,10),dp(activity,7));
+            taskProgress.setBackground(round(activity,0xFF102B3C,10,0xFF245D79));
+            LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(
+                Math.round(activity.getResources().getDisplayMetrics().widthPixels*.84f),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+            progressLp.gravity=Gravity.START;
+            progressLp.topMargin=dp(activity,3);
+            messages.addView(taskProgress,progressLp);
+            TextView taskName=text(activity,"Hazırlanıyor • ilerleme ölçülüyor",11f,0xFFD4E7EE,true);
+            taskProgress.addView(taskName);
+            ProgressBar taskBar=new ProgressBar(activity,null,android.R.attr.progressBarStyleHorizontal);
+            taskBar.setMax(100);
+            taskBar.setIndeterminate(true);
+            if(Build.VERSION.SDK_INT>=21){
+                taskBar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF26D1C0));
+                taskBar.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFF26D1C0));
+            }
+            LinearLayout.LayoutParams barLp=new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,dp(activity,5));
+            barLp.topMargin=dp(activity,6);
+            taskProgress.addView(taskBar,barLp);
+            TextView taskElapsed=text(activity,"0 sn • ilerleme bekleniyor",10f,0xFF9FC1D1,false);
+            LinearLayout.LayoutParams elapsedLp=new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
+            elapsedLp.topMargin=dp(activity,4);
+            taskProgress.addView(taskElapsed,elapsedLp);
             scrollBottom(messagesScroll);
             final AtomicBoolean completed=new AtomicBoolean(false);
             final StringBuilder previousTurns=new StringBuilder();
@@ -224,17 +259,39 @@ public final class MusaAiPanel {
             }
             final Handler timeoutHandler=new Handler(Looper.getMainLooper());
             final long startedMs=android.os.SystemClock.elapsedRealtime();
+            final long[] lastProgressMs={startedMs};
+            final String[] taskStage={"Hazırlanıyor"};
+            final boolean[] measured={false};
+            final Runnable[] progressTicker=new Runnable[1];
+            progressTicker[0]=()->{
+                if(completed.get()||!sheet.isShowing())return;
+                long now=android.os.SystemClock.elapsedRealtime();
+                long elapsed=Math.max(0,(now-startedMs)/1000);
+                long stageWait=Math.max(0,(now-lastProgressMs[0])/1000);
+                String diagnostic=measured[0]
+                    ?"Doğrulanmış adımlar; sıradaki işlem bekleniyor"
+                    :stageWait>=45
+                        ?"Yeni yanıt yok • ağ/model gecikmiş olabilir"
+                        :"İşlem izleniyor • yüzde yalnız ölçülen adımlardır";
+                taskElapsed.setText(elapsed+" sn geçti • "+diagnostic);
+                timeoutHandler.postDelayed(progressTicker[0],2000L);
+            };
+            timeoutHandler.postDelayed(progressTicker[0],2000L);
             // One Qwen image call can legitimately take 90s, plus CAD rendering.
             // An idle notification is NOT a terminal failure; accept a late reply.
             final Runnable idleNotice=()->{
                 if(completed.get())return;
-                pending.setText("Gandalf • Yapay zekâ görüntü yanıtı bekleniyor. "+
-                    "İşlem arka planda sürüyor; analiz sonuçları henüz doğrulanmadı.");
-                scrollBottom(messagesScroll);
+                // Never overwrite the last confirmed progress with a deceptive
+                // generic "working" claim: the Worker may actually be stalled.
+                if(!measured[0])taskName.setText(taskStage[0]+" • yanıt henüz doğrulanmadı");
+                taskElapsed.setText(Math.max(0,(android.os.SystemClock.elapsedRealtime()-startedMs)/1000)+
+                    " sn geçti • Son işlemden yeni yanıt alınamadı");
             };
             final Runnable timeout=()->{
                 if(!completed.compareAndSet(false,true))return;
                 timeoutHandler.removeCallbacks(idleNotice);
+                timeoutHandler.removeCallbacks(progressTicker[0]);
+                taskProgress.setVisibility(View.GONE);
                 pending.setText("Gandalf • 12 dakikalık toplam analiz sınırına ulaşıldı. "+
                     "Bu mesaj 9/9 görsel incelemenin tamamlandığını göstermez. "+
                     "Çizime müdahale edilmedi. Eksik bölgeler doğrulanmış kabul edilmez.");
@@ -248,6 +305,8 @@ public final class MusaAiPanel {
                         if(!completed.compareAndSet(false,true))return;
                         timeoutHandler.removeCallbacks(timeout);
                         timeoutHandler.removeCallbacks(idleNotice);
+                        timeoutHandler.removeCallbacks(progressTicker[0]);
+                        taskProgress.setVisibility(View.GONE);
                         String answer=text==null||text.trim().isEmpty()?"Yanıt oluşturulamadı.":text.trim();
                         pending.setText(answer);
                         latestAssistantAnswer[0]=answer;
@@ -295,18 +354,37 @@ public final class MusaAiPanel {
                         state.setBackground(round(activity,0xFF4C2428,16,0));
                     });
                 }
+                private void applyStage(String stage,boolean known,int done,int total){
+                    if(completed.get())return;
+                    timeoutHandler.removeCallbacks(idleNotice);
+                    timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
+                    taskStage[0]=stage==null?"İşleniyor":stage.trim();
+                    measured[0]=known;
+                    lastProgressMs[0]=android.os.SystemClock.elapsedRealtime();
+                    if(known&&total>0){
+                        int count=Math.max(0,Math.min(done,total));
+                        int percent=(int)((100L*count)/total);
+                        taskBar.setIndeterminate(false);
+                        taskBar.setProgress(percent);
+                        taskName.setText(taskStage[0]+" • "+count+"/"+total+" • %"+percent);
+                    }else{
+                        taskBar.setIndeterminate(true);
+                        taskName.setText(taskStage[0]+" • yanıt bekleniyor (yüzde ölçülemiyor)");
+                    }
+                    pending.setText("Gandalf • "+taskStage[0]);
+                    taskElapsed.setText(Math.max(0,
+                        (android.os.SystemClock.elapsedRealtime()-startedMs)/1000)+
+                        " sn geçti • "+(known?"Doğrulanmış ilerleme":"Sonucun gelmesi bekleniyor"));
+                    scrollBottom(messagesScroll);
+                }
                 @Override public void progress(String text){
-                    activity.runOnUiThread(()->{
-                        if(completed.get())return;
-                        // A multi-region vision sweep has bounded provider calls; restart
-                        // the idle watchdog only on actual progress, with a hard total cap.
-                        // Progress does not extend the hard deadline. It only
-                        // moves the nonterminal 'still waiting' notification.
-                        timeoutHandler.removeCallbacks(idleNotice);
-                        timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
-                        if(text!=null&&!text.trim().isEmpty())pending.setText(text.trim());
-                        scrollBottom(messagesScroll);
-                    });
+                    activity.runOnUiThread(()->applyStage(text,false,0,0));
+                }
+                @Override public void progressMeasured(String task,int done,int total){
+                    activity.runOnUiThread(()->applyStage(task,total>0,done,total));
+                }
+                @Override public void progressWaiting(String task){
+                    activity.runOnUiThread(()->applyStage(task,false,0,0));
                 }
             };
             try{host.onPrompt(prompt,previousTurns.toString(),requestReply);}

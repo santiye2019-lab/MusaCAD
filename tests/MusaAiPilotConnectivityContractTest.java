@@ -41,7 +41,7 @@ public final class MusaAiPilotConnectivityContractTest {
 
         int session=main.indexOf("MusaAiSessionService.Result preflight=");
         int probe=main.indexOf("MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseNow();");
-        int index=main.indexOf("MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);");
+        int index=main.indexOf("MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(");
         check(session>=0&&probe>session&&index>probe,
             "Probe must follow authorization, precede costly indexing");
         has(main,"AI görsel bölgeleri: 0/9 — hiçbir görüntü AI tarafından incelenmedi.");

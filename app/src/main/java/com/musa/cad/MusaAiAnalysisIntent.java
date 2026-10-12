@@ -82,13 +82,15 @@ public final class MusaAiAnalysisIntent {
         boolean operation=contains(q,"analiz","incele","denetle","kontrol et","proje kontrolu",
             "proje incele","teknik rapor hazirla","gozden gecir","bir bak",
             "bakabilir misin","bakar misin","degerlendir","tarama yap","taramak",
-            "bastan sona bak","eksikleri bul","hatalari bul","sorunlari bul",
+            "bastan sona bak","bak","yorumla","raporla","tara","inceleyebilir misin",
+            "eksikleri bul","hatalari bul","sorunlari bul",
             "uygun mu","uyumlu mu","sorun var mi","eksik var mi","hata var mi","ne dersin",
             "neler yanlis","yanlislar","teknik sorun","tum paftalari tara","butun paftalari tara");
         boolean topic=contains(q,"proje","cizim","pafta","tesisat","mekanik","sihhi",
             "pis su","atik su","yangin","havalandirma","klima","isitma","statik",
             "mimari","elektrik","peyzaj","altyapi","asansor","kanal","boru",
-            "hidrofor","pompa","sprinkler","hepsini","kesit","vaziyet",
+            "hidrofor","pompa","sprinkler","hepsini","tumunu","her disiplin",
+            "kuvvetli akim","zayif akim","otomasyon","bms","yangin algilama","kesit","vaziyet",
             "kot","kat plani","cati plani","bodrum","zemin kat","gorunus",
             "katlar","kolon","dosya","planlar","burada","burayi","bunda","bunlari");
         return operation&&topic;
@@ -135,8 +137,15 @@ public final class MusaAiAnalysisIntent {
 
     public static String scope(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
+        // Electrical subdisciplines are distinct from fire suppression.
+        if(contains(q,"zayif akim","yangin algilama","kamera sistemi",
+                    "cctv","data kablolama","kartli gecis"))return "lowcurrent";
+        if(contains(q,"kuvvetli akim","kompanzasyon","guc dagitim",
+                    "enerji dagitim"))return "highcurrent";
+        if(contains(q,"bina otomasyonu","otomasyon","bms","ddc","scada"))return "automation";
         if(contains(q,"pis su","atik su","kanalizasyon","wastewater","sewer"))return "wastewater";
-        if(contains(q,"sihhi tesisat","temiz su","sicak su","soguk su","kullanma suyu"))return "sanitary";
+        if(contains(q,"temiz su","sicak su","soguk su","kullanma suyu"))return "cleanwater";
+        if(contains(q,"sihhi tesisat"))return "sanitary";
         if(contains(q,"yangin","sprinkler","hidrant","fire"))return "fire";
         if(contains(q,"havalandirma","hava kanali","ventilasyon","spiro","egzoz"))return "ventilation";
         if(contains(q,"kalorifer","isitma","radyator","yerden isitma"))return "heating";
@@ -155,6 +164,10 @@ public final class MusaAiAnalysisIntent {
     public static String label(String scope){
         if(scope==null)return "Tüm disiplinler";
         switch(scope){
+            case "cleanwater":return "Temiz su";
+            case "automation":return "Otomasyon tesisatları";
+            case "lowcurrent":return "Elektrik / Zayıf akım";
+            case "highcurrent":return "Elektrik / Kuvvetli akım";
             case "wastewater":return "Pis su / atık su";
             case "sanitary":return "Sıhhi tesisat";
             case "fire":return "Yangın tesisatı";
