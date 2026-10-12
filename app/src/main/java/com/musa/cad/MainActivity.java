@@ -43,6 +43,12 @@ public class MainActivity extends AppCompatActivity {
         t.setPriority(Thread.NORM_PRIORITY-1);
         return t;
     });
+    // General voice/text questions cannot queue behind 9-region DWG/Qwen scans.
+    private final ExecutorService chatExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-quick-text-chat");
+        t.setPriority(Thread.NORM_PRIORITY);
+        return t;
+    });
     // Local CAD review must not wait behind Cloud AI network requests.
     private final ExecutorService localAiExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-local-review");
@@ -927,6 +933,12 @@ public class MainActivity extends AppCompatActivity {
             handleMusaAiCloudPrompt(prompt.trim(),reply,recentContext);
             return;
         }
+        // Ordinary definition/explanation questions, including recognized voice,
+        // must not trigger expensive CAD indexing or wait behind Qwen image jobs.
+        if(MusaAiConversationalIntent.isInformationalQuestion(raw)){
+            handleCloudChatWithoutDrawing(raw,recentContext,reply);
+            return;
+        }
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
             reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu, hesap raporu/model çıktısı ↔ DWG karşılaştırması ve Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
@@ -1710,23 +1722,24 @@ public class MainActivity extends AppCompatActivity {
     private void handleCloudChatWithoutDrawing(String raw,String recentContext,
                                                MusaAiPanel.Reply reply){
         if(MusaAiAnalysisIntent.isLocalOnly(raw)){
-            reply.send("Çevrim dışı istekte proje çizimi yok; yerel mühendislik delili sunulamıyor.");
+            reply.send("Bu genel soru çevrim içi sohbet yanıtı gerektiriyor. Çevrim dışı CAD ölçüleriyle doğrulanmış bir tanım verilemez.");
             return;
         }
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
         if(!prefs.getBoolean(K_CLOUD_CHAT_CONSENT,false)){
             new AlertDialog.Builder(this)
-                .setTitle("Gandalf • Çizimsiz sohbet")
-                .setMessage("Henüz proje açık değil. Sorunuz ve bu sohbet penceresindeki "+
-                    "en fazla dört kısa önceki soru-yanıt MusaCAD bulut AI ağına aktarılabilir. "+
-                    "DWG veya teknik çizim gönderilmez. Bu izin, çizim CAD-JSON/görsel veri "+
-                    "gönderme izninden bağımsızdır. Devam edilsin mi?")
+                .setTitle("Gandalf • Genel sohbet izni")
+                .setMessage("Sorunuz ve bu sohbet penceresindeki en fazla dört kısa "+
+                    "önceki soru-yanıt MusaCAD AI sunucusuna gönderilebilir. "+
+                    "Açık bir proje olsa bile DWG/DXF, çizim görselleri, CAD-JSON "+
+                    "ve poz kitabı bu sohbet isteğine dahil edilmez. "+
+                    "Bu izin proje görsel aktarımından ayrıdır. Devam edilsin mi?")
                 .setPositiveButton("SOHBETE DEVAM ET",(d,w)->{
                     prefs.edit().putBoolean(K_CLOUD_CHAT_CONSENT,true).apply();
                     runCloudChatWithoutDrawing(raw,recentContext,reply);
                 })
                 .setNegativeButton("İPTAL",(d,w)->reply.send(
-                    "Çevrim içi sohbet iptal edildi; proje açınca yerel araçları kullanabilirsiniz."))
+                    "Çevrim içi sohbet iptal edildi. CAD çizimi değişmedi."))
                 .setOnCancelListener(d->reply.send("Çevrim içi sohbet iptal edildi."))
                 .show();
             return;
@@ -1736,18 +1749,22 @@ public class MainActivity extends AppCompatActivity {
 
     private void runCloudChatWithoutDrawing(String raw,String recentContext,
                                            MusaAiPanel.Reply reply){
-        reply.progress("Gandalf • Çevrim içi sohbet yanıtı hazırlanıyor…");
+        reply.progressWaiting("Genel bilgi sorusu yanıtlanıyor • DWG görsel analizi çalıştırılmıyor");
+        final boolean drawingOpen=currentProject!=null;
         try{
-            aiExecutor.submit(()->{
+            chatExecutor.submit(()->{
                 MusaAiDrawingIndex empty=new MusaAiDrawingIndex(
                     "",0,0,Collections.emptyList(),Collections.emptyList(),
                     Collections.emptyList(),"");
                 MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
-                    getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
+                    getApplicationContext(),empty,"Genel bilgi sorusu (CAD verisi yok)",raw,recentContext,"");
                 if(cloud.ok()){
                     reply.cloudStatus(true);
-                    pendingAiActions=Collections.emptyList();
-                    reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
+                    // A chat answer must not clear a separate in-progress DWG
+                    // review's proposed CAD actions.
+                    reply.send(cloud.text+"\n\n"+(drawingOpen
+                        ?"Bu bir genel bilgi yanıtıdır; açık DWG teknik olarak incelenmedi."
+                        :"Çizim açık olmadığı için CAD analizi yapılmadı."));
                 }else{
                     reply.cloudFailure(cloud.message);
                     reply.send("Bulut sohbeti kullanılamıyor: "+
@@ -4980,7 +4997,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();localAiExecutor.shutdownNow();yfkCatalogExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();chatExecutor.shutdownNow();localAiExecutor.shutdownNow();yfkCatalogExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
