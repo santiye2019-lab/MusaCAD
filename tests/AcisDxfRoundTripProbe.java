@@ -13,7 +13,7 @@ import java.util.List;
  */
 public final class AcisDxfRoundTripProbe {
     private static final class Stats {
-        int bodies,meshBodies,completeBodies,partialBodies,faces,tessellatedFaces,unsupportedFaces,triangles,edges;
+        int bodies,meshBodies,completeBodies,partialBodies,faces,tessellatedFaces,unsupportedFaces,triangles,edges,danglingReferences;
         void finish(String type,List<String> chunks,boolean publicFixtureDebug)throws Exception{
             if(!"3DSOLID".equals(type)&&!"REGION".equals(type)&&!"BODY".equals(type))return;
             bodies++;
@@ -76,6 +76,7 @@ public final class AcisDxfRoundTripProbe {
             faces+=mesh.faces;
             tessellatedFaces+=mesh.tessellatedFaces;
             unsupportedFaces+=mesh.unsupportedFaces;
+            danglingReferences+=mesh.danglingReferences;
             triangles+=mesh.triangles.length/3;
             edges+=mesh.edges.length/2;
         }
@@ -191,16 +192,16 @@ public final class AcisDxfRoundTripProbe {
             }
             counts.finish(type,chunks,publicFixtureDebug);
         }
-        System.out.printf("ACIS_REAL_DXF_MESH bodies=%d mesh=%d complete=%d partial=%d faces=%d tessellated=%d unsupported=%d triangles=%d edges=%d%n",
+        System.out.printf("ACIS_REAL_DXF_MESH bodies=%d mesh=%d complete=%d partial=%d faces=%d tessellated=%d unsupported=%d triangles=%d edges=%d dangling=%d%n",
                 counts.bodies,counts.meshBodies,counts.completeBodies,counts.partialBodies,
-                counts.faces,counts.tessellatedFaces,counts.unsupportedFaces,counts.triangles,counts.edges);
+                counts.faces,counts.tessellatedFaces,counts.unsupportedFaces,counts.triangles,counts.edges,counts.danglingReferences);
         if(counts.bodies==0)throw new AssertionError("Real test did not contain ACIS entities");
         if(publicFixtureDebug){
             // This is ONLY used with the pinned public LibreDWG example_2013.dwg.
             // We require one independently observed planar REGION to remain
             // triangulated, but do not claim that the other two B-Reps work.
             if(counts.bodies!=3||counts.faces!=10||counts.completeBodies<1||counts.triangles<2||
-               counts.tessellatedFaces+counts.unsupportedFaces!=counts.faces)
+               counts.tessellatedFaces+counts.unsupportedFaces!=counts.faces||counts.danglingReferences==0)
                 throw new AssertionError("R2013 ACIS planar face regression: expected 3 source bodies and at least one closed, triangulated face");
             System.out.println("PASS: pinned public R2013 has a real triangulated ACIS face; unresolved bodies remain explicitly incomplete");
         }
