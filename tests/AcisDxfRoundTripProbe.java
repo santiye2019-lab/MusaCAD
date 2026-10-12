@@ -153,6 +153,15 @@ public final class AcisDxfRoundTripProbe {
                 counts.bodies,counts.meshBodies,counts.completeBodies,counts.partialBodies,
                 counts.faces,counts.triangles,counts.edges);
         if(counts.bodies==0)throw new AssertionError("Real test did not contain ACIS entities");
+        if(publicFixtureDebug){
+            // This is ONLY used with the pinned public LibreDWG example_2013.dwg.
+            // We require one independently observed planar REGION to remain
+            // triangulated, but do not claim that the other two B-Reps work.
+            if(counts.bodies!=3||counts.completeBodies<1||counts.triangles<2)
+                throw new AssertionError("R2013 ACIS planar face regression: expected 3 source bodies and at least one closed, triangulated face");
+            System.out.println("PASS: pinned public R2013 has a real triangulated ACIS face; unresolved bodies remain explicitly incomplete");
+        }
+
         // This probe is diagnostic until a confirmed compatible source drawing
         // and closed B-Rep expected-triangle contract are established.
     }
