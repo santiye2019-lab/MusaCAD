@@ -728,7 +728,7 @@ jobs:
           PY
           mkdir -p app/src/main/assets
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
-      # Development, push and PR checks never create an installable APK.
+      # Development pushes and pull requests must never create an installable APK.
       # Final release requires an explicit manual approval input.
       - name: Enforce explicit final-release approval before any APK build
         run: |
@@ -752,7 +752,7 @@ jobs:
           path: /tmp/MusaCAD-latest.apk
           if-no-files-found: error
       - name: Build in-place MusaCAD development update APK
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true) || (github.event_name == 'pull_request' && github.head_ref == 'feature/gandalf-autoupload-retention-20261011') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
         env:
           MUSACAD_AI_API_URL: ${{ vars.MUSACAD_AI_API_URL || secrets.MUSACAD_AI_API_URL }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL }}
@@ -775,7 +775,7 @@ jobs:
           cp "$APK" /tmp/MusaCAD-update.apk
           sha256sum /tmp/MusaCAD-update.apk > /tmp/MusaCAD-update.sha256
       - name: Upload in-place MusaCAD development update APK
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true) || (github.event_name == 'pull_request' && github.head_ref == 'feature/gandalf-autoupload-retention-20261011') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}
         uses: actions/upload-artifact@v4
         with:
           name: MusaCAD-development-update-apk
