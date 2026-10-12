@@ -144,8 +144,8 @@ public final class Dxf3dMeshTest {
             for(int line:mesh.sourceLines)if(line!=-1)throw new AssertionError("tessellated ACIS vertices are read-only");
             if(mesh.acisDanglingHistoryReferences!=0||mesh.acisDanglingNonHistoryReferences!=0)
                 throw new AssertionError("Valid ACIS triangle contains no unresolved SAT references");
-            String historyCase=dxf.toString().replace("0\\nENDSEC\\n",
-                "3\\n-90 persubent-acadsolidhistory-attrib $999 $1000 #\\n0\\nENDSEC\\n");
+            String historyCase=dxf.toString().replace("0\nENDSEC\n",
+                "3\n-90 persubent-acadsolidhistory-attrib $999 $1000 #\n0\nENDSEC\n");
             Files.writeString(file.toPath(),historyCase,StandardCharsets.UTF_8);
             Dxf3dMesh withHistory=Dxf3dMesh.read(file);
             if(withHistory.solidProxy||withHistory.triangles.length!=3||
