@@ -23,11 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,SAVE_DWG=22,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
+    private static final int OPEN=20,SAVE_DXF=21,SAVE_DWG=22,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39,PICK_XREF=54,SAVE_BOUND_XREF=55;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_SAVE_DWG=12;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_SAVE_DWG=12,MENU_BIND_XREF=13;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -61,6 +61,9 @@ public class MainActivity extends AppCompatActivity {
     private final android.os.Handler recoveryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long RECOVERY_INTERVAL_MS=15_000L;
     private LoadTask activeLoad;
+    private String pendingXrefName;
+    private File pendingXrefParentDxf,pendingBoundXref;
+    private ProjectSession pendingXrefProject;
     private boolean recoveryPromptShown;
     private final Runnable recoveryTicker=new Runnable(){
         @Override public void run(){
@@ -3957,8 +3960,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_SAVE_DWG,6,"DWG kaydet (deneysel / yalnız eski biçim)").setEnabled(canEdit()&&NativeDwgWrite.available());menu.add(0,MENU_PRINT,7,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_SAVE_DWG:requestEditedDwgSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_BIND_XREF,6,"XREF bağla (temel 2B)").setEnabled(activeDxf!=null&&!activeDxf.externalReferences.isEmpty());menu.add(0,MENU_SAVE_DWG,7,"DWG kaydet (deneysel / yalnız eski biçim)").setEnabled(canEdit()&&NativeDwgWrite.available());menu.add(0,MENU_PRINT,7,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_SAVE_DWG:requestEditedDwgSave();return true;case MENU_BIND_XREF:requestXrefBind();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4157,6 +4160,9 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if((r==PICK_XREF||r==SAVE_BOUND_XREF)&&c!=RESULT_OK){
+            clearXrefPending();return;
+        }
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
             pendingYfk2025Reply=null;
@@ -4190,6 +4196,8 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
+        if(r==PICK_XREF){handleXrefPicked(data.getData());return;}
+        if(r==SAVE_BOUND_XREF){publishBoundXref(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());else if(r==SAVE_DWG)saveEditedDwg(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
@@ -4986,6 +4994,115 @@ public class MainActivity extends AppCompatActivity {
                 if(stagedDxf!=null)stagedDxf.delete();
                 if(stagedDwg!=null)stagedDwg.delete();
             }
+        });
+    }
+
+    private void clearXrefPending(){
+        pendingXrefName=null;pendingXrefParentDxf=null;pendingXrefProject=null;
+        if(pendingBoundXref!=null)pendingBoundXref.delete();
+        pendingBoundXref=null;
+    }
+    private void requestXrefBind(){
+        if(activeLoad!=null||currentProject==null||activeDxf==null||
+            activeDxf.externalReferences.isEmpty()||editingBaseDxf==null)return;
+        java.util.ArrayList<String> names=new java.util.ArrayList<>();
+        for(DxfBlocks.ExternalReference ref:activeDxf.externalReferences){
+            if(names.size()>=100)break;
+            names.add(ref.name);
+        }
+        new AlertDialog.Builder(this).setTitle("XREF • harici çizimi seç")
+            .setMessage("Bu işlem yalnızca harici DXF'deki temel Layer-0 geometrisini bağlar. "+
+                "Karmaşık blok, dinamik özellik ve katmanlar kayıpsız taşınamıyorsa kayıt durur.")
+            .setItems(names.toArray(new String[0]),(dialog,index)->{
+                pendingXrefName=names.get(index);
+                pendingXrefProject=currentProject;
+                pendingXrefParentDxf=editingBaseDxf;
+                Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");
+                startActivityForResult(intent,PICK_XREF);
+            }).setNegativeButton("İPTAL",null).show();
+    }
+    private void handleXrefPicked(Uri selected){
+        if(selected==null||pendingXrefName==null||pendingXrefParentDxf==null||
+            currentProject!=pendingXrefProject){clearXrefPending();return;}
+        final String name=pendingXrefName;
+        final File parent=pendingXrefParentDxf;
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("XREF güvenli bağlama")
+            .setMessage("Harici dosya doğrulanıyor ve yeni DXF kopyası hazırlanıyor")
+            .setNegativeButton("İPTAL",(dialog,which)->cancelLoad()).create();
+        task.dialog.show();
+        task.future=loader.submit(()->{
+            File input=null,childDxf=null,output=null;
+            try{
+                input=File.createTempFile("MusaCAD_xref_child_",".cad",getCacheDir());
+                try(InputStream in=getContentResolver().openInputStream(selected);
+                    OutputStream out=new FileOutputStream(input)){
+                    FileTransfer.copy(in,out,128L*1024L*1024L,null);
+                }
+                FileTransfer.checkCancelled();
+                childDxf=input;
+                try(java.io.InputStream header=new java.io.FileInputStream(input)){
+                    byte[] first=new byte[6];int size=header.read(first);
+                    if(size==6&&first[0]=='A'&&first[1]=='C'&&first[2]=='1'){
+                        childDxf=File.createTempFile("MusaCAD_xref_child_",".dxf",getCacheDir());
+                        try(NativeCadEngine engine=NativeCadEngine.open(input)){
+                            engine.exportDxf(childDxf);
+                        }
+                    }
+                }
+                output=File.createTempFile("MusaCAD_xref_bound_",".dxf",getCacheDir());
+                CadXrefBinder.bind(parent,childDxf,name,output);
+                CadDxfSaveStage.validate(output);
+                File ready=output;output=null;
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||currentProject!=pendingXrefProject||
+                        isFinishing()||isDestroyed()){ready.delete();return;}
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    pendingBoundXref=ready;
+                    Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    save.addCategory(Intent.CATEGORY_OPENABLE);
+                    save.setType("application/dxf");
+                    save.putExtra(Intent.EXTRA_TITLE,"MusaCAD-XREF-baglanmis.dxf");
+                    startActivityForResult(save,SAVE_BOUND_XREF);
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    clearXrefPending();error(e);
+                });
+            }finally{
+                if(childDxf!=null&&childDxf!=input)childDxf.delete();
+                if(input!=null)input.delete();
+                if(output!=null)output.delete();
+            }
+        });
+    }
+    private void publishBoundXref(Uri destination){
+        final File ready=pendingBoundXref;
+        if(destination==null||ready==null||!ready.isFile()){
+            clearXrefPending();return;
+        }
+        // Detach state; user may begin another operation while copy completes.
+        pendingBoundXref=null;pendingXrefName=null;pendingXrefParentDxf=null;
+        pendingXrefProject=null;
+        loader.submit(()->{
+            String message;
+            try(InputStream in=new FileInputStream(ready);
+                OutputStream out=getContentResolver().openOutputStream(destination,"wt")){
+                if(out==null)throw new IOException("DXF bağlama hedefi açılamadı");
+                FileTransfer.copy(in,out,128L*1024L*1024L,null);
+                out.flush();
+                message="XREF'li yeni DXF kopyası kaydedildi • kaynaklar korunuyor";
+            }catch(Exception e){message="XREF kaydı başarısız: "+e.getMessage();}
+            finally{ready.delete();}
+            final String report=message;
+            runOnUiThread(()->{
+                if(!isFinishing()&&!isDestroyed())
+                    Toast.makeText(this,report,Toast.LENGTH_LONG).show();
+            });
         });
     }
 
