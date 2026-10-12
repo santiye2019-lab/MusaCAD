@@ -35,7 +35,8 @@ public final class MusaAiEngineeringSynthesisTest {
             "Qwen genel görsel grup 1/3",
             "• Görsel gözlem: hidrofor bağlantı etiketi [kaynak 184] üzerinde Q/H okunamıyor.\n"+
             "• Görsel gözlem: hidrofor bağlantı etiketi [kaynak 184] üzerinde Q/H okunamıyor.\n"+
-            "• Bir armatür simgesi olabilir, ancak boru çapı okunamadı [kaynak 99999].",
+            "• Bir armatür simgesi olabilir, ancak boru çapı okunamadı [kaynak 99999].\n"+
+            "• Durum: Doğrulanan (yalnız model yorumu).",
             1,4,false));
         return d;
     }
@@ -49,6 +50,9 @@ public final class MusaAiEngineeringSynthesisTest {
         contains(out,"Qwen genel görsel grup 1/3");
         contains(out,"DWG nesne kimliği mevcut");
         contains(out,"Kaynak 99999: DWG örnekleminde bulunamadı");
+        contains(out,"Qwen atfı 2; CAD örnekleminde bulunan 1; eşleşmeyen 1");
+        contains(out,"Yalnız Qwen görsel nitelemesi; CAD ile doğrulanmadı");
+        contains(out,"7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ\nAI yanıtı");
         contains(out,"YEREL DWG ÇAPRAZ KONTROLÜ • QWEN'DEN SONRA");
         contains(out,"Hidrofor [kaynak 184]");
         contains(out,"Ölçü birimi: belirsiz");
@@ -77,6 +81,9 @@ public final class MusaAiEngineeringSynthesisTest {
         String fullReport=MusaAiEngineeringSynthesis.compose(full);
         contains(fullReport,"9/9");
         contains(fullReport,"mühendis onayı değildir");
+        MusaAiEngineeringSynthesis.Input three=input();
+        three.plannedTiles=3;three.reviewedTiles=3;three.visualIssue="";
+        contains(MusaAiEngineeringSynthesis.compose(three),"Planlanan 3 görsel bölgeye AI yanıtı alındı");
         contains(fullReport,"6. DOĞRULANABİLİR METRAJ");
         contains(fullReport,"Çizim birimi doğrulanamadı");
         contains(fullReport,"2025 kitabından eşleşen");
@@ -85,6 +92,7 @@ public final class MusaAiEngineeringSynthesisTest {
         MusaAiEngineeringSynthesis.Input noVisual=input();
         noVisual.reviewedTiles=0;noVisual.visualGroups.clear();
         noVisual.visualIssue="Worker DNS çözümlenemedi";
+        noVisual.auditScopeList="İSTENEN DİSİPLİN VE ALT SİSTEM DENETİMLERİ\n• Isıtma\n• Klima";
         noVisual.includeTakeoff=true;
         noVisual.quantityEvidence="Sahte imalat metrajı 103 m";
         String missing=MusaAiEngineeringSynthesis.compose(noVisual);
@@ -94,6 +102,18 @@ public final class MusaAiEngineeringSynthesisTest {
         notContains(missing,"Sahte imalat");
         notContains(missing,"Hidrofor [kaynak 184]");
         notContains(missing,"YEREL DWG ÇAPRAZ KONTROLÜ");
+        notContains(missing,"İSTENEN DİSİPLİN VE ALT SİSTEM DENETİMLERİ");
+        notContains(missing,"• Isıtma");
+        String detailed=MusaAiEngineeringSynthesis.composeDetailed(d);
+        contains(detailed,"\n\n8. TAM BULGU EKİ");
+        notContains(detailed,"\\n\\n8. TAM BULGU EKİ");
+        contains(detailed,"9. TAM YEREL KANIT EKİ");
+        contains(detailed,"10. GÖRÜNÜM / PAFTA ENVANTERİ");
+        contains(detailed,"11. KAPSAM VE DOĞRULAMA AÇIKLARI");
+        yes(count(detailed,"Görsel gözlem: hidrofor bağlantı etiketi")>=2,
+            "Detailed annex must retain original repeated visual records");
+        String noVisualDetailed=MusaAiEngineeringSynthesis.composeDetailed(noVisual);
+        notContains(noVisualDetailed,"8. TAM BULGU EKİ");
         System.out.println("MusaAiEngineeringSynthesisTest OK");
     }
 }

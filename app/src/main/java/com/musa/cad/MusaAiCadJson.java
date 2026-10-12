@@ -21,6 +21,18 @@ public final class MusaAiCadJson {
 
     public static String build(MusaAiDrawingIndex index,String fileName,int maxItems){
         if(index==null)return "{}";
+        return buildPageInternal(index,fileName,0,maxItems,false);
+    }
+
+    /** Opt-in bounded paging. Existing build() output and Qwen request sizes remain unchanged. */
+    public static String buildPage(MusaAiDrawingIndex index,String fileName,int offset,int maxItems){
+        if(index==null)return "{}";
+        return buildPageInternal(index,fileName,offset,maxItems,true);
+    }
+
+    private static String buildPageInternal(MusaAiDrawingIndex index,String fileName,
+                                            int offset,int maxItems,boolean paged){
+        int start=Math.max(0,offset);
         int limit=Math.max(1,Math.min(5000,maxItems));
         StringBuilder out=new StringBuilder(Math.min(1_000_000,4096+limit*180));
         out.append('{');
@@ -49,16 +61,21 @@ public final class MusaAiCadJson {
 
         out.append("\"items\":[");
         int written=0;
-        for(MusaAiDrawingIndex.Item item:index.items()){
+        int end=(int)Math.min((long)index.items().size(),(long)start+limit);
+        for(int pos=start;pos<end;pos++){
+            MusaAiDrawingIndex.Item item=index.items().get(pos);
             if(item==null)continue;
-            if(written>=limit)break;
             if(written>0)out.append(',');
             appendItem(out,item);
             written++;
         }
         out.append("],");
         numberField(out,"itemsIncluded",written);out.append(',');
-        out.append("\"truncated\":").append(index.items().size()>written?"true":"false").append(',');
+        if(paged){
+            numberField(out,"pageOffset",start);out.append(',');
+            numberField(out,"nextOffset",end);out.append(',');
+        }
+        out.append("\"truncated\":").append(index.items().size()>end?"true":"false").append(',');
 
         out.append("\"cloudPolicy\":{");
         out.append("\"rawDrawingIncluded\":false,");

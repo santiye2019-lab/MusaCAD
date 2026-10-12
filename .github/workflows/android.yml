@@ -124,8 +124,14 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiCompactVisionRetryContractTest
       - name: Test Qwen-first local engineering evidence synthesis and optional metraj
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiEngineeringSynthesis.java tests/MusaAiEngineeringSynthesisTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiVisualDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplinePlan.java app/src/main/java/com/musa/cad/MusaAiEngineeringSynthesis.java tests/MusaAiEngineeringSynthesisTest.java tests/MusaAiVisualDisciplineTest.java tests/MusaAiDisciplinePlanTest.java
           java -cp /tmp/musacad-tests MusaAiEngineeringSynthesisTest
+          java -cp /tmp/musacad-tests MusaAiVisualDisciplineTest
+          java -cp /tmp/musacad-tests MusaAiDisciplinePlanTest
+      - name: Test discipline quantity evidence and uploaded YFK source candidates
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiVisualDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplinePlan.java app/src/main/java/com/musa/cad/MusaAiDisciplineEstimate.java tests/MusaAiDisciplineEstimateTest.java
+          java -cp /tmp/musacad-tests MusaAiDisciplineEstimateTest
       - name: Test Turkish no-keşif intent does not bypass visual AI
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiNegatedTakeoffRouteTest.java
@@ -206,6 +212,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCadJson.java tests/MusaAiCadJsonTest.java
           java -cp /tmp/musacad-tests MusaAiCadJsonTest
+      - name: Test paged CAD evidence without changing legacy AI JSON
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiCadJson.java tests/MusaAiCadJsonPagingTest.java
+          java -cp /tmp/musacad-tests MusaAiCadJsonPagingTest
       - name: Test MusaCAD bounded multi-drawing CAD package JSON
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplineAnalyzer.java app/src/main/java/com/musa/cad/MusaAiStructuralCalc.java app/src/main/java/com/musa/cad/MusaAiStructuralAdvanced.java app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java app/src/main/java/com/musa/cad/MusaAiBoq.java app/src/main/java/com/musa/cad/MusaAiCadJson.java app/src/main/java/com/musa/cad/MusaAiProjectPackage.java app/src/main/java/com/musa/cad/MusaAiCadPackageJson.java tests/MusaAiCadPackageJsonTest.java
@@ -689,6 +699,10 @@ jobs:
             app/src/main/java/com/musa/cad/DxfBlocks.java \
             tests/DxfStreamingLargeTest.java
           java -Xmx64m -cp /tmp/musacad-tests DxfStreamingLargeTest
+      - name: Guard existing Gandalf connectivity and full-vector editor regression
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaCadWorkingApkRegressionTest.java
+          java -cp /tmp/musacad-tests MusaCadWorkingApkRegressionTest
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
@@ -754,3 +768,114 @@ jobs:
           path: |
             /tmp/musa-native/musacad_dwg_convert
             /tmp/MusaCAD-source.tar.gz
+
+  build-tested-apk:
+    name: Build isolated test APK after quality gate
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'feature/gandalf-cad-paged-evidence-20261012' || github.head_ref == 'feature/restore-drive-evidence-focused-reports-20261012') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # The preview APK must keep the same gateway addresses as the previously
+      # functioning Gandalf build. Never publish a deceptive "AI ayarsız" APK.
+      # URLs are public routing information; provider credentials stay server-side.
+      - name: Verify Gandalf connection configuration before assembling test APK
+        env:
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL || 'https://musacad-ai.musacad2019.workers.dev/v1/analyze' }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/ai/session' }}
+          MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL || vars.MUSACAD_TRIAL_API_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/trial/start' }}
+          MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          trusted_roots={
+              'MUSACAD_AI_API_URL':'https://musacad-ai.musacad2019.workers.dev',
+              'MUSACAD_AI_SESSION_URL':'https://musacad-trial-api.musacad2019.workers.dev'
+          }
+          for name, suffix in [
+              ('MUSACAD_AI_API_URL', '/v1/analyze'),
+              ('MUSACAD_AI_SESSION_URL', '/v1/ai/session')]:
+              val=os.environ.get(name,'').strip()
+              # Historical GitHub variable sometimes held only the worker
+              # origin and posted to '/', which produces an HTTP 404.
+              # Complete a missing path ONLY for the already-known Worker host.
+              if val.rstrip('/')==trusted_roots[name]:
+                  val=trusted_roots[name]+suffix
+              parsed=urlsplit(val)
+              if parsed.scheme!='https' or not parsed.hostname or not parsed.path.endswith(suffix) or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                  raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
+              with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as output:
+                  output.write(name+'='+val+'\n')
+          trial=urlsplit(os.environ.get('MUSACAD_TRIAL_API_URL',''))
+          key=os.environ.get('MUSACAD_TRIAL_PUBLIC_KEY_PEM','')
+          if trial.scheme!='https' or trial.path!='/v1/trial/start' or not trial.hostname:
+              raise SystemExit('::error::Trial/licensing server URL missing from replacement APK.')
+          if '-----BEGIN PUBLIC KEY-----' not in key or '-----END PUBLIC KEY-----' not in key:
+              raise SystemExit('::error::Trial verification public key missing. Replacing app could lose AI entitlement.')
+          print('Existing Gandalf gateway routes and license public-key metadata are configured.')
+          PY
+          # Same health path the actual Android indicator checks; checking
+          # it cannot change Cloudflare deployment or private license state.
+          health_url="$(python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit,urlunsplit
+          src=urlsplit(os.environ['MUSACAD_AI_API_URL'])
+          print(urlunsplit((src.scheme,src.netloc,'/health','','')))
+          PY
+          )"
+          status="$(curl --silent --max-time 20 --output /dev/null --write-out '%{http_code}' "$health_url" || true)"
+          if [ "$status" != "200" ]; then
+            echo "::error::Existing Gandalf gateway /health returned HTTP $status. Test APK withheld."
+            exit 1
+          fi
+          echo "Existing Gandalf AI gateway health returned HTTP 200."
+      - name: Build developer test APK with existing Gandalf configuration (no production deployment)
+        env:
+          MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL || vars.MUSACAD_TRIAL_API_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/trial/start' }}
+          MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectDebug
+          test -s app/build/outputs/apk/direct/debug/app-direct-debug.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          builds=list(Path('app/build/generated/source/buildConfig').rglob('BuildConfig.java'))
+          expected=[x for x in builds if '/direct/debug/' in str(x).replace('\\','/')]
+          if len(expected)!=1:
+              raise SystemExit('::error::Cannot verify the assembled directDebug BuildConfig; APK withheld.')
+          source=expected[0].read_text()
+          for field in ('AI_API_URL','AI_SESSION_URL','TRIAL_API_URL'):
+              if not re.search(r'\b'+field+r'\s*=\s*"https://[^"]+"',source):
+                  raise SystemExit('::error::Assembled APK does not contain a configured '+field+'; APK withheld.')
+          if '-----BEGIN PUBLIC KEY-----' not in source:
+              raise SystemExit('::error::Assembled APK lacks trial entitlement verification key; APK withheld.')
+          print('Verified Gandalf and trial licensing configuration in directDebug BuildConfig (values not logged).')
+          PY
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Gandalf-TEST-APK
+          path: app/build/outputs/apk/direct/debug/app-direct-debug.apk
+          if-no-files-found: error
+          retention-days: 7

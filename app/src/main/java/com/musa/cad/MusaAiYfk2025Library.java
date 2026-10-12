@@ -333,6 +333,68 @@ public final class MusaAiYfk2025Library {
             .append("2025 tarihli fiyat güncel proje toplamına aktarılmaz.");
         return out.toString();
     }
+    /**
+     * Resolve official-book CANDIDATES by engineering subsystem.
+     * Matching a word/page never validates an installed rate or quantity.
+     * The user's complete PDF remains in app-private storage.
+     */
+    public static String suggestForDisciplineTakeoff(Context context,
+                                          MusaAiDisciplineEstimate.Result estimated){
+        if(estimated==null)return "Ön keşif verisi bulunamadı.";
+        if(!status(context).installed)return "2025 birim fiyat kitabı yüklenmemiş.";
+        StringBuilder out=new StringBuilder(
+            "2025 YFK • DİSİPLİN BAZLI KAYNAKLI POZ ADAYLARI (OCAK 2025)");
+        int rows=0;
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(target(context,DB).getAbsolutePath(),
+                       null,SQLiteDatabase.OPEN_READONLY)){
+            for(MusaAiDisciplineEstimate.Row row:estimated.rows){
+                if(rows++>=28){
+                    out.append("\nDiğer ön metraj satırları katalog tarama sınırında kaldı.");
+                    break;
+                }
+                out.append("\n\n").append(MusaAiDisciplinePlan.sectionLabel(row.section))
+                    .append(" • ").append(row.description).append(" (")
+                    .append(row.unit).append(")");
+                String token=MusaAiYfk2025Parser.fold(row.searchTerm);
+                if(token.length()<3){
+                    out.append("\nPoz adı için yeterli teknik malzeme verisi yok.");
+                    continue;
+                }
+                String sql="SELECT code,description,unit,price_2025,mounting_2025,page "+
+                    "FROM items WHERE folded LIKE ? ESCAPE '\\\\' ORDER BY code LIMIT 4";
+                int n=0;
+                try(Cursor cur=db.rawQuery(sql,new String[]{"%"+escapeLike(token)+"%"})){
+                    while(cur.moveToNext()){
+                        n++;
+                        String u=cur.getString(2),price=cur.getString(3),
+                            mount=cur.getString(4),desc=cur.getString(1);
+                        out.append("\n  • Poz ADAYI ").append(cur.getString(0))
+                            .append(" • sayfa ").append(cur.getInt(5))
+                            .append(" • birim ").append(u==null||u.isEmpty()?"belirsiz":u)
+                            .append(" • ").append(desc==null?"":desc.substring(0,Math.min(desc.length(),110)));
+                        if(price!=null&&!price.isEmpty())
+                            out.append(" • 2025 referans fiyat ").append(price).append(" TL");
+                        if(mount!=null&&!mount.isEmpty())
+                            out.append(" • 2025 montaj sütunu ").append(mount).append(" TL");
+                        // Only a preliminary unit-format comparison. The official
+                        // unit, technical spec and work description remain unapproved.
+                        if(u==null||u.trim().isEmpty())
+                            out.append(" [resmî birim teyitsiz]");
+                    }
+                }
+                if(n==0)out.append("\n  Kaynak kitabında kelime eşleşmesi bulunamadı.");
+                if(n>1)out.append("\n  Birden fazla poz adayı var; seçim yapılmadı.");
+            }
+        }catch(Exception e){
+            return "2025 poz adayları özel kütüphaneden okunamadı; otomatik fiyat atanmadı.";
+        }
+        if(rows==0)out.append("\nMetraj adayları bulunmadığı için poz aranmadı.");
+        out.append("\n\nNOT: Kelime eşleşmesi kesin poz değildir. Teknik tarif, ölçü birimi, "+
+            "malzeme, montaj bedeli ve 2025/2026 dönem farkı onaylanmadan "+
+            "adet × birim fiyat çarpımı veya keşif genel toplamı hesaplanmaz.");
+        return out.toString();
+    }
+
     private static String materialToken(String desc) {
         for(String token:new String[]{"hidrofor","boyler","klozet","lavabo",
             "pisuvar","batarya","evye","suzgec","pprc","polipropilen",
