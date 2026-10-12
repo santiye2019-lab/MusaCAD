@@ -45,15 +45,18 @@ public final class DxfParser {
         private final Path source=new Path(),mapped=new Path();
         private final RectF extent=new RectF();
         PolylineNetwork(List<DxfPolyline3D.Segment> edges){
-            boolean first=true;
+            float minX=Float.POSITIVE_INFINITY,minY=Float.POSITIVE_INFINITY;
+            float maxX=Float.NEGATIVE_INFINITY,maxY=Float.NEGATIVE_INFINITY;
             for(DxfPolyline3D.Segment edge:edges){
                 float x0=(float)edge.start.x,y0=(float)edge.start.y;
                 float x1=(float)edge.end.x,y1=(float)edge.end.y;
                 source.moveTo(x0,y0);source.lineTo(x1,y1);
-                if(first){extent.set(Math.min(x0,x1),Math.min(y0,y1),
-                    Math.max(x0,x1),Math.max(y0,y1));first=false;}
-                else extent.union(x0,y0,x1,y1);
+                minX=Math.min(minX,Math.min(x0,x1));
+                minY=Math.min(minY,Math.min(y0,y1));
+                maxX=Math.max(maxX,Math.max(x0,x1));
+                maxY=Math.max(maxY,Math.max(y0,y1));
             }
+            if(minX<=maxX&&minY<=maxY)extent.set(minX,minY,maxX,maxY);
         }
         public void bounds(RectF b){add(b,extent.left,extent.top);add(b,extent.right,extent.bottom);}
         public void draw(Canvas c,Paint p,Matrix m){source.transform(m,mapped);c.drawPath(mapped,p);}
