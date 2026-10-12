@@ -51,7 +51,7 @@ public final class MusaAiVisualDiscipline {
     private static String inferName(String name){
         if(name.isEmpty())return "all";
         // Specialized mechanical drawing titles take precedence over generic "tesisat".
-        for(String scope:new String[]{"wastewater","sanitary","fire","ventilation",
+        for(String scope:new String[]{"lowcurrent","highcurrent","automation","cleanwater","wastewater","sanitary","fire","ventilation",
                 "heating","cooling","gas","structural","architectural",
                 "electrical","landscape","infrastructure","elevator"}){
             if(nameMatches(name,scope))return scope;
@@ -61,6 +61,10 @@ public final class MusaAiVisualDiscipline {
 
     private static boolean nameMatches(String s,String scope){
         switch(scope){
+            case "lowcurrent":return has(s,"zayif akim","zayif-akim","data kablolama","yangin algilama");
+            case "highcurrent":return has(s,"kuvvetli akim","guc dagitim","elektrik kuvvet");
+            case "automation":return has(s,"otomasyon","bms","bina yonetim");
+            case "cleanwater":return has(s,"temiz su","kullanma suyu");
             case "wastewater":return has(s,"pis su","atik su","kanalizasyon","wastewater");
             case "sanitary":return has(s,"sihhi tesisat","temiz su","sicak su tesisat");
             case "fire":return has(s,"yangin tesisat","sprinkler","hidrant");
@@ -96,7 +100,7 @@ public final class MusaAiVisualDiscipline {
         switch(scope==null?"all":scope){
             case "structural":return MusaAiDiscipline.STRUCTURAL;
             case "architectural":return MusaAiDiscipline.ARCHITECTURAL;
-            case "electrical":return MusaAiDiscipline.ELECTRICAL;
+            case "electrical":case "lowcurrent":case "highcurrent":case "automation":return MusaAiDiscipline.ELECTRICAL;
             case "landscape":return MusaAiDiscipline.LANDSCAPE;
             case "infrastructure":return MusaAiDiscipline.INFRASTRUCTURE;
             case "elevator":return MusaAiDiscipline.ELEVATOR;
@@ -107,6 +111,7 @@ public final class MusaAiVisualDiscipline {
 
     public static boolean mechanicalScope(String scope){
         return "mechanical".equals(scope)||"sanitary".equals(scope)||
+            "cleanwater".equals(scope)||
             "wastewater".equals(scope)||
             "ventilation".equals(scope)||"heating".equals(scope)||
             "cooling".equals(scope)||"gas".equals(scope);
@@ -114,6 +119,10 @@ public final class MusaAiVisualDiscipline {
 
     public static String focus(String scope){
         switch(scope==null?"all":scope){
+            case "cleanwater":return "temiz su, basınçlandırma, hat çapları, vana, armatür, hidrofor, boyler bağlantıları ve hesap referansları";
+            case "automation":return "BMS/DDC kontrol panoları, sensörler, aktüatörler, kumanda ve alarm noktaları, otomasyon şemaları ile mekanik/elektrik ekipman arayüzleri";
+            case "lowcurrent":return "yangın algılama/ihbar, CCTV, data, erişim kontrolü, seslendirme, zayıf akım kabloları, santral ve saha uçları";
+            case "highcurrent":return "enerji dağıtımı, AG panoları, kablo kesit/güzergâhları, yük çizelgesi, kompanzasyon, koruma, topraklama ve beslemeler";
             case "wastewater":return "pis su kolonları, hat çapları, boru eğimleri, havalık, süzgeç ve şebeke çıkış kotları";
             case "sanitary":return "temiz ve sıcak su hatları, çaplar, vana/armatürler, hidrofor, boyler ve debi-basınç hesabı referansları";
             case "fire":return "sprinkler/hidrant yerleşimi, yangın pompası, zonlama, vana ve yangın senaryosu ilişkileri";
