@@ -756,7 +756,23 @@ public final class DxfParser {
                 parts.add(new MTextLabel((float)ml.textX,(float)ml.textY,(float)Math.max(.01d,ml.textHeight),(float)ml.rotationDegrees,rich,style,1f,0f,1));
             }
             return parts.isEmpty()?null:(parts.size()==1?parts.get(0):new EntityGroup(parts));
-        }if("IMAGE".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new Poly(p,true);}if("OLE2FRAME".equals(type)){DxfOleFrame.Result o=DxfOleFrame.parse(a,from,to);return o.valid()?new OleFrameEntity(o):null;}if("WIPEOUT".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new WipeoutEntity(p);}if("HATCH".equals(type)){try{DxfHatch.Result h=DxfHatch.parse(a,from,to);return h.loops.isEmpty()?null:new HatchEntity(h);}catch(IOException ignored){return null;}}if("VIEWPORT".equals(type)){DxfViewport.View vp=DxfViewport.parse(a,from,to);return vp.id>1&&vp.paperWidth>0&&vp.paperHeight>0?new ViewportEntity(vp):null;}if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){ArrayList<PointF>p=numberedPoints(a,from,to,10,20,4);return p.size()<2?null:new Poly(p,true);}if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
+        }if("IMAGE".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new Poly(p,true);}if("OLE2FRAME".equals(type)){DxfOleFrame.Result o=DxfOleFrame.parse(a,from,to);return o.valid()?new OleFrameEntity(o):null;}if("WIPEOUT".equals(type)){DxfWipeout.Result w=DxfWipeout.parse(a,from,to);if(w.boundary.size()<3)return null;ArrayList<PointF>p=new ArrayList<>(w.boundary.size());for(DxfWipeout.Point q:w.boundary)p.add(new PointF((float)q.x,(float)q.y));return new WipeoutEntity(p);}if("HATCH".equals(type)){try{DxfHatch.Result h=DxfHatch.parse(a,from,to);return h.loops.isEmpty()?null:new HatchEntity(h);}catch(IOException ignored){return null;}}if("VIEWPORT".equals(type)){DxfViewport.View vp=DxfViewport.parse(a,from,to);return vp.id>1&&vp.paperWidth>0&&vp.paperHeight>0?new ViewportEntity(vp):null;}if("SOLID".equals(type)||"TRACE".equals(type)||"3DFACE".equals(type)){
+            DxfPlanarFace.Geometry g=DxfPlanarFace.parse(type,a,from,to);
+            if(g==null)return null;
+            if("3DFACE".equals(type)){
+                // Respect the four 3DFACE invisible-edge bits: an ordinary
+                // closed polygon paints hidden edges that must not be shown.
+                ArrayList<Entity>edges=new ArrayList<>(g.visibleEdges.size());
+                for(DxfPlanarFace.Edge edge:g.visibleEdges)
+                    edges.add(new Line((float)edge.a.x,(float)edge.a.y,(float)edge.b.x,(float)edge.b.y));
+                return edges.isEmpty()?null:edges.size()==1?edges.get(0):new EntityGroup(edges);
+            }
+            // DXF SOLID/TRACE vertices are ordered 1-2-4-3, unlike 3DFACE.
+            ArrayList<PointF>outline=new ArrayList<>(g.outline.size());
+            for(DxfPlanarFace.Point point:g.outline)
+                outline.add(new PointF((float)point.x,(float)point.y));
+            return new Poly(outline,true);
+        }if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
     }
 
     private static Bitmap decodeEmbeddedRaster(byte[] encoded){
