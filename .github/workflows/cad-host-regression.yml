@@ -132,7 +132,7 @@ jobs:
           set -euo pipefail
           java_src=app/src/main/java/com/musa/cad
           mkdir -p /tmp/musacad-large-stream
-          javac -sourcepath "$java_src" -d /tmp/musacad-large-stream tests/DxfStreamingLargeTest.java
+          javac -sourcepath app/src/main/java -d /tmp/musacad-large-stream tests/DxfStreamingLargeTest.java
           java -Xmx768m -cp /tmp/musacad-large-stream DxfStreamingLargeTest
       - name: Verify full ACI/TrueColor display values
         run: |
