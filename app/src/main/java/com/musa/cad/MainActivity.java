@@ -4600,6 +4600,12 @@ public class MainActivity extends AppCompatActivity {
 
         if(dirty){
             builder.setPositiveButton("KAYDET VE KAPAT",(d,w)->{
+                // A save-close must be bound to the same active, editable project.
+                if(project!=currentProject||activeLoad!=null||!canEdit()){
+                    pendingCloseAfterSave=null;
+                    Toast.makeText(this,"Proje artık kayda hazır değil; kapatma iptal edildi",Toast.LENGTH_LONG).show();
+                    return;
+                }
                 pendingCloseAfterSave=project;
                 requestEditedDxfSave();
             });
@@ -4746,11 +4752,24 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestEditedDxfSave(){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden kaydedilemez",Toast.LENGTH_SHORT).show();return;}if(!canEdit()){Toast.makeText(this,"Bu çizim DXF olarak düzenlenebilir durumda değil",Toast.LENGTH_SHORT).show();return;}
-        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");startActivityForResult(intent,SAVE_DXF);
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");
+        try{startActivityForResult(intent,SAVE_DXF);}
+        catch(Exception failure){pendingCloseAfterSave=null;error(failure);}
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
+        // Never publish a different project's edits after returning from Android's document picker.
+        if(pendingCloseAfterSave!=null&&currentProject!=pendingCloseAfterSave){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Etkin proje değişti; yanlış çizimin kaydı engellendi",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(currentProject!=null&&currentProject.sourceUri!=null&&currentProject.sourceUri.equals(uri)){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Orijinal CAD kaynağının üzerine yazılamaz; yeni kopya seçin",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(!canEdit()||activeLoad!=null){pendingCloseAfterSave=null;return;}final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
                     CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
