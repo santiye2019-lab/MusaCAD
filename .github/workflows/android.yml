@@ -699,6 +699,10 @@ jobs:
             app/src/main/java/com/musa/cad/DxfBlocks.java \
             tests/DxfStreamingLargeTest.java
           java -Xmx64m -cp /tmp/musacad-tests DxfStreamingLargeTest
+      - name: Guard existing Gandalf connectivity and full-vector editor regression
+        run: |
+          javac -d /tmp/musacad-tests tests/MusaCadWorkingApkRegressionTest.java
+          java -cp /tmp/musacad-tests MusaCadWorkingApkRegressionTest
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
