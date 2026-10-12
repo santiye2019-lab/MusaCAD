@@ -56,20 +56,25 @@ if(NOT ANDROID)
     file(READ "${_musa_acds_spec}" _musa_acds_text)
     set(_musa_acds_old "    num_acis_sab_data = 0;")
     set(_musa_acds_probe [=[
-    size_t musa_starts = 0, musa_ends = 0;
-    const size_t musa_sl = strlen (start), musa_el = strlen (end);
+    size_t musa_starts = 0, musa_asm_starts = 0, musa_ends = 0;
+    const char musa_asm_binary[] = "ASM BinaryFile";
+    const size_t musa_sl = strlen (start), musa_al = strlen (musa_asm_binary);
+    const size_t musa_el = strlen (end);
     for (size_t musa_i = 0; musa_i < dat->size; musa_i++)
       {
         if (musa_i + musa_sl <= dat->size &&
             memcmp (&dat->chain[musa_i], start, musa_sl) == 0)
           musa_starts++;
+        if (musa_i + musa_al <= dat->size &&
+            memcmp (&dat->chain[musa_i], musa_asm_binary, musa_al) == 0)
+          musa_asm_starts++;
         if (musa_i + musa_el <= dat->size &&
             memcmp (&dat->chain[musa_i], end, musa_el) == 0)
           musa_ends++;
       }
     fprintf (stderr,
-             "MUSACAD_PUBLIC_ACDS_MARKERS bytes=%zu starts=%zu ends=%zu\n",
-             (size_t)dat->size, musa_starts, musa_ends);
+             "MUSACAD_PUBLIC_ACDS_MARKERS bytes=%zu starts=%zu asm_starts=%zu ends=%zu\n",
+             (size_t)dat->size, musa_starts, musa_asm_starts, musa_ends);
     num_acis_sab_data = 0;
 ]=])
     string(FIND "${_musa_acds_text}" "${_musa_acds_old}" _musa_acds_pos)
