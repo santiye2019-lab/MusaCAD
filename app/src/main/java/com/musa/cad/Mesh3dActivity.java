@@ -64,12 +64,13 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void showModelCommands(FrameLayout root){
-        final String[] commands={"BOX","EXTRUDE","REVOLVE","LOFT","UNION","INTERSECTION","DIFFERENCE","UCS"};
+        final String[] commands={"BOX","EXTRUDE","REVOLVE","LOFT","SWEEP","UNION","INTERSECTION","DIFFERENCE","UCS"};
         final String[] suggestions={
             "0,0,0,10,6,4",
             "0,0;8,0;8,5;0,5|4",
             "1,0;2,0;2,5;1,5|48|360",
             "0,0;4,0;4,4;0,4|0|1,1;3,1;3,3;1,3|6",
+            "0,0;4,0;4,4;0,4|0,0,0;2,1,5;4,2,10",
             "0,0,0,8,6,5|4,3,2,11,10,7",
             "0,0,0,8,6,5|4,3,2,11,10,7",
             "0,0,0,8,6,5|4,3,2,11,10,7",
