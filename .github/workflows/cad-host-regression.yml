@@ -176,7 +176,18 @@ jobs:
           cmake --build /tmp/musacad-host --parallel 2
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-history-ab.dxf 2>/tmp/musacad-history-ab.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab.dxf --source-log /tmp/musacad-history-ab.log --require-source --require-external
-          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab.dxf
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab.dxf --public-fixture-debug
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-history-ab-cone.dxf 2>/tmp/musacad-history-ab-cone.log
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-cone.dxf --source-log /tmp/musacad-history-ab-cone.log --require-source
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-cone.dxf
+          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2018.dwg
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2018.dwg /tmp/musacad-history-ab-r2018.dxf 2>/tmp/musacad-history-ab-r2018.log
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-r2018.dxf --source-log /tmp/musacad-history-ab-r2018.log
+          if grep -q 'MUSACAD_ACIS_SOURCE=0 ' /tmp/musacad-history-ab-r2018.log; then
+            echo 'Public R2018 fixture contains no source ACIS solids; skip mesh proof'
+          else
+            java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-r2018.dxf
+          fi
           echo 'A/B TEST ONLY: do not promote this experimental converter to production'
 
   edit-regression:
