@@ -66,15 +66,29 @@ public final class AcisDxfRoundTripProbe {
         java.util.Map<Integer,?> nodes=(java.util.Map<Integer,?>)parse.invoke(null,decoded);
         java.lang.reflect.Field type=nodeClass.getDeclaredField("type");
         java.lang.reflect.Field id=nodeClass.getDeclaredField("id");
-        type.setAccessible(true);id.setAccessible(true);
+        java.lang.reflect.Field refs=nodeClass.getDeclaredField("refs");
+        type.setAccessible(true);id.setAccessible(true);refs.setAccessible(true);
         java.lang.reflect.Method sample=AcisSatMesh.class.getDeclaredMethod("sampleEdge",java.util.Map.class,nodeClass,boolean.class);
         sample.setAccessible(true);
         java.lang.reflect.Method build=AcisSatMesh.class.getDeclaredMethod("buildLoop",java.util.Map.class,nodeClass);
         build.setAccessible(true);
         int pointsInLoops=0,nonEmptyLoops=0,nonEmptyEdges=0;
+        int inspected=0;
         java.util.ArrayList<Integer> sampleIds=new java.util.ArrayList<>();
         for(Object n:nodes.values()){
             String kind=(String)type.get(n);
+            if(("edge".equals(kind)||"vertex".equals(kind)||"face".equals(kind))&&inspected<12){
+                int[] links=(int[])refs.get(n);
+                StringBuilder resolved=new StringBuilder();
+                for(int i=0;i<links.length&&i<9;i++){
+                    Object target=nodes.get(links[i]);
+                    resolved.append(links[i]).append('=')
+                        .append(target==null?"missing":type.get(target)).append(' ');
+                }
+                System.out.printf("ACIS_PUBLIC_LINK body=%d id=%d kind=%s refs=%s%n",
+                    body,id.get(n),kind,resolved);
+                inspected++;
+            }
             if("loop".equals(kind)){
                 Object path=build.invoke(null,nodes,n);
                 java.lang.reflect.Field points=path.getClass().getDeclaredField("points");
