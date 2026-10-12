@@ -72,9 +72,12 @@ public final class Mesh3dActivity extends Activity {
                 text.append("\nDoğrulanan yüzey: ").append(mesh.acisTessellatedFaces)
                     .append(" / ").append(mesh.acisFaces)
                     .append("  •  çözülemeyen: ").append(mesh.acisUnsupportedFaces);
-            if(mesh.acisDanglingReferences>0)
-                text.append("\nUYARI: ").append(mesh.acisDanglingReferences)
-                    .append(" ACIS SAT bağlantı referansı çözülemedi. Eksik 3B geometri ölçüm veya keşif için doğrulanmış kabul edilmez.");
+            if(mesh.acisDanglingNonHistoryReferences>0)
+                text.append("\nUYARI: ").append(mesh.acisDanglingNonHistoryReferences)
+                    .append(" ACIS geometri/topoloji veya sınıflandırılamayan SAT referansı çözülemedi. Bu katıların 3B ölçüm doğruluğu kanıtlanmış değildir.");
+            if(mesh.acisDanglingHistoryReferences>0)
+                text.append("\nACIS geçmiş kayıtları: ").append(mesh.acisDanglingHistoryReferences)
+                    .append(" eksik öznitelik bağlantısı. Görüntülenen yüzeyler bundan bağımsız okunmuştur; eksiksiz B-Rep ve DWG kaydetme doğruluğu kanıtlanmış değildir.");
             text.append("\nACIS B-Rep salt okunur; dönüştürülen köşeler gerçek DXF köşeleri gibi kaydedilmez.");
         }
         if(mesh.solidProxy){
