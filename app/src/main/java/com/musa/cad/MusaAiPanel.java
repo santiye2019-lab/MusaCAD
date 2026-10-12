@@ -344,6 +344,9 @@ public final class MusaAiPanel {
                 }
                 @Override public void cloudStatus(boolean answered){
                     activity.runOnUiThread(()->{
+                        // A late result from an expired request must not make
+                        // its stale status LED green after a visible timeout.
+                        if(completed.get())return;
                         modelVerified.set(answered);
                         if(answered){
                             lastCloudFailure[0]="";
@@ -361,6 +364,7 @@ public final class MusaAiPanel {
                 }
                 @Override public void cloudFailure(String reason){
                     activity.runOnUiThread(()->{
+                        if(completed.get())return;
                         modelVerified.set(false);
                         String diagnostic=reason==null?"AI isteği başarısız.":reason.trim();
                         if(diagnostic.length()>280)diagnostic=diagnostic.substring(0,280);
