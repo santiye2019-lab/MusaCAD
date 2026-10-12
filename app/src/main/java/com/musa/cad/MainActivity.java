@@ -79,14 +79,14 @@ public class MainActivity extends AppCompatActivity {
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,colorDiagnostics;boolean dxf,handedOff,threeDOnly;
         List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,loadDiagnostics,colorDiagnostics;boolean dxf,threeDOnly;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
@@ -4027,7 +4027,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDrawingInfo(){
-        if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String oleTypes=activeDxf.oleTypes.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.oleTypes);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"OLE / gömülü belge: "+activeDxf.oleObjectCount+" ("+oleTypes+")\n"+"OLE gerçek önizleme: "+activeDxf.olePreviewCount+"\n"+"OLE önizlemesi bulunamayan: "+activeDxf.oleMissingPreviewCount+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
+        if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String oleTypes=activeDxf.oleTypes.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.oleTypes);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Atlanan / çizilemeyen CAD kaydı: "+activeDxf.skippedCount+"\n"+"Harici XREF (henüz yüklenmiyor): "+activeDxf.externalReferences.size()+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"OLE / gömülü belge: "+activeDxf.oleObjectCount+" ("+oleTypes+")\n"+"OLE gerçek önizleme: "+activeDxf.olePreviewCount+"\n"+"OLE önizlemesi bulunamayan: "+activeDxf.oleMissingPreviewCount+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
+        if(currentProject!=null){
+            if(currentProject.loadDiagnostics!=null)
+                text+="\n\nCAD yükleme aşamaları (milisaniye):\n"+currentProject.loadDiagnostics;
+            if(currentProject.colorDiagnostics!=null)
+                text+="\n\nİlk Native / DXF renk karşılaştırması (örneklem):\n"+currentProject.colorDiagnostics;
+        }
+        text+="\n\n"+cad.drawingCpuSummary();
         new AlertDialog.Builder(this).setTitle("Çizim bilgileri").setMessage(text).setPositiveButton("TAMAM",null).show();
     }
 
@@ -4193,10 +4200,13 @@ public class MainActivity extends AppCompatActivity {
         task.dialog=new AlertDialog.Builder(this).setTitle("Çizim açılıyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{
             Loaded loaded=new Loaded();loaded.sourceUri=uri;
+            // Timing is local-only; no CAD geometry, labels or filenames leave the device.
+            final CadOpenTrace openTrace=new CadOpenTrace();
             try{
                 FileTransfer.checkCancelled();loaded.imageOverlays=CadImageOverlayStore.load(getApplicationContext(),uri.toString());loaded.name=nameOf(uri);loaded.dxf=loaded.name.toLowerCase(Locale.ROOT).endsWith(".dxf");loaded.file=File.createTempFile("MusaCAD_acilan_",loaded.dxf?".dxf":".dwg",getCacheDir());
                 try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(loaded.file)){FileTransfer.copy(in,out,512L*1024*1024,bytes->runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())task.progress.setText(String.format(Locale.getDefault(),"Okunan: %.1f MB",bytes/1048576d));}));}
                 FileTransfer.checkCancelled();
+                openTrace.mark(CadOpenTrace.Phase.COPY_DONE);
 
                 if(loaded.dxf){
                     runOnUiThread(()->{if(activeLoad==task)task.progress.setText("Vektör çizim hazırlanıyor…");});
@@ -4204,15 +4214,21 @@ public class MainActivity extends AppCompatActivity {
                     // paint. Large DXF files open directly as authoritative vectors.
                     boolean largeDxf=loaded.file.length()>6L*1024L*1024L;
                     loaded.parsed=DxfParser.render(loaded.file,!largeDxf);
+                    openTrace.mark(CadOpenTrace.Phase.FINAL_DXF_PARSE);
                     loaded.workingDxf=loaded.file;
                     loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
-                    if(loaded.parsed==null||loaded.parsed.entityCount<=0)
+                    if(loaded.parsed==null||loaded.parsed.entityCount<=0){
+                        if(prepare3dOnly(loaded,loaded.file)){handOff3dOnly(loaded,task);return;}
                         throw new IOException("Desteklenen DXF geometrisi bulunamadı");
+                    }
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                         loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                        openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
+                        project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
+                        android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4224,9 +4240,11 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())
                     task.progress.setText("DWG hızlı görünüm hazırlanıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
+                    openTrace.mark(CadOpenTrace.Phase.NATIVE_OPEN);
                     FileTransfer.checkCancelled();
                     NativeScene provisional=null;
                     try{provisional=engine.fastScene();}catch(Exception ignored){}
+                    openTrace.mark(CadOpenTrace.Phase.NATIVE_SCENE_READY);
                     if(provisional!=null&&!Thread.currentThread().isInterrupted()){
                         final NativeScene nativePreview=provisional;
                         final java.util.concurrent.CountDownLatch uiHandoff=
@@ -4272,6 +4290,7 @@ public class MainActivity extends AppCompatActivity {
                     File converted=File.createTempFile("MusaCAD_donusen_",".dxf",getCacheDir());boolean keep=false;
                     try{
                         int status=engine.exportDxf(converted);FileTransfer.checkCancelled();
+                        openTrace.mark(CadOpenTrace.Phase.DXF_EXPORT);
                         if(converted.length()>512L*1024*1024)throw new IOException("Dönüştürülen çizim 512 MB sınırını aşıyor");
                         // Always build the authoritative DXF-rendered navigation preview.
                         // Native first paint is only a loading bridge; pinch/pan after the full
@@ -4279,8 +4298,24 @@ public class MainActivity extends AppCompatActivity {
                         // Rendering a 1200px bitmap of every CAD entity before open
                         // doubles work for large projects; direct vectors are authoritative.
                         DxfParser.Result parsed=DxfParser.render(converted,false);
-                        if(parsed==null||parsed.entityCount<=0)
-                            throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
+                        openTrace.mark(CadOpenTrace.Phase.FINAL_DXF_PARSE);
+                        if(parsed!=null&&provisional!=null){
+                            // Native scene and expanded DXF differ in primitive count.
+                            // Color profiles are diagnostics, not a per-object parity proof.
+                            CadColorProfile fastColors=provisional.colorProfile();
+                            CadColorProfile fullColors=parsed.colorProfile();
+                            boolean suspect=fastColors.likelyFirstPaintMismatch(fullColors);
+                            loaded.colorDiagnostics="Native: "+fastColors.safeSummary()+
+                                "\nDXF: "+fullColors.safeSummary()+
+                                "\nİlk kare renk uyumsuzluğu şüphesi: "+(suspect?"VAR":"Görülmedi");
+                            android.util.Log.i("MusaCAD-CadColor",
+                                "native{"+fastColors.safeSummary()+"} full{"+fullColors.safeSummary()+"}"+
+                                " suspect="+suspect);
+                        }
+                        if(parsed==null||parsed.entityCount<=0){
+                            if(prepare3dOnly(loaded,converted)){keep=true;handOff3dOnly(loaded,task);return;}
+                            throw new IOException("DWG içinde desteklenen 2B/3B geometri bulunamadı");
+                        }
                         parsed.conversionWarnings=status;
                         loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
                     }finally{if(!keep)converted.delete();}
@@ -4292,7 +4327,7 @@ public class MainActivity extends AppCompatActivity {
                         if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
                         Bitmap oldPreview=project.bitmap;
-                        project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
+                        project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;project.colorDiagnostics=loaded.colorDiagnostics;
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
@@ -4303,6 +4338,9 @@ public class MainActivity extends AppCompatActivity {
                         }
                         if(oldPreview!=null&&oldPreview!=parsed.bitmap&&!oldPreview.isRecycled())oldPreview.recycle();
                         if(activeLoad==task)activeLoad=null;refreshProjectTabs();
+                        openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
+                        project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),parsed.entityCount);
+                        android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                         // Metadata/thumbnail persistence is secondary to showing the complete model.
                         scheduleRecentMetadataRecord(uri,loaded.name);
                     });
@@ -4316,6 +4354,9 @@ public class MainActivity extends AppCompatActivity {
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                     loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
+                    project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
+                    android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
@@ -4330,6 +4371,66 @@ public class MainActivity extends AppCompatActivity {
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
                 }
             }
+        });
+    }
+
+    private boolean prepare3dOnly(Loaded loaded,File workingDxf)throws IOException{
+        FileTransfer.checkCancelled();
+        Dxf3dMesh mesh;
+        try{mesh=Dxf3dMesh.read(workingDxf);}
+        catch(IOException invalidOrUnsupported){return false;}
+        FileTransfer.checkCancelled();
+        if(!mesh.canOpenWithout2d())return false;
+        loaded.threeDOnly=true;
+        loaded.workingDxf=workingDxf;
+        return true;
+    }
+
+    private void handOff3dOnly(Loaded loaded,LoadTask task){
+        runOnUiThread(()->{
+            if(isFinishing()||isDestroyed()){loaded.dispose();return;}
+            ProjectSession project=loaded.project;
+            if(project==null){
+                if(activeLoad!=task){loaded.dispose();return;}
+                project=new ProjectSession();
+                project.sourceUri=loaded.sourceUri;
+                project.file=loaded.file;
+                project.name=loaded.name;
+                project.dxf=loaded.dxf;
+                project.lastAccessMs=System.currentTimeMillis();
+                project.persistedImages.addAll(loaded.imageOverlays);
+                projects.add(project);
+                loaded.project=project;
+                loaded.handedOff=true;
+            }else if(!projects.contains(project)){
+                loaded.dispose();
+                return;
+            }
+            project.threeDOnly=true;
+            project.workingDxf=loaded.workingDxf;
+            project.parsed=null;
+            project.bitmap=null;
+            project.preparingEditor=false;
+            project.prepareTask=null;
+            project.prepareError=null;
+            if(activeLoad==task)activeLoad=null;
+            if(task.dialog!=null&&task.dialog.isShowing())task.dialog.dismiss();
+            // A project may have been switched while LibreDWG was converting.
+            if(currentProject!=project)activateProject(project);
+            else{
+                activeDxf=null;
+                editingBaseDxf=loaded.workingDxf;
+                cad.setDrawing(null);
+                updateEditorEnabled(false);
+                updateLayerButtons(false);
+                renderCurrentProjectStatus();
+                refreshProjectTabs();
+            }
+            project.savedFingerprint=cad.editFingerprint();
+            project.baselineSet=true;
+            project.dirty=false;
+            if(currentProject==project)open3d(Mesh3dActivity.MODE_ISO);
+            scheduleRecentMetadataRecord(loaded.sourceUri,loaded.name);
         });
     }
 
@@ -4522,7 +4623,8 @@ public class MainActivity extends AppCompatActivity {
         if(project==currentProject){refreshProjectTabs();return;}
         captureCurrentProject();
         currentProject=project;currentFile=project.file;editingBaseDxf=project.workingDxf;activeDxf=project.parsed;currentDisplayName=project.name==null?"cizim.dwg":project.name;project.lastAccessMs=System.currentTimeMillis();
-        if(project.viewState!=null){
+        if(project.threeDOnly){cad.setDrawing(null);}
+        else if(project.viewState!=null){
             if(project.parsed!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,project.viewState);
             else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
             else cad.restoreSessionState(null,project.bitmap,project.viewState);
@@ -4537,12 +4639,14 @@ public class MainActivity extends AppCompatActivity {
     private void renderCurrentProjectStatus(){
         if(currentProject==null){fileName.setText("Henüz proje açılmadı");result.setText("Hazır");return;}
         String editable=canEdit()?"  •  düzenlenebilir":"";
-        String mode=currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
+        String mode=currentProject.threeDOnly?"  •  3B Model":currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
         fileName.setText(currentDisplayName+mode+editable);
-        if(activeDxf!=null){
+        if(currentProject.threeDOnly){
+            result.setText("3B proje hazır • doğrulanmış 3B geometri • 3B görüntüleme açık");
+        }else if(activeDxf!=null){
             String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
             String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
-            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
+            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(activeDxf.skippedCount>0?"  •  ⚠ Atlanan "+activeDxf.skippedCount+" kayıt":"")+(activeDxf.externalReferences.isEmpty()?"":"  •  ⚠ XREF "+activeDxf.externalReferences.size()+" harici")+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
         }else if(currentProject.nativeScene!=null){
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
             else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
@@ -4744,14 +4848,48 @@ public class MainActivity extends AppCompatActivity {
     private void saveEditedDxf(Uri uri){
         if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
-                    CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
-                    if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
-                    FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
-                    if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
-                    Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",Toast.LENGTH_LONG).show();
+        task.future=loader.submit(()->{
+            File staged=null;
+            try{
+                // DXF generation and structural validation happen entirely in
+                // private cache BEFORE the SAF target is opened or truncated.
+                staged=CadDxfSaveStage.prepare(getCacheDir(),out->
+                    DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer));
+                FileTransfer.checkCancelled();
+                try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+                    if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");
+                    CadDxfSaveStage.publish(staged,out);
+                    out.flush();
+                }
+                FileTransfer.checkCancelled();
+                CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
+                if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))
+                    CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();
+                    if(currentProject!=null){
+                        currentProject.savedFingerprint=cad.editFingerprint();
+                        currentProject.baselineSet=true;currentProject.dirty=false;
+                        currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);
+                    }
+                    Toast.makeText(this,rasterCount==0
+                        ?"DXF kaydedildi • "+total+" düzenleme"
+                        :"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",
+                        Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);
+                });
+            }finally{
+                if(staged!=null&&!staged.delete()&&staged.exists())staged.deleteOnExit();
+            }
+        });
     }
 
     private void showShare(){
