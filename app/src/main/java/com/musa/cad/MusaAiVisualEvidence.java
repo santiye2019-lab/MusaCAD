@@ -269,6 +269,8 @@ public final class MusaAiVisualEvidence {
                 details++;
             }
             images.put(image);
+            if(idx>0&&progress!=null)progress.onMeasured(
+                "Kat/kesit yakın-plan görselleri hazırlanıyor",from+details,positioned.size());
         }
         JSONObject out=new JSONObject();
         out.put("schema","musacad-visual-evidence/v1");
