@@ -51,7 +51,7 @@ def sat_markers(text: str) -> bool:
     return False
 
 
-def audit(path: Path, source: int, external: int) -> dict:
+def audit(path: Path, source: int, external: int, *, debug_public_fixture: bool = False) -> dict:
     if not path.is_file():
         raise AcisAuditError(f"Missing converted DXF: {path}")
     section = ""
@@ -77,6 +77,18 @@ def audit(path: Path, source: int, external: int) -> dict:
             return
         found += 1
         text = " ".join(text_parts)
+        if debug_public_fixture:
+            # Opt-in only for pinned PUBLIC LibreDWG test drawings; never user files.
+            print(json.dumps({
+                "public_fixture_type": current_type,
+                "text_chunks": len(text_parts),
+                "binary_chunks": len(binary_chunks),
+                "text_chars": len(text),
+                "raw_prefix_repr": repr(text[:140]),
+                "decoded_prefix_repr": repr(decode_sat(text)[:140]),
+                "raw_suffix_repr": repr(text[-80:]),
+                "decoded_suffix_repr": repr(decode_sat(text)[-80:]),
+            }, sort_keys=True))
         has_text = any(text_parts)
         has_binary = any(binary_chunks)
         binary_valid = all(
@@ -218,6 +230,7 @@ def main() -> int:
     p.add_argument("--source-log", type=Path)
     p.add_argument("--require-source", action="store_true")
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--debug-public-fixture", action="store_true")
     args = p.parse_args()
     try:
         if args.self_test:
@@ -225,7 +238,8 @@ def main() -> int:
         if args.dxf:
             if not args.source_log:
                 raise AcisAuditError("--source-log is required for DWG comparison")
-            report = audit(args.dxf, *source_counts(args.source_log))
+            report = audit(args.dxf, *source_counts(args.source_log),
+                           debug_public_fixture=args.debug_public_fixture)
             print(json.dumps(report, sort_keys=True))
             verify(report, require_source=args.require_source)
         elif not args.self_test:
