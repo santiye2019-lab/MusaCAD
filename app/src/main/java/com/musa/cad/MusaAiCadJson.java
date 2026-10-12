@@ -21,12 +21,17 @@ public final class MusaAiCadJson {
 
     public static String build(MusaAiDrawingIndex index,String fileName,int maxItems){
         if(index==null)return "{}";
-        return buildPage(index,fileName,0,maxItems);
+        return buildPageInternal(index,fileName,0,maxItems,false);
     }
 
     /** Opt-in bounded paging. Existing build() output and Qwen request sizes remain unchanged. */
     public static String buildPage(MusaAiDrawingIndex index,String fileName,int offset,int maxItems){
         if(index==null)return "{}";
+        return buildPageInternal(index,fileName,offset,maxItems,true);
+    }
+
+    private static String buildPageInternal(MusaAiDrawingIndex index,String fileName,
+                                            int offset,int maxItems,boolean paged){
         int start=Math.max(0,offset);
         int limit=Math.max(1,Math.min(5000,maxItems));
         StringBuilder out=new StringBuilder(Math.min(1_000_000,4096+limit*180));
@@ -66,8 +71,10 @@ public final class MusaAiCadJson {
         }
         out.append("],");
         numberField(out,"itemsIncluded",written);out.append(',');
-        numberField(out,"pageOffset",start);out.append(',');
-        numberField(out,"nextOffset",end);out.append(',');
+        if(paged){
+            numberField(out,"pageOffset",start);out.append(',');
+            numberField(out,"nextOffset",end);out.append(',');
+        }
         out.append("\"truncated\":").append(index.items().size()>end?"true":"false").append(',');
 
         out.append("\"cloudPolicy\":{");
