@@ -152,6 +152,27 @@ public final class AcisDxfRoundTripProbe {
         java.lang.reflect.Field id=nodeClass.getDeclaredField("id");
         java.lang.reflect.Field refs=nodeClass.getDeclaredField("refs");
         type.setAccessible(true);id.setAccessible(true);refs.setAccessible(true);
+        // The SAT "dangling" total may include history/attribute records
+        // that are not part of active B-Rep face geometry. Group by SOURCE
+        // node type before changing any safety policy.
+        java.util.TreeMap<String,Integer> danglingByKind=new java.util.TreeMap<>();
+        java.util.TreeMap<String,Integer> damagedTopology=new java.util.TreeMap<>();
+        int totalMissing=0,outsideNodeRange=0;
+        int maxNode=nodes.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+        for(Object node:nodes.values()){
+            String owner=(String)type.get(node);
+            for(int target:(int[])refs.get(node)){
+                if(nodes.containsKey(target))continue;
+                totalMissing++;
+                danglingByKind.merge(owner,1,Integer::sum);
+                if(target>maxNode)outsideNodeRange++;
+                if(java.util.Arrays.asList("body","lump","shell","face","loop",
+                    "coedge","edge","vertex").contains(owner))
+                    damagedTopology.merge(owner,1,Integer::sum);
+            }
+        }
+        System.out.printf("ACIS_PUBLIC_DANGLING_CLASS body=%d total=%d owners=%s topology=%s past_last_node=%d%n",
+            body,totalMissing,danglingByKind,damagedTopology,outsideNodeRange);
         java.lang.reflect.Method sample=AcisSatMesh.class.getDeclaredMethod("sampleEdge",java.util.Map.class,nodeClass,boolean.class);
         sample.setAccessible(true);
         java.lang.reflect.Method build=AcisSatMesh.class.getDeclaredMethod("buildLoop",java.util.Map.class,nodeClass);
