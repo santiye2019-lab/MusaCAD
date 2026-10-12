@@ -172,11 +172,13 @@ def audit(path: Path, source: int, external: int, *, debug_public_fixture: bool 
     }
 
 
-def verify(report: dict, require_source: bool = False) -> None:
+def verify(report: dict, require_source: bool = False, require_external: bool = False) -> None:
     source = report["source_entities"]
     exported = report["exported_entities"]
     if require_source and source == 0:
         raise AcisAuditError("Fixture has no source ACIS entity: invalid regression sample")
+    if require_external and report["source_external_acds"] == 0:
+        raise AcisAuditError("Fixture lacks external AcDs data: cannot test R2013+ SAB")
     if source > 0 and exported < source:
         raise AcisAuditError(f"Source DWG has {source} ACIS entities; DXF has only {exported}")
     if source > 0 and report["missing_payload_entities"] > 0:
@@ -230,6 +232,7 @@ def main() -> int:
     p.add_argument("dxf", nargs="?", type=Path)
     p.add_argument("--source-log", type=Path)
     p.add_argument("--require-source", action="store_true")
+    p.add_argument("--require-external", action="store_true")
     p.add_argument("--self-test", action="store_true")
     p.add_argument("--debug-public-fixture", action="store_true")
     args = p.parse_args()
@@ -242,7 +245,8 @@ def main() -> int:
             report = audit(args.dxf, *source_counts(args.source_log),
                            debug_public_fixture=args.debug_public_fixture)
             print(json.dumps(report, sort_keys=True))
-            verify(report, require_source=args.require_source)
+            verify(report, require_source=args.require_source,
+                   require_external=args.require_external)
         elif not args.self_test:
             raise AcisAuditError("Supply an exported DXF or --self-test")
     except (AcisAuditError, OSError) as exc:
