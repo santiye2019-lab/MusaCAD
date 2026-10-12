@@ -70,7 +70,7 @@ public final class AcisDxfRoundTripProbe {
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
                 if(bodies>=1&&bodies<=3)debugParseTopology(decoded,bodies);
             }
-            if(publicFixtureDebug&&bodies==3&&mesh.tessellatedFaces==10)
+            if(publicFixtureDebug&&bodies==3&&mesh.faces==8&&mesh.tessellatedFaces==8)
                 assertPublicR2013TriangularOpenings(mesh);
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
