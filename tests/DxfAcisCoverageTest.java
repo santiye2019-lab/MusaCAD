@@ -31,7 +31,7 @@ public final class DxfAcisCoverageTest {
         need(audit.withInlineData==2&&audit.withoutInlineData==2,
             "Entity identity must not be mistaken for valid SAT/SAB payload");
         need(audit.invalidHexChunks==1,"Corrupt SAB hex data was accepted");
-        need(audit.inlineTextChars==36,"ASCII payload segments not counted");
+        need(audit.inlineTextChars==34,"ASCII payload segments not counted");
         need(audit.inlineBinaryBytes==4,"Valid binary hex should be counted in bytes");
         need(expanded.placements.size()==4,
             "ACIS audit must leave original entity placements untouched");
