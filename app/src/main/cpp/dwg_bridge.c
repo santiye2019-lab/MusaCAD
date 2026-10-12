@@ -115,9 +115,9 @@ int main(int argc,char **argv){
      * Do not discard the full-document DXF conversion on preview failure.
      */
     if(scene_status<0||scene.primitives<=0)
-        fprintf(stderr,"MusaCAD preview unavailable; trying full DWG conversion (model/layout data may remain)\\n");
+        fprintf(stderr,"MusaCAD preview unavailable; trying full DWG conversion (model/layout data may remain)\n");
     else if(scene.truncated)
-        fprintf(stderr,"MusaCAD preview truncated; trying full DWG conversion\\n");
+        fprintf(stderr,"MusaCAD preview truncated; trying full DWG conversion\n");
     musa_scene_free(&scene);
     int result=session_export_dxf(session,argv[2]);
     session_close(session);
