@@ -102,9 +102,9 @@ public final class AcisSatMesh {
             }
             Node surface=firstRefBySuffix(face,nodes,"-surface");
             boolean ok=false;
-            if(surface!=null&&paths.size()==1&&paths.get(0).points.size()>=3&&"plane-surface".equals(surface.type)){
+            if(surface!=null&&paths.size()==1&&paths.get(0).exact&&paths.get(0).points.size()>=3&&"plane-surface".equals(surface.type)){
                 ok=mesh.triangulatePlanar(paths.get(0).points);
-            }else if(surface!=null&&paths.size()==2&&"cone-surface".equals(surface.type)){
+            }else if(surface!=null&&paths.size()==2&&paths.get(0).exact&&paths.get(1).exact&&"cone-surface".equals(surface.type)){
                 ok=mesh.loft(paths.get(0).points,paths.get(1).points);
             }
             if(ok)tessellated++;else unsupported++;
@@ -229,22 +229,34 @@ public final class AcisSatMesh {
 
     private static boolean contains(int[] values,int value){for(int v:values)if(v==value)return true;return false;}
 
+    /**
+     * An ACIS loop contains ordered coedges. Their sense in real SAT can be
+     * I/F rather than the long-form "reversed"/"forward"; simply joining
+     * their vertex arrays invents links and can self-intersect the face.
+     *
+     * Accept a polygon only when all measured source endpoints connect.
+     * Try both orientations of the first edge and keep the first closed
+     * sequence. Never fill an unclosed or partly unsupported B-Rep loop.
+     */
     private static LoopPath buildLoop(Map<Integer,Node> nodes,Node loop){
         Node start=firstRefByType(loop,nodes,"coedge");
         if(start==null){
-            for(Node n:nodes.values())if("coedge".equals(n.type)&&contains(n.refs,loop.id)){start=n;break;}
+            for(Node n:nodes.values())
+                if("coedge".equals(n.type)&&contains(n.refs,loop.id)){start=n;break;}
         }
         if(start==null)return new LoopPath(Collections.emptyList(),false);
-        List<Vec> points=new ArrayList<>();
+
+        List<EdgePath> ordered=new ArrayList<>();
         Set<Integer> seen=new HashSet<>();
-        Node current=start;boolean exact=true;
+        Node current=start;
+        boolean cycled=false,allExact=true;
         while(current!=null&&seen.add(current.id)&&seen.size()<100000){
             Node edge=firstRefByType(current,nodes,"edge");
-            if(edge==null){exact=false;break;}
-            boolean reversed=current.hasWord("reversed");
-            EdgePath path=sampleEdge(nodes,edge,reversed);
-            exact&=path.exact;
-            appendPath(points,path.points);
+            if(edge==null)return new LoopPath(Collections.emptyList(),false);
+            EdgePath path=sampleEdge(nodes,edge,current.hasWord("reversed")||current.hasWord("I"));
+            if(path.points.size()<2)return new LoopPath(Collections.emptyList(),false);
+            ordered.add(path);
+            allExact&=path.exact;
             Node next=null;
             for(int ref:current.refs){
                 Node candidate=nodes.get(ref);
@@ -252,11 +264,47 @@ public final class AcisSatMesh {
                     next=candidate;break;
                 }
             }
+            if(next!=null&&next.id==start.id){cycled=true;break;}
             current=next;
-            if(current!=null&&current.id==start.id)break;
         }
-        removeClosingDuplicate(points);
-        return new LoopPath(points,exact&&points.size()>=3);
+        if(!cycled||!allExact||ordered.isEmpty())return new LoopPath(Collections.emptyList(),false);
+
+        // One full-circle elliptical edge already carries a sampled closed ring.
+        // For other loops, endpoints MUST be joined by source geometry.
+        if(ordered.size()==1){
+            EdgePath only=ordered.get(0);
+            return new LoopPath(only.points,only.exact&&only.points.size()>=3);
+        }
+        for(int firstSense=0;firstSense<2;firstSense++){
+            List<Vec> polygon=new ArrayList<>();
+            List<Vec> first=ordered.get(0).points;
+            if(firstSense==1)first=reversed(first);
+            polygon.addAll(first);
+            boolean connected=true;
+            for(int i=1;i<ordered.size();i++){
+                List<Vec> edgePoints=ordered.get(i).points;
+                Vec previous=polygon.get(polygon.size()-1);
+                if(previous.distance(edgePoints.get(0))<=EPS){
+                    for(int k=1;k<edgePoints.size();k++)polygon.add(edgePoints.get(k));
+                }else if(previous.distance(edgePoints.get(edgePoints.size()-1))<=EPS){
+                    for(int k=edgePoints.size()-2;k>=0;k--)polygon.add(edgePoints.get(k));
+                }else{
+                    connected=false;break;
+                }
+            }
+            if(connected&&polygon.size()>=4&&
+                    polygon.get(polygon.size()-1).distance(polygon.get(0))<=EPS){
+                removeClosingDuplicate(polygon);
+                return new LoopPath(polygon,polygon.size()>=3);
+            }
+        }
+        return new LoopPath(Collections.emptyList(),false);
+    }
+
+    private static List<Vec> reversed(List<Vec> values){
+        List<Vec> out=new ArrayList<>(values);
+        Collections.reverse(out);
+        return out;
     }
 
     private static EdgePath sampleEdge(Map<Integer,Node> nodes,Node edge,boolean coedgeReversed){
