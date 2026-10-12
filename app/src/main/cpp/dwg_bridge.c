@@ -25,6 +25,8 @@ typedef struct {
     long long polyline2d_count;
     long long point_count;
     long long version;
+    long long acis_entity_count;
+    long long acis_external_data_count;
 } MusaCadStats;
 
 static MusaCadSession *session_open(const char *input,int *error_out) {
@@ -74,6 +76,22 @@ static MusaCadStats session_stats(MusaCadSession *session) {
         Dwg_Object *obj=&dwg->object[i];
         if(obj->supertype==DWG_SUPERTYPE_OBJECT)continue;
         stats.entity_count++;
+        /*
+         * DWG 2013+ stores many 3DSOLID/REGION/BODY SAB bodies outside the
+         * entity, in AcDs (ACDSDATA). The pinned LibreDWG export can retain
+         * the entity record while losing its external geometry.
+         *
+         * Audit the original DWG *before* any DXF conversion. This is a
+         * warning/coverage metric, not an excuse to erase otherwise valid
+         * model-space drawing data.
+         */
+        if(obj->fixedtype==DWG_TYPE__3DSOLID||
+           obj->fixedtype==DWG_TYPE_REGION||
+           obj->fixedtype==DWG_TYPE_BODY){
+            stats.acis_entity_count++;
+            if(obj->tio.entity&&obj->tio.entity->has_ds_data)
+                stats.acis_external_data_count++;
+        }
         switch(obj->fixedtype){
             case DWG_TYPE_LINE: stats.line_count++; break;
             case DWG_TYPE_CIRCLE: stats.circle_count++; break;
@@ -187,15 +205,16 @@ JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_statsNative(JNIEn
     MusaCadStats s=session_stats(session);
     int read_status=session->read_status;
     pthread_mutex_unlock(&engine_lock);
-    jlong values[12]={
+    jlong values[14]={
         (jlong)read_status,(jlong)s.object_count,(jlong)s.entity_count,
         (jlong)s.core_entity_count,(jlong)s.unsupported_entity_count,
         (jlong)s.line_count,(jlong)s.circle_count,(jlong)s.arc_count,
         (jlong)s.lwpolyline_count,(jlong)s.polyline2d_count,
-        (jlong)s.point_count,(jlong)s.version
+        (jlong)s.point_count,(jlong)s.version,
+        (jlong)s.acis_entity_count,(jlong)s.acis_external_data_count
     };
-    jlongArray out=(*env)->NewLongArray(env,12);
-    if(out)(*env)->SetLongArrayRegion(env,out,0,12,values);
+    jlongArray out=(*env)->NewLongArray(env,14);
+    if(out)(*env)->SetLongArrayRegion(env,out,0,14,values);
     return out;
 }
 
