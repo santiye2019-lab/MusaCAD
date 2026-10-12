@@ -75,6 +75,10 @@ public final class CadSolidKernelTest {
         try{CadSolidCommand.execute("REVOLVE","0,0;2,0;2,2;0,2|32|360");}
         catch(java.io.IOException error){blocked=true;}
         check(blocked,"axis singularity must not be silently generated");
+        blocked=false;
+        try{CadSolidCommand.execute("BOX","100000000,0,0,100000001,5,5");}
+        catch(java.io.IOException error){blocked=true;}
+        check(blocked,"large CAD coordinates silently lost precision in float mesh");
         System.out.println("MusaCAD real EXTRUDE/REVOLVE/BOX boolean 3D triangle geometry and DXF writer verified");
     }
 }
