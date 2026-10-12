@@ -54,7 +54,7 @@ jobs:
             /tmp/musacad-android-history-negative.log
           grep -q 'set(_MUSACAD_SAB_HISTORY_DEFAULT OFF)' app/src/main/cpp/CMakeLists.txt
           echo 'PASS: host-only ACIS experiment cannot enter Android APK'
-          if cmake -S app/src/main/cpp -B /tmp/musacad-android-asm-negative               -DANDROID=ON -DMUSACAD_PRESERVE_R2013_SAB_HISTORY=OFF               -DMUSACAD_HOST_R2018_ASM_COMPAT=ON               >/tmp/musacad-android-asm-negative.log 2>&1; then
+          if cmake -S app/src/main/cpp -B /tmp/musacad-android-asm-negative -DANDROID=ON -DMUSACAD_PRESERVE_R2013_SAB_HISTORY=OFF -DMUSACAD_HOST_R2018_ASM_COMPAT=ON >/tmp/musacad-android-asm-negative.log 2>&1; then
             echo 'FAIL: host-only R2018 ASM bridge was allowed into Android' >&2
             exit 1
           fi
