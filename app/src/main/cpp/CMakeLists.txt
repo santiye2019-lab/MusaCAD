@@ -16,8 +16,20 @@ endif()
 # before LibreDWG compiles; no changes to 2D first paint or CAD navigation.
 # This feature is enabled on the isolated development branch ONLY. Keep
 # production/main and existing APK unchanged until Android device smoke tests.
+# The R2013 SAB/history change is still an experimental HOST converter fix.
+# It must not silently enter an Android APK while incomplete B-Rep cases remain.
+if(ANDROID)
+  set(_MUSACAD_SAB_HISTORY_DEFAULT OFF)
+else()
+  set(_MUSACAD_SAB_HISTORY_DEFAULT ON)
+endif()
 option(MUSACAD_PRESERVE_R2013_SAB_HISTORY
-  "Retain R2013+ source AcDs/SAB record history while exporting legacy SAT" ON)
+  "Retain R2013+ source AcDs/SAB record history while exporting legacy SAT"
+  ${_MUSACAD_SAB_HISTORY_DEFAULT})
+if(ANDROID AND MUSACAD_PRESERVE_R2013_SAB_HISTORY)
+  message(FATAL_ERROR
+    "Experimental R2013 SAB history conversion cannot be included in an Android APK until geometry and real-device checks pass.")
+endif()
 if(MUSACAD_PRESERVE_R2013_SAB_HISTORY)
   set(_musa_sab_source "${LIBREDWG_SOURCE}/src/out_dxf.c")
   file(READ "${_musa_sab_source}" _musa_sab_text)
