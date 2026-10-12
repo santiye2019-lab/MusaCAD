@@ -70,7 +70,7 @@ public final class AcisDxfRoundTripProbe {
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
                 if(bodies>=1&&bodies<=3)debugParseTopology(decoded,bodies);
             }
-            if(publicFixtureDebug&&bodies==3&&mesh.faces==8&&mesh.tessellatedFaces==8)
+            if(publicFixtureDebug&&mesh.faces==8&&mesh.tessellatedFaces==8)
                 assertPublicR2013TriangularOpenings(mesh);
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
@@ -173,7 +173,7 @@ public final class AcisDxfRoundTripProbe {
         }
         System.out.printf("ACIS_PUBLIC_DANGLING_CLASS body=%d total=%d owners=%s topology=%s past_last_node=%d%n",
             body,totalMissing,danglingByKind,damagedTopology,outsideNodeRange);
-        int expectedHistory=body==1?0:body==2?10:body==3?16:-1;
+        int expectedHistory=nodes.size()==27?0:nodes.size()==32?10:nodes.size()==134?16:-1;
         if(expectedHistory<0||totalMissing!=expectedHistory||
            outsideNodeRange!=expectedHistory||!damagedTopology.isEmpty()||
            danglingByKind.size()>(expectedHistory==0?0:1)||
