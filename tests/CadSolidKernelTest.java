@@ -39,6 +39,12 @@ public final class CadSolidKernelTest {
         closed(ext);near(volume(ext),400d,"extrusion cube");
         CadSolidKernel.Mesh concave=CadSolidCommand.execute("EXTRUDE","0,0;4,0;4,1;1,1;1,3;0,3|2");
         closed(concave);near(volume(concave),12d,"concave ear clipping volume");
+        CadSolidKernel.Mesh loft=CadSolidCommand.execute("LOFT",
+            "0,0;4,0;4,4;0,4|0|1,1;3,1;3,3;1,3|6");
+        closed(loft);near(volume(loft),56d,"two-section LOFT truncated pyramid");
+        CadSolidKernel.Mesh sweep=CadSolidCommand.execute("SWEEP",
+            "0,0;4,0;4,4;0,4|0,0,0;2,1,5;4,2,10");
+        closed(sweep);near(volume(sweep),160d,"translation SWEEP XY section volume");
         CadSolidKernel.Mesh shell=CadSolidCommand.execute("REVOLVE","1,0;2,0;2,5;1,5|64|360");
         closed(shell);check(volume(shell)>40d&&volume(shell)<50d,
             "revolved annular cylinder volume");
