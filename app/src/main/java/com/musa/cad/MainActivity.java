@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_NATIVE_RETRY=12;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -4094,10 +4094,113 @@ public class MainActivity extends AppCompatActivity {
     }
     private boolean canEdit(){return activeDxf!=null&&editingBaseDxf!=null&&editingBaseDxf.exists();}
 
+    /**
+     * A visible NativeScene does not mean the authoritative editable CAD model
+     * exists. Retry only the conversion (not reimporting / deleting the source
+     * project), preserving the displayed preview, project identity and data.
+     */
+    private void retryNativeVectorLoad(){
+        final ProjectSession project=currentProject;
+        if(project==null||project.parsed!=null||project.nativeScene==null||
+           project.preparingEditor||project.file==null||!project.file.isFile()){
+            Toast.makeText(this,"Yeniden denenecek DWG önizlemesi bulunamadı",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final File source=project.file;
+        final LoadTask task=new LoadTask();
+        project.preparingEditor=true;
+        project.prepareError=null;
+        project.prepareTask=task;
+        renderCurrentProjectStatus();
+        Toast.makeText(this,"Tam vektör DWG dönüştürmesi yeniden başlatıldı",Toast.LENGTH_SHORT).show();
+        try{
+            task.future=loader.submit(()->{
+                File generated=null;
+                DxfParser.Result parsed=null;
+                try(NativeCadEngine engine=NativeCadEngine.open(source)){
+                    FileTransfer.checkCancelled();
+                    generated=File.createTempFile("MusaCAD_retry_",".dxf",getCacheDir());
+                    int status=engine.exportDxf(generated);
+                    FileTransfer.checkCancelled();
+                    if(generated.length()>512L*1024L*1024L)
+                        throw new IOException("Dönüşüm sonucu 512 MB sınırını aştı");
+                    parsed=DxfParser.render(generated,false);
+                    if(parsed==null||parsed.entityCount<=0)
+                        throw new IOException("Dönüştürülen DWG içinde desteklenen vektör verisi bulunamadı");
+                    parsed.conversionWarnings=status;
+                    final File finalDxf=generated;
+                    final DxfParser.Result finalParsed=parsed;
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||!projects.contains(project)||
+                           project.prepareTask!=task){
+                            if(finalParsed.bitmap!=null&&!finalParsed.bitmap.isRecycled())
+                                finalParsed.bitmap.recycle();
+                            finalDxf.delete();
+                            return;
+                        }
+                        project.prepareTask=null;
+                        project.preparingEditor=false;
+                        project.prepareError=null;
+                        project.workingDxf=finalDxf;
+                        project.parsed=finalParsed;
+                        project.bitmap=finalParsed.bitmap;
+                        if(currentProject==project){
+                            activeDxf=finalParsed;
+                            editingBaseDxf=finalDxf;
+                            cad.upgradeNativeDrawing(finalParsed);
+                            snapToggle.setEnabled(finalParsed.snapPoints.length>0);
+                            cad.setSnapPoints(finalParsed.snapPoints);
+                            updateEditorEnabled(canEdit());
+                            updateLayerButtons(true);
+                            project.savedFingerprint=cad.editFingerprint();
+                            project.baselineSet=true;
+                            project.dirty=false;
+                            renderCurrentProjectStatus();
+                        }else if(project.nativeScene!=null){
+                            project.nativeScene.alignTo(finalParsed.drawingToContentMatrix());
+                            project.viewState=null;
+                        }
+                        refreshProjectTabs();
+                    });
+                    generated=null;
+                    parsed=null;
+                }catch(Exception|OutOfMemoryError error){
+                    final String message=error.getMessage()==null?
+                        "Tam vektör çizim hazırlanamadı":error.getMessage();
+                    runOnUiThread(()->{
+                        if(!projects.contains(project)||project.prepareTask!=task)return;
+                        project.prepareTask=null;
+                        project.preparingEditor=false;
+                        project.prepareError=message;
+                        if(currentProject==project){
+                            updateEditorEnabled(false);
+                            renderCurrentProjectStatus();
+                            new AlertDialog.Builder(this)
+                                .setTitle("Tam vektör model açılamadı")
+                                .setMessage("DWG hızlı görünümü korundu. Katman ve çizim düzenleme "+
+                                    "araçları tam vektör oluşturulana kadar kullanılamaz.\n\n"+
+                                    message)
+                                .setPositiveButton("KAPAT",null).show();
+                        }
+                    });
+                }finally{
+                    if(parsed!=null&&parsed.bitmap!=null&&!parsed.bitmap.isRecycled())
+                        parsed.bitmap.recycle();
+                    if(generated!=null)generated.delete();
+                }
+            });
+        }catch(RejectedExecutionException error){
+            project.prepareTask=null;
+            project.preparingEditor=false;
+            project.prepareError="DWG dönüştürme işlemi başlatılamadı";
+            renderCurrentProjectStatus();
+        }
+    }
+
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");if(currentProject!=null&&currentProject.nativeScene!=null&&activeDxf==null){if(currentProject.preparingEditor)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör hazırlanıyor…").setEnabled(false);else if(currentProject.prepareError!=null)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör yüklemeyi yeniden dene");}menu.add(0,MENU_LAYERS,3,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_NATIVE_RETRY:retryNativeVectorLoad();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
