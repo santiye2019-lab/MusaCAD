@@ -1,0 +1,61 @@
+name: MusaCAD Linux CAD engine regression
+on:
+  push:
+    branches:
+      - 'feature/gandalf-drive-server-cad-bridge-*'
+    paths:
+      - 'app/src/main/cpp/**'
+      - '.github/workflows/cad-host-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-native:
+    name: Host compiler and DWG conversion
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get pinned LibreDWG (same source as Android)
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Check host converter does not reject drawings on preview failure
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('app/src/main/cpp/dwg_bridge.c').read_text()
+          start = src.index('#ifdef MUSA_HOST')
+          stop = src.index('#else', start)
+          host = src[start:stop]
+          assert 'if(scene_status<0||scene.primitives<=0)' in host
+          assert 'int result=session_export_dxf(session,argv[2]);' in host
+          assert host.index('musa_scene_free(&scene)') < host.index('int result=session_export_dxf(session,argv[2]);')
+          assert 'scene.primitives<=0){musa_scene_free(&scene);session_close(session);return 1;}' not in host
+          print('PASS: empty model preview no longer blocks full DXF export')
+          PY
+      - name: Build Linux host CAD converter
+        run: |
+          cmake -S app/src/main/cpp -B /tmp/musacad-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/musacad-host --parallel 2
+          test -x /tmp/musacad-host/musacad_dwg_convert
+      - name: Convert reference DWG without losing DXF data
+        run: |
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-host-smoke.dxf
+          test -s /tmp/musacad-host-smoke.dxf
+          grep -aq 'SECTION' /tmp/musacad-host-smoke.dxf
+          grep -aq 'ENTITIES' /tmp/musacad-host-smoke.dxf
+      - name: Preserve embedded OLE object payload
+        run: |
+          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
+          python3 - <<'PY'
+          from pathlib import Path
+          pairs=Path('/tmp/musacad-ole.dxf').read_text(errors='ignore').replace('\r','').split('\n')
+          ole='OLE2FRAME' in pairs
+          payload=any(pairs[i].strip()=='310' and pairs[i+1].strip() for i in range(len(pairs)-1))
+          assert ole, 'OLE2FRAME entity was lost in conversion'
+          assert payload, 'OLE2FRAME binary payload was lost'
+          print('PASS: OLE2FRAME entity and payload retained')
+          PY
