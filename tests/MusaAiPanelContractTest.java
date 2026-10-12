@@ -53,6 +53,11 @@ public final class MusaAiPanelContractTest {
         require(panel,"AI oturum hatası","session and license rejection state");
         require(panel,"AI zaman aşımı","multimodal timeout state");
         require(panel,"state.setOnClickListener","tap LED for actionable reason");
+        require(panel,"Bağlantıyı test et","manual same-Worker HTTPS health test");
+        require(panel,"Tarayıcıda aç","phone browser comparison");
+        require(panel,"MusaAiCloudHealth.checkDetailed","bounded two-probe health validation");
+        require(panel,"MusaAiCloudHealth.healthUrl()","exact installed public Worker URL");
+        require(panel,"veya Qwen model isteği gönderilmedi","diagnostic must not send CAD or images");
 
         require(panel,"setScrollbarFadingEnabled(false)","always-visible message scrollbar");
         require(panel,"onImportPriceBook","explicit YFK book import callback");
