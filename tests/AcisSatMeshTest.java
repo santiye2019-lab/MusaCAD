@@ -18,12 +18,62 @@ public final class AcisSatMeshTest {
         if(mesh.edges.length!=24)throw new AssertionError("cube must preserve 12 real B-Rep edges");
 
         testCylinderSide();
+        testImplicitInvertedCoedgeLoop();
         testUnsupportedFaceWireframe();
 
         AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of("ACIS_PLACEHOLDER"));
         if(bad.hasGeometry())throw new AssertionError("invalid ACIS payload must not invent geometry");
 
         System.out.println("ACIS SAT B-Rep cases passed: encrypted payload, planar solids, cylindrical/conic loft and safe fallback.");
+    }
+
+
+    /** Matches real R2013 implicit SAT ids, I-sense coedges and shuffled edge order. */
+    private static void testImplicitInvertedCoedgeLoop(){
+        String[] records={
+            "asmheader $-1",
+            "body $-1 $-1 $-1 $2 $-1 $-1",
+            "lump $-1 $-1 $3 $1",
+            "shell $-1 $-1 $-1 $-1 $-1 $4 $-1 $2",
+            "face $-1 $-1 $-1 $-1 $5 $3 $-1 $6 forward single",
+            "loop $-1 $-1 $-1 $-1 $7 $4",
+            "plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I",
+            "coedge $-1 $-1 $-1 $8 $9 $-1 $10 I $5 $0 $-1",
+            "coedge $-1 $-1 $-1 $11 $7 $-1 $12 I $5 $0 $-1",
+            "coedge $-1 $-1 $-1 $7 $11 $-1 $13 I $5 $0 $-1",
+            "edge $-1 $-1 $-1 $14 0 $15 1 $7 $16 forward 7 unknown",
+            "coedge $-1 $-1 $-1 $9 $8 $-1 $17 I $5 $0 $-1",
+            "edge $-1 $-1 $-1 $18 0 $14 1 $8 $19 forward 7 unknown",
+            "edge $-1 $-1 $-1 $15 0 $20 1 $9 $21 forward 7 unknown",
+            "vertex $-1 $-1 $-1 $10 $2 $22",
+            "vertex $-1 $-1 $-1 $10 $2 $23",
+            "straight-curve $-1 0 0 0 1 0 0 I I",
+            "edge $-1 $-1 $-1 $20 0 $18 1 $11 $24 forward 7 unknown",
+            "vertex $-1 $-1 $-1 $17 $2 $25",
+            "straight-curve $-1 0 0 0 0 1 0 I I",
+            "vertex $-1 $-1 $-1 $13 $2 $26",
+            "straight-curve $-1 1 0 0 0 1 0 I I",
+            "point $-1 $-1 $-1 0 0 0",
+            "point $-1 $-1 $-1 1 0 0",
+            "straight-curve $-1 1 1 0 -1 0 0 I I",
+            "point $-1 $-1 $-1 0 1 0",
+            "point $-1 $-1 $-1 1 1 0"
+        };
+        AcisSatMesh.Result complete=AcisSatMesh.parseDxfChunks(List.of(implicitSat(records)));
+        if(!complete.complete||complete.faces!=1||complete.tessellatedFaces!=1||
+           complete.triangles.length!=6||complete.edges.length!=8)
+            throw new AssertionError("Real SAT coedge connectivity must produce exactly two actual planar triangles");
+        // A broken next-reference must not be closed with a fabricated line.
+        records[8]=records[8].replace("$11 $7","$999 $7");
+        AcisSatMesh.Result broken=AcisSatMesh.parseDxfChunks(List.of(implicitSat(records)));
+        if(broken.complete||broken.triangles.length!=0)
+            throw new AssertionError("Unclosed coedge ring was wrongly filled as a valid ACIS face");
+    }
+
+    private static String implicitSat(String[] records){
+        StringBuilder out=new StringBuilder("700 0 1 0\nMusaCAD implicit SAT\n1 1e-06 1e-10\n");
+        for(String record:records)out.append(record).append(" #\n");
+        return out.append("End-of-ACIS-data\n").toString();
     }
 
     private static void testUnsupportedFaceWireframe(){
