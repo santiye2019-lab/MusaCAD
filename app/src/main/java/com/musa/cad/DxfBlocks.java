@@ -93,7 +93,7 @@ public final class DxfBlocks {
             String key=type==null?"UNKNOWN":type.trim().toUpperCase(Locale.ROOT);
             if(key.length()>64)key=key.substring(0,64);
             if(key.isEmpty())key="UNKNOWN";
-            if(!skippedByType.containsKey(key)&&skippedByType.size()>=64)key="OTHER";
+            if(!skippedByType.containsKey(key)&&skippedByType.size()>=63)key="OTHER";
             skippedByType.put(key,skippedByType.getOrDefault(key,0)+1);
         }
         public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
