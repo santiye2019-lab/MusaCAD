@@ -67,7 +67,7 @@ public final class MusaAiDisciplinePlan {
             for(String key:sections)
                 out.append("• ").append(sectionLabel(key)).append(": ")
                    .append(MusaAiVisualDiscipline.focus(key)).append(".\n");
-            out.append("Önce görselde baskın gerçek sistemleri belirle; çizimde görülmeyen disiplinler için uzun kontrol listesi üretme. Her kanıtlanan alt disiplin için AYRI başlık aç. Her başlık altında yalnız ")
+            out.append("Önce görselde baskın gerçek sistemleri belirle; çizimde görülmeyen disiplinler için uzun kontrol listesi üretme. Her alt disiplin için AYRI başlık aç, fakat yalnız görüntüde kanıtlanan sistemleri göster. Her başlık altında yalnız ")
                .append("görüntüde gerçekten okunan cihaz/hat/ölçü/mahal ve konumunu, ")
                .append("şüpheli eksik/çelişkiyi, koordinasyon ihtiyacını ve belirsizliği bildir. ")
                .append("Görülemeyen sistemi 'görsel kanıt yok / ayrıca incelenmeli' olarak belirt; ")
