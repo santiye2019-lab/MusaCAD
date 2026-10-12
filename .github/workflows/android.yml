@@ -669,6 +669,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/CadRasterReferenceDisclosureTest.java
           java -cp /tmp/musacad-tests CadRasterReferenceDisclosureTest
+      - name: Test real 3D mesh SECTION output and WCS coordinates
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadUcs3d.java app/src/main/java/com/musa/cad/CadSolidKernel.java app/src/main/java/com/musa/cad/CadSolidCommand.java app/src/main/java/com/musa/cad/CadMeshSection.java tests/CadMeshSectionTest.java
+          java -cp /tmp/musacad-tests CadMeshSectionTest
       - name: Test generated 3D EXTRUDE REVOLVE and orthogonal Boolean solids
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadUcs3d.java app/src/main/java/com/musa/cad/CadSolidKernel.java app/src/main/java/com/musa/cad/CadSolidCommand.java tests/CadSolidKernelTest.java tests/CadUcs3dTest.java
