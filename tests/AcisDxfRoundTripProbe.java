@@ -39,7 +39,7 @@ public final class AcisDxfRoundTripProbe {
                     String kind=words[0].matches("-\\d+")?words[1]:words[0];
                     if(!java.util.Arrays.asList("face","loop","coedge","edge","vertex","point","body","shell").contains(kind))continue;
                     int index=sampleCounts.getOrDefault(kind,0);sampleCounts.put(kind,index+1);
-                    if(index<2&&(bodies==1||bodies==3))
+                    if(index<2&&(bodies>=1&&bodies<=3))
                         System.out.printf("ACIS_PUBLIC_REF ordinal=%d kind=%s record=%s%n",ordinal,kind,
                             rec.trim().substring(0,Math.min(220,rec.trim().length())).replaceAll("[^a-zA-Z0-9. $-]","_"));
                 }
@@ -47,7 +47,7 @@ public final class AcisDxfRoundTripProbe {
                 String prefix=decoded.substring(0,Math.min(110,decoded.length())).replaceAll("[^a-zA-Z0-9. -]","_");
                 System.out.printf("ACIS_PUBLIC_FIXTURE_BODY index=%d kind=%s chunks=%d chars=%d classes=%s head=%s%n",
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
-                if(bodies==1||bodies==3)debugParseTopology(decoded,bodies);
+                if(bodies>=1&&bodies<=3)debugParseTopology(decoded,bodies);
             }
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
