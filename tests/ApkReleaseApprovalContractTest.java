@@ -26,6 +26,10 @@ public final class ApkReleaseApprovalContractTest {
         String android=read(".github/workflows/android.yml");
         guarded(".github/workflows/android.yml",manual);
         require(android.contains("if: ${{ "+manual+" }}"),"Android APK must not build on push");
+        require(!android.contains("github.head_ref == 'feature/gandalf-autoupload-retention-20261011'"),
+            "A pull request must not automatically produce development APKs");
+        require(android.contains("if: ${{ github.event_name == 'workflow_dispatch' && inputs.sandbox_approved == true }}"),
+            "Development APK requires manual explicit approval");
         require(!android.contains("contains(github.event.head_commit.message, '[build-apk]')"),
             "commit message must never trigger an APK");
         guarded(".github/workflows/production-apk.yml",manual);
