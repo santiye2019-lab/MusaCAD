@@ -142,6 +142,18 @@ public final class Dxf3dMeshTest {
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
                 throw new AssertionError("ACIS triangle must become real tessellated geometry");
             for(int line:mesh.sourceLines)if(line!=-1)throw new AssertionError("tessellated ACIS vertices are read-only");
+            if(mesh.acisDanglingHistoryReferences!=0||mesh.acisDanglingNonHistoryReferences!=0)
+                throw new AssertionError("Valid ACIS triangle contains no unresolved SAT references");
+            String historyCase=dxf.toString().replace("0\\nENDSEC\\n",
+                "3\\n-90 persubent-acadsolidhistory-attrib $999 $1000 #\\n0\\nENDSEC\\n");
+            Files.writeString(file.toPath(),historyCase,StandardCharsets.UTF_8);
+            Dxf3dMesh withHistory=Dxf3dMesh.read(file);
+            if(withHistory.solidProxy||withHistory.triangles.length!=3||
+               withHistory.acisFaces!=1||withHistory.acisTessellatedFaces!=1||
+               withHistory.acisDanglingHistoryReferences!=2||
+               withHistory.acisDanglingNonHistoryReferences!=0||
+               withHistory.acisDanglingReferences!=2||withHistory.acisPartialGeometrySolids!=1)
+                throw new AssertionError("History-only SAT refs must not hide genuine 3D source geometry");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
@@ -184,7 +196,8 @@ public final class Dxf3dMeshTest {
             if(mesh.solidProxy||mesh.acisSolids!=1||mesh.unsupportedSolids!=1||
                mesh.acisMissingGeometrySolids!=1||mesh.acisPartialGeometrySolids!=0)
                 throw new AssertionError("Unrenderable source ACIS body must be reported missing");
-            if(mesh.acisFaces!=1||mesh.acisTessellatedFaces!=0||mesh.acisUnsupportedFaces!=1)
+            if(mesh.acisFaces!=1||mesh.acisTessellatedFaces!=0||mesh.acisUnsupportedFaces!=1||
+               mesh.acisDanglingHistoryReferences!=0||mesh.acisDanglingNonHistoryReferences<1)
                 throw new AssertionError("Unrendered ACIS face inventory was lost");
             if(mesh.triangles.length!=0||mesh.edges.length!=2)
                 throw new AssertionError("Unrendered ACIS body must not produce imaginary geometry");
