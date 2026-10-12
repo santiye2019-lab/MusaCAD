@@ -52,7 +52,8 @@ public final class MusaAiDisciplinePlan {
             return Collections.unmodifiableList(new ArrayList<>(types));
         }
         public String register(){
-            StringBuilder out=new StringBuilder("İSTENEN DİSİPLİN VE ALT SİSTEM DENETİMLERİ");
+            if(sections.isEmpty())return "Yerel CAD etiketlerinde güvenilir alt disiplin sınıflandırması bulunamadı; görsel AI tanısı bekleniyor.";
+            StringBuilder out=new StringBuilder("İNCELENECEK DİSİPLİNLER • ÇİZİM KANITI / İSTEK");
             for(String key:sections)
                 out.append("\n• ").append(sectionLabel(key)).append(" — ")
                    .append(MusaAiVisualDiscipline.focus(key));
@@ -66,7 +67,7 @@ public final class MusaAiDisciplinePlan {
             for(String key:sections)
                 out.append("• ").append(sectionLabel(key)).append(": ")
                    .append(MusaAiVisualDiscipline.focus(key)).append(".\n");
-            out.append("Her alt disiplin için AYRI başlık aç. Her başlık altında yalnız ")
+            out.append("Önce görselde baskın gerçek sistemleri belirle; çizimde görülmeyen disiplinler için uzun kontrol listesi üretme. Her kanıtlanan alt disiplin için AYRI başlık aç. Her başlık altında yalnız ")
                .append("görüntüde gerçekten okunan cihaz/hat/ölçü/mahal ve konumunu, ")
                .append("şüpheli eksik/çelişkiyi, koordinasyon ihtiyacını ve belirsizliği bildir. ")
                .append("Görülemeyen sistemi 'görsel kanıt yok / ayrıca incelenmeli' olarak belirt; ")
@@ -206,6 +207,56 @@ public final class MusaAiDisciplinePlan {
             reportScope="all";label="Çok disiplinli / çok sistemli denetim";
         }
         return new Plan(reportScope,label,chosen,false);
+    }
+
+    /**
+     * For an open-ended request, select the CAD-evidenced predominant systems
+     * instead of printing every possible mechanical/electrical subsystem.
+     * This is only a *focus candidate* based on labels/layers; Qwen must
+     * independently identify what is actually visible. Explicit user scope wins.
+     */
+    public static Plan focusOnDrawing(String raw,Plan plan,MusaAiDrawingIndex index){
+        if(plan==null||plan.fullProject||plan.sections.size()<=3||index==null)return plan;
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(contains(q,"tum alt sistem","butun alt sistem","butun mekanik",
+                "tum mekanik","tum elektrik","her sistemi","tum sistemleri",
+                "tek tek hepsini","temiz su","pis su","atik su","kalorifer",
+                "havalandirma","sogutma","klima","sprinkler","yangin sondurme",
+                "otomasyon","dogalgaz","kuvvetli akim","zayif akim",
+                "mimari ve statik","mimariyle statik"))return plan;
+        LinkedHashMap<String,Integer> counts=new LinkedHashMap<>();
+        for(String key:plan.sections)counts.put(key,0);
+        for(MusaAiDrawingIndex.Item item:index.items()){
+            if(item==null)continue;
+            for(String key:counts.keySet()){
+                if(matchesSection(key,item)){
+                    int weight=item.text.isEmpty()?1:3;
+                    counts.put(key,Math.min(100000,counts.get(key)+weight));
+                }
+            }
+        }
+        int maximum=0;
+        for(Integer score:counts.values())maximum=Math.max(maximum,score);
+        if(maximum<3){
+            LinkedHashSet<String> candidates=new LinkedHashSet<>();
+            String parent=plan.scope.equals("mechanical")?"mechanical":
+                plan.scope.equals("electrical")?"electrical":"";
+            if(!parent.isEmpty())candidates.add(parent);
+            return new Plan(parent.isEmpty()?"all":parent,
+                "Paftadaki alt disiplinler • görsel tanı bekleniyor",candidates,false);
+        }
+        final int minimum=Math.max(3,maximum/5);
+        ArrayList<String> ordered=new ArrayList<>(counts.keySet());
+        ordered.sort((a,b)->Integer.compare(counts.get(b),counts.get(a)));
+        LinkedHashSet<String> selected=new LinkedHashSet<>();
+        for(String key:ordered){
+            if(counts.get(key)<minimum||selected.size()==3)break;
+            selected.add(key);
+        }
+        String label=selected.size()==1?sectionLabel(selected.iterator().next()):
+            "Paftada öne çıkan "+selected.size()+" alt sistem";
+        String scope=selected.size()==1?selected.iterator().next():plan.scope;
+        return new Plan(scope,label,selected,false);
     }
 
     public static String sectionLabel(String scope){
