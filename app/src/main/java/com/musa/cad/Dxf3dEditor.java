@@ -10,13 +10,20 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Writes changed XYZ tags into a new DXF while retaining other drawing records. */
 public final class Dxf3dEditor {
     private Dxf3dEditor(){}
 
     public static void write(File source,OutputStream target,Dxf3dMesh mesh,float[] original)throws IOException{
-        if(original.length!=mesh.xyz.length)throw new IOException("3B düzenleme verisi eksik");
+        if(source==null||!source.isFile()||mesh==null||original==null||target==null)
+            throw new IOException("3B dosya veya kayıt hedefi bulunamadı");
+        if(original.length!=mesh.xyz.length||original.length%3!=0
+            ||mesh.coordinateSlots.length!=original.length/3
+            ||mesh.sourceLines.length!=original.length/3)
+            throw new IOException("3B düzenleme verisi eksik");
         Map<Long,Float> replacements=new HashMap<>();
         for(int i=0;i<original.length;i+=3){
             int slot=mesh.coordinateSlots[i/3],line=mesh.sourceLines[i/3];
@@ -25,11 +32,21 @@ public final class Dxf3dEditor {
                 if(!Float.isFinite(value))throw new IOException("Geçersiz 3B koordinat");
                 if(value!=original[i+axis]){
                     if(line<0)throw new IOException("Blok içindeki dönüştürülmüş 3B geometri doğrudan kaydedilemez");
-                    replacements.put(key(line,10+axis*10+slot),value);
+                    long address=key(line,10+axis*10+slot);
+                    Float previous=replacements.putIfAbsent(address,value);
+                    if(previous!=null&&Float.compare(previous,value)!=0)
+                        throw new IOException("Aynı DXF etiketi için çelişen 3B koordinatlar");
                 }
             }
         }
         if(replacements.isEmpty())throw new IOException("Kaydedilecek 3B değişiklik yok");
+        // Validate the entire source and all requested addresses before touching
+        // the caller's output stream. An absent/malformed DXF tag must not leave
+        // a partially written 3D file behind.
+        long length=source.length(),modified=source.lastModified();
+        validateBeforeWrite(source,replacements);
+        if(length!=source.length()||modified!=source.lastModified())
+            throw new IOException("Kaynak DXF kayıt sırasında değiştirildi");
         int changed=0,recordLine=-1,line=0;
         try(BufferedInputStream reader=new BufferedInputStream(new FileInputStream(source));
             BufferedOutputStream writer=new BufferedOutputStream(target)){
@@ -51,6 +68,28 @@ public final class Dxf3dEditor {
             if(changed!=replacements.size())throw new IOException("Bazı 3B kaynak koordinatları bulunamadı");
         }
     }
+    private static void validateBeforeWrite(File source,Map<Long,Float> replacements)throws IOException{
+        Set<Long> found=new HashSet<>();
+        int recordLine=-1,line=0;
+        try(BufferedInputStream in=new BufferedInputStream(new FileInputStream(source))){
+            byte[] code;
+            while((code=readLine(in))!=null){
+                byte[] value=readLine(in);
+                if(value==null)throw new IOException("DXF etiket çifti eksik");
+                int tag;
+                try{tag=Integer.parseInt(new String(code,StandardCharsets.US_ASCII).trim());}
+                catch(NumberFormatException e){throw new IOException("Geçersiz DXF etiketi",e);}
+                if(tag==0)recordLine=line;
+                long address=key(recordLine,tag);
+                if(replacements.containsKey(address)&&!found.add(address))
+                    throw new IOException("Birden fazla kaynak 3B koordinat etiketi eşleşti");
+                line+=2;
+            }
+        }
+        if(found.size()!=replacements.size())
+            throw new IOException("Bazı 3B kaynak koordinatları bulunamadı; dosya yazılmadı");
+    }
+
     private static byte[] readLine(BufferedInputStream in)throws IOException{
         ByteArrayOutputStream line=new ByteArrayOutputStream(64);int b;
         while((b=in.read())!=-1){line.write(b);if(b=='\n')break;if(line.size()>1024*1024)throw new IOException("DXF satırı çok uzun");}
