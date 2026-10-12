@@ -19,6 +19,7 @@ public final class AcisSatMeshTest {
 
         testCylinderSide();
         testImplicitInvertedCoedgeLoop();
+        testPlanarTriangularHoleAndUnsafeVariants();
         testUnsupportedFaceWireframe();
         testMissingAcisReferencesStillCountFaces();
 
@@ -86,6 +87,78 @@ public final class AcisSatMeshTest {
         StringBuilder out=new StringBuilder("700 0 1 0\nMusaCAD implicit SAT\n1 1e-06 1e-10\n");
         for(String record:records)out.append(record).append(" #\n");
         return out.append("End-of-ACIS-data\n").toString();
+    }
+
+    private static void testPlanarTriangularHoleAndUnsafeVariants(){
+        double[][] outside={{0,0,0},{6,0,0},{0,6,0}};
+        double[][] inside={{1,1,0},{2,1,0},{1,2,0}};
+        AcisSatMesh.Result ring=AcisSatMesh.parseDxfChunks(List.of(
+            twoLoopPlanarSat(outside,inside)));
+        if(!ring.complete||ring.faces!=1||ring.tessellatedFaces!=1||
+           ring.unsupportedFaces!=0||ring.triangles.length!=18||ring.edges.length!=12)
+            throw new AssertionError("Nested triangle opening must make 6 faces without filling the void");
+        double actualArea=0;
+        for(int i=0;i<ring.triangles.length;i+=3){
+            int ia=3*ring.triangles[i],ib=3*ring.triangles[i+1],ic=3*ring.triangles[i+2];
+            float[] v=ring.xyz;
+            double ax=v[ia],ay=v[ia+1],bx=v[ib],by=v[ib+1],cx=v[ic],cy=v[ic+1];
+            double area=Math.abs((bx-ax)*(cy-ay)-(by-ay)*(cx-ax))/2;
+            actualArea+=area;
+            double x=(ax+bx+cx)/3,y=(ay+by+cy)/3;
+            if(x>1+1e-7&&y>1+1e-7&&x+y<3-1e-7)
+                throw new AssertionError("A triangle was incorrectly drawn over the actual planar opening");
+        }
+        if(Math.abs(actualArea-17.5)>1e-6)
+            throw new AssertionError("Triangular hole area not subtracted: "+actualArea);
+
+        double[][] disjoint={{8,8,0},{9,8,0},{8,9,0}};
+        AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of(
+            twoLoopPlanarSat(outside,disjoint)));
+        if(bad.complete||bad.triangles.length!=0||bad.faces!=1||bad.unsupportedFaces!=1)
+            throw new AssertionError("Disjoint planar contours must not be glued together");
+
+        double[][] nonplanar={{1,1,0.5},{2,1,0.5},{1,2,0.5}};
+        AcisSatMesh.Result offset=AcisSatMesh.parseDxfChunks(List.of(
+            twoLoopPlanarSat(outside,nonplanar)));
+        if(offset.complete||offset.triangles.length!=0)
+            throw new AssertionError("Noncoplanar loops must not fabricate a planar annulus");
+    }
+
+    private static String twoLoopPlanarSat(double[][] outer,double[][] inner){
+        double[][] xyz=new double[6][3];
+        for(int i=0;i<3;i++){xyz[i]=outer[i];xyz[i+3]=inner[i];}
+        StringBuilder sat=new StringBuilder("700 0 1 0\nMusaCAD nested-planar-SAT fixture\n1 1e-06 1e-10\n");
+        for(int i=0;i<6;i++){
+            sat.append("-").append(i).append(" point $-1 ")
+                .append(xyz[i][0]).append(' ').append(xyz[i][1]).append(' ')
+                .append(xyz[i][2]).append(" #\n");
+            sat.append("-").append(10+i).append(" vertex $-1 $-1 $")
+                .append(i).append(" #\n");
+        }
+        for(int i=0;i<6;i++){
+            int base=(i/3)*3,next=base+(i+1)%3,prev=base+(i+2)%3;
+            int curve=20+i,edge=30+i,coedge=40+i,loop=50+i/3;
+            sat.append("-").append(curve).append(" straight-curve $-1 ")
+                .append(xyz[i][0]).append(' ').append(xyz[i][1]).append(' ')
+                .append(xyz[i][2]).append(' ')
+                .append(xyz[next][0]-xyz[i][0]).append(' ')
+                .append(xyz[next][1]-xyz[i][1]).append(' ')
+                .append(xyz[next][2]-xyz[i][2]).append(" I I #\n");
+            sat.append("-").append(edge).append(" edge $-1 $").append(10+i)
+                .append(" 0 $").append(10+next).append(" 1 $")
+                .append(coedge).append(" $").append(curve)
+                .append(" forward 7 unknown #\n");
+            sat.append("-").append(coedge).append(" coedge $-1 $")
+                .append(40+next).append(" $").append(40+prev)
+                .append(" $-1 $").append(edge).append(" forward $")
+                .append(loop).append(" $-1 #\n");
+        }
+        sat.append("-50 loop $-1 $-1 $40 $60 #\n")
+            .append("-51 loop $-1 $-1 $43 $60 #\n")
+            .append("-70 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #\n")
+            .append("-60 face $-1 $-1 $50 $-1 $-1 $70 forward single #\n")
+            .append("End-of-ACIS-data\n");
+        return sat.toString();
     }
 
     private static void testMissingAcisReferencesStillCountFaces(){
