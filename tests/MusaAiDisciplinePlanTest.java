@@ -85,6 +85,11 @@ public final class MusaAiDisciplinePlanTest {
             "natural low-current review");
         yes(MusaAiAnalysisIntent.isReview("Kuvvetli akım projesini analiz et"),
             "natural strong-current review");
+        yes(!MusaAiDisciplinePlan.wantsMultiOpenFiles("Tüm disiplinleri incele"),
+            "All disciplines in active project is not a multi-file project package");
+        yes(MusaAiDisciplinePlan.wantsMultiOpenFiles("Tüm açık projeleri karşılaştır"),
+            "Explicit multi-open-project intent is retained");
+        has(main,"MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)");
         System.out.println("MusaAiDisciplinePlanTest OK");
     }
 }
