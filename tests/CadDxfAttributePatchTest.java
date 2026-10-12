@@ -44,6 +44,14 @@ public final class CadDxfAttributePatchTest {
             assertTrue(Arrays.equals(original,Files.readAllBytes(source.toPath())),"source file must remain untouched");
             assertTrue(out.toString(StandardCharsets.UTF_8).contains("2\nCODE\n1\nUNTOUCHED\n"),"other INSERT preserved");
             assertTrue(out.toString(StandardCharsets.UTF_8).contains("0\nTEXT\n5\n15\n1\nOLD\n"),"unrelated text preserved");
+            ByteArrayOutputStream legacy=new ByteArrayOutputStream();
+            boolean encodingRejected=false;
+            try {
+                CadDxfAttributePatch.write(source,legacy,
+                    java.nio.charset.Charset.forName("windows-1252"),
+                    Collections.singletonList(new CadDxfAttributePatch.Change("A1","CODE","Türkçe 😀")));
+            } catch(IOException expectedError) { encodingRejected=true; }
+            assertTrue(encodingRejected&&legacy.size()==0,"unmappable ANSI characters rejected before publish");
             failsWithoutBytes(source,new CadDxfAttributePatch.Change("MISSING","CODE","X"));
             failsWithoutBytes(source,new CadDxfAttributePatch.Change("A1","MISSING","X"));
             failsWithoutBytes(source,new CadDxfAttributePatch.Change("A1","CODE","X"),
