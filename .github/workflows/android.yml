@@ -787,11 +787,51 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Build developer test APK (no production signing or deployment)
+      # The preview APK must keep the same gateway addresses as the previously
+      # functioning Gandalf build. Never publish a deceptive "AI ayarsız" APK.
+      # URLs are public routing information; provider credentials stay server-side.
+      - name: Verify Gandalf connection configuration before assembling test APK
+        env:
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL }}
+        shell: bash
         run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          for name, suffix in [
+              ('MUSACAD_AI_API_URL', '/v1/analyze'),
+              ('MUSACAD_AI_SESSION_URL', '/v1/ai/session')]:
+              val=os.environ.get(name,'').strip()
+              parsed=urlsplit(val)
+              if parsed.scheme!='https' or not parsed.hostname or not parsed.path.endswith(suffix) or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                  raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
+          print('Both Gandalf AI endpoint configurations are present and URL-safe.')
+          PY
+      - name: Build developer test APK with existing Gandalf configuration (no production deployment)
+        env:
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon assembleDirectDebug
           test -s app/build/outputs/apk/direct/debug/app-direct-debug.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          builds=list(Path('app/build/generated/source/buildConfig').rglob('BuildConfig.java'))
+          expected=[x for x in builds if '/direct/debug/' in str(x).replace('\\','/')]
+          if len(expected)!=1:
+              raise SystemExit('::error::Cannot verify the assembled directDebug BuildConfig; APK withheld.')
+          source=expected[0].read_text()
+          for field in ('AI_API_URL','AI_SESSION_URL'):
+              if not re.search(r'\\b'+field+r'\\s*=\\s*"https://[^"]+"',source):
+                  raise SystemExit('::error::Assembled APK does not contain a configured '+field+'; APK withheld.')
+          print('Verified both Gandalf endpoint values in compiled-configuration source (values not logged).')
+          PY
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
