@@ -974,6 +974,13 @@ public class MainActivity extends AppCompatActivity {
             });
             return;
         }
+        // Natural discipline-based BOQ is read-only and never builds the
+        // expensive drawing projection on Android's UI thread.
+        if(MusaAiDisciplineEstimate.wantsEstimate(raw)&&
+           !MusaAiAnalysisIntent.isVisionFirstReview(raw)){
+            runMusaAiDisciplineTakeoff(raw,reply);
+            return;
+        }
         if(MusaAiYfk2025Parser.wantsLookup(raw)){
             reply.progress("2025 çevrim dışı poz kataloğunda aranıyor…");
             yfkCatalogExecutor.submit(()->{
@@ -1751,6 +1758,76 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void runMusaAiDisciplineTakeoff(String raw,MusaAiPanel.Reply reply){
+        final DxfParser.Result drawing=activeDxf;
+        final String fileName=currentDisplayName;
+        final java.util.List<MusaAiCsbEstimate.Rate> verifiedRates=
+            currentProject==null?Collections.emptyList():
+                new ArrayList<>(currentProject.csbRates);
+        if(drawing==null){
+            reply.send("Disiplin bazlı keşif için DWG/DXF vektör çizimi açın.");
+            return;
+        }
+        reply.progress("Gandalf • Disiplin bazlı DWG metraj adayları ve yüklenen poz kitapları inceleniyor…");
+        try{
+            aiExecutor.submit(()->{
+                try{
+                    MusaAiDrawingIndex idx=drawing.aiDrawingIndex(Integer.MAX_VALUE);
+                    String fallback=MusaAiVisualDiscipline.resolve(
+                        MusaAiAnalysisIntent.scope(raw),raw,fileName,idx);
+                    MusaAiDisciplinePlan.Plan plan=MusaAiDisciplinePlan.resolve(raw,fallback);
+                    MusaAiDisciplineEstimate.Result measured=
+                        MusaAiDisciplineEstimate.analyze(idx,plan);
+                    StringBuilder report=new StringBuilder(measured.report);
+                    boolean catalog=false;
+                    if(MusaAiYfk2025Library.status(this).installed){
+                        catalog=true;
+                        report.append("\n\n").append(
+                            MusaAiYfk2025Library.suggestForDisciplineTakeoff(this,measured));
+                    }
+                    if(MusaAiYfkOfflineCatalog.status(this).installed){
+                        catalog=true;
+                        report.append("\n\n").append(
+                            MusaAiYfkOfflineCatalog.suggestForDisciplineTakeoff(this,measured));
+                    }
+                    if(!catalog)report.append("\n\nBİRİM FİYAT KİTABI YÜKLENMEDİ: ")
+                        .append("Metraj adayları hazır; kaynaklı poz/fiyat karşılaştırması için ")
+                        .append("2025 kitabını telefona yükleyin veya resmî 2026 YFK kitabını kurun.");
+                    if(plan.needsMechanicalEvidence()&&!verifiedRates.isEmpty()){
+                        MusaAiCsbEstimate.Result mecha=
+                            MusaAiCsbEstimate.analyze(idx,verifiedRates);
+                        report.append("\n\nBAĞIMSIZ MEKANİK METRAJ / KULLANICI DOĞRULAMALI FİYAT EKİ:")
+                            .append(mecha.report);
+                    }
+                    report.append("\n\nGenel toplam: HESAPLANMADI. ")
+                        .append("Kitaptan bulunan aday fiyatlar doğrulanmış poz/tarif/birim ")
+                        .append("eşleşmesi veya güncel birim fiyat onayı sayılmaz.");
+                    final String title=measured.title;
+                    final String text=report.toString();
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||drawing!=activeDxf){
+                            if(reply!=null)reply.send("Keşif hesaplanırken aktif proje değişti; "+
+                                "eski çizim raporu yeni projeye kaydedilmedi.");
+                            return;
+                        }
+                        lastAiReport=text;
+                        lastAiReportTitle=title;
+                        lastAiReportSourceIds=Collections.unmodifiableList(
+                            new ArrayList<>(measured.sourceIds));
+                        if(reply!=null)reply.send(text+
+                            "\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
+                    });
+                }catch(Exception e){
+                    final String msg="Keşif ön analizi tamamlanamadı: "+
+                        (e.getMessage()==null?"CAD veya katalog okunamadı.":e.getMessage());
+                    runOnUiThread(()->{if(reply!=null)reply.send(msg);});
+                }
+            });
+        }catch(RejectedExecutionException e){
+            reply.send("Gandalf keşif iş parçacığı şu anda kullanılamıyor.");
+        }
+    }
+
     private static String localContextEvidence(MusaAiDrawingIndex snapshot){
         if(snapshot==null)return "";
         // All quantities remain tentative. The whole PDF/YFK catalog is never sent.
@@ -2379,22 +2456,30 @@ public class MainActivity extends AppCompatActivity {
             if(synthesis.includeTakeoff){
                 reply.progress("Gandalf • Görsel bulgular sonrası yerel metraj"+
                     " ve kaynaklı poz adayları kontrol ediliyor…");
-                MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
-                    currentProject==null?Collections.emptyList():currentProject.csbRates);
-                synthesis.quantityEvidence=measured.report;
-                if(MusaAiYfk2025Library.status(this).installed){
-                    synthesis.priceCandidates="2025 resmî kitap adayları:"+
-                        "\nKaynak tarifi, birim ve montaj kapsamı teyit edilmeden"+
-                        " poz kodu kesin sayılmaz.\n"+
-                        MusaAiYfk2025Library.suggestForTakeoff(this,measured);
-                }else{
-                    synthesis.priceCandidates="2025 resmî poz kitabı bu telefonda"+
-                        " kurulu değil; doğrulanmış poz eşleştirmesi yapılamadı.";
+                MusaAiDisciplineEstimate.Result takeoff=
+                    MusaAiDisciplineEstimate.analyze(snapshot,plan);
+                synthesis.quantityEvidence=takeoff.report;
+                StringBuilder catalogCandidates=new StringBuilder();
+                if(MusaAiYfk2025Library.status(this).installed)
+                    catalogCandidates.append(
+                        MusaAiYfk2025Library.suggestForDisciplineTakeoff(this,takeoff));
+                if(MusaAiYfkOfflineCatalog.status(this).installed){
+                    if(catalogCandidates.length()>0)catalogCandidates.append("\n\n");
+                    catalogCandidates.append(
+                        MusaAiYfkOfflineCatalog.suggestForDisciplineTakeoff(this,takeoff));
                 }
-                if(currentProject!=null&&currentProject.boqModel!=null)
-                    synthesis.priceCandidates+="\n"+
-                        MusaAiCsbMaterialCompare.compare(
-                            currentProject.boqModel,measured).report;
+                if(catalogCandidates.length()==0)
+                    catalogCandidates.append("Poz kitabı yüklenmemiş; kaynaklı poz adayı belirlenemedi.");
+                if(plan.needsMechanicalEvidence()){
+                    MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
+                        currentProject==null?Collections.emptyList():currentProject.csbRates);
+                    synthesis.quantityEvidence+="\n\nMEKANİK KANIT KONTROLÜ:\n"+measured.report;
+                    if(currentProject!=null&&currentProject.boqModel!=null)
+                        catalogCandidates.append("\n\n").append(
+                            MusaAiCsbMaterialCompare.compare(
+                                currentProject.boqModel,measured).report);
+                }
+                synthesis.priceCandidates=catalogCandidates.toString();
             }
         }else{
             // A Qwen outage is never misrepresented as a local visual report.
