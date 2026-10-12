@@ -79,14 +79,14 @@ public class MainActivity extends AppCompatActivity {
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,colorDiagnostics;boolean dxf,handedOff;
         List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,loadDiagnostics,colorDiagnostics;boolean dxf;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
@@ -4218,7 +4218,8 @@ public class MainActivity extends AppCompatActivity {
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                         loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                         openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
-                        android.util.Log.i("MusaCAD-CadLoad",openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount));
+                        project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
+                        android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4294,9 +4295,13 @@ public class MainActivity extends AppCompatActivity {
                             // Color profiles are diagnostics, not a per-object parity proof.
                             CadColorProfile fastColors=provisional.colorProfile();
                             CadColorProfile fullColors=parsed.colorProfile();
+                            boolean suspect=fastColors.likelyFirstPaintMismatch(fullColors);
+                            loaded.colorDiagnostics="Native: "+fastColors.safeSummary()+
+                                "\\nDXF: "+fullColors.safeSummary()+
+                                "\\nİlk kare renk uyumsuzluğu şüphesi: "+(suspect?"VAR":"Görülmedi");
                             android.util.Log.i("MusaCAD-CadColor",
                                 "native{"+fastColors.safeSummary()+"} full{"+fullColors.safeSummary()+"}"+
-                                " suspect="+fastColors.likelyFirstPaintMismatch(fullColors));
+                                " suspect="+suspect);
                         }
                         if(parsed==null||parsed.entityCount<=0)
                             throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
@@ -4311,7 +4316,7 @@ public class MainActivity extends AppCompatActivity {
                         if(isFinishing()||isDestroyed()){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();return;}
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
                         Bitmap oldPreview=project.bitmap;
-                        project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
+                        project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;project.colorDiagnostics=loaded.colorDiagnostics;
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
@@ -4323,7 +4328,8 @@ public class MainActivity extends AppCompatActivity {
                         if(oldPreview!=null&&oldPreview!=parsed.bitmap&&!oldPreview.isRecycled())oldPreview.recycle();
                         if(activeLoad==task)activeLoad=null;refreshProjectTabs();
                         openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
-                        android.util.Log.i("MusaCAD-CadLoad",openTrace.safeSummary(loaded.file.length(),parsed.entityCount));
+                        project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),parsed.entityCount);
+                        android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                         // Metadata/thumbnail persistence is secondary to showing the complete model.
                         scheduleRecentMetadataRecord(uri,loaded.name);
                     });
@@ -4338,7 +4344,8 @@ public class MainActivity extends AppCompatActivity {
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
                     loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
-                    android.util.Log.i("MusaCAD-CadLoad",openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount));
+                    project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
+                    android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
