@@ -76,6 +76,16 @@ public final class AcisSatMeshTest {
         AcisSatMesh.Result unsafe=AcisSatMesh.parseDxfChunks(List.of(implicitSat(brokenBody)));
         if(!unsafe.hasGeometry()||unsafe.complete||unsafe.danglingReferences!=1)
             throw new AssertionError("A visible face must not certify a body with dangling SAB refs");
+        String historyPayload=implicitSat(records).replace("End-of-ACIS-data",
+            "persubent-acadsolidhistory-attrib $999 $1000 #\\nEnd-of-ACIS-data");
+        AcisSatMesh.Result missingHistory=AcisSatMesh.parseDxfChunks(List.of(historyPayload));
+        if(!missingHistory.hasGeometry()||missingHistory.complete||
+           missingHistory.tessellatedFaces!=1||missingHistory.danglingReferences!=2||
+           missingHistory.danglingHistoryReferences!=2||
+           missingHistory.danglingNonHistoryReferences!=0)
+            throw new AssertionError("ACIS history attributes must not be misreported as geometry damage");
+        if(unsafe.danglingHistoryReferences!=0||unsafe.danglingNonHistoryReferences!=1)
+            throw new AssertionError("Broken B-Rep geometry pointer incorrectly classified as history");
         // A broken next-reference must not be closed with a fabricated line.
         records[8]=records[8].replace("$11 $7","$999 $7");
         AcisSatMesh.Result broken=AcisSatMesh.parseDxfChunks(List.of(implicitSat(records)));
@@ -171,7 +181,7 @@ public final class AcisSatMeshTest {
         AcisSatMesh.Result result=AcisSatMesh.parseDxfChunks(List.of(sat));
         if(result.hasGeometry()||result.complete||result.faces!=1||
            result.unsupportedFaces!=1||result.tessellatedFaces!=0||
-           result.danglingReferences<1)
+           result.danglingReferences<1||result.danglingNonHistoryReferences<1)
             throw new AssertionError("Missing ACIS geometry must retain its real face inventory");
     }
 
