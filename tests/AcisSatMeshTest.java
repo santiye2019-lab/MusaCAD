@@ -18,11 +18,30 @@ public final class AcisSatMeshTest {
         if(mesh.edges.length!=24)throw new AssertionError("cube must preserve 12 real B-Rep edges");
 
         testCylinderSide();
+        testUnsupportedFaceWireframe();
 
         AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of("ACIS_PLACEHOLDER"));
         if(bad.hasGeometry())throw new AssertionError("invalid ACIS payload must not invent geometry");
 
         System.out.println("ACIS SAT B-Rep cases passed: encrypted payload, planar solids, cylindrical/conic loft and safe fallback.");
+    }
+
+    private static void testUnsupportedFaceWireframe(){
+        String sat="700 0 1 0\\nACIS orphan-edge test\\n1 1e-06 1e-10\\n"
+            +"-0 point $-1 0 0 0 #\\n"
+            +"-1 point $-1 3 0 0 #\\n"
+            +"-10 vertex $-1 $-1 $0 #\\n"
+            +"-11 vertex $-1 $-1 $1 #\\n"
+            +"-20 straight-curve $-1 0 0 0 1 0 0 I I #\\n"
+            +"-30 edge $-1 $10 0 $11 1 $-1 $20 forward 7 unknown #\\n"
+            +"-40 spline-surface $-1 #\\n"
+            +"-50 face $-1 $-1 $-1 $-1 $-1 $40 forward single #\\n"
+            +"End-of-ACIS-data\\n";
+        AcisSatMesh.Result mesh=AcisSatMesh.parseDxfChunks(List.of(sat));
+        if(!mesh.hasGeometry()||mesh.complete||mesh.faces!=1||mesh.unsupportedFaces!=1)
+            throw new AssertionError("Unsupported ACIS face must retain only true source edges");
+        if(mesh.triangles.length!=0||mesh.edges.length!=2)
+            throw new AssertionError("Wireframe fallback invented triangles or lost a real edge");
     }
 
     private static void testCylinderSide(){
