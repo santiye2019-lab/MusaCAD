@@ -47,6 +47,8 @@ public final class MusaAiEngineeringSynthesis {
 
     public static final class Input {
         public String project="",layout="",discipline="";
+        /** Scope is resolved from explicit request or DWG metadata before Qwen. */
+        public String scope="";
         public int reviewedTiles, plannedTiles=9, reviewedCloseups, plannedCloseups;
         public String visualIssue="", closeupIssue="", viewInventory="", coverageRegister="";
         public String localVectorEvidence="", quantityEvidence="", priceCandidates="";
@@ -78,10 +80,15 @@ public final class MusaAiEngineeringSynthesis {
         if(data==null)throw new IllegalArgumentException("Sentez verisi yok");
         int total=Math.max(1,data.plannedTiles);
         int accepted=Math.max(0,Math.min(total,data.reviewedTiles));
-        StringBuilder out=new StringBuilder("GANDALF • GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU");
+        StringBuilder out=new StringBuilder("GANDALF • "+
+            (clean(data.scope).isEmpty()?"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU":
+                MusaAiVisualDiscipline.heading(data.scope)));
         out.append("\nProje: ").append(clean(data.project));
         out.append("\nDüzen: ").append(clean(data.layout));
         out.append("\nDisiplin: ").append(clean(data.discipline));
+        if(!clean(data.scope).isEmpty())
+            out.append("\nBu disiplin için kontrol odağı (bulgu değil): ")
+               .append(MusaAiVisualDiscipline.focus(data.scope));
         out.append("\nİşlem sırası: 1) Qwen çevrim içi görsel inceleme → ")
            .append("2) telefonda DWG kanıtlarıyla yerel çapraz kontrol → ")
            .append("3) mühendislik raporu.");
@@ -212,9 +219,15 @@ public final class MusaAiEngineeringSynthesis {
         out.append("\n• Qwen'in teknik bulguları yalnız gerçekten yanıt alınan bölgelere aittir.");
         out.append("\n• Yerel analiz ölçü, kaynak ID, blok/katman ve etiketleri ")
             .append("bağımsız olarak destekleyebilir; otomatik olarak mevzuata uygunluk onayı vermez.");
-        out.append("\n• DN/PN, montaj malzemesi, kolon düşeyliği, hidrolik hesap, ")
-            .append("sızdırmazlık, tesisat güzergâhı ve plan/kesit çelişkileri ")
-            .append("ortak referans ve hesapla teyit edilmelidir.");
+        if(clean(data.scope).isEmpty() || MusaAiVisualDiscipline.mechanicalScope(data.scope)){
+            out.append("\n• DN/PN, montaj malzemesi, kolon düşeyliği, hidrolik hesap, ")
+               .append("sızdırmazlık, tesisat güzergâhı ve plan/kesit çelişkileri ")
+               .append("ortak referans ve hesapla teyit edilmelidir.");
+        }else{
+            out.append("\n• ").append(MusaAiAnalysisIntent.label(data.scope))
+               .append(" denetiminde ").append(MusaAiVisualDiscipline.focus(data.scope))
+               .append(" için çizim, hesap ve ilgili disiplin referansları karşılaştırılmalıdır.");
+        }
         out.append("\n• DWG üzerinde değişiklik yapılmadı.");
 
         if(data.includeTakeoff) {
@@ -235,6 +248,10 @@ public final class MusaAiEngineeringSynthesis {
         if(!clean(data.coverageRegister).isEmpty())
             out.append("\n\n7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ\n")
                .append(clean(data.coverageRegister));
+        if(!clean(data.scope).isEmpty())
+            out.append("\n\nDİSİPLİN KAPSAMI: Ana teknik sonuçlar ")
+               .append(MusaAiAnalysisIntent.label(data.scope))
+               .append(" konusu içindir; farklı disiplin öğeleri yalnız koordinasyon bağlamında değerlendirilir.");
         out.append("\n\nSONUÇ: Bu rapor Qwen görsel gözlemleri ile telefonun ")
            .append("DWG kanıtlarının kaynakları karıştırılmadan derlenmiş ön denetimidir.")
            .append(" Teknik imalat kararları, kesin keşif ve mevzuat uygunluğu ")
