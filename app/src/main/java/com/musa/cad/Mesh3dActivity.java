@@ -64,14 +64,15 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void showModelCommands(FrameLayout root){
-        final String[] commands={"BOX","EXTRUDE","REVOLVE","UNION","INTERSECTION","DIFFERENCE"};
+        final String[] commands={"BOX","EXTRUDE","REVOLVE","UNION","INTERSECTION","DIFFERENCE","UCS"};
         final String[] suggestions={
             "0,0,0,10,6,4",
             "0,0;8,0;8,5;0,5|4",
             "1,0;2,0;2,5;1,5|48|360",
             "0,0,0,8,6,5|4,3,2,11,10,7",
             "0,0,0,8,6,5|4,3,2,11,10,7",
-            "0,0,0,8,6,5|4,3,2,11,10,7"
+            "0,0,0,8,6,5|4,3,2,11,10,7",
+            "10,20,30|0,1,0|-1,0,0"
         };
         new AlertDialog.Builder(this).setTitle("3B Modelleme • üçgen ağ / DXF")
             .setItems(commands,(dialog,index)->{
@@ -85,7 +86,9 @@ public final class Mesh3dActivity extends Activity {
                     .setView(input).setNegativeButton("İPTAL",null)
                     .setPositiveButton("MODELİ OLUŞTUR",(d,button)->{
                         try{
-                            CadSolidKernel.Mesh produced=CadSolidCommand.execute(commands[index],input.getText().toString());
+                            CadSolidKernel.Mesh produced="UCS".equals(commands[index])
+                                ?CadSolidCommand.applyUcs(generatedSolid,input.getText().toString())
+                                :CadSolidCommand.execute(commands[index],input.getText().toString());
                             Dxf3dMesh preview=Dxf3dMesh.fromGenerated(produced);
                             generatedSolid=produced;installMesh(root,preview);
                         }catch(Exception error){
