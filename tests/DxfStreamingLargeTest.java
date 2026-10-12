@@ -6,7 +6,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DxfStreamingLargeTest {
     public static void main(String[] args)throws Exception{
         File file=File.createTempFile("musacad-stream-", ".dxf");
-        final int lineEntities=70000;
+        final int lineEntities=args.length==0?70000:Integer.parseInt(args[0]);
+        if(lineEntities<70000||lineEntities>500000)
+            throw new IllegalArgumentException("Large CAD stress range must be 70000..500000 entities");
         try(BufferedWriter w=new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file),StandardCharsets.UTF_8),128*1024)){
             tag(w,0,"SECTION");tag(w,2,"HEADER");
             tag(w,9,"$INSUNITS");tag(w,70,"4");
