@@ -23,11 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
+    private static final int OPEN=20,SAVE_DXF=21,SAVE_DWG=22,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_SAVE_DWG=12;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -3957,8 +3957,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_SAVE_DWG,6,"DWG kaydet (deneysel / yalnız eski biçim)").setEnabled(canEdit()&&NativeDwgWrite.available());menu.add(0,MENU_PRINT,7,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_SAVE_DWG:requestEditedDwgSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4190,7 +4190,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
-        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());
+        if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());else if(r==SAVE_DWG)saveEditedDwg(data.getData());
     }
     private void openHomeCategory(int groupId){pendingHomeCategory=groupId;open();}
     private void showPendingHomeCategory(){
@@ -4910,6 +4910,81 @@ public class MainActivity extends AppCompatActivity {
                 });
             }finally{
                 if(staged!=null&&!staged.delete()&&staged.exists())staged.deleteOnExit();
+            }
+        });
+    }
+
+    private void requestEditedDwgSave(){
+        if(activeLoad!=null||!canEdit()||!NativeDwgWrite.available()){
+            Toast.makeText(this,"Bu APK'da güvenilir DWG yazma desteği etkin değil; DXF kaydedin",
+                Toast.LENGTH_LONG).show();return;
+        }
+        if(activeDxf.skippedCount>0||!activeDxf.externalReferences.isEmpty()
+            ||activeDxf.oleObjectCount>0||activeDxf.externalRasterImageCount>0){
+            Toast.makeText(this,"Eksik / dış referanslı CAD içeriği DWG'ye kayıpsız aktarılamaz",
+                Toast.LENGTH_LONG).show();return;
+        }
+        new AlertDialog.Builder(this).setTitle("Deneysel DWG kaydı • 2000–2004")
+            .setMessage("Bu işlem yalnızca desteklenen eski DWG biçimleri içindir. " +
+                "Yeni DWG biçimleri ve karmaşık nesneler kayıpsız yazılamaz. " +
+                "Orijinal dosya değiştirilmeyecek; önce DXF, sonra geçici DWG oluşturulup yeniden okunacak.")
+            .setNegativeButton("VAZGEÇ",null).setPositiveButton("DEVAM",(dialog,which)->{
+                Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/acad");
+                String title=currentDisplayName==null?"MusaCAD":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");
+                intent.putExtra(Intent.EXTRA_TITLE,title+"_deneysel.dwg");
+                startActivityForResult(intent,SAVE_DWG);
+            }).show();
+    }
+
+    private void saveEditedDwg(Uri uri){
+        if(uri==null||!canEdit()||activeLoad!=null||!NativeDwgWrite.available())return;
+        final File source=editingBaseDxf;
+        final DxfParser.Result parsed=activeDxf;
+        if(source==null||parsed==null||parsed.skippedCount>0||
+            !parsed.externalReferences.isEmpty()||parsed.oleObjectCount>0||
+            parsed.externalRasterImageCount>0){
+            Toast.makeText(this,"DWG yazma güvenlik koşulları sağlanmıyor",Toast.LENGTH_LONG).show();
+            return;
+        }
+        final List<CadEdit> additions=cad.getAddedEdits();
+        final List<SourceReplacement> replacements=cad.getSourceReplacements();
+        final List<SourceRange> removals=cad.getSourceRemovals();
+        final List<CadBlock.Definition> blocks=cad.getUserBlocks();
+        final String layer=currentProject==null?"0":currentProject.defaultLayer;
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("Deneysel DWG hazırlanıyor")
+            .setMessage("Geçici DXF → DWG → yeniden açıp doğrulama")
+            .setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.show();
+        task.future=loader.submit(()->{
+            File stagedDxf=null,stagedDwg=null;
+            try{
+                stagedDxf=CadDxfSaveStage.prepare(getCacheDir(),out->
+                    DxfWriter.write(source,out,parsed,additions,replacements,removals,blocks,layer));
+                stagedDwg=NativeDwgWrite.exportStaged(stagedDxf,getCacheDir());
+                FileTransfer.checkCancelled();
+                try(java.io.InputStream in=new java.io.FileInputStream(stagedDwg);
+                    OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+                    if(out==null)throw new IOException("DWG kayıt hedefi açılamadı");
+                    FileTransfer.copy(in,out,512L*1024L*1024L,null);out.flush();
+                }
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    Toast.makeText(this,"Deneysel DWG kopyası üretildi; AutoCAD AUDIT kontrolü gereklidir",
+                        Toast.LENGTH_LONG).show();
+                });
+            }catch(Exception error){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(error);
+                });
+            }finally{
+                if(stagedDxf!=null)stagedDxf.delete();
+                if(stagedDwg!=null)stagedDwg.delete();
             }
         });
     }
