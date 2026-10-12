@@ -241,6 +241,9 @@ public final class MusaAiDisciplinePlan {
         for(String key:MECHANICAL)if(key.equals(scope))return true;
         return false;
     }
+    public static boolean matchesSection(String key,MusaAiDrawingIndex.Item item){
+        return item!=null && matches(key,item);
+    }
     private static boolean matches(String key,MusaAiDrawingIndex.Item item){
         // Hyphen/underscore separators in CAD layer names are word boundaries.
         String normalized=MusaAiDrawingIndex.normalize(
