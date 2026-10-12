@@ -22,6 +22,23 @@ public final class AcisDxfRoundTripProbe {
                 StringBuilder raw=new StringBuilder();
                 for(String chunk:chunks){if(raw.length()>0)raw.append(' ');raw.append(chunk);}
                 String decoded=AcisSatMeshDebug.decode(raw.toString().replace("^ ","^"));
+                if(bodies==2||bodies==3){
+                    java.util.ArrayList<Integer> lens=new java.util.ArrayList<>();
+                    for(String part:chunks)lens.add(part.length());
+                    int at=0;
+                    for(int i=0;i<chunks.size();i++){
+                        if(chunks.get(i).length()>=250){
+                            String tail=chunks.get(i).substring(Math.max(0,chunks.get(i).length()-14));
+                            String next=i+1<chunks.size()?chunks.get(i+1).substring(0,Math.min(14,chunks.get(i+1).length())):"";
+                            System.out.printf("ACIS_PUBLIC_CHUNK_SEAM body=%d idx=%d len=%d tail=%s next=%s%n",
+                                bodies,i,chunks.get(i).length(),tail.replaceAll("[^A-Za-z0-9 ]","_"),
+                                next.replaceAll("[^A-Za-z0-9 ]","_"));
+                        }
+                        at+=chunks.get(i).length();
+                    }
+                    System.out.printf("ACIS_PUBLIC_CHUNK_LENGTHS body=%d lengths=%s%n",bodies,lens);
+                }
+
                 java.util.TreeMap<String,Integer> types=new java.util.TreeMap<>();
                 for(String rec:decoded.split("#")){
                     String[] words=rec.trim().split("\\s+");
@@ -29,6 +46,10 @@ public final class AcisDxfRoundTripProbe {
                     String kind=words[0].matches("-\\d+")?words[1]:words[0];
                     if(kind.endsWith("-surface")||java.util.Arrays.asList("body","lump","shell","face","loop","coedge","edge","vertex","point","transform","asmheader").contains(kind))
                         types.merge(kind,1,Integer::sum);
+                    else if(bodies==3&&kind.length()<14&&!"straight-curve".equals(kind)&&
+                            !"ellipse-curve".equals(kind)&&"strai".equals(kind))
+                        System.out.printf("ACIS_PUBLIC_ODD_RECORD body=%d kind=%s text=%s%n",bodies,kind,
+                            rec.trim().substring(0,Math.min(90,rec.trim().length())).replaceAll("[^a-zA-Z0-9. $-]","_"));
                 }
                 java.util.Map<String,Integer> sampleCounts=new java.util.HashMap<>();
                 int recordOrdinal=0;
