@@ -115,3 +115,43 @@ jobs:
           java -cp /tmp/musacad-edit-tests CadDimensionTest
           javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadBlock.java" "$java_src/CadBlockLibrary.java" tests/CadBlockLibraryTest.java
           java -cp /tmp/musacad-edit-tests CadBlockLibraryTest
+
+  java-android-compile:
+    name: Android CAD compile and navigation regression (no APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Fetch pinned DWG source required by Android native build
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Verify navigation hot path and unchanged full-fidelity renderer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          parser=Path('app/src/main/java/com/musa/cad/DxfParser.java').read_text()
+          view=Path('app/src/main/java/com/musa/cad/CadView.java').read_text()
+          assert 'MATRIX_SCALE_SCRATCH.get()' in parser
+          assert '(linePattern==null||linePattern.continuous())?null' in parser
+          assert 'spatialIndex.draw(canvas,navigationPaint' in parser
+          assert 'vectorDrawing.drawVectorNavigation(c,imageMatrix' in view
+          assert 'vectorDrawing.drawVector(c,imageMatrix' in view
+          assert 'drawEdits(c);drawLiveFreehand(c)' in view
+          print('PASS: low-allocation navigation, final vector and drawing overlay retained')
+          PY
+      - name: Compile Android app Java without building an APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDirectDebugJavaWithJavac
+      - name: Test navigation policy and color/path switching
+        run: |
+          javac -d /tmp/musacad-navigation-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/CadNavigationPolicyTest.java tests/RenderPathPolicyTest.java
+          java -cp /tmp/musacad-navigation-tests CadNavigationPolicyTest
+          java -cp /tmp/musacad-navigation-tests RenderPathPolicyTest
