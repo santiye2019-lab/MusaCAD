@@ -126,11 +126,11 @@ public final class MusaAiPanel {
                         if(activity.isFinishing()||activity.isDestroyed()||!sheet.isShowing())
                             return;
                         lastHealthOk.set(diagnostic.reachable);
-                        if(!diagnostic.reachable&&!modelVerified.get()){
+                        if(!diagnostic.reachable){
                             state.setText("● Worker erişilemedi");
                             state.setTextColor(0xFFFFA7A7);
                             state.setBackground(round(activity,0xFF4C2428,16,0));
-                        }else if(diagnostic.reachable&&!modelVerified.get()){
+                        }else{
                             state.setText("● Worker erişilebilir");
                             state.setTextColor(0xFFFFD184);
                             state.setBackground(round(activity,0xFF4A3A21,16,0));
