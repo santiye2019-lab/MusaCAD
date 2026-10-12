@@ -22,10 +22,14 @@ public final class Dxf3dMesh {
     public final int[] triangles,edges,sourceLines,coordinateSlots;
     public final float cx,cy,cz,radius,minZ,maxZ;
     public final int acisSolids,unsupportedSolids;
+    public final int acisMissingGeometrySolids,acisPartialGeometrySolids;
+    public final int acisFaces,acisTessellatedFaces,acisUnsupportedFaces;
     public final boolean flatPlan,solidProxy;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,boolean solidProxy){
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,boolean solidProxy,int missing,int partial,int faces,int tessellated,int unsupportedFaces){
         this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.acisSolids=acisSolids;this.unsupportedSolids=unsupportedSolids;this.solidProxy=solidProxy;
+        this.acisMissingGeometrySolids=missing;this.acisPartialGeometrySolids=partial;
+        this.acisFaces=faces;this.acisTessellatedFaces=tessellated;this.acisUnsupportedFaces=unsupportedFaces;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i+1<explicitEdges.length;i+=2)edge(seen,lines,explicitEdges[i],explicitEdges[i+1]);
         for(int i=0;i+2<triangles.length;i+=3){
@@ -64,7 +68,9 @@ public final class Dxf3dMesh {
                 :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),collector.solidProxy
+            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),collector.solidProxy,
+            collector.acisMissingGeometrySolids,collector.acisPartialGeometrySolids,collector.acisFaces,
+            collector.acisTessellatedFaces,collector.acisUnsupportedFaces
         );
     }
 
@@ -74,6 +80,7 @@ public final class Dxf3dMesh {
         final ArrayList<Face> faces=new ArrayList<>();
         boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
         int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids;
+        int acisMissingGeometrySolids,acisPartialGeometrySolids,acisFaces,acisTessellatedFaces,acisUnsupportedFaces;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
             if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(p.layout))return;
@@ -139,9 +146,17 @@ public final class Dxf3dMesh {
                     if(code==1||code==3)chunks.add(tags.get(i+1));
                 }
                 AcisSatMesh.Result acis=AcisSatMesh.parseDxfChunks(chunks);
+                acisFaces+=acis.faces;
+                acisTessellatedFaces+=acis.tessellatedFaces;
+                acisUnsupportedFaces+=acis.unsupportedFaces;
                 if(acis.hasGeometry()){
                     appendAcis(this,p,acis);
                     if(acis.complete)resolvedSolids++;
+                    else acisPartialGeometrySolids++;
+                }else{
+                    // Do not present a separate missing ACIS body as "wireframe shown".
+                    // Source face counts remain available for coverage warnings.
+                    acisMissingGeometrySolids++;
                 }
             }
         }
