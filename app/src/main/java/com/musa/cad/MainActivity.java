@@ -4606,11 +4606,10 @@ public class MainActivity extends AppCompatActivity {
             String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
             // ACIS fidelity is a separate technical status, never a finding
             // injected into the user's engineering-analysis report.
-            boolean acisUnverified=currentProject.sourceAcisEntities>0||
-                activeDxf.acisCoverage.entityCount()>0;
-            String acis=acisUnverified?
-                ("  •  ACIS 3B geometri doğrulanmadı"+
-                    (currentProject.sourceExternalAcisEntities>0?" (harici AcDs veri)":"")):"";
+            String acisDetails=AcisConversionDiagnostic.status(
+                currentProject.sourceAcisEntities,currentProject.sourceExternalAcisEntities,
+                activeDxf.acisCoverage);
+            String acis=acisDetails.isEmpty()?"":"  •  "+acisDetails;
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback+acis);
         }else if(currentProject.nativeScene!=null){
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
