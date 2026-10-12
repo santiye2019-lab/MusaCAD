@@ -40,6 +40,24 @@ public final class DxfParser {
             finally{p.setStyle(previous);}
         }
     }
+    /** Fast single-path rendering of the XY projection of 3D polyline / mesh edges. */
+    private static final class PolylineNetwork implements Entity{
+        private final Path source=new Path(),mapped=new Path();
+        private final RectF extent=new RectF();
+        PolylineNetwork(List<DxfPolyline3D.Segment> edges){
+            boolean first=true;
+            for(DxfPolyline3D.Segment edge:edges){
+                float x0=(float)edge.start.x,y0=(float)edge.start.y;
+                float x1=(float)edge.end.x,y1=(float)edge.end.y;
+                source.moveTo(x0,y0);source.lineTo(x1,y1);
+                if(first){extent.set(Math.min(x0,x1),Math.min(y0,y1),
+                    Math.max(x0,x1),Math.max(y0,y1));first=false;}
+                else extent.union(x0,y0,x1,y1);
+            }
+        }
+        public void bounds(RectF b){add(b,extent.left,extent.top);add(b,extent.right,extent.bottom);}
+        public void draw(Canvas c,Paint p,Matrix m){source.transform(m,mapped);c.drawPath(mapped,p);}
+    }
     private static final class EntityGroup implements Entity{
         final List<Entity>children;EntityGroup(List<Entity>children){this.children=children;}
         public void bounds(RectF b){for(Entity e:children)e.bounds(b);}
@@ -697,20 +715,51 @@ public final class DxfParser {
     private static Result renderStreaming(File file,boolean makePreview)throws IOException{
         final ArrayList<Entity>entities=new ArrayList<>();final Set<String>layers=new HashSet<>();final LinkedHashSet<String>layouts=new LinkedHashSet<>();
         final class Collector implements DxfBlocks.Sink{
-            DxfBlocks.Result meta;DxfBlocks.Placement pendingPolyline;ArrayList<DxfBulge.Vertex>vertices;
+            DxfBlocks.Result meta;DxfBlocks.Placement pendingPolyline;ArrayList<DxfBulge.Vertex>vertices;ArrayList<DxfPolyline3D.Vertex>vertices3D;boolean valid3D;
             public void begin(DxfBlocks.Result metadata){meta=metadata;}
             public void accept(DxfBlocks.Placement item)throws IOException{
                 FileTransfer.checkCancelled();
                 if(pendingPolyline!=null){
-                    if("VERTEX".equals(item.record.type)){vertices.add(new DxfBulge.Vertex(f(item.record.tags(),item.record.from,item.record.to,10),f(item.record.tags(),item.record.from,item.record.to,20),fv(item.record.tags(),item.record.from,item.record.to,42,0f)));return;}
+                    if("VERTEX".equals(item.record.type)){
+                        if(vertices3D!=null){
+                            DxfPolyline3D.Vertex vertex=DxfPolyline3D.readVertex(
+                                item.record.tags(),item.record.from,item.record.to);
+                            if(vertex==null)valid3D=false;
+                            else vertices3D.add(vertex);
+                        }else vertices.add(new DxfBulge.Vertex(
+                            f(item.record.tags(),item.record.from,item.record.to,10),
+                            f(item.record.tags(),item.record.from,item.record.to,20),
+                            fv(item.record.tags(),item.record.from,item.record.to,42,0f)));
+                        return;
+                    }
                     flushPolyline();
                 }
-                if("POLYLINE".equals(item.record.type)){pendingPolyline=item;vertices=new ArrayList<>();return;}
+                if("POLYLINE".equals(item.record.type)){
+                    pendingPolyline=item;
+                    int flags=item.record.integer(70,0);
+                    vertices3D=(flags&88)!=0?new ArrayList<DxfPolyline3D.Vertex>():null;
+                    vertices=vertices3D==null?new ArrayList<DxfBulge.Vertex>():null;
+                    valid3D=true;
+                    return;
+                }
                 if("VERTEX".equals(item.record.type)){meta.skipped++;return;}
                 add(item,parse(item.record.type,item.record.tags(),item.record.from,item.record.to,meta.textStyles));
             }
             private void flushPolyline()throws IOException{
-                if(pendingPolyline==null)return;boolean closed=(((int)pendingPolyline.record.number(70,0))&1)!=0;Entity entity=bulgePoly(vertices,closed);DxfBlocks.Placement item=pendingPolyline;pendingPolyline=null;vertices=null;if(entity==null){meta.skipped++;return;}add(item,entity);
+                if(pendingPolyline==null)return;
+                DxfBlocks.Placement item=pendingPolyline;
+                int flags=item.record.integer(70,0);
+                Entity entity;
+                if(vertices3D!=null){
+                    List<DxfPolyline3D.Segment> edges=valid3D
+                        ?DxfPolyline3D.segments(flags,item.record.integer(71,0),
+                            item.record.integer(72,0),vertices3D)
+                        :Collections.emptyList();
+                    entity=edges.isEmpty()?null:new PolylineNetwork(edges);
+                }else entity=bulgePoly(vertices,(flags&1)!=0);
+                pendingPolyline=null;vertices=null;vertices3D=null;
+                if(entity==null){meta.skipped++;return;}
+                add(item,entity);
             }
             private void add(DxfBlocks.Placement item,Entity entity)throws IOException{
                 if(entity==null){meta.skipped++;return;}
