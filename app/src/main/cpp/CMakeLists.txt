@@ -12,6 +12,27 @@ set(LIBREDWG_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/libredwg"
 if(NOT EXISTS "${LIBREDWG_SOURCE}/CMakeLists.txt")
   message(FATAL_ERROR "Fetch pinned LibreDWG source as described in NATIVE_BUILD.md")
 endif()
+# MusaCAD R2013+ ACIS compatibility. Only adjusts the source-version check
+# before LibreDWG compiles; no changes to 2D first paint or CAD navigation.
+# This feature is enabled on the isolated development branch ONLY. Keep
+# production/main and existing APK unchanged until Android device smoke tests.
+option(MUSACAD_PRESERVE_R2013_SAB_HISTORY
+  "Retain R2013+ source AcDs/SAB record history while exporting legacy SAT" ON)
+if(MUSACAD_PRESERVE_R2013_SAB_HISTORY)
+  set(_musa_sab_source "${LIBREDWG_SOURCE}/src/out_dxf.c")
+  file(READ "${_musa_sab_source}" _musa_sab_text)
+  set(_musa_sab_old "if (dwg_version < R_2010)\n    has_history = 0;")
+  set(_musa_sab_new "if (dwg_version < R_2010 && (!dwg || dwg->header.version < R_2010))\n    has_history = 0;")
+  string(FIND "${_musa_sab_text}" "${_musa_sab_old}" _musa_sab_old_pos)
+  string(FIND "${_musa_sab_text}" "${_musa_sab_new}" _musa_sab_new_pos)
+  if(NOT _musa_sab_old_pos EQUAL -1)
+    string(REPLACE "${_musa_sab_old}" "${_musa_sab_new}" _musa_sab_patched "${_musa_sab_text}")
+    file(WRITE "${_musa_sab_source}" "${_musa_sab_patched}")
+    message(STATUS "MusaCAD development: keep original R2013+ SAB history records")
+  elseif(_musa_sab_new_pos EQUAL -1)
+    message(FATAL_ERROR "Pinned LibreDWG SAB conversion changed; do not silently patch a different source")
+  endif()
+endif()
 add_subdirectory("${LIBREDWG_SOURCE}" "libredwg")
 if(ANDROID)
   add_library(musacad_dwg SHARED dwg_bridge.c native_scene.c)
