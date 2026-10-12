@@ -4599,16 +4599,12 @@ public class MainActivity extends AppCompatActivity {
         projectCloseTarget=project;
         projectCloseDialog=builder.create();
         projectCloseDialog.setCanceledOnTouchOutside(false);
+        // Back means CANCEL, never a hidden "close without saving".
+        // Only the explicitly named save/discard/close buttons may dispose a project.
         projectCloseDialog.setOnKeyListener((dialog,keyCode,event)->{
-            if(keyCode==KeyEvent.KEYCODE_BACK&&event.getAction()==KeyEvent.ACTION_UP){
-                ProjectSession target=projectCloseTarget;
-                dialog.dismiss();
-                projectCloseDialog=null;
-                projectCloseTarget=null;
-                if(target!=null&&projects.contains(target))closeProjectNow(target);
-                return true;
-            }
-            return keyCode==KeyEvent.KEYCODE_BACK;
+            if(keyCode!=KeyEvent.KEYCODE_BACK)return false;
+            if(event.getAction()==KeyEvent.ACTION_UP)dialog.dismiss();
+            return true;
         });
         projectCloseDialog.setOnDismissListener(d->{
             if(projectCloseDialog==d){
