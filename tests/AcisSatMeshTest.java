@@ -27,16 +27,16 @@ public final class AcisSatMeshTest {
     }
 
     private static void testUnsupportedFaceWireframe(){
-        String sat="700 0 1 0\\nACIS orphan-edge test\\n1 1e-06 1e-10\\n"
-            +"-0 point $-1 0 0 0 #\\n"
-            +"-1 point $-1 3 0 0 #\\n"
-            +"-10 vertex $-1 $-1 $0 #\\n"
-            +"-11 vertex $-1 $-1 $1 #\\n"
-            +"-20 straight-curve $-1 0 0 0 1 0 0 I I #\\n"
-            +"-30 edge $-1 $10 0 $11 1 $-1 $20 forward 7 unknown #\\n"
-            +"-40 spline-surface $-1 #\\n"
-            +"-50 face $-1 $-1 $-1 $-1 $-1 $40 forward single #\\n"
-            +"End-of-ACIS-data\\n";
+        String sat="700 0 1 0\nACIS orphan-edge test\n1 1e-06 1e-10\n"
+            +"-0 point $-1 0 0 0 #\n"
+            +"-1 point $-1 3 0 0 #\n"
+            +"-10 vertex $-1 $-1 $0 #\n"
+            +"-11 vertex $-1 $-1 $1 #\n"
+            +"-20 straight-curve $-1 0 0 0 1 0 0 I I #\n"
+            +"-30 edge $-1 $10 0 $11 1 $-1 $20 forward 7 unknown #\n"
+            +"-40 spline-surface $-1 #\n"
+            +"-50 face $-1 $-1 $-1 $-1 $-1 $40 forward single #\n"
+            +"End-of-ACIS-data\n";
         AcisSatMesh.Result mesh=AcisSatMesh.parseDxfChunks(List.of(sat));
         if(!mesh.hasGeometry()||mesh.complete||mesh.faces!=1||mesh.unsupportedFaces!=1)
             throw new AssertionError("Unsupported ACIS face must retain only true source edges");
