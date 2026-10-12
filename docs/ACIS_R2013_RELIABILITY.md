@@ -27,6 +27,36 @@ Pinned upstream drawing: `LibreDWG/libredwg/test/test-data/example_2013.dwg`.
 
 See the project workflow: `.github/workflows/cad-host-regression.yml`.
 
+## Original SAB versus converted SAT: confirmed provenance
+
+The host-only analyzer `tests/native_acis_sab_audit.c` reads the original *public*
+SAB byte stream before calling the DXF writer. It never logs any user drawing
+contents or writes back to source DWGs.
+
+| Original ACIS body | Original SAB record terminators | Default SAT nodes | Experimentally retained SAT nodes |
+|---|---:|---:|---:|
+| 1 | 27 | 27 | 27 |
+| 2 | 32 | 27 | 32 |
+| 3 | 134 | 126 | 134 |
+
+The original binary has **193** records, while default DXF export keeps **180**.
+The SAT Java parser preserves **all** records actually written. This identifies
+missing conversion records upstream of the Java mesh parser.
+
+An isolated R2013 host-only experiment changed the LibreDWG branch that clears
+the SAB `has_history` flag when the DXF writer downconverts a R2013+ DWG.
+The public example then yielded **3/3 mesh-bearing solids and 8/10
+triangulated faces (16 triangles)** instead of **1/3 and 1/10
+(2 triangles)**. The experimental output still has dangling references and
+2 unsupported faces, so it is NOT a fully faithful or production-approved
+conversion. This A/B fix is restricted to a disposable GitHub runner.
+
+Cross-version risk: `example_2018.dwg` has 3 original external-AcDs ACIS
+entity records, but the pinned LibreDWG reader exposes **no binary SAB
+payload** for any of them. History preservation cannot repair missing raw data.
+The older public R2000 `Cone.dwg` remains partially tessellated (34 triangles)
+in the A/B test.
+
 ## Upstream limitation
 
 LibreDWG issue [#1411](https://github.com/LibreDWG/libredwg/issues/1411) documents cases where R2013+ AcDs/ACDSDATA SAB geometry cannot be read or round-tripped. A successful DXF export does not prove 3D fidelity. The pinned source has partial salvage, but this does not guarantee other DWG files have any usable SAB content.
