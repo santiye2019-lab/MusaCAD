@@ -94,3 +94,31 @@ jobs:
             echo '::error::Invalid DWG was incorrectly accepted'
             exit 1
           fi
+
+  linux-opt-in-legacy-dwg:
+    needs: cmake-android-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source for experimental legacy writer
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Compile opt-in r2004 and earlier DWG writer (host only)
+        run: |
+          set -euo pipefail
+          cmake -S app/src/main/cpp -B "$RUNNER_TEMP/musa-dwg-write" \
+            -DCMAKE_BUILD_TYPE=Debug -DMUSACAD_EXPERIMENTAL_DWG_WRITE=ON
+          cmake --build "$RUNNER_TEMP/musa-dwg-write" --parallel 2
+      - name: Round-trip pinned 2D r2000 DXF through actual DWG format
+        run: |
+          set -euo pipefail
+          converter="$RUNNER_TEMP/musa-dwg-write/musacad_dwg_convert"
+          source="third_party/libredwg/test/test-data/2000/entities-2d.dxf"
+          "$converter" --experimental-dxf-to-dwg "$source" "$RUNNER_TEMP/musa-legacy.dwg"
+          test -s "$RUNNER_TEMP/musa-legacy.dwg"
+          "$converter" "$RUNNER_TEMP/musa-legacy.dwg" "$RUNNER_TEMP/musa-legacy-reopen.dxf"
+          python3 tools/native-dxf-regression.py "$RUNNER_TEMP/musa-legacy-reopen.dxf"
