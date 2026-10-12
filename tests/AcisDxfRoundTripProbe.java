@@ -14,7 +14,7 @@ import java.util.List;
 public final class AcisDxfRoundTripProbe {
     private static final class Stats {
         int bodies,meshBodies,completeBodies,partialBodies,faces,triangles,edges;
-        void finish(String type,List<String> chunks,boolean publicFixtureDebug){
+        void finish(String type,List<String> chunks,boolean publicFixtureDebug)throws Exception{
             if(!"3DSOLID".equals(type)&&!"REGION".equals(type)&&!"BODY".equals(type))return;
             bodies++;
             AcisSatMesh.Result mesh=AcisSatMesh.parseDxfChunks(chunks);
@@ -47,6 +47,7 @@ public final class AcisDxfRoundTripProbe {
                 String prefix=decoded.substring(0,Math.min(110,decoded.length())).replaceAll("[^a-zA-Z0-9. -]","_");
                 System.out.printf("ACIS_PUBLIC_FIXTURE_BODY index=%d kind=%s chunks=%d chars=%d classes=%s head=%s%n",
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
+                if(bodies==1||bodies==3)debugParseTopology(decoded,bodies);
             }
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
@@ -56,6 +57,43 @@ public final class AcisDxfRoundTripProbe {
             edges+=mesh.edges.length/2;
         }
     }
+    /** Read-only access to production parser internals for PUBLIC pinned fixture diagnostics. */
+    private static void debugParseTopology(String decoded,int body)throws Exception{
+        Class<?> nodeClass=Class.forName("com.musa.cad.AcisSatMesh$Node");
+        java.lang.reflect.Method parse=AcisSatMesh.class.getDeclaredMethod("parseNodes",String.class);
+        parse.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<Integer,?> nodes=(java.util.Map<Integer,?>)parse.invoke(null,decoded);
+        java.lang.reflect.Field type=nodeClass.getDeclaredField("type");
+        java.lang.reflect.Field id=nodeClass.getDeclaredField("id");
+        type.setAccessible(true);id.setAccessible(true);
+        java.lang.reflect.Method sample=AcisSatMesh.class.getDeclaredMethod("sampleEdge",java.util.Map.class,nodeClass,boolean.class);
+        sample.setAccessible(true);
+        java.lang.reflect.Method build=AcisSatMesh.class.getDeclaredMethod("buildLoop",java.util.Map.class,nodeClass);
+        build.setAccessible(true);
+        int pointsInLoops=0,nonEmptyLoops=0,nonEmptyEdges=0;
+        java.util.ArrayList<Integer> sampleIds=new java.util.ArrayList<>();
+        for(Object n:nodes.values()){
+            String kind=(String)type.get(n);
+            if("loop".equals(kind)){
+                Object path=build.invoke(null,nodes,n);
+                java.lang.reflect.Field points=path.getClass().getDeclaredField("points");
+                points.setAccessible(true);
+                int count=((java.util.List<?>)points.get(path)).size();
+                pointsInLoops+=count;
+                if(count>0)nonEmptyLoops++;
+                if(sampleIds.size()<3)sampleIds.add((Integer)id.get(n));
+            }else if("edge".equals(kind)){
+                Object path=sample.invoke(null,nodes,n,false);
+                java.lang.reflect.Field points=path.getClass().getDeclaredField("points");
+                points.setAccessible(true);
+                if(((java.util.List<?>)points.get(path)).size()>=2)nonEmptyEdges++;
+            }
+        }
+        System.out.printf("ACIS_PUBLIC_INTERNAL body=%d nodes=%d loopIds=%s liveLoops=%d loopPoints=%d liveEdges=%d%n",
+            body,nodes.size(),sampleIds,nonEmptyLoops,pointsInLoops,nonEmptyEdges);
+    }
+
     private static final class AcisSatMeshDebug{
         static String decode(String data){
             StringBuilder out=new StringBuilder(data.length());
