@@ -1,5 +1,8 @@
 import com.musa.cad.*;
 import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 public final class MusaAiVisualDisciplineTest {
     private static void equal(String actual,String expected){
@@ -19,7 +22,7 @@ public final class MusaAiVisualDisciplineTest {
             Arrays.asList(layers),Arrays.asList(layers),
             Collections.emptyList(),"mm");
     }
-    public static void main(String[]args){
+    public static void main(String[]args)throws Exception{
         equal(MusaAiVisualDiscipline.resolve("all","projeyi görsel analiz et",
             "TESİSAT - SİLİVRİKAPI KAFE MUTFAK.dwg",index("M-KESIT")),
             "mechanical");
@@ -69,6 +72,16 @@ public final class MusaAiVisualDisciplineTest {
         report=MusaAiEngineeringSynthesis.compose(d);
         has(report,"MEKANİK TESİSAT GÖRSEL");
         has(report,"DN/PN, montaj malzemesi");
+        String main=Files.readString(Path.of(
+            "app/src/main/java/com/musa/cad/MainActivity.java"),StandardCharsets.UTF_8);
+        has(main,"MusaAiVisualDiscipline.resolve(");
+        has(main,"MusaAiVisualDiscipline.visionInstruction(scope)");
+        has(main,"String focusPrompt=raw+");
+        has(main,"synthesis.scope=scope");
+        has(main,"MusaAiDisciplineAnalyzer.analyzeDiscipline(");
+        has(main,"MusaAiDisciplineAnalyzer.analyzeAll(snapshot)");
+        has(main,"if(MusaAiVisualDiscipline.mechanicalScope(scope))");
+        has(main,"MusaAiEngineeringSynthesis.composeDetailed(synthesis)");
         System.out.println("MusaAiVisualDisciplineTest OK");
     }
 }
