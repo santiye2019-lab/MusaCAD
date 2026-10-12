@@ -24,6 +24,10 @@ public final class NativeDwgWrite {
             throw new IOException("DWG yazma için doğrulanmış geçici DXF bulunamadı");
         CadDxfSaveStage.validate(stagedDxf);
         File temp=File.createTempFile("MusaCAD_dwg_legacy_",".dwg",cacheDir);
+        // LibreDWG deliberately refuses to overwrite *any* existing file.
+        // Reserve an unpredictable private-cache name, then unlink it before
+        // passing the output path to its writer.
+        if(!temp.delete())throw new IOException("DWG geçici dosyası hazırlanamadı");
         boolean valid=false;
         try{
             // LibreDWG writer must not overwrite/truncate the user's original file.
