@@ -86,10 +86,19 @@ public final class MusaAiEngineeringSynthesis {
                 " GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU"
             :(clean(data.scope).isEmpty()?"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU":
                 MusaAiVisualDiscipline.heading(data.scope));
-        StringBuilder out=new StringBuilder("GANDALF • "+caption);
+        boolean noVisualGroups=accepted==0||data.visualGroups.isEmpty();
+        StringBuilder out=new StringBuilder(noVisualGroups
+            ?"GANDALF • GÖRSEL ANALİZ DOĞRULANAMADI — TEKNİK RAPOR DEĞİLDİR"
+            :"GANDALF • "+caption);
         out.append("\nProje: ").append(clean(data.project));
         out.append("\nDüzen: ").append(clean(data.layout));
-        out.append("\nDisiplin: ").append(clean(data.discipline));
+        if(noVisualGroups){
+            out.append("\nGörsel olarak doğrulanan disiplin: YOK (AI yanıtı alınmadı)");
+            out.append("\nYerel DWG etiketlerine dayalı inceleme odağı (bulgu değil): ")
+                .append(clean(data.discipline));
+        }else{
+            out.append("\nDisiplin: ").append(clean(data.discipline));
+        }
         out.append("\nGörsel AI yanıtı alınan bölge: ").append(accepted)
             .append("/").append(total);
         out.append("\nBaşlık çevresi yakın-plan adayları: ")
