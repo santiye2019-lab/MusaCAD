@@ -247,7 +247,8 @@ public final class MusaAiDisciplinePlan {
     private static boolean matches(String key,MusaAiDrawingIndex.Item item){
         // Hyphen/underscore separators in CAD layer names are word boundaries.
         String normalized=MusaAiDrawingIndex.normalize(
-            item.layer.replace('-',' ').replace('_',' ')+" "+item.text);
+            item.layer.replace('-',' ').replace('_',' ')+" "+item.text)+" "+
+            MusaAiDrawingIndex.normalize(item.layer+" "+item.text);
         switch(key){
             case "cleanwater":return contains(normalized,"temiz su","sicak su","soguk su","hidrofor","boyler","kullanma suyu","mek-ts","m-ts");
             case "wastewater":return contains(normalized,"pis su","atik su","havalik","kanalizasyon","mek-ps","m-ps");
