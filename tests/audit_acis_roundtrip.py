@@ -40,16 +40,16 @@ def decode_sat(text: str) -> str:
 
 
 def sat_markers(text: str) -> bool:
-    """Structural hints only; no claim that faces or surfaces are valid."""
-    variants = (text, decode_sat(text))
-    for value in variants:
+    """SAT header+topology is transport evidence, not proof of closed B-Rep."""
+    for value in (text, decode_sat(text)):
         lower = value.lower()
-        if "end-of-acis" in lower and re.search(
-            r"\b(body|face|edge|vertex|shell|lump|point|surface)\b", lower
-        ):
-            return True
+        header = lower.lstrip().split(" ", 4)
+        if len(header) >= 4 and all(token.isdigit() for token in header[:4]):
+            if any((" " + kind + " ") in (" " + lower + " ")
+                   for kind in ("body", "face", "edge", "vertex", "shell",
+                                "lump", "point", "surface")):
+                return True
     return False
-
 
 def audit(path: Path, source: int, external: int, *, debug_public_fixture: bool = False) -> dict:
     if not path.is_file():
@@ -102,11 +102,11 @@ def audit(path: Path, source: int, external: int, *, debug_public_fixture: bool 
         if has_text:
             text_entities += 1
             candidates = (text, decode_sat(text))
-            if any(re.search(r"\\b(body|face|edge|vertex|shell|lump|point|surface)\\b", v.lower()) for v in candidates):
+            if any(re.search(r"\b(body|face|edge|vertex|shell|lump|point|surface)\b", v.lower()) for v in candidates):
                 sat_topology_hints += 1
             if any("end-of-acis" in v.lower() or "end-of-asm" in v.lower() for v in candidates):
                 sat_end_hints += 1
-            if any(re.search(r"^\\s*\\d{3,6}\\s+\\d+\\s+\\d+\\s+\\d+", v) for v in candidates):
+            if any(re.search(r"^\s*\d{3,6}\s+\d+\s+\d+\s+\d+", v) for v in candidates):
                 sat_header_hints += 1
         if has_text and sat_markers(text):
             sat_hints += 1
@@ -166,6 +166,7 @@ def audit(path: Path, source: int, external: int, *, debug_public_fixture: bool 
         "sat_text_entities": text_entities,
         "sat_topology_hints": sat_topology_hints,
         "sat_terminal_hints": sat_end_hints,
+        "sat_terminal_missing": max(0, text_entities - sat_end_hints),
         "sat_header_hints": sat_header_hints,
         "hex_payload_entities": sab_hints,
     }
