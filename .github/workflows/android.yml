@@ -772,7 +772,7 @@ jobs:
   build-tested-apk:
     name: Build isolated test APK after quality gate
     needs: build
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'feature/gandalf-cad-paged-evidence-20261012' || github.head_ref == 'feature/restore-drive-evidence-focused-reports-20261012' || github.head_ref == 'feature/gandalf-visible-task-progress-20261012') }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'feature/gandalf-cad-paged-evidence-20261012' || github.head_ref == 'feature/restore-drive-evidence-focused-reports-20261012' || github.head_ref == 'feature/gandalf-visible-task-progress-20261012' || github.head_ref == 'feature/gandalf-voice-chat-timeout-fix-20261012') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
