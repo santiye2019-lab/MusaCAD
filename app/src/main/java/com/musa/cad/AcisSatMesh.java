@@ -121,7 +121,13 @@ public final class AcisSatMesh {
                 if(p.points.size()>=2&&seen.add(edge.id))mesh.addOpenEdges(p.points);
             }
         }
-        if(mesh.pointCount()==0)return EMPTY;
+        if(mesh.pointCount()==0){
+            // Preserve the ACIS face inventory even if SAB->SAT produced
+            // unusable vertex references. Returning EMPTY here used to hide
+            // all unsupported faces from engineering coverage diagnostics.
+            return new Result(new float[0],new int[0],new int[0],false,
+                faces.size(),tessellated,unsupported);
+        }
         boolean complete=!faces.isEmpty()&&tessellated==faces.size();
         return new Result(mesh.xyz(),mesh.triangles(),mesh.edges(),complete,faces.size(),tessellated,unsupported);
     }
