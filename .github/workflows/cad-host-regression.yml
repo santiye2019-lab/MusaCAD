@@ -137,6 +137,17 @@ jobs:
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-r2013-acds.dxf 2>/tmp/musacad-r2013-acds.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2013-acds.dxf --source-log /tmp/musacad-r2013-acds.log --require-source --require-external
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2013-acds.dxf --public-fixture-debug
+      - name: Diagnose R2013 ACIS history filtering without changing production build
+        run: |
+          set -euo pipefail
+          # Independent host-only experiment. Default pinned Android and host
+          # binaries remain untouched. PUBLIC upstream DWG fixture only.
+          cmake -S app/src/main/cpp -B /tmp/musacad-acis-history-ab -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-DCAN_ACIS_HISTORY
+          cmake --build /tmp/musacad-acis-history-ab --parallel 2
+          /tmp/musacad-acis-history-ab/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-acis-history-ab.dxf 2>/tmp/musacad-acis-history-ab-source.log
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-acis-history-ab.dxf --source-log /tmp/musacad-acis-history-ab-source.log --require-source --require-external
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-acis-history-ab.dxf
+          echo 'ACIS history experiment is observational; all production tests use the unchanged pinned build.'
       - name: Preserve embedded OLE object payload
         run: |
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
