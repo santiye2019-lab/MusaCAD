@@ -828,7 +828,7 @@ jobs:
               raise SystemExit('::error::Cannot verify the assembled directDebug BuildConfig; APK withheld.')
           source=expected[0].read_text()
           for field in ('AI_API_URL','AI_SESSION_URL'):
-              if not re.search(r'\\b'+field+r'\\s*=\\s*"https://[^"]+"',source):
+              if not re.search(r'\b'+field+r'\s*=\s*"https://[^"]+"',source):
                   raise SystemExit('::error::Assembled APK does not contain a configured '+field+'; APK withheld.')
           print('Verified both Gandalf endpoint values in compiled-configuration source (values not logged).')
           PY
