@@ -161,7 +161,7 @@ public final class AcisSatMesh {
 
     private static String firstRecord(String text){
         String lower=text.toLowerCase(Locale.ROOT);
-        String[] starts={"body ","asmheader ","-0 body ","-0 asmheader ","point ","-0 point "};
+        String[] starts={"body ","asmheader ","-0 body ","-0 asmheader ","point ","-0 point ","-0 face ","face "};
         int best=-1;
         for(String needle:starts){
             int p=lower.indexOf(needle);
