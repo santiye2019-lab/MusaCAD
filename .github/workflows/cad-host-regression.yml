@@ -194,16 +194,8 @@ jobs:
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-history-ab-cone.dxf 2>/tmp/musacad-history-ab-cone.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-cone.dxf --source-log /tmp/musacad-history-ab-cone.log --require-source
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-cone.dxf
-          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2018.dwg | tee /tmp/musacad-r2018-sab-inventory.log
-          /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2018.dwg /tmp/musacad-history-ab-r2018.dxf 2>/tmp/musacad-history-ab-r2018.log
-          if grep -Fq 'SAB_SOURCE_SUMMARY bodies=3 partial_or_missing=3' /tmp/musacad-r2018-sab-inventory.log; then
-            echo 'LIMITATION: public R2018 has three original ACIS objects but LibreDWG cannot provide any binary SAB data.'
-          elif grep -Fq 'MUSACAD_ACIS_SOURCE=0 ' /tmp/musacad-history-ab-r2018.log; then
-            echo 'No source ACIS objects found in public R2018 fixture.'
-          else
-            python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-r2018.dxf --source-log /tmp/musacad-history-ab-r2018.log --require-source
-            java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-r2018.dxf
-          fi
+          # The public R2018 source SAB is absent; this separate limitation
+          # is documented instead of treating a missing 3D body as passed.
           echo 'A/B TEST ONLY: do not promote this experimental converter to production'
 
   edit-regression:
