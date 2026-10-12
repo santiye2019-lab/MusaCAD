@@ -70,6 +70,8 @@ public final class AcisDxfRoundTripProbe {
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
                 if(bodies>=1&&bodies<=3)debugParseTopology(decoded,bodies);
             }
+            if(publicFixtureDebug&&bodies==3&&mesh.tessellatedFaces==10)
+                assertPublicR2013TriangularOpenings(mesh);
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
             if(mesh.hasGeometry()&&!mesh.complete)partialBodies++;
@@ -81,6 +83,49 @@ public final class AcisDxfRoundTripProbe {
             edges+=mesh.edges.length/2;
         }
     }
+    /**
+     * Pinned upstream example_2013.dwg contains two near-identical triangular
+     * rings, at Z=0 and Z=4. These checks compare the ACTUAL emitted triangles
+     * against the public fixture's known voids, not just face counters.
+     */
+    private static void assertPublicR2013TriangularOpenings(AcisSatMesh.Result mesh){
+        double[][] hole={{3443.51,14168.8},{4235.41,14168.8},{2232.37,13563.4}};
+        int[] count={0,0};double[] area={0,0};
+        for(int i=0;i<mesh.triangles.length;i+=3){
+            float[] p=mesh.xyz;
+            int a=mesh.triangles[i]*3,b=mesh.triangles[i+1]*3,c=mesh.triangles[i+2]*3;
+            double z=(p[a+2]+p[b+2]+p[c+2])/3.0;
+            int level=Math.abs(z)<1e-4?0:Math.abs(z-4)<1e-4?1:-1;
+            if(level<0||Math.abs(p[a+2]-z)>1e-4||Math.abs(p[b+2]-z)>1e-4||
+                    Math.abs(p[c+2]-z)>1e-4)continue;
+            double x=(p[a]+p[b]+p[c])/3.0,y=(p[a+1]+p[b+1]+p[c+1])/3.0;
+            if(strictlyInsidePublicTriangle(x,y,hole))
+                throw new AssertionError("R2013 ACIS triangular hole was incorrectly filled");
+            count[level]++;
+            area[level]+=Math.abs((p[b]-p[a])*(p[c+1]-p[a+1])-
+                (p[b+1]-p[a+1])*(p[c]-p[a]))/2.0;
+        }
+        for(int level=0;level<2;level++){
+            // SAT coordinates are doubles, display geometry is float32; allow
+            // for submillimetre rounding at ~14,000 coordinate magnitude.
+            if(count[level]!=6||Math.abs(area[level]-1085.28)>3.0)
+                throw new AssertionError("Public R2013 planar ring area/triangles regressed: level="+level+
+                    " count="+count[level]+" area="+area[level]);
+        }
+        System.out.println("PASS: two public R2013 nested triangular openings stay EMPTY (6 triangles per planar ring)");
+    }
+
+    private static boolean strictlyInsidePublicTriangle(double x,double y,double[][] tri){
+        double[] c=new double[3];
+        for(int i=0;i<3;i++){
+            int j=(i+1)%3;
+            c[i]=(tri[j][0]-tri[i][0])*(y-tri[i][1])-
+                 (tri[j][1]-tri[i][1])*(x-tri[i][0]);
+        }
+        return c[0]>1e-5&&c[1]>1e-5&&c[2]>1e-5||
+               c[0]<-1e-5&&c[1]<-1e-5&&c[2]<-1e-5;
+    }
+
     /** Read-only access to production parser internals for PUBLIC pinned fixture diagnostics. */
     private static void debugParseTopology(String decoded,int body)throws Exception{
         Class<?> nodeClass=Class.forName("com.musa.cad.AcisSatMesh$Node");
