@@ -231,6 +231,40 @@ public final class MusaAiEngineeringSynthesis {
         return out.toString();
     }
 
+    /**
+     * Full audit edition: retains the proven visual-first summary and appends
+     * complete, source-labelled raw findings instead of silently discarding
+     * entries at the summary display limits.
+     */
+    public static String composeDetailed(Input data) {
+        String summary=compose(data);
+        if(data==null||data.visualGroups.isEmpty()||data.reviewedTiles<=0)return summary;
+        StringBuilder out=new StringBuilder(summary);
+        out.append("\\n\\n8. TAM BULGU EKİ • GÖRSEL AI HAM KAYITLARI");
+        out.append("\\nBu kayıtlar AI gözlemidir; CAD kimliği, mühendislik hesabı ve mevzuat uygunluğu otomatik doğrulanmış sayılmaz.");
+        int groupNumber=0;
+        for(VisualGroup group:data.visualGroups) {
+            if(group==null||group.response.isEmpty())continue;
+            out.append("\\n\\nGrup ").append(++groupNumber).append(": ").append(group.name);
+            out.append(" [bölge ").append(group.firstRegion).append("–").append(group.lastRegion).append("]");
+            out.append("\\n").append(group.response);
+        }
+        out.append("\\n\\n9. TAM YEREL KANIT EKİ");
+        out.append("\\n").append(clean(data.localVectorEvidence).isEmpty()
+            ?"Yerel vektör kanıtı sunulmadı.":data.localVectorEvidence);
+        out.append("\\n\\n10. GÖRÜNÜM / PAFTA ENVANTERİ");
+        out.append("\\n").append(clean(data.viewInventory).isEmpty()
+            ?"Görünüm envanteri sunulmadı.":data.viewInventory);
+        out.append("\\n\\n11. KAPSAM VE DOĞRULAMA AÇIKLARI");
+        out.append("\\nCAD indeks kapsamı: ").append(data.sampledCadItems)
+           .append("/").append(data.declaredCadItems);
+        out.append("\\nGörsel bölge kapsamı: ").append(data.reviewedTiles)
+           .append("/").append(data.plannedTiles);
+        out.append("\\nKaynak ID bulunması, görsel iddianın doğrulandığı anlamına gelmez.");
+        if(!clean(data.coverageRegister).isEmpty())out.append("\\n").append(data.coverageRegister);
+        return out.toString();
+    }
+
     private static void appendLocalBullets(StringBuilder out,String local) {
         if(clean(local).isEmpty()) {
             out.append("\n• Yerel vektör kanıtı okunamadı.");return;
