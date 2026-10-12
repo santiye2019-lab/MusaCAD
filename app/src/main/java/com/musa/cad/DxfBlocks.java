@@ -86,7 +86,17 @@ public final class DxfBlocks {
 
     public static final class Result {
         public final List<Placement>placements=new ArrayList<>();public final List<BlockInsertion>blockInsertions=new ArrayList<>();public final List<ExternalReference>externalReferences=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
-        public int skipped,units;public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
+        public int skipped,units;public final Map<String,Integer> skippedByType=new LinkedHashMap<>();
+        /** Track unsupported/ignored CAD entity types with bounded metadata only. */
+        public void noteSkipped(String type){
+            skipped++;
+            String key=type==null?"UNKNOWN":type.trim().toUpperCase(Locale.ROOT);
+            if(key.length()>64)key=key.substring(0,64);
+            if(key.isEmpty())key="UNKNOWN";
+            if(!skippedByType.containsKey(key)&&skippedByType.size()>=64)key="OTHER";
+            skippedByType.put(key,skippedByType.getOrDefault(key,0)+1);
+        }
+        public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
         public boolean layerInitiallyVisible(String layer){return !initiallyHiddenLayerKeys.contains(DxfLayerState.key(layer));}
     }
 
@@ -212,11 +222,11 @@ public final class DxfBlocks {
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
-            if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
+            if(block==null||stack.contains(name)||stack.size()>=32){result.noteSkipped(r.type);return;}
             double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
             boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
             boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-            if(!positiveZ&&!negativeZ){result.skipped++;return;}
+            if(!positiveZ&&!negativeZ){result.noteSkipped(r.type);return;}
             double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
             if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
             double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
@@ -230,15 +240,15 @@ public final class DxfBlocks {
             return;
         }
         if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
-        String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
+        String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.noteSkipped(r.type);return;}
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
         boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
         boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
         // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
         // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
         int columns=r.integer(70,1),rows=r.integer(71,1);
-        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
-        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.noteSkipped(r.type);return;}
+        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.noteSkipped(r.type);return;}
         if(directRoot){
             String rawName=r.text(2,"").trim();
             if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
