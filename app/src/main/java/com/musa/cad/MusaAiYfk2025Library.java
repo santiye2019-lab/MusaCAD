@@ -349,15 +349,15 @@ public final class MusaAiYfk2025Library {
                        null,SQLiteDatabase.OPEN_READONLY)){
             for(MusaAiDisciplineEstimate.Row row:estimated.rows){
                 if(rows++>=28){
-                    out.append("\\nDiğer ön metraj satırları katalog tarama sınırında kaldı.");
+                    out.append("\nDiğer ön metraj satırları katalog tarama sınırında kaldı.");
                     break;
                 }
-                out.append("\\n\\n").append(MusaAiDisciplinePlan.sectionLabel(row.section))
+                out.append("\n\n").append(MusaAiDisciplinePlan.sectionLabel(row.section))
                     .append(" • ").append(row.description).append(" (")
                     .append(row.unit).append(")");
                 String token=MusaAiYfk2025Parser.fold(row.searchTerm);
                 if(token.length()<3){
-                    out.append("\\nPoz adı için yeterli teknik malzeme verisi yok.");
+                    out.append("\nPoz adı için yeterli teknik malzeme verisi yok.");
                     continue;
                 }
                 String sql="SELECT code,description,unit,price_2025,mounting_2025,page "+
@@ -368,7 +368,7 @@ public final class MusaAiYfk2025Library {
                         n++;
                         String u=cur.getString(2),price=cur.getString(3),
                             mount=cur.getString(4),desc=cur.getString(1);
-                        out.append("\\n  • Poz ADAYI ").append(cur.getString(0))
+                        out.append("\n  • Poz ADAYI ").append(cur.getString(0))
                             .append(" • sayfa ").append(cur.getInt(5))
                             .append(" • birim ").append(u==null||u.isEmpty()?"belirsiz":u)
                             .append(" • ").append(desc==null?"":desc.substring(0,Math.min(desc.length(),110)));
@@ -382,14 +382,14 @@ public final class MusaAiYfk2025Library {
                             out.append(" [resmî birim teyitsiz]");
                     }
                 }
-                if(n==0)out.append("\\n  Kaynak kitabında kelime eşleşmesi bulunamadı.");
-                if(n>1)out.append("\\n  Birden fazla poz adayı var; seçim yapılmadı.");
+                if(n==0)out.append("\n  Kaynak kitabında kelime eşleşmesi bulunamadı.");
+                if(n>1)out.append("\n  Birden fazla poz adayı var; seçim yapılmadı.");
             }
         }catch(Exception e){
             return "2025 poz adayları özel kütüphaneden okunamadı; otomatik fiyat atanmadı.";
         }
-        if(rows==0)out.append("\\nMetraj adayları bulunmadığı için poz aranmadı.");
-        out.append("\\n\\nNOT: Kelime eşleşmesi kesin poz değildir. Teknik tarif, ölçü birimi, "+
+        if(rows==0)out.append("\nMetraj adayları bulunmadığı için poz aranmadı.");
+        out.append("\n\nNOT: Kelime eşleşmesi kesin poz değildir. Teknik tarif, ölçü birimi, "+
             "malzeme, montaj bedeli ve 2025/2026 dönem farkı onaylanmadan "+
             "adet × birim fiyat çarpımı veya keşif genel toplamı hesaplanmaz.");
         return out.toString();
