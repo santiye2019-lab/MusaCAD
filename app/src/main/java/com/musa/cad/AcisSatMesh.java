@@ -113,6 +113,11 @@ public final class AcisSatMesh {
             boolean ok=false;
             if(surface!=null&&paths.size()==1&&paths.get(0).exact&&paths.get(0).points.size()>=3&&"plane-surface".equals(surface.type)){
                 ok=mesh.triangulatePlanar(paths.get(0).points);
+            }else if(surface!=null&&paths.size()==2&&paths.get(0).exact&&paths.get(1).exact&&"plane-surface".equals(surface.type)){
+                // A planar face can be a triangle with a smaller triangular
+                // opening. Never fill the hole or treat two disjoint loops
+                // as independent solid faces.
+                ok=mesh.triangulateTriangularHole(paths.get(0).points,paths.get(1).points);
             }else if(surface!=null&&paths.size()==2&&paths.get(0).exact&&paths.get(1).exact&&"cone-surface".equals(surface.type)){
                 ok=mesh.loft(paths.get(0).points,paths.get(1).points);
             }
@@ -480,6 +485,105 @@ public final class AcisSatMesh {
             }
             if(remaining.size()==3&&addTriangle(p.get(remaining.get(0)),p.get(remaining.get(1)),p.get(remaining.get(2))))added++;
             return added>0;
+        }
+
+        /**
+         * A conservative, verified special case: one triangular hole strictly
+         * inside a triangular planar face. Every candidate triangle is tested
+         * against the inner hole and all its peers before anything is committed.
+         * More general multi-loop faces deliberately remain unsupported.
+         */
+        boolean triangulateTriangularHole(List<Vec> first,List<Vec> second){
+            List<Vec> a=cleanPolygon(first),b=cleanPolygon(second);
+            if(a.size()!=3||b.size()!=3)return false;
+            Vec normal=newell(a);
+            if(normal.length()<EPS)return false;
+            int axis=dominantAxis(normal);
+            double aa=Math.abs(signedArea2(a,axis)),ab=Math.abs(signedArea2(b,axis));
+            if(aa<EPS||ab<EPS||Math.abs(aa-ab)<EPS)return false;
+            List<Vec> outer=aa>ab?a:b,inner=aa>ab?b:a;
+            double outerArea=Math.max(aa,ab),holeArea=Math.min(aa,ab);
+            double areaTol=Math.max(EPS,outerArea*1e-10);
+            if(holeArea>=outerArea-areaTol)return false;
+            double scale=0;
+            for(int i=0;i<3;i++)scale=Math.max(scale,outer.get(i).distance(outer.get((i+1)%3)));
+            Vec unit=newell(outer).normalized(),origin=outer.get(0);
+            for(Vec p:inner){
+                if(Math.abs(p.minus(origin).dot(unit))>Math.max(EPS,scale*1e-8))return false;
+                if(!strictlyInTriangle(p,outer,axis,areaTol))return false;
+            }
+            double target=outerArea-holeArea;
+            for(int direction:new int[]{1,-1})for(int shift=0;shift<3;shift++){
+                List<Vec> aligned=new ArrayList<>(3);
+                for(int j=0;j<3;j++)aligned.add(inner.get((shift+direction*j+6)%3));
+                List<List<Vec>> pieces=new ArrayList<>(6);
+                double sum=0;
+                boolean valid=true;
+                for(int j=0;j<3;j++){
+                    int next=(j+1)%3;
+                    List<Vec> t1=Arrays.asList(outer.get(j),outer.get(next),aligned.get(next));
+                    List<Vec> t2=Arrays.asList(outer.get(j),aligned.get(next),aligned.get(j));
+                    for(List<Vec> t:Arrays.asList(t1,t2)){
+                        double area=Math.abs(signedArea2(t,axis));
+                        if(area<=areaTol||convexIntersectionArea(t,inner,axis,areaTol)>areaTol){
+                            valid=false;break;
+                        }
+                        sum+=area;
+                        pieces.add(t);
+                    }
+                    if(!valid)break;
+                }
+                if(!valid||Math.abs(sum-target)>Math.max(areaTol,target*1e-8))continue;
+                for(int i=0;i<pieces.size()&&valid;i++)
+                    for(int j=i+1;j<pieces.size();j++)
+                        if(convexIntersectionArea(pieces.get(i),pieces.get(j),axis,areaTol)>areaTol){
+                            valid=false;break;
+                        }
+                if(!valid)continue;
+                // All six triangles are proven nonoverlapping, coplanar and
+                // outside the hole. Only now add actual geometry to the mesh.
+                for(List<Vec> t:pieces)
+                    if(!addTriangle(t.get(0),t.get(1),t.get(2)))
+                        throw new IllegalStateException("Validated ACIS hole triangle collapsed");
+                return true;
+            }
+            return false;
+        }
+
+        private boolean strictlyInTriangle(Vec p,List<Vec> triangle,int axis,double tol){
+            double winding=signedArea2(triangle,axis)>=0?1:-1;
+            for(int i=0;i<3;i++)
+                if(winding*cross2(triangle.get(i),triangle.get((i+1)%3),p,axis)<=tol)
+                    return false;
+            return true;
+        }
+
+        /** Projected area where two convex 2D polygons intersect. */
+        private double convexIntersectionArea(List<Vec> subject,List<Vec> clip,int axis,double tol){
+            List<Vec> result=new ArrayList<>(subject);
+            double winding=signedArea2(clip,axis)>=0?1:-1;
+            for(int i=0;i<clip.size();i++){
+                Vec a=clip.get(i),b=clip.get((i+1)%clip.size());
+                List<Vec> incoming=result;
+                result=new ArrayList<>();
+                if(incoming.isEmpty())break;
+                Vec previous=incoming.get(incoming.size()-1);
+                double prev=winding*cross2(a,b,previous,axis);
+                for(Vec current:incoming){
+                    double curr=winding*cross2(a,b,current,axis);
+                    boolean previousInside=prev>=-tol,currentInside=curr>=-tol;
+                    if(previousInside!=currentInside){
+                        double denominator=prev-curr;
+                        if(Math.abs(denominator)>1e-15){
+                            double t=Math.max(0,Math.min(1,prev/denominator));
+                            result.add(previous.plus(current.minus(previous).times(t)));
+                        }
+                    }
+                    if(currentInside)result.add(current);
+                    previous=current;prev=curr;
+                }
+            }
+            return result.size()<3?0:Math.abs(signedArea2(result,axis));
         }
 
         boolean loft(List<Vec> first,List<Vec> second){
