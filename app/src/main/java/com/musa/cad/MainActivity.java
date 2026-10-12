@@ -4408,19 +4408,28 @@ public class MainActivity extends AppCompatActivity {
             })
             .show();
     }
+    /** A reopened URI refers to the same Drive project within this installation. */
+    private String driveProjectId(ProjectSession project){
+        if(project==null)return "";
+        String stable=project.sourceUri!=null?project.sourceUri.toString():
+            project.recoveryId!=null?project.recoveryId:null;
+        return stable==null?project.driveSessionId:
+            java.util.UUID.nameUUIDFromBytes(
+                stable.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+    }
     private void scheduleDriveSync(){
         if(!MusaGoogleDriveSync.enabled(this)||!MusaGoogleDriveConsent.hasScope(this))return;
         ArrayList<MusaGoogleDriveSync.Entry> open=new ArrayList<>();
         for(ProjectSession p:projects){
             if(p.file!=null&&p.file.isFile())
-                open.add(new MusaGoogleDriveSync.Entry(p.driveSessionId,
+                open.add(new MusaGoogleDriveSync.Entry(driveProjectId(p),
                     p.name==null?"cizim.dwg":p.name,p.file));
         }
         if(open.isEmpty())return;
         MusaGoogleDriveSync.submit(getApplicationContext(),open,(id,percent,message)->
             runOnUiThread(()->{
                 if(isFinishing()||isDestroyed()||currentProject==null)return;
-                if(currentProject.driveSessionId.equals(id)&&result!=null)
+                if(driveProjectId(currentProject).equals(id)&&result!=null)
                     result.setText(message);
             }));
     }
