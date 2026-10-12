@@ -34,6 +34,8 @@ public final class MusaAiNegatedTakeoffRouteTest {
             "Positive BOQ generator must honor negation");
         ok(main.contains("synthesis.includeTakeoff=!MusaAiAnalysisIntent.prohibitsTakeoff(raw)"),
             "Post-Qwen metraj should be opt-in and respect negatives");
+        ok(main.contains("hybridVisual?Integer.MAX_VALUE:CLOUD_AI_INDEX_MAX_ITEMS"),
+            "Hybrid visual engineering review must not stop at the legacy 5000 CAD item cap");
         ok(main.contains("if(acceptedBatches>0)"),
             "No local detailed synthesis before cloud image results");
         ok(main.contains("MusaAiEngineeringSynthesis.composeDetailed(synthesis)") ||
