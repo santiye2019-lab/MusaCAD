@@ -241,6 +241,32 @@ public final class CadSolidKernel {
         return b.build();
     }
 
+    /**
+     * SWEEP of an unchanged XY cross-section along a 3D polyline with strictly
+     * increasing Z. Translation-only: section remains parallel to world XY,
+     * never claims a path-tangent frame or closed general NURBS sweep.
+     */
+    public static Mesh sweepXY(double[] profile,double[] pathXYZ)throws IOException{
+        checkPolygon(profile);
+        if(pathXYZ==null||pathXYZ.length<6||pathXYZ.length%3!=0
+            ||pathXYZ.length/3>256)
+            throw new IOException("SWEEP için en az iki XYZ yol noktası gereklidir");
+        int n=profile.length/2,rings=pathXYZ.length/3;
+        double[][] shapes=new double[rings][profile.length];
+        double[] heights=new double[rings];
+        for(int k=0;k<rings;k++){
+            double dx=pathXYZ[3*k],dy=pathXYZ[3*k+1],z=pathXYZ[3*k+2];
+            if(!Double.isFinite(dx)||!Double.isFinite(dy)||!Double.isFinite(z))
+                throw new IOException("SWEEP yol koordinatı geçersiz");
+            heights[k]=z;
+            for(int i=0;i<n;i++){
+                shapes[k][2*i]=profile[2*i]+dx;
+                shapes[k][2*i+1]=profile[2*i+1]+dy;
+            }
+        }
+        return loft(shapes,heights);
+    }
+
     public static final class Box {
         public final double[] min,max;
         public Box(double x0,double y0,double z0,double x1,double y1,double z1)throws IOException{
