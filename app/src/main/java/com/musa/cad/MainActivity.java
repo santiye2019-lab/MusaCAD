@@ -1778,6 +1778,7 @@ public class MainActivity extends AppCompatActivity {
         // Requested 9-region sweep of the OPEN drawing must not be replaced
         // by a text-only multi-project package review.
         boolean packageMode=!visionFirst&&MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&
+            MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)&&
             openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
         boolean hybridVisual=(visionFirst||MusaAiAnalysisIntent.isReview(raw)||
@@ -1841,7 +1842,8 @@ public class MainActivity extends AppCompatActivity {
         final DxfParser.Result activeSnapshot=activeDxf;
         final String displayName=currentDisplayName;
         final String requestedScope=MusaAiAnalysisIntent.scope(raw);
-        final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
+        final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&
+            MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)&&openVectorProjectCount()>1;
         final List<AiCloudProjectSource> packageSources=packageMode
             ?currentAiCloudProjectSources():Collections.emptyList();
         if(activeSnapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
