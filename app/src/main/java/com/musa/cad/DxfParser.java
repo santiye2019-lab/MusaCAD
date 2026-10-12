@@ -117,8 +117,30 @@ public final class DxfParser {
 
     public static final class Result{
         public final Bitmap bitmap;public final float[] snapPoints;public final int entityCount,layerCount,skippedCount,oleObjectCount,olePreviewCount,oleMissingPreviewCount;public int conversionWarnings;public final Set<String>layerNames,visibleLayers,layoutNames,fontFallbacks,oleTypes;public final String activeLayout;public final boolean externalShapeFallback;
-        private final List<Entity>document;private final float[] modelExtents;private final List<LayerEntity>visibleDocument;private final SpatialIndex spatialIndex;private final Matrix view;private final RectF contentBounds;private final Paint navigationPaint=new Paint(Paint.ANTI_ALIAS_FLAG);private final Matrix navigationCombined=new Matrix(),navigationInverse=new Matrix();private final Rect navigationClip=new Rect();private final RectF navigationVisibleWorld=new RectF();private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<LayerEntity>editableSourceLayers;private final android.util.SparseArray<LayerEntity>sourceLayerById;private final Set<String>visibleLayerKeys;private final List<DxfBlocks.BlockInsertion>blockInsertions;
-        Result(Bitmap b,int e,int skipped,float[]points,List<Entity>document,Matrix view,Set<String>all,Set<String>visible,Set<String>layouts,String activeLayout,RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,Map<String,DxfLineStyle.Pattern>lineTypes,float[] modelExtents,List<DxfBlocks.BlockInsertion>blockInsertions){bitmap=b;this.modelExtents=modelExtents==null?null:modelExtents.clone();entityCount=e;skippedCount=skipped;snapPoints=points;this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));this.blockInsertions=Collections.unmodifiableList(new ArrayList<>(blockInsertions==null?Collections.emptyList():blockInsertions));layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(canonicalVisible(all,visible)));visibleLayerKeys=Collections.unmodifiableSet(DxfLayerState.normalized(visibleLayers));layoutNames=Collections.unmodifiableSet(new LinkedHashSet<>(layouts));this.activeLayout=activeLayout;layerCount=all.size();ArrayList<LayerEntity>visibleList=new ArrayList<>();for(Entity wrapped:document){LayerEntity layer=(LayerEntity)wrapped;if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys))visibleList.add(layer);}visibleDocument=Collections.unmodifiableList(visibleList);spatialIndex=new SpatialIndex(visibleList);ArrayList<LayerEntity>sourceList=new ArrayList<>();android.util.SparseArray<LayerEntity>sourceMap=new android.util.SparseArray<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;sourceList.add(layer);sourceMap.put(layer.sourceId,layer);}editableSourceLayers=Collections.unmodifiableList(sourceList);sourceLayerById=sourceMap;LinkedHashSet<String>fallbacks=new LinkedHashSet<>();for(Entity wrapped:document){Entity raw=((LayerEntity)wrapped).entity;if(raw instanceof Transformed)raw=((Transformed)raw).entity;if(raw instanceof Label){DxfTextStyle.Style st=((Label)raw).style;String ref=st.fontFile.isEmpty()?st.familyHint():st.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,st.usesShx()))fallbacks.add(ref);}else if(raw instanceof MTextLabel){MTextLabel mt=(MTextLabel)raw;String ref=mt.style.fontFile.isEmpty()?mt.style.familyHint():mt.style.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,mt.style.usesShx()))fallbacks.add(ref);for(DxfMText.Run run:mt.rich.runs){String rf=run.font==null?"":run.font.trim();if(!rf.isEmpty()&&!CadFontManager.isAvailable(rf,run.usesShxFont()))fallbacks.add(rf);}}}fontFallbacks=Collections.unmodifiableSet(fallbacks);boolean shape=false;for(DxfLineStyle.Pattern p:lineTypes.values())if(p!=null&&p.requiresExternalShape()){shape=true;break;}externalShapeFallback=shape;
+        private final List<Entity>document;private final float[] modelExtents;private final List<LayerEntity>visibleDocument;private final SpatialIndex spatialIndex;private final Matrix view;private final RectF contentBounds;private final Paint navigationPaint=new Paint(Paint.ANTI_ALIAS_FLAG);private final Matrix navigationCombined=new Matrix(),navigationInverse=new Matrix();private final Rect navigationClip=new Rect();private final RectF navigationVisibleWorld=new RectF();private final float worldToContentScale;private final double millimetersPerUnit;private final String drawingUnitName;private final double globalLineTypeScale;private final Map<String,DxfLineStyle.Pattern>lineTypes;private final List<LayerEntity>editableSourceLayers;private final android.util.SparseArray<LayerEntity>sourceLayerById;private final Set<String>visibleLayerKeys;private final List<DxfBlocks.BlockInsertion>blockInsertions;private final SpatialIndex viewportModelIndex;private final List<ViewportEntity>activeViewports;
+        Result(Bitmap b,int e,int skipped,float[]points,List<Entity>document,Matrix view,Set<String>all,Set<String>visible,Set<String>layouts,String activeLayout,RectF contentBounds,float worldToContentScale,double millimetersPerUnit,String drawingUnitName,double globalLineTypeScale,Map<String,DxfLineStyle.Pattern>lineTypes,float[] modelExtents,List<DxfBlocks.BlockInsertion>blockInsertions){bitmap=b;this.modelExtents=modelExtents==null?null:modelExtents.clone();entityCount=e;skippedCount=skipped;snapPoints=points;this.document=document;this.view=new Matrix(view);this.contentBounds=new RectF(contentBounds);this.worldToContentScale=worldToContentScale;this.millimetersPerUnit=millimetersPerUnit;this.drawingUnitName=drawingUnitName;this.globalLineTypeScale=safeLineTypeScale(globalLineTypeScale);this.lineTypes=Collections.unmodifiableMap(new LinkedHashMap<>(lineTypes));this.blockInsertions=Collections.unmodifiableList(new ArrayList<>(blockInsertions==null?Collections.emptyList():blockInsertions));layerNames=Collections.unmodifiableSet(new TreeSet<>(all));visibleLayers=Collections.unmodifiableSet(new TreeSet<>(canonicalVisible(all,visible)));visibleLayerKeys=Collections.unmodifiableSet(DxfLayerState.normalized(visibleLayers));layoutNames=Collections.unmodifiableSet(new LinkedHashSet<>(layouts));this.activeLayout=activeLayout;layerCount=all.size();ArrayList<LayerEntity>visibleList=new ArrayList<>();for(Entity wrapped:document){LayerEntity layer=(LayerEntity)wrapped;if(activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys))visibleList.add(layer);}visibleDocument=Collections.unmodifiableList(visibleList);spatialIndex=new SpatialIndex(visibleList);
+            // A paper-space viewport must not walk every model entity on
+            // every pinch/pan frame. Index visible model entities once per
+            // immutable Result and query only what intersects the viewport.
+            ArrayList<ViewportEntity>paperViewports=new ArrayList<>();
+            if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(activeLayout)){
+                for(LayerEntity layer:visibleList){
+                    ViewportEntity vp=viewportOf(layer);
+                    if(vp!=null&&vp.viewport.active2d())paperViewports.add(vp);
+                }
+            }
+            activeViewports=Collections.unmodifiableList(paperViewports);
+            if(paperViewports.isEmpty())viewportModelIndex=null;
+            else{
+                ArrayList<LayerEntity>modelLayers=new ArrayList<>();
+                for(Entity wrapped:document){
+                    LayerEntity layer=(LayerEntity)wrapped;
+                    if(DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(layer.layout)&&layer.isVisible(visibleLayerKeys))
+                        modelLayers.add(layer);
+                }
+                viewportModelIndex=modelLayers.isEmpty()?null:new SpatialIndex(modelLayers);
+            }
+            ArrayList<LayerEntity>sourceList=new ArrayList<>();android.util.SparseArray<LayerEntity>sourceMap=new android.util.SparseArray<>();for(Entity entity:document){LayerEntity layer=(LayerEntity)entity;if(layer.sourceRange==null||layer.sourceEditWorld==null)continue;sourceList.add(layer);sourceMap.put(layer.sourceId,layer);}editableSourceLayers=Collections.unmodifiableList(sourceList);sourceLayerById=sourceMap;LinkedHashSet<String>fallbacks=new LinkedHashSet<>();for(Entity wrapped:document){Entity raw=((LayerEntity)wrapped).entity;if(raw instanceof Transformed)raw=((Transformed)raw).entity;if(raw instanceof Label){DxfTextStyle.Style st=((Label)raw).style;String ref=st.fontFile.isEmpty()?st.familyHint():st.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,st.usesShx()))fallbacks.add(ref);}else if(raw instanceof MTextLabel){MTextLabel mt=(MTextLabel)raw;String ref=mt.style.fontFile.isEmpty()?mt.style.familyHint():mt.style.fontFile;if(!ref.isEmpty()&&!CadFontManager.isAvailable(ref,mt.style.usesShx()))fallbacks.add(ref);for(DxfMText.Run run:mt.rich.runs){String rf=run.font==null?"":run.font.trim();if(!rf.isEmpty()&&!CadFontManager.isAvailable(rf,run.usesShxFont()))fallbacks.add(rf);}}}fontFallbacks=Collections.unmodifiableSet(fallbacks);boolean shape=false;for(DxfLineStyle.Pattern p:lineTypes.values())if(p!=null&&p.requiresExternalShape()){shape=true;break;}externalShapeFallback=shape;
             int oleCount=0,olePreview=0;LinkedHashSet<String>types=new LinkedHashSet<>();
             for(Entity wrapped:document){
                 Entity raw=((LayerEntity)wrapped).entity;while(raw instanceof Transformed)raw=((Transformed)raw).entity;
@@ -143,7 +165,7 @@ public final class DxfParser {
         public void drawVectorNavigation(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds){drawVectorInternal(canvas,imageMatrix,hiddenIds,true);}
         private void drawVectorInternal(Canvas canvas,Matrix imageMatrix,Set<Integer>hiddenIds,boolean navigation){
             navigationPaint.reset();navigationPaint.setAntiAlias(true);navigationPaint.setStyle(Paint.Style.STROKE);navigationCombined.setConcat(imageMatrix,view);
-            drawViewportModels(canvas,navigationPaint,navigationCombined,document,activeLayout,visibleLayerKeys,false,false,globalLineTypeScale);
+            drawViewportModelsIndexed(canvas,navigationPaint,navigationCombined,hiddenIds);
             canvas.getClipBounds(navigationClip);navigationVisibleWorld.set(navigationClip);
             RectF visibleWorld=navigationVisibleWorld;
             if(!navigationCombined.invert(navigationInverse))visibleWorld=null;else{navigationInverse.mapRect(navigationVisibleWorld);if(navigationClip.width()>0&&navigationClip.height()>0){float worldPerPixel=Math.max(navigationVisibleWorld.width()/navigationClip.width(),navigationVisibleWorld.height()/navigationClip.height());float pad=worldPerPixel*(navigation?12f:24f);navigationVisibleWorld.inset(-pad,-pad);}}
@@ -156,6 +178,49 @@ public final class DxfParser {
             }
             spatialIndex.draw(canvas,navigationPaint,navigationCombined,visibleWorld,hiddenIds,
                 globalLineTypeScale,subpixelLimit);
+        }
+        private void drawViewportModelsIndexed(Canvas canvas,Paint paint,Matrix paperMatrix,
+                                               Set<Integer>hiddenIds){
+            if(viewportModelIndex==null||activeViewports.isEmpty())return;
+            Rect clipPixels=canvas.getClipBounds();
+            if(clipPixels.width()<=0||clipPixels.height()<=0)return;
+            RectF screenClip=new RectF(clipPixels);
+            for(ViewportEntity item:activeViewports){
+                if(Thread.currentThread().isInterrupted())return;
+                DxfViewport.View vp=item.viewport;
+                float scale=(float)vp.scale();
+                if(!Float.isFinite(scale)||scale<=0f)continue;
+                RectF viewportScreen=new RectF((float)vp.left(),(float)vp.bottom(),
+                    (float)vp.right(),(float)vp.top());
+                paperMatrix.mapRect(viewportScreen);
+                RectF screenVisible=new RectF(viewportScreen);
+                if(!screenVisible.intersect(screenClip))continue;
+                Matrix modelToPaper=new Matrix();
+                modelToPaper.postTranslate((float)-vp.modelCenterX(),(float)-vp.modelCenterY());
+                modelToPaper.postRotate((float)vp.twistDegrees);
+                modelToPaper.postScale(scale,scale);
+                modelToPaper.postTranslate((float)vp.paperCenterX,(float)vp.paperCenterY);
+                Matrix modelToScreen=new Matrix();
+                modelToScreen.setConcat(paperMatrix,modelToPaper);
+                Matrix screenToModel=new Matrix();
+                RectF visibleWorld=null;
+                if(modelToScreen.invert(screenToModel)){
+                    visibleWorld=new RectF(screenVisible);
+                    screenToModel.mapRect(visibleWorld);
+                    // Stroke caps and text may extend just outside geometric
+                    // bounds; generous pixel padding prevents edge popping.
+                    float worldPerPixel=Math.max(visibleWorld.width()/
+                        Math.max(1f,screenVisible.width()),visibleWorld.height()/
+                        Math.max(1f,screenVisible.height()));
+                    float pad=worldPerPixel*24f;
+                    visibleWorld.inset(-pad,-pad);
+                }
+                int save=canvas.save();
+                canvas.clipRect(viewportScreen);
+                viewportModelIndex.draw(canvas,paint,modelToScreen,visibleWorld,hiddenIds,
+                    globalLineTypeScale,0f);
+                canvas.restoreToCount(save);
+            }
         }
         public void drawPreview(Canvas canvas,Matrix contentToScreen,Paint paint){
             if(bitmap==null||bitmap.isRecycled())return;Matrix bitmapToContent=new Matrix();bitmapToContent.setScale(SIZE/(float)bitmap.getWidth(),SIZE/(float)bitmap.getHeight());Matrix target=new Matrix();target.setConcat(contentToScreen,bitmapToContent);canvas.drawBitmap(bitmap,target,paint);
