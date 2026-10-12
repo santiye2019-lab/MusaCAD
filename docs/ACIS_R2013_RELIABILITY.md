@@ -102,6 +102,24 @@ otherwise compatible with legacy SAB binary record parsing. Correct
 header offset, version and record compatibility still require separate
 validation. The signature audit is explicitly host-only and never
 changes source drawings or Android shipping binaries.
+
+A **disposable Linux-only compatibility experiment** subsequently located
+the 15-byte public R2018 prefix `ASM BinaryFile4`. Its four subsequent
+32-bit fields aligned at byte 15: version **22300**, declared record count
+0, entity count 2, flags 4 (identical across the three public R2018
+envelopes). The old LibreDWG reader requires `ACIS BinaryFile` at that
+same 15-byte offset. The test temporarily matches `ASM BinaryFile4`
+and aliases **only the in-memory copy** of its prefix before sending it
+through the existing SAB-to-SAT converter. The original DWG is unchanged.
+
+On the pinned `example_2018.dwg`, this experiment recovered **three mesh
+bearing ACIS records, ten triangulated planar faces and 28 triangles**,
+whereas the unmodified converter yielded no renderable SAB. This is a
+promising interoperability result, **not certified B-Rep fidelity**:
+the output still carries unresolved history references, and there is
+not yet independent verification across unrelated R2018 projects.
+It is deliberately not part of the regular Android/native production
+converter and must remain disabled for APK builds.
 The older public R2000 `Cone.dwg` remains partially tessellated (34 triangles)
 in the A/B test.
 
