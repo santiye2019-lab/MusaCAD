@@ -247,6 +247,48 @@ jobs:
           # Report the limitation separately; do not certify missing geometry.
           echo 'Development-only native ACIS candidate passed its public fixture gate; APK not built.'
 
+      - name: Investigate R2018 ASM envelope with isolated read-only host alias
+        run: |
+          set -euo pipefail
+          # This is an OBSERVATIONAL test with a disposable GitHub runner.
+          # The source DWG, main branch, Android compiler and APK are unchanged.
+          # A 15-byte ASM BinaryFile4 prefix is normalized ONLY in memory,
+          # before the existing SAB-to-SAT test decoder. No success is presumed.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('third_party/libredwg/src/acds.spec')
+          src=p.read_text()
+          old='const char start[] = "ACIS BinaryFile";'
+          marker='memcpy (acis_sab_data, s, size);'
+          assert src.count(old)==1 and src.count(marker)==1, 'Pinned AcDs finder changed'
+          src=src.replace(old,'const char start[] = "ASM BinaryFile4";')
+          src=src.replace(marker,marker+'\n            memcpy (acis_sab_data, "ACIS BinaryFile", 15);')
+          p.write_text(src)
+          print('TEST ONLY: decode public R2018 ASM envelope using a byte-aligned 15-character alias')
+          PY
+          cmake --build /tmp/musacad-host --parallel 2
+          set +e
+          timeout 45s /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2018.dwg /tmp/musacad-r2018-asm-alias.dxf 2>/tmp/musacad-r2018-asm-alias.log
+          result=$?
+          set -e
+          echo "MUSACAD_R2018_ASM_ALIAS_CONVERTER_EXIT=$result"
+          grep -E 'MUSACAD_ACIS_SOURCE|MUSACAD_PUBLIC_ACDS_MARKERS|MusaCAD converter status' /tmp/musacad-r2018-asm-alias.log || true
+          if [ "$result" -eq 0 ] && [ -s /tmp/musacad-r2018-asm-alias.dxf ]; then
+            if python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2018-asm-alias.dxf --source-log /tmp/musacad-r2018-asm-alias.log --require-source --require-external; then
+              echo 'MUSACAD_R2018_ASM_ALIAS_SAT_TRANSPORT=1'
+              if java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2018-asm-alias.dxf; then
+                echo 'MUSACAD_R2018_ASM_ALIAS_MESH_PROBE=1 (not B-Rep fidelity)'
+              else
+                echo 'MUSACAD_R2018_ASM_ALIAS_MESH_PROBE=0'
+              fi
+            else
+              echo 'MUSACAD_R2018_ASM_ALIAS_SAT_TRANSPORT=0'
+            fi
+          else
+            echo 'MUSACAD_R2018_ASM_ALIAS_SAT_TRANSPORT=0'
+          fi
+          echo 'OBSERVATIONAL ONLY: alias test must never be merged into the Android/native production decoder.'
+
   edit-regression:
     name: Android drawing and editing logic (no APK)
     runs-on: ubuntu-24.04
