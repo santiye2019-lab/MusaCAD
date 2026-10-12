@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "dwg.h"
 #include "bits.h"
 #include "out_dxf.h"
@@ -64,6 +65,40 @@ static int session_export_dxf(MusaCadSession *session,const char *output) {
     return session->read_status|write_error;
 }
 
+/*
+ * Opt-in legacy DXF -> DWG export. Never enabled in production by default.
+ * Reject newer versions (r2007+), re-open written file to validate its object
+ * count. This does NOT prove arbitrary metadata roundtrip/AutoCAD audit parity.
+ */
+static int experimental_dxf_to_dwg(const char *input,const char *output) {
+#ifndef MUSA_ENABLE_DWG_WRITE
+    (void)input;(void)output;
+    return -90; /* writer disabled */
+#else
+    if(!input||!output)return -91;
+    Dwg_Data doc={0},verified={0};
+    int status=dxf_read_file(input,&doc);
+    if(status>=DWG_ERR_CRITICAL){dwg_free(&doc);return -92;}
+    /* LibreDWG r2010/r2013/r2018 writes are not reliably audit-clean. */
+    if(doc.header.version>R_2004 || doc.header.version<R_2000){
+        dwg_free(&doc);return -93;
+    }
+    unsigned long expected=(unsigned long)doc.num_objects;
+    if(expected==0){dwg_free(&doc);return -94;}
+    status=dwg_write_file(output,&doc);
+    dwg_free(&doc);
+    if(status>=DWG_ERR_CRITICAL || status!=0){
+        remove(output);return -95;
+    }
+    status=dwg_read_file(output,&verified);
+    if(status>=DWG_ERR_CRITICAL || (unsigned long)verified.num_objects!=expected){
+        dwg_free(&verified);remove(output);return -96;
+    }
+    dwg_free(&verified);
+    return 0;
+#endif
+}
+
 static MusaCadStats session_stats(MusaCadSession *session) {
     MusaCadStats stats={0};
     if(!session||!session->dwg)return stats;
@@ -101,6 +136,11 @@ static int convert_dwg(const char *input,const char *output) {
 
 #ifdef MUSA_HOST
 int main(int argc,char **argv){
+    if(argc==4 && !strcmp(argv[1],"--experimental-dxf-to-dwg")){
+        int status=experimental_dxf_to_dwg(argv[2],argv[3]);
+        fprintf(stderr,"MusaCAD experimental DXF->DWG status: %d\\n",status);
+        return status==0?0:1;
+    }
     if(argc!=3)return 2;
     int read_error=0;
     MusaCadSession *session=session_open(argv[1],&read_error);
@@ -137,6 +177,29 @@ JNIEXPORT jint JNICALL Java_com_musa_cad_NativeDwg_convertNative(JNIEnv *env,jcl
     (*env)->ReleaseStringUTFChars(env,input,in);
     (*env)->ReleaseStringUTFChars(env,output,out);
     return result;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_musa_cad_NativeDwgWrite_availableNative(JNIEnv *env,jclass cls){
+    (void)env;(void)cls;
+#ifdef MUSA_ENABLE_DWG_WRITE
+    return JNI_TRUE;
+#else
+    return JNI_FALSE;
+#endif
+}
+JNIEXPORT jint JNICALL Java_com_musa_cad_NativeDwgWrite_exportNative(JNIEnv *env,jclass cls,jstring input,jstring output){
+    (void)cls;
+    if(!input||!output)return -91;
+    const char *in=(*env)->GetStringUTFChars(env,input,NULL);
+    if(!in)return -91;
+    const char *out=(*env)->GetStringUTFChars(env,output,NULL);
+    if(!out){(*env)->ReleaseStringUTFChars(env,input,in);return -91;}
+    pthread_mutex_lock(&engine_lock);
+    int status=experimental_dxf_to_dwg(in,out);
+    pthread_mutex_unlock(&engine_lock);
+    (*env)->ReleaseStringUTFChars(env,input,in);
+    (*env)->ReleaseStringUTFChars(env,output,out);
+    return status;
 }
 
 JNIEXPORT jlong JNICALL Java_com_musa_cad_NativeCadEngine_openNative(JNIEnv *env,jclass cls,jstring input){
