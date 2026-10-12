@@ -62,6 +62,9 @@ public class CadView extends View {
     }
 
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+    private final CadFrameDrawTimes drawTimes=new CadFrameDrawTimes();
+    /** CPU-side Canvas draw timings only, not measured hardware presentation FPS. */
+    public String drawingCpuSummary(){return drawTimes.safeSummary();}
     private final ArrayList<PointF> points=new ArrayList<>();
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
     private final ArrayList<CadEdit> edits=new ArrayList<>();
@@ -261,6 +264,7 @@ public class CadView extends View {
 
     /** Fast first-paint path. Editing remains disabled until upgradeNativeDrawing installs the full vector model. */
     public void setNativeDrawing(NativeScene result){
+        drawTimes.clear();
         if(result==null)throw new IllegalArgumentException("Native çizim yok");
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         drawing=null;vectorDrawing=null;nativeDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
@@ -269,6 +273,7 @@ public class CadView extends View {
 
     /** Swaps in the complete editor while preserving the same DWG world point and zoom. */
     public void upgradeNativeDrawing(DxfParser.Result result){
+        drawTimes.clear();
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();
         NativeScene oldNative=nativeDrawing;PointF worldAnchor=null;float worldScreenScale=0f;float screenX=getWidth()/2f,screenY=getHeight()/2f;
@@ -295,6 +300,7 @@ public class CadView extends View {
     }
 
     public void setVectorDrawing(DxfParser.Result result){
+        drawTimes.clear();
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
         drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
@@ -902,6 +908,7 @@ public class CadView extends View {
 
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
+        final long cpuDrawStart=System.nanoTime();
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
                 // First visible vector frame is already the final authoritative CAD
@@ -925,6 +932,7 @@ public class CadView extends View {
         if((!exporting||reportEvidenceExporting)&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}
         if(stylusHover&&!exporting)drawStylusCursor(c);
+        if(hasDrawing()&&!exporting)drawTimes.record(System.nanoTime()-cpuDrawStart);
     }
 
     private void drawImageOverlays(Canvas c){
