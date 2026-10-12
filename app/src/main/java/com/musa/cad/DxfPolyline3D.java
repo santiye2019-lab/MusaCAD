@@ -47,7 +47,9 @@ public final class DxfPolyline3D {
                 else if(code>=71&&code<=74)indices[code-71]=Integer.parseInt(value);
                 else if(code==10||code==20||code==30){
                     double number=Double.parseDouble(value);
-                    if(!Double.isFinite(number))return null;
+                    // Android renders with float matrices; silent overflow
+                    // would make bounds/path invalid rather than show geometry.
+                    if(!Double.isFinite(number)||Math.abs(number)>Float.MAX_VALUE)return null;
                     coordinates[code/10-1]=number;
                     if(code==10)hasX=true;
                     if(code==20)hasY=true;
