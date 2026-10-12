@@ -180,12 +180,171 @@ jobs:
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-history-ab-cone.dxf 2>/tmp/musacad-history-ab-cone.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-cone.dxf --source-log /tmp/musacad-history-ab-cone.log --require-source
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-cone.dxf
-          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2018.dwg
+          /tmp/musacad-host/musacad_sab_audit third_party/libredwg/test/test-data/example_2018.dwg | tee /tmp/musacad-r2018-sab-inventory.log
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2018.dwg /tmp/musacad-history-ab-r2018.dxf 2>/tmp/musacad-history-ab-r2018.log
-          python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-r2018.dxf --source-log /tmp/musacad-history-ab-r2018.log
-          if grep -q 'MUSACAD_ACIS_SOURCE=0 ' /tmp/musacad-history-ab-r2018.log; then
+          if grep -q '^SAB_SOURCE_SUMMARY bodies=3 partial_or_missing=3
+          echo 'A/B TEST ONLY: do not promote this experimental converter to production'
+
+  edit-regression:
+    name: Android drawing and editing logic (no APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test drawing, snapping, selection and editable geometry
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-edit-tests
+          java_src=app/src/main/java/com/musa/cad
+          javac -d /tmp/musacad-edit-tests "$java_src/SelectionBounds.java" tests/SelectionBoundsTest.java
+          java -cp /tmp/musacad-edit-tests SelectionBoundsTest
+          javac -d /tmp/musacad-edit-tests "$java_src/SnapPoints.java" tests/SnapPointsTest.java
+          java -cp /tmp/musacad-edit-tests SnapPointsTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" tests/CadEditStylusTest.java
+          java -cp /tmp/musacad-edit-tests CadEditStylusTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/SourceRange.java" tests/CadEditTransformTest.java
+          java -cp /tmp/musacad-edit-tests CadEditTransformTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadBlock.java" tests/CadBlockTest.java
+          java -cp /tmp/musacad-edit-tests CadBlockTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadDimension.java" tests/CadDimensionTest.java
+          java -cp /tmp/musacad-edit-tests CadDimensionTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadBlock.java" "$java_src/CadBlockLibrary.java" tests/CadBlockLibraryTest.java
+          java -cp /tmp/musacad-edit-tests CadBlockLibraryTest
+      - name: Stress streaming DXF with 70,000 entities (no APK)
+        run: |
+          set -euo pipefail
+          java_src=app/src/main/java/com/musa/cad
+          mkdir -p /tmp/musacad-large-stream
+          javac -sourcepath app/src/main/java -d /tmp/musacad-large-stream tests/DxfStreamingLargeTest.java
+          java -Xmx768m -cp /tmp/musacad-large-stream DxfStreamingLargeTest 70000
+          java -Xmx768m -cp /tmp/musacad-large-stream DxfStreamingLargeTest 250000
+      - name: Verify full ACI/TrueColor display values
+        run: |
+          mkdir -p /tmp/musacad-palette
+          javac -d /tmp/musacad-palette app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
+          java -cp /tmp/musacad-palette DxfColorTest
+      - name: Audit ACIS body/payload preservation without retaining geometry in RAM
+        run: |
+          mkdir -p /tmp/musacad-acis
+          javac -sourcepath app/src/main/java -d /tmp/musacad-acis tests/DxfAcisCoverageTest.java
+          java -cp /tmp/musacad-acis DxfAcisCoverageTest
+      - name: Verify ACIS DWG-to-DXF diagnostics never claim unproven fidelity
+        run: |
+          mkdir -p /tmp/musacad-acis-diagnostic
+          javac -d /tmp/musacad-acis-diagnostic app/src/main/java/com/musa/cad/DxfAcisCoverage.java app/src/main/java/com/musa/cad/AcisConversionDiagnostic.java tests/AcisConversionDiagnosticTest.java
+          java -cp /tmp/musacad-acis-diagnostic AcisConversionDiagnosticTest
+      - name: Verify genuine SAT edge fallback when faces are unsupported
+        run: |
+          mkdir -p /tmp/musacad-acis-sat
+          javac -d /tmp/musacad-acis-sat app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisSatMeshTest.java
+          java -cp /tmp/musacad-acis-sat AcisSatMeshTest
+      - name: Test 3D CAD mesh and missing ACIS face reporting
+        run: |
+          mkdir -p /tmp/musacad-full-3d-tests
+          javac -sourcepath app/src/main/java -d /tmp/musacad-full-3d-tests tests/Dxf3dMeshTest.java
+          java -cp /tmp/musacad-full-3d-tests Dxf3dMeshTest
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/musa/cad/Mesh3dActivity.java').read_text()
+          assert 'mesh.acisMissingGeometrySolids' in ui
+          assert 'mesh.acisTessellatedFaces' in ui
+          assert 'bu katılar görünümde YOK' in ui
+          assert 'gerçek B-Rep kenarları gösterildi' not in ui
+          print('PASS: 3D screen identifies missing rather than imaginary ACIS geometry')
+          PY
+      - name: Verify SOLID TRACE and 3DFACE geometry fidelity
+        run: |
+          mkdir -p /tmp/musacad-face
+          javac -d /tmp/musacad-face app/src/main/java/com/musa/cad/DxfPlanarFace.java tests/DxfPlanarFaceTest.java
+          java -cp /tmp/musacad-face DxfPlanarFaceTest
+      - name: Test 3D polyline, polyface and polygon-mesh projection
+        run: |
+          mkdir -p /tmp/musacad-poly3d
+          javac -d /tmp/musacad-poly3d app/src/main/java/com/musa/cad/DxfPolyline3D.java tests/DxfPolyline3DTest.java
+          java -cp /tmp/musacad-poly3d DxfPolyline3DTest
+
+  java-android-compile:
+    name: Android CAD compile and navigation regression (no APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Fetch pinned DWG source required by Android native build
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Verify navigation hot path and unchanged full-fidelity renderer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          parser=Path('app/src/main/java/com/musa/cad/DxfParser.java').read_text()
+          view=Path('app/src/main/java/com/musa/cad/CadView.java').read_text()
+          assert 'MATRIX_SCALE_SCRATCH.get()' in parser
+          assert '(linePattern==null||linePattern.continuous())?null' in parser
+          assert 'spatialIndex.draw(canvas,navigationPaint' in parser
+          assert 'vectorDrawing.drawVectorNavigation(c,imageMatrix' in view
+          assert 'vectorDrawing.drawVector(c,imageMatrix' in view
+          assert 'drawEdits(c);drawLiveFreehand(c)' in view
+          activity=Path('app/src/main/java/com/musa/cad/MainActivity.java').read_text()
+          assert 'loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount' in activity
+          assert 'AcisConversionDiagnostic.status(' in activity
+          assert 'activeDxf.acisCoverage' in activity
+          acis=Path('app/src/main/java/com/musa/cad/AcisConversionDiagnostic.java').read_text()
+          assert '3B geometri doğrulanmadı' in acis
+          assert 'gövde verisi eksik' in acis
+          assert 'drawViewportModelsIndexed(canvas,navigationPaint,navigationCombined,hiddenIds)' in parser
+          assert 'p.setStyle(Paint.Style.FILL);polygon.draw(c,p,m);' in parser
+          assert 'viewportModelIndex.draw(canvas,paint,modelToScreen,visibleWorld,hiddenIds' in parser
+          assert 'drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayerKeys,true,monochrome' in parser
+          print('PASS: low-allocation navigation, final vector and drawing overlay retained')
+          PY
+      - name: Compile Android app Java without building an APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:compileDirectDebugJavaWithJavac
+      - name: Test navigation policy and color/path switching
+        run: |
+          javac -d /tmp/musacad-navigation-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/CadNavigationPolicyTest.java tests/RenderPathPolicyTest.java
+          java -cp /tmp/musacad-navigation-tests CadNavigationPolicyTest
+          java -cp /tmp/musacad-navigation-tests RenderPathPolicyTest
+      - name: Test blue-first-frame protection without an APK
+        run: |
+          mkdir -p /tmp/musacad-color-check
+          javac -d /tmp/musacad-color-check app/src/main/java/com/musa/cad/NativeFirstPaintColorGuard.java
+          jshell --class-path /tmp/musacad-color-check <<'EOF' | tee /tmp/color-results
+          import com.musa.cad.NativeFirstPaintColorGuard;
+          if (!NativeFirstPaintColorGuard.blueTint(0xff0000ff)) throw new RuntimeException("blue not recognized");
+          if (NativeFirstPaintColorGuard.blueTint(0xffff0000)) throw new RuntimeException("red mistaken for blue");
+          if (NativeFirstPaintColorGuard.blueTint(0xff00ff00)) throw new RuntimeException("green mistaken for blue");
+          if (!NativeFirstPaintColorGuard.shouldDefer(95,100)) throw new RuntimeException("blue flash not gated");
+          if (NativeFirstPaintColorGuard.shouldDefer(60,100)) throw new RuntimeException("colored scene blocked");
+          /exit
+          EOF
+          ! grep -F 'Exception' /tmp/color-results
+          python3 - <<'PY'
+          from pathlib import Path
+          scene=Path('app/src/main/java/com/musa/cad/NativeScene.java').read_text()
+          activity=Path('app/src/main/java/com/musa/cad/MainActivity.java').read_text()
+          assert 'public boolean hasSuspiciousBlueTint()' in scene
+          assert 'provisional.hasSuspiciousBlueTint()' in activity
+          print('PASS: suspicious blue first-frame stays hidden until true-color model')
+          PY
+ /tmp/musacad-r2018-sab-inventory.log; then
+            echo 'LIMITATION: 3 public R2018 ACIS objects but LibreDWG exposed no binary SAB; cannot prove or fabricate missing geometry.'
+          elif grep -q 'MUSACAD_ACIS_SOURCE=0 ' /tmp/musacad-history-ab-r2018.log; then
             echo 'Public R2018 fixture contains no source ACIS solids; skip mesh proof'
           else
+            python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-r2018.dxf --source-log /tmp/musacad-history-ab-r2018.log --require-source
             java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-r2018.dxf
           fi
           echo 'A/B TEST ONLY: do not promote this experimental converter to production'
