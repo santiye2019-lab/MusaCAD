@@ -122,7 +122,7 @@ jobs:
           python3 tests/audit_acis_roundtrip.py --self-test
           # Test a pinned upstream DWG, not just synthetic SAT text.
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-cone-acis.dxf 2>/tmp/musacad-cone-source.log
-          python3 tests/audit_acis_roundtrip.py /tmp/musacad-cone-acis.dxf --source-log /tmp/musacad-cone-source.log --require-source
+          python3 tests/audit_acis_roundtrip.py /tmp/musacad-cone-acis.dxf --source-log /tmp/musacad-cone-source.log --require-source --debug-public-fixture
       - name: Preserve embedded OLE object payload
         run: |
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/TS1.dwg /tmp/musacad-ole.dxf
