@@ -11,6 +11,7 @@ on:
       - 'tests/SnapPointsTest.java'
       - 'tests/DxfStreamingLargeTest.java'
       - 'tests/DxfColorTest.java'
+      - 'tests/DxfPlanarFaceTest.java'
       - 'tests/native_color_test.c'
       - 'tests/audit_dwg_to_dxf.py'
       - '.github/workflows/cad-host-regression.yml'
@@ -152,6 +153,11 @@ jobs:
           mkdir -p /tmp/musacad-palette
           javac -d /tmp/musacad-palette app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-palette DxfColorTest
+      - name: Verify SOLID TRACE and 3DFACE geometry fidelity
+        run: |
+          mkdir -p /tmp/musacad-face
+          javac -d /tmp/musacad-face app/src/main/java/com/musa/cad/DxfPlanarFace.java tests/DxfPlanarFaceTest.java
+          java -cp /tmp/musacad-face DxfPlanarFaceTest
 
   java-android-compile:
     name: Android CAD compile and navigation regression (no APK)
