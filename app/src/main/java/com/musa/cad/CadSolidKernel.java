@@ -43,11 +43,17 @@ public final class CadSolidKernel {
             if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(z)
                 ||Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)))>1e9)
                 throw new IOException("3B koordinat güvenlik sınırı aşıldı");
+            float fx=(float)x,fy=(float)y,fz=(float)z;
+            // Android mesh is float-based; never silently collapse engineering
+            // coordinates whose numeric error exceeds 0.001 drawing unit.
+            if(Math.abs((double)fx-x)>0.001d||Math.abs((double)fy-y)>0.001d
+                ||Math.abs((double)fz-z)>0.001d)
+                throw new IOException("3B koordinat float hassasiyetini aşıyor; orijin yakınında modelleyin");
             String key=Double.toHexString(x)+","+Double.toHexString(y)+","+Double.toHexString(z);
             Integer previous=shared.get(key);if(previous!=null)return previous;
             if(xyz.size()/3>=MAX_POINTS)throw new IOException("3B köşe sınırı aşıldı");
             int index=xyz.size()/3;
-            xyz.add((float)x);xyz.add((float)y);xyz.add((float)z);
+            xyz.add(fx);xyz.add(fy);xyz.add(fz);
             shared.put(key,index);
             return index;
         }
