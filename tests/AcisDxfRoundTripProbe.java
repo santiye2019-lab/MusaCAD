@@ -24,7 +24,6 @@ public final class AcisDxfRoundTripProbe {
                 String decoded=AcisSatMeshDebug.decode(raw.toString().replace("^ ","^"));
                 java.util.TreeMap<String,Integer> types=new java.util.TreeMap<>();
                 for(String rec:decoded.split("#")){
-                    int ordinal=recordOrdinal++;
                     String[] words=rec.trim().split("\\s+");
                     if(words.length<2)continue;
                     String kind=words[0].matches("-\\d+")?words[1]:words[0];
@@ -34,6 +33,7 @@ public final class AcisDxfRoundTripProbe {
                 java.util.Map<String,Integer> sampleCounts=new java.util.HashMap<>();
                 int recordOrdinal=0;
                 for(String rec:decoded.split("#")){
+                    int ordinal=recordOrdinal++;
                     String[] words=rec.trim().split("\\s+");
                     if(words.length<2)continue;
                     String kind=words[0].matches("-\\d+")?words[1]:words[0];
