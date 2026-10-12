@@ -136,6 +136,27 @@ public final class NativeScene {
         grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
     }
 
+    /**
+     * Sample serialized first-frame colors without any Canvas draws or
+     * image allocation. Used once after native decoding, off the UI thread.
+     */
+    public CadColorProfile colorProfile(){
+        CadColorProfile profile=new CadColorProfile();
+        int step=Math.max(1,(offsets.length+CadColorProfile.MAX_SAMPLES-1)/CadColorProfile.MAX_SAMPLES);
+        for(int i=0;i<offsets.length;i+=step){
+            int p=offsets[i],encoded=Math.round(raw[p++]),color;
+            if(streamVersion>=4&&encoded<0){
+                color=DxfColor.trueColorArgb(Math.round(raw[p]));
+            }else if(streamVersion>=3){
+                color=DxfColor.aciArgb(encoded&255);
+            }else{
+                color=DxfColor.aciArgb(Math.round(raw[p]));
+            }
+            profile.add(color);
+        }
+        return profile;
+    }
+
     private int primitiveType(int index){
         int encoded=Math.round(raw[offsets[index]]);
         if(streamVersion>=4&&encoded<0)return (-encoded-1)>>>8;
