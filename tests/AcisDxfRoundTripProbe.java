@@ -173,6 +173,14 @@ public final class AcisDxfRoundTripProbe {
         }
         System.out.printf("ACIS_PUBLIC_DANGLING_CLASS body=%d total=%d owners=%s topology=%s past_last_node=%d%n",
             body,totalMissing,danglingByKind,damagedTopology,outsideNodeRange);
+        int expectedHistory=body==1?0:body==2?10:body==3?16:-1;
+        if(expectedHistory<0||totalMissing!=expectedHistory||
+           outsideNodeRange!=expectedHistory||!damagedTopology.isEmpty()||
+           danglingByKind.size()>(expectedHistory==0?0:1)||
+           danglingByKind.getOrDefault("persubent-acadsolidhistory-attrib",0)!=expectedHistory)
+            throw new AssertionError("Public R2013 ACIS dangling references changed classification: body="+body);
+        System.out.printf("PASS: R2013 body %d has %d history-only unresolved refs and zero direct B-Rep topology refs%n",
+            body,expectedHistory);
         java.lang.reflect.Method sample=AcisSatMesh.class.getDeclaredMethod("sampleEdge",java.util.Map.class,nodeClass,boolean.class);
         sample.setAccessible(true);
         java.lang.reflect.Method build=AcisSatMesh.class.getDeclaredMethod("buildLoop",java.util.Map.class,nodeClass);
