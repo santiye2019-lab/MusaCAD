@@ -2351,7 +2351,7 @@ public class MainActivity extends AppCompatActivity {
         synthesis.coverageRegister=MusaAiPaftaCoverage.build(snapshot,viewCatalog,
             acceptedTiles,total,focusedReviewed,focusedEligible,
             issue.isEmpty()?focusedIssue:issue);
-        String completeReport=MusaAiEngineeringSynthesis.compose(synthesis);
+        String completeReport=MusaAiEngineeringSynthesis.composeDetailed(synthesis);
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()
