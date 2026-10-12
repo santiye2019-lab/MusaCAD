@@ -183,7 +183,12 @@ jobs:
           log=Path('/tmp/musacad-public-r2018-raw.log').read_text(errors='replace')
           markers=[x for x in log.splitlines() if x.startswith('MUSACAD_PUBLIC_ACDS_MARKERS ')]
           assert len(markers)==1, 'Decoded public R2018 AcDs marker coverage missing'
+          fields=dict(part.split('=',1) for part in markers[0].split()[1:])
+          assert (fields['starts'],fields['asm_starts'],fields['ends'])==('0','3','3'),fields
+          header_lines=[x for x in log.splitlines() if x.startswith('MUSACAD_PUBLIC_ASM_HEADER ')]
+          assert len(header_lines)==6, 'Public R2018 ASM numeric header probes unavailable'
           print('PUBLIC R2018 '+markers[0])
+          for line in header_lines: print('PUBLIC R2018 '+line)
           PY
       - name: Verify native AcDs SAB-to-SAT conversion from real R2013 DWG
         run: |
@@ -194,6 +199,8 @@ jobs:
           lines=Path('/tmp/musacad-r2013-acds.log').read_text(errors='replace').splitlines()
           markers=[x for x in lines if x.startswith('MUSACAD_PUBLIC_ACDS_MARKERS ')]
           assert len(markers)==1, 'Public R2013 AcDs raw marker audit not reached'
+          fields=dict(part.split('=',1) for part in markers[0].split()[1:])
+          assert (fields['starts'],fields['asm_starts'],fields['ends'])==('3','0','3'),fields
           print('PUBLIC R2013 '+markers[0])
           PY
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2013-acds.dxf --source-log /tmp/musacad-r2013-acds.log --require-source --require-external
