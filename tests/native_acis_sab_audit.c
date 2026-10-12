@@ -92,11 +92,47 @@ invalid:
          item,header_version,declared,records,count,tag,unknown);
   return 1;
 }
+/** Non-sensitive, bounded summary of the decoded AcDs section metadata.
+ * R2018 may store SAB inside multi-page blobs rather than expose a single
+ * contiguous "ACIS BinaryFile" marker. Never scan private user drawings.
+ */
+static void scan_acds_metadata(const Dwg_Data *dwg){
+  const Dwg_AcDs *ds=&dwg->acds;
+  unsigned total=(unsigned)ds->num_segidx;
+  unsigned loaded=(unsigned)ds->total_segments;
+  printf("ACDS_METADATA version=%d sections=%u loaded=%u datastore_revision=%u "
+         "dataindex=%u schema_props=%u search_records=%u queued_sab=%u "
+         "blob_pages=%u blob_bytes=%llu\n",
+         (int)dwg->header.version,total,loaded,(unsigned)ds->ds_version,
+         (unsigned)ds->datidx.num_entries,(unsigned)ds->schidx.num_props,
+         (unsigned)ds->search.num_search,(unsigned)dwg->num_acis_sab_hdl,
+         (unsigned)ds->blob01.page_count,
+         (unsigned long long)ds->blob01.data_size);
+  if(!ds->segments||!ds->segidx||!total){
+    puts("ACDS_SEGMENT_SUMMARY available=0 data=0 blob=0 search=0 unknown=0");
+    return;
+  }
+  unsigned types[9]={0};unsigned unknown=0;
+  for(unsigned i=0;i<total&&i<4096;i++){
+    // No data, handles, names or drawing coordinates emitted. Types only.
+    if(!ds->segidx[i].offset)continue;
+    int type=(int)ds->segments[i].type;
+    if(type>=0&&type<9)types[type]++;
+    else unknown++;
+  }
+  printf("ACDS_SEGMENT_SUMMARY available=1 data=%u blob=%u search=%u "
+         "datidx=%u schema=%u other=%u unknown=%u\n",
+         types[2],types[6],types[5],types[1],types[3]+types[4],
+         types[0]+types[7]+types[8],unknown);
+  if(total>4096)puts("ACDS_SEGMENT_SUMMARY truncated=1");
+}
+
 int main(int argc,char **argv){
   if(argc!=2)return 2;
   Dwg_Data dwg={0};
   int err=dwg_read_file(argv[1],&dwg);
   if(err>=DWG_ERR_CRITICAL){fprintf(stderr,"Failed to read public SAB fixture\n");return 1;}
+  scan_acds_metadata(&dwg);
   int item=0,bad=0;
   for(BITCODE_BL i=0;i<dwg.num_objects;i++){
     Dwg_Object *o=&dwg.object[i];
