@@ -115,6 +115,24 @@ public final class NativeScene {
     /** Once the full DXF model is ready, use its exact world-to-content transform for gesture previews. */
     public void alignTo(Matrix drawingToContent){if(drawingToContent!=null)worldToContent.set(drawingToContent);}
 
+    public boolean hasSuspiciousBlueTint(){
+        if(primitiveCount<12)return false;
+        int blue=0;
+        for(int offset:offsets){
+            int at=offset,encoded=Math.round(raw[at++]),color;
+            if(streamVersion>=4&&encoded<0){
+                if(at>=raw.length)continue;
+                color=DxfColor.trueColorArgb(Math.round(raw[at]));
+            }else if(streamVersion>=3)color=DxfColor.aciArgb(encoded&255);
+            else{
+                if(at>=raw.length)continue;
+                color=DxfColor.aciArgb(Math.round(raw[at]));
+            }
+            if(NativeFirstPaintColorGuard.blueTint(color))blue++;
+        }
+        return NativeFirstPaintColorGuard.shouldDefer(blue,primitiveCount);
+    }
+
     public void draw(Canvas canvas,Matrix contentToScreen){draw(canvas,contentToScreen,false);}
 
     /**
