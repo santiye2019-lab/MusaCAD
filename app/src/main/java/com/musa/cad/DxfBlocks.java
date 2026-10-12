@@ -52,6 +52,26 @@ public final class DxfBlocks {
         }
     }
 
+    /** A referenced DWG is listed but not loaded or merged into the parent model. */
+    public static final class ExternalReference {
+        public final String name,path;
+        public final boolean overlay;
+        ExternalReference(String name,String path,boolean overlay){
+            this.name=name==null?"":name.trim();
+            this.path=path==null?"":path.trim();
+            this.overlay=overlay;
+        }
+    }
+
+    private static void trackExternalReference(Result result,Record record)throws IOException{
+        int flags=record.integer(70,0);
+        if((flags&12)==0)return; // 4=external reference; 8=overlay
+        if(result.externalReferences.size()>=10000)
+            throw new IOException("Harici referans sayısı sınırı aşıldı");
+        result.externalReferences.add(new ExternalReference(
+            record.text(2,""),record.text(1,""),(flags&8)!=0));
+    }
+
     private static final class Block{
         final Record header;final List<Record>members=new ArrayList<>();
         File file;Charset charset;long offset;int offsetLine;
@@ -65,7 +85,7 @@ public final class DxfBlocks {
     }
 
     public static final class Result {
-        public final List<Placement>placements=new ArrayList<>();public final List<BlockInsertion>blockInsertions=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
+        public final List<Placement>placements=new ArrayList<>();public final List<BlockInsertion>blockInsertions=new ArrayList<>();public final List<ExternalReference>externalReferences=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
         public int skipped,units;public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
         public boolean layerInitiallyVisible(String layer){return !initiallyHiddenLayerKeys.contains(DxfLayerState.key(layer));}
     }
@@ -79,7 +99,7 @@ public final class DxfBlocks {
             if(record.type.equals("SECTION")){section=record.text(2,"");active=null;continue;}if(record.type.equals("ENDSEC")){section="";active=null;continue;}
             if(section.equals("TABLES")&&record.type.equals("LTYPE")){String name=DxfLineStyle.normalizeName(record.text(2,DxfLineStyle.CONTINUOUS));result.lineTypes.put(name,DxfLineTypeParser.parse(name,tags,record.from,record.to));}
             else if(section.equals("TABLES")&&record.type.equals("LAYER")){String name=record.text(2,"0"),lookup=key(name);int color=layerColor(record);String lineType=DxfLineStyle.normalizeName(record.text(6,DxfLineStyle.CONTINUOUS));int lineWeight=layerLineweight(record,defaultWeight);layerColorLookup.put(lookup,color);layerLineTypeLookup.put(lookup,lineType);layerLineWeightLookup.put(lookup,lineWeight);result.layerColors.put(name,color);result.layerLineTypes.put(name,lineType);result.layerLineWeights.put(name,lineWeight);setLayerInitialVisibility(result,name,record);}
-            else if(section.equals("BLOCKS")){if(record.type.equals("BLOCK")){active=new Block(record);blocks.put(key(record.text(2,"")),active);}else if(record.type.equals("ENDBLK"))active=null;else if(active!=null)active.members.add(record);}
+            else if(section.equals("BLOCKS")){if(record.type.equals("BLOCK")){active=new Block(record);blocks.put(key(record.text(2,"")),active);trackExternalReference(result,record);}else if(record.type.equals("ENDBLK"))active=null;else if(active!=null)active.members.add(record);}
             else if(section.equals("ENTITIES"))roots.add(record);
         }
         if(!layerColorLookup.containsKey("0")){int color=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);layerColorLookup.put("0",color);layerLineTypeLookup.put("0",DxfLineStyle.CONTINUOUS);layerLineWeightLookup.put("0",defaultWeight);result.layerColors.put("0",color);result.layerLineTypes.put("0",DxfLineStyle.CONTINUOUS);result.layerLineWeights.put("0",defaultWeight);}
@@ -126,7 +146,7 @@ public final class DxfBlocks {
                     String styleName=DxfTextStyle.normalize(r.text(2,DxfTextStyle.STANDARD));DxfTextStyle.Style style=DxfTextStyle.parse(one).get(styleName);if(style!=null)result.textStyles.put(styleName,style);
                 }else if("BLOCKS".equals(section)&&"BLOCK".equals(r.type)){
                     if(blocks.size()>=100000)throw new IOException("DXF blok sayısı sınırı aşıldı");
-                    Block block=new Block(r);block.file=file;block.charset=charset;block.offset=input.nextRecordOffset;block.offsetLine=input.nextRecordLine;blocks.put(key(r.text(2,"")),block);
+                    Block block=new Block(r);block.file=file;block.charset=charset;block.offset=input.nextRecordOffset;block.offsetLine=input.nextRecordLine;blocks.put(key(r.text(2,"")),block);trackExternalReference(result,r);
                 }
             }
         }
