@@ -65,7 +65,5 @@ public final class DxfAcisCoverage {
         }
         public int entityCount(){return solidCount+regionCount+bodyCount;}
         public boolean hasMissingBodies(){return withoutInlineData>0;}
-        /** A record with a payload is NOT proof that a full 3D B-rep was decoded. */
-        public boolean fullyRendered(){return entityCount()==0;}
     }
 }
