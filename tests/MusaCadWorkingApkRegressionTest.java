@@ -47,6 +47,22 @@ public final class MusaCadWorkingApkRegressionTest {
             "Successful retry must upgrade the original project in place");
         yes(menu.contains("project.prepareError=message"),
             "Failed retry keeps an observable error");
+        yes(gradle.contains("play-services-auth:21.3.0"),
+            "Restored Drive OAuth needs an Android Sign-In dependency");
+        yes(menu.contains("promptDriveConsentOnce()")&&
+                menu.contains("case MENU_DRIVE_CONSENT:showDriveConsent()")&&
+                menu.contains("MusaGoogleDriveSync.submit(")&&
+                menu.contains("scheduleDriveSync()"),
+            "Drive first run consent, connection menu and automatic upload must survive rebuild");
+        String consent=read("app/src/main/java/com/musa/cad/MusaGoogleDriveConsent.java");
+        String sync=read("app/src/main/java/com/musa/cad/MusaGoogleDriveSync.java");
+        String drive=read("app/src/main/java/com/musa/cad/MusaGoogleDriveTransport.java");
+        yes(consent.contains("MusaGoogleDriveTransport.SCOPE")&&
+                sync.contains("GoogleAuthUtil.getToken(")&&
+                drive.contains("https://www.googleapis.com/auth/drive.file"),
+            "Drive scope, authorization and transfer cannot silently disappear");
+        yes(!menu.contains("MusaAiProjectSync.submit("),
+            "Drive-only project archive must not silently enable Cloudflare project storage");
         System.out.println("MusaCadWorkingApkRegressionTest OK");
     }
 }
