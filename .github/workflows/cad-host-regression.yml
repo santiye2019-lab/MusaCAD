@@ -14,6 +14,7 @@ on:
       - 'tests/DxfPlanarFaceTest.java'
       - 'tests/DxfPolyline3DTest.java'
       - 'tests/DxfAcisCoverageTest.java'
+      - 'tests/AcisConversionDiagnosticTest.java'
       - 'tests/native_color_test.c'
       - 'tests/audit_dwg_to_dxf.py'
       - '.github/workflows/cad-host-regression.yml'
@@ -174,6 +175,11 @@ jobs:
           mkdir -p /tmp/musacad-acis
           javac -sourcepath app/src/main/java -d /tmp/musacad-acis tests/DxfAcisCoverageTest.java
           java -cp /tmp/musacad-acis DxfAcisCoverageTest
+      - name: Verify ACIS DWG-to-DXF diagnostics never claim unproven fidelity
+        run: |
+          mkdir -p /tmp/musacad-acis-diagnostic
+          javac -d /tmp/musacad-acis-diagnostic app/src/main/java/com/musa/cad/DxfAcisCoverage.java app/src/main/java/com/musa/cad/AcisConversionDiagnostic.java tests/AcisConversionDiagnosticTest.java
+          java -cp /tmp/musacad-acis-diagnostic AcisConversionDiagnosticTest
       - name: Verify SOLID TRACE and 3DFACE geometry fidelity
         run: |
           mkdir -p /tmp/musacad-face
@@ -215,8 +221,11 @@ jobs:
           assert 'drawEdits(c);drawLiveFreehand(c)' in view
           activity=Path('app/src/main/java/com/musa/cad/MainActivity.java').read_text()
           assert 'loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount' in activity
-          assert 'ACIS 3B geometri doğrulanmadı' in activity
-          assert 'activeDxf.acisCoverage.entityCount()>0' in activity
+          assert 'AcisConversionDiagnostic.status(' in activity
+          assert 'activeDxf.acisCoverage' in activity
+          acis=Path('app/src/main/java/com/musa/cad/AcisConversionDiagnostic.java').read_text()
+          assert '3B geometri doğrulanmadı' in acis
+          assert 'gövde verisi eksik' in acis
           assert 'drawViewportModelsIndexed(canvas,navigationPaint,navigationCombined,hiddenIds)' in parser
           assert 'p.setStyle(Paint.Style.FILL);polygon.draw(c,p,m);' in parser
           assert 'viewportModelIndex.draw(canvas,paint,modelToScreen,visibleWorld,hiddenIds' in parser
