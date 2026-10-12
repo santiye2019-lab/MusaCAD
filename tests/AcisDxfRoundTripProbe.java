@@ -100,6 +100,8 @@ public final class AcisDxfRoundTripProbe {
         }
         System.out.printf("ACIS_PUBLIC_RECORD_PARITY body=%d source_records=%d parsed_nodes=%d excess_records=%d%n",
             body,satRecordCount,nodes.size(),satRecordCount-nodes.size());
+        if(satRecordCount!=nodes.size())
+            throw new AssertionError("Public R2013 SAT records silently lost by MusaCAD parser");
 
         java.lang.reflect.Field type=nodeClass.getDeclaredField("type");
         java.lang.reflect.Field id=nodeClass.getDeclaredField("id");
