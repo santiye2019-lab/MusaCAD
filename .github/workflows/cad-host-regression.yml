@@ -5,6 +5,10 @@ on:
       - 'feature/gandalf-drive-server-cad-bridge-*'
     paths:
       - 'app/src/main/cpp/**'
+      - 'app/src/main/java/com/musa/cad/**'
+      - 'tests/Cad*Test.java'
+      - 'tests/SelectionBoundsTest.java'
+      - 'tests/SnapPointsTest.java'
       - '.github/workflows/cad-host-regression.yml'
   workflow_dispatch:
 permissions:
@@ -81,3 +85,33 @@ jobs:
           assert payload, 'OLE2FRAME binary payload was lost'
           print('PASS: OLE2FRAME entity and payload retained')
           PY
+
+  edit-regression:
+    name: Android drawing and editing logic (no APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test drawing, snapping, selection and editable geometry
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-edit-tests
+          java_src=app/src/main/java/com/musa/cad
+          javac -d /tmp/musacad-edit-tests "$java_src/SelectionBounds.java" tests/SelectionBoundsTest.java
+          java -cp /tmp/musacad-edit-tests SelectionBoundsTest
+          javac -d /tmp/musacad-edit-tests "$java_src/SnapPoints.java" tests/SnapPointsTest.java
+          java -cp /tmp/musacad-edit-tests SnapPointsTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" tests/CadEditStylusTest.java
+          java -cp /tmp/musacad-edit-tests CadEditStylusTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/SourceRange.java" tests/CadEditTransformTest.java
+          java -cp /tmp/musacad-edit-tests CadEditTransformTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadBlock.java" tests/CadBlockTest.java
+          java -cp /tmp/musacad-edit-tests CadBlockTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadDimension.java" tests/CadDimensionTest.java
+          java -cp /tmp/musacad-edit-tests CadDimensionTest
+          javac -d /tmp/musacad-edit-tests "$java_src/CadEdit.java" "$java_src/CadBlock.java" "$java_src/CadBlockLibrary.java" tests/CadBlockLibraryTest.java
+          java -cp /tmp/musacad-edit-tests CadBlockLibraryTest
