@@ -46,7 +46,10 @@ jobs:
           if not body.get("success"): raise SystemExit("Cannot read live Worker settings")
           bindings=body.get("result",{}).get("bindings",[])
           if bindings:
-              raise SystemExit("Production has bindings; bare wrangler deploy could erase them. Deployment blocked until binding-preserving configuration is implemented.")
+              print("Production binding inventory (types and names only):")
+              for binding in bindings:
+                  print(" - type="+str(binding.get("type","unknown"))+" name="+str(binding.get("name","unknown")))
+              raise SystemExit("Production bindings detected. Deployment safely blocked; explicit binding-preserving deployment required.")
           print("No bindings found; safe for bare script deploy with --keep-vars")
           PY
       - name: Deploy production Worker (keep runtime vars)
