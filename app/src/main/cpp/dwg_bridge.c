@@ -123,6 +123,14 @@ int main(int argc,char **argv){
     int read_error=0;
     MusaCadSession *session=session_open(argv[1],&read_error);
     if(!session){fprintf(stderr,"MusaCAD native open failed: %d\n",read_error);return 1;}
+    /*
+     * Read-only original-DWG inventory for loss-detection tests.
+     * Print before dwg_write_dxf(), which may transform SAB into SAT.
+     * No payload bytes, drawing contents or user identifiers are logged.
+     */
+    MusaCadStats source=session_stats(session);
+    fprintf(stderr,"MUSACAD_ACIS_SOURCE=%lld EXTERNAL=%lld\\n",
+            source.acis_entity_count,source.acis_external_data_count);
     MusaNativeScene scene={0};
     int scene_status=musa_scene_build(session->dwg,&scene);
     fprintf(stderr,"MusaCAD native scene: status=%d primitives=%d floats=%zu\n",scene_status,scene.primitives,scene.count);
