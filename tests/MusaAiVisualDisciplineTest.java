@@ -29,7 +29,7 @@ public final class MusaAiVisualDisciplineTest {
         equal(MusaAiVisualDiscipline.resolve("all","projeyi incele",
             "STATİK KALIP PLANI.dwg",index("MIM-KAPI")),"structural");
         equal(MusaAiVisualDiscipline.resolve("all","projeyi incele",
-            "ELEKTRİK KUVVET PLANI.dwg",index("MIM-KAPI")),"electrical");
+            "ELEKTRİK KUVVET PLANI.dwg",index("MIM-KAPI")),"highcurrent");
         equal(MusaAiVisualDiscipline.resolve("architectural","mimariyi incele",
             "TESİSAT MUTFak.dwg",index("MEK-TEMIZ")),"architectural");
         equal(MusaAiVisualDiscipline.resolve("all","tüm disiplinleri analiz et",
