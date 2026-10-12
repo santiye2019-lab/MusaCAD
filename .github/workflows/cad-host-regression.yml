@@ -12,6 +12,7 @@ on:
       - 'tests/DxfStreamingLargeTest.java'
       - 'tests/DxfColorTest.java'
       - 'tests/DxfPlanarFaceTest.java'
+      - 'tests/DxfPolyline3DTest.java'
       - 'tests/native_color_test.c'
       - 'tests/audit_dwg_to_dxf.py'
       - '.github/workflows/cad-host-regression.yml'
@@ -158,6 +159,11 @@ jobs:
           mkdir -p /tmp/musacad-face
           javac -d /tmp/musacad-face app/src/main/java/com/musa/cad/DxfPlanarFace.java tests/DxfPlanarFaceTest.java
           java -cp /tmp/musacad-face DxfPlanarFaceTest
+      - name: Test 3D polyline, polyface and polygon-mesh projection
+        run: |
+          mkdir -p /tmp/musacad-poly3d
+          javac -d /tmp/musacad-poly3d app/src/main/java/com/musa/cad/DxfPolyline3D.java tests/DxfPolyline3DTest.java
+          java -cp /tmp/musacad-poly3d DxfPolyline3DTest
 
   java-android-compile:
     name: Android CAD compile and navigation regression (no APK)
