@@ -4274,7 +4274,7 @@ public class MainActivity extends AppCompatActivity {
                     FileTransfer.checkCancelled();
                     NativeScene provisional=null;
                     try{provisional=engine.fastScene();}catch(Exception ignored){}
-                    if(provisional!=null&&!Thread.currentThread().isInterrupted()){
+                    if(provisional!=null&&!provisional.hasSuspiciousBlueTint()&&!Thread.currentThread().isInterrupted()){
                         final NativeScene nativePreview=provisional;
                         final java.util.concurrent.CountDownLatch uiHandoff=
                             new java.util.concurrent.CountDownLatch(1);
