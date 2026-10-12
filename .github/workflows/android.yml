@@ -821,7 +821,7 @@ jobs:
               if parsed.scheme!='https' or not parsed.hostname or not parsed.path.endswith(suffix) or parsed.username or parsed.password or parsed.query or parsed.fragment:
                   raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
               with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as output:
-                  output.write(name+'='+val+'\\n')
+                  output.write(name+'='+val+'\n')
           print('Both Gandalf AI endpoint configurations are present and URL-safe.')
           PY
           # Same health path the actual Android indicator checks; checking
