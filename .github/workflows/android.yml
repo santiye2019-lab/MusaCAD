@@ -798,6 +798,8 @@ jobs:
         env:
           MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL || 'https://musacad-ai.musacad2019.workers.dev/v1/analyze' }}
           MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/ai/session' }}
+          MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL || vars.MUSACAD_TRIAL_API_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/trial/start' }}
+          MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
         shell: bash
         run: |
           set -euo pipefail
@@ -822,7 +824,13 @@ jobs:
                   raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
               with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as output:
                   output.write(name+'='+val+'\n')
-          print('Both Gandalf AI endpoint configurations are present and URL-safe.')
+          trial=urlsplit(os.environ.get('MUSACAD_TRIAL_API_URL',''))
+          key=os.environ.get('MUSACAD_TRIAL_PUBLIC_KEY_PEM','')
+          if trial.scheme!='https' or trial.path!='/v1/trial/start' or not trial.hostname:
+              raise SystemExit('::error::Trial/licensing server URL missing from replacement APK.')
+          if '-----BEGIN PUBLIC KEY-----' not in key or '-----END PUBLIC KEY-----' not in key:
+              raise SystemExit('::error::Trial verification public key missing. Replacing app could lose AI entitlement.')
+          print('Existing Gandalf gateway routes and license public-key metadata are configured.')
           PY
           # Same health path the actual Android indicator checks; checking
           # it cannot change Cloudflare deployment or private license state.
@@ -840,6 +848,9 @@ jobs:
           fi
           echo "Existing Gandalf AI gateway health returned HTTP 200."
       - name: Build developer test APK with existing Gandalf configuration (no production deployment)
+        env:
+          MUSACAD_TRIAL_API_URL: ${{ secrets.MUSACAD_TRIAL_API_URL || vars.MUSACAD_TRIAL_API_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/trial/start' }}
+          MUSACAD_TRIAL_PUBLIC_KEY_PEM: ${{ secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM }}
         shell: bash
         run: |
           set -euo pipefail
@@ -854,10 +865,12 @@ jobs:
           if len(expected)!=1:
               raise SystemExit('::error::Cannot verify the assembled directDebug BuildConfig; APK withheld.')
           source=expected[0].read_text()
-          for field in ('AI_API_URL','AI_SESSION_URL'):
+          for field in ('AI_API_URL','AI_SESSION_URL','TRIAL_API_URL'):
               if not re.search(r'\b'+field+r'\s*=\s*"https://[^"]+"',source):
                   raise SystemExit('::error::Assembled APK does not contain a configured '+field+'; APK withheld.')
-          print('Verified both Gandalf endpoint values in compiled-configuration source (values not logged).')
+          if '-----BEGIN PUBLIC KEY-----' not in source:
+              raise SystemExit('::error::Assembled APK lacks trial entitlement verification key; APK withheld.')
+          print('Verified Gandalf and trial licensing configuration in directDebug BuildConfig (values not logged).')
           PY
       - name: Upload test APK
         uses: actions/upload-artifact@v4
