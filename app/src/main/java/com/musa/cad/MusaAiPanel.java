@@ -93,14 +93,60 @@ public final class MusaAiPanel {
         state.setPadding(dp(activity,8),dp(activity,5),dp(activity,8),dp(activity,5));
         state.setBackground(round(activity,0xFF233541,16,0));
         header.addView(state,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-        state.setOnClickListener(v->Toast.makeText(activity,
-            !lastCloudFailure[0].isEmpty()?lastCloudFailure[0]:
-            !lastHealthOk.get()
-                ?"Bağlantı denetimi geçici olarak yanıt vermedi. Son AI yanıtı başarılı olabilir; yeni soruda oturum yeniden doğrulanır."
-                :modelVerified.get()
-                    ?"Son AI isteği başarıyla yanıtlandı. Bir sonraki soru yeni güvenli HTTPS isteği açar."
-                    :"AI sunucusuna erişiliyor. Model yanıtı ve lisans yetkisi ayrı doğrulanır.",
-            Toast.LENGTH_LONG).show());
+        state.setOnClickListener(v->{
+            String healthLink=MusaAiCloudHealth.healthUrl();
+            String lastProblem=lastCloudFailure[0].isEmpty()
+                ?"Bu oturumda son model hata ayrıntısı yok."
+                :"Son model/oturum hatası: "+lastCloudFailure[0];
+            new android.app.AlertDialog.Builder(activity)
+                .setTitle("Gandalf • AI bağlantı tanısı")
+                .setMessage(lastProblem+
+                    "\n\nWorker sağlık adresi:\n"+
+                    (healthLink.isEmpty()?"Yapılandırılmamış":healthLink)+
+                    "\n\n/health kontrolü yalnız HTTPS sunucu erişimini sınar. "+
+                    "Başarılı olması Qwen'in görüntü incelemesini veya lisansı onaylamaz.")
+                .setNegativeButton("Kapat",null)
+                .setNeutralButton("Tarayıcıda aç",(d,w)->{
+                    if(healthLink.isEmpty()){
+                        Toast.makeText(activity,"Worker adresi bulunamadı",Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    try{
+                        activity.startActivity(new android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(healthLink)));
+                    }catch(Exception e){
+                        Toast.makeText(activity,"HTTPS bağlantısı tarayıcıda açılamadı",
+                            Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setPositiveButton("Bağlantıyı test et",(d,w)->{
+                    state.setText("● Worker test ediliyor");
+                    MusaAiCloudHealth.checkDetailed(diagnostic->{
+                        if(activity.isFinishing()||activity.isDestroyed()||!sheet.isShowing())
+                            return;
+                        lastHealthOk.set(diagnostic.reachable);
+                        if(!diagnostic.reachable&&!modelVerified.get()){
+                            state.setText("● Worker erişilemedi");
+                            state.setTextColor(0xFFFFA7A7);
+                            state.setBackground(round(activity,0xFF4C2428,16,0));
+                        }else if(diagnostic.reachable&&!modelVerified.get()){
+                            state.setText("● Worker erişilebilir");
+                            state.setTextColor(0xFFFFD184);
+                            state.setBackground(round(activity,0xFF4A3A21,16,0));
+                        }
+                        new android.app.AlertDialog.Builder(activity)
+                            .setTitle(diagnostic.reachable?
+                                "Worker HTTPS erişimi doğrulandı":
+                                "Worker bağlantısı doğrulanamadı")
+                            .setMessage("Kategori: "+diagnostic.category+
+                                "\n"+diagnostic.message+
+                                "\n\nBu testte DWG, görsel, oturum anahtarı "+
+                                "veya Qwen model isteği gönderilmedi.")
+                            .setPositiveButton("Tamam",null).show();
+                    });
+                }).show();
+        });
         root.addView(header,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView context=text(activity,host.contextLabel(),11f,0xFF9FC1D1,false);
