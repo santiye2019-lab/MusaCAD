@@ -14,10 +14,26 @@ import java.util.List;
 public final class AcisDxfRoundTripProbe {
     private static final class Stats {
         int bodies,meshBodies,completeBodies,partialBodies,faces,triangles,edges;
-        void finish(String type,List<String> chunks){
+        void finish(String type,List<String> chunks,boolean publicFixtureDebug){
             if(!"3DSOLID".equals(type)&&!"REGION".equals(type)&&!"BODY".equals(type))return;
             bodies++;
             AcisSatMesh.Result mesh=AcisSatMesh.parseDxfChunks(chunks);
+            if(publicFixtureDebug){
+                StringBuilder raw=new StringBuilder();
+                for(String chunk:chunks){if(raw.length()>0)raw.append(' ');raw.append(chunk);}
+                String decoded=AcisSatMeshDebug.decode(raw.toString().replace("^ ","^"));
+                java.util.TreeMap<String,Integer> types=new java.util.TreeMap<>();
+                for(String rec:decoded.split("#")){
+                    String[] words=rec.trim().split("\\s+");
+                    if(words.length<2)continue;
+                    String kind=words[0].matches("-\\d+")?words[1]:words[0];
+                    if(kind.endsWith("-surface")||java.util.Arrays.asList("body","lump","shell","face","loop","coedge","edge","vertex","point","transform","asmheader").contains(kind))
+                        types.merge(kind,1,Integer::sum);
+                }
+                String prefix=decoded.substring(0,Math.min(110,decoded.length())).replaceAll("[^a-zA-Z0-9. -]","_");
+                System.out.printf("ACIS_PUBLIC_FIXTURE_BODY index=%d kind=%s chunks=%d chars=%d classes=%s head=%s%n",
+                    bodies,type,chunks.size(),decoded.length(),types,prefix);
+            }
             if(mesh.hasGeometry())meshBodies++;
             if(mesh.complete)completeBodies++;
             if(mesh.hasGeometry()&&!mesh.complete)partialBodies++;
@@ -26,8 +42,19 @@ public final class AcisDxfRoundTripProbe {
             edges+=mesh.edges.length/2;
         }
     }
+    private static final class AcisSatMeshDebug{
+        static String decode(String data){
+            StringBuilder out=new StringBuilder(data.length());
+            for(int i=0;i<data.length();i++){
+                char c=data.charAt(i);out.append(c>32&&c<159?(char)(159-c):c);
+            }
+            return out.toString();
+        }
+    }
     public static void main(String[] args)throws Exception{
-        if(args.length!=1)throw new IllegalArgumentException("Usage: Probe exported.dxf");
+        if(args.length<1||args.length>2||args.length==2&&!"--public-fixture-debug".equals(args[1]))
+            throw new IllegalArgumentException("Usage: Probe exported.dxf [--public-fixture-debug]");
+        boolean publicFixtureDebug=args.length==2;
         Stats counts=new Stats();
         try(BufferedReader reader=Files.newBufferedReader(Path.of(args[0]),StandardCharsets.ISO_8859_1)){
             String section="",type="",codeLine,valueLine;
@@ -43,7 +70,7 @@ public final class AcisDxfRoundTripProbe {
                     section=value.toUpperCase();needSection=false;continue;
                 }
                 if(code==0){
-                    counts.finish(type,chunks);
+                    counts.finish(type,chunks,publicFixtureDebug);
                     chunks.clear();type="";
                     if("SECTION".equalsIgnoreCase(value))needSection=true;
                     else if("ENDSEC".equalsIgnoreCase(value))section="";
@@ -54,7 +81,7 @@ public final class AcisDxfRoundTripProbe {
                     chunks.add(value);
                 }
             }
-            counts.finish(type,chunks);
+            counts.finish(type,chunks,publicFixtureDebug);
         }
         System.out.printf("ACIS_REAL_DXF_MESH bodies=%d mesh=%d complete=%d partial=%d faces=%d triangles=%d edges=%d%n",
                 counts.bodies,counts.meshBodies,counts.completeBodies,counts.partialBodies,
