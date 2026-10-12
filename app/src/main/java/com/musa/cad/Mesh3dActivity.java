@@ -65,15 +65,24 @@ public final class Mesh3dActivity extends Activity {
                 .append(String.format(java.util.Locale.getDefault(),"%.3f",mesh.maxZ))
                 .append(". Üst görünüş otomatik açıldı; ISO ile eğik görünüşe geçebilirsiniz.");
         }
-        if(mesh.acisSolids>0&&!mesh.solidProxy)text.append("\nACIS B-Rep görünümü salt-okunurdur; 3B ölçüm kullanılabilir, tessellated ACIS köşeleri DXF koordinatı gibi kaydedilmez.");
+        if(mesh.acisSolids>0){
+            text.append("\nACIS 3B katı: ").append(mesh.acisSolids)
+                .append("  •  görüntülenemeyen: ").append(mesh.acisMissingGeometrySolids);
+            if(mesh.acisFaces>0)
+                text.append("\nDoğrulanan yüzey: ").append(mesh.acisTessellatedFaces)
+                    .append(" / ").append(mesh.acisFaces)
+                    .append("  •  çözülemeyen: ").append(mesh.acisUnsupportedFaces);
+            text.append("\nACIS B-Rep salt okunur; dönüştürülen köşeler gerçek DXF köşeleri gibi kaydedilmez.");
+        }
         if(mesh.solidProxy){
-            text.append("\n")
-                .append(mesh.unsupportedSolids)
-                .append(" adet 3DSOLID/BODY/REGION için kullanılabilir ACIS B-Rep verisi bulunamadı; yalnız bu durumda sınır kutusu tel-kafes fallback gösteriliyor.");
+            text.append("\nGüvenilir ACIS yüzeyi/kenarı elde edilemedi. Yalnızca çizim sınır kutusu gösteriliyor; gerçek 3B katı değildir.");
         }else if(mesh.unsupportedSolids>0){
-            text.append("\n")
-                .append(mesh.unsupportedSolids)
-                .append(" adet ACIS katının gerçek B-Rep kenarları gösterildi; tam tessellate edilemeyen eğrisel/spline yüzeyler tel-kafes bırakıldı.");
+            if(mesh.acisMissingGeometrySolids>0)
+                text.append("\n").append(mesh.acisMissingGeometrySolids)
+                    .append(" ACIS katı için çizilebilir geometri çıkarılamadı; bu katılar görünümde YOK.");
+            if(mesh.acisPartialGeometrySolids>0)
+                text.append("\n").append(mesh.acisPartialGeometrySolids)
+                    .append(" ACIS katı kısmi yüzey/kenar olarak gösteriliyor; eksik kısımlar tamamlanmış sayılmaz.");
         }
         return text.toString();
     }
