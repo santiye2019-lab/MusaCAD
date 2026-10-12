@@ -103,6 +103,11 @@ public final class CadDxfAttributePatch {
             String id = key(item.insertHandle, item.tag);
             if (changes.putIfAbsent(id, item) != null) throw new IOException("Duplicate attribute request");
         }
+        // Never silently substitute '?' for a character in legacy ANSI DXFs.
+        // A failed codec preflight leaves the user's SAF destination unopened.
+        for (Change change : changes.values())
+            if (!charset.newEncoder().canEncode(change.value))
+                throw new IOException("Attribute value cannot be represented in DXF code page");
         // Entire source is parsed and all edits are uniquely found before
         // caller's destination receives any bytes.
         Pass check = process(source, charset, changes, null);
