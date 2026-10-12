@@ -104,6 +104,25 @@ public final class AcisDxfRoundTripProbe {
                 if(((java.util.List<?>)points.get(path)).size()>=2)nonEmptyEdges++;
             }
         }
+        if(body==2||body==3){
+            // Pinned PUBLIC test-data/example_2013.dwg only, never customer content.
+            int emitted=0;
+            for(Object n:nodes.values()){
+                int number=(Integer)id.get(n);
+                if(body==2||number<46||number>=110){
+                    int[] links=(int[])refs.get(n);
+                    StringBuilder mapped=new StringBuilder();
+                    for(int i=0;i<Math.min(links.length,8);i++){
+                        Object dest=nodes.get(links[i]);
+                        mapped.append(links[i]).append(':')
+                            .append(dest==null?"MISSING":type.get(dest)).append(',');
+                    }
+                    System.out.printf("ACIS_PUBLIC_GRAPH body=%d id=%d kind=%s refs=%s%n",body,
+                         number,type.get(n),mapped);
+                    if(++emitted>=115)break;
+                }
+            }
+        }
         System.out.printf("ACIS_PUBLIC_INTERNAL body=%d nodes=%d loopIds=%s liveLoops=%d loopPoints=%d liveEdges=%d%n",
             body,nodes.size(),sampleIds,nonEmptyLoops,pointsInLoops,nonEmptyEdges);
     }
