@@ -25,11 +25,12 @@ public final class Mesh3dActivity extends Activity {
     public static final String MODE_ISO="iso",MODE_ORBIT="orbit",MODE_FRONT="front",MODE_TOP="top",
         MODE_RIGHT="right",MODE_WIREFRAME="wireframe",MODE_SURFACE="surface",
         MODE_MEASURE="measure",MODE_EDIT="edit";
-    private static final int SAVE_DXF=3103,SAVE_GENERATED=3104;
+    private static final int SAVE_DXF=3103,SAVE_GENERATED=3104,SAVE_SECTION=3105;
     private volatile boolean closing;
     private boolean saving;
     private Dxf3dMesh mesh,importedMesh;
     private CadSolidKernel.Mesh generatedSolid;
+    private float[] pendingSection;
     private float[] original;
     private Mesh3dView meshView;
     @Override protected void onCreate(Bundle state){
@@ -64,7 +65,7 @@ public final class Mesh3dActivity extends Activity {
     }
 
     private void showModelCommands(FrameLayout root){
-        final String[] commands={"BOX","EXTRUDE","REVOLVE","LOFT","SWEEP","UNION","INTERSECTION","DIFFERENCE","UCS"};
+        final String[] commands={"BOX","EXTRUDE","REVOLVE","LOFT","SWEEP","UNION","INTERSECTION","DIFFERENCE","UCS","SECTION"};
         final String[] suggestions={
             "0,0,0,10,6,4",
             "0,0;8,0;8,5;0,5|4",
@@ -74,7 +75,8 @@ public final class Mesh3dActivity extends Activity {
             "0,0,0,8,6,5|4,3,2,11,10,7",
             "0,0,0,8,6,5|4,3,2,11,10,7",
             "0,0,0,8,6,5|4,3,2,11,10,7",
-            "10,20,30|0,1,0|-1,0,0"
+            "10,20,30|0,1,0|-1,0,0",
+            "2.5"
         };
         new AlertDialog.Builder(this).setTitle("3B Modelleme • üçgen ağ / DXF")
             .setItems(commands,(dialog,index)->{
@@ -87,6 +89,9 @@ public final class Mesh3dActivity extends Activity {
                         "BOOLEAN yalnız eksene paralel iki kapalı kutu için; ACIS katı değildir.")
                     .setView(input).setNegativeButton("İPTAL",null)
                     .setPositiveButton("MODELİ OLUŞTUR",(d,button)->{
+                        if("SECTION".equals(commands[index])){
+                            startSectionExtraction(input.getText().toString());return;
+                        }
                         try{
                             CadSolidKernel.Mesh produced="UCS".equals(commands[index])
                                 ?CadSolidCommand.applyUcs(generatedSolid,input.getText().toString())
@@ -99,6 +104,44 @@ public final class Mesh3dActivity extends Activity {
                         }
                     }).show();
             }).setNegativeButton("KAPAT",null).show();
+    }
+
+    private void startSectionExtraction(String zText){
+        if(mesh==null||saving)return;
+        final float cut;
+        try{cut=Float.parseFloat(zText.trim());
+            if(!Float.isFinite(cut))throw new NumberFormatException();
+        }catch(NumberFormatException bad){
+            android.widget.Toast.makeText(this,"Geçerli bir Z kesit kotu girin",
+                android.widget.Toast.LENGTH_LONG).show();return;
+        }
+        final Dxf3dMesh sourceMesh=mesh;
+        saving=true;
+        new Thread(()->{
+            try{
+                float[] segments=CadMeshSection.horizontal(
+                    sourceMesh.xyz,sourceMesh.triangles,cut);
+                runOnUiThread(()->{
+                    saving=false;if(closing)return;
+                    if(segments.length==0){
+                        android.widget.Toast.makeText(this,
+                            "Bu Z kotunda yüzey kesişimi bulunamadı",
+                            android.widget.Toast.LENGTH_LONG).show();return;
+                    }
+                    pendingSection=segments;
+                    Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/dxf");
+                    intent.putExtra(Intent.EXTRA_TITLE,"MusaCAD-3B-kesit-Z.dxf");
+                    startActivityForResult(intent,SAVE_SECTION);
+                });
+            }catch(Exception error){
+                runOnUiThread(()->{
+                    saving=false;
+                    if(!closing)android.widget.Toast.makeText(this,"3B kesit: "+error.getMessage(),
+                        android.widget.Toast.LENGTH_LONG).show();
+                });
+            }
+        },"MusaCAD-3D-section").start();
     }
 
     private void addGeneratedControls(FrameLayout root){
@@ -243,6 +286,31 @@ public final class Mesh3dActivity extends Activity {
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
+        if(request==SAVE_SECTION){
+            float[] section=pendingSection;pendingSection=null;
+            if(section==null)return;
+            Uri uri=data.getData();saving=true;
+            new Thread(()->{
+                File staged=null;String message;
+                try{
+                    staged=CadDxfSaveStage.prepare(getCacheDir(),out->
+                        CadMeshSection.writeDxf(section,out));
+                    try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
+                        if(output==null)throw new java.io.IOException("Kesit hedefi açılamadı");
+                        CadDxfSaveStage.publish(staged,output);output.flush();
+                    }
+                    message="3B kesit çizgileri DXF olarak kaydedildi";
+                }catch(Exception e){message="Kesit DXF kaydı başarısız: "+e.getMessage();}
+                finally{if(staged!=null)staged.delete();}
+                final String report=message;
+                runOnUiThread(()->{
+                    saving=false;
+                    if(!closing)android.widget.Toast.makeText(this,report,
+                        android.widget.Toast.LENGTH_LONG).show();
+                });
+            },"MusaCAD-3D-section-save").start();
+            return;
+        }
         if(request==SAVE_GENERATED){
             final CadSolidKernel.Mesh generated=generatedSolid;
             if(generated==null)return;
