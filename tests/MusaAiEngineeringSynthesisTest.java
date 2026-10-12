@@ -94,6 +94,15 @@ public final class MusaAiEngineeringSynthesisTest {
         notContains(missing,"Sahte imalat");
         notContains(missing,"Hidrofor [kaynak 184]");
         notContains(missing,"YEREL DWG ÇAPRAZ KONTROLÜ");
+        String detailed=MusaAiEngineeringSynthesis.composeDetailed(d);
+        contains(detailed,"8. TAM BULGU EKİ");
+        contains(detailed,"9. TAM YEREL KANIT EKİ");
+        contains(detailed,"10. GÖRÜNÜM / PAFTA ENVANTERİ");
+        contains(detailed,"11. KAPSAM VE DOĞRULAMA AÇIKLARI");
+        yes(count(detailed,"Görsel gözlem: hidrofor bağlantı etiketi")>=2,
+            "Detailed annex must retain original repeated visual records");
+        String noVisualDetailed=MusaAiEngineeringSynthesis.composeDetailed(noVisual);
+        notContains(noVisualDetailed,"8. TAM BULGU EKİ");
         System.out.println("MusaAiEngineeringSynthesisTest OK");
     }
 }
