@@ -4571,15 +4571,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestCloseProject(ProjectSession project){
-        if(project==null)return;
-        if(project!=currentProject)activateProject(project);
+        if(project==null||!projects.contains(project))return;
+        // Do not switch tabs or prepare a save while another modal or CAD task is active.
         if(projectCloseDialog!=null&&projectCloseDialog.isShowing())return;
+        if(activeLoad!=null){
+            Toast.makeText(this,"Devam eden CAD işlemi bitince projeyi kapatın",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(project!=currentProject){
+            activateProject(project);
+            // Saving another tab's in-memory edits would risk closing the wrong project.
+            if(currentProject!=project){
+                Toast.makeText(this,"Proje etkinleştirilemedi; kapatma iptal edildi",Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
 
         final boolean dirty=isProjectDirty(project);
         String name=project.name==null||project.name.trim().isEmpty()?"Bu proje":project.name;
         String message=dirty
-            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydetmek, kaydetmeden kapatmak veya işlemi iptal etmek için seçim yapın.\n\nİkinci kez geri tuşuna basarsanız proje kaydedilmeden kapanır; MusaCAD açık kalır."
-            : name+" kapatılsın mı?\n\nİkinci kez geri tuşuna basarsanız proje kapanır; MusaCAD açık kalır.";
+            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydet ve kapat, kaydetmeden kapat veya iptal seçeneklerinden birini seçin. Telefonun Geri tuşu yalnızca bu uyarıyı kapatır."
+            : name+" kapatılsın mı?\n\nTelefonun Geri tuşu kapatma işlemini iptal eder.";
 
         AlertDialog.Builder builder=new AlertDialog.Builder(this)
             .setTitle(dirty?"Projeyi kapat • Kaydedilmemiş değişiklikler":"Projeyi kapat")
