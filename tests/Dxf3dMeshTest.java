@@ -37,6 +37,7 @@ public final class Dxf3dMeshTest {
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
+        testMissing3dTagDoesNotWritePartialFile();
     }
 
     private static void testLineAndPolyline() throws Exception {
@@ -53,6 +54,7 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.triangles.length!=0)throw new AssertionError("line-only model must not invent surfaces");
             if(mesh.xyz.length!=15)throw new AssertionError("LINE + 3D POLYLINE vertex count");
+            if(!mesh.canOpenWithout2d())throw new AssertionError("real non-planar 3D geometry can open without a 2D scene");
             if(mesh.edges.length!=8)throw new AssertionError("LINE + closed 3D POLYLINE edges");
             if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
                 throw new AssertionError("3D line/polyline Z coordinates");
@@ -105,6 +107,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(!mesh.flatPlan)throw new AssertionError("flat 2D plan must be detected");
+            if(mesh.canOpenWithout2d())throw new AssertionError("2D-only plan must not be routed as 3D-only");
             if(mesh.minZ!=0f||mesh.maxZ!=0f)throw new AssertionError("flat 2D Z range");
             if(mesh.solidProxy)throw new AssertionError("ordinary 2D plan must not be marked as solid proxy");
         }finally{Files.deleteIfExists(file.toPath());}
@@ -133,6 +136,7 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf.toString(),StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.solidProxy)throw new AssertionError("valid ACIS SAT must not fall back to bounds proxy");
+            if(!mesh.canOpenWithout2d())throw new AssertionError("verified ACIS solid-only DXF must open in 3D");
             if(mesh.acisSolids!=1)throw new AssertionError("ACIS solid must be marked read-only");
             if(mesh.unsupportedSolids!=0)throw new AssertionError("planar ACIS solid must resolve completely");
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
@@ -154,12 +158,35 @@ public final class Dxf3dMeshTest {
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(!mesh.solidProxy)throw new AssertionError("ACIS solid must use bounds proxy when no tessellation is available");
+            if(mesh.canOpenWithout2d())throw new AssertionError("a fake bounds box is not a verified 3D-only model");
             if(mesh.acisSolids!=1)throw new AssertionError("fallback ACIS solid count");
             if(mesh.unsupportedSolids!=1)throw new AssertionError("ACIS solid count");
             if(mesh.xyz.length!=24||mesh.triangles.length!=0||mesh.edges.length!=24)
                 throw new AssertionError("solid proxy must be an 8-corner, 12-edge wire box");
             if(mesh.minZ!=3f||mesh.maxZ!=33f||mesh.flatPlan)throw new AssertionError("solid proxy Z bounds");
             for(int v:mesh.sourceLines)if(v!=-1)throw new AssertionError("solid proxy geometry must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMissing3dTagDoesNotWritePartialFile() throws Exception {
+        File file=File.createTempFile("mesh3d-save-guard-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\n3DFACE\n10\n0\n20\n0\n30\n1\n"
+                +"11\n1\n21\n0\n31\n1\n"
+                +"12\n0\n22\n1\n32\n1\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            float[] original=mesh.xyz.clone();
+            mesh.xyz[2]=9f; // edit source vertex-0 Z coordinate (DXF group 30)
+            Files.writeString(file.toPath(),dxf.replace("30\n1\n",""),StandardCharsets.UTF_8);
+            ByteArrayOutputStream target=new ByteArrayOutputStream();
+            boolean blocked=false;
+            try{Dxf3dEditor.write(file,target,mesh,original);}
+            catch(java.io.IOException e){blocked=true;}
+            if(!blocked)throw new AssertionError("missing source coordinate must block 3D save");
+            if(target.size()!=0)throw new AssertionError("preflight failure wrote an incomplete 3D DXF file");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
