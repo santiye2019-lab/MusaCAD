@@ -32,6 +32,14 @@ public final class CadSolidCommand {
         double[] six=numbers(spec,6);
         return new CadSolidKernel.Box(six[0],six[1],six[2],six[3],six[4],six[5]);
     }
+    public static CadSolidKernel.Mesh applyUcs(CadSolidKernel.Mesh model,String spec)throws IOException{
+        if(model==null)throw new IOException("Önce BOX / EXTRUDE / REVOLVE / BOOLEAN ile model oluşturun");
+        String[] parts=spec==null?new String[0]:spec.trim().split("\\s*\\|\\s*",-1);
+        if(parts.length!=3)throw new IOException("UCS: orijinX,Y,Z|XeksenX,Y,Z|YeksenX,Y,Z");
+        return CadSolidKernel.inWorld(model,
+            CadUcs3d.of(numbers(parts[0],3),numbers(parts[1],3),numbers(parts[2],3)));
+    }
+
     public static CadSolidKernel.Mesh execute(String operation,String specification)throws IOException{
         if(operation==null||specification==null)throw new IOException("3B komut boş");
         String[] segments=specification.trim().split("\\s*\\|\\s*",-1);
