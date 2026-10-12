@@ -213,6 +213,10 @@ jobs:
           assert 'vectorDrawing.drawVectorNavigation(c,imageMatrix' in view
           assert 'vectorDrawing.drawVector(c,imageMatrix' in view
           assert 'drawEdits(c);drawLiveFreehand(c)' in view
+          activity=Path('app/src/main/java/com/musa/cad/MainActivity.java').read_text()
+          assert 'loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount' in activity
+          assert 'ACIS 3B geometri doğrulanmadı' in activity
+          assert 'activeDxf.acisCoverage.entityCount()>0' in activity
           assert 'drawViewportModelsIndexed(canvas,navigationPaint,navigationCombined,hiddenIds)' in parser
           assert 'p.setStyle(Paint.Style.FILL);polygon.draw(c,p,m);' in parser
           assert 'viewportModelIndex.draw(canvas,paint,modelToScreen,visibleWorld,hiddenIds' in parser
