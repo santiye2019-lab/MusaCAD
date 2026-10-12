@@ -634,6 +634,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadDxfSaveStage.java tests/CadDxfSaveStageTest.java
           java -cp /tmp/musacad-tests CadDxfSaveStageTest
+      - name: Test safe DXF INSERT ATTRIB value patch roundtrip
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadDxfAttributePatch.java tests/CadDxfAttributePatchTest.java
+          java -cp /tmp/musacad-tests CadDxfAttributePatchTest
       - name: Test cancellable file transfer
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
