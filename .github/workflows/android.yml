@@ -406,6 +406,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfColor.java tests/DxfColorTest.java
           java -cp /tmp/musacad-tests DxfColorTest
+      - name: Test CPU drawing p50 p95 bounded timing samples
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadFrameDrawTimes.java tests/CadFrameDrawTimesTest.java
+          java -cp /tmp/musacad-tests CadFrameDrawTimesTest
       - name: Test native first paint color anomaly profile
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadColorProfile.java tests/CadColorProfileTest.java
