@@ -67,6 +67,18 @@ public final class MusaAiPanelContractTest {
         require(panel,"completed.compareAndSet(false,true)","only first terminal reply can update request");
         require(panel,"@Override public void progress","intermediate cloud state visible to user");
 
+        require(panel,"ProgressBar taskBar","visible live progress indicator");
+        require(panel,"progressMeasured(String task,int completed,int total)","measured progress callback");
+        require(panel,"progressWaiting(String task)","unmeasurable remote model wait");
+        require(panel,"100L*count","accurate bounded percentages");
+        require(panel,"taskBar.setIndeterminate(true)","no misleading percentages during model wait");
+        require(panel,"taskElapsed.setText","elapsed wait and heartbeat");
+        require(panel,"timeoutHandler.removeCallbacks(progressTicker[0])","progress timer cleanup");
+        require(main,"reply.progressMeasured(\"Qwen yanıtı alınan genel bölgeler\"","actual server response coverage");
+        require(main,"reply.progressWaiting(\"Qwen görsel yanıtı bekleniyor","show inference wait separately");
+        require(main,"MusaAiVisualEvidence.Progress visualProgress","rendered region progress bridge");
+        String vision=read("app/src/main/java/com/musa/cad/MusaAiVisualEvidence.java");
+        require(vision,"progress.onMeasured(","confirm each rendered tile rather than guessing");
         System.out.println("MusaCAD AI panel contract OK.");
     }
 }
