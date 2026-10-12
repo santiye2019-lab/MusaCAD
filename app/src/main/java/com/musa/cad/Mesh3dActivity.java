@@ -92,16 +92,32 @@ public final class Mesh3dActivity extends Activity {
                         if("SECTION".equals(commands[index])){
                             startSectionExtraction(input.getText().toString());return;
                         }
-                        try{
-                            CadSolidKernel.Mesh produced="UCS".equals(commands[index])
-                                ?CadSolidCommand.applyUcs(generatedSolid,input.getText().toString())
-                                :CadSolidCommand.execute(commands[index],input.getText().toString());
-                            Dxf3dMesh preview=Dxf3dMesh.fromGenerated(produced);
-                            generatedSolid=produced;installMesh(root,preview);
-                        }catch(Exception error){
-                            android.widget.Toast.makeText(this,"3B modelleme: "+error.getMessage(),
-                                android.widget.Toast.LENGTH_LONG).show();
-                        }
+                        if(saving)return;
+                        final String spec=input.getText().toString();
+                        final String command=commands[index];
+                        final CadSolidKernel.Mesh previous=generatedSolid;
+                        saving=true;
+                        android.widget.Toast.makeText(this,"3B ağ arka planda oluşturuluyor",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                        new Thread(()->{
+                            try{
+                                CadSolidKernel.Mesh produced="UCS".equals(command)
+                                    ?CadSolidCommand.applyUcs(previous,spec)
+                                    :CadSolidCommand.execute(command,spec);
+                                Dxf3dMesh preview=Dxf3dMesh.fromGenerated(produced);
+                                runOnUiThread(()->{
+                                    saving=false;if(closing)return;
+                                    generatedSolid=produced;installMesh(root,preview);
+                                });
+                            }catch(Exception error){
+                                runOnUiThread(()->{
+                                    saving=false;
+                                    if(!closing)android.widget.Toast.makeText(this,
+                                        "3B modelleme: "+error.getMessage(),
+                                        android.widget.Toast.LENGTH_LONG).show();
+                                });
+                            }
+                        },"MusaCAD-solid-model").start();
                     }).show();
             }).setNegativeButton("KAPAT",null).show();
     }
