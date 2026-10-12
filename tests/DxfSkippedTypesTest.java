@@ -28,6 +28,13 @@ public final class DxfSkippedTypesTest {
             Files.writeString(temp.toPath(),DXF,StandardCharsets.UTF_8);
             verify(DxfBlocks.expand(temp,StandardCharsets.UTF_8,placement->{}));
         }finally{Files.deleteIfExists(temp.toPath());}
+        DxfBlocks.Result bounded=new DxfBlocks.Result();
+        for(int i=0;i<200;i++)bounded.noteSkipped("UNSUPPORTED_"+i);
+        if(bounded.skippedByType.size()>64)
+            throw new AssertionError("unbounded skipped type inventory");
+        int grouped=0;for(int value:bounded.skippedByType.values())grouped+=value;
+        if(grouped!=200||bounded.skipped!=200)
+            throw new AssertionError("skipped type overflow lost an entity");
         System.out.println("DXF skipped-type counts preserved in buffered and streamed readers");
     }
 }
