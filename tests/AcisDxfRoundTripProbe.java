@@ -30,6 +30,18 @@ public final class AcisDxfRoundTripProbe {
                     if(kind.endsWith("-surface")||java.util.Arrays.asList("body","lump","shell","face","loop","coedge","edge","vertex","point","transform","asmheader").contains(kind))
                         types.merge(kind,1,Integer::sum);
                 }
+                java.util.Map<String,Integer> sampleCounts=new java.util.HashMap<>();
+                for(String rec:decoded.split("#")){
+                    String[] words=rec.trim().split("\\s+");
+                    if(words.length<2)continue;
+                    String kind=words[0].matches("-\\d+")?words[1]:words[0];
+                    if(!java.util.Arrays.asList("face","loop","coedge","edge","vertex","point","body","shell").contains(kind))continue;
+                    int index=sampleCounts.getOrDefault(kind,0);sampleCounts.put(kind,index+1);
+                    if(index<2&&(bodies==1||bodies==3))
+                        System.out.printf("ACIS_PUBLIC_REF kind=%s record=%s%n",kind,
+                            rec.trim().substring(0,Math.min(220,rec.trim().length())).replaceAll("[^a-zA-Z0-9. $-]","_"));
+                }
+
                 String prefix=decoded.substring(0,Math.min(110,decoded.length())).replaceAll("[^a-zA-Z0-9. -]","_");
                 System.out.printf("ACIS_PUBLIC_FIXTURE_BODY index=%d kind=%s chunks=%d chars=%d classes=%s head=%s%n",
                     bodies,type,chunks.size(),decoded.length(),types,prefix);
