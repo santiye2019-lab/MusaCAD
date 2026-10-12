@@ -103,7 +103,7 @@ public final class MusaAiEngineeringSynthesis {
         }
         boolean allTiles=accepted==total&&clean(data.visualIssue).isEmpty();
         out.append("\nDenetim seviyesi: ")
-            .append(allTiles?"Planlanan 9 görsel bölgeye AI yanıtı alındı; mühendis onayı değildir."
+            .append(allTiles?"Planlanan "+total+" görsel bölgeye AI yanıtı alındı; mühendis onayı değildir."
                             :"KISMİ; eksik bölgeler hakkında teknik çıkarım yapılmadı.");
         out.append("\nDWG kanıt örneklemi: ").append(Math.max(0,data.sampledCadItems))
             .append("/").append(Math.max(0,data.declaredCadItems))
@@ -153,7 +153,11 @@ public final class MusaAiEngineeringSynthesis {
                     catch(NumberFormatException ignored) {}
                 }
                 if(shown++<MAX_SUMMARY_LINES_PER_GROUP) {
-                    out.append("\n• ").append(limit(line,650));
+                    // A model-written "Doğrulanan" is not a CAD-backed validation.
+                    String visualLine=normalize(line).contains("dogrulanan")
+                        ?line+" [Yalnız Qwen görsel nitelemesi; CAD ile doğrulanmadı]"
+                        :line;
+                    out.append("\n• ").append(limit(visualLine,650));
                     usefulLines++;
                 }else omitted++;
             }
@@ -188,6 +192,13 @@ public final class MusaAiEngineeringSynthesis {
                     .append(qwenSourceIds.size()-MAX_CAD_SOURCE_MATCHES)
                     .append(" (özet dışında).");
         }
+        int foundSources=0;
+        for(Integer id:qwenSourceIds)if(data.sourceDescriptions.containsKey(id))foundSources++;
+        out.append("\nKaynak-ID çapraz kontrol özeti: Qwen atfı ")
+           .append(qwenSourceIds.size()).append("; CAD örnekleminde bulunan ")
+           .append(foundSources).append("; eşleşmeyen ")
+           .append(qwenSourceIds.size()-foundSources)
+           .append(". Kimlik varlığı teknik uygunluk/cihaz tanısı kanıtı değildir.");
         out.append("\nBağımsız yerel çizim kanıtları (yalnız CAD metni/vektörü):");
         appendLocalBullets(out,data.localVectorEvidence);
         if(!clean(data.viewInventory).isEmpty()) {
@@ -222,7 +233,7 @@ public final class MusaAiEngineeringSynthesis {
                 .append("yerel keşif hesaplaması yapılmadı.");
         }
         if(!clean(data.coverageRegister).isEmpty())
-            out.append("\n\n7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ")
+            out.append("\n\n7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ\n")
                .append(clean(data.coverageRegister));
         out.append("\n\nSONUÇ: Bu rapor Qwen görsel gözlemleri ile telefonun ")
            .append("DWG kanıtlarının kaynakları karıştırılmadan derlenmiş ön denetimidir.")
@@ -240,28 +251,28 @@ public final class MusaAiEngineeringSynthesis {
         String summary=compose(data);
         if(data==null||data.visualGroups.isEmpty()||data.reviewedTiles<=0)return summary;
         StringBuilder out=new StringBuilder(summary);
-        out.append("\\n\\n8. TAM BULGU EKİ • GÖRSEL AI HAM KAYITLARI");
-        out.append("\\nBu kayıtlar AI gözlemidir; CAD kimliği, mühendislik hesabı ve mevzuat uygunluğu otomatik doğrulanmış sayılmaz.");
+        out.append("\n\n8. TAM BULGU EKİ • GÖRSEL AI HAM KAYITLARI");
+        out.append("\nBu kayıtlar AI gözlemidir; CAD kimliği, mühendislik hesabı ve mevzuat uygunluğu otomatik doğrulanmış sayılmaz.");
         int groupNumber=0;
         for(VisualGroup group:data.visualGroups) {
             if(group==null||group.response.isEmpty())continue;
-            out.append("\\n\\nGrup ").append(++groupNumber).append(": ").append(group.name);
+            out.append("\n\nGrup ").append(++groupNumber).append(": ").append(group.name);
             out.append(" [bölge ").append(group.firstRegion).append("–").append(group.lastRegion).append("]");
-            out.append("\\n").append(group.response);
+            out.append("\n").append(group.response);
         }
-        out.append("\\n\\n9. TAM YEREL KANIT EKİ");
-        out.append("\\n").append(clean(data.localVectorEvidence).isEmpty()
+        out.append("\n\n9. TAM YEREL KANIT EKİ");
+        out.append("\n").append(clean(data.localVectorEvidence).isEmpty()
             ?"Yerel vektör kanıtı sunulmadı.":data.localVectorEvidence);
-        out.append("\\n\\n10. GÖRÜNÜM / PAFTA ENVANTERİ");
-        out.append("\\n").append(clean(data.viewInventory).isEmpty()
+        out.append("\n\n10. GÖRÜNÜM / PAFTA ENVANTERİ");
+        out.append("\n").append(clean(data.viewInventory).isEmpty()
             ?"Görünüm envanteri sunulmadı.":data.viewInventory);
-        out.append("\\n\\n11. KAPSAM VE DOĞRULAMA AÇIKLARI");
-        out.append("\\nCAD indeks kapsamı: ").append(data.sampledCadItems)
+        out.append("\n\n11. KAPSAM VE DOĞRULAMA AÇIKLARI");
+        out.append("\nCAD indeks kapsamı: ").append(data.sampledCadItems)
            .append("/").append(data.declaredCadItems);
-        out.append("\\nGörsel bölge kapsamı: ").append(data.reviewedTiles)
+        out.append("\nGörsel bölge kapsamı: ").append(data.reviewedTiles)
            .append("/").append(data.plannedTiles);
-        out.append("\\nKaynak ID bulunması, görsel iddianın doğrulandığı anlamına gelmez.");
-        if(!clean(data.coverageRegister).isEmpty())out.append("\\n").append(data.coverageRegister);
+        out.append("\nKaynak ID bulunması, görsel iddianın doğrulandığı anlamına gelmez.");
+        if(!clean(data.coverageRegister).isEmpty())out.append("\n").append(data.coverageRegister);
         return out.toString();
     }
 
