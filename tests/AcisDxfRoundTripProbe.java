@@ -88,6 +88,19 @@ public final class AcisDxfRoundTripProbe {
         parse.setAccessible(true);
         @SuppressWarnings("unchecked")
         java.util.Map<Integer,?> nodes=(java.util.Map<Integer,?>)parse.invoke(null,decoded);
+        int satRecordCount=0;
+        int malformedRecordTypes=0;
+        for(String record:decoded.split("#")){
+            String[] fields=record.trim().split("\\s+");
+            if(fields.length<2||record.trim().startsWith("End-of-ACIS"))continue;
+            satRecordCount++;
+            // First record carries an ASCII SAT header followed by asmheader.
+            String typeName=fields[0].matches("-\\d+")?fields[1]:fields[0];
+            if(typeName.length()<2)malformedRecordTypes++;
+        }
+        System.out.printf("ACIS_PUBLIC_RECORD_PARITY body=%d source_records=%d parsed_nodes=%d excess_records=%d%n",
+            body,satRecordCount,nodes.size(),satRecordCount-nodes.size());
+
         java.lang.reflect.Field type=nodeClass.getDeclaredField("type");
         java.lang.reflect.Field id=nodeClass.getDeclaredField("id");
         java.lang.reflect.Field refs=nodeClass.getDeclaredField("refs");
