@@ -65,6 +65,11 @@ public final class AcisSatMeshTest {
         if(!complete.complete||complete.faces!=1||complete.tessellatedFaces!=1||
            complete.triangles.length!=6||complete.edges.length!=8)
             throw new AssertionError("Real SAT coedge connectivity must produce exactly two actual planar triangles");
+        AcisSatMesh.Result repaired=AcisSatMesh.parseDxfChunks(List.of(
+            implicitSat(records).replace("straight-curve", "strai ght-curve")));
+        if(!repaired.complete||repaired.triangles.length!=complete.triangles.length||
+           repaired.danglingReferences!=0)
+            throw new AssertionError("Split SAB straight-curve identifier must be restored without new topology");
         // A broken next-reference must not be closed with a fabricated line.
         records[8]=records[8].replace("$11 $7","$999 $7");
         AcisSatMesh.Result broken=AcisSatMesh.parseDxfChunks(List.of(implicitSat(records)));
