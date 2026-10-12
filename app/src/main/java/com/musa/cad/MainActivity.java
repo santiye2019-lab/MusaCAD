@@ -4032,15 +4032,15 @@ public class MainActivity extends AppCompatActivity {
             StringBuilder linked=new StringBuilder();
             int count=0;
             for(DxfBlocks.ExternalReference ref:activeDxf.externalReferences){
-                if(count++>=12){linked.append("\\n... diğer harici referanslar");break;}
+                if(count++>=12){linked.append("\n... diğer harici referanslar");break;}
                 String pathText=ref.path.length()>160?ref.path.substring(0,160)+"...":ref.path;
-                linked.append("\\n").append(ref.overlay?"Overlay: ":"XREF ek: ")
+                linked.append("\n").append(ref.overlay?"Overlay: ":"XREF ek: ")
                     .append(ref.name).append(" → ").append(pathText.isEmpty()?"yol bilinmiyor":pathText);
             }
-            text+="\\n\\nYüklenmeyen harici DWG referansları:"+linked;
+            text+="\n\nYüklenmeyen harici DWG referansları:"+linked;
         }
         if(activeDxf.externalRasterImageCount>0)
-            text+="\\nHarici IMAGE raster nesnesi: "+activeDxf.externalRasterImageCount+
+            text+="\nHarici IMAGE raster nesnesi: "+activeDxf.externalRasterImageCount+
                 " (görüntü verisi değil, yalnız çerçeve gösteriliyor)";
         if(!activeDxf.skippedByType.isEmpty()){
             StringBuilder skipped=new StringBuilder();
@@ -4048,7 +4048,7 @@ public class MainActivity extends AppCompatActivity {
                 if(skipped.length()>0)skipped.append(", ");
                 skipped.append(type.getKey()).append(": ").append(type.getValue());
             }
-            text+="\\nAtlanan DXF nesne türleri: "+skipped;
+            text+="\nAtlanan DXF nesne türleri: "+skipped;
         }
         if(currentProject!=null){
             if(currentProject.loadDiagnostics!=null)
