@@ -121,6 +121,58 @@ public final class MusaAiCloudHealth {
         }
     }
 
+    /** Exact public Worker health URL; never includes a license token or CAD data. */
+    public static String healthUrl(){
+        if(!configured())return "";
+        try{
+            URL endpoint=new URL(BuildConfig.AI_API_URL);
+            return new URL(endpoint.getProtocol(),endpoint.getHost(),endpoint.getPort(),
+                "/health").toExternalForm();
+        }catch(Exception ignored){return "";}
+    }
+
+    /**
+     * On a failing network, confirm with one bounded second probe. The
+     * second failure is diagnostic evidence, NOT proof that a Worker is down:
+     * carrier/Private DNS/VPN and a disabled hostname can look identical.
+     * Never upload CAD or retry an expensive AI request blindly.
+     * Background thread only (never block the Android UI).
+     */
+    public static Diagnostic diagnoseStableNow(){
+        Diagnostic first=diagnoseNow();
+        if(first.reachable||"CONFIG".equals(first.category))return first;
+        try{Thread.sleep(900L);}
+        catch(InterruptedException interrupted){
+            Thread.currentThread().interrupt();
+            return first;
+        }
+        Diagnostic second=diagnoseNow();
+        if(second.reachable)return new Diagnostic(true,"RECOVERED",
+            "İlk /health denetimi ["+first.category+"] başarısızdı; "+
+            "ikinci HTTPS kontrolü başarılı. Erişim geçici kesilmiş olabilir. "+
+            "Bu sonuç Qwen model yanıtını doğrulamaz.");
+        if(first.category.equals(second.category))
+            return new Diagnostic(false,second.category,
+                "Worker /health iki kez ["+second.category+"] hatası verdi. "+
+                "Telefondan erişim hâlâ doğrulanamadı; sebep DNS/ağ "+
+                "ayarları veya sunucu alan adı olabilir. "+second.message);
+        return new Diagnostic(false,"INTERMITTENT",
+            "İlk HTTPS testi ["+first.category+"], ikinci testi ["+
+            second.category+"] hatası verdi. Dalgalanan telefon/ağ erişimi "+
+            "olabilir; tek bir hata kesin kök neden olarak kabul edilmedi.");
+    }
+
+    public interface DiagnosticCallback { void onResult(Diagnostic diagnostic); }
+
+    /** Interactive LED diagnostic; authorization, provider calls and uploads excluded. */
+    public static void checkDetailed(DiagnosticCallback callback){
+        if(callback==null)return;
+        WORK.execute(()->{
+            Diagnostic outcome=diagnoseStableNow();
+            MAIN.post(()->callback.onResult(outcome));
+        });
+    }
+
     /** LED check reuses the same authenticated-independent endpoint probe. */
     public static void check(Callback callback){
         if(callback==null)return;

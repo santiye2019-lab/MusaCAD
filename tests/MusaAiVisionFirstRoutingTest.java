@@ -57,7 +57,9 @@ public final class MusaAiVisionFirstRoutingTest {
         contains(main,"boolean hybridVisual=(visionFirst||");
         contains(main,"if(MusaAiAnalysisIntent.isVisionFirstReview(raw)){");
         contains(main,"GÖRSEL DENETİM BAŞARISIZ — 0/9");
-        contains(main,"MusaAiEngineeringSynthesis.compose(synthesis)");
+        require(main.contains("MusaAiEngineeringSynthesis.composeDetailed(synthesis)") ||
+                main.contains("MusaAiEngineeringSynthesis.compose(synthesis)"),
+            "Qwen-first final report must use engineering synthesis");
         contains(main,"if(acceptedBatches>0)");
         contains(main,"runMusaAiWholeSheetVision(");
         require(main.indexOf("GÖRSEL DENETİM BAŞARISIZ — 0/9")<

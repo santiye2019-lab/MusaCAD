@@ -27,10 +27,14 @@ public final class MusaAiVisionTimeBudgetTest {
 
         String panel=Files.readString(Path.of(
             "app/src/main/java/com/musa/cad/MusaAiPanel.java"),StandardCharsets.UTF_8);
-        assertTrue(panel.contains("timeoutHandler.postDelayed(timeout,MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS)"),
-            "Hard deadline must stay fixed");
-        assertTrue(panel.contains("timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS)"),
-            "Soft idle notice before hard timeout");
+        assertTrue(MusaAiVisionTimeBudget.PANEL_CHAT_DEADLINE_MS>=
+            MusaAiVisionTimeBudget.MODEL_READ_LIMIT_MS,"Text Q&A must allow HTTPS model response");
+        assertTrue(MusaAiVisionTimeBudget.PANEL_CHAT_DEADLINE_MS<
+            MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS,"A definition does not require a 12-minute deadline");
+        assertTrue(panel.contains("timeoutHandler.postDelayed(timeout,hardDeadlineMs)"),
+            "Use the task-specific hard deadline");
+        assertTrue(panel.contains("timeoutHandler.postDelayed(idleNotice,idleDelayMs)"),
+            "Use the task-specific nonterminal idle notice");
         assertTrue(panel.contains("timeoutHandler.removeCallbacks(idleNotice)"),
             "Do not keep old idle callbacks after final result");
         assertTrue(!panel.contains("timeoutHandler.postDelayed(timeout,75_000L)"),

@@ -47,6 +47,9 @@ public final class MusaAiEngineeringSynthesis {
 
     public static final class Input {
         public String project="",layout="",discipline="";
+        /** Scope is resolved from explicit request or DWG metadata before Qwen. */
+        public String scope="";
+        public String reportTitle="",auditScopeList="";
         public int reviewedTiles, plannedTiles=9, reviewedCloseups, plannedCloseups;
         public String visualIssue="", closeupIssue="", viewInventory="", coverageRegister="";
         public String localVectorEvidence="", quantityEvidence="", priceCandidates="";
@@ -78,13 +81,24 @@ public final class MusaAiEngineeringSynthesis {
         if(data==null)throw new IllegalArgumentException("Sentez verisi yok");
         int total=Math.max(1,data.plannedTiles);
         int accepted=Math.max(0,Math.min(total,data.reviewedTiles));
-        StringBuilder out=new StringBuilder("GANDALF • GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU");
+        String caption=!clean(data.reportTitle).isEmpty()
+            ?clean(data.reportTitle).toUpperCase(new Locale("tr","TR"))+
+                " GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU"
+            :(clean(data.scope).isEmpty()?"GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU":
+                MusaAiVisualDiscipline.heading(data.scope));
+        boolean noVisualGroups=accepted==0||data.visualGroups.isEmpty();
+        StringBuilder out=new StringBuilder(noVisualGroups
+            ?"GANDALF • GÖRSEL ANALİZ DOĞRULANAMADI — TEKNİK RAPOR DEĞİLDİR"
+            :"GANDALF • "+caption);
         out.append("\nProje: ").append(clean(data.project));
         out.append("\nDüzen: ").append(clean(data.layout));
-        out.append("\nDisiplin: ").append(clean(data.discipline));
-        out.append("\nİşlem sırası: 1) Qwen çevrim içi görsel inceleme → ")
-           .append("2) telefonda DWG kanıtlarıyla yerel çapraz kontrol → ")
-           .append("3) mühendislik raporu.");
+        if(noVisualGroups){
+            out.append("\nGörsel olarak doğrulanan disiplin: YOK (AI yanıtı alınmadı)");
+            out.append("\nYerel DWG etiketlerine dayalı inceleme odağı (bulgu değil): ")
+                .append(clean(data.discipline));
+        }else{
+            out.append("\nDisiplin: ").append(clean(data.discipline));
+        }
         out.append("\nGörsel AI yanıtı alınan bölge: ").append(accepted)
             .append("/").append(total);
         out.append("\nBaşlık çevresi yakın-plan adayları: ")
@@ -101,9 +115,17 @@ public final class MusaAiEngineeringSynthesis {
                 .append("kontrol edin. Çizim değiştirilmedi.");
             return out.toString();
         }
+        // Only successful visual work warrants the planned subsystem checklist.
+        // When Qwen returns 0/9, report the failure, not eight unseen systems.
+        if(!clean(data.auditScopeList).isEmpty())
+            out.append("\n\n").append(clean(data.auditScopeList));
+        if(!clean(data.scope).isEmpty())
+            out.append("\nBu disiplin için kontrol odağı (bulgu değil): ")
+               .append(MusaAiVisualDiscipline.focus(data.scope));
+        out.append("\nYöntem: Qwen görsel inceleme → yerel DWG çapraz kontrol → mühendislik raporu.");
         boolean allTiles=accepted==total&&clean(data.visualIssue).isEmpty();
         out.append("\nDenetim seviyesi: ")
-            .append(allTiles?"Planlanan 9 görsel bölgeye AI yanıtı alındı; mühendis onayı değildir."
+            .append(allTiles?"Planlanan "+total+" görsel bölgeye AI yanıtı alındı; mühendis onayı değildir."
                             :"KISMİ; eksik bölgeler hakkında teknik çıkarım yapılmadı.");
         out.append("\nDWG kanıt örneklemi: ").append(Math.max(0,data.sampledCadItems))
             .append("/").append(Math.max(0,data.declaredCadItems))
@@ -153,7 +175,11 @@ public final class MusaAiEngineeringSynthesis {
                     catch(NumberFormatException ignored) {}
                 }
                 if(shown++<MAX_SUMMARY_LINES_PER_GROUP) {
-                    out.append("\n• ").append(limit(line,650));
+                    // A model-written "Doğrulanan" is not a CAD-backed validation.
+                    String visualLine=normalize(line).contains("dogrulanan")
+                        ?line+" [Yalnız Qwen görsel nitelemesi; CAD ile doğrulanmadı]"
+                        :line;
+                    out.append("\n• ").append(limit(visualLine,650));
                     usefulLines++;
                 }else omitted++;
             }
@@ -188,6 +214,13 @@ public final class MusaAiEngineeringSynthesis {
                     .append(qwenSourceIds.size()-MAX_CAD_SOURCE_MATCHES)
                     .append(" (özet dışında).");
         }
+        int foundSources=0;
+        for(Integer id:qwenSourceIds)if(data.sourceDescriptions.containsKey(id))foundSources++;
+        out.append("\nKaynak-ID çapraz kontrol özeti: Qwen atfı ")
+           .append(qwenSourceIds.size()).append("; CAD örnekleminde bulunan ")
+           .append(foundSources).append("; eşleşmeyen ")
+           .append(qwenSourceIds.size()-foundSources)
+           .append(". Kimlik varlığı teknik uygunluk/cihaz tanısı kanıtı değildir.");
         out.append("\nBağımsız yerel çizim kanıtları (yalnız CAD metni/vektörü):");
         appendLocalBullets(out,data.localVectorEvidence);
         if(!clean(data.viewInventory).isEmpty()) {
@@ -201,9 +234,15 @@ public final class MusaAiEngineeringSynthesis {
         out.append("\n• Qwen'in teknik bulguları yalnız gerçekten yanıt alınan bölgelere aittir.");
         out.append("\n• Yerel analiz ölçü, kaynak ID, blok/katman ve etiketleri ")
             .append("bağımsız olarak destekleyebilir; otomatik olarak mevzuata uygunluk onayı vermez.");
-        out.append("\n• DN/PN, montaj malzemesi, kolon düşeyliği, hidrolik hesap, ")
-            .append("sızdırmazlık, tesisat güzergâhı ve plan/kesit çelişkileri ")
-            .append("ortak referans ve hesapla teyit edilmelidir.");
+        if(clean(data.scope).isEmpty() || MusaAiVisualDiscipline.mechanicalScope(data.scope)){
+            out.append("\n• DN/PN, montaj malzemesi, kolon düşeyliği, hidrolik hesap, ")
+               .append("sızdırmazlık, tesisat güzergâhı ve plan/kesit çelişkileri ")
+               .append("ortak referans ve hesapla teyit edilmelidir.");
+        }else{
+            out.append("\n• ").append(MusaAiAnalysisIntent.label(data.scope))
+               .append(" denetiminde ").append(MusaAiVisualDiscipline.focus(data.scope))
+               .append(" için çizim, hesap ve ilgili disiplin referansları karşılaştırılmalıdır.");
+        }
         out.append("\n• DWG üzerinde değişiklik yapılmadı.");
 
         if(data.includeTakeoff) {
@@ -222,12 +261,50 @@ public final class MusaAiEngineeringSynthesis {
                 .append("yerel keşif hesaplaması yapılmadı.");
         }
         if(!clean(data.coverageRegister).isEmpty())
-            out.append("\n\n7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ")
+            out.append("\n\n7. GÖRÜNÜM VE KAYNAK KAPSAM CETVELİ\n")
                .append(clean(data.coverageRegister));
+        if(!clean(data.scope).isEmpty())
+            out.append("\n\nDİSİPLİN KAPSAMI: Ana teknik sonuçlar ")
+               .append(MusaAiAnalysisIntent.label(data.scope))
+               .append(" konusu içindir; farklı disiplin öğeleri yalnız koordinasyon bağlamında değerlendirilir.");
         out.append("\n\nSONUÇ: Bu rapor Qwen görsel gözlemleri ile telefonun ")
            .append("DWG kanıtlarının kaynakları karıştırılmadan derlenmiş ön denetimidir.")
            .append(" Teknik imalat kararları, kesin keşif ve mevzuat uygunluğu ")
            .append("sorumlu mühendis tarafından doğrulanmalıdır.");
+        return out.toString();
+    }
+
+    /**
+     * Full audit edition: retains the proven visual-first summary and appends
+     * complete, source-labelled raw findings instead of silently discarding
+     * entries at the summary display limits.
+     */
+    public static String composeDetailed(Input data) {
+        String summary=compose(data);
+        if(data==null||data.visualGroups.isEmpty()||data.reviewedTiles<=0)return summary;
+        StringBuilder out=new StringBuilder(summary);
+        out.append("\n\n8. TAM BULGU EKİ • GÖRSEL AI HAM KAYITLARI");
+        out.append("\nBu kayıtlar AI gözlemidir; CAD kimliği, mühendislik hesabı ve mevzuat uygunluğu otomatik doğrulanmış sayılmaz.");
+        int groupNumber=0;
+        for(VisualGroup group:data.visualGroups) {
+            if(group==null||group.response.isEmpty())continue;
+            out.append("\n\nGrup ").append(++groupNumber).append(": ").append(group.name);
+            out.append(" [bölge ").append(group.firstRegion).append("–").append(group.lastRegion).append("]");
+            out.append("\n").append(group.response);
+        }
+        out.append("\n\n9. TAM YEREL KANIT EKİ");
+        out.append("\n").append(clean(data.localVectorEvidence).isEmpty()
+            ?"Yerel vektör kanıtı sunulmadı.":data.localVectorEvidence);
+        out.append("\n\n10. GÖRÜNÜM / PAFTA ENVANTERİ");
+        out.append("\n").append(clean(data.viewInventory).isEmpty()
+            ?"Görünüm envanteri sunulmadı.":data.viewInventory);
+        out.append("\n\n11. KAPSAM VE DOĞRULAMA AÇIKLARI");
+        out.append("\nCAD indeks kapsamı: ").append(data.sampledCadItems)
+           .append("/").append(data.declaredCadItems);
+        out.append("\nGörsel bölge kapsamı: ").append(data.reviewedTiles)
+           .append("/").append(data.plannedTiles);
+        out.append("\nKaynak ID bulunması, görsel iddianın doğrulandığı anlamına gelmez.");
+        if(!clean(data.coverageRegister).isEmpty())out.append("\n").append(data.coverageRegister);
         return out.toString();
     }
 

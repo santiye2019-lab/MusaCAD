@@ -196,6 +196,50 @@ public final class MusaAiYfkOfflineCatalog {
         return new Lookup(out.toString(),hits);
     }
 
+    /** 2026 official page-level hints for discipline BOQ; never parse an invented price. */
+    public static String suggestForDisciplineTakeoff(Context ctx,
+                                          MusaAiDisciplineEstimate.Result estimated){
+        if(estimated==null)return "Ön keşif verisi bulunamadı.";
+        if(!status(ctx).installed)return "2026 resmî fiyat kitabı cihazda kurulu değil.";
+        StringBuilder out=new StringBuilder("2026 YFK • DİSİPLİN BAZLI PDF SAYFA ADAYLARI");
+        out.append("\nFiyat dönemi: ").append(MusaAiYfkCatalogQuery.PRICE_PERIOD);
+        int count=0;
+        try(SQLiteDatabase sqlite=SQLiteDatabase.openDatabase(db(ctx).getAbsolutePath(),
+                       null,SQLiteDatabase.OPEN_READONLY)){
+            for(MusaAiDisciplineEstimate.Row row:estimated.rows){
+                if(count++>=24){out.append("\nDiğer kalemler ön tarama sınırında kaldı.");break;}
+                out.append("\n\n").append(MusaAiDisciplinePlan.sectionLabel(row.section))
+                    .append(" • ").append(row.description).append(" [")
+                    .append(row.unit).append("]");
+                String term=MusaAiYfkCatalogQuery.fold(row.searchTerm);
+                if(term.length()<3){
+                    out.append("\nMalzeme kelimesi yetersiz; poz atanmadı.");continue;
+                }
+                String target=term.replace("\\","\\\\").replace("%","\\%")
+                    .replace("_","\\_");
+                int hits=0;
+                try(Cursor cur=sqlite.rawQuery(
+                    "SELECT page,body FROM pages WHERE folded LIKE ? ESCAPE '\\' "+
+                    "ORDER BY page LIMIT 2",new String[]{"%"+target+"%"})){
+                    while(cur.moveToNext()){
+                        hits++;
+                        out.append("\n  • 2026 resmî PDF sayfa ").append(cur.getInt(0))
+                            .append(" • ").append(MusaAiYfkCatalogQuery.safeSnippet(
+                                cur.getString(1),row.searchTerm));
+                    }
+                }
+                if(hits==0)out.append("\nBu anahtar kelime için PDF sayfa adayı bulunamadı.");
+            }
+        }catch(Exception e){
+            return "2026 katalog sayfa eşleştirmesi okunamadı; fiyat uygulanmadı.";
+        }
+        if(count==0)out.append("\nFiyat araması yapılabilecek metraj adayı yok.");
+        out.append("\nBu yalnız resmî PDF içindeki SAYFA aramasıdır; "+
+            "poz, birim, montaj şartı, miktar ve birim fiyat otomatik doğrulanmış değildir. "+
+            "Toplam yaklaşık maliyet hesaplanmadı.");
+        return out.toString();
+    }
+
     private static void putMeta(SQLiteDatabase db,String key,String value){
         ContentValues vals=new ContentValues();
         vals.put("k",key);vals.put("v",value);

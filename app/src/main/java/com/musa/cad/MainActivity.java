@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_NATIVE_RETRY=12,MENU_DRIVE_CONSENT=13;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -41,6 +41,12 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService aiExecutor=Executors.newSingleThreadExecutor(r->{
         Thread t=new Thread(r,"MusaCAD-cloud-ai");
         t.setPriority(Thread.NORM_PRIORITY-1);
+        return t;
+    });
+    // General voice/text questions cannot queue behind 9-region DWG/Qwen scans.
+    private final ExecutorService chatExecutor=Executors.newSingleThreadExecutor(r->{
+        Thread t=new Thread(r,"MusaCAD-quick-text-chat");
+        t.setPriority(Thread.NORM_PRIORITY);
         return t;
     });
     // Local CAD review must not wait behind Cloud AI network requests.
@@ -86,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static final class ProjectSession {
+        final String driveSessionId=java.util.UUID.randomUUID().toString();
         Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
@@ -168,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void handleOnBackPressed(){handleBackNavigation();}
         });
         View root=findViewById(R.id.mainRoot);
+        root.post(this::promptDriveConsentOnce);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(0,bars.top,0,bars.bottom+dp(6));return insets;});
 
         cad=findViewById(R.id.cadView);fileName=findViewById(R.id.fileName);result=findViewById(R.id.resultText);welcomePanel=findViewById(R.id.welcomePanel);
@@ -925,6 +933,12 @@ public class MainActivity extends AppCompatActivity {
             handleMusaAiCloudPrompt(prompt.trim(),reply,recentContext);
             return;
         }
+        // Ordinary definition/explanation questions, including recognized voice,
+        // must not trigger expensive CAD indexing or wait behind Qwen image jobs.
+        if(MusaAiConversationalIntent.isInformationalQuestion(raw)){
+            handleCloudChatWithoutDrawing(raw,recentContext,reply);
+            return;
+        }
         if(q.contains("ne yapabilir")||q.equals("yardım")||q.equals("help")){
             reply.send("MusaCAD AI yetenekleri:\n• Doğal dille CAD komutları ve çizime soru sorma\n• Metraj, keşif/BOQ yükleme, projeden keşif oluşturma ve karşılaştırma\n• Mimari, statik, mekanik, elektrik, peyzaj, altyapı, asansör ve yangın proje kontrolü\n• Statik proje inceleme raporu, hesap raporu/model çıktısı ↔ DWG karşılaştırması ve Proje Paketi tam denetimi\n• Mekanik tesisat proje kontrolü\n• MEKAI_* yerel mekanik uzman komutları\n• MIMAI / STATIKAI / ELKAI / PEYAI / ALTYAPIAI / ASNAI / YANGAI uzman komutları\n• G ile başlayan uzman komutları Gandalf derin analizine gider\n• GMEKAI_* Gandalf derin mekanik uzman analizi\n• Gandalf Cloud AI ile derin proje analizi\n• Akıllı seçim, tablo/lejant/OLE analizi ve revizyon karşılaştırma\n• Word (.docx) ve PDF teknik rapor çıktısı\n• Sesli komut");
             return;
@@ -972,6 +986,13 @@ public class MainActivity extends AppCompatActivity {
                 String comparison=MusaAiYfk2025Library.compareNew2026(this);
                 runOnUiThread(()->{if(reply!=null)reply.send(comparison);});
             });
+            return;
+        }
+        // Natural discipline-based BOQ is read-only and never builds the
+        // expensive drawing projection on Android's UI thread.
+        if(MusaAiDisciplineEstimate.wantsEstimate(raw)&&
+           !MusaAiAnalysisIntent.isVisionFirstReview(raw)){
+            runMusaAiDisciplineTakeoff(raw,reply);
             return;
         }
         if(MusaAiYfk2025Parser.wantsLookup(raw)){
@@ -1701,23 +1722,24 @@ public class MainActivity extends AppCompatActivity {
     private void handleCloudChatWithoutDrawing(String raw,String recentContext,
                                                MusaAiPanel.Reply reply){
         if(MusaAiAnalysisIntent.isLocalOnly(raw)){
-            reply.send("Çevrim dışı istekte proje çizimi yok; yerel mühendislik delili sunulamıyor.");
+            reply.send("Bu genel soru çevrim içi sohbet yanıtı gerektiriyor. Çevrim dışı CAD ölçüleriyle doğrulanmış bir tanım verilemez.");
             return;
         }
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
         if(!prefs.getBoolean(K_CLOUD_CHAT_CONSENT,false)){
             new AlertDialog.Builder(this)
-                .setTitle("Gandalf • Çizimsiz sohbet")
-                .setMessage("Henüz proje açık değil. Sorunuz ve bu sohbet penceresindeki "+
-                    "en fazla dört kısa önceki soru-yanıt MusaCAD bulut AI ağına aktarılabilir. "+
-                    "DWG veya teknik çizim gönderilmez. Bu izin, çizim CAD-JSON/görsel veri "+
-                    "gönderme izninden bağımsızdır. Devam edilsin mi?")
+                .setTitle("Gandalf • Genel sohbet izni")
+                .setMessage("Sorunuz ve bu sohbet penceresindeki en fazla dört kısa "+
+                    "önceki soru-yanıt MusaCAD AI sunucusuna gönderilebilir. "+
+                    "Açık bir proje olsa bile DWG/DXF, çizim görselleri, CAD-JSON "+
+                    "ve poz kitabı bu sohbet isteğine dahil edilmez. "+
+                    "Bu izin proje görsel aktarımından ayrıdır. Devam edilsin mi?")
                 .setPositiveButton("SOHBETE DEVAM ET",(d,w)->{
                     prefs.edit().putBoolean(K_CLOUD_CHAT_CONSENT,true).apply();
                     runCloudChatWithoutDrawing(raw,recentContext,reply);
                 })
                 .setNegativeButton("İPTAL",(d,w)->reply.send(
-                    "Çevrim içi sohbet iptal edildi; proje açınca yerel araçları kullanabilirsiniz."))
+                    "Çevrim içi sohbet iptal edildi. CAD çizimi değişmedi."))
                 .setOnCancelListener(d->reply.send("Çevrim içi sohbet iptal edildi."))
                 .show();
             return;
@@ -1727,18 +1749,22 @@ public class MainActivity extends AppCompatActivity {
 
     private void runCloudChatWithoutDrawing(String raw,String recentContext,
                                            MusaAiPanel.Reply reply){
-        reply.progress("Gandalf • Çevrim içi sohbet yanıtı hazırlanıyor…");
+        reply.progressWaiting("Genel bilgi sorusu yanıtlanıyor • DWG görsel analizi çalıştırılmıyor");
+        final boolean drawingOpen=currentProject!=null;
         try{
-            aiExecutor.submit(()->{
+            chatExecutor.submit(()->{
                 MusaAiDrawingIndex empty=new MusaAiDrawingIndex(
                     "",0,0,Collections.emptyList(),Collections.emptyList(),
                     Collections.emptyList(),"");
                 MusaAiCloudService.Result cloud=MusaAiCloudService.analyzeWithContext(
-                    getApplicationContext(),empty,"Henüz proje açılmadı",raw,recentContext,"");
+                    getApplicationContext(),empty,"Genel bilgi sorusu (CAD verisi yok)",raw,recentContext,"");
                 if(cloud.ok()){
                     reply.cloudStatus(true);
-                    pendingAiActions=Collections.emptyList();
-                    reply.send(cloud.text+"\n\nÇizim açık olmadığı için CAD analiz sonucu üretilmedi.");
+                    // A chat answer must not clear a separate in-progress DWG
+                    // review's proposed CAD actions.
+                    reply.send(cloud.text+"\n\n"+(drawingOpen
+                        ?"Bu bir genel bilgi yanıtıdır; açık DWG teknik olarak incelenmedi."
+                        :"Çizim açık olmadığı için CAD analizi yapılmadı."));
                 }else{
                     reply.cloudFailure(cloud.message);
                     reply.send("Bulut sohbeti kullanılamıyor: "+
@@ -1748,6 +1774,76 @@ public class MainActivity extends AppCompatActivity {
             });
         }catch(RejectedExecutionException error){
             reply.send("Gandalf sohbet iş parçacığı şu anda kullanılamıyor.");
+        }
+    }
+
+    private void runMusaAiDisciplineTakeoff(String raw,MusaAiPanel.Reply reply){
+        final DxfParser.Result drawing=activeDxf;
+        final String fileName=currentDisplayName;
+        final java.util.List<MusaAiCsbEstimate.Rate> verifiedRates=
+            currentProject==null?Collections.emptyList():
+                new ArrayList<>(currentProject.csbRates);
+        if(drawing==null){
+            reply.send("Disiplin bazlı keşif için DWG/DXF vektör çizimi açın.");
+            return;
+        }
+        reply.progress("Gandalf • Disiplin bazlı DWG metraj adayları ve yüklenen poz kitapları inceleniyor…");
+        try{
+            aiExecutor.submit(()->{
+                try{
+                    MusaAiDrawingIndex idx=drawing.aiDrawingIndex(Integer.MAX_VALUE);
+                    String fallback=MusaAiVisualDiscipline.resolve(
+                        MusaAiAnalysisIntent.scope(raw),raw,fileName,idx);
+                    MusaAiDisciplinePlan.Plan plan=MusaAiDisciplinePlan.resolve(raw,fallback);
+                    MusaAiDisciplineEstimate.Result measured=
+                        MusaAiDisciplineEstimate.analyze(idx,plan);
+                    StringBuilder report=new StringBuilder(measured.report);
+                    boolean catalog=false;
+                    if(MusaAiYfk2025Library.status(this).installed){
+                        catalog=true;
+                        report.append("\n\n").append(
+                            MusaAiYfk2025Library.suggestForDisciplineTakeoff(this,measured));
+                    }
+                    if(MusaAiYfkOfflineCatalog.status(this).installed){
+                        catalog=true;
+                        report.append("\n\n").append(
+                            MusaAiYfkOfflineCatalog.suggestForDisciplineTakeoff(this,measured));
+                    }
+                    if(!catalog)report.append("\n\nBİRİM FİYAT KİTABI YÜKLENMEDİ: ")
+                        .append("Metraj adayları hazır; kaynaklı poz/fiyat karşılaştırması için ")
+                        .append("2025 kitabını telefona yükleyin veya resmî 2026 YFK kitabını kurun.");
+                    if(plan.needsMechanicalEvidence()&&!verifiedRates.isEmpty()){
+                        MusaAiCsbEstimate.Result mecha=
+                            MusaAiCsbEstimate.analyze(idx,verifiedRates);
+                        report.append("\n\nBAĞIMSIZ MEKANİK METRAJ / KULLANICI DOĞRULAMALI FİYAT EKİ:")
+                            .append(mecha.report);
+                    }
+                    report.append("\n\nGenel toplam: HESAPLANMADI. ")
+                        .append("Kitaptan bulunan aday fiyatlar doğrulanmış poz/tarif/birim ")
+                        .append("eşleşmesi veya güncel birim fiyat onayı sayılmaz.");
+                    final String title=measured.title;
+                    final String text=report.toString();
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||drawing!=activeDxf){
+                            if(reply!=null)reply.send("Keşif hesaplanırken aktif proje değişti; "+
+                                "eski çizim raporu yeni projeye kaydedilmedi.");
+                            return;
+                        }
+                        lastAiReport=text;
+                        lastAiReportTitle=title;
+                        lastAiReportSourceIds=Collections.unmodifiableList(
+                            new ArrayList<>(measured.sourceIds));
+                        if(reply!=null)reply.send(text+
+                            "\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
+                    });
+                }catch(Exception e){
+                    final String msg="Keşif ön analizi tamamlanamadı: "+
+                        (e.getMessage()==null?"CAD veya katalog okunamadı.":e.getMessage());
+                    runOnUiThread(()->{if(reply!=null)reply.send(msg);});
+                }
+            });
+        }catch(RejectedExecutionException e){
+            reply.send("Gandalf keşif iş parçacığı şu anda kullanılamıyor.");
         }
     }
 
@@ -1778,6 +1874,7 @@ public class MainActivity extends AppCompatActivity {
         // Requested 9-region sweep of the OPEN drawing must not be replaced
         // by a text-only multi-project package review.
         boolean packageMode=!visionFirst&&MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&
+            MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)&&
             openVectorProjectCount()>1;
         SharedPreferences prefs=getSharedPreferences(AI_PRIVACY_PREFS,MODE_PRIVATE);
         boolean hybridVisual=(visionFirst||MusaAiAnalysisIntent.isReview(raw)||
@@ -1841,7 +1938,8 @@ public class MainActivity extends AppCompatActivity {
         final DxfParser.Result activeSnapshot=activeDxf;
         final String displayName=currentDisplayName;
         final String requestedScope=MusaAiAnalysisIntent.scope(raw);
-        final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&openVectorProjectCount()>1;
+        final boolean packageMode=MusaAiCloudPolicy.shouldUseProjectPackage(raw)&&
+            MusaAiDisciplinePlan.wantsMultiOpenFiles(raw)&&openVectorProjectCount()>1;
         final List<AiCloudProjectSource> packageSources=packageMode
             ?currentAiCloudProjectSources():Collections.emptyList();
         if(activeSnapshot==null){reply.send("Gandalf AI için çizim indeksi hazırlanamadı.");return;}
@@ -1875,7 +1973,7 @@ public class MainActivity extends AppCompatActivity {
                     // separate host and therefore does not prove Worker reachability.
                     if(hybridVisual){
                         reply.progress("Gandalf • Qwen Worker DNS/HTTPS erişimi kontrol ediliyor…");
-                        MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseNow();
+                        MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseStableNow();
                         if(!network.reachable){
                             String notice="GÖRSEL PROJE ANALİZİ BAŞLATILAMADI"+
                                 "\nAI görsel bölgeleri: 0/9 — hiçbir görüntü AI tarafından incelenmedi."+
@@ -1893,7 +1991,12 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                     }
-                    MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(CLOUD_AI_INDEX_MAX_ITEMS);
+                    // Hybrid Qwen engineering review needs all visible local CAD evidence.
+                    // Keep legacy cloud/chat payload bounded; this runs on aiExecutor,
+                    // never on the UI thread, and does not change Qwen upload limits.
+                    if(hybridVisual)reply.progress("Gandalf • Tüm görünür DWG nesneleri indeksleniyor…");
+                    MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(
+                        hybridVisual?Integer.MAX_VALUE:CLOUD_AI_INDEX_MAX_ITEMS);
                     List<MusaAiProjectPackage.Drawing> packageDrawings=Collections.emptyList();
                     if(packageMode){
                         ArrayList<MusaAiProjectPackage.Drawing> built=new ArrayList<>();
@@ -1908,8 +2011,16 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if(hybridVisual){
+                        String reportScope=MusaAiVisualDiscipline.resolve(
+                            requestedScope,raw,displayName,snapshot);
+                        MusaAiDisciplinePlan.Plan reviewPlan=
+                            MusaAiDisciplinePlan.resolve(raw,reportScope);
+                        // Broad requests should follow strong CAD evidence, never a
+                        // generic eight-system mechanical checklist from the file name.
+                        MusaAiDisciplinePlan.Plan focusedPlan=
+                            MusaAiDisciplinePlan.focusOnDrawing(raw,reviewPlan,snapshot);
                         runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,
-                            requestedScope,reply,recentContext);
+                            focusedPlan.scope,focusedPlan,reply,recentContext);
                         return;
                     }
                     reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
@@ -2057,8 +2168,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private void runMusaAiWholeSheetVision(DxfParser.Result drawing,
                                            MusaAiDrawingIndex snapshot,String fileName,
-                                           String raw,String scope,MusaAiPanel.Reply reply,
-                                           String recentContext){
+                                           String raw,String scope,MusaAiDisciplinePlan.Plan plan,
+                                           MusaAiPanel.Reply reply,String recentContext){
         // Stage 1 is Qwen's image review. No independent local engineering
         // judgement is performed before the image batches return.
         // Only index metadata/annotations are supplied as spatial context.
@@ -2068,14 +2179,23 @@ public class MainActivity extends AppCompatActivity {
             "; birim: "+snapshot.unitName+
             ". CAD etiketi tek başına görsel doğrulama değildir.";
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
+        final MusaAiVisualEvidence.Progress visualProgress=new MusaAiVisualEvidence.Progress(){
+            @Override public void onProgress(String status){reply.progress(status);}
+            @Override public void onMeasured(String step,int done,int count){
+                reply.progressMeasured(step,done,count);
+            }
+        };
+        reply.progressMeasured("Görsel bölgeler için hazırlık",0,total);
         int acceptedTiles=0,acceptedBatches=0,compactAcceptedBatches=0;
         final ArrayList<MusaAiEngineeringSynthesis.VisualGroup> visualRecords=
             new ArrayList<>();
         String issue="";
-        StringBuilder report=new StringBuilder("GANDALF • GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU");
+        StringBuilder report=new StringBuilder("GANDALF • "+plan.label+
+            " GÖRSEL + YEREL MÜHENDİSLİK DENETİM RAPORU");
         report.append("\nProje: ").append(fileName);
         report.append("\nLayout: ").append(snapshot.layout);
-        report.append("\nDisiplin: ").append(MusaAiAnalysisIntent.label(scope));
+        report.append("\nDisiplin: ").append(plan.label);
+        report.append("\n").append(plan.register());
         report.append("\nKullanıcı isteği: ").append(raw.length()>300?raw.substring(0,300)+"…":raw);
         report.append("\nYöntem: aktif DWG düzeninde 3×3 tarama + yazıdan bulunan kat planı, kesit, vaziyet ve çatı adaylarına yakın görsel inceleme.");
         if(MusaAiAnalysisIntent.wantsAllViews(raw)){
@@ -2118,16 +2238,19 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiVisualEvidence.Result rendered;
             try{
-                rendered=MusaAiVisualEvidence.renderBatch(drawing,batch,reply::progress);
+                rendered=MusaAiVisualEvidence.renderBatch(drawing,batch,visualProgress);
             }catch(Exception ex){
                 issue="Paftanın "+(batch+1)+". görsel grubunun hazırlanması başarısız.";break;
             }
             if(rendered.renderedTiles==0){
                 issue=(batch+1)+". grupta okunabilir ayrıntı görüntüsü üretilemedi.";break;
             }
-            reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
-                " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
-            String task=raw+"\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
+            reply.progressWaiting("Qwen görsel yanıtı bekleniyor • grup "+
+                (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
+                " • daha önce yanıt alınan "+acceptedTiles+"/"+total+" bölge");
+            String task=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
+                "\n"+plan.visionInstruction()+
+                "\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
                 (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
                 ". Yalnızca sunulan ayrıntı bölgelerini incele, hiçbir görünmeyen bölge için sonuç uydurma."+
                 " Bulguları görüntü bölgesi kimliği, teknik etiket, gözlem, güven durumu ve kontrol önerisiyle sırala.";
@@ -2139,9 +2262,10 @@ public class MainActivity extends AppCompatActivity {
             // CAD payload or user prompts. Shrinking images cannot repair DNS.
             MusaAiCloudHealth.Diagnostic afterFailure=
                 cloud.status==MusaAiCloudService.Status.NETWORK_ERROR
-                    ?MusaAiCloudHealth.diagnoseNow():null;
+                    ?MusaAiCloudHealth.diagnoseStableNow():null;
             if(afterFailure!=null&&!afterFailure.reachable)
-                reply.progress("Gandalf • Qwen ağ tanısı: "+afterFailure.message);
+                reply.progress("Gandalf • Görsel aktarım başarısız oldu; "+
+                    "ardından yapılan HTTPS bağlantı testleri: "+afterFailure.message);
             // Retry only when the same HTTPS Worker remains reachable.
             if(!cloud.ok()&&(afterFailure==null||afterFailure.reachable)&&
                 canRetryCompactVisual(cloud)&&
@@ -2149,12 +2273,13 @@ public class MainActivity extends AppCompatActivity {
                     android.os.SystemClock.elapsedRealtime()-inspectionStarted)&&
                 !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
                 final String originalFailure=cloud.message;
-                reply.progress("Gandalf • Görsel aktarım başarısız; "+(batch+1)+
-                    ". grup daha küçük görüntülerle bir kez yeniden deneniyor…");
+                reply.progressWaiting("Qwen yanıtı gecikti • "+(batch+1)+
+                    ". grup daha küçük görüntülerle yeniden deneniyor");
                 try{
                     MusaAiVisualEvidence.Result compact=
-                        MusaAiVisualEvidence.renderBatchCompact(drawing,batch,reply::progress);
+                        MusaAiVisualEvidence.renderBatchCompact(drawing,batch,visualProgress);
                     if(compact.complete&&compact.renderedTiles>=rendered.renderedTiles){
+                        reply.progressWaiting("Qwen yeniden deneme yanıtı bekleniyor • grup "+(batch+1));
                         MusaAiCloudService.Result retry=MusaAiCloudService.analyzeHybridWithContext(
                             getApplicationContext(),snapshot,fileName,task,scope,compact.json,
                             recentContext,evidenceSummary);
@@ -2179,14 +2304,17 @@ public class MainActivity extends AppCompatActivity {
                     !firstTransferFailure.equals(cloud.message))
                     issue+=" | İlk aktarım: "+firstTransferFailure;
                 if(afterFailure!=null)
-                    issue+=" | Worker sağlık kontrolü ["+afterFailure.category+
-                        "]: "+afterFailure.message;
+                    issue+=" | İsteğin kesilmesinden SONRA yapılan bağımsız"+
+                        " Worker /health testleri ["+afterFailure.category+
+                        "]: "+afterFailure.message+
+                        " Bu testler ilk aktarım hatasının kesin nedenini kanıtlamaz.";
                 reply.progress("Gandalf • Çevrim içi görsel analiz durdu. "+issue);
                 break;
             }
             reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
+            reply.progressMeasured("Qwen yanıtı alınan genel bölgeler",acceptedTiles,total);
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
@@ -2227,21 +2355,23 @@ public class MainActivity extends AppCompatActivity {
                 MusaAiVisualEvidence.Result closeups;
                 try{
                     closeups=MusaAiVisualEvidence.renderViewsBatch(drawing,viewCatalog.views,
-                        group,reply::progress);
+                        group,visualProgress);
                 }catch(Exception e){
                     focusedIssue="Kat/kesit/vaziyet görüntü grubunun hazırlanması tamamlanamadı.";break;
                 }
                 if(closeups.renderedTiles==0){
                     focusedIssue="Yakın-plan görüntüsü oluşturulamadı.";break;
                 }
-                reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
-                    (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
-                    "/"+focusedRequested+" yakın-plan adayı işlendi…");
-                String focusPrompt=raw+"\n"+viewCatalog.report+
+                reply.progressWaiting("Qwen kat/kesit yakın-plan yanıtı • "+
+                    (group+1)+"/"+focusBatchCount+" • önceki yanıt "+
+                    focusedReviewed+"/"+focusedRequested);
+                String focusPrompt=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
+                    "\n"+plan.visionInstruction()+
+                    "\n"+viewCatalog.report+
                     "\nBu görseller ayrı çizim görünüm başlıklarına yakın ALAN ADAYLARIDIR."+
                     " Kesitleri, vaziyet planını, çatı planını ve her katı bağımsız değerlendir."+
-                    " Plan–kesit kotları, iniş kolonları, havalıklar, yağmur/atık su güzergâhları"+
-                    " ve şebeke bağlantılarındaki uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
+                    " Plan–kesit kotları ve "+MusaAiVisualDiscipline.focus(scope)+
+                    " açısından uyuşmazlıkları yalnız net ortak referans görüldüğünde raporla."+
                     " Her bulguda görünüm etiketi, okunan değeri, kaynak ve belirsizliği belirt."+
                     " Görülmeyen görünüm detayları veya kot uyuşmazlığı uydurma.";
                 MusaAiCloudService.Result detailed=MusaAiCloudService.analyzeHybridWithContext(
@@ -2256,6 +2386,8 @@ public class MainActivity extends AppCompatActivity {
                 }
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
+                reply.progressMeasured("Qwen yanıtı alınan yakın-planlar",
+                    focusedReviewed,focusedRequested);
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
                     .append(group+1).append("/").append(focusBatchCount)
                     .append(" ==========\n").append(detailed.text);
@@ -2298,7 +2430,10 @@ public class MainActivity extends AppCompatActivity {
         MusaAiEngineeringSynthesis.Input synthesis=new MusaAiEngineeringSynthesis.Input();
         synthesis.project=fileName;
         synthesis.layout=snapshot.layout;
-        synthesis.discipline=MusaAiAnalysisIntent.label(scope);
+        synthesis.discipline=plan.label;
+        synthesis.scope=scope;
+        synthesis.reportTitle=plan.label;
+        synthesis.auditScopeList=plan.register();
         synthesis.reviewedTiles=acceptedTiles;
         synthesis.plannedTiles=total;
         synthesis.reviewedCloseups=focusedReviewed;
@@ -2314,33 +2449,75 @@ public class MainActivity extends AppCompatActivity {
             reply.progress("Gandalf • Qwen görsel incelemesi bitti; yerel DWG"+
                 " kaynaklarıyla eşleştiriliyor ve mühendislik raporu hazırlanıyor…");
             synthesis.addCadSources(snapshot);
-            MusaAiEngineeringReview.Result local=
-                MusaAiEngineeringReview.analyze(snapshot,fileName);
-            synthesis.localVectorEvidence=local.text;
+            LinkedHashSet<Integer> combinedIds=new LinkedHashSet<>();
+            StringBuilder localText=new StringBuilder();
+            if(plan.single()&&MusaAiVisualDiscipline.mechanicalScope(scope)){
+                // Existing measured pipe/duct evidence retained for a single
+                // mechanical subsystem; do not change proven Qwen calls.
+                MusaAiEngineeringReview.Result local=
+                    MusaAiEngineeringReview.analyze(snapshot,fileName);
+                localText.append(local.text);
+                combinedIds.addAll(local.sourceIds);
+            }else{
+                // Run each requested parent discipline once. A scoped electrical
+                // request never turns into a generic mechanical inspection.
+                if(plan.fullProject){
+                    MusaAiDisciplineAnalyzer.Result allLocal=
+                        MusaAiDisciplineAnalyzer.analyzeAll(snapshot);
+                    localText.append(allLocal.text);
+                    combinedIds.addAll(allLocal.sourceIds);
+                }else for(MusaAiDiscipline parent:plan.localParents()){
+                    MusaAiDisciplineAnalyzer.Result local=
+                        MusaAiDisciplineAnalyzer.analyzeDiscipline(snapshot,parent);
+                    localText.append("\n\n").append(local.text);
+                    combinedIds.addAll(local.sourceIds);
+                }
+                if(plan.needsMechanicalEvidence()){
+                    MusaAiEngineeringReview.Result mechanical=
+                        MusaAiEngineeringReview.analyze(snapshot,fileName);
+                    localText.append("\n\nMEKANİK VEKTOREL KANITLAR (AYRI ÖN İNCELEME)\n")
+                        .append(mechanical.text);
+                    combinedIds.addAll(mechanical.sourceIds);
+                }
+            }
+            // Per-subsystem evidence is an index of actual labels/layers, not
+            // evidence of completeness, a code violation or accurate quantities.
+            MusaAiDisciplinePlan.Evidence specialized=plan.localEvidence(snapshot);
+            localText.append("\n\n").append(specialized.text);
+            combinedIds.addAll(specialized.sourceIds);
+            synthesis.localVectorEvidence=localText.toString();
             lastAiReportSourceIds=Collections.unmodifiableList(
-                new ArrayList<>(local.sourceIds));
+                new ArrayList<>(combinedIds));
 
             // Local takeoff/official poz checks occur after Qwen only when
             // requested. These estimates must not be called approved quantities.
             if(synthesis.includeTakeoff){
                 reply.progress("Gandalf • Görsel bulgular sonrası yerel metraj"+
                     " ve kaynaklı poz adayları kontrol ediliyor…");
-                MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
-                    currentProject==null?Collections.emptyList():currentProject.csbRates);
-                synthesis.quantityEvidence=measured.report;
-                if(MusaAiYfk2025Library.status(this).installed){
-                    synthesis.priceCandidates="2025 resmî kitap adayları:"+
-                        "\nKaynak tarifi, birim ve montaj kapsamı teyit edilmeden"+
-                        " poz kodu kesin sayılmaz.\n"+
-                        MusaAiYfk2025Library.suggestForTakeoff(this,measured);
-                }else{
-                    synthesis.priceCandidates="2025 resmî poz kitabı bu telefonda"+
-                        " kurulu değil; doğrulanmış poz eşleştirmesi yapılamadı.";
+                MusaAiDisciplineEstimate.Result takeoff=
+                    MusaAiDisciplineEstimate.analyze(snapshot,plan);
+                synthesis.quantityEvidence=takeoff.report;
+                StringBuilder catalogCandidates=new StringBuilder();
+                if(MusaAiYfk2025Library.status(this).installed)
+                    catalogCandidates.append(
+                        MusaAiYfk2025Library.suggestForDisciplineTakeoff(this,takeoff));
+                if(MusaAiYfkOfflineCatalog.status(this).installed){
+                    if(catalogCandidates.length()>0)catalogCandidates.append("\n\n");
+                    catalogCandidates.append(
+                        MusaAiYfkOfflineCatalog.suggestForDisciplineTakeoff(this,takeoff));
                 }
-                if(currentProject!=null&&currentProject.boqModel!=null)
-                    synthesis.priceCandidates+="\n"+
-                        MusaAiCsbMaterialCompare.compare(
-                            currentProject.boqModel,measured).report;
+                if(catalogCandidates.length()==0)
+                    catalogCandidates.append("Poz kitabı yüklenmemiş; kaynaklı poz adayı belirlenemedi.");
+                if(plan.needsMechanicalEvidence()){
+                    MusaAiCsbEstimate.Result measured=MusaAiCsbEstimate.analyze(snapshot,
+                        currentProject==null?Collections.emptyList():currentProject.csbRates);
+                    synthesis.quantityEvidence+="\n\nMEKANİK KANIT KONTROLÜ:\n"+measured.report;
+                    if(currentProject!=null&&currentProject.boqModel!=null)
+                        catalogCandidates.append("\n\n").append(
+                            MusaAiCsbMaterialCompare.compare(
+                                currentProject.boqModel,measured).report);
+                }
+                synthesis.priceCandidates=catalogCandidates.toString();
             }
         }else{
             // A Qwen outage is never misrepresented as a local visual report.
@@ -2351,12 +2528,14 @@ public class MainActivity extends AppCompatActivity {
         synthesis.coverageRegister=MusaAiPaftaCoverage.build(snapshot,viewCatalog,
             acceptedTiles,total,focusedReviewed,focusedEligible,
             issue.isEmpty()?focusedIssue:issue);
-        String completeReport=MusaAiEngineeringSynthesis.compose(synthesis);
+        reply.progressWaiting("Mühendislik raporu düzenleniyor");
+        String completeReport=MusaAiEngineeringSynthesis.composeDetailed(synthesis);
         lastAiReport=completeReport;
-        lastAiReportTitle="Gandalf • "+MusaAiAnalysisIntent.label(scope)+
+        lastAiReportTitle="Gandalf • "+plan.label+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()
                 ?" Görsel + Yerel Mühendislik Denetimi"
                 :" Kısmi Görsel + Yerel Mühendislik Ön Denetimi");
+        reply.progressMeasured("Mühendislik raporu tamamlandı",1,1);
         reply.send(completeReport+"\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
     }
 
@@ -3529,7 +3708,7 @@ public class MainActivity extends AppCompatActivity {
             String dxf="0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n";
             try(OutputStream out=new FileOutputStream(base)){out.write(dxf.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
             ProjectSession project=new ProjectSession();project.file=base;project.workingDxf=base;project.parsed=DxfParser.blankDrawing();project.name=name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
-            projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+            projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
             result.setText("Yeni boş çizim hazır • Çizgi, Daire, Dikdörtgen veya diğer araçları seçin");
         }catch(Exception e){error(e);}
     }
@@ -3955,10 +4134,113 @@ public class MainActivity extends AppCompatActivity {
     }
     private boolean canEdit(){return activeDxf!=null&&editingBaseDxf!=null&&editingBaseDxf.exists();}
 
+    /**
+     * A visible NativeScene does not mean the authoritative editable CAD model
+     * exists. Retry only the conversion (not reimporting / deleting the source
+     * project), preserving the displayed preview, project identity and data.
+     */
+    private void retryNativeVectorLoad(){
+        final ProjectSession project=currentProject;
+        if(project==null||project.parsed!=null||project.nativeScene==null||
+           project.preparingEditor||project.file==null||!project.file.isFile()){
+            Toast.makeText(this,"Yeniden denenecek DWG önizlemesi bulunamadı",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final File source=project.file;
+        final LoadTask task=new LoadTask();
+        project.preparingEditor=true;
+        project.prepareError=null;
+        project.prepareTask=task;
+        renderCurrentProjectStatus();
+        Toast.makeText(this,"Tam vektör DWG dönüştürmesi yeniden başlatıldı",Toast.LENGTH_SHORT).show();
+        try{
+            task.future=loader.submit(()->{
+                File generated=null;
+                DxfParser.Result parsed=null;
+                try(NativeCadEngine engine=NativeCadEngine.open(source)){
+                    FileTransfer.checkCancelled();
+                    generated=File.createTempFile("MusaCAD_retry_",".dxf",getCacheDir());
+                    int status=engine.exportDxf(generated);
+                    FileTransfer.checkCancelled();
+                    if(generated.length()>512L*1024L*1024L)
+                        throw new IOException("Dönüşüm sonucu 512 MB sınırını aştı");
+                    parsed=DxfParser.render(generated,false);
+                    if(parsed==null||parsed.entityCount<=0)
+                        throw new IOException("Dönüştürülen DWG içinde desteklenen vektör verisi bulunamadı");
+                    parsed.conversionWarnings=status;
+                    final File finalDxf=generated;
+                    final DxfParser.Result finalParsed=parsed;
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()||!projects.contains(project)||
+                           project.prepareTask!=task){
+                            if(finalParsed.bitmap!=null&&!finalParsed.bitmap.isRecycled())
+                                finalParsed.bitmap.recycle();
+                            finalDxf.delete();
+                            return;
+                        }
+                        project.prepareTask=null;
+                        project.preparingEditor=false;
+                        project.prepareError=null;
+                        project.workingDxf=finalDxf;
+                        project.parsed=finalParsed;
+                        project.bitmap=finalParsed.bitmap;
+                        if(currentProject==project){
+                            activeDxf=finalParsed;
+                            editingBaseDxf=finalDxf;
+                            cad.upgradeNativeDrawing(finalParsed);
+                            snapToggle.setEnabled(finalParsed.snapPoints.length>0);
+                            cad.setSnapPoints(finalParsed.snapPoints);
+                            updateEditorEnabled(canEdit());
+                            updateLayerButtons(true);
+                            project.savedFingerprint=cad.editFingerprint();
+                            project.baselineSet=true;
+                            project.dirty=false;
+                            renderCurrentProjectStatus();
+                        }else if(project.nativeScene!=null){
+                            project.nativeScene.alignTo(finalParsed.drawingToContentMatrix());
+                            project.viewState=null;
+                        }
+                        refreshProjectTabs();
+                    });
+                    generated=null;
+                    parsed=null;
+                }catch(Exception|OutOfMemoryError error){
+                    final String message=error.getMessage()==null?
+                        "Tam vektör çizim hazırlanamadı":error.getMessage();
+                    runOnUiThread(()->{
+                        if(!projects.contains(project)||project.prepareTask!=task)return;
+                        project.prepareTask=null;
+                        project.preparingEditor=false;
+                        project.prepareError=message;
+                        if(currentProject==project){
+                            updateEditorEnabled(false);
+                            renderCurrentProjectStatus();
+                            new AlertDialog.Builder(this)
+                                .setTitle("Tam vektör model açılamadı")
+                                .setMessage("DWG hızlı görünümü korundu. Katman ve çizim düzenleme "+
+                                    "araçları tam vektör oluşturulana kadar kullanılamaz.\n\n"+
+                                    message)
+                                .setPositiveButton("KAPAT",null).show();
+                        }
+                    });
+                }finally{
+                    if(parsed!=null&&parsed.bitmap!=null&&!parsed.bitmap.isRecycled())
+                        parsed.bitmap.recycle();
+                    if(generated!=null)generated.delete();
+                }
+            });
+        }catch(RejectedExecutionException error){
+            project.prepareTask=null;
+            project.preparingEditor=false;
+            project.prepareError="DWG dönüştürme işlemi başlatılamadı";
+            renderCurrentProjectStatus();
+        }
+    }
+
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");if(currentProject!=null&&currentProject.nativeScene!=null&&activeDxf==null){if(currentProject.preparingEditor)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör hazırlanıyor…").setEnabled(false);else if(currentProject.prepareError!=null)menu.add(0,MENU_NATIVE_RETRY,2,"Tam vektör yüklemeyi yeniden dene");}menu.add(0,MENU_LAYERS,3,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_DRIVE_CONSENT,10,"Google Drive • "+(MusaGoogleDriveSync.enabled(this)?"Otomatik yükleme açık":"Bağlantı / Ayarlar"));menu.add(0,MENU_ABOUT,11,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_NATIVE_RETRY:retryNativeVectorLoad();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_DRIVE_CONSENT:showDriveConsent();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4124,7 +4406,80 @@ public class MainActivity extends AppCompatActivity {
         if(directPicker)intent.putExtra(RecentFilesActivity.EXTRA_PICK_IMMEDIATELY,true);
         startActivityForResult(intent,OPEN);
     }
+
+    /** Ask once, respecting earlier account consent and future user disable. */
+    private void promptDriveConsentOnce(){
+        android.content.SharedPreferences p=getSharedPreferences("musacad_drive_consent_ui_v1",MODE_PRIVATE);
+        if(p.getBoolean("prompted",false)||MusaGoogleDriveSync.enabled(this))return;
+        p.edit().putBoolean("prompted",true).apply();
+        new AlertDialog.Builder(this)
+            .setTitle("Google Drive bağlantısı")
+            .setMessage("MusaCAD'de açtığınız DWG/DXF projelerini Google Drive hesabınıza otomatik yedeklemek ister misiniz? İlk kez hesap izni istenir, sonraki açılışlarda otomatik sürer. İstediğiniz zaman menüden kapatabilirsiniz. Yerel dosyalar silinmez.")
+            .setNegativeButton("Şimdi değil",null)
+            .setPositiveButton("Google Drive'a bağlan",(d,w)->connectDrive())
+            .show();
+    }
+    private void connectDrive(){
+        if(MusaGoogleDriveConsent.hasScope(this)){
+            MusaGoogleDriveSync.setEnabled(this,true);
+            scheduleDriveSync();
+            Toast.makeText(this,"Google Drive otomatik yükleme açık",Toast.LENGTH_LONG).show();
+        }else MusaGoogleDriveConsent.request(this);
+    }
+    private void showDriveConsent(){
+        boolean connected=MusaGoogleDriveConsent.hasScope(this);
+        boolean active=connected&&MusaGoogleDriveSync.enabled(this);
+        new AlertDialog.Builder(this)
+            .setTitle("Google Drive • Bağlantı / Ayarlar")
+            .setMessage("Hesap izni: "+(connected?"Mevcut":"Gerekli")+
+                "\nOtomatik proje yükleme: "+(active?"AÇIK":"KAPALI")+
+                "\n\nDrive proje depolama içindir; AI görsel analiz bağlantısı ayrı çalışır. Yerel çizimler silinmez.")
+            .setNegativeButton("Kapat",null)
+            .setPositiveButton(active?"Otomatik yüklemeyi kapat":connected?"Otomatik yüklemeyi aç":"Google hesabını bağla",(d,w)->{
+                if(active){MusaGoogleDriveSync.setEnabled(this,false);
+                    Toast.makeText(this,"Otomatik Drive yüklemesi kapalı",Toast.LENGTH_SHORT).show();
+                }else connectDrive();
+            })
+            .show();
+    }
+    /** A reopened URI refers to the same Drive project within this installation. */
+    private String driveProjectId(ProjectSession project){
+        if(project==null)return "";
+        String stable=project.sourceUri!=null?project.sourceUri.toString():
+            project.recoveryId!=null?project.recoveryId:null;
+        return stable==null?project.driveSessionId:
+            java.util.UUID.nameUUIDFromBytes(
+                stable.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+    }
+    private void scheduleDriveSync(){
+        if(!MusaGoogleDriveSync.enabled(this)||!MusaGoogleDriveConsent.hasScope(this))return;
+        ArrayList<MusaGoogleDriveSync.Entry> open=new ArrayList<>();
+        for(ProjectSession p:projects){
+            if(p.file!=null&&p.file.isFile())
+                open.add(new MusaGoogleDriveSync.Entry(driveProjectId(p),
+                    p.name==null?"cizim.dwg":p.name,p.file));
+        }
+        if(open.isEmpty())return;
+        MusaGoogleDriveSync.submit(getApplicationContext(),open,(id,percent,message)->
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed()||currentProject==null)return;
+                if(driveProjectId(currentProject).equals(id)&&result!=null)
+                    result.setText(message);
+            }));
+    }
+
     @Override protected void onActivityResult(int r,int c,Intent data){
+        if(r==MusaGoogleDriveConsent.REQUEST_CODE){
+            boolean granted=data!=null&&c==RESULT_OK&&MusaGoogleDriveConsent.consentResult(data);
+            if(granted){
+                MusaGoogleDriveSync.setEnabled(this,true);
+                scheduleDriveSync();
+            }
+            Toast.makeText(this,granted?
+                "Google Drive izni alındı; otomatik yükleme etkin.":
+                MusaGoogleDriveConsent.errorMessage(data,c),Toast.LENGTH_LONG).show();
+            return;
+        }
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
@@ -4212,7 +4567,7 @@ public class MainActivity extends AppCompatActivity {
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
                         ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                        loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4252,7 +4607,7 @@ public class MainActivity extends AppCompatActivity {
                                 projects.add(project);
                                 activeLoad=null;
                                 if(task.dialog!=null)task.dialog.dismiss();
-                                activateProject(project);
+                                activateProject(project);scheduleDriveSync();
                                 result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
                                     "Önizleme renkleri nihai değildir.");
                                 // NativeScene owns mutable Canvas/Paint scratch buffers;
@@ -4315,7 +4670,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
                     ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
-                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
+                    loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleDriveSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
@@ -4478,7 +4833,7 @@ public class MainActivity extends AppCompatActivity {
                     project.sourceUri=record.sourceUri==null||record.sourceUri.trim().isEmpty()?null:Uri.parse(record.sourceUri);
                     project.file=recovered;project.workingDxf=recovered;project.bitmap=parsed.bitmap;project.parsed=parsed;project.name=record.displayName;project.dxf=true;project.lastAccessMs=System.currentTimeMillis();
                     project.recoveryId=record.id;project.recoveryFingerprint=record.fingerprint;
-                    projects.add(project);activateProject(project);
+                    projects.add(project);activateProject(project);scheduleDriveSync();
                     project.savedFingerprint=Long.MIN_VALUE;project.baselineSet=true;project.dirty=true;
                     refreshProjectTabs();
                     result.setText("Kurtarılan çalışma • Kaydet / DXF dışa aktar ile kalıcı dosya oluşturun");
@@ -4645,7 +5000,7 @@ public class MainActivity extends AppCompatActivity {
         activeDxf=null;editingBaseDxf=null;currentFile=null;
     }
 
-    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();localAiExecutor.shutdownNow();yfkCatalogExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){recoveryHandler.removeCallbacks(recoveryTicker);recoveryExecutor.shutdownNow();recentExecutor.shutdownNow();aiExecutor.shutdownNow();chatExecutor.shutdownNow();localAiExecutor.shutdownNow();yfkCatalogExecutor.shutdownNow();cancelLoad();ImageView featured=findViewById(R.id.homeFeaturedPreview);if(featured!=null){Object old=featured.getTag();featured.setImageDrawable(null);if(old instanceof Bitmap&&!((Bitmap)old).isRecycled())((Bitmap)old).recycle();}releaseAllProjects();loader.shutdownNow();super.onDestroy();}
 
     private void showLayers(){
         if(activeDxf==null||activeLoad!=null){if(activeDxf==null)Toast.makeText(this,"Katmanlar için önce bir çizim açın",Toast.LENGTH_SHORT).show();return;}
