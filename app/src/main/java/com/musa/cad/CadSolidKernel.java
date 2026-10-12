@@ -354,6 +354,9 @@ public final class CadSolidKernel {
         if(mesh==null||output==null)throw new IOException("3B DXF hedefi eksik");
         try(BufferedWriter out=new BufferedWriter(new OutputStreamWriter(output,StandardCharsets.US_ASCII),65536)){
             out.write("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1027\n0\nENDSEC\n");
+            out.write("0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n"+
+                "0\nLAYER\n2\nMUSACAD_SOLID_MESH\n70\n0\n62\n7\n6\nCONTINUOUS\n"+
+                "0\nENDTAB\n0\nENDSEC\n");
             out.write("0\nSECTION\n2\nENTITIES\n");
             for(int f=0;f<mesh.triangles.length;f+=3){
                 FileTransfer.checkCancelled();
