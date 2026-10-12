@@ -45,15 +45,15 @@ public final class DxfXrefInventoryTest {
         check(summary.contains("MEP_REFERENCE")&&summary.contains("MEP/site.dwg"),"attached XREF visible in drawing detail");
         check(summary.contains("STRUCTURE_OVERLAY")&&summary.contains("[overlay]"),"overlay flag visible in drawing detail");
         check(summary.contains("yüklenmemiş")&&summary.contains("içeri aktarılmadı"),"do not claim external DWG was loaded");
-        String bidiContent=CONTENT.replace("MEP/site.dwg","MEP/\\u202Esite.dwg");
-        DxfBlocks.Result bidi=DxfBlocks.expand(Arrays.asList(bidiContent.split("\\n")));
-        check(!com.musa.cad.CadXrefSummary.describe(bidi.externalReferences).contains("\\u202E"),
+        String bidiContent=CONTENT.replace("MEP/site.dwg","MEP/"+((char)0x202E)+"site.dwg");
+        DxfBlocks.Result bidi=DxfBlocks.expand(Arrays.asList(bidiContent.split("\n")));
+        check(!com.musa.cad.CadXrefSummary.describe(bidi.externalReferences).contains(String.valueOf((char)0x202E)),
               "untrusted DXF paths must not inject bidi override into Android dialog");
-        StringBuilder many=new StringBuilder("0\\nSECTION\\n2\\nBLOCKS\\n");
-        for(int i=0;i<19;i++)many.append("0\\nBLOCK\\n2\\nXR").append(i)
-            .append("\\n70\\n4\\n1\\nfolder/ref").append(i).append(".dwg\\n0\\nENDBLK\\n");
-        many.append("0\\nENDSEC\\n0\\nSECTION\\n2\\nENTITIES\\n0\\nENDSEC\\n0\\nEOF\\n");
-        DxfBlocks.Result large=DxfBlocks.expand(Arrays.asList(many.toString().split("\\n")));
+        StringBuilder many=new StringBuilder("0\nSECTION\n2\nBLOCKS\n");
+        for(int i=0;i<19;i++)many.append("0\nBLOCK\n2\nXR").append(i)
+            .append("\n70\n4\n1\nfolder/ref").append(i).append(".dwg\n0\nENDBLK\n");
+        many.append("0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n");
+        DxfBlocks.Result large=DxfBlocks.expand(Arrays.asList(many.toString().split("\n")));
         String bounded=com.musa.cad.CadXrefSummary.describe(large.externalReferences);
         check(bounded.contains("7 ek referans")&&!bounded.contains("XR12 [attach]"),"XREF dialog must be bounded");
         System.out.println("XREF attachment, overlay and local-block preservation passed");
