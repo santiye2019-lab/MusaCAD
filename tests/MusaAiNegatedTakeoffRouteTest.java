@@ -36,7 +36,8 @@ public final class MusaAiNegatedTakeoffRouteTest {
             "Post-Qwen metraj should be opt-in and respect negatives");
         ok(main.contains("if(acceptedBatches>0)"),
             "No local detailed synthesis before cloud image results");
-        ok(main.contains("MusaAiEngineeringSynthesis.compose(synthesis)"),
+        ok(main.contains("MusaAiEngineeringSynthesis.composeDetailed(synthesis)") ||
+           main.contains("MusaAiEngineeringSynthesis.compose(synthesis)"),
             "Final response must be compiled from Qwen images and CAD evidence");
         System.out.println("MusaAiNegatedTakeoffRouteTest OK");
     }
