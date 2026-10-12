@@ -45,14 +45,20 @@ jobs:
           with urllib.request.urlopen(req) as resp: body=json.load(resp)
           if not body.get("success"): raise SystemExit("Cannot read live Worker settings")
           bindings=body.get("result",{}).get("bindings",[])
-          if bindings:
-              print("Production binding inventory (types and names only):")
-              for binding in bindings:
-                  print(" - type="+str(binding.get("type","unknown"))+" name="+str(binding.get("name","unknown")))
-              raise SystemExit("Production bindings detected. Deployment safely blocked; explicit binding-preserving deployment required.")
-          print("No bindings found; safe for bare script deploy with --keep-vars")
+          expected={
+              "AI_MAX_OUTPUT_TOKENS":"plain_text",
+              "AI_PROVIDER":"plain_text",
+              "GEMINI_API_KEY":"secret_text",
+              "GEMINI_API_MODE":"plain_text",
+              "GEMINI_MODEL":"plain_text",
+              "MUSACAD_AI_SESSION_PUBLIC_KEY_PEM":"secret_text",
+          }
+          actual={b.get("name"):b.get("type") for b in bindings}
+          if actual != expected:
+              raise SystemExit("Unexpected production binding inventory; deployment blocked.")
+          print("Expected six production bindings confirmed. Deploy will use --keep-vars.")
           PY
-      - name: Deploy production Worker (keep runtime vars)
+      - name: Deploy production Worker (preserve vars and secrets)
         working-directory: server/ai-worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -61,3 +67,19 @@ jobs:
       - name: Verify live health
         run: |
           curl --fail --silent --show-error https://musacad-ai.musacad2019.workers.dev/health
+      - name: Verify production bindings survived deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python3 - <<'PY'
+          import os,urllib.request,json
+          url="https://api.cloudflare.com/client/v4/accounts/"+os.environ["CLOUDFLARE_ACCOUNT_ID"]+"/workers/scripts/musacad-ai/settings"
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["CLOUDFLARE_API_TOKEN"]})
+          with urllib.request.urlopen(req) as resp: body=json.load(resp)
+          if not body.get("success"): raise SystemExit("Cannot verify production bindings")
+          expected={"AI_MAX_OUTPUT_TOKENS":"plain_text","AI_PROVIDER":"plain_text","GEMINI_API_KEY":"secret_text","GEMINI_API_MODE":"plain_text","GEMINI_MODEL":"plain_text","MUSACAD_AI_SESSION_PUBLIC_KEY_PEM":"secret_text"}
+          actual={b.get("name"):b.get("type") for b in body.get("result",{}).get("bindings",[])}
+          if actual != expected: raise SystemExit("CRITICAL: production bindings differ after deployment")
+          print("All six production bindings retained")
+          PY
