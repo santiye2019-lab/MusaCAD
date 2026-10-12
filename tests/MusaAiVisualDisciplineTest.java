@@ -83,7 +83,8 @@ public final class MusaAiVisualDisciplineTest {
         has(main,"synthesis.scope=scope");
         has(main,"MusaAiDisciplineAnalyzer.analyzeDiscipline(");
         has(main,"MusaAiDisciplineAnalyzer.analyzeAll(snapshot)");
-        has(main,"if(MusaAiVisualDiscipline.mechanicalScope(scope))");
+        has(main,"MusaAiVisualDiscipline.mechanicalScope(scope)");
+        has(main,"MusaAiDisciplinePlan.resolve(raw,reportScope)");
         has(main,"MusaAiEngineeringSynthesis.composeDetailed(synthesis)");
         System.out.println("MusaAiVisualDisciplineTest OK");
     }
