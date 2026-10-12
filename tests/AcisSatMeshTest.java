@@ -70,6 +70,11 @@ public final class AcisSatMeshTest {
         if(!repaired.complete||repaired.triangles.length!=complete.triangles.length||
            repaired.danglingReferences!=0)
             throw new AssertionError("Split SAB straight-curve identifier must be restored without new topology");
+        String[] brokenBody=records.clone();
+        brokenBody[1]=brokenBody[1].replace("$2", "$999");
+        AcisSatMesh.Result unsafe=AcisSatMesh.parseDxfChunks(List.of(implicitSat(brokenBody)));
+        if(!unsafe.hasGeometry()||unsafe.complete||unsafe.danglingReferences!=1)
+            throw new AssertionError("A visible face must not certify a body with dangling SAB refs");
         // A broken next-reference must not be closed with a fabricated line.
         records[8]=records[8].replace("$11 $7","$999 $7");
         AcisSatMesh.Result broken=AcisSatMesh.parseDxfChunks(List.of(implicitSat(records)));
