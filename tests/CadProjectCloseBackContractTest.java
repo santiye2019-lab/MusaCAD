@@ -54,6 +54,8 @@ public final class CadProjectCloseBackContractTest {
             "save callback restores captured project identity");
         verify(source.contains("selectedProject!=currentProject||!projects.contains(selectedProject)"),
             "picker callback must reject a stale or different active tab");
+        verify(source.contains("r==SAVE_DXF&&(c!=RESULT_OK||data==null||data.getData()==null)"),
+            "missing destination result clears pending save-close state");
         verify(source.contains("pendingDxfSaveProject=null;return;"),
             "cancelling Android document selection clears project identity");
         System.out.println("CAD multi-project close: Back cancels and does not discard unsaved work");
