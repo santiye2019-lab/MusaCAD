@@ -173,12 +173,11 @@ public final class Dxf3dMeshTest {
         // A visible LINE must not conceal a failed ACIS 3D body's absence.
         File file=File.createTempFile("mesh3d-missing-face-", ".dxf");
         try{
-            String sat="700 0 1 0 Missing ACIS\n"
-                +"-0 face $-1 $-1 $-1 $-1 $999 $-1 $-1 $1 forward single #\n"
-                +"-1 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #\n";
             String dxf="0\nSECTION\n2\nENTITIES\n"
                 +"0\nLINE\n10\n0\n20\n0\n30\n0\n11\n2\n21\n0\n31\n0\n"
-                +"0\n3DSOLID\n1\n"+sat
+                +"0\n3DSOLID\n1\n700 0 1 0 Missing ACIS\n"
+                +"3\n-0 face $-1 $-1 $-1 $-1 $999 $-1 $-1 $1 forward single #\n"
+                +"3\n-1 plane-surface $-1 0 0 0 0 0 1 1 0 0 forward_v I I I I #\n"
                 +"0\nENDSEC\n0\nEOF\n";
             Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
