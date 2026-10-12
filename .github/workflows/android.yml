@@ -128,6 +128,10 @@ jobs:
           java -cp /tmp/musacad-tests MusaAiEngineeringSynthesisTest
           java -cp /tmp/musacad-tests MusaAiVisualDisciplineTest
           java -cp /tmp/musacad-tests MusaAiDisciplinePlanTest
+      - name: Test discipline quantity evidence and uploaded YFK source candidates
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiDiscipline.java app/src/main/java/com/musa/cad/MusaAiVisualDiscipline.java app/src/main/java/com/musa/cad/MusaAiDisciplinePlan.java app/src/main/java/com/musa/cad/MusaAiDisciplineEstimate.java tests/MusaAiDisciplineEstimateTest.java
+          java -cp /tmp/musacad-tests MusaAiDisciplineEstimateTest
       - name: Test Turkish no-keşif intent does not bypass visual AI
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiDrawingIndex.java app/src/main/java/com/musa/cad/MusaAiAnalysisIntent.java app/src/main/java/com/musa/cad/MusaAiConversationalIntent.java tests/MusaAiNegatedTakeoffRouteTest.java
