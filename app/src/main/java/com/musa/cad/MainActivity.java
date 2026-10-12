@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
     private GridLayout toolPanelGrid;
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
-    private ProjectSession currentProject,pendingCloseAfterSave;
+    private ProjectSession currentProject,pendingCloseAfterSave,pendingDxfSaveProject;
     private AlertDialog projectCloseDialog;
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
@@ -4127,7 +4127,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
-        if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;pendingDxfSaveProject=null;return;}
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
             pendingYfk2025Reply=null;
@@ -4753,11 +4753,19 @@ public class MainActivity extends AppCompatActivity {
     private void requestEditedDxfSave(){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden kaydedilemez",Toast.LENGTH_SHORT).show();return;}if(!canEdit()){Toast.makeText(this,"Bu çizim DXF olarak düzenlenebilir durumda değil",Toast.LENGTH_SHORT).show();return;}
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");
+        pendingDxfSaveProject=currentProject;
         try{startActivityForResult(intent,SAVE_DXF);}
-        catch(Exception failure){pendingCloseAfterSave=null;error(failure);}
+        catch(Exception failure){pendingCloseAfterSave=null;pendingDxfSaveProject=null;error(failure);}
     }
 
     private void saveEditedDxf(Uri uri){
+        final ProjectSession selectedProject=pendingDxfSaveProject;
+        pendingDxfSaveProject=null;
+        if(selectedProject==null||selectedProject!=currentProject||!projects.contains(selectedProject)){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Dosya seçimi sırasında aktif CAD projesi değişti; kayıt engellendi",Toast.LENGTH_LONG).show();
+            return;
+        }
         // Never publish a different project's edits after returning from Android's document picker.
         if(pendingCloseAfterSave!=null&&currentProject!=pendingCloseAfterSave){
             pendingCloseAfterSave=null;
