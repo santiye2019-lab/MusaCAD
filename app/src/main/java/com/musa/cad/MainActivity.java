@@ -4272,9 +4272,6 @@ public class MainActivity extends AppCompatActivity {
                     task.progress.setText("DWG hızlı görünüm hazırlanıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     FileTransfer.checkCancelled();
-                    NativeCadEngine.Stats originalStats=engine.stats();
-                    loaded.sourceAcisEntities=originalStats.acisEntityCount;
-                    loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount;
                     NativeScene provisional=null;
                     try{provisional=engine.fastScene();}catch(Exception ignored){}
                     if(provisional!=null&&!provisional.hasSuspiciousBlueTint()&&!Thread.currentThread().isInterrupted()){
@@ -4322,6 +4319,11 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                     FileTransfer.checkCancelled();
+                    // Do not delay the native first paint by scanning DWG objects.
+                    // Source ACIS diagnostics are gathered after the preview handoff.
+                    NativeCadEngine.Stats originalStats=engine.stats();
+                    loaded.sourceAcisEntities=originalStats.acisEntityCount;
+                    loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount;
                     File converted=File.createTempFile("MusaCAD_donusen_",".dxf",getCacheDir());boolean keep=false;
                     try{
                         int status=engine.exportDxf(converted);FileTransfer.checkCancelled();
@@ -4383,7 +4385,7 @@ public class MainActivity extends AppCompatActivity {
                     if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
                     runOnUiThread(()->{
                         if(activeLoad==task)activeLoad=null;
-                        if(projects.contains(project)){project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){pendingHomeCategory=0;updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
+                        if(projects.contains(project)){project.sourceAcisEntities=loaded.sourceAcisEntities;project.sourceExternalAcisEntities=loaded.sourceExternalAcisEntities;project.prepareTask=null;project.preparingEditor=false;project.prepareError=message;if(currentProject==project){pendingHomeCategory=0;updateEditorEnabled(false);renderCurrentProjectStatus();Toast.makeText(this,"Hızlı görünüm açık; düzenleme modeli hazırlanamadı",Toast.LENGTH_LONG).show();}}
                     });
                 }else{
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
