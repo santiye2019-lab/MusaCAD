@@ -110,6 +110,47 @@ if(NOT ANDROID)
   endif()
 endif()
 
+# Test-only, opt-in R2018 ASM envelope compatibility in an isolated host build.
+# Original source DWGs are never edited. The pinned LibreDWG test checkout is
+# modified at configure time; OFF again requires a clean third-party checkout.
+option(MUSACAD_HOST_R2018_ASM_COMPAT
+  "EXPERIMENTAL: alias public R2018 ASM BinaryFile4 envelopes in a host-only build" OFF)
+if(ANDROID AND MUSACAD_HOST_R2018_ASM_COMPAT)
+  message(FATAL_ERROR
+    "Unvalidated R2018 ASM ACIS compatibility must never enter an Android APK")
+endif()
+if(NOT ANDROID AND MUSACAD_HOST_R2018_ASM_COMPAT)
+  set(_musa_asm_spec "${LIBREDWG_SOURCE}/src/acds.spec")
+  file(READ "${_musa_asm_spec}" _musa_asm_text)
+  set(_musa_asm_start_old "const char start[] = \"ACIS BinaryFile\";")
+  set(_musa_asm_start_new "const char start[] = \"ASM BinaryFile4\";")
+  set(_musa_asm_copy_old "memcpy (acis_sab_data, s, size);")
+  set(_musa_asm_copy_new [=[
+memcpy (acis_sab_data, s, size);
+            /* HOST TEST ONLY: identical 15-byte prefix alignment. */
+            memcpy (acis_sab_data, "ACIS BinaryFile", 15);
+]=])
+  string(FIND "${_musa_asm_text}" "${_musa_asm_start_old}" _musa_asm_start_pos)
+  string(FIND "${_musa_asm_text}" "${_musa_asm_start_new}" _musa_asm_patched_pos)
+  string(FIND "${_musa_asm_text}" "HOST TEST ONLY: identical 15-byte prefix alignment."
+    _musa_asm_copy_pos)
+  if(NOT _musa_asm_start_pos EQUAL -1 AND _musa_asm_copy_pos EQUAL -1)
+    string(FIND "${_musa_asm_text}" "${_musa_asm_copy_old}" _musa_asm_old_copy_pos)
+    if(_musa_asm_old_copy_pos EQUAL -1)
+      message(FATAL_ERROR "Pinned LibreDWG AcDs copy changed; refuse experimental R2018 patch")
+    endif()
+    string(REPLACE "${_musa_asm_start_old}" "${_musa_asm_start_new}"
+      _musa_asm_text "${_musa_asm_text}")
+    string(REPLACE "${_musa_asm_copy_old}" "${_musa_asm_copy_new}"
+      _musa_asm_text "${_musa_asm_text}")
+    file(WRITE "${_musa_asm_spec}" "${_musa_asm_text}")
+    message(STATUS "MusaCAD host test: R2018 ASM envelope alias enabled (not APK safe)")
+  elseif(_musa_asm_patched_pos EQUAL -1 OR _musa_asm_copy_pos EQUAL -1)
+    message(FATAL_ERROR
+      "Pinned LibreDWG AcDs signature changed; refuse unvalidated R2018 patch")
+  endif()
+endif()
+
 add_subdirectory("${LIBREDWG_SOURCE}" "libredwg")
 if(ANDROID)
   add_library(musacad_dwg SHARED dwg_bridge.c native_scene.c)
