@@ -65,8 +65,12 @@ static int scan_sab(const Dwg_Entity_3DSOLID *solid,int item){
       case 4: case 12: case 21: {
         if(at+4>n)goto invalid;
         uint32_t pointer=u32(b+at);at+=4;
-        ptrs++;if(pointer>largest)largest=pointer;
-        if(declared!=0&&pointer>=declared)outside++;
+        // Signed $-1 is the ordinary null-pointer marker in SAT/SAB.
+        // Exclude negative markers from missing-reference statistics.
+        if((int32_t)pointer>=0){
+          ptrs++;if(pointer>largest)largest=pointer;
+          if(declared!=0&&pointer>=declared)outside++;
+        }
         break;
       }
       case 2: if(!consume(b,n,&at,1))goto invalid;break;
