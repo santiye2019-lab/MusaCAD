@@ -67,7 +67,28 @@ if(NOT ANDROID)
           musa_starts++;
         if (musa_i + musa_al <= dat->size &&
             memcmp (&dat->chain[musa_i], musa_asm_binary, musa_al) == 0)
-          musa_asm_starts++;
+          {
+            musa_asm_starts++;
+            if (musa_asm_starts <= 5)
+              for (size_t musa_shift = 0; musa_shift <= 1; musa_shift++)
+                {
+                  size_t musa_at = musa_i + musa_al + musa_shift;
+                  if (musa_at > dat->size ||
+                      dat->size - musa_at < 16) continue;
+                  unsigned int musa_field[4] = {0};
+                  for (int musa_f = 0; musa_f < 4; musa_f++)
+                    {
+                      const unsigned char *p = &dat->chain[musa_at + musa_f*4];
+                      musa_field[musa_f] =
+                          (unsigned)p[0] | ((unsigned)p[1]<<8) |
+                          ((unsigned)p[2]<<16) | ((unsigned)p[3]<<24);
+                    }
+                  fprintf (stderr,
+                    "MUSACAD_PUBLIC_ASM_HEADER item=%zu shift=%zu version=%u records=%u entities=%u flags=%u\n",
+                    musa_asm_starts, musa_shift, musa_field[0],
+                    musa_field[1], musa_field[2], musa_field[3]);
+                }
+          }
         if (musa_i + musa_el <= dat->size &&
             memcmp (&dat->chain[musa_i], end, musa_el) == 0)
           musa_ends++;
