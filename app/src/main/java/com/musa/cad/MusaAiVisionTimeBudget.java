@@ -13,6 +13,9 @@ public final class MusaAiVisionTimeBudget {
     public static final long IDLE_NOTICE_MS=120_000L;
     public static final long SWEEP_START_DEADLINE_MS=480_000L;
     public static final long PANEL_HARD_DEADLINE_MS=720_000L;
+    /** Bounded ordinary text Q&A; never borrow the 12-minute image sweep cap. */
+    public static final long PANEL_CHAT_DEADLINE_MS=120_000L;
+    public static final long CHAT_IDLE_NOTICE_MS=25_000L;
 
     public static boolean mayStartNextBatch(long elapsedMs){
         return elapsedMs>=0L&&elapsedMs<SWEEP_START_DEADLINE_MS;
