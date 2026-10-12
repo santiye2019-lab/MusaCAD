@@ -176,7 +176,21 @@ jobs:
           cmake --build /tmp/musacad-host --parallel 2
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/example_2013.dwg /tmp/musacad-history-ab.dxf 2>/tmp/musacad-history-ab.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab.dxf --source-log /tmp/musacad-history-ab.log --require-source --require-external
-          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab.dxf --public-fixture-debug
+          java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab.dxf --public-fixture-debug | tee /tmp/musacad-history-ab-mesh.log
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          log=Path('/tmp/musacad-history-ab-mesh.log').read_text()
+          match=re.search(r'ACIS_REAL_DXF_MESH bodies=(\\d+) mesh=(\\d+) complete=(\\d+) partial=(\\d+) faces=(\\d+) tessellated=(\\d+) unsupported=(\\d+) triangles=(\\d+) edges=(\\d+) dangling=(\\d+)',log)
+          assert match, 'Experimental R2013 host B-Rep summary missing'
+          bodies,meshed,complete,partial,faces,tess,unsupported,triangles,edges,dangling=map(int,match.groups())
+          assert (bodies,meshed,faces)==(3,3,10), (bodies,meshed,faces)
+          assert tess>=8 and triangles>=16 and tess+unsupported==10, (tess,triangles,unsupported)
+          for body,records in ((1,27),(2,32),(3,134)):
+              phrase=f'ACIS_PUBLIC_RECORD_PARITY body={body} source_records={records} parsed_nodes={records} excess_records=0'
+              assert phrase in log, f'Historical SAB records absent from experimental SAT: {body}'
+          print('PASS: public R2013 SAB history preserved: 193 source records, 3 renderable bodies and 8+ faces')
+          PY
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-history-ab-cone.dxf 2>/tmp/musacad-history-ab-cone.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-cone.dxf --source-log /tmp/musacad-history-ab-cone.log --require-source
           java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-history-ab-cone.dxf
