@@ -20,7 +20,11 @@ import java.util.List;
  * batches before reporting complete coverage. Never uploads raw DWG bytes.
  */
 public final class MusaAiVisualEvidence {
-    public interface Progress {void onProgress(String text);}
+    public interface Progress {
+        void onProgress(String text);
+        /** Real rendered region count, independent of Qwen/model completion. */
+        default void onMeasured(String task,int completed,int total){onProgress(task);}
+    }
 
     private static final int TILE_SIDE=1200;
     private static final int OVERVIEW_SIDE=640;
@@ -135,7 +139,12 @@ public final class MusaAiVisualEvidence {
                 Math.min(worldA.y,worldB.y),Math.max(worldA.x,worldB.x),
                 Math.max(worldA.y,worldB.y)));
             images.put(one);
-            if(i>0)renderedTiles++;
+            if(i>0){
+                renderedTiles++;
+                if(progress!=null)progress.onMeasured(
+                    compact?"Küçük görsel bölgeler hazırlanıyor":"DWG görsel bölgeleri hazırlanıyor",
+                    begin+renderedTiles,MusaAiVisualSweepPlan.TILE_COUNT);
+            }
         }
 
         JSONObject payload=new JSONObject();
