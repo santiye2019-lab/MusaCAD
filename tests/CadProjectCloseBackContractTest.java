@@ -46,6 +46,16 @@ public final class CadProjectCloseBackContractTest {
             "original CAD source URI must not be truncated");
         verify(save.contains("pendingCloseAfterSave=null;return;"),
             "failure before export resets pending close flag");
+        verify(source.contains("currentProject,pendingCloseAfterSave,pendingDxfSaveProject"),
+            "DXF picker must retain source project identity");
+        verify(source.contains("pendingDxfSaveProject=currentProject;"),
+            "save document picker captures originating tab");
+        verify(source.contains("final ProjectSession selectedProject=pendingDxfSaveProject;"),
+            "save callback restores captured project identity");
+        verify(source.contains("selectedProject!=currentProject||!projects.contains(selectedProject)"),
+            "picker callback must reject a stale or different active tab");
+        verify(source.contains("pendingDxfSaveProject=null;return;"),
+            "cancelling Android document selection clears project identity");
         System.out.println("CAD multi-project close: Back cancels and does not discard unsaved work");
     }
 }
