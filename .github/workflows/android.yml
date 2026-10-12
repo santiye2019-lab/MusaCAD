@@ -796,21 +796,32 @@ jobs:
       # URLs are public routing information; provider credentials stay server-side.
       - name: Verify Gandalf connection configuration before assembling test APK
         env:
-          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL }}
-          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL }}
+          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL || 'https://musacad-ai.musacad2019.workers.dev/v1/analyze' }}
+          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL || 'https://musacad-trial-api.musacad2019.workers.dev/v1/ai/session' }}
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import os
           from urllib.parse import urlsplit
+          trusted_roots={
+              'MUSACAD_AI_API_URL':'https://musacad-ai.musacad2019.workers.dev',
+              'MUSACAD_AI_SESSION_URL':'https://musacad-trial-api.musacad2019.workers.dev'
+          }
           for name, suffix in [
               ('MUSACAD_AI_API_URL', '/v1/analyze'),
               ('MUSACAD_AI_SESSION_URL', '/v1/ai/session')]:
               val=os.environ.get(name,'').strip()
+              # Historical GitHub variable sometimes held only the worker
+              # origin and posted to '/', which produces an HTTP 404.
+              # Complete a missing path ONLY for the already-known Worker host.
+              if val.rstrip('/')==trusted_roots[name]:
+                  val=trusted_roots[name]+suffix
               parsed=urlsplit(val)
               if parsed.scheme!='https' or not parsed.hostname or not parsed.path.endswith(suffix) or parsed.username or parsed.password or parsed.query or parsed.fragment:
                   raise SystemExit(f'::error::{name} is missing or is not a valid Gandalf HTTPS endpoint. No unusable APK will be published.')
+              with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as output:
+                  output.write(name+'='+val+'\\n')
           print('Both Gandalf AI endpoint configurations are present and URL-safe.')
           PY
           # Same health path the actual Android indicator checks; checking
@@ -829,9 +840,6 @@ jobs:
           fi
           echo "Existing Gandalf AI gateway health returned HTTP 200."
       - name: Build developer test APK with existing Gandalf configuration (no production deployment)
-        env:
-          MUSACAD_AI_API_URL: ${{ secrets.MUSACAD_AI_API_URL || vars.MUSACAD_AI_API_URL }}
-          MUSACAD_AI_SESSION_URL: ${{ secrets.MUSACAD_AI_SESSION_URL || vars.MUSACAD_AI_SESSION_URL }}
         shell: bash
         run: |
           set -euo pipefail
