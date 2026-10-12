@@ -18,10 +18,18 @@ public final class NativeCadEngine implements AutoCloseable {
         public final long objectCount,entityCount,coreEntityCount,unsupportedEntityCount;
         public final long lineCount,circleCount,arcCount,lwPolylineCount,polyline2dCount,pointCount;
         public final long dwgVersion;
+        /** Original DWG ACIS solids/regions/bodies; this is not a geometry count. */
+        public final long acisEntityCount;
+        /** R2013+ ACIS entities whose shapes reside in external AcDs records. */
+        public final long acisExternalDataCount;
+        /** Such files need a validated AcDs-capable decoder, not DXF-only inference. */
+        public boolean needsAcisDataBridge(){return acisExternalDataCount>0;}
         private Stats(long[] v){
             if(v==null||v.length<12)throw new IllegalStateException("Native CAD istatistikleri alınamadı");
             readWarnings=(int)v[0];objectCount=v[1];entityCount=v[2];coreEntityCount=v[3];unsupportedEntityCount=v[4];
             lineCount=v[5];circleCount=v[6];arcCount=v[7];lwPolylineCount=v[8];polyline2dCount=v[9];pointCount=v[10];dwgVersion=v[11];
+            acisEntityCount=v.length>=14?v[12]:0;
+            acisExternalDataCount=v.length>=14?v[13]:0;
         }
         public boolean coreOnly(){return entityCount>0&&unsupportedEntityCount==0;}
         public double coreCoverage(){return entityCount<=0?0d:Math.min(1d,Math.max(0d,coreEntityCount/(double)entityCount));}
