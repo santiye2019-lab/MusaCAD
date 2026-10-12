@@ -138,6 +138,28 @@ public final class AcisDxfRoundTripProbe {
             }
             System.out.printf("ACIS_PUBLIC_FACE body=%d id=%d surface=%s loop_count=%d loop_paths=%s%n",
                 body,faceId,surfaceName,loops.size(),paths);
+            if(loops.size()==2&&"plane-surface".equals(surfaceName)){
+                // Exact contour vertices ONLY for pinned PUBLIC upstream fixture.
+                for(Object loop:loops){
+                    Object path=build.invoke(null,nodes,loop);
+                    java.lang.reflect.Field points=path.getClass().getDeclaredField("points");
+                    points.setAccessible(true);
+                    java.util.List<?> vertices=(java.util.List<?>)points.get(path);
+                    StringBuilder coords=new StringBuilder();
+                    for(Object vec:vertices){
+                        Class<?> vclass=vec.getClass();
+                        java.lang.reflect.Field fx=vclass.getDeclaredField("x");
+                        java.lang.reflect.Field fy=vclass.getDeclaredField("y");
+                        java.lang.reflect.Field fz=vclass.getDeclaredField("z");
+                        fx.setAccessible(true);fy.setAccessible(true);fz.setAccessible(true);
+                        if(coords.length()>0)coords.append(';');
+                        coords.append(String.format(java.util.Locale.ROOT,"%.6f,%.6f,%.6f",
+                            fx.getDouble(vec),fy.getDouble(vec),fz.getDouble(vec)));
+                    }
+                    System.out.printf("ACIS_PUBLIC_MULTILOOP_COORD body=%d face=%d loop=%d xyz=%s%n",
+                        body,faceId,id.get(loop),coords);
+                }
+            }
         }
 
         int pointsInLoops=0,nonEmptyLoops=0,nonEmptyEdges=0;
