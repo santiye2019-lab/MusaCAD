@@ -197,6 +197,50 @@ public final class CadSolidKernel {
         return b.build();
     }
 
+    /**
+     * LOFT between 2+ ordered XY contours with one-to-one vertex correspondence.
+     * Contours must have the same point count and winding, with ascending Z.
+     * Rejects insufficient/degenerate profiles; complex intersecting lofts
+     * should be checked by engineering tools before manufacture.
+     */
+    public static Mesh loft(double[][] contours,double[] heights)throws IOException{
+        if(contours==null||heights==null||contours.length<2
+            ||contours.length!=heights.length||contours.length>256)
+            throw new IOException("LOFT için en az iki kesit ve her kesitin kotu gerekir");
+        int n=contours[0].length/2;
+        if((long)n*contours.length>MAX_POINTS)throw new IOException("LOFT model köşe sınırı aşıldı");
+        boolean ccw=area(contours[0])>0d;
+        for(int k=0;k<contours.length;k++){
+            checkPolygon(contours[k]);
+            if(contours[k].length/2!=n||ccw!=(area(contours[k])>0d))
+                throw new IOException("LOFT kesitlerin nokta sayısı/yönü eşleşmiyor");
+            if(!Double.isFinite(heights[k])||
+                (k>0&&heights[k]<=heights[k-1]))
+                throw new IOException("LOFT kotları artan sırada olmalıdır");
+        }
+        // Distinct triangulated end-caps, not a fake bounding-box extrusion.
+        int[] bottomFaces=caps(contours[0]),topFaces=caps(contours[contours.length-1]);
+        Builder b=new Builder();
+        int[][] rings=new int[contours.length][n];
+        for(int k=0;k<contours.length;k++)for(int i=0;i<n;i++)
+            rings[k][i]=b.vertex(contours[k][i*2],contours[k][i*2+1],heights[k]);
+        for(int i=0;i<bottomFaces.length;i+=3){
+            int a=bottomFaces[i],d=bottomFaces[i+1],e=bottomFaces[i+2];
+            b.triangle(rings[0][a],rings[0][e],rings[0][d]);
+        }
+        int last=rings.length-1;
+        for(int i=0;i<topFaces.length;i+=3){
+            int a=topFaces[i],d=topFaces[i+1],e=topFaces[i+2];
+            b.triangle(rings[last][a],rings[last][d],rings[last][e]);
+        }
+        for(int k=0;k+1<rings.length;k++)for(int i=0;i<n;i++){
+            int j=(i+1)%n;
+            if(ccw)b.quad(rings[k][i],rings[k][j],rings[k+1][j],rings[k+1][i]);
+            else b.quad(rings[k][j],rings[k][i],rings[k+1][i],rings[k+1][j]);
+        }
+        return b.build();
+    }
+
     public static final class Box {
         public final double[] min,max;
         public Box(double x0,double y0,double z0,double x1,double y1,double z1)throws IOException{
