@@ -60,13 +60,31 @@ public final class MusaAiPanelContractTest {
             throw new AssertionError("Legacy command chips must not replace natural conversation");
         require(panel,"Gandalf dinliyor","Gandalf voice status");
         require(icon,"<vector","AI vector icon");
-        require(panel,"timeoutHandler.postDelayed(timeout,MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS)","Hard deadline always ends abandoned requests");
-        require(panel,"timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS)","Long Qwen inference remains nonterminal");
+        require(panel,"timeoutHandler.postDelayed(timeout,hardDeadlineMs)","Per-request deadline for abandoned requests");
+        require(panel,"MusaAiVisionTimeBudget.PANEL_CHAT_DEADLINE_MS","Short ordinary Q&A deadline");
+        require(panel,"MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS","Long CAD vision deadline");
+        require(panel,"timeoutHandler.postDelayed(idleNotice,idleDelayMs)","Per-request nonterminal idle progress");
+        require(panel,"isInformationalQuestion(prompt)","Voice definitions must not use visual analysis timeout");
+        require(panel,"Sohbet yanıtı 2 dakikalık süre sınırını aştı","Do not show 9/9 after an ordinary text Q&A delay");
         require(panel,"timeoutHandler.removeCallbacks(idleNotice)","Cleanup of idle notices on completion");
         require(panel,"if(completed.get())return;","Idle notice must not override completed responses");
         require(panel,"completed.compareAndSet(false,true)","only first terminal reply can update request");
         require(panel,"@Override public void progress","intermediate cloud state visible to user");
 
+        require(panel,"ProgressBar taskBar","visible live progress indicator");
+        require(panel,"progressMeasured(String task,int completed,int total)","measured progress callback");
+        require(panel,"progressWaiting(String task)","unmeasurable remote model wait");
+        require(panel,"100L*count","accurate bounded percentages");
+        require(panel,"taskBar.setIndeterminate(true)","no misleading percentages during model wait");
+        require(panel,"taskElapsed.setText","elapsed wait and heartbeat");
+        require(panel,"timeoutHandler.removeCallbacks(progressTicker[0])","progress timer cleanup");
+        require(main,"reply.progressMeasured(\"Qwen yanıtı alınan genel bölgeler\"","actual server response coverage");
+        require(main,"reply.progressWaiting(\"Qwen görsel yanıtı bekleniyor","show inference wait separately");
+        require(main,"MusaAiVisualEvidence.Progress visualProgress","rendered region progress bridge");
+        String vision=read("app/src/main/java/com/musa/cad/MusaAiVisualEvidence.java");
+        require(vision,"progress.onMeasured(","confirm each rendered tile rather than guessing");
+        require(main,"chatExecutor.submit(","General cloud Q&A cannot queue behind visual Qwen");
+        require(main,"handleCloudChatWithoutDrawing(raw,recentContext,reply);","Definition route uses independent chat");
         System.out.println("MusaCAD AI panel contract OK.");
     }
 }

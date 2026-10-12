@@ -44,6 +44,31 @@ public final class MusaAiConversationalIntent {
                 q.equals("pdf olarak goruntule")||q.equals("pdf ac")||
                 q.equals("pdf goster"));
     }
+    /**
+     * Definition/explanation requests are natural chat, not a DWG inspection.
+     * Keep project-relative engineering questions on their original CAD route.
+     * This applies equally to keyboard and Android speech recognition.
+     */
+    public static boolean isInformationalQuestion(String raw){
+        String q=MusaAiDrawingIndex.normalize(raw);
+        if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(raw))return false;
+        if(q.contains("bu projede")||q.contains("bu cizimde")||
+           q.contains("bu paftada")||q.contains("acik projede")||
+           q.contains("acik cizimde")||q.contains("cizimdeki")||
+           q.contains("paftadaki")||q.contains("projedeki")||
+           q.contains("projemde")||q.contains("dwg dosyasinda")||
+           q.contains("cad dosyasinda"))return false;
+        if(MusaAiAnalysisIntent.isVisionFirstReview(raw)||
+           MusaAiAnalysisIntent.isCombinedVisualReview(raw))return false;
+        if(editLike(q)||isGenericBoq(q)||isGenericTakeoff(q))return false;
+        boolean asksDefinition=q.endsWith(" nedir")||q.equals("nedir")||
+            q.endsWith(" ne demek")||q.contains(" ne anlama gelir")||
+            q.endsWith(" ne ise yarar")||q.endsWith(" ne ise yariyor")||
+            q.endsWith(" nasil yapilir")||q.endsWith(" nasil calisir")||
+            q.endsWith(" neden olur")||q.endsWith(" aciklar misin")||
+            q.endsWith(" anlatir misin")||q.endsWith(" acikla");
+        return asksDefinition;
+    }
     public static boolean shouldCloudInterpret(String raw){
         String q=MusaAiDrawingIndex.normalize(raw);
         if(q.isEmpty()||MusaAiAnalysisIntent.isLocalOnly(raw))return false;

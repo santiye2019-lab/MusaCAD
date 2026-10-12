@@ -39,6 +39,23 @@ public final class MusaAiConversationalIntentTest {
             "Şu kapıyı sil"),"Ambiguous edits cannot cloud-execute");
         check(MusaAiConversationalIntent.shouldCloudInterpret(
             "Bu tesisatın teknik eksiklerini açıklar mısın?"),"Open question reaches consent gate");
+        for(String question:new String[]{
+            "Analiz sonuçlarını doğrulamak nedir?",
+            "Gandalf, analiz sonuçlarını doğrulamak nedir",
+            "Hidrofor ne işe yarar?",
+            "Statik proje analizi nedir?",
+            "VRF nasıl çalışır?"
+        })check(MusaAiConversationalIntent.isInformationalQuestion(question),
+            "Definition must be general text chat: "+question);
+        for(String engineering:new String[]{
+            "Bu projede eksik var mı?",
+            "Bu çizimde analiz et",
+            "Bu paftada hidrofor nedir?",
+            "Projeyi görsel analiz et",
+            "Projeden keşif oluştur",
+            "Bu proje için 9 bölgeyi Qwen ile analiz et"
+        })check(!MusaAiConversationalIntent.isInformationalQuestion(engineering),
+            "Do not hijack project/CAD review: "+engineering);
         System.out.println("MusaAiConversationalIntentTest OK");
     }
 }

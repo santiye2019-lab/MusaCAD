@@ -58,6 +58,15 @@ public final class MusaAiProjectPackageTest {
         }
         if(!proximity)throw new AssertionError("expected proximity");
         if(!unknownUnit)throw new AssertionError("expected unknown-unit finding");
+        // A discipline appearing only after item 12,000 must still be detected.
+        ArrayList<MusaAiDrawingIndex.Item> lateItems=new ArrayList<>();
+        for(int i=0;i<12000;i++)lateItems.add(new MusaAiDrawingIndex.Item(i+1,"LINE","0",""));
+        for(int i=0;i<5;i++)lateItems.add(new MusaAiDrawingIndex.Item(12001+i,"TEXT","0","ELEKTRIK PANO KABLO"));
+        MusaAiDrawingIndex lateIndex=new MusaAiDrawingIndex("Model",lateItems.size(),0,
+            Arrays.asList("0"),Arrays.asList("0"),lateItems,"mm");
+        MusaAiProjectPackage.Drawing late=new MusaAiProjectPackage.Drawing(
+            "unclassified.dwg",lateIndex,null);
+        eq(late.discipline,MusaAiDiscipline.ELECTRICAL,"late-index discipline");
         System.out.println("MusaAiProjectPackageTest OK");
     }
 }
