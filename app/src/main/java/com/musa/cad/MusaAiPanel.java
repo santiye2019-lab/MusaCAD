@@ -257,6 +257,18 @@ public final class MusaAiPanel {
                 if(previousTurns.length()+turn.length()>2600)continue;
                 previousTurns.append(turn).append("\\n");
             }
+            // The 12-minute cap belongs exclusively to an explicit DWG visual
+            // engineering review. Spoken definitions use an ordinary chat cap.
+            final boolean imageReview=!MusaAiConversationalIntent.isInformationalQuestion(prompt)&&
+                (MusaAiAnalysisIntent.isVisionFirstReview(prompt)||
+                 MusaAiAnalysisIntent.isReview(prompt)||
+                 MusaAiAnalysisIntent.isCombinedVisualReview(prompt));
+            final long hardDeadlineMs=imageReview
+                ?MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS
+                :MusaAiVisionTimeBudget.PANEL_CHAT_DEADLINE_MS;
+            final long idleDelayMs=imageReview
+                ?MusaAiVisionTimeBudget.IDLE_NOTICE_MS
+                :MusaAiVisionTimeBudget.CHAT_IDLE_NOTICE_MS;
             final Handler timeoutHandler=new Handler(Looper.getMainLooper());
             final long startedMs=android.os.SystemClock.elapsedRealtime();
             final long[] lastProgressMs={startedMs};
@@ -292,13 +304,24 @@ public final class MusaAiPanel {
                 timeoutHandler.removeCallbacks(idleNotice);
                 timeoutHandler.removeCallbacks(progressTicker[0]);
                 taskProgress.setVisibility(View.GONE);
-                pending.setText("Gandalf • 12 dakikalık toplam analiz sınırına ulaşıldı. "+
-                    "Bu mesaj 9/9 görsel incelemenin tamamlandığını göstermez. "+
-                    "Çizime müdahale edilmedi. Eksik bölgeler doğrulanmış kabul edilmez.");
+                if(imageReview){
+                    pending.setText("Gandalf • 12 dakikalık toplam analiz sınırına ulaşıldı. "+
+                        "Bu mesaj 9/9 görsel incelemenin tamamlandığını göstermez. "+
+                        "Çizime müdahale edilmedi. Eksik bölgeler doğrulanmış kabul edilmez.");
+                }else{
+                    pending.setText("Gandalf • Sohbet yanıtı 2 dakikalık süre sınırını aştı. "+
+                        "DWG görsel taraması yapılmadı. Sunucu yanıtı gecikti; yeniden deneyebilirsiniz.");
+                }
+                // A green /health from an earlier call does not prove THIS
+                // model request returned successfully.
+                lastCloudFailure[0]="Yanıt zaman aşımı: "+(imageReview?"görsel inceleme":"genel sohbet");
+                state.setText("● İstek zaman aşımı");
+                state.setTextColor(0xFFFFA7A7);
+                state.setBackground(round(activity,0xFF4C2428,16,0));
                 scrollBottom(messagesScroll);
             };
-            timeoutHandler.postDelayed(timeout,MusaAiVisionTimeBudget.PANEL_HARD_DEADLINE_MS);
-            timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
+            timeoutHandler.postDelayed(timeout,hardDeadlineMs);
+            timeoutHandler.postDelayed(idleNotice,idleDelayMs);
             Reply requestReply=new Reply(){
                 @Override public void send(String text){
                     activity.runOnUiThread(()->{
@@ -357,7 +380,7 @@ public final class MusaAiPanel {
                 private void applyStage(String stage,boolean known,int done,int total){
                     if(completed.get())return;
                     timeoutHandler.removeCallbacks(idleNotice);
-                    timeoutHandler.postDelayed(idleNotice,MusaAiVisionTimeBudget.IDLE_NOTICE_MS);
+                    timeoutHandler.postDelayed(idleNotice,idleDelayMs);
                     taskStage[0]=stage==null?"İşleniyor":stage.trim();
                     measured[0]=known;
                     lastProgressMs[0]=android.os.SystemClock.elapsedRealtime();
