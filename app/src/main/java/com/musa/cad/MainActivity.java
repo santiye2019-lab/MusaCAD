@@ -79,14 +79,14 @@ public class MainActivity extends AppCompatActivity {
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff,threeDOnly;
         List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,threeDOnly;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
@@ -4206,8 +4206,13 @@ public class MainActivity extends AppCompatActivity {
                     loaded.parsed=DxfParser.render(loaded.file,!largeDxf);
                     loaded.workingDxf=loaded.file;
                     loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
-                    if(loaded.parsed==null||loaded.parsed.entityCount<=0)
+                    if(loaded.parsed==null||loaded.parsed.entityCount<=0){
+                        if(prepare3dOnly(loaded,loaded.file)){
+                            handOff3dOnly(loaded,task);
+                            return;
+                        }
                         throw new IOException("Desteklenen DXF geometrisi bulunamadı");
+                    }
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
@@ -4279,8 +4284,14 @@ public class MainActivity extends AppCompatActivity {
                         // Rendering a 1200px bitmap of every CAD entity before open
                         // doubles work for large projects; direct vectors are authoritative.
                         DxfParser.Result parsed=DxfParser.render(converted,false);
-                        if(parsed==null||parsed.entityCount<=0)
-                            throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
+                        if(parsed==null||parsed.entityCount<=0){
+                            if(prepare3dOnly(loaded,converted)){
+                                keep=true;
+                                handOff3dOnly(loaded,task);
+                                return;
+                            }
+                            throw new IOException("DWG içinde desteklenen 2B/3B geometri bulunamadı");
+                        }
                         parsed.conversionWarnings=status;
                         loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
                     }finally{if(!keep)converted.delete();}
@@ -4330,6 +4341,71 @@ public class MainActivity extends AppCompatActivity {
                     loaded.dispose();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e instanceof Exception?(Exception)e:new IOException("Bu çizim için yeterli bellek yok"));});
                 }
             }
+        });
+    }
+
+    /**
+     * Only used after the normal 2D parser has returned no displayable geometry.
+     * This is a real 3D geometry check, not a fallback bounding-box substitute.
+     * 3D-only projects retain their work file until the tab is closed.
+     */
+    private boolean prepare3dOnly(Loaded loaded,File workingDxf)throws IOException{
+        FileTransfer.checkCancelled();
+        Dxf3dMesh mesh;
+        try{mesh=Dxf3dMesh.read(workingDxf);}
+        catch(IOException invalidOrUnsupported){return false;}
+        FileTransfer.checkCancelled();
+        if(!mesh.canOpenWithout2d())return false;
+        loaded.threeDOnly=true;
+        loaded.workingDxf=workingDxf;
+        return true;
+    }
+
+    private void handOff3dOnly(Loaded loaded,LoadTask task){
+        runOnUiThread(()->{
+            if(isFinishing()||isDestroyed()){loaded.dispose();return;}
+            ProjectSession project=loaded.project;
+            if(project==null){
+                if(activeLoad!=task){loaded.dispose();return;}
+                project=new ProjectSession();
+                project.sourceUri=loaded.sourceUri;
+                project.file=loaded.file;
+                project.name=loaded.name;
+                project.dxf=loaded.dxf;
+                project.lastAccessMs=System.currentTimeMillis();
+                project.persistedImages.addAll(loaded.imageOverlays);
+                projects.add(project);
+                loaded.project=project;
+                loaded.handedOff=true;
+            }else if(!projects.contains(project)){
+                loaded.dispose();
+                return;
+            }
+            project.threeDOnly=true;
+            project.workingDxf=loaded.workingDxf;
+            project.parsed=null;
+            project.bitmap=null;
+            project.preparingEditor=false;
+            project.prepareTask=null;
+            project.prepareError=null;
+            if(activeLoad==task)activeLoad=null;
+            if(task.dialog!=null&&task.dialog.isShowing())task.dialog.dismiss();
+            // A project may have been switched while LibreDWG was converting.
+            if(currentProject!=project)activateProject(project);
+            else{
+                activeDxf=null;
+                editingBaseDxf=loaded.workingDxf;
+                cad.setDrawing(null);
+                updateEditorEnabled(false);
+                updateLayerButtons(false);
+                renderCurrentProjectStatus();
+                refreshProjectTabs();
+            }
+            project.savedFingerprint=cad.editFingerprint();
+            project.baselineSet=true;
+            project.dirty=false;
+            if(currentProject==project)open3d(Mesh3dActivity.MODE_ISO);
+            scheduleRecentMetadataRecord(loaded.sourceUri,loaded.name);
         });
     }
 
@@ -4522,7 +4598,8 @@ public class MainActivity extends AppCompatActivity {
         if(project==currentProject){refreshProjectTabs();return;}
         captureCurrentProject();
         currentProject=project;currentFile=project.file;editingBaseDxf=project.workingDxf;activeDxf=project.parsed;currentDisplayName=project.name==null?"cizim.dwg":project.name;project.lastAccessMs=System.currentTimeMillis();
-        if(project.viewState!=null){
+        if(project.threeDOnly){cad.setDrawing(null);}
+        else if(project.viewState!=null){
             if(project.parsed!=null)cad.restoreSessionState(project.parsed,project.nativeScene,null,project.viewState);
             else if(project.nativeScene!=null)cad.restoreNativeSessionState(project.nativeScene,project.viewState);
             else cad.restoreSessionState(null,project.bitmap,project.viewState);
@@ -4537,9 +4614,11 @@ public class MainActivity extends AppCompatActivity {
     private void renderCurrentProjectStatus(){
         if(currentProject==null){fileName.setText("Henüz proje açılmadı");result.setText("Hazır");return;}
         String editable=canEdit()?"  •  düzenlenebilir":"";
-        String mode=currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
+        String mode=currentProject.threeDOnly?"  •  3B Model":currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
         fileName.setText(currentDisplayName+mode+editable);
-        if(activeDxf!=null){
+        if(currentProject.threeDOnly){
+            result.setText("3B proje hazır • gerçek 3B geometri algılandı • 2B çizim verisi yok • 3B Araçları ile açın");
+        }else if(activeDxf!=null){
             String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
             String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
