@@ -129,7 +129,7 @@ int main(int argc,char **argv){
      * No payload bytes, drawing contents or user identifiers are logged.
      */
     MusaCadStats source=session_stats(session);
-    fprintf(stderr,"MUSACAD_ACIS_SOURCE=%lld EXTERNAL=%lld\\n",
+    fprintf(stderr,"MUSACAD_ACIS_SOURCE=%lld EXTERNAL=%lld\n",
             source.acis_entity_count,source.acis_external_data_count);
     MusaNativeScene scene={0};
     int scene_status=musa_scene_build(session->dwg,&scene);
