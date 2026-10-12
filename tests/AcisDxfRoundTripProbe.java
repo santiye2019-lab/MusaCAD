@@ -111,6 +111,35 @@ public final class AcisDxfRoundTripProbe {
         sample.setAccessible(true);
         java.lang.reflect.Method build=AcisSatMesh.class.getDeclaredMethod("buildLoop",java.util.Map.class,nodeClass);
         build.setAccessible(true);
+        // Public R2013 fixture: establish which two source faces fail, and
+        // distinguish missing loop topology from unsupported surfaces. Only
+        // record IDs, surface classes and vertex COUNTS are logged.
+        java.lang.reflect.Method loopsForFace=AcisSatMesh.class.getDeclaredMethod(
+            "loopsForFace",java.util.Map.class,int.class);
+        loopsForFace.setAccessible(true);
+        java.lang.reflect.Method surfaceOfFace=AcisSatMesh.class.getDeclaredMethod(
+            "firstRefBySuffix",nodeClass,java.util.Map.class,String.class);
+        surfaceOfFace.setAccessible(true);
+        for(Object faceNode:nodes.values()){
+            if(!"face".equals(type.get(faceNode)))continue;
+            int faceId=(Integer)id.get(faceNode);
+            @SuppressWarnings("unchecked")
+            java.util.List<?> loops=(java.util.List<?>)loopsForFace.invoke(null,nodes,faceId);
+            Object surface=surfaceOfFace.invoke(null,faceNode,nodes,"-surface");
+            String surfaceName=surface==null?"UNRESOLVED":(String)type.get(surface);
+            java.util.ArrayList<String> paths=new java.util.ArrayList<>();
+            for(Object loop:loops){
+                Object path=build.invoke(null,nodes,loop);
+                java.lang.reflect.Field points=path.getClass().getDeclaredField("points");
+                java.lang.reflect.Field exact=path.getClass().getDeclaredField("exact");
+                points.setAccessible(true);exact.setAccessible(true);
+                paths.add(id.get(loop)+":"+((java.util.List<?>)points.get(path)).size()+
+                    ":"+(Boolean)exact.get(path));
+            }
+            System.out.printf("ACIS_PUBLIC_FACE body=%d id=%d surface=%s loop_count=%d loop_paths=%s%n",
+                body,faceId,surfaceName,loops.size(),paths);
+        }
+
         int pointsInLoops=0,nonEmptyLoops=0,nonEmptyEdges=0;
         int inspected=0;
         java.util.ArrayList<Integer> sampleIds=new java.util.ArrayList<>();
