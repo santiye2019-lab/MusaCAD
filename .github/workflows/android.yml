@@ -758,3 +758,38 @@ jobs:
           path: |
             /tmp/musa-native/musacad_dwg_convert
             /tmp/MusaCAD-source.tar.gz
+
+  build-tested-apk:
+    name: Build isolated test APK after quality gate
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/gandalf-cad-paged-evidence-20261012' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build developer test APK (no production signing or deployment)
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDirectDebug
+          test -s app/build/outputs/apk/direct/debug/app-direct-debug.apk
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusaCAD-Gandalf-TEST-APK
+          path: app/build/outputs/apk/direct/debug/app-direct-debug.apk
+          if-no-files-found: error
+          retention-days: 7
