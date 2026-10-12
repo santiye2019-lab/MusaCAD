@@ -105,7 +105,7 @@ public final class MusaAiVisualDiscipline {
 
     public static boolean mechanicalScope(String scope){
         return "mechanical".equals(scope)||"sanitary".equals(scope)||
-            "wastewater".equals(scope)||"fire".equals(scope)||
+            "wastewater".equals(scope)||
             "ventilation".equals(scope)||"heating".equals(scope)||
             "cooling".equals(scope)||"gas".equals(scope);
     }
