@@ -110,8 +110,11 @@ public final class AcisSatMesh {
             if(ok)tessellated++;else unsupported++;
         }
 
-        // Wire bodies / partially supported topology can have ACIS edges without faces.
-        if(faces.isEmpty()){
+        // Some legitimate SAT files contain faces whose loops/surfaces we
+        // cannot resolve, yet still expose real vertex/edge geometry.
+        // Keep those source edges as wireframe ONLY if no face yielded points.
+        // Never synthesize a filled face or mark the B-Rep as complete.
+        if(faces.isEmpty()||mesh.pointCount()==0){
             Set<Integer> seen=new HashSet<>();
             for(Node edge:nodesByType(nodes,"edge")){
                 EdgePath p=sampleEdge(nodes,edge,false);
