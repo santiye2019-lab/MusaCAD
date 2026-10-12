@@ -92,6 +92,7 @@ public final class MusaAiEngineeringSynthesisTest {
         MusaAiEngineeringSynthesis.Input noVisual=input();
         noVisual.reviewedTiles=0;noVisual.visualGroups.clear();
         noVisual.visualIssue="Worker DNS çözümlenemedi";
+        noVisual.auditScopeList="İSTENEN DİSİPLİN VE ALT SİSTEM DENETİMLERİ\n• Isıtma\n• Klima";
         noVisual.includeTakeoff=true;
         noVisual.quantityEvidence="Sahte imalat metrajı 103 m";
         String missing=MusaAiEngineeringSynthesis.compose(noVisual);
@@ -101,6 +102,8 @@ public final class MusaAiEngineeringSynthesisTest {
         notContains(missing,"Sahte imalat");
         notContains(missing,"Hidrofor [kaynak 184]");
         notContains(missing,"YEREL DWG ÇAPRAZ KONTROLÜ");
+        notContains(missing,"İSTENEN DİSİPLİN VE ALT SİSTEM DENETİMLERİ");
+        notContains(missing,"• Isıtma");
         String detailed=MusaAiEngineeringSynthesis.composeDetailed(d);
         contains(detailed,"\n\n8. TAM BULGU EKİ");
         notContains(detailed,"\\n\\n8. TAM BULGU EKİ");
