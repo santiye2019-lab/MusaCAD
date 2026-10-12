@@ -187,6 +187,9 @@ jobs:
           assert 'vectorDrawing.drawVectorNavigation(c,imageMatrix' in view
           assert 'vectorDrawing.drawVector(c,imageMatrix' in view
           assert 'drawEdits(c);drawLiveFreehand(c)' in view
+          assert 'drawViewportModelsIndexed(canvas,navigationPaint,navigationCombined,hiddenIds)' in parser
+          assert 'viewportModelIndex.draw(canvas,paint,modelToScreen,visibleWorld,hiddenIds' in parser
+          assert 'drawViewportModels(canvas,paint,combined,document,activeLayout,visibleLayerKeys,true,monochrome' in parser
           print('PASS: low-allocation navigation, final vector and drawing overlay retained')
           PY
       - name: Compile Android app Java without building an APK
