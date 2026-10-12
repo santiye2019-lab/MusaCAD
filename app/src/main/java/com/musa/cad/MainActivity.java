@@ -2162,6 +2162,13 @@ public class MainActivity extends AppCompatActivity {
             "; birim: "+snapshot.unitName+
             ". CAD etiketi tek başına görsel doğrulama değildir.";
         final int total=MusaAiVisualSweepPlan.TILE_COUNT;
+        final MusaAiVisualEvidence.Progress visualProgress=new MusaAiVisualEvidence.Progress(){
+            @Override public void onProgress(String status){reply.progress(status);}
+            @Override public void onMeasured(String step,int done,int count){
+                reply.progressMeasured(step,done,count);
+            }
+        };
+        reply.progressMeasured("Görsel bölgeler için hazırlık",0,total);
         int acceptedTiles=0,acceptedBatches=0,compactAcceptedBatches=0;
         final ArrayList<MusaAiEngineeringSynthesis.VisualGroup> visualRecords=
             new ArrayList<>();
@@ -2214,15 +2221,16 @@ public class MainActivity extends AppCompatActivity {
             }
             MusaAiVisualEvidence.Result rendered;
             try{
-                rendered=MusaAiVisualEvidence.renderBatch(drawing,batch,reply::progress);
+                rendered=MusaAiVisualEvidence.renderBatch(drawing,batch,visualProgress);
             }catch(Exception ex){
                 issue="Paftanın "+(batch+1)+". görsel grubunun hazırlanması başarısız.";break;
             }
             if(rendered.renderedTiles==0){
                 issue=(batch+1)+". grupta okunabilir ayrıntı görüntüsü üretilemedi.";break;
             }
-            reply.progress("Gandalf • "+(batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
-                " grup AI ile inceleniyor; "+acceptedTiles+"/"+total+" bölge tamamlandı…");
+            reply.progressWaiting("Qwen görsel yanıtı bekleniyor • grup "+
+                (batch+1)+"/"+MusaAiVisualSweepPlan.BATCH_COUNT+
+                " • daha önce yanıt alınan "+acceptedTiles+"/"+total+" bölge");
             String task=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
                 "\n"+plan.visionInstruction()+
                 "\nBaşlıklar arasındaki kat planları, kesitler, çatı ve vaziyet için ayrı kontrol yapılması bekleniyor. Bu görsel grupta yalnız gerçekten görünür olanları değerlendir. Plan–kesit kotunu doğrulamadan eşleştirme; çizim koordinatları dışında bağ kurma.\n"+viewCatalog.report+"\nBu istek tek görsel tarama grubudur: "+
@@ -2247,12 +2255,13 @@ public class MainActivity extends AppCompatActivity {
                     android.os.SystemClock.elapsedRealtime()-inspectionStarted)&&
                 !Thread.currentThread().isInterrupted()&&drawing==activeDxf){
                 final String originalFailure=cloud.message;
-                reply.progress("Gandalf • Görsel aktarım başarısız; "+(batch+1)+
-                    ". grup daha küçük görüntülerle bir kez yeniden deneniyor…");
+                reply.progressWaiting("Qwen yanıtı gecikti • "+(batch+1)+
+                    ". grup daha küçük görüntülerle yeniden deneniyor");
                 try{
                     MusaAiVisualEvidence.Result compact=
-                        MusaAiVisualEvidence.renderBatchCompact(drawing,batch,reply::progress);
+                        MusaAiVisualEvidence.renderBatchCompact(drawing,batch,visualProgress);
                     if(compact.complete&&compact.renderedTiles>=rendered.renderedTiles){
+                        reply.progressWaiting("Qwen yeniden deneme yanıtı bekleniyor • grup "+(batch+1));
                         MusaAiCloudService.Result retry=MusaAiCloudService.analyzeHybridWithContext(
                             getApplicationContext(),snapshot,fileName,task,scope,compact.json,
                             recentContext,evidenceSummary);
@@ -2285,6 +2294,7 @@ public class MainActivity extends AppCompatActivity {
             reply.cloudStatus(true);
             acceptedBatches++;
             acceptedTiles+=rendered.renderedTiles;
+            reply.progressMeasured("Qwen yanıtı alınan genel bölgeler",acceptedTiles,total);
             report.append("\n\n2. GÖRSEL KANIT • PAFTA BÖLGESİ ").append(batch+1).append(" / ")
                 .append(MusaAiVisualSweepPlan.BATCH_COUNT).append(" ==========");
             report.append("\n").append(cloud.text);
@@ -2325,16 +2335,16 @@ public class MainActivity extends AppCompatActivity {
                 MusaAiVisualEvidence.Result closeups;
                 try{
                     closeups=MusaAiVisualEvidence.renderViewsBatch(drawing,viewCatalog.views,
-                        group,reply::progress);
+                        group,visualProgress);
                 }catch(Exception e){
                     focusedIssue="Kat/kesit/vaziyet görüntü grubunun hazırlanması tamamlanamadı.";break;
                 }
                 if(closeups.renderedTiles==0){
                     focusedIssue="Yakın-plan görüntüsü oluşturulamadı.";break;
                 }
-                reply.progress("Gandalf • Kat/kesit/vaziyet AI kontrolü "+
-                    (group+1)+"/"+focusBatchCount+"; "+focusedReviewed+
-                    "/"+focusedRequested+" yakın-plan adayı işlendi…");
+                reply.progressWaiting("Qwen kat/kesit yakın-plan yanıtı • "+
+                    (group+1)+"/"+focusBatchCount+" • önceki yanıt "+
+                    focusedReviewed+"/"+focusedRequested);
                 String focusPrompt=raw+"\n"+MusaAiVisualDiscipline.visionInstruction(scope)+
                     "\n"+plan.visionInstruction()+
                     "\n"+viewCatalog.report+
@@ -2356,6 +2366,8 @@ public class MainActivity extends AppCompatActivity {
                 }
                 focusedReviewed+=closeups.renderedTiles;
                 focusedBatches++;
+                reply.progressMeasured("Qwen yanıtı alınan yakın-planlar",
+                    focusedReviewed,focusedRequested);
                 report.append("\n\n3. KAT / KESİT / VAZİYET YAKIN GÖRSEL İNCELEMESİ ")
                     .append(group+1).append("/").append(focusBatchCount)
                     .append(" ==========\n").append(detailed.text);
@@ -2496,12 +2508,14 @@ public class MainActivity extends AppCompatActivity {
         synthesis.coverageRegister=MusaAiPaftaCoverage.build(snapshot,viewCatalog,
             acceptedTiles,total,focusedReviewed,focusedEligible,
             issue.isEmpty()?focusedIssue:issue);
+        reply.progressWaiting("Mühendislik raporu düzenleniyor");
         String completeReport=MusaAiEngineeringSynthesis.composeDetailed(synthesis);
         lastAiReport=completeReport;
         lastAiReportTitle="Gandalf • "+plan.label+
             (visualComplete&&focusedReviewed==focusedEligible&&focusedIssue.isEmpty()
                 ?" Görsel + Yerel Mühendislik Denetimi"
                 :" Kısmi Görsel + Yerel Mühendislik Ön Denetimi");
+        reply.progressMeasured("Mühendislik raporu tamamlandı",1,1);
         reply.send(completeReport+"\n\nRaporu Word veya PDF olarak dışa aktarabilirsiniz.");
     }
 
