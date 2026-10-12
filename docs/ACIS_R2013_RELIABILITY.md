@@ -73,9 +73,17 @@ was added to the **separate MusaCAD development branch** as a CMake switch
 native compilation and now passes host CAD regression; no production merge,
 APK release or real Android-device ACIS fidelity test has occurred.
 
-Cross-version risk: `example_2018.dwg` has 3 original external-AcDs ACIS
-entity records, but the pinned LibreDWG reader exposes **no binary SAB
-payload** for any of them. History preservation cannot repair missing raw data.
+Cross-version risk: `example_2018.dwg` has 3 original external-AcDs
+ACIS entity records, but the pinned LibreDWG reader exposes **no binary SAB
+payload** for any of them. Importantly, the AcDs section itself **is present**:
+R2018 (DWG version 40) includes 7 segment indices, 6 loaded segments,
+a `_data_` segment, a search segment and schema entries, datastore revision 1.
+The public R2013 fixture (DWG version 38) has 13 indices, 8 loaded
+segments and datastore revision 2. The `blob01` page count is zero
+in both decoded structures. These facts localize the R2018 limitation to
+AcDs record extraction/association, not disappearance of the entire
+datastore section. They do **not** prove the underlying binary SAB is intact.
+History preservation cannot repair missing or unextracted raw data.
 The older public R2000 `Cone.dwg` remains partially tessellated (34 triangles)
 in the A/B test.
 
