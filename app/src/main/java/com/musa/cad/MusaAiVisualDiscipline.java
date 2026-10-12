@@ -20,10 +20,12 @@ public final class MusaAiVisualDiscipline {
     public static String resolve(String requestedScope,String userPrompt,
                                  String fileName,MusaAiDrawingIndex index){
         String explicit=requestedScope==null?"all":requestedScope;
-        if(!"all".equals(explicit))return explicit;
         String q=MusaAiDrawingIndex.normalize(userPrompt);
+        // Explicit multi-discipline review wins even if the prompt also names
+        // mechanical/electrical/structural systems for coordination.
         if(has(q,"tum disiplin","butun disiplin","disiplinler arasi",
                  "multidisiplin","tüm disiplin","her disiplini"))return "all";
+        if(!"all".equals(explicit))return explicit;
 
         String filename=MusaAiDrawingIndex.normalize(fileName);
         String named=inferName(filename);
