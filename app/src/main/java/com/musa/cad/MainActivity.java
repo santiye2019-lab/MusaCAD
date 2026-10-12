@@ -79,14 +79,14 @@ public class MainActivity extends AppCompatActivity {
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf,handedOff;long sourceAcisEntities,sourceExternalAcisEntities;
         List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name;boolean dxf;long sourceAcisEntities,sourceExternalAcisEntities;
         final String cloudId=java.util.UUID.randomUUID().toString();
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
@@ -4272,6 +4272,9 @@ public class MainActivity extends AppCompatActivity {
                     task.progress.setText("DWG hızlı görünüm hazırlanıyor…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     FileTransfer.checkCancelled();
+                    NativeCadEngine.Stats originalStats=engine.stats();
+                    loaded.sourceAcisEntities=originalStats.acisEntityCount;
+                    loaded.sourceExternalAcisEntities=originalStats.acisExternalDataCount;
                     NativeScene provisional=null;
                     try{provisional=engine.fastScene();}catch(Exception ignored){}
                     if(provisional!=null&&!provisional.hasSuspiciousBlueTint()&&!Thread.currentThread().isInterrupted()){
@@ -4288,6 +4291,8 @@ public class MainActivity extends AppCompatActivity {
                                 project.file=loaded.file;
                                 project.name=loaded.name;
                                 project.dxf=false;
+                                project.sourceAcisEntities=loaded.sourceAcisEntities;
+                                project.sourceExternalAcisEntities=loaded.sourceExternalAcisEntities;
                                 project.nativeScene=nativePreview;
                                 project.preparingEditor=true;
                                 project.prepareTask=task;
@@ -4341,6 +4346,8 @@ public class MainActivity extends AppCompatActivity {
                         if(!projects.contains(project)){if(working!=null)working.delete();if(parsed.bitmap!=null&&!parsed.bitmap.isRecycled())parsed.bitmap.recycle();if(activeLoad==task)activeLoad=null;return;}
                         Bitmap oldPreview=project.bitmap;
                         project.prepareTask=null;project.workingDxf=working;project.parsed=parsed;project.bitmap=parsed.bitmap;project.preparingEditor=false;project.prepareError=null;
+                        project.sourceAcisEntities=loaded.sourceAcisEntities;
+                        project.sourceExternalAcisEntities=loaded.sourceExternalAcisEntities;
                         if(currentProject==project){
                             editingBaseDxf=working;activeDxf=parsed;cad.upgradeNativeDrawing(parsed);snapToggle.setEnabled(parsed.snapPoints.length>0);snapToggle.setChecked(true);cad.setSnapPoints(parsed.snapPoints);updateEditorEnabled(canEdit());updateLayerButtons(true);renderCurrentProjectStatus();
                             project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;
@@ -4363,7 +4370,10 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap recentPreview=loaded.bitmap;
                 runOnUiThread(()->{
                     if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
-                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();project.persistedImages.addAll(loaded.imageOverlays);
+                    ProjectSession project=new ProjectSession();project.sourceUri=loaded.sourceUri;project.file=loaded.file;project.workingDxf=loaded.workingDxf;project.bitmap=loaded.bitmap;project.parsed=loaded.parsed;project.name=loaded.name;project.dxf=false;project.lastAccessMs=System.currentTimeMillis();
+                    project.sourceAcisEntities=loaded.sourceAcisEntities;
+                    project.sourceExternalAcisEntities=loaded.sourceExternalAcisEntities;
+                    project.persistedImages.addAll(loaded.imageOverlays);
                     loaded.project=project;loaded.handedOff=true;projects.add(project);activateProject(project);scheduleProjectCloudSync();project.savedFingerprint=cad.editFingerprint();project.baselineSet=true;project.dirty=false;refreshProjectTabs();
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
@@ -4592,7 +4602,14 @@ public class MainActivity extends AppCompatActivity {
         if(activeDxf!=null){
             String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
             String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
-            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
+            // ACIS fidelity is a separate technical status, never a finding
+            // injected into the user's engineering-analysis report.
+            boolean acisUnverified=currentProject.sourceAcisEntities>0||
+                activeDxf.acisCoverage.entityCount()>0;
+            String acis=acisUnverified?
+                ("  •  ACIS 3B geometri doğrulanmadı"+
+                    (currentProject.sourceExternalAcisEntities>0?" (harici AcDs veri)":"")):"";
+            result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(canEdit()?"  •  düzenleme açık":"")+ole+fallback+acis);
         }else if(currentProject.nativeScene!=null){
             if(currentProject.preparingEditor)result.setText("Hazır  •  Native hızlı görünüm  •  "+currentProject.nativeScene.primitiveCount+" geometri"+(currentProject.nativeScene.truncated?"  •  hızlı sahne kısmi":"")+"  •  tam vektör hazırlanıyor");
             else if(currentProject.prepareError!=null)result.setText("Native görünüm  •  düzenleme modeli kullanılamadı");
