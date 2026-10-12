@@ -16,7 +16,7 @@ Pinned upstream drawing: `LibreDWG/libredwg/test/test-data/example_2013.dwg`.
 
 - Original DWG: 3 ACIS bodies, all flagged for external AcDs payload.
 - Converted DXF: 3 ACIS records with data.
-- SAT reader: 10 face records, 1 tessellated face (2 triangles), 9 unsupported faces.
+- Without the R2013 source-history fix or planar-hole support: 10 face records, 1 tessellated face (2 triangles), 9 unsupported faces. With both development fixes enabled: 10 triangulated planar faces (28 triangles), but 26 unresolved SAT pointers persist.
 - Source/reference check: 18 unresolved SAT node references.
 - A public-fixture SAT record parity audit confirmed record counts equal parsed nodes for all three bodies (27/27, 27/27, 126/126). No SAT records were silently dropped by the Java parser. Missing referenced node ids predate its node map.
 - Exact partial token `strai ght-curve` is repaired only when both tokens match. Other broken links remain unresolved.
@@ -45,11 +45,22 @@ missing conversion records upstream of the Java mesh parser.
 
 An isolated R2013 host-only experiment changed the LibreDWG branch that clears
 the SAB `has_history` flag when the DXF writer downconverts a R2013+ DWG.
-The public example then yielded **3/3 mesh-bearing solids and 8/10
+The public example initially yielded **3/3 mesh-bearing solids and 8/10
 triangulated faces (16 triangles)** instead of **1/3 and 1/10
-(2 triangles)**. The recovered output still has dangling references and
-2 unsupported faces, so it is NOT a fully faithful or production-approved
-conversion. After an isolated host A/B test, the exact version-gated workaround
+(2 triangles)**. Further inspection identified the other two surfaces as
+nested triangular planar rings with real central openings. A verified
+non-overlapping, hole-preserving triangulator brings the same pinned R2013
+fixture to **10/10 tessellated source faces, 28 triangles and 26 original
+boundary edges**. Regression tests also forbid filling the two openings, or
+connecting disjoint or noncoplanar contours.
+
+**26 SAT references are still unresolved after history preservation**. In
+particular, the two affected R2013 bodies continue to report incomplete;
+visible surfaces do NOT certify fully intact B-Rep topology, precise
+solid-volume measurements or DWG round-trip fidelity. The new tessellation
+is NOT a production-approved complete solid converter.
+
+After an isolated host A/B test, the exact version-gated workaround
 was added to the **separate MusaCAD development branch** as a CMake switch
 (`MUSACAD_PRESERVE_R2013_SAB_HISTORY`). It is enabled for development
 native compilation and now passes host CAD regression; no production merge,
