@@ -4028,6 +4028,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void showDrawingInfo(){
         if(activeDxf==null)return;String missing=activeDxf.fontFallbacks.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.fontFallbacks);String oleTypes=activeDxf.oleTypes.isEmpty()?"yok":android.text.TextUtils.join(", ",activeDxf.oleTypes);String text="Dosya başarıyla açıldı.\n\n"+"Layout: "+activeDxf.activeLayout+" ("+activeDxf.layoutNames.size()+")\n"+"Nesne: "+activeDxf.entityCount+"\n"+"Atlanan / çizilemeyen CAD kaydı: "+activeDxf.skippedCount+"\n"+"Harici XREF (henüz yüklenmiyor): "+activeDxf.externalReferences.size()+"\n"+"Katman: "+activeDxf.layerCount+"\n"+"Görünür katman: "+activeDxf.visibleLayers.size()+"\n"+"Seçilebilir kaynak nesne: "+activeDxf.editableSourceCount()+"\n"+"OLE / gömülü belge: "+activeDxf.oleObjectCount+" ("+oleTypes+")\n"+"OLE gerçek önizleme: "+activeDxf.olePreviewCount+"\n"+"OLE önizlemesi bulunamayan: "+activeDxf.oleMissingPreviewCount+"\n"+"Düzenleme toplamı: "+cad.editCount()+"\n"+"Kaynak nesne değişikliği: "+cad.sourceModifiedCount()+"\n"+"Eksik / fallback font: "+missing+"\n"+"Kullanıcı TTF/OTF: "+CadFontManager.userFontCount(this)+"\n"+"Complex SHX shape fallback: "+(activeDxf.externalShapeFallback?"var":"yok")+"\n"+"Düzenleme: "+(canEdit()?"açık":"yalnız görüntüleme")+"\n"+"Görüntüleme: vektörel / net yakınlaştırma";
+        if(!activeDxf.skippedByType.isEmpty()){
+            StringBuilder skipped=new StringBuilder();
+            for(Map.Entry<String,Integer> type:activeDxf.skippedByType.entrySet()){
+                if(skipped.length()>0)skipped.append(", ");
+                skipped.append(type.getKey()).append(": ").append(type.getValue());
+            }
+            text+="\\nAtlanan DXF nesne türleri: "+skipped;
+        }
         if(currentProject!=null){
             if(currentProject.loadDiagnostics!=null)
                 text+="\n\nCAD yükleme aşamaları (milisaniye):\n"+currentProject.loadDiagnostics;
