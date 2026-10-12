@@ -52,6 +52,34 @@ public final class DxfBlocks {
         }
     }
 
+    /** Bounded diagnostic sample; source records and full CAD geometry are not retained. */
+    public static final class SkippedRecord {
+        public final String type,handle,layer,reason;
+        public final int sourceLine;
+        SkippedRecord(Record r,String layer,String reason){
+            this.type=shortValue(r==null?"UNKNOWN":r.type,48);
+            this.handle=shortValue(r==null?"":r.text(5,""),72);
+            this.layer=shortValue(layer,72);
+            this.reason=reason==null?"Unknown":"".concat(reason);
+            this.sourceLine=r==null?0:Math.max(0,r.sourceStart+1);
+        }
+    }
+    private static String shortValue(String value,int max){
+        if(value==null)return "";
+        StringBuilder safe=new StringBuilder(Math.min(max,value.length()));
+        int used=0;
+        for(int i=0;i<value.length()&&used<max;){
+            int c=value.codePointAt(i);i+=Character.charCount(c);used++;
+            byte direction=Character.getDirectionality(c);
+            if(Character.isISOControl(c)||Character.getType(c)==Character.FORMAT
+                ||direction==Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE
+                ||direction==Character.DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE)
+                safe.append('?');
+            else safe.appendCodePoint(c);
+        }
+        return safe.toString();
+    }
+
     private static final class Block{
         final Record header;final List<Record>members=new ArrayList<>();
         File file;Charset charset;long offset;int offsetLine;
@@ -66,6 +94,18 @@ public final class DxfBlocks {
 
     public static final class Result {
         public final List<Placement>placements=new ArrayList<>();public final List<BlockInsertion>blockInsertions=new ArrayList<>();public final Map<String,Integer>layerColors=new LinkedHashMap<>();public final Map<String,String>layerLineTypes=new LinkedHashMap<>();public final Map<String,Integer>layerLineWeights=new LinkedHashMap<>();public final Map<String,DxfLineStyle.Pattern>lineTypes=new LinkedHashMap<>();public final Map<String,DxfTextStyle.Style>textStyles=new LinkedHashMap<>();public final Set<String>layoutNames=new LinkedHashSet<>();
+        public final List<SkippedRecord> skippedSamples=new ArrayList<>();
+        public final Map<String,Integer> skippedByType=new LinkedHashMap<>();
+        public void noteSkipped(Record record,String layer,String reason){
+            if(skipped<Integer.MAX_VALUE)skipped++;
+            String type=shortValue(record==null?"UNKNOWN":record.type,48).toUpperCase(Locale.ROOT);
+            if(type.isEmpty())type="UNKNOWN";
+            if(!skippedByType.containsKey(type)&&skippedByType.size()>=24)type="OTHER";
+            skippedByType.put(type,Math.min(Integer.MAX_VALUE,
+                skippedByType.getOrDefault(type,0)+1));
+            if(skippedSamples.size()<20)
+                skippedSamples.add(new SkippedRecord(record,layer,reason));
+        }
         public int skipped,units;public float[] modelExtents;public int defaultLineweight=DxfLineStyle.DEFAULT_LINEWEIGHT;public double globalLineTypeScale=1d;private int visits;private Sink sink;private final Set<String>initiallyHiddenLayerKeys=new HashSet<>();
         public boolean layerInitiallyVisible(String layer){return !initiallyHiddenLayerKeys.contains(DxfLayerState.key(layer));}
     }
@@ -192,11 +232,13 @@ public final class DxfBlocks {
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
-            if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
+            if(block==null||stack.contains(name)||stack.size()>=32){
+                result.noteSkipped(r,layer,block==null?"ACAD_TABLE block absent":"ACAD_TABLE block cycle/depth");return;
+            }
             double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
             boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
             boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-            if(!positiveZ&&!negativeZ){result.skipped++;return;}
+            if(!positiveZ&&!negativeZ){result.noteSkipped(r,layer,"Nonplanar ACAD_TABLE extrusion");return;}
             double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
             if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
             double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
@@ -210,15 +252,23 @@ public final class DxfBlocks {
             return;
         }
         if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
-        String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
+        String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){
+            result.noteSkipped(r,layer,block==null?"Referenced INSERT block absent":"INSERT block cycle/depth");return;
+        }
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
         boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
         boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
         // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
         // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
         int columns=r.integer(70,1),rows=r.integer(71,1);
-        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
-        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        if(columns<1||rows<1||(long)columns*rows>100000L){
+            result.noteSkipped(r,layer,"Invalid/oversize MINSERT array");return;
+        }
+        if(!positiveZ&&!negativeZ){result.noteSkipped(r,layer,"Nonplanar INSERT extrusion");return;}
+        if((((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
+            result.noteSkipped(r,layer,"Unresolved external INSERT reference");return;
+        }
+        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.noteSkipped(r,layer,"Zero INSERT scale");return;}
         if(directRoot){
             String rawName=r.text(2,"").trim();
             if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
