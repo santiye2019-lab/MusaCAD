@@ -79,6 +79,17 @@ public final class Dxf3dMesh {
             && (acisSolids>0 || !flatPlan);
     }
 
+    /** Display freshly modeled triangular geometry without modifying source CAD. */
+    public static Dxf3dMesh fromGenerated(CadSolidKernel.Mesh mesh)throws IOException{
+        if(mesh==null||mesh.vertexCount()>MAX_VERTICES||mesh.faceCount()>MAX_TRIANGLES)
+            throw new IOException("Üretilen 3B ağ boyutu geçersiz");
+        int n=mesh.vertexCount();
+        int[] source=new int[n],slots=new int[n];
+        Arrays.fill(source,-1); // generated mesh has no source-DXF editable slots
+        return new Dxf3dMesh(mesh.xyz.clone(),mesh.triangles.clone(),
+            new int[0],source,slots,0,0,false);
+    }
+
     private static final class Collector implements DxfBlocks.Sink {
         final FloatBuffer points=new FloatBuffer();
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
