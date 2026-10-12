@@ -669,6 +669,23 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/CadRasterReferenceDisclosureTest.java
           java -cp /tmp/musacad-tests CadRasterReferenceDisclosureTest
+      - name: Test generated 3D EXTRUDE REVOLVE and orthogonal Boolean solids
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadUcs3d.java app/src/main/java/com/musa/cad/CadSolidKernel.java app/src/main/java/com/musa/cad/CadSolidCommand.java tests/CadSolidKernelTest.java tests/CadUcs3dTest.java
+          java -cp /tmp/musacad-tests CadSolidKernelTest
+          java -cp /tmp/musacad-tests CadUcs3dTest
+      - name: Test user-approved basic XREF binding without losing originals
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadXrefBinder.java tests/CadXrefBinderTest.java
+          java -cp /tmp/musacad-tests CadXrefBinderTest
+      - name: Test source-safe DXF block attribute value editing
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/CadBlockAttributes.java tests/CadBlockAttributesTest.java
+          java -cp /tmp/musacad-tests CadBlockAttributesTest
+      - name: Guard opt-in legacy DWG write and source-preserving UI
+        run: |
+          javac -d /tmp/musacad-tests tests/CadNativeDwgWriteContractTest.java
+          java -cp /tmp/musacad-tests CadNativeDwgWriteContractTest
       - name: Test unsupported DXF entity type breakdown
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfSkippedTypesTest.java
