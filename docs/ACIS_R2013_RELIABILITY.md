@@ -118,8 +118,16 @@ whereas the unmodified converter yielded no renderable SAB. This is a
 promising interoperability result, **not certified B-Rep fidelity**:
 the output still carries unresolved history references, and there is
 not yet independent verification across unrelated R2018 projects.
-It is deliberately not part of the regular Android/native production
-converter and must remain disabled for APK builds.
+The reproducible candidate is now an opt-in, **host-only** CMake
+switch: `-DMUSACAD_HOST_R2018_ASM_COMPAT=ON`. It remains OFF by
+default; `ANDROID=ON` with this switch is rejected by a fatal configure
+guard. The pinned test `example_2018.dwg` is checked for 193 real
+SAT nodes (body order independent), 10 tessellated faces, 28 triangles
+and two actual empty triangular openings. The patch updates only a
+temporary LibreDWG build checkout at CMake configure time, and must
+never run in any Android or production build. An unpatched future host
+build requires a clean third-party LibreDWG checkout, not merely
+toggling the option OFF.
 The older public R2000 `Cone.dwg` remains partially tessellated (34 triangles)
 in the A/B test.
 
