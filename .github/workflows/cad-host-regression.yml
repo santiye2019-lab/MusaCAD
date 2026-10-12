@@ -276,7 +276,7 @@ jobs:
           if [ "$result" -eq 0 ] && [ -s /tmp/musacad-r2018-asm-alias.dxf ]; then
             if python3 tests/audit_acis_roundtrip.py /tmp/musacad-r2018-asm-alias.dxf --source-log /tmp/musacad-r2018-asm-alias.log --require-source --require-external; then
               echo 'MUSACAD_R2018_ASM_ALIAS_SAT_TRANSPORT=1'
-              if java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2018-asm-alias.dxf; then
+              if java -cp /tmp/musacad-acis-probe AcisDxfRoundTripProbe /tmp/musacad-r2018-asm-alias.dxf --public-fixture-debug | tee /tmp/musacad-r2018-asm-mesh.log; then
                 echo 'MUSACAD_R2018_ASM_ALIAS_MESH_PROBE=1 (not B-Rep fidelity)'
               else
                 echo 'MUSACAD_R2018_ASM_ALIAS_MESH_PROBE=0'
