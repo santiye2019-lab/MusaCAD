@@ -108,7 +108,16 @@ int main(int argc,char **argv){
     MusaNativeScene scene={0};
     int scene_status=musa_scene_build(session->dwg,&scene);
     fprintf(stderr,"MusaCAD native scene: status=%d primitives=%d floats=%zu\n",scene_status,scene.primitives,scene.count);
-    if(scene_status<0||scene.primitives<=0){musa_scene_free(&scene);session_close(session);return 1;}
+    /*
+     * The native scene is a bounded, model-space-only first-paint preview.
+     * An empty/unsupported model scene does NOT imply an empty DWG: paper
+     * space layouts, 3D objects and other valid DWG data may still exist.
+     * Do not discard the full-document DXF conversion on preview failure.
+     */
+    if(scene_status<0||scene.primitives<=0)
+        fprintf(stderr,"MusaCAD preview unavailable; trying full DWG conversion (model/layout data may remain)\\n");
+    else if(scene.truncated)
+        fprintf(stderr,"MusaCAD preview truncated; trying full DWG conversion\\n");
     musa_scene_free(&scene);
     int result=session_export_dxf(session,argv[2]);
     session_close(session);
