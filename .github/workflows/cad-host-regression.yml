@@ -20,6 +20,7 @@ on:
       - 'tests/audit_acis_roundtrip.py'
       - 'tests/AcisDxfRoundTripProbe.java'
       - 'tests/AcisSatMeshTest.java'
+      - 'tests/Dxf3dMeshTest.java'
       - '.github/workflows/cad-host-regression.yml'
   workflow_dispatch:
 permissions:
@@ -206,6 +207,20 @@ jobs:
           mkdir -p /tmp/musacad-acis-sat
           javac -d /tmp/musacad-acis-sat app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisSatMeshTest.java
           java -cp /tmp/musacad-acis-sat AcisSatMeshTest
+      - name: Test 3D CAD mesh and missing ACIS face reporting
+        run: |
+          mkdir -p /tmp/musacad-full-3d-tests
+          javac -sourcepath app/src/main/java -d /tmp/musacad-full-3d-tests tests/Dxf3dMeshTest.java
+          java -cp /tmp/musacad-full-3d-tests Dxf3dMeshTest
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/musa/cad/Mesh3dActivity.java').read_text()
+          assert 'mesh.acisMissingGeometrySolids' in ui
+          assert 'mesh.acisTessellatedFaces' in ui
+          assert 'bu katılar görünümde YOK' in ui
+          assert 'gerçek B-Rep kenarları gösterildi' not in ui
+          print('PASS: 3D screen identifies missing rather than imaginary ACIS geometry')
+          PY
       - name: Verify SOLID TRACE and 3DFACE geometry fidelity
         run: |
           mkdir -p /tmp/musacad-face
