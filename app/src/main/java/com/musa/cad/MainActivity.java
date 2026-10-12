@@ -23,11 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,SAVE_DWG=22,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39,PICK_XREF=54,SAVE_BOUND_XREF=55;
+    private static final int OPEN=20,SAVE_DXF=21,SAVE_DWG=22,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39,PICK_XREF=54,SAVE_BOUND_XREF=55,SAVE_ATTRIB=56;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_SAVE_DWG=12,MENU_BIND_XREF=13;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_SAVE_DWG=12,MENU_BIND_XREF=13,MENU_ATTRIB=14;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
     private final android.os.Handler recoveryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long RECOVERY_INTERVAL_MS=15_000L;
     private LoadTask activeLoad;
+    private File pendingAttributeDxf;
     private String pendingXrefName;
     private File pendingXrefParentDxf,pendingBoundXref;
     private ProjectSession pendingXrefProject;
@@ -3960,8 +3961,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_BIND_XREF,6,"XREF bağla (temel 2B)").setEnabled(activeDxf!=null&&!activeDxf.externalReferences.isEmpty());menu.add(0,MENU_SAVE_DWG,7,"DWG kaydet (deneysel / yalnız eski biçim)").setEnabled(canEdit()&&NativeDwgWrite.available());menu.add(0,MENU_PRINT,7,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_SAVE_DWG:requestEditedDwgSave();return true;case MENU_BIND_XREF:requestXrefBind();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_ATTRIB,6,"Blok öznitelikleri (ATTRIB)").setEnabled(canEdit());menu.add(0,MENU_BIND_XREF,7,"XREF bağla (temel 2B)").setEnabled(activeDxf!=null&&!activeDxf.externalReferences.isEmpty());menu.add(0,MENU_SAVE_DWG,7,"DWG kaydet (deneysel / yalnız eski biçim)").setEnabled(canEdit()&&NativeDwgWrite.available());menu.add(0,MENU_PRINT,7,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_SAVE_DWG:requestEditedDwgSave();return true;case MENU_BIND_XREF:requestXrefBind();return true;case MENU_ATTRIB:showBlockAttributes();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4160,6 +4161,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==SAVE_ATTRIB&&c!=RESULT_OK){if(pendingAttributeDxf!=null)pendingAttributeDxf.delete();pendingAttributeDxf=null;return;}
         if((r==PICK_XREF||r==SAVE_BOUND_XREF)&&c!=RESULT_OK){
             clearXrefPending();return;
         }
@@ -4196,6 +4198,7 @@ public class MainActivity extends AppCompatActivity {
         if(r==PICK_CSB_RATES){handleCsbPricePicked(data.getData());return;}
         if(r==PICK_BOQ){handleBoqPicked(data.getData());return;}
         if(r==PICK_STRUCT_CALC){handleStructuralCalcPicked(data.getData());return;}
+        if(r==SAVE_ATTRIB){publishAttributeDxf(data.getData());return;}
         if(r==PICK_XREF){handleXrefPicked(data.getData());return;}
         if(r==SAVE_BOUND_XREF){publishBoundXref(data.getData());return;}
         if(r==OPEN)startLoad(data.getData());else if(r==SAVE_DXF)saveEditedDxf(data.getData());else if(r==SAVE_DWG)saveEditedDwg(data.getData());
@@ -4994,6 +4997,106 @@ public class MainActivity extends AppCompatActivity {
                 if(stagedDxf!=null)stagedDxf.delete();
                 if(stagedDwg!=null)stagedDwg.delete();
             }
+        });
+    }
+
+    private void showBlockAttributes(){
+        if(activeLoad!=null||!canEdit()||editingBaseDxf==null)return;
+        final File source=editingBaseDxf;
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("Blok öznitelikleri")
+            .setMessage("ATTRIB kayıtları okunuyor…")
+            .setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.show();
+        task.future=loader.submit(()->{
+            try{
+                List<CadBlockAttributes.Attribute> found=CadBlockAttributes.list(source);
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    if(found.isEmpty()){
+                        Toast.makeText(this,"Bu DXF içinde düzenlenebilir INSERT/ATTRIB kaydı yok",
+                            Toast.LENGTH_LONG).show();return;
+                    }
+                    int count=Math.min(120,found.size());
+                    String[] labels=new String[count];
+                    for(int i=0;i<count;i++){
+                        CadBlockAttributes.Attribute a=found.get(i);
+                        labels[i]=a.block+" • "+a.tag+" = "+a.value;
+                    }
+                    new AlertDialog.Builder(this).setTitle("ATTRIB değeri düzenle")
+                        .setItems(labels,(dialog,index)->{
+                            CadBlockAttributes.Attribute chosen=found.get(index);
+                            EditText input=new EditText(this);
+                            input.setSingleLine(false);input.setText(chosen.value);
+                            new AlertDialog.Builder(this).setTitle(chosen.block+" / "+chosen.tag)
+                                .setMessage("Yalnızca öznitelik değeri değişir; dinamik blok görünürlük/eylem parametreleri korunur.")
+                                .setView(input).setNegativeButton("İPTAL",null)
+                                .setPositiveButton("YENİ DXF HAZIRLA",(d,which)->
+                                    prepareAttributeCopy(source,chosen.id,input.getText().toString()))
+                                .show();
+                        }).setNegativeButton("KAPAT",null).show();
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e);
+                });
+            }
+        });
+    }
+
+    private void prepareAttributeCopy(File source,int id,String value){
+        if(activeLoad!=null)return;
+        LoadTask task=new LoadTask();activeLoad=task;
+        task.dialog=new AlertDialog.Builder(this).setTitle("ATTRIB kayıt kopyası")
+            .setMessage("Kaynak korunuyor, yeni DXF hazırlanıyor").setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();
+        task.dialog.show();
+        task.future=loader.submit(()->{
+            File candidate=null;
+            try{
+                candidate=File.createTempFile("MusaCAD_attrib_",".dxf",getCacheDir());
+                CadBlockAttributes.replace(source,candidate,id,value);
+                CadDxfSaveStage.validate(candidate);
+                File ready=candidate;candidate=null;
+                FileTransfer.checkCancelled();
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed()){ready.delete();return;}
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();
+                    if(pendingAttributeDxf!=null)pendingAttributeDxf.delete();
+                    pendingAttributeDxf=ready;
+                    Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    save.addCategory(Intent.CATEGORY_OPENABLE);save.setType("application/dxf");
+                    save.putExtra(Intent.EXTRA_TITLE,"MusaCAD-ATTRIB-duzenlendi.dxf");
+                    startActivityForResult(save,SAVE_ATTRIB);
+                });
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(activeLoad!=task||isFinishing()||isDestroyed())return;
+                    activeLoad=null;if(task.dialog!=null)task.dialog.dismiss();error(e);
+                });
+            }finally{if(candidate!=null)candidate.delete();}
+        });
+    }
+
+    private void publishAttributeDxf(Uri destination){
+        File staged=pendingAttributeDxf;pendingAttributeDxf=null;
+        if(destination==null||staged==null||!staged.isFile()){
+            if(staged!=null)staged.delete();return;
+        }
+        loader.submit(()->{
+            String message;
+            try(InputStream in=new FileInputStream(staged);
+                OutputStream out=getContentResolver().openOutputStream(destination,"wt")){
+                if(out==null)throw new IOException("ATTRIB kayıt hedefi açılamadı");
+                FileTransfer.copy(in,out,128L*1024L*1024L,null);out.flush();
+                message="ATTRIB düzenlemesi yeni DXF kopyasına kaydedildi";
+            }catch(Exception e){message="ATTRIB kaydı başarısız: "+e.getMessage();}
+            finally{staged.delete();}
+            String resultMessage=message;
+            runOnUiThread(()->{
+                if(!isFinishing()&&!isDestroyed())Toast.makeText(this,resultMessage,Toast.LENGTH_LONG).show();
+            });
         });
     }
 
