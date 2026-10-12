@@ -61,6 +61,19 @@ public final class CadSolidCommand {
                 if(segment!=Math.rint(segment))throw new IOException("Dilim sayısı tam olmalı");
                 return CadSolidKernel.revolve(polygon(segments[0]),(int)segment,numbers(segments[2],1)[0]);
             }
+            case "SWEEP":{
+                if(segments.length!=2)
+                    throw new IOException("SWEEP: kesit x,y;...|yolX,Y,Z;...");
+                String[] points=segments[1].split("\\s*;\\s*");
+                if(points.length<2||points.length>256)
+                    throw new IOException("SWEEP yolunda en az 2 XYZ nokta olmalı");
+                double[] path=new double[points.length*3];
+                for(int i=0;i<points.length;i++){
+                    double[] v=numbers(points[i],3);
+                    System.arraycopy(v,0,path,3*i,3);
+                }
+                return CadSolidKernel.sweepXY(polygon(segments[0]),path);
+            }
             case "LOFT":{
                 if(segments.length<4||segments.length%2!=0||segments.length>512)
                     throw new IOException("LOFT: profil1|kot1|profil2|kot2[|profil3|kot3...]");
