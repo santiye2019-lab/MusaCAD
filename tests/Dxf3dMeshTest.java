@@ -37,6 +37,7 @@ public final class Dxf3dMeshTest {
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
+        testMissing3dTagDoesNotWritePartialFile();
     }
 
     private static void testLineAndPolyline() throws Exception {
@@ -160,6 +161,28 @@ public final class Dxf3dMeshTest {
                 throw new AssertionError("solid proxy must be an 8-corner, 12-edge wire box");
             if(mesh.minZ!=3f||mesh.maxZ!=33f||mesh.flatPlan)throw new AssertionError("solid proxy Z bounds");
             for(int v:mesh.sourceLines)if(v!=-1)throw new AssertionError("solid proxy geometry must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMissing3dTagDoesNotWritePartialFile() throws Exception {
+        File file=File.createTempFile("mesh3d-save-guard-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\n3DFACE\n10\n0\n20\n0\n30\n1\n"
+                +"11\n1\n21\n0\n31\n1\n"
+                +"12\n0\n22\n1\n32\n1\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            float[] original=mesh.xyz.clone();
+            mesh.xyz[2]=9f; // edit source vertex-0 Z coordinate (DXF group 30)
+            Files.writeString(file.toPath(),dxf.replace("30\n1\n",""),StandardCharsets.UTF_8);
+            ByteArrayOutputStream target=new ByteArrayOutputStream();
+            boolean blocked=false;
+            try{Dxf3dEditor.write(file,target,mesh,original);}
+            catch(java.io.IOException e){blocked=true;}
+            if(!blocked)throw new AssertionError("missing source coordinate must block 3D save");
+            if(target.size()!=0)throw new AssertionError("preflight failure wrote an incomplete 3D DXF file");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
