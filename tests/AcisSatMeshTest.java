@@ -24,6 +24,7 @@ public final class AcisSatMeshTest {
 
         AcisSatMesh.Result bad=AcisSatMesh.parseDxfChunks(List.of("ACIS_PLACEHOLDER"));
         if(bad.hasGeometry())throw new AssertionError("invalid ACIS payload must not invent geometry");
+        if(bad.danglingReferences!=0)throw new AssertionError("Invalid placeholder has no node ids to audit");
 
         System.out.println("ACIS SAT B-Rep cases passed: encrypted payload, planar solids, cylindrical/conic loft and safe fallback.");
     }
@@ -86,7 +87,8 @@ public final class AcisSatMeshTest {
             +"End-of-ACIS-data\n";
         AcisSatMesh.Result result=AcisSatMesh.parseDxfChunks(List.of(sat));
         if(result.hasGeometry()||result.complete||result.faces!=1||
-           result.unsupportedFaces!=1||result.tessellatedFaces!=0)
+           result.unsupportedFaces!=1||result.tessellatedFaces!=0||
+           result.danglingReferences<1)
             throw new AssertionError("Missing ACIS geometry must retain its real face inventory");
     }
 
