@@ -1998,8 +1998,12 @@ public class MainActivity extends AppCompatActivity {
                             requestedScope,raw,displayName,snapshot);
                         MusaAiDisciplinePlan.Plan reviewPlan=
                             MusaAiDisciplinePlan.resolve(raw,reportScope);
+                        // Broad requests should follow strong CAD evidence, never a
+                        // generic eight-system mechanical checklist from the file name.
+                        MusaAiDisciplinePlan.Plan focusedPlan=
+                            MusaAiDisciplinePlan.focusOnDrawing(raw,reviewPlan,snapshot);
                         runMusaAiWholeSheetVision(activeSnapshot,snapshot,displayName,raw,
-                            reviewPlan.scope,reviewPlan,reply,recentContext);
+                            focusedPlan.scope,focusedPlan,reply,recentContext);
                         return;
                     }
                     reply.progress("Gandalf • CAD delilleri çevrim içi AI tarafından değerlendiriliyor…");
