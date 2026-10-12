@@ -37,15 +37,18 @@ public final class AcisSatMesh {
         public final int faces;
         public final int tessellatedFaces;
         public final int unsupportedFaces;
+        /** Positive SAT node ids referenced but absent in this payload. Not a repair hint. */
+        public final int danglingReferences;
 
-        Result(float[] xyz,int[] triangles,int[] edges,boolean complete,int faces,int tessellatedFaces,int unsupportedFaces){
+        Result(float[] xyz,int[] triangles,int[] edges,boolean complete,int faces,int tessellatedFaces,int unsupportedFaces,int danglingReferences){
             this.xyz=xyz;this.triangles=triangles;this.edges=edges;this.complete=complete;
             this.faces=faces;this.tessellatedFaces=tessellatedFaces;this.unsupportedFaces=unsupportedFaces;
+            this.danglingReferences=danglingReferences;
         }
         public boolean hasGeometry(){return xyz.length>=3&&(triangles.length>=3||edges.length>=2);}
     }
 
-    private static final Result EMPTY=new Result(new float[0],new int[0],new int[0],false,0,0,0);
+    private static final Result EMPTY=new Result(new float[0],new int[0],new int[0],false,0,0,0,0);
 
     /** Parses the group 1 / group 3 ACIS payload carried by DXF 3DSOLID/BODY/REGION. */
     public static Result parseDxfChunks(List<String> chunks){
@@ -86,6 +89,12 @@ public final class AcisSatMesh {
         if(sat==null||sat.trim().isEmpty())return EMPTY;
         Map<Integer,Node> nodes=parseNodes(sat);
         if(nodes.isEmpty())return EMPTY;
+        // Detect malformed SAB->SAT references, do NOT "fix" by guessed index
+        // shifting or fabricate B-Rep topology. Used solely for coverage status.
+        int danglingReferences=0;
+        for(Node node:nodes.values())
+            for(int ref:node.refs)
+                if(!nodes.containsKey(ref))danglingReferences++;
         Transform3 transform=findTransform(nodes);
         MeshBuilder mesh=new MeshBuilder(transform);
         List<Node> faces=nodesByType(nodes,"face");
@@ -126,10 +135,10 @@ public final class AcisSatMesh {
             // unusable vertex references. Returning EMPTY here used to hide
             // all unsupported faces from engineering coverage diagnostics.
             return new Result(new float[0],new int[0],new int[0],false,
-                faces.size(),tessellated,unsupported);
+                faces.size(),tessellated,unsupported,danglingReferences);
         }
         boolean complete=!faces.isEmpty()&&tessellated==faces.size();
-        return new Result(mesh.xyz(),mesh.triangles(),mesh.edges(),complete,faces.size(),tessellated,unsupported);
+        return new Result(mesh.xyz(),mesh.triangles(),mesh.edges(),complete,faces.size(),tessellated,unsupported,danglingReferences);
     }
 
     private static Map<Integer,Node> parseNodes(String sat){
