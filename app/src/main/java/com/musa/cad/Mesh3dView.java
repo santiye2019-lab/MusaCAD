@@ -18,6 +18,7 @@ public final class Mesh3dView extends View {
     private final Path facePath=new Path();
     private final float[] screen,depth;
     private final long[] faceOrder;
+    private static final int EDGE_BATCH_FLOATS=16_384; // bounded 64 KiB, even for huge models
     private final float[] segments;
     private float yaw=.65f,pitch=.32f,zoom=1f,lastX,lastY,pinchDistance;
     private int first=-1,second=-1;
@@ -25,7 +26,7 @@ public final class Mesh3dView extends View {
     private InteractionMode interactionMode=InteractionMode.ORBIT;
 
     public Mesh3dView(Context context,Dxf3dMesh model){
-        super(context);this.model=model;screen=new float[model.xyz.length/3*2];depth=new float[model.xyz.length/3];faceOrder=new long[model.triangles.length/3];segments=new float[model.edges.length*2];
+        super(context);this.model=model;screen=new float[model.xyz.length/3*2];depth=new float[model.xyz.length/3];faceOrder=new long[model.triangles.length/3];segments=new float[EDGE_BATCH_FLOATS];
         lines.setStyle(Paint.Style.STROKE);lines.setColor(Color.rgb(102,211,232));lines.setStrokeWidth(getResources().getDisplayMetrics().density);
         surface.setStyle(Paint.Style.FILL);
         marker.setColor(Color.YELLOW);caption.setColor(Color.WHITE);caption.setTextSize(14f*getResources().getDisplayMetrics().scaledDensity);
@@ -51,20 +52,30 @@ public final class Mesh3dView extends View {
         int count=0;
         for(int i=0;i<model.edges.length;i+=2){
             int a=model.edges[i]*2,b=model.edges[i+1]*2;
-            segments[count++]=screen[a];segments[count++]=screen[a+1];
-            segments[count++]=screen[b];segments[count++]=screen[b+1];
+            float ax=screen[a],ay=screen[a+1],bx=screen[b],by=screen[b+1];
+            if(!Cad3dVisibility.edgeVisible(ax,ay,bx,by,getWidth(),getHeight(),8f))continue;
+            if(count+4>segments.length){canvas.drawLines(segments,0,count,lines);count=0;}
+            segments[count++]=ax;segments[count++]=ay;
+            segments[count++]=bx;segments[count++]=by;
         }
         if(count>0)canvas.drawLines(segments,0,count,lines);
     }
 
     private void drawSurfaces(Canvas canvas){
+        int visibleCount=0;
         for(int f=0;f<faceOrder.length;f++){
             int i=f*3,a=model.triangles[i],b=model.triangles[i+1],c=model.triangles[i+2];
+            if(!Cad3dVisibility.triangleVisible(
+                screen[a*2],screen[a*2+1],screen[b*2],screen[b*2+1],
+                screen[c*2],screen[c*2+1],getWidth(),getHeight(),8f))continue;
             int bucket=(int)(-(depth[a]+depth[b]+depth[c])*333333f/model.radius);
-            faceOrder[f]=((long)bucket<<32)|(f&0xffffffffL);
+            faceOrder[visibleCount++]=((long)bucket<<32)|(f&0xffffffffL);
         }
-        Arrays.sort(faceOrder);
-        for(long key:faceOrder){
+        // Sort only onscreen triangles. In dense/zoomed-in CAD this is often
+        // much smaller than the whole model's face count.
+        Arrays.sort(faceOrder,0,visibleCount);
+        for(int visible=0;visible<visibleCount;visible++){
+            long key=faceOrder[visible];
             int i=((int)key)*3,a=model.triangles[i],b=model.triangles[i+1],c=model.triangles[i+2];
             float ax=model.xyz[a*3],ay=model.xyz[a*3+1],az=model.xyz[a*3+2];
             float ux=model.xyz[b*3]-ax,uy=model.xyz[b*3+1]-ay,uz=model.xyz[b*3+2]-az;
