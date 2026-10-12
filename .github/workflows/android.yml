@@ -665,6 +665,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadPickBounds.java tests/CadPickBoundsTest.java
           java -cp /tmp/musacad-tests CadPickBoundsTest
+      - name: Guard honest raster IMAGE placeholder disclosure
+        run: |
+          javac -d /tmp/musacad-tests tests/CadRasterReferenceDisclosureTest.java
+          java -cp /tmp/musacad-tests CadRasterReferenceDisclosureTest
       - name: Test unsupported DXF entity type breakdown
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfSkippedTypesTest.java
