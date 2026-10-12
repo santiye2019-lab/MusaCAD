@@ -29,6 +29,17 @@ public final class DxfParser {
         Poly(ArrayList<PointF>p,boolean c){this(p,c,p);}Poly(ArrayList<PointF>p,boolean c,ArrayList<PointF>snap){pts=p;closed=c;snapPts=snap==null?p:snap;if(!pts.isEmpty()){sourcePath.moveTo(pts.get(0).x,pts.get(0).y);for(int i=1;i<pts.size();i++)sourcePath.lineTo(pts.get(i).x,pts.get(i).y);if(closed)sourcePath.close();}}
         public void bounds(RectF b){for(PointF p:pts)add(b,p.x,p.y);}public void draw(Canvas c,Paint p,Matrix m){if(pts.size()<2)return;sourcePath.transform(m,screenPath);c.drawPath(screenPath,p);}
     }
+    /** DXF SOLID and TRACE are filled planar quadrilaterals, not wire loops. */
+    private static final class FilledPolygon implements Entity{
+        final Poly polygon;
+        FilledPolygon(ArrayList<PointF>points){polygon=new Poly(points,true);}
+        public void bounds(RectF b){polygon.bounds(b);}
+        public void draw(Canvas c,Paint p,Matrix m){
+            Paint.Style previous=p.getStyle();
+            try{p.setStyle(Paint.Style.FILL);polygon.draw(c,p,m);}
+            finally{p.setStyle(previous);}
+        }
+    }
     private static final class EntityGroup implements Entity{
         final List<Entity>children;EntityGroup(List<Entity>children){this.children=children;}
         public void bounds(RectF b){for(Entity e:children)e.bounds(b);}
@@ -836,7 +847,7 @@ public final class DxfParser {
             ArrayList<PointF>outline=new ArrayList<>(g.outline.size());
             for(DxfPlanarFace.Point point:g.outline)
                 outline.add(new PointF((float)point.x,(float)point.y));
-            return new Poly(outline,true);
+            return new FilledPolygon(outline);
         }if("DIMENSION".equals(type)){ArrayList<PointF>p=new ArrayList<>();addPointIfPresent(p,a,from,to,13,23);addPointIfPresent(p,a,from,to,14,24);addPointIfPresent(p,a,from,to,10,20);return p.size()<2?null:new Poly(p,false);}return null;
     }
 
