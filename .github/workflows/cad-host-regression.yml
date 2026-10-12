@@ -186,11 +186,12 @@ jobs:
           assert line is not None, 'Experimental R2013 ACIS mesh report missing'
           values=dict(part.split('=',1) for part in line.split()[1:])
           assert values.get('bodies')=='3' and values.get('mesh')=='3' and values.get('faces')=='10', values
-          assert int(values['tessellated'])>=8 and int(values['triangles'])>=16, values
+          assert int(values['tessellated'])==10 and int(values['unsupported'])==0 and int(values['triangles'])==28, values
           for body,number in ((1,27),(2,32),(3,134)):
               expected=f'ACIS_PUBLIC_RECORD_PARITY body={body} source_records={number} parsed_nodes={number} excess_records=0'
               assert expected in log, expected
-          print('PASS: retained 193 real SAB records and at least 8 tessellated faces')
+          assert 'PASS: two public R2013 nested triangular openings stay EMPTY' in log
+          print('PASS: retained 193 original SAB records, all 10 planar faces and both genuine triangular holes')
           PY
           /tmp/musacad-host/musacad_dwg_convert third_party/libredwg/test/test-data/2000/Cone.dwg /tmp/musacad-history-ab-cone.dxf 2>/tmp/musacad-history-ab-cone.log
           python3 tests/audit_acis_roundtrip.py /tmp/musacad-history-ab-cone.dxf --source-log /tmp/musacad-history-ab-cone.log --require-source
