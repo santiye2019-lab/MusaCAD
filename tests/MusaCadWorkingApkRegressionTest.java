@@ -21,6 +21,10 @@ public final class MusaCadWorkingApkRegressionTest {
         yes(workflow.contains("secrets.MUSACAD_AI_API_URL")&&
                 workflow.contains("secrets.MUSACAD_AI_SESSION_URL"),
             "Existing public gateway addresses must reach the test APK build");
+        yes(workflow.contains("secrets.MUSACAD_TRIAL_API_URL")&&
+                workflow.contains("secrets.MUSACAD_TRIAL_PUBLIC_KEY_PEM")&&
+                workflow.contains("TRIAL_PUBLIC_KEY_PEM"),
+            "Restored APK must preserve signed trial entitlement verification");
         yes(workflow.contains("BuildConfig.java")&&workflow.contains("AI_SESSION_URL")&&
                 workflow.contains("AI_API_URL")&&
                 workflow.contains("APK withheld"),
