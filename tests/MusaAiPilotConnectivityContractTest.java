@@ -19,6 +19,13 @@ public final class MusaAiPilotConnectivityContractTest {
         String cloud=read("app/src/main/java/com/musa/cad/MusaAiCloudService.java");
         String pilot=read(".github/workflows/qwen-isolated-pilot-24h.yml");
         has(health,"public static Diagnostic diagnoseNow()");
+        has(health,"public static Diagnostic diagnoseStableNow()");
+        has(health,"public static void checkDetailed(DiagnosticCallback callback)");
+        has(health,"public static String healthUrl()");
+        has(health,"Diagnostic first=diagnoseNow()");
+        has(health,"Diagnostic second=diagnoseNow()");
+        has(health,"if(second.reachable)");
+        has(health,"bu sonuç Qwen model yanıtını doğrulamaz.".replace("bu","Bu"));
         has(health,"if(!configured())");
         has(health,"new URL(endpoint.getProtocol(),endpoint.getHost(),endpoint.getPort(),\"/health\")");
         has(health,"connection=(HttpsURLConnection)health.openConnection()");
@@ -40,12 +47,14 @@ public final class MusaAiPilotConnectivityContractTest {
             "Never upload drawing evidence in diagnostic request");
 
         int session=main.indexOf("MusaAiSessionService.Result preflight=");
-        int probe=main.indexOf("MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseNow();");
+        int probe=main.indexOf("MusaAiCloudHealth.Diagnostic network=MusaAiCloudHealth.diagnoseStableNow();");
         int index=main.indexOf("MusaAiDrawingIndex snapshot=activeSnapshot.aiDrawingIndex(");
         check(session>=0&&probe>session&&index>probe,
             "Probe must follow authorization, precede costly indexing");
         has(main,"AI görsel bölgeleri: 0/9 — hiçbir görüntü AI tarafından incelenmedi.");
         has(main,"MusaAiCloudHealth.Diagnostic afterFailure=");
+        has(main,"?MusaAiCloudHealth.diagnoseStableNow():null;");
+        has(main,"Bu testler ilk aktarım hatasının kesin nedenini kanıtlamaz.");
         has(main,"cloud.status==MusaAiCloudService.Status.NETWORK_ERROR");
         has(main,"(afterFailure==null||afterFailure.reachable)");
         has(main,"if(!firstTransferFailure.isEmpty()");
