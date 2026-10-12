@@ -54,7 +54,14 @@ fixture to **10/10 tessellated source faces, 28 triangles and 26 original
 boundary edges**. Regression tests also forbid filling the two openings, or
 connecting disjoint or noncoplanar contours.
 
-**26 SAT references are still unresolved after history preservation**. In
+**26 SAT references are still unresolved after history preservation**.
+A read-only PUBLIC fixture ownership audit found all 26 occur in
+`persubent-acadsolidhistory-attrib` records: 10 in the second body and
+16 in the third. **None originate in direct face, loop, coedge, edge or
+vertex records.** Both real triangular openings remain unfilled.
+This is a *classification*, not a license to discard broken history
+or claim exact B-Rep/round-trip fidelity. The 3D viewer now reports
+history-only unresolved links separately from unclassified/geometric links. In
 particular, the two affected R2013 bodies continue to report incomplete;
 visible surfaces do NOT certify fully intact B-Rep topology, precise
 solid-volume measurements or DWG round-trip fidelity. The new tessellation
