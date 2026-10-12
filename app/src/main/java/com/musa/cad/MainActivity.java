@@ -4127,7 +4127,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
-        if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;pendingDxfSaveProject=null;return;}
+        if(r==SAVE_DXF&&(c!=RESULT_OK||data==null||data.getData()==null)){pendingCloseAfterSave=null;pendingDxfSaveProject=null;return;}
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
             pendingYfk2025Reply=null;
