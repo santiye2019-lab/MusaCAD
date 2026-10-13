@@ -626,6 +626,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisSatMeshTest.java
           java -cp /tmp/musacad-tests AcisSatMeshTest
+      - name: Test watertight 3D planar B-Rep extrusion and DXF mesh writing
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepTest.java
+          java -cp /tmp/musacad-tests CadPrismBrepTest
       - name: Test DXF write full-precision coordinates and locale independence
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfNumber.java tests/DxfNumberTest.java
