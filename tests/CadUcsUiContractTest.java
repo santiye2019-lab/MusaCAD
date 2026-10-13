@@ -23,6 +23,20 @@ public final class CadUcsUiContractTest {
             "partial invalid axis delta must not corrupt geometry");
         verify(src.contains("Dxf3dSafeSave.stage(")&&src.contains("Dxf3dSafeSave.publish("),
             "UCS editor must preserve guarded staged 3D DXF saving");
+        verify(src.contains("showSavedUcsSelector(control)")&&
+            src.contains("showSaveUcsDialog(control)")&&
+            src.contains("showDeleteUcsDialog()"),
+            "3D UCS selector must offer select, save and delete named profiles");
+        verify(src.contains("getSharedPreferences(UCS_PREFS,MODE_PRIVATE)"),
+            "named UCS profiles must be stored device-locally");
+        verify(src.contains("CadUcsProfiles.put(storedUcs(),name,editingUcs)"),
+            "current frame must be saved as named profile");
+        verify(src.contains("CadUcsProfiles.remove(storedUcs(),name)"),
+            "remove action must update named profile storage");
+        verify(src.contains("editingUcs=saved.get(names[which])"),
+            "restoring a named frame must update live editing axes");
+        verify(src.contains("setMessage(name+\" kaydı silinsin mi?"),
+            "removing a named UCS requires explicit confirmation");
         System.out.println("3D UCS controls and guarded DXF save UI integration contract passed");
     }
 }
