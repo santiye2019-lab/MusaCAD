@@ -361,6 +361,7 @@ public final class Mesh3dActivity extends Activity {
         super.onActivityResult(request,result,data);
         if(request!=SAVE_DXF||result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
         Uri uri=data.getData();String path=getIntent().getStringExtra(EXTRA_DXF);saving=true;
+        refresh3dUndoButtons();
         new Thread(()->{String message;File staged=null;
             try{
                 // Prepare and verify the full DXF before opening Android's potentially truncating URI.
@@ -372,7 +373,10 @@ public final class Mesh3dActivity extends Activity {
                 message="3B DXF kopyası kaydedildi";
             }catch(Exception e){message="3B kayıt başarısız: "+e.getMessage();}
             finally{if(staged!=null)staged.delete();}
-            final String resultMessage=message;runOnUiThread(()->{saving=false;if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();});
+            final String resultMessage=message;runOnUiThread(()->{
+                saving=false;refresh3dUndoButtons();
+                if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();
+            });
         },"MusaCAD-3D-save").start();
     }
     @Override protected void onDestroy(){closing=true;super.onDestroy();}
