@@ -32,6 +32,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Verify canonical CAD engine 18-item acceptance ledger
+        run: |
+          python3 -m unittest discover -s tests -p 'test_cad_18_item_ledger.py' -v
       - name: Test guarded production trial Worker deployment invariants
         run: |
           python3 -m unittest discover -s tests -p 'test_trial_worker_deploy_guard.py' -v
