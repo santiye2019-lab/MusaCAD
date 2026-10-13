@@ -661,6 +661,11 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryJournalTest.java tests/Cad3dRecoveryIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryJournalTest
           java -cp /tmp/musacad-tests Cad3dRecoveryIntegrationContractTest
+      - name: Test nonblocking 3D recovery snapshots and serialized lifecycle I/O
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
+          java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
+          java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
       - name: Test 3D DXF surface geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
