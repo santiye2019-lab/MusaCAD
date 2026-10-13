@@ -7,6 +7,22 @@ public final class CadProjectCloseBackContractTest {
     private static void verify(boolean yes,String why){if(!yes)throw new AssertionError(why);}
     public static void main(String[]args)throws Exception{
         String source=Files.readString(Path.of("app/src/main/java/com/musa/cad/MainActivity.java"),StandardCharsets.UTF_8);
+        // The global Android Back handler must route an open tab to a confirmation,
+        // while Back on the empty home screen may finish the activity.
+        verify(source.contains("handleOnBackPressed(){handleBackNavigation();}"),
+            "Android Back dispatcher must use project-aware navigation");
+        int navigationStart=source.indexOf("private void handleBackNavigation(){");
+        int navigationEnd=source.indexOf("@Override protected void onNewIntent(",navigationStart);
+        verify(navigationStart>=0&&navigationEnd>navigationStart,"project-aware Back handler exists");
+        String navigation=source.substring(navigationStart,navigationEnd);
+        verify(navigation.contains("if(currentProject!=null){")&&
+            navigation.contains("requestCloseProject(currentProject);"),
+            "Back with open project requests explicit close confirmation");
+        verify(navigation.contains("finish();")&&
+            navigation.indexOf("requestCloseProject(currentProject);")<navigation.indexOf("finish();"),
+            "only Back without an open project can finish the activity");
+        verify(!navigation.contains("closeProjectNow("),
+            "Back navigation must not silently discard a project");
         int blockStart=source.indexOf("projectCloseDialog.setOnKeyListener(");
         int blockEnd=source.indexOf("projectCloseDialog.setOnDismissListener(",blockStart);
         verify(blockStart>=0&&blockEnd>blockStart,"close confirmation key handler exists");
