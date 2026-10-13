@@ -119,7 +119,7 @@ public final class DxfTiltedOcsTest {
             tags(0,"INSERT",2,"OUTER",10,1,20,2,30,3,210,0,220,1,230,0)),1);
         // Inner TABLE starts at (7,5,6), ends at (7,5,8).
         // Outer OCS with normal Y: WCS X=(-1,0,0), Y=(0,0,1), Z=(0,1,0).
-        xyz(m,0,-6,9,7);xyz(m,1,-6,11,7);
+        xyz(m,0,-8,9,7);xyz(m,1,-8,11,7);
     }
     private static void invalidHeadingDoesNotFabricateTable()throws Exception{
         String b=block("*TABLE",line());
