@@ -59,6 +59,7 @@ public final class CadPrismBrep {
         public void writeDxf(Writer out, String layer) throws IOException {
             if(out==null||layer==null||!layer.matches("[A-Za-z0-9_.-]{1,32}"))
                 throw new IllegalArgumentException("Invalid DXF layer/target");
+            validateBeforeWrite();
             tag(out,0,"SECTION");tag(out,2,"HEADER");
             tag(out,9,"$ACADVER");tag(out,1,"AC1015");
             tag(out,0,"ENDSEC");tag(out,0,"SECTION");tag(out,2,"ENTITIES");
@@ -72,6 +73,43 @@ public final class CadPrismBrep {
                 }
             }
             tag(out,0,"ENDSEC");tag(out,0,"EOF");
+        }
+
+
+        /**
+         * Public XYZ/triangle arrays can be modified by a caller after extrusion.
+         * Refuse unsafe geometry *before emitting the first byte* to a DXF writer.
+         * This checks mesh topology, finite CAD coordinates, nondegenerate faces
+         * and the signed volume previously established by the extrusion engine.
+         */
+        private void validateBeforeWrite() {
+            int n=ringVertices;
+            if(n<3 || n>MAX_RING || xyz==null || triangles==null ||
+                    xyz.length!=6*n ||
+                    triangles.length!=((n-2)*2+n*2)*3 ||
+                    !Double.isFinite(volume) || volume<=0)
+                throw new IllegalArgumentException("3D output mesh layout is invalid");
+            for(double v:xyz)
+                if(!bounded(v))throw new IllegalArgumentException("Non-finite/out-of-range 3D coordinate");
+            if(!isWatertight())
+                throw new IllegalArgumentException("3D output shell is not watertight");
+            double ox=xyz[0],oy=xyz[1],oz=xyz[2],signedSix=0d;
+            for(int i=0;i<triangles.length;i+=3) {
+                int ia=triangles[i]*3,ib=triangles[i+1]*3,ic=triangles[i+2]*3;
+                double ax=xyz[ia]-ox,ay=xyz[ia+1]-oy,az=xyz[ia+2]-oz;
+                double bx=xyz[ib]-ox,by=xyz[ib+1]-oy,bz=xyz[ib+2]-oz;
+                double cx=xyz[ic]-ox,cy=xyz[ic+1]-oy,cz=xyz[ic+2]-oz;
+                double crossX=by*cz-bz*cy,crossY=bz*cx-bx*cz,crossZ=bx*cy-by*cx;
+                if((crossX==0d&&crossY==0d&&crossZ==0d)||
+                        !Double.isFinite(crossX)||!Double.isFinite(crossY)||
+                        !Double.isFinite(crossZ))
+                    throw new IllegalArgumentException("Degenerate 3D output triangle");
+                signedSix+=ax*crossX+ay*crossY+az*crossZ;
+            }
+            double signedVolume=signedSix/6d;
+            if(!Double.isFinite(signedVolume)||signedVolume<=0 ||
+                    Math.abs(signedVolume-volume)>Math.max(1e-8,volume*1e-8))
+                throw new IllegalArgumentException("3D output solid volume/orientation changed");
         }
 
         private static void tag(Writer out,int group,String value)throws IOException{
