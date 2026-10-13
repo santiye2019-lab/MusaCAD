@@ -44,6 +44,7 @@ public final class Mesh3dActivity extends Activity {
     private File recoveryFile;
     private String recoveryFingerprint;
     private boolean explicitlyDiscarding;
+    private boolean pendingRecoveryDecision;
     private final Set<Integer> touchedVertices=new HashSet<>();
     private OnBackInvokedCallback systemBackCallback;
     private Button undo3dButton,redo3dButton;
@@ -218,22 +219,27 @@ public final class Mesh3dActivity extends Activity {
         }
     }
     private void offer3dRecovery(Cad3dRecoveryJournal.Snapshot recovered){
+        pendingRecoveryDecision=true;
         new android.app.AlertDialog.Builder(this)
             .setTitle("3B düzenleme kurtarma kaydı")
             .setMessage(recovered.changedVertices()+" köşe için cihazda tamamlanmamış bir çalışma bulundu. Yalnız aynı çizim verisine ait kayıt kullanılabilir. Değişiklikler geri yüklensin mi?")
             .setCancelable(false)
             .setPositiveButton("KURTAR",(dialog,which)->{
+                pendingRecoveryDecision=false;
                 float[] saved=recovered.savedGeometry(original);
                 recovered.restoreCurrent(mesh.xyz);
                 saveCheckpoint.markSaved(saved);
                 touchedVertices.clear();
-                for(int vertex:recovered.vertices)touchedVertices.add(vertex);
+                for(int vertex:recovered.indices())touchedVertices.add(vertex);
                 // Source-compatible coordinates were recovered, not the old undo stack.
                 editHistory.clear();
                 refresh3dUndoButtons();
                 meshView.geometryChanged();
             })
-            .setNegativeButton("KAYDI SİL",(dialog,which)->delete3dRecovery())
+            .setNegativeButton("KAYDI SİL",(dialog,which)->{
+                pendingRecoveryDecision=false;
+                delete3dRecovery();
+            })
             .show();
     }
     private void delete3dRecovery(){
@@ -509,7 +515,7 @@ public final class Mesh3dActivity extends Activity {
     @Override protected void onStop(){
         super.onStop();
         if(mesh==null||saveCheckpoint==null||recoveryFile==null||
-            recoveryFingerprint==null)return;
+            recoveryFingerprint==null||pendingRecoveryDecision)return;
         if(meshView!=null)meshView.cancelActiveAxisDrag();
         if(explicitlyDiscarding||!saveCheckpoint.hasUnsavedChanges(mesh.xyz)){
             delete3dRecovery();
