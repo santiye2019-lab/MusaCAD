@@ -27,8 +27,9 @@ public final class Cad3dRecoveryIntegrationContractTest {
            "Backgrounding an unanswered recovery prompt must keep original journal");
         ok(activity.contains("@Override protected void onStop()")&&
            activity.contains("meshView.cancelActiveAxisDrag()")&&
-           activity.contains("Cad3dRecoveryJournal.save("),
-           "Completed vertex edits are persisted at lifecycle stop, never preview-only gestures");
+           activity.contains("Cad3dRecoveryJournal.capture(")&&
+           activity.contains("Cad3dRecoveryJournal.persist("),
+           "Completed vertex edits are captured on stop and persisted off the UI thread");
         ok(activity.contains("touchedVertices.add(vertex)")&&
            activity.contains("for(int vertex:recovered.indices())touchedVertices.add(vertex)"),
            "Sparse checkpoint tracks all committed and restored vertices");
