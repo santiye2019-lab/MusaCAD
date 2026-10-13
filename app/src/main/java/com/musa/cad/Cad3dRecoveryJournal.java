@@ -12,10 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.Set;
 import java.util.zip.CRC32;
 
@@ -36,9 +33,11 @@ public final class Cad3dRecoveryJournal {
         private final int[] vertices;
         private final float[] current,checkpoint;
         private Snapshot(int[] vertices,float[] current,float[] checkpoint){
-            this.vertices=vertices.clone();
-            this.current=current.clone();
-            this.checkpoint=checkpoint.clone();
+            // Both capture() and load() own these freshly allocated arrays.
+            // No external aliases exist; accessors never expose them directly.
+            this.vertices=vertices;
+            this.current=current;
+            this.checkpoint=checkpoint;
         }
         public int changedVertices(){return vertices.length;}
         public int[] indices(){return vertices.clone();}
@@ -127,12 +126,14 @@ public final class Cad3dRecoveryJournal {
             lines.length!=original.length/3||slots.length!=lines.length||
             checkpoint==null||touched==null||touched.size()>MAX_CHANGED)
             throw new IOException("3D recovery snapshot input invalid");
-        List<Integer> keys=new ArrayList<>(touched);
-        Collections.sort(keys);
-        int[] vertices=new int[keys.size()];
-        float[] live=new float[keys.size()*3],saved=new float[keys.size()*3];
-        for(int k=0;k<keys.size();k++){
-            int vertex=keys.get(k);
+        // UI capture stays O(touched vertices): sorting occurs on the I/O worker.
+        int size=touched.size();
+        int[] vertices=new int[size];
+        float[] live=new float[size*3],saved=new float[size*3];
+        int k=0;
+        for(Integer key:touched){
+            if(key==null)throw new IOException("3D recovery contains a null vertex");
+            int vertex=key;
             validateIndex(vertex,original,lines,slots);
             vertices[k]=vertex;
             float[] checkpointVertex=checkpoint.savedVertex(vertex);
@@ -143,6 +144,7 @@ public final class Cad3dRecoveryJournal {
                 live[k*3+axis]=now;
                 saved[k*3+axis]=before;
             }
+            k++;
         }
         return new Snapshot(vertices,live,saved);
     }
@@ -159,11 +161,21 @@ public final class Cad3dRecoveryJournal {
             out.writeInt(MAGIC);out.writeInt(VERSION);
             out.writeUTF(fingerprint);out.writeInt(totalVertices);
             out.writeInt(captured.vertices.length);
-            int previous=-1;
-            for(int k=0;k<captured.vertices.length;k++){
+            // Sort primitive vertex/index pairs off the Android UI thread.
+            // The lower 32 bits retain the source slot in the immutable capture.
+            long[] ordered=new long[captured.vertices.length];
+            for(int k=0;k<ordered.length;k++){
                 int vertex=captured.vertices[k];
-                if(vertex<=previous||vertex>=totalVertices)
-                    throw new IOException("3D recovery snapshot indices invalid");
+                if(vertex<0||vertex>=totalVertices)
+                    throw new IOException("3D recovery snapshot index invalid");
+                ordered[k]=((long)vertex<<32)|(k&0xffffffffL);
+            }
+            Arrays.sort(ordered);
+            int previous=-1;
+            for(long pair:ordered){
+                int vertex=(int)(pair>>>32),k=(int)pair;
+                if(vertex<=previous)
+                    throw new IOException("3D recovery snapshot indices duplicated");
                 previous=vertex;
                 out.writeInt(vertex);
                 for(int axis=0;axis<3;axis++)
