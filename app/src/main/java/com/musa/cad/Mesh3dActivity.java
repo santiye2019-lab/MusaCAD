@@ -170,11 +170,17 @@ public final class Mesh3dActivity extends Activity {
         super.onActivityResult(request,result,data);
         if(request!=SAVE_DXF||result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
         Uri uri=data.getData();String path=getIntent().getStringExtra(EXTRA_DXF);saving=true;
-        new Thread(()->{String message;
-            try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
-                if(output==null)throw new java.io.IOException("Dosya açılamadı");
-                Dxf3dEditor.write(new File(path),output,mesh,original);message="3B DXF kopyası kaydedildi";
+        new Thread(()->{String message;File staged=null;
+            try{
+                // Prepare and verify the full DXF before opening Android's potentially truncating URI.
+                staged=Dxf3dSafeSave.stage(path==null?null:new File(path),mesh,original,getCacheDir());
+                try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
+                    if(output==null)throw new java.io.IOException("Dosya açılamadı");
+                    Dxf3dSafeSave.publish(staged,output);
+                }
+                message="3B DXF kopyası kaydedildi";
             }catch(Exception e){message="3B kayıt başarısız: "+e.getMessage();}
+            finally{if(staged!=null)staged.delete();}
             final String resultMessage=message;runOnUiThread(()->{saving=false;if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();});
         },"MusaCAD-3D-save").start();
     }
