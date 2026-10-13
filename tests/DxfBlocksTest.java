@@ -40,6 +40,12 @@ public class DxfBlocksTest {
         DxfBlocks.Result inheritedLayer=read(b,insert("A",8,"BORU"));if(!inheritedLayer.placements.get(0).layer.equals("BORU"))throw new AssertionError("Layer inheritance");
         skipped(read(b,insert("MISSING")));skipped(read(block("A",insert("A")),insert("A")));skipped(read(b,insert("A",70,0)));
         point(read(b,insert("A",10,10,20,20,30,6540.072947)),12,22);
+        DxfBlocks.Result zInsert=read(block("ZPIPE",LINE),insert("ZPIPE",10,10,20,20,30,7,43,3));
+        if(zInsert.placements.size()!=1||zInsert.placements.get(0).transform.z(5)!=22d)
+            throw new AssertionError("In-memory block expansion must preserve insert Z and 43 scale");
+        double[] planPoint=zInsert.placements.get(0).transform.point(2,2);
+        if(planPoint[0]!=12d||planPoint[1]!=22d)
+            throw new AssertionError("3D support must not change XY plan positions");
         point(read(b,insert("A",230,-1)),-2,2);
         skipped(read(b,insert("A",210,1,220,0,230,0)));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");if(repeated.blockInsertions.size()!=2)throw new AssertionError("Repeated block insertion metadata");

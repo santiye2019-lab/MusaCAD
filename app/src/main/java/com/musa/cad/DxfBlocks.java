@@ -10,15 +10,32 @@ public final class DxfBlocks {
     public static final String PAPER_LAYOUT="Paper Space";
 
     public static final class Transform {
-        public final double a,b,c,d,x,y;
-        public Transform(){this(1,0,0,1,0,0);}
-        private Transform(double a,double b,double c,double d,double x,double y){this.a=a;this.b=b;this.c=c;this.d=d;this.x=x;this.y=y;}
+        public final double a,b,c,d,x,y,zScale,zOffset;
+        public Transform(){this(1,0,0,1,0,0,1,0);}
+        private Transform(double a,double b,double c,double d,double x,double y,double zScale,double zOffset){
+            this.a=a;this.b=b;this.c=c;this.d=d;this.x=x;this.y=y;
+            this.zScale=zScale;this.zOffset=zOffset;
+        }
+        /** XY stays planar for 2D rendering; Z is retained for the 3D mesh. */
         public double[] point(double px,double py){return new double[]{a*px+c*py+x,b*px+d*py+y};}
+        public double z(double pz){return zScale*pz+zOffset;}
+        public double[] point3d(double px,double py,double pz){return new double[]{a*px+c*py+x,b*px+d*py+y,z(pz)};}
         public double scale(){double sx=Math.hypot(a,b),sy=Math.hypot(c,d);double value=(sx+sy)/2d;return Double.isFinite(value)&&value>0d?value:1d;}
-        public boolean isIdentity(){return Math.abs(a-1d)<1e-12&&Math.abs(d-1d)<1e-12&&Math.abs(b)<1e-12&&Math.abs(c)<1e-12&&Math.abs(x)<1e-12&&Math.abs(y)<1e-12;}
-        public Transform thenLocal(Transform t){return new Transform(a*t.a+c*t.b,b*t.a+d*t.b,a*t.c+c*t.d,b*t.c+d*t.d,a*t.x+c*t.y+x,b*t.x+d*t.y+y);}
-        static Transform translate(double x,double y){return new Transform(1,0,0,1,x,y);}
-        static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);}
+        public boolean isIdentity(){return Math.abs(a-1d)<1e-12&&Math.abs(d-1d)<1e-12&&Math.abs(b)<1e-12&&Math.abs(c)<1e-12&&Math.abs(x)<1e-12&&Math.abs(y)<1e-12&&Math.abs(zScale-1d)<1e-12&&Math.abs(zOffset)<1e-12;}
+        public Transform thenLocal(Transform t){
+            return new Transform(a*t.a+c*t.b,b*t.a+d*t.b,a*t.c+c*t.d,b*t.c+d*t.d,
+                a*t.x+c*t.y+x,b*t.x+d*t.y+y,zScale*t.zScale,zScale*t.zOffset+zOffset);
+        }
+        static Transform translate(double x,double y){return translate(x,y,0d);}
+        static Transform translate(double x,double y,double z){return new Transform(1,0,0,1,x,y,1,z);}
+        static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){
+            return insert(bx,by,0,sx,sy,1,degrees,x,y,0);
+        }
+        static Transform insert(double bx,double by,double bz,double sx,double sy,double sz,double degrees,double x,double y,double z){
+            double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);
+            double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;
+            return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by,sz,z-sz*bz);
+        }
     }
 
     public static final class Record {
@@ -188,7 +205,7 @@ public final class DxfBlocks {
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;String[] visibilityGates=DxfLayerState.addGate(parentVisibilityGates,layer);String layout=entityLayout(r,parentLayout);int color=entityColor(r,layer,parentBlockColor,layerColors);String lineType=entityLineType(r,layer,parentBlockLineType,layerLineTypes);int lineWeight=entityLineweight(r,layer,parentBlockLineWeight,layerLineWeights,defaultLineweight);double ownScale=r.number(48,1d);if(!Double.isFinite(ownScale)||ownScale<=0d)ownScale=1d;double effectiveLineTypeScale=parentLineTypeScale*ownScale;
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
-            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0),r.number(32,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
@@ -200,10 +217,11 @@ public final class DxfBlocks {
             double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
             if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
             double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
-            double bx=block.header.number(10,0),by=block.header.number(20,0),ix=r.number(10,0),iy=r.number(20,0);
+            double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
+            double ix=r.number(10,0),iy=r.number(20,0),iz=r.number(30,0);
             Transform local=negativeZ
-                ?Transform.insert(bx,by,-1,1,-degrees,-ix,iy)
-                :Transform.insert(bx,by,1,1,degrees,ix,iy);
+                ?Transform.insert(bx,by,bz,-1,1,-1,-degrees,-ix,iy,-iz)
+                :Transform.insert(bx,by,bz,1,1,1,degrees,ix,iy,iz);
             stack.add(name);
             try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
             finally{stack.remove(name);}
@@ -214,16 +232,17 @@ public final class DxfBlocks {
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
         boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
         boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-        // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
-        // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
+        // 2D rendering remains planar; 3D mesh expansion now retains full Z transform.
+        // Tilted OCS still requires a complete 3D basis and is rejected.
         int columns=r.integer(70,1),rows=r.integer(71,1);
         if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
-        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        double sx=r.number(41,1),sy=r.number(42,1),sz=r.number(43,1);if(sx==0||sy==0){result.skipped++;return;}
         if(directRoot){
             String rawName=r.text(2,"").trim();
             if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
         }
-        double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
+        double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
+        double degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0),iz=r.number(30,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
         // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
         // the whole array; spacing is a drawing-unit distance and is not block-scaled.
@@ -234,8 +253,8 @@ public final class DxfBlocks {
                 double arrayX=ix+co*dx-si*dy,arrayY=iy+si*dx+co*dy;
                 // For OCS normal (0,0,-1), OCS X maps to -WCS X and rotation reverses.
                 Transform local=negativeZ
-                    ?Transform.insert(bx,by,-sx,sy,-degrees,-arrayX,arrayY)
-                    :Transform.insert(bx,by,sx,sy,degrees,arrayX,arrayY);
+                    ?Transform.insert(bx,by,bz,-sx,sy,-sz,-degrees,-arrayX,arrayY,-iz)
+                    :Transform.insert(bx,by,bz,sx,sy,sz,degrees,arrayX,arrayY,iz);
                 Transform transform=parent.thenLocal(local);
                 expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
