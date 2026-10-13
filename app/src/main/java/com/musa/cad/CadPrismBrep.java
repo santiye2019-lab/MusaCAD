@@ -99,12 +99,21 @@ public final class CadPrismBrep {
                 double ax=xyz[ia]-ox,ay=xyz[ia+1]-oy,az=xyz[ia+2]-oz;
                 double bx=xyz[ib]-ox,by=xyz[ib+1]-oy,bz=xyz[ib+2]-oz;
                 double cx=xyz[ic]-ox,cy=xyz[ic+1]-oy,cz=xyz[ic+2]-oz;
-                double crossX=by*cz-bz*cy,crossY=bz*cx-bx*cz,crossZ=bx*cy-by*cx;
-                if((crossX==0d&&crossY==0d&&crossZ==0d)||
-                        !Double.isFinite(crossX)||!Double.isFinite(crossY)||
-                        !Double.isFinite(crossZ))
+                // Triangle degeneracy uses edges based at A, not vectors
+                // from the global volume origin. B and C can be collinear
+                // with that origin even when A-B-C is a valid face.
+                double abx=bx-ax,aby=by-ay,abz=bz-az;
+                double acx=cx-ax,acy=cy-ay,acz=cz-az;
+                double areaX=aby*acz-abz*acy;
+                double areaY=abz*acx-abx*acz;
+                double areaZ=abx*acy-aby*acx;
+                if((areaX==0d&&areaY==0d&&areaZ==0d)||
+                        !Double.isFinite(areaX)||!Double.isFinite(areaY)||
+                        !Double.isFinite(areaZ))
                     throw new IllegalArgumentException("Degenerate 3D output triangle");
-                signedSix+=ax*crossX+ay*crossY+az*crossZ;
+                // For *signed volume* keep a common origin and tetrahedra.
+                double volX=by*cz-bz*cy,volY=bz*cx-bx*cz,volZ=bx*cy-by*cx;
+                signedSix+=ax*volX+ay*volY+az*volZ;
             }
             double signedVolume=signedSix/6d;
             if(!Double.isFinite(signedVolume)||signedVolume<=0 ||
