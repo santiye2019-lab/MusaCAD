@@ -33,7 +33,7 @@ public final class Cad3dRecoveryJournal {
     private Cad3dRecoveryJournal(){}
 
     public static final class Snapshot {
-        public final int[] vertices;
+        private final int[] vertices;
         private final float[] current,checkpoint;
         private Snapshot(int[] vertices,float[] current,float[] checkpoint){
             this.vertices=vertices.clone();
@@ -41,6 +41,7 @@ public final class Cad3dRecoveryJournal {
             this.checkpoint=checkpoint.clone();
         }
         public int changedVertices(){return vertices.length;}
+        public int[] indices(){return vertices.clone();}
         /** Apply only after load() validated the matching source fingerprint. */
         public float[] savedGeometry(float[] original){
             float[] result=original.clone();
@@ -71,6 +72,14 @@ public final class Cad3dRecoveryJournal {
             .append(Character.forDigit(b&15,16));
         return out.toString();
     }
+    private static void feed(MessageDigest md,float[] values){
+        ByteBuffer bytes=ByteBuffer.allocate(8192);
+        for(float value:values){
+            if(bytes.remaining()<4){md.update(bytes.array(),0,bytes.position());bytes.clear();}
+            bytes.putInt(Float.floatToIntBits(value));
+        }
+        md.update(bytes.array(),0,bytes.position());
+    }
     private static void feed(MessageDigest md,int[] values){
         ByteBuffer bytes=ByteBuffer.allocate(8192);
         for(int value:values){
@@ -91,9 +100,7 @@ public final class Cad3dRecoveryJournal {
             ByteBuffer stat=ByteBuffer.allocate(16);
             stat.putLong(source.length()).putLong(source.lastModified());
             md.update(stat.array());
-            int[] coords=new int[original.length];
-            for(int i=0;i<original.length;i++)coords[i]=Float.floatToIntBits(original[i]);
-            feed(md,coords);feed(md,lines);feed(md,slots);
+            feed(md,original);feed(md,lines);feed(md,slots);
             return hex(md.digest());
         }catch(NoSuchAlgorithmException e){throw new IOException("SHA-256 unavailable",e);}
     }
@@ -111,9 +118,10 @@ public final class Cad3dRecoveryJournal {
         float[] current,int[] lines,int[] slots,Cad3dSaveCheckpoint checkpoint,
         Set<Integer> touched)throws IOException{
         if(destination==null||fingerprint==null||fingerprint.length()!=64||
-            original==null||current==null||!Arrays.equals(new int[]{original.length},
-            new int[]{current.length})||original.length%3!=0||
-            lines==null||slots==null||checkpoint==null||touched==null||
+            original==null||current==null||original.length!=current.length||
+            original.length%3!=0||lines==null||slots==null||
+            lines.length!=original.length/3||slots.length!=lines.length||
+            checkpoint==null||touched==null||
             touched.size()>MAX_CHANGED)
             throw new IOException("3D recovery snapshot input invalid");
         List<Integer> keys=new ArrayList<>(touched);
