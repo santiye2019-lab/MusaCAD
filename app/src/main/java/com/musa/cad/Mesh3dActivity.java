@@ -33,6 +33,8 @@ public final class Mesh3dActivity extends Activity {
     private float[] original;
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
+    private final Cad3dEditHistory editHistory=new Cad3dEditHistory();
+    private Button undo3dButton,redo3dButton;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(7,19,29));setContentView(root);
@@ -43,7 +45,9 @@ public final class Mesh3dActivity extends Activity {
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);
+                    editHistory.clear();
                     meshView.setAxisDragListener(this::moveGizmoVertex);
+                    meshView.setAxisDragCommitListener(this::recordCompletedAxisDrag);
                     meshView.setUcsFrame(editingUcs);
                     applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
                     TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+modelHint());
@@ -161,6 +165,25 @@ public final class Mesh3dActivity extends Activity {
         for(int k=0;k<3;k++)mesh.xyz[vertex*3+k]=(float)coords[k];
         return true;
     }
+    private void recordCompletedAxisDrag(int vertex,float[] before,float[] after){
+        if(saving||mesh==null||vertex<0||vertex>=mesh.sourceLines.length||
+           vertex>=mesh.coordinateSlots.length||mesh.sourceLines[vertex]<0||
+           mesh.coordinateSlots[vertex]<0)return;
+        if(editHistory.record(mesh.xyz,vertex,before,after))refresh3dUndoButtons();
+    }
+    private void refresh3dUndoButtons(){
+        if(undo3dButton!=null)undo3dButton.setEnabled(editHistory.canUndo()&&!saving);
+        if(redo3dButton!=null)redo3dButton.setEnabled(editHistory.canRedo()&&!saving);
+    }
+    private void perform3dHistory(boolean redo){
+        if(saving||mesh==null||meshView==null||meshView.isAxisDragging())return;
+        boolean applied=redo?editHistory.redo(mesh.xyz):editHistory.undo(mesh.xyz);
+        refresh3dUndoButtons();
+        if(applied)meshView.geometryChanged();
+        else android.widget.Toast.makeText(this,
+            redo?"İleri alınacak geçerli işlem yok":"Geri alınacak geçerli işlem yok",
+            android.widget.Toast.LENGTH_SHORT).show();
+    }
     private void addEditControls(FrameLayout root){
         if(mesh==null||mesh.solidProxy||mesh.acisSolids>0)return;
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
@@ -168,6 +191,15 @@ public final class Mesh3dActivity extends Activity {
         Button style=new Button(this);style.setText("Ağ çizgileri");views.addView(style,new LinearLayout.LayoutParams(0,-2,1));
         style.setOnClickListener(v->style.setText(meshView.toggleWireframe()?"Yüzey görünümü":"Ağ çizgileri"));
         Button reset=new Button(this);reset.setText("Görünümü sıfırla");views.addView(reset,new LinearLayout.LayoutParams(0,-2,1));reset.setOnClickListener(v->meshView.resetCamera());
+        LinearLayout historyRow=new LinearLayout(this);
+        panel.addView(historyRow,new LinearLayout.LayoutParams(-1,-2));
+        undo3dButton=new Button(this);undo3dButton.setText("↶ GERİ AL");
+        historyRow.addView(undo3dButton,new LinearLayout.LayoutParams(0,-2,1));
+        undo3dButton.setOnClickListener(v->perform3dHistory(false));
+        redo3dButton=new Button(this);redo3dButton.setText("↷ İLERİ AL");
+        historyRow.addView(redo3dButton,new LinearLayout.LayoutParams(0,-2,1));
+        redo3dButton.setOnClickListener(v->perform3dHistory(true));
+        refresh3dUndoButtons();
         Button ucsButton=new Button(this);
         ucsButton.setText("UCS: WCS");
         panel.addView(ucsButton,new LinearLayout.LayoutParams(-1,-2));
@@ -191,7 +223,9 @@ public final class Mesh3dActivity extends Activity {
                     if(!Double.isFinite(value)||Math.abs(value)>1e9d)throw new NumberFormatException();
                     next[k]=(float)value;
                 }
+                float[] before={mesh.xyz[vertex*3],mesh.xyz[vertex*3+1],mesh.xyz[vertex*3+2]};
                 for(int k=0;k<3;k++)mesh.xyz[vertex*3+k]=next[k];
+                if(editHistory.record(mesh.xyz,vertex,before,next))refresh3dUndoButtons();
                 meshView.geometryChanged();
             }catch(NumberFormatException error){step.setError("Pozitif bir adım girin");}
         });}
