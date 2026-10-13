@@ -96,6 +96,40 @@ public final class DxfTiltedOcsTest {
         xyz(m,0,4,1,2);
         xyz(m,1,7,1,2);
     }
+    private static void tiltedAcadTableAndDimension()throws Exception{
+        // ACAD_TABLE heading group 11 points along world Z, with extrusion along world X.
+        String tableBlock=block("*TABLE",tags(0,"LINE",10,0,20,0,30,0,11,2,21,0,31,0));
+        String table=tags(0,"ACAD_TABLE",2,"*TABLE",10,5,20,6,30,7,
+            11,0,21,0,31,1,210,1,220,0,230,0);
+        Dxf3dMesh tableMesh=check(document(tableBlock,table),1);
+        xyz(tableMesh,0,7,5,6);xyz(tableMesh,1,7,5,8);
+
+        // Dimension clone group-12 origin is OCS, not ordinary WCS translation.
+        String dimensionBlock=block("*D1",tags(0,"LINE",10,0,20,0,30,0,11,2,21,0,31,0));
+        String dimension=tags(0,"DIMENSION",2,"*D1",12,5,22,6,32,7,
+            210,0,220,1,230,0,70,32);
+        Dxf3dMesh dimMesh=check(document(dimensionBlock,dimension),1);
+        xyz(dimMesh,0,-5,7,6);xyz(dimMesh,1,-7,7,6);
+    }
+    private static void nestedTiltedTable()throws Exception{
+        String blocks=block("*TABLE",tags(0,"LINE",10,0,20,0,30,0,11,2,21,0,31,0))
+            +block("OUTER",tags(0,"ACAD_TABLE",2,"*TABLE",
+                10,5,20,6,30,7,11,0,21,0,31,1,210,1,220,0,230,0));
+        Dxf3dMesh m=check(document(blocks,
+            tags(0,"INSERT",2,"OUTER",10,1,20,2,30,3,210,0,220,1,230,0)),1);
+        // Inner TABLE starts at (7,5,6), ends at (7,5,8).
+        // Outer OCS with normal Y: WCS X=(-1,0,0), Y=(0,0,1), Z=(0,1,0).
+        xyz(m,0,-6,9,7);xyz(m,1,-6,11,7);
+    }
+    private static void invalidHeadingDoesNotFabricateTable()throws Exception{
+        String b=block("*TABLE",line());
+        String invalid=tags(0,"ACAD_TABLE",2,"*TABLE",11,1,21,0,31,0,
+            210,1,220,0,230,0);
+        String dxf=document(b,invalid);
+        DxfBlocks.Result expanded=DxfBlocks.expand(Arrays.asList(dxf.split("\n")));
+        if(expanded.skipped!=1||!expanded.placements.isEmpty())
+            throw new AssertionError("table heading parallel to extrusion must not invent a rotation");
+    }
     private static void zeroExtrusionIsSkipped()throws Exception{
         String dxf=document(block("PIPE",line()),
             tags(0,"INSERT",2,"PIPE",210,0,220,0,230,0));
@@ -110,6 +144,9 @@ public final class DxfTiltedOcsTest {
         sourceZCrossAxisAndBlockBase();
         mInsertArrayInTiltedPlane();
         zeroExtrusionIsSkipped();
+        tiltedAcadTableAndDimension();
+        nestedTiltedTable();
+        invalidHeadingDoesNotFabricateTable();
         System.out.println("3D OCS: tilted X/Y/diagonal, nonunit normals, 90deg scale, nested and MINSERT fixture passed");
     }
 }
