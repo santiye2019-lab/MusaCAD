@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -78,7 +79,40 @@ public final class Cad3dRecoveryAsyncTest {
                 destination,fingerprint,original,sourceLines,slots);
             model=original.clone();restored.restoreCurrent(model);
             ok(model[0]==200,"Newer queued save must persist new session edits");
+            // Large edit sets should not require sorting/extra cloning on the UI.
+            // A deliberately reverse-order capture must round-trip in sorted disk order
+            // without mixing the coordinate triples of adjacent vertices.
+            float[] openedFour={0,1,2,3,4,5,6,7,8,9,10,11};
+            float[] changedFour=openedFour.clone();
+            for(int v=0;v<4;v++)changedFour[v*3]=100+v;
+            int[] linesFour={2,4,6,8},slotsFour={0,0,0,0};
+            Set<Integer> reverse=new LinkedHashSet<>(Arrays.asList(3,2,1,0));
+            Cad3dRecoveryJournal.Snapshot unsorted=Cad3dRecoveryJournal.capture(
+                openedFour,changedFour,linesFour,slotsFour,
+                new Cad3dSaveCheckpoint(openedFour),reverse);
+            ok(Arrays.equals(unsorted.indices(),new int[]{3,2,1,0}),
+                "UI capture must avoid sorting touched vertices");
+            changedFour[9]=-999; // After capture, editor can keep moving vertex 3.
+            String fourFingerprint=Cad3dRecoveryJournal.fingerprint(
+                source,openedFour,linesFour,slotsFour);
+            File fourJournal=new File(dir,"unordered-vertices.m3dr");
+            Future<?> saveUnsorted=queue.submit(()->{
+                try{Cad3dRecoveryJournal.persist(fourJournal,fourFingerprint,4,unsorted);}
+                catch(Exception e){throw new RuntimeException(e);}
+            });
+            saveUnsorted.get();
+            Cad3dRecoveryJournal.Snapshot ordered=Cad3dRecoveryJournal.load(
+                fourJournal,fourFingerprint,openedFour,linesFour,slotsFour);
+            ok(Arrays.equals(ordered.indices(),new int[]{0,1,2,3}),
+                "Disk format must retain increasing vertex order for safe recovery");
+            float[] restoredFour=openedFour.clone();
+            ordered.restoreCurrent(restoredFour);
+            for(int v=0;v<4;v++)
+                ok(restoredFour[v*3]==100+v,
+                    "Sorted persistence must preserve each vertex's own XYZ");
+            ok(Arrays.equals(ordered.savedGeometry(openedFour),openedFour),
+                "Reordered checkpoint coordinates must remain aligned");
         }finally{queue.shutdown();}
-        System.out.println("3D async recovery: immutable capture, serialized load/write/discard passed");
+        System.out.println("3D async recovery: immutable capture, unordered vertex save, serialized I/O passed");
     }
 }
