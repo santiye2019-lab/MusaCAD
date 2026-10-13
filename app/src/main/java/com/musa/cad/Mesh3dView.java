@@ -25,7 +25,10 @@ public final class Mesh3dView extends View {
     private InteractionMode interactionMode=InteractionMode.ORBIT;
     /** The Activity owns source-validation and decides whether an edit can commit. */
     public interface AxisDragListener {boolean moveVertex(int vertex,double x,double y,double z);}
+    /** Called exactly once for a completed pointer drag; never for preview moves/cancel. */
+    public interface AxisDragCommitListener {void finished(int vertex,float[] before,float[] after);}
     private AxisDragListener axisDragListener;
+    private AxisDragCommitListener axisDragCommitListener;
     private CadUcsFrame gizmoUcs=CadUcsFrame.world();
     private final Paint[] gizmoPaints={new Paint(Paint.ANTI_ALIAS_FLAG),
         new Paint(Paint.ANTI_ALIAS_FLAG),new Paint(Paint.ANTI_ALIAS_FLAG)};
@@ -103,6 +106,10 @@ public final class Mesh3dView extends View {
         gizmoUcs=frame;postInvalidateOnAnimation();
     }
     public void setAxisDragListener(AxisDragListener listener){axisDragListener=listener;}
+    public void setAxisDragCommitListener(AxisDragCommitListener listener){
+        axisDragCommitListener=listener;
+    }
+    public boolean isAxisDragging(){return axisDragging;}
     private boolean startAxisDrag(float x,float y){
         if(interactionMode!=InteractionMode.EDIT||!editableVertex(first)||axisDragListener==null)return false;
         double[][] directions=projectedAxes();
@@ -223,6 +230,11 @@ public final class Mesh3dView extends View {
             case MotionEvent.ACTION_UP:
                 if(axisDragging){
                     moveDraggedAxis(e.getX(),e.getY());
+                    if(axisDragCommitListener!=null&&dragVertex>=0){
+                        int k=dragVertex*3;
+                        float[] after={model.xyz[k],model.xyz[k+1],model.xyz[k+2]};
+                        axisDragCommitListener.finished(dragVertex,dragOriginal.clone(),after);
+                    }
                     axisDragging=false;dragAxis=dragVertex=-1;
                     performClick();return true;
                 }
