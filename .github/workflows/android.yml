@@ -639,6 +639,12 @@ jobs:
           java -cp /tmp/musacad-tests CadUcsProfilesTest
           javac -encoding UTF-8 -d /tmp/musacad-tests tests/CadUcsUiContractTest.java
           java -cp /tmp/musacad-tests CadUcsUiContractTest
+      - name: Test interactive UCS 3D axis gizmo mathematics and Android safe-edit contract
+        run: |
+          javac -encoding UTF-8 -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadGizmoMath.java tests/CadGizmoMathTest.java
+          java -cp /tmp/musacad-tests CadGizmoMathTest
+          javac -encoding UTF-8 -d /tmp/musacad-tests tests/CadUcsGizmoIntegrationContractTest.java
+          java -cp /tmp/musacad-tests CadUcsGizmoIntegrationContractTest
       - name: Test 3D DXF surface geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
