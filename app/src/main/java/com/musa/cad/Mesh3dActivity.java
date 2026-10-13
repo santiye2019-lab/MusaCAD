@@ -21,6 +21,8 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.Arrays;
 
 /** Reads the converted DWG/DXF mesh off the UI thread and opens a real 3D orbit view. */
@@ -33,6 +35,13 @@ public final class Mesh3dActivity extends Activity {
     private static final int SAVE_DXF=3103;
     private static final String UCS_PREFS="musacad_3d_named_ucs";
     private static final String UCS_DATA="profiles";
+    // A process-wide FIFO queue ensures the previous Activity's onStop write
+    // completes before a replacement Activity reads the journal on rotation.
+    private static final ExecutorService RECOVERY_IO=Executors.newSingleThreadExecutor(r->{
+        Thread worker=new Thread(r,"MusaCAD-3D-recovery");
+        worker.setDaemon(true);
+        return worker;
+    });
     private volatile boolean closing;
     private boolean saving;
     private Dxf3dMesh mesh;
@@ -60,7 +69,7 @@ public final class Mesh3dActivity extends Activity {
         TextView status=new TextView(this);status.setText("3B yüzeyler hazırlanıyor…");status.setTextColor(Color.WHITE);status.setTextSize(16);status.setGravity(Gravity.CENTER);root.addView(status,new FrameLayout.LayoutParams(-1,-1));
         String path=getIntent().getStringExtra(EXTRA_DXF);
         if(path==null){status.setText("3B çalışma dosyası bulunamadı");return;}
-        new Thread(()->{
+        RECOVERY_IO.execute(()->{
             try{
                 File sourceFile=new File(path);
                 Dxf3dMesh loaded=Dxf3dMesh.read(sourceFile);
@@ -100,7 +109,7 @@ public final class Mesh3dActivity extends Activity {
                             android.widget.Toast.LENGTH_LONG).show();
                 });
             }catch(Exception e){runOnUiThread(()->{if(!closing)status.setText("3B görünüm açılamadı: "+e.getMessage());});}
-        },"MusaCAD-3D-load").start();
+        });
     }
     private String requestedMode(){
         String mode=getIntent().getStringExtra(EXTRA_MODE);
@@ -243,8 +252,13 @@ public final class Mesh3dActivity extends Activity {
             .show();
     }
     private void delete3dRecovery(){
-        if(recoveryFile!=null&&recoveryFile.exists()&&!recoveryFile.delete())
-            android.util.Log.w("MusaCAD-3D","Could not remove recovery journal");
+        final File target=recoveryFile;
+        if(target==null)return;
+        // File removal is serialized after any pending checkpoint write.
+        RECOVERY_IO.execute(()->{
+            if(target.exists()&&!target.delete())
+                android.util.Log.w("MusaCAD-3D","Could not remove recovery journal");
+        });
     }
     private void refresh3dUndoButtons(){
         if(undo3dButton!=null)undo3dButton.setEnabled(editHistory.canUndo()&&!saving);
@@ -522,11 +536,23 @@ public final class Mesh3dActivity extends Activity {
             return;
         }
         try{
-            // Sparse onStop checkpoint: no disk I/O for every touch frame.
-            Cad3dRecoveryJournal.save(recoveryFile,recoveryFingerprint,original,
-                mesh.xyz,mesh.sourceLines,mesh.coordinateSlots,saveCheckpoint,touchedVertices);
+            // Capture only edited vertices while the Activity still owns UI state.
+            // Serialization, fsync and rename run on the shared ordered I/O queue.
+            final Cad3dRecoveryJournal.Snapshot snapshot=Cad3dRecoveryJournal.capture(
+                original,mesh.xyz,mesh.sourceLines,mesh.coordinateSlots,
+                saveCheckpoint,touchedVertices);
+            final File destination=recoveryFile;
+            final String identity=recoveryFingerprint;
+            final int vertexCount=mesh.xyz.length/3;
+            RECOVERY_IO.execute(()->{
+                try{
+                    Cad3dRecoveryJournal.persist(destination,identity,vertexCount,snapshot);
+                }catch(IOException failure){
+                    android.util.Log.e("MusaCAD-3D","Recovery snapshot was not written",failure);
+                }
+            });
         }catch(IOException failure){
-            android.util.Log.e("MusaCAD-3D","Recovery snapshot was not written",failure);
+            android.util.Log.e("MusaCAD-3D","Recovery snapshot capture failed",failure);
         }
     }
     @Override protected void onDestroy(){
