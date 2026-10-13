@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Build;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.net.Uri;
 import android.view.Gravity;
 import android.view.View;
@@ -34,9 +37,17 @@ public final class Mesh3dActivity extends Activity {
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
     private final Cad3dEditHistory editHistory=new Cad3dEditHistory();
+    private Cad3dSaveCheckpoint saveCheckpoint;
+    private OnBackInvokedCallback systemBackCallback;
     private Button undo3dButton,redo3dButton;
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        // Android 13+ predictive back also follows the unsaved-edit guard.
+        if(Build.VERSION.SDK_INT>=33){
+            systemBackCallback=this::request3dExit;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT,systemBackCallback);
+        }
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(7,19,29));setContentView(root);
         TextView status=new TextView(this);status.setText("3B yüzeyler hazırlanıyor…");status.setTextColor(Color.WHITE);status.setTextSize(16);status.setGravity(Gravity.CENTER);root.addView(status,new FrameLayout.LayoutParams(-1,-1));
         String path=getIntent().getStringExtra(EXTRA_DXF);
@@ -44,7 +55,9 @@ public final class Mesh3dActivity extends Activity {
         new Thread(()->{
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
-                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);
+                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);
+                    saveCheckpoint=new Cad3dSaveCheckpoint(original);
+                    meshView=new Mesh3dView(this,mesh);
                     editHistory.clear();
                     meshView.setAxisDragListener(this::moveGizmoVertex);
                     meshView.setAxisDragCommitListener(this::recordCompletedAxisDrag);
@@ -209,6 +222,8 @@ public final class Mesh3dActivity extends Activity {
         String[] names={"X−","X+","Y−","Y+","Z−","Z+"};
         for(int n=0;n<names.length;n++){final int axis=n/2,sign=n%2==0?-1:1;Button button=new Button(this);button.setText(names[n]);row.addView(button,new LinearLayout.LayoutParams(0,-2,1));button.setOnClickListener(v->{
             if(saving)return;
+            // A second-finger button press must never interleave a preview drag and a step.
+            meshView.cancelActiveAxisDrag();
             int vertex=meshView.selectedVertex();if(vertex<0){step.setError("Önce modelden bir köşe seçin");return;}
             if(vertex>=mesh.sourceLines.length||mesh.sourceLines[vertex]<0||
                vertex>=mesh.coordinateSlots.length||mesh.coordinateSlots[vertex]<0){
@@ -229,13 +244,50 @@ public final class Mesh3dActivity extends Activity {
                 meshView.geometryChanged();
             }catch(NumberFormatException error){step.setError("Pozitif bir adım girin");}
         });}
-        Button save=new Button(this);save.setText("3B DXF kopyasını kaydet");panel.addView(save,new LinearLayout.LayoutParams(-1,-2));save.setOnClickListener(v->{
-            if(saving)return;
-            if(Arrays.equals(original,mesh.xyz)){step.setError("Önce bir köşeyi düzenleyin");return;}
-            Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/dxf");intent.putExtra(Intent.EXTRA_TITLE,"MusaCAD-3B-duzenleme.dxf");startActivityForResult(intent,SAVE_DXF);
-        });
+        Button save=new Button(this);save.setText("3B DXF kopyasını kaydet");panel.addView(save,new LinearLayout.LayoutParams(-1,-2));
+        save.setOnClickListener(v->begin3dSavePicker());
         root.addView(panel,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
     }
+    private void begin3dSavePicker(){
+        if(saving||mesh==null||meshView==null)return;
+        // Uncommitted gizmo previews must not be exported as real edits.
+        meshView.cancelActiveAxisDrag();
+        if(Arrays.equals(original,mesh.xyz)){
+            android.widget.Toast.makeText(this,"Önce bir köşeyi düzenleyin",
+                android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/dxf");
+        intent.putExtra(Intent.EXTRA_TITLE,"MusaCAD-3B-duzenleme.dxf");
+        startActivityForResult(intent,SAVE_DXF);
+    }
+
+    @Override public void onBackPressed(){
+        request3dExit();
+    }
+
+    private void request3dExit(){
+        if(saving){
+            android.widget.Toast.makeText(this,"3B DXF kaydı sürüyor; bitmesini bekleyin",
+                android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(meshView!=null)meshView.cancelActiveAxisDrag();
+        if(mesh!=null&&saveCheckpoint!=null&&saveCheckpoint.hasUnsavedChanges(mesh.xyz)){
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Kaydedilmemiş 3B düzenlemeler")
+                .setMessage("Son başarılı DXF kopyası kaydından sonra değişiklikler var. Kaydetmeden çıkarsanız bu değişiklikler kaybolacak.")
+                .setPositiveButton("DXF KOPYASI KAYDET",(dialog,which)->begin3dSavePicker())
+                .setNegativeButton("KAYDETMEDEN ÇIK",(dialog,which)->finish())
+                .setNeutralButton("İPTAL",null)
+                .show();
+            return;
+        }
+        finish();
+    }
+
     private void showUcsSelector(Button control){
         if(saving)return;
         String[] options={"WCS (Dünya)","Ön düzlem (XZ)","Sağ düzlem (YZ)",
@@ -360,9 +412,12 @@ public final class Mesh3dActivity extends Activity {
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(request!=SAVE_DXF||result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
+        if(meshView!=null)meshView.cancelActiveAxisDrag();
+        // UI edits are blocked until the staged write and destination publish finish.
+        final float[] exportSnapshot=Arrays.copyOf(mesh.xyz,mesh.xyz.length);
         Uri uri=data.getData();String path=getIntent().getStringExtra(EXTRA_DXF);saving=true;
         refresh3dUndoButtons();
-        new Thread(()->{String message;File staged=null;
+        new Thread(()->{String message;File staged=null;boolean exported=false;
             try{
                 // Prepare and verify the full DXF before opening Android's potentially truncating URI.
                 staged=Dxf3dSafeSave.stage(path==null?null:new File(path),mesh,original,getCacheDir());
@@ -370,14 +425,25 @@ public final class Mesh3dActivity extends Activity {
                     if(output==null)throw new java.io.IOException("Dosya açılamadı");
                     Dxf3dSafeSave.publish(staged,output);
                 }
+                exported=true;
                 message="3B DXF kopyası kaydedildi";
             }catch(Exception e){message="3B kayıt başarısız: "+e.getMessage();}
             finally{if(staged!=null)staged.delete();}
-            final String resultMessage=message;runOnUiThread(()->{
+            final String resultMessage=message;
+            final boolean finishedExport=exported;
+            runOnUiThread(()->{
+                if(finishedExport&&saveCheckpoint!=null)saveCheckpoint.markSaved(exportSnapshot);
                 saving=false;refresh3dUndoButtons();
                 if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();
             });
         },"MusaCAD-3D-save").start();
     }
-    @Override protected void onDestroy(){closing=true;super.onDestroy();}
+    @Override protected void onDestroy(){
+        closing=true;
+        if(Build.VERSION.SDK_INT>=33&&systemBackCallback!=null){
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(systemBackCallback);
+            systemBackCallback=null;
+        }
+        super.onDestroy();
+    }
 }
