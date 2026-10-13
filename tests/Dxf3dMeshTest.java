@@ -34,6 +34,8 @@ public final class Dxf3dMeshTest {
         testLineAndPolyline();
         testPolygonMesh();
         testInsertedBlockLine();
+        testNestedBlockZTransforms();
+        testNegativeOcsBlockZTransform();
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
@@ -96,6 +98,52 @@ public final class Dxf3dMeshTest {
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
+
+    private static void testNestedBlockZTransforms() throws Exception {
+        File file=File.createTempFile("mesh3d-block-levels-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"
+                +"0\nBLOCK\n2\nRISER\n10\n0\n20\n0\n30\n2\n"
+                +"0\nLINE\n10\n0\n20\n0\n30\n3\n11\n1\n21\n0\n31\n5\n"
+                +"0\nENDBLK\n"
+                +"0\nBLOCK\n2\nLEVEL\n10\n0\n20\n0\n30\n5\n"
+                +"0\nINSERT\n2\nRISER\n10\n0\n20\n0\n30\n30\n43\n2\n"
+                +"0\nENDBLK\n0\nENDSEC\n"
+                +"0\nSECTION\n2\nENTITIES\n"
+                +"0\nINSERT\n2\nLEVEL\n10\n10\n20\n20\n30\n100\n43\n3\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh model=Dxf3dMesh.read(file);
+            if(model.xyz.length!=6||model.edges.length!=2)throw new AssertionError("nested 3D INSERT vertex count");
+            // RISER: 30 + 2*(3/5 - 2) = 32/36; LEVEL: 100 + 3*(32/36 - 5) = 181/193.
+            if(model.xyz[2]!=181f||model.xyz[5]!=193f)
+                throw new AssertionError("nested block base Z and 43 Z-scale lost");
+            if(model.xyz[0]!=10f||model.xyz[1]!=20f)
+                throw new AssertionError("3D block XY must remain unchanged");
+            for(int line:model.sourceLines)if(line!=-1)
+                throw new AssertionError("expanded block vertices must not write source coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testNegativeOcsBlockZTransform() throws Exception {
+        File file=File.createTempFile("mesh3d-block-ocs-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"
+                +"0\nBLOCK\n2\nPIPE\n10\n0\n20\n0\n30\n2\n"
+                +"0\nLINE\n10\n1\n20\n0\n30\n3\n11\n2\n21\n0\n31\n4\n"
+                +"0\nENDBLK\n0\nENDSEC\n"
+                +"0\nSECTION\n2\nENTITIES\n"
+                +"0\nINSERT\n2\nPIPE\n10\n10\n20\n20\n30\n50\n43\n2\n210\n0\n220\n0\n230\n-1\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh model=Dxf3dMesh.read(file);
+            if(model.xyz.length!=6||model.xyz[2]!=-52f||model.xyz[5]!=-54f)
+                throw new AssertionError("negative extrusion must mirror 3D Z");
+            if(model.xyz[0]!=-11f||model.xyz[1]!=20f)
+                throw new AssertionError("negative extrusion must preserve existing XY mirroring");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
     private static void testFlat2dPlanMetadata() throws Exception {
         File file=File.createTempFile("mesh3d-flat-", ".dxf");
         try{
@@ -138,6 +186,20 @@ public final class Dxf3dMeshTest {
             if(mesh.triangles.length!=3||mesh.xyz.length!=9)
                 throw new AssertionError("ACIS triangle must become real tessellated geometry");
             for(int line:mesh.sourceLines)if(line!=-1)throw new AssertionError("tessellated ACIS vertices are read-only");
+            // The same SAT face placed in an elevated and Z-scaled BLOCK.
+            String inserted=dxf.toString().replace("0\nSECTION\n2\nENTITIES\n0\n3DSOLID\n",
+                "0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n2\nSOLID_Z\n10\n0\n20\n0\n30\n1\n0\n3DSOLID\n")
+                .replace("0\nENDSEC\n0\nEOF\n",
+                    "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
+                    +"0\nINSERT\n2\nSOLID_Z\n10\n7\n20\n8\n30\n15\n43\n2\n"
+                    +"0\nENDSEC\n0\nEOF\n");
+            Files.writeString(file.toPath(),inserted,StandardCharsets.UTF_8);
+            Dxf3dMesh elevated=Dxf3dMesh.read(file);
+            if(elevated.triangles.length!=3||elevated.acisSolids!=1)
+                throw new AssertionError("inserted ACIS B-Rep triangulation lost");
+            for(int n=0;n<elevated.xyz.length;n+=3)
+                if(elevated.xyz[n+2]!=13f)
+                    throw new AssertionError("inserted ACIS Z base/scale not applied");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 

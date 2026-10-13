@@ -9,16 +9,83 @@ public final class DxfBlocks {
     public static final String MODEL_LAYOUT="Model";
     public static final String PAPER_LAYOUT="Paper Space";
 
+    /** 3x4 affine transform: XY projection for 2D and complete XYZ for 3D. */
     public static final class Transform {
-        public final double a,b,c,d,x,y;
-        public Transform(){this(1,0,0,1,0,0);}
-        private Transform(double a,double b,double c,double d,double x,double y){this.a=a;this.b=b;this.c=c;this.d=d;this.x=x;this.y=y;}
+        public final double a,b,c,d,x,y,xz,yz,zx,zy,zScale,zOffset;
+        public Transform(){this(1,0,0,1,0,0,0,0,0,0,1,0);}
+        private Transform(double a,double b,double c,double d,
+                          double xz,double yz,double zx,double zy,
+                          double x,double y,double zScale,double zOffset){
+            this.a=a;this.b=b;this.c=c;this.d=d;
+            this.xz=xz;this.yz=yz;this.zx=zx;this.zy=zy;
+            this.x=x;this.y=y;this.zScale=zScale;this.zOffset=zOffset;
+        }
+        /** XY projected at local Z=0. For tilted 3D records call point3d with actual Z. */
         public double[] point(double px,double py){return new double[]{a*px+c*py+x,b*px+d*py+y};}
+        /** Project the local Z axis. For tilted INSERT, use point3d for full XYZ. */
+        public double z(double pz){return zScale*pz+zOffset;}
+        public double[] point3d(double px,double py,double pz){
+            return new double[]{a*px+c*py+xz*pz+x,b*px+d*py+yz*pz+y,
+                zx*px+zy*py+zScale*pz+zOffset};
+        }
         public double scale(){double sx=Math.hypot(a,b),sy=Math.hypot(c,d);double value=(sx+sy)/2d;return Double.isFinite(value)&&value>0d?value:1d;}
-        public boolean isIdentity(){return Math.abs(a-1d)<1e-12&&Math.abs(d-1d)<1e-12&&Math.abs(b)<1e-12&&Math.abs(c)<1e-12&&Math.abs(x)<1e-12&&Math.abs(y)<1e-12;}
-        public Transform thenLocal(Transform t){return new Transform(a*t.a+c*t.b,b*t.a+d*t.b,a*t.c+c*t.d,b*t.c+d*t.d,a*t.x+c*t.y+x,b*t.x+d*t.y+y);}
-        static Transform translate(double x,double y){return new Transform(1,0,0,1,x,y);}
-        static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);}
+        public boolean isIdentity(){return Math.abs(a-1d)<1e-12&&Math.abs(d-1d)<1e-12&&Math.abs(b)<1e-12&&Math.abs(c)<1e-12&&Math.abs(x)<1e-12&&Math.abs(y)<1e-12&&Math.abs(xz)<1e-12&&Math.abs(yz)<1e-12&&Math.abs(zx)<1e-12&&Math.abs(zy)<1e-12&&Math.abs(zScale-1d)<1e-12&&Math.abs(zOffset)<1e-12;}
+        /** Parent * local: preserve shear, tilt, mirrors, offsets and nested block bases. */
+        public Transform thenLocal(Transform t){
+            return new Transform(
+                a*t.a+c*t.b+xz*t.zx, b*t.a+d*t.b+yz*t.zx,
+                a*t.c+c*t.d+xz*t.zy, b*t.c+d*t.d+yz*t.zy,
+                a*t.xz+c*t.yz+xz*t.zScale, b*t.xz+d*t.yz+yz*t.zScale,
+                zx*t.a+zy*t.b+zScale*t.zx, zx*t.c+zy*t.d+zScale*t.zy,
+                a*t.x+c*t.y+xz*t.zOffset+x, b*t.x+d*t.y+yz*t.zOffset+y,
+                zx*t.xz+zy*t.yz+zScale*t.zScale,
+                zx*t.x+zy*t.y+zScale*t.zOffset+zOffset);
+        }
+        static Transform translate(double x,double y){return translate(x,y,0d);}
+        static Transform translate(double x,double y,double z){return new Transform(1,0,0,1,0,0,0,0,x,y,1,z);}
+        static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){
+            return insert(bx,by,0,sx,sy,1,degrees,x,y,0);
+        }
+        static Transform insert(double bx,double by,double bz,double sx,double sy,double sz,double degrees,double x,double y,double z){
+            double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);
+            double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;
+            return new Transform(a,b,c,d,0,0,0,0,x-a*bx-c*by,y-b*bx-d*by,sz,z-sz*bz);
+        }
+        /**
+         * DXF arbitrary axis algorithm: the INSERT normal (210/220/230) defines
+         * the OCS Z axis. The OCS X and Y axes follow Autodesk's 1/64 threshold.
+         * The insertion point and array offsets are expressed in OCS coordinates.
+         */
+        static Transform insertOcs(double bx,double by,double bz,double sx,double sy,double sz,
+                                   double degrees,double ix,double iy,double iz,
+                                   double nx,double ny,double nz)throws IOException{
+            double length=Math.hypot(Math.hypot(nx,ny),nz);
+            if(!Double.isFinite(length)||length<1e-12)
+                throw new IOException("Invalid INSERT OCS extrusion normal");
+            nx/=length;ny/=length;nz/=length;
+            double ax,ay,az;
+            if(Math.abs(nx)<1d/64d&&Math.abs(ny)<1d/64d){
+                ax=nz;ay=0;az=-nx; // world Y cross normal
+            }else{
+                ax=-ny;ay=nx;az=0; // world Z cross normal
+            }
+            double alength=Math.hypot(Math.hypot(ax,ay),az);
+            ax/=alength;ay/=alength;az/=alength;
+            double ux=ny*az-nz*ay,uy=nz*ax-nx*az,uz=nx*ay-ny*ax;
+            double radians=Math.toRadians(degrees),co=Math.cos(radians),si=Math.sin(radians);
+            double a=sx*(co*ax+si*ux),b=sx*(co*ay+si*uy),zx=sx*(co*az+si*uz);
+            double c=sy*(-si*ax+co*ux),d=sy*(-si*ay+co*uy),zy=sy*(-si*az+co*uz);
+            double xz=sz*nx,yz=sz*ny,zz=sz*nz;
+            double tx=ix*ax+iy*ux+iz*nx-a*bx-c*by-xz*bz;
+            double ty=ix*ay+iy*uy+iz*ny-b*bx-d*by-yz*bz;
+            double tz=ix*az+iy*uz+iz*nz-zx*bx-zy*by-zz*bz;
+            if(!Double.isFinite(tx)||!Double.isFinite(ty)||!Double.isFinite(tz)||
+               !Double.isFinite(a)||!Double.isFinite(b)||!Double.isFinite(c)||
+               !Double.isFinite(d)||!Double.isFinite(xz)||!Double.isFinite(yz)||
+               !Double.isFinite(zx)||!Double.isFinite(zy)||!Double.isFinite(zz))
+                throw new IOException("INSERT OCS transform overflow");
+            return new Transform(a,b,c,d,xz,yz,zx,zy,tx,ty,zz,tz);
+        }
     }
 
     public static final class Record {
@@ -187,23 +254,45 @@ public final class DxfBlocks {
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");if(++result.visits>2000000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;String[] visibilityGates=DxfLayerState.addGate(parentVisibilityGates,layer);String layout=entityLayout(r,parentLayout);int color=entityColor(r,layer,parentBlockColor,layerColors);String lineType=entityLineType(r,layer,parentBlockLineType,layerLineTypes);int lineWeight=entityLineweight(r,layer,parentBlockLineWeight,layerLineWeights,defaultLineweight);double ownScale=r.number(48,1d);if(!Double.isFinite(ownScale)||ownScale<=0d)ownScale=1d;double effectiveLineTypeScale=parentLineTypeScale*ownScale;
         if(r.type.equals("DIMENSION")){
-            String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
-            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+            String name=key(r.text(2,""));Block block=blocks.get(name);
+            if(block!=null&&!stack.contains(name)&&stack.size()<32){
+                double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+                double length=Math.hypot(Math.hypot(nx,ny),nz);
+                if(!Double.isFinite(length)||length<1e-12){result.skipped++;return;}
+                // Group 12 is a DIMENSION picture-block clone origin expressed in OCS.
+                // Keep legacy block pictures at base (0,0,0) for dimension compatibility.
+                Transform local=Transform.insertOcs(0,0,0,1,1,1,0,
+                    r.number(12,0),r.number(22,0),r.number(32,0),nx,ny,nz);
+                stack.add(name);
+                try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,
+                        effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,
+                        layerLineWeights,defaultLineweight,stack,result);}
+                finally{stack.remove(name);}
+                return;
+            }
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
             if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
             double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
-            boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
-            boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-            if(!positiveZ&&!negativeZ){result.skipped++;return;}
-            double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
-            if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
-            double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
-            double bx=block.header.number(10,0),by=block.header.number(20,0),ix=r.number(10,0),iy=r.number(20,0);
-            Transform local=negativeZ
-                ?Transform.insert(bx,by,-1,1,-degrees,-ix,iy)
-                :Transform.insert(bx,by,1,1,degrees,ix,iy);
+            double length=Math.hypot(Math.hypot(nx,ny),nz);
+            if(!Double.isFinite(length)||length<1e-12){result.skipped++;return;}
+            // ACAD_TABLE group 11/21/31 describes the horizontal direction in WCS.
+            // Project that direction onto its extrusion plane to obtain OCS rotation.
+            Transform basis=Transform.insertOcs(0,0,0,1,1,1,0,0,0,0,nx,ny,nz);
+            double hx=r.number(11,1),hy=r.number(21,0),hz=r.number(31,0);
+            double dx=hx*basis.a+hy*basis.b+hz*basis.zx;
+            double dy=hx*basis.c+hy*basis.d+hz*basis.zy;
+            double dirLength=Math.hypot(dx,dy);
+            if(!Double.isFinite(dirLength)||dirLength<1e-12){
+                if(r.has(11)||r.has(21)||r.has(31)){result.skipped++;return;}
+                dx=1;dy=0; // absent header direction: native OCS X
+            }
+            double degrees=Math.toDegrees(Math.atan2(dy,dx));
+            double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
+            double ix=r.number(10,0),iy=r.number(20,0),iz=r.number(30,0);
+            Transform local=Transform.insertOcs(bx,by,bz,1,1,1,degrees,
+                ix,iy,iz,nx,ny,nz);
             stack.add(name);
             try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
             finally{stack.remove(name);}
@@ -212,18 +301,20 @@ public final class DxfBlocks {
         if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
-        boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
-        boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-        // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
-        // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
+        double normalLength=Math.hypot(Math.hypot(nx,ny),nz);
         int columns=r.integer(70,1),rows=r.integer(71,1);
-        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
-        double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
+        if(columns<1||rows<1||(long)columns*rows>100000L||
+           !Double.isFinite(normalLength)||normalLength<1e-12||
+           (((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){
+            result.skipped++;return;
+        }
+        double sx=r.number(41,1),sy=r.number(42,1),sz=r.number(43,1);if(sx==0||sy==0){result.skipped++;return;}
         if(directRoot){
             String rawName=r.text(2,"").trim();
             if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
         }
-        double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
+        double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
+        double degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0),iz=r.number(30,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
         // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
         // the whole array; spacing is a drawing-unit distance and is not block-scaled.
@@ -232,10 +323,9 @@ public final class DxfBlocks {
             for(int row=0;row<rows;row++)for(int column=0;column<columns;column++){
                 double dx=column*columnSpacing,dy=row*rowSpacing;
                 double arrayX=ix+co*dx-si*dy,arrayY=iy+si*dx+co*dy;
-                // For OCS normal (0,0,-1), OCS X maps to -WCS X and rotation reverses.
-                Transform local=negativeZ
-                    ?Transform.insert(bx,by,-sx,sy,-degrees,-arrayX,arrayY)
-                    :Transform.insert(bx,by,sx,sy,degrees,arrayX,arrayY);
+                // Compose complete 3D OCS basis, rotation, scale and block base point.
+                Transform local=Transform.insertOcs(
+                    bx,by,bz,sx,sy,sz,degrees,arrayX,arrayY,iz,nx,ny,nz);
                 Transform transform=parent.thenLocal(local);
                 expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }

@@ -171,12 +171,11 @@ public final class Dxf3dMesh {
         int base=c.points.n/3;
         for(int i=0;i+2<mesh.xyz.length;i+=3){
             if(c.points.n/3>=MAX_VERTICES)throw new IOException("ACIS 3B köşe sayısı sınırı aşıldı");
-            double[] xy=p.transform.point(mesh.xyz[i],mesh.xyz[i+1]);
-            double z=mesh.xyz[i+2];
-            if(!Double.isFinite(xy[0])||!Double.isFinite(xy[1])||!Double.isFinite(z)||
-                Math.abs(xy[0])>1e9||Math.abs(xy[1])>1e9||Math.abs(z)>1e9)
+            double[] xyz=p.transform.point3d(mesh.xyz[i],mesh.xyz[i+1],mesh.xyz[i+2]);
+            if(!Double.isFinite(xyz[0])||!Double.isFinite(xyz[1])||!Double.isFinite(xyz[2])||
+                Math.abs(xyz[0])>1e9||Math.abs(xyz[1])>1e9||Math.abs(xyz[2])>1e9)
                 throw new IOException("ACIS 3B koordinat sınırı aşıldı");
-            c.points.add((float)xy[0]);c.points.add((float)xy[1]);c.points.add((float)z);
+            c.points.add((float)xyz[0]);c.points.add((float)xyz[1]);c.points.add((float)xyz[2]);
             c.sourceLines.add(-1);c.coordinateSlots.add(-1);
         }
         for(int i=0;i+2<mesh.triangles.length;i+=3)
@@ -245,10 +244,11 @@ public final class Dxf3dMesh {
     private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,int x,int y,int z)throws IOException{
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
         DxfBlocks.Record r=p.record;
-        double[] xy=p.transform.point(r.number(x,0),r.number(y,0));
-        double c=r.number(z,0),a=xy[0],b=xy[1];
-        if(Math.abs(a)>1e9||Math.abs(b)>1e9||Math.abs(c)>1e9)throw new IOException("3B koordinat sınırı aşıldı");
-        out.add((float)a);out.add((float)b);out.add((float)c);
+        double[] xyz=p.transform.point3d(r.number(x,0),r.number(y,0),r.number(z,0));
+        if(!Double.isFinite(xyz[0])||!Double.isFinite(xyz[1])||!Double.isFinite(xyz[2])||
+            Math.abs(xyz[0])>1e9||Math.abs(xyz[1])>1e9||Math.abs(xyz[2])>1e9)
+            throw new IOException("3B koordinat sınırı aşıldı");
+        out.add((float)xyz[0]);out.add((float)xyz[1]);out.add((float)xyz[2]);
     }
 
     private static void edge(HashSet<Long> seen,IntBuffer out,int a,int b){
