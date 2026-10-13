@@ -110,6 +110,12 @@ public final class Mesh3dView extends View {
         axisDragCommitListener=listener;
     }
     public boolean isAxisDragging(){return axisDragging;}
+    /** Cancel an in-flight preview before a save picker or exit decision. */
+    public boolean cancelActiveAxisDrag(){
+        if(!axisDragging)return false;
+        restoreCancelledDrag();
+        return true;
+    }
     private boolean startAxisDrag(float x,float y){
         if(interactionMode!=InteractionMode.EDIT||!editableVertex(first)||axisDragListener==null)return false;
         double[][] directions=projectedAxes();
