@@ -47,7 +47,13 @@ public class DxfBlocksTest {
         if(planPoint[0]!=12d||planPoint[1]!=22d)
             throw new AssertionError("3D support must not change XY plan positions");
         point(read(b,insert("A",230,-1)),-2,2);
-        skipped(read(b,insert("A",210,1,220,0,230,0)));
+        DxfBlocks.Result tilted=read(b,insert("A",210,1,220,0,230,0));
+        if(tilted.skipped!=0||tilted.placements.size()!=1)
+            throw new AssertionError("Tilted INSERT should now resolve as real 3D geometry");
+        double[] tiltedXYZ=tilted.placements.get(0).transform.point3d(3,4,2);
+        if(Math.abs(tiltedXYZ[0]-2)>1e-6||Math.abs(tiltedXYZ[1]-3)>1e-6||
+           Math.abs(tiltedXYZ[2]-4)>1e-6)
+            throw new AssertionError("Tilted INSERT OCS point3d "+Arrays.toString(tiltedXYZ));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");if(repeated.blockInsertions.size()!=2)throw new AssertionError("Repeated block insertion metadata");
 
         String tableBlock=block("*T1",LINE);
