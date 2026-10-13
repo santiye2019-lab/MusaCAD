@@ -18,6 +18,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.File;
 import java.io.OutputStream;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Arrays;
 
 /** Reads the converted DWG/DXF mesh off the UI thread and opens a real 3D orbit view. */
@@ -38,6 +41,10 @@ public final class Mesh3dActivity extends Activity {
     private CadUcsFrame editingUcs=CadUcsFrame.world();
     private final Cad3dEditHistory editHistory=new Cad3dEditHistory();
     private Cad3dSaveCheckpoint saveCheckpoint;
+    private File recoveryFile;
+    private String recoveryFingerprint;
+    private boolean explicitlyDiscarding;
+    private final Set<Integer> touchedVertices=new HashSet<>();
     private OnBackInvokedCallback systemBackCallback;
     private Button undo3dButton,redo3dButton;
     @Override protected void onCreate(Bundle state){
@@ -54,8 +61,27 @@ public final class Mesh3dActivity extends Activity {
         if(path==null){status.setText("3B çalışma dosyası bulunamadı");return;}
         new Thread(()->{
             try{
-                Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
-                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);
+                File sourceFile=new File(path);
+                Dxf3dMesh loaded=Dxf3dMesh.read(sourceFile);
+                float[] openedOriginal=Arrays.copyOf(loaded.xyz,loaded.xyz.length);
+                File recoveryPath=Cad3dRecoveryJournal.pathFor(
+                    new File(getFilesDir(),"musacad-3d-recovery"),sourceFile);
+                String sourceFingerprint=Cad3dRecoveryJournal.fingerprint(
+                    sourceFile,openedOriginal,loaded.sourceLines,loaded.coordinateSlots);
+                Cad3dRecoveryJournal.Snapshot candidate=null;
+                String recoveryWarning=null;
+                if(recoveryPath.isFile()){
+                    try{
+                        candidate=Cad3dRecoveryJournal.load(recoveryPath,sourceFingerprint,
+                            openedOriginal,loaded.sourceLines,loaded.coordinateSlots);
+                    }catch(IOException incompatible){
+                        recoveryWarning="Eski 3B kurtarma kaydı bu projeyle eşleşmiyor; uygulanmadı";
+                    }
+                }
+                final Cad3dRecoveryJournal.Snapshot recovered=candidate;
+                final String warning=recoveryWarning;
+                runOnUiThread(()->{if(closing)return;mesh=loaded;original=openedOriginal;
+                    recoveryFile=recoveryPath;recoveryFingerprint=sourceFingerprint;
                     saveCheckpoint=new Cad3dSaveCheckpoint(original);
                     meshView=new Mesh3dView(this,mesh);
                     editHistory.clear();
@@ -67,6 +93,10 @@ public final class Mesh3dActivity extends Activity {
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
                     addViewControls(root);
                     if(MODE_EDIT.equals(requestedMode()))addEditControls(root);
+                    if(recovered!=null)offer3dRecovery(recovered);
+                    else if(warning!=null)
+                        android.widget.Toast.makeText(this,warning,
+                            android.widget.Toast.LENGTH_LONG).show();
                 });
             }catch(Exception e){runOnUiThread(()->{if(!closing)status.setText("3B görünüm açılamadı: "+e.getMessage());});}
         },"MusaCAD-3D-load").start();
@@ -182,7 +212,33 @@ public final class Mesh3dActivity extends Activity {
         if(saving||mesh==null||vertex<0||vertex>=mesh.sourceLines.length||
            vertex>=mesh.coordinateSlots.length||mesh.sourceLines[vertex]<0||
            mesh.coordinateSlots[vertex]<0)return;
-        if(editHistory.record(mesh.xyz,vertex,before,after))refresh3dUndoButtons();
+        if(editHistory.record(mesh.xyz,vertex,before,after)){
+            touchedVertices.add(vertex);
+            refresh3dUndoButtons();
+        }
+    }
+    private void offer3dRecovery(Cad3dRecoveryJournal.Snapshot recovered){
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("3B düzenleme kurtarma kaydı")
+            .setMessage(recovered.changedVertices()+" köşe için cihazda tamamlanmamış bir çalışma bulundu. Yalnız aynı çizim verisine ait kayıt kullanılabilir. Değişiklikler geri yüklensin mi?")
+            .setCancelable(false)
+            .setPositiveButton("KURTAR",(dialog,which)->{
+                float[] saved=recovered.savedGeometry(original);
+                recovered.restoreCurrent(mesh.xyz);
+                saveCheckpoint.markSaved(saved);
+                touchedVertices.clear();
+                for(int vertex:recovered.vertices)touchedVertices.add(vertex);
+                // Source-compatible coordinates were recovered, not the old undo stack.
+                editHistory.clear();
+                refresh3dUndoButtons();
+                meshView.geometryChanged();
+            })
+            .setNegativeButton("KAYDI SİL",(dialog,which)->delete3dRecovery())
+            .show();
+    }
+    private void delete3dRecovery(){
+        if(recoveryFile!=null&&recoveryFile.exists()&&!recoveryFile.delete())
+            android.util.Log.w("MusaCAD-3D","Could not remove recovery journal");
     }
     private void refresh3dUndoButtons(){
         if(undo3dButton!=null)undo3dButton.setEnabled(editHistory.canUndo()&&!saving);
@@ -240,7 +296,10 @@ public final class Mesh3dActivity extends Activity {
                 }
                 float[] before={mesh.xyz[vertex*3],mesh.xyz[vertex*3+1],mesh.xyz[vertex*3+2]};
                 for(int k=0;k<3;k++)mesh.xyz[vertex*3+k]=next[k];
-                if(editHistory.record(mesh.xyz,vertex,before,next))refresh3dUndoButtons();
+                if(editHistory.record(mesh.xyz,vertex,before,next)){
+                    touchedVertices.add(vertex);
+                    refresh3dUndoButtons();
+                }
                 meshView.geometryChanged();
             }catch(NumberFormatException error){step.setError("Pozitif bir adım girin");}
         });}
@@ -280,11 +339,17 @@ public final class Mesh3dActivity extends Activity {
                 .setTitle("Kaydedilmemiş 3B düzenlemeler")
                 .setMessage("Son başarılı DXF kopyası kaydından sonra değişiklikler var. Kaydetmeden çıkarsanız bu değişiklikler kaybolacak.")
                 .setPositiveButton("DXF KOPYASI KAYDET",(dialog,which)->begin3dSavePicker())
-                .setNegativeButton("KAYDETMEDEN ÇIK",(dialog,which)->finish())
+                .setNegativeButton("KAYDETMEDEN ÇIK",(dialog,which)->{
+                    explicitlyDiscarding=true;
+                    delete3dRecovery();
+                    finish();
+                })
                 .setNeutralButton("İPTAL",null)
                 .show();
             return;
         }
+        explicitlyDiscarding=true;
+        delete3dRecovery();
         finish();
     }
 
@@ -432,11 +497,31 @@ public final class Mesh3dActivity extends Activity {
             final String resultMessage=message;
             final boolean finishedExport=exported;
             runOnUiThread(()->{
-                if(finishedExport&&saveCheckpoint!=null)saveCheckpoint.markSaved(exportSnapshot);
+                if(finishedExport&&saveCheckpoint!=null){
+                    saveCheckpoint.markSaved(exportSnapshot);
+                    if(!saveCheckpoint.hasUnsavedChanges(mesh.xyz))delete3dRecovery();
+                }
                 saving=false;refresh3dUndoButtons();
                 if(!closing)android.widget.Toast.makeText(this,resultMessage,android.widget.Toast.LENGTH_LONG).show();
             });
         },"MusaCAD-3D-save").start();
+    }
+    @Override protected void onStop(){
+        super.onStop();
+        if(mesh==null||saveCheckpoint==null||recoveryFile==null||
+            recoveryFingerprint==null)return;
+        if(meshView!=null)meshView.cancelActiveAxisDrag();
+        if(explicitlyDiscarding||!saveCheckpoint.hasUnsavedChanges(mesh.xyz)){
+            delete3dRecovery();
+            return;
+        }
+        try{
+            // Sparse onStop checkpoint: no disk I/O for every touch frame.
+            Cad3dRecoveryJournal.save(recoveryFile,recoveryFingerprint,original,
+                mesh.xyz,mesh.sourceLines,mesh.coordinateSlots,saveCheckpoint,touchedVertices);
+        }catch(IOException failure){
+            android.util.Log.e("MusaCAD-3D","Recovery snapshot was not written",failure);
+        }
     }
     @Override protected void onDestroy(){
         closing=true;
