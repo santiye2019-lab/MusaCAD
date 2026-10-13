@@ -254,24 +254,45 @@ public final class DxfBlocks {
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");if(++result.visits>2000000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;String[] visibilityGates=DxfLayerState.addGate(parentVisibilityGates,layer);String layout=entityLayout(r,parentLayout);int color=entityColor(r,layer,parentBlockColor,layerColors);String lineType=entityLineType(r,layer,parentBlockLineType,layerLineTypes);int lineWeight=entityLineweight(r,layer,parentBlockLineWeight,layerLineWeights,defaultLineweight);double ownScale=r.number(48,1d);if(!Double.isFinite(ownScale)||ownScale<=0d)ownScale=1d;double effectiveLineTypeScale=parentLineTypeScale*ownScale;
         if(r.type.equals("DIMENSION")){
-            String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
-            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0),r.number(32,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+            String name=key(r.text(2,""));Block block=blocks.get(name);
+            if(block!=null&&!stack.contains(name)&&stack.size()<32){
+                double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+                double length=Math.hypot(Math.hypot(nx,ny),nz);
+                if(!Double.isFinite(length)||length<1e-12){result.skipped++;return;}
+                // Group 12 is a DIMENSION picture-block clone origin expressed in OCS.
+                // Keep legacy block pictures at base (0,0,0) for dimension compatibility.
+                Transform local=Transform.insertOcs(0,0,0,1,1,1,0,
+                    r.number(12,0),r.number(22,0),r.number(32,0),nx,ny,nz);
+                stack.add(name);
+                try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,
+                        effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,
+                        layerLineWeights,defaultLineweight,stack,result);}
+                finally{stack.remove(name);}
+                return;
+            }
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
             if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
             double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
-            boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
-            boolean negativeZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz<-.999999;
-            if(!positiveZ&&!negativeZ){result.skipped++;return;}
-            double hx=r.number(11,1),hy=r.number(21,0),hlen=Math.hypot(hx,hy);
-            if(!Double.isFinite(hlen)||hlen<1e-12){hx=1;hy=0;hlen=1;}
-            double degrees=Math.toDegrees(Math.atan2(hy/hlen,hx/hlen));
+            double length=Math.hypot(Math.hypot(nx,ny),nz);
+            if(!Double.isFinite(length)||length<1e-12){result.skipped++;return;}
+            // ACAD_TABLE group 11/21/31 describes the horizontal direction in WCS.
+            // Project that direction onto its extrusion plane to obtain OCS rotation.
+            Transform basis=Transform.insertOcs(0,0,0,1,1,1,0,0,0,0,nx,ny,nz);
+            double hx=r.number(11,1),hy=r.number(21,0),hz=r.number(31,0);
+            double dx=hx*basis.a+hy*basis.b+hz*basis.zx;
+            double dy=hx*basis.c+hy*basis.d+hz*basis.zy;
+            double dirLength=Math.hypot(dx,dy);
+            if(!Double.isFinite(dirLength)||dirLength<1e-12){
+                if(r.has(11)||r.has(21)||r.has(31)){result.skipped++;return;}
+                dx=1;dy=0; // absent header direction: native OCS X
+            }
+            double degrees=Math.toDegrees(Math.atan2(dy,dx));
             double bx=block.header.number(10,0),by=block.header.number(20,0),bz=block.header.number(30,0);
             double ix=r.number(10,0),iy=r.number(20,0),iz=r.number(30,0);
-            Transform local=negativeZ
-                ?Transform.insert(bx,by,bz,-1,1,-1,-degrees,-ix,iy,-iz)
-                :Transform.insert(bx,by,bz,1,1,1,degrees,ix,iy,iz);
+            Transform local=Transform.insertOcs(bx,by,bz,1,1,1,degrees,
+                ix,iy,iz,nx,ny,nz);
             stack.add(name);
             try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
             finally{stack.remove(name);}
