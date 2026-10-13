@@ -84,6 +84,18 @@ public final class DxfTiltedOcsTest {
         xyz(m,0,3,1,2);xyz(m,2,3,6,2);
         xyz(m,4,3,1,9);xyz(m,6,3,6,9);
     }
+    private static void sourceZCrossAxisAndBlockBase()throws Exception{
+        // A tilted extrusion must project each source Z into WCS X, not discard it.
+        String b=tags(0,"BLOCK",2,"PIPE_Z",10,0,20,0,30,1)
+            +tags(0,"LINE",10,0,20,0,30,2,11,0,21,0,31,5)
+            +tags(0,"ENDBLK");
+        String insert=tags(0,"INSERT",2,"PIPE_Z",10,1,20,2,30,3,
+            210,1,220,0,230,0);
+        Dxf3dMesh m=check(document(b,insert),1);
+        // Base Z=1 is removed before the OCS axis is applied.
+        xyz(m,0,4,1,2);
+        xyz(m,1,7,1,2);
+    }
     private static void zeroExtrusionIsSkipped()throws Exception{
         String dxf=document(block("PIPE",line()),
             tags(0,"INSERT",2,"PIPE",210,0,220,0,230,0));
@@ -95,6 +107,7 @@ public final class DxfTiltedOcsTest {
         basicTiltedNormals();
         rotatedScaledInclinedInsert();
         nestedTiltsCompose();
+        sourceZCrossAxisAndBlockBase();
         mInsertArrayInTiltedPlane();
         zeroExtrusionIsSkipped();
         System.out.println("3D OCS: tilted X/Y/diagonal, nonunit normals, 90deg scale, nested and MINSERT fixture passed");
