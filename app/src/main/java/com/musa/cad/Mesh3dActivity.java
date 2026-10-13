@@ -30,6 +30,7 @@ public final class Mesh3dActivity extends Activity {
     private Dxf3dMesh mesh;
     private float[] original;
     private Mesh3dView meshView;
+    private CadUcsFrame editingUcs=CadUcsFrame.world();
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(Color.rgb(7,19,29));setContentView(root);
@@ -148,15 +149,27 @@ public final class Mesh3dActivity extends Activity {
         Button style=new Button(this);style.setText("Ağ çizgileri");views.addView(style,new LinearLayout.LayoutParams(0,-2,1));
         style.setOnClickListener(v->style.setText(meshView.toggleWireframe()?"Yüzey görünümü":"Ağ çizgileri"));
         Button reset=new Button(this);reset.setText("Görünümü sıfırla");views.addView(reset,new LinearLayout.LayoutParams(0,-2,1));reset.setOnClickListener(v->meshView.resetCamera());
-        EditText step=new EditText(this);step.setSingleLine(true);step.setText("1");step.setHint("Adım (çizim birimi)");step.setTextColor(Color.WHITE);step.setInputType(8194);panel.addView(step,new LinearLayout.LayoutParams(-1,-2));
+        Button ucsButton=new Button(this);
+        ucsButton.setText("UCS: WCS");
+        panel.addView(ucsButton,new LinearLayout.LayoutParams(-1,-2));
+        ucsButton.setOnClickListener(v->showUcsSelector(ucsButton));
+        EditText step=new EditText(this);step.setSingleLine(true);step.setText("1");step.setHint("UCS ekseninde adım (çizim birimi)");step.setTextColor(Color.WHITE);step.setInputType(8194);panel.addView(step,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout row=new LinearLayout(this);panel.addView(row,new LinearLayout.LayoutParams(-1,-2));
         String[] names={"X−","X+","Y−","Y+","Z−","Z+"};
         for(int n=0;n<names.length;n++){final int axis=n/2,sign=n%2==0?-1:1;Button button=new Button(this);button.setText(names[n]);row.addView(button,new LinearLayout.LayoutParams(0,-2,1));button.setOnClickListener(v->{
             if(saving)return;
             int vertex=meshView.selectedVertex();if(vertex<0){step.setError("Önce modelden bir köşe seçin");return;}
             try{float amount=Float.parseFloat(step.getText().toString());if(!Float.isFinite(amount)||amount<=0||amount>1e6f)throw new NumberFormatException();
-                float next=mesh.xyz[vertex*3+axis]+sign*amount;if(!Float.isFinite(next)||Math.abs(next)>1e9f)throw new NumberFormatException();
-                mesh.xyz[vertex*3+axis]=next;meshView.geometryChanged();
+                // Move on the chosen UCS axis but store absolute geometry in WCS.
+                double[] delta=editingUcs.move(axis,sign*amount);
+                float[] next=new float[3];
+                for(int k=0;k<3;k++){
+                    double value=mesh.xyz[vertex*3+k]+delta[k];
+                    if(!Double.isFinite(value)||Math.abs(value)>1e9d)throw new NumberFormatException();
+                    next[k]=(float)value;
+                }
+                for(int k=0;k<3;k++)mesh.xyz[vertex*3+k]=next[k];
+                meshView.geometryChanged();
             }catch(NumberFormatException error){step.setError("Pozitif bir adım girin");}
         });}
         Button save=new Button(this);save.setText("3B DXF kopyasını kaydet");panel.addView(save,new LinearLayout.LayoutParams(-1,-2));save.setOnClickListener(v->{
@@ -166,6 +179,49 @@ public final class Mesh3dActivity extends Activity {
         });
         root.addView(panel,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
     }
+    private void showUcsSelector(Button control){
+        if(saving)return;
+        String[] options={"WCS (Dünya)","Ön düzlem (XZ)","Sağ düzlem (YZ)","Özel UCS eksenleri"};
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("3B koordinat sistemi")
+            .setItems(options,(dialog,selected)->{
+                if(saving)return;
+                switch(selected){
+                    case 0: editingUcs=CadUcsFrame.world();control.setText("UCS: WCS");break;
+                    case 1: editingUcs=CadUcsFrame.front();control.setText("UCS: ÖN / XZ");break;
+                    case 2: editingUcs=CadUcsFrame.right();control.setText("UCS: SAĞ / YZ");break;
+                    case 3: showCustomUcsInput(control);break;
+                }
+            })
+            .setNegativeButton("İPTAL",null)
+            .show();
+    }
+    private void showCustomUcsInput(Button control){
+        if(saving)return;
+        EditText input=new EditText(this);
+        input.setSingleLine(false);
+        input.setText("0,0,0,1,0,0,0,1,0");
+        input.setHint("Başlangıç XYZ, X ekseni XYZ, Y ekseni XYZ");
+        input.setTextColor(Color.WHITE);
+        input.setSelectAllOnFocus(true);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Özel UCS • 9 sayısal değer")
+            .setMessage("Önce başlangıç X,Y,Z; sonra X ekseni vektörü; ardından Y ekseni vektörü. Örnek: 0,0,0,1,0,0,0,0,1")
+            .setView(input)
+            .setNegativeButton("İPTAL",null)
+            .setPositiveButton("UYGULA",(dialog,which)->{
+                if(saving)return;
+                try{
+                    CadUcsFrame custom=CadUcsFrame.parse(input.getText().toString());
+                    editingUcs=custom;
+                    control.setText("UCS: ÖZEL");
+                }catch(IllegalArgumentException invalid){
+                    android.widget.Toast.makeText(this,"Geçersiz UCS: "+invalid.getMessage(),
+                        android.widget.Toast.LENGTH_LONG).show();
+                }
+            }).show();
+    }
+
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(request!=SAVE_DXF||result!=RESULT_OK||data==null||data.getData()==null||saving||mesh==null)return;
