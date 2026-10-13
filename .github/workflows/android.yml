@@ -763,6 +763,26 @@ jobs:
           PY
           mkdir -p app/src/main/assets
           cp third_party/libredwg/COPYING app/src/main/assets/COPYING-LibreDWG.txt
+      - name: Host-only R2000 DWG writer proof and safe-failure checks
+        run: |
+          # Deliberately separate from Android/read-only build; this is NOT release enablement.
+          cmake -S app/src/main/cpp -B /tmp/musa-writer-proof -DCMAKE_BUILD_TYPE=Release -DMUSACAD_HOST_DWG_WRITE_PILOT=ON
+          cmake --build /tmp/musa-writer-proof --parallel 2
+          cp third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-writer-input.dxf
+          cp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg
+          test -s /tmp/musa-pilot-output.dwg
+          cmp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg; then
+            echo "Writer must never overwrite an existing destination"
+            exit 1
+          fi
+          printf 'not a DXF\\n' >/tmp/musa-malformed.dxf
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-malformed.dxf /tmp/musa-malformed-output.dwg; then
+            echo "Malformed input must never produce DWG"
+            exit 1
+          fi
+          test ! -e /tmp/musa-malformed-output.dwg
       # Development, push and PR checks never create an installable APK.
       # Final release requires an explicit manual approval input.
       - name: Enforce explicit final-release approval before any APK build
