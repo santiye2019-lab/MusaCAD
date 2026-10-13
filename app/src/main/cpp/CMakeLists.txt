@@ -2,7 +2,17 @@ cmake_minimum_required(VERSION 3.22)
 project(musacad_native C)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(LIBREDWG_LIBONLY ON CACHE BOOL "" FORCE)
-set(LIBREDWG_DISABLE_WRITE ON CACHE BOOL "" FORCE)
+# Normal Android and host converter stay read-only. DWG writing is compiled only
+# by explicitly opting in to the isolated host proof; never affect production.
+option(MUSACAD_HOST_DWG_WRITE_PILOT "Build isolated non-production DXF to R2000 DWG proof" OFF)
+if(ANDROID AND MUSACAD_HOST_DWG_WRITE_PILOT)
+  message(FATAL_ERROR "DWG write pilot is restricted to host CI; never an Android release")
+endif()
+if(MUSACAD_HOST_DWG_WRITE_PILOT)
+  set(LIBREDWG_DISABLE_WRITE OFF CACHE BOOL "" FORCE)
+else()
+  set(LIBREDWG_DISABLE_WRITE ON CACHE BOOL "" FORCE)
+endif()
 set(LIBREDWG_DISABLE_JSON ON CACHE BOOL "" FORCE)
 set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
 set(ENABLE_LTO OFF CACHE BOOL "" FORCE)
@@ -24,3 +34,12 @@ else()
 endif()
 target_include_directories(${MUSA_TARGET} PRIVATE "${LIBREDWG_SOURCE}/include" "${LIBREDWG_SOURCE}/src" "${CMAKE_CURRENT_BINARY_DIR}/libredwg/src")
 target_link_libraries(${MUSA_TARGET} PRIVATE redwg m)
+
+# Host-only proof: the existing DWG reader and Android application are unchanged.
+if(NOT ANDROID AND MUSACAD_HOST_DWG_WRITE_PILOT)
+  add_executable(musacad_dxf2dwg_pilot dwg_write_pilot.c)
+  target_include_directories(musacad_dxf2dwg_pilot PRIVATE
+    "${LIBREDWG_SOURCE}/include" "${LIBREDWG_SOURCE}/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/libredwg/src")
+  target_link_libraries(musacad_dxf2dwg_pilot PRIVATE redwg m)
+endif()
