@@ -13,6 +13,14 @@ public class CadPrismBrepTest {
     private static int count(String s,String needle){
         int n=0,p=0;while((p=s.indexOf(needle,p))>=0){n++;p+=needle.length();}return n;
     }
+    private static void rejectExport(CadPrismBrep.Solid solid,String detail)throws Exception{
+        StringWriter target=new StringWriter();
+        boolean rejected=false;
+        try{solid.writeDxf(target,"MUSACAD_3D");}
+        catch(IllegalArgumentException expected){rejected=true;}
+        if(!rejected||target.getBuffer().length()!=0)
+            throw new AssertionError(detail+": invalid geometry must not emit even partial DXF");
+    }
     public static void main(String[]args)throws Exception{
         double[] square={0,0,2,0,2,2,0,2};
         CadPrismBrep.Solid s=CadPrismBrep.extrude(square,1,3);
@@ -46,6 +54,23 @@ public class CadPrismBrepTest {
             throw new AssertionError("3DFACE DXF export contract");
         try{s.writeDxf(new StringWriter(),"BAD\n0\nLINE");throw new AssertionError("DXF injection accepted");}
         catch(IllegalArgumentException expected){}
+        // Export is a security boundary: public mesh arrays can be mutated
+        // *after* the extrusion constructor's initial topological validation.
+        CadPrismBrep.Solid nan=CadPrismBrep.extrude(square,1,3);
+        nan.xyz[0]=Double.NaN;
+        rejectExport(nan,"NaN injection");
+        CadPrismBrep.Solid tooLarge=CadPrismBrep.extrude(square,1,3);
+        tooLarge.xyz[0]=1e20d;
+        rejectExport(tooLarge,"CAD bound violation");
+        CadPrismBrep.Solid badIndex=CadPrismBrep.extrude(square,1,3);
+        badIndex.triangles[0]=badIndex.xyz.length/3;
+        rejectExport(badIndex,"invalid triangle index");
+        CadPrismBrep.Solid collapsed=CadPrismBrep.extrude(square,1,3);
+        collapsed.triangles[0]=collapsed.triangles[1];
+        rejectExport(collapsed,"degenerate face");
+        CadPrismBrep.Solid edited=CadPrismBrep.extrude(square,1,3);
+        edited.xyz[0]+=0.5d;
+        rejectExport(edited,"stale volume after mutation");
         System.out.println("CadPrismBrep watertight extrusion, concavity, invalid input and DXF tests passed.");
     }
 }
