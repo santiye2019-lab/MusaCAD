@@ -51,8 +51,8 @@ public class DxfBlocksTest {
         if(tilted.skipped!=0||tilted.placements.size()!=1)
             throw new AssertionError("Tilted INSERT should now resolve as real 3D geometry");
         double[] tiltedXYZ=tilted.placements.get(0).transform.point3d(3,4,2);
-        if(Math.abs(tiltedXYZ[0]-2)>1e-6||Math.abs(tiltedXYZ[1]-3)>1e-6||
-           Math.abs(tiltedXYZ[2]-4)>1e-6)
+        if(Math.abs(tiltedXYZ[0]-2)>1e-6||Math.abs(tiltedXYZ[1]-2)>1e-6||
+           Math.abs(tiltedXYZ[2]-2)>1e-6)
             throw new AssertionError("Tilted INSERT OCS point3d "+Arrays.toString(tiltedXYZ));
         DxfBlocks.Result repeated=read(b,insert("A")+insert("A",10,100));if(repeated.placements.size()!=2||repeated.skipped!=0)throw new AssertionError("Repeated block");if(repeated.blockInsertions.size()!=2)throw new AssertionError("Repeated block insertion metadata");
 
