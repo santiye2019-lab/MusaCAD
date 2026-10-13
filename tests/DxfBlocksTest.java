@@ -43,7 +43,7 @@ public class DxfBlocksTest {
         DxfBlocks.Result zInsert=read(block("ZPIPE",LINE),insert("ZPIPE",10,10,20,20,30,7,43,3));
         if(zInsert.placements.size()!=1||zInsert.placements.get(0).transform.z(5)!=22d)
             throw new AssertionError("In-memory block expansion must preserve insert Z and 43 scale");
-        double[] planPoint=zInsert.placements.get(0).transform.point(2,2);
+        double[] planPoint=zInsert.placements.get(0).transform.point(3,4);
         if(planPoint[0]!=12d||planPoint[1]!=22d)
             throw new AssertionError("3D support must not change XY plan positions");
         point(read(b,insert("A",230,-1)),-2,2);
