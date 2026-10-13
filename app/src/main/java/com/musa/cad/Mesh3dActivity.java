@@ -42,7 +42,10 @@ public final class Mesh3dActivity extends Activity {
         new Thread(()->{
             try{
                 Dxf3dMesh loaded=Dxf3dMesh.read(new File(path));
-                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
+                runOnUiThread(()->{if(closing)return;mesh=loaded;original=Arrays.copyOf(mesh.xyz,mesh.xyz.length);meshView=new Mesh3dView(this,mesh);
+                    meshView.setAxisDragListener(this::moveGizmoVertex);
+                    meshView.setUcsFrame(editingUcs);
+                    applyRequestedMode();root.removeAllViews();root.addView(meshView,new FrameLayout.LayoutParams(-1,-1));
                     TextView hint=new TextView(this);hint.setText("← Geri   •   "+modeHint()+"   •   İki parmak: yakınlaştır\n"+modelHint());
                     hint.setTextColor(Color.WHITE);hint.setTextSize(11);hint.setPadding(16,16,16,16);hint.setBackgroundColor(0xcc07131d);FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.TOP);root.addView(hint,lp);
                     addViewControls(root);
@@ -84,7 +87,7 @@ public final class Mesh3dActivity extends Activity {
     private String modeHint(){
         switch(requestedMode()){
             case MODE_MEASURE:return "Ölçüm: iki köşe seç";
-            case MODE_EDIT:return "Düzenle: bir köşe seç, sonra X/Y/Z adımı uygula";
+            case MODE_EDIT:return "Düzenle: köşe seç, X/Y/Z tutamacını sürükle veya adım uygula";
             case MODE_FRONT:return "Ön görünüş • tek parmakla döndür";
             case MODE_TOP:return "Üst görünüş • tek parmakla döndür";
             case MODE_RIGHT:return "Sağ görünüş • tek parmakla döndür";
@@ -144,6 +147,20 @@ public final class Mesh3dActivity extends Activity {
         root.addView(bar,lp);
     }
 
+    /** Shared safety gate for touch-gizmo edits. Only direct source vertices are writable. */
+    private boolean moveGizmoVertex(int vertex,double x,double y,double z){
+        if(saving||mesh==null||mesh.solidProxy||mesh.acisSolids>0||
+           vertex<0||vertex>=mesh.sourceLines.length||
+           vertex>=mesh.coordinateSlots.length||
+           mesh.sourceLines[vertex]<0||mesh.coordinateSlots[vertex]<0)
+            return false;
+        double[] coords={x,y,z};
+        for(double value:coords){
+            if(!Double.isFinite(value)||Math.abs(value)>1e9d)return false;
+        }
+        for(int k=0;k<3;k++)mesh.xyz[vertex*3+k]=(float)coords[k];
+        return true;
+    }
     private void addEditControls(FrameLayout root){
         if(mesh==null||mesh.solidProxy||mesh.acisSolids>0)return;
         LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);panel.setBackgroundColor(0xee07131d);
@@ -161,6 +178,10 @@ public final class Mesh3dActivity extends Activity {
         for(int n=0;n<names.length;n++){final int axis=n/2,sign=n%2==0?-1:1;Button button=new Button(this);button.setText(names[n]);row.addView(button,new LinearLayout.LayoutParams(0,-2,1));button.setOnClickListener(v->{
             if(saving)return;
             int vertex=meshView.selectedVertex();if(vertex<0){step.setError("Önce modelden bir köşe seçin");return;}
+            if(vertex>=mesh.sourceLines.length||mesh.sourceLines[vertex]<0||
+               vertex>=mesh.coordinateSlots.length||mesh.coordinateSlots[vertex]<0){
+                step.setError("Bu köşe bloktan türetilmiş ve doğrudan düzenlenemez");return;
+            }
             try{float amount=Float.parseFloat(step.getText().toString());if(!Float.isFinite(amount)||amount<=0||amount>1e6f)throw new NumberFormatException();
                 // Move on the chosen UCS axis but store absolute geometry in WCS.
                 double[] delta=editingUcs.move(axis,sign*amount);
@@ -190,9 +211,9 @@ public final class Mesh3dActivity extends Activity {
             .setItems(options,(dialog,selected)->{
                 if(saving)return;
                 switch(selected){
-                    case 0: editingUcs=CadUcsFrame.world();control.setText("UCS: WCS");break;
-                    case 1: editingUcs=CadUcsFrame.front();control.setText("UCS: ÖN / XZ");break;
-                    case 2: editingUcs=CadUcsFrame.right();control.setText("UCS: SAĞ / YZ");break;
+                    case 0: editingUcs=CadUcsFrame.world();meshView.setUcsFrame(editingUcs);control.setText("UCS: WCS");break;
+                    case 1: editingUcs=CadUcsFrame.front();meshView.setUcsFrame(editingUcs);control.setText("UCS: ÖN / XZ");break;
+                    case 2: editingUcs=CadUcsFrame.right();meshView.setUcsFrame(editingUcs);control.setText("UCS: SAĞ / YZ");break;
                     case 3: showCustomUcsInput(control);break;
                     case 4: showSavedUcsSelector(control);break;
                     case 5: showSaveUcsDialog(control);break;
@@ -220,6 +241,7 @@ public final class Mesh3dActivity extends Activity {
                 try{
                     CadUcsFrame custom=CadUcsFrame.parse(input.getText().toString());
                     editingUcs=custom;
+                    meshView.setUcsFrame(editingUcs);
                     control.setText("UCS: ÖZEL");
                 }catch(IllegalArgumentException invalid){
                     android.widget.Toast.makeText(this,"Geçersiz UCS: "+invalid.getMessage(),
@@ -249,6 +271,7 @@ public final class Mesh3dActivity extends Activity {
                 if(saving||which<0||which>=names.length)return;
                 // Use the immutable frame that was already validated by the preset codec.
                 editingUcs=saved.get(names[which]);
+                meshView.setUcsFrame(editingUcs);
                 control.setText("UCS: "+names[which]);
             })
             .setNegativeButton("İPTAL",null).show();
