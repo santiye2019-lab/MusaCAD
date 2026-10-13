@@ -124,9 +124,23 @@ public final class Dxf3dMesh {
                 appendEdge(explicitEdges,start,start+1);
             }else if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
                 int start=points.n/3;
-                for(int k=0;k<3;k++){addPoint(points,p,10+k,20+k,30+k);addSource(p,k);}
+                // DXF TRACE and SOLID vertices are OCS; 3DFACE vertices are WCS.
+                // Apply the entity extrusion basis before the enclosing INSERT transform.
+                // Never write transformed WCS values into OCS source-coordinate tags.
+                DxfBlocks.Transform vertexTransform=p.transform;
+                if("TRACE".equals(r.type)||"SOLID".equals(r.type)){
+                    DxfBlocks.Transform ocs=DxfBlocks.Transform.insertOcs(
+                        0,0,0,1,1,1,0,0,0,0,
+                        r.number(210,0),r.number(220,0),r.number(230,1));
+                    vertexTransform=vertexTransform.thenLocal(ocs);
+                }
+                for(int k=0;k<3;k++){
+                    addPoint(points,p,vertexTransform,10+k,20+k,30+k);
+                    addSource(p,k,vertexTransform);
+                }
                 if(r.has(13)&&r.has(23)){
-                    addPoint(points,p,13,23,33);addSource(p,3);
+                    addPoint(points,p,vertexTransform,13,23,33);
+                    addSource(p,3,vertexTransform);
                     appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);
                 }else appendTriangle(triangles,start,start+1,start+2);
             }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type)){
@@ -161,7 +175,10 @@ public final class Dxf3dMesh {
         }
 
         private void addSource(DxfBlocks.Placement p,int slot){
-            boolean editable=p.directRoot&&p.transform.isIdentity();
+            addSource(p,slot,p.transform);
+        }
+        private void addSource(DxfBlocks.Placement p,int slot,DxfBlocks.Transform vertexTransform){
+            boolean editable=p.directRoot&&vertexTransform.isIdentity();
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
@@ -242,9 +259,13 @@ public final class Dxf3dMesh {
     }
 
     private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,int x,int y,int z)throws IOException{
+        addPoint(out,p,p.transform,x,y,z);
+    }
+    private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,DxfBlocks.Transform vertexTransform,
+                                 int x,int y,int z)throws IOException{
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
         DxfBlocks.Record r=p.record;
-        double[] xyz=p.transform.point3d(r.number(x,0),r.number(y,0),r.number(z,0));
+        double[] xyz=vertexTransform.point3d(r.number(x,0),r.number(y,0),r.number(z,0));
         if(!Double.isFinite(xyz[0])||!Double.isFinite(xyz[1])||!Double.isFinite(xyz[2])||
             Math.abs(xyz[0])>1e9||Math.abs(xyz[1])>1e9||Math.abs(xyz[2])>1e9)
             throw new IOException("3B koordinat sınırı aşıldı");
