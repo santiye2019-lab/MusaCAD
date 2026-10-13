@@ -37,7 +37,7 @@ static int geometry_signature(const Dwg_Data *dwg, GeometrySignature *sig) {
       case DWG_TYPE_LWPOLYLINE: kind = 3; break;
       case DWG_TYPE_POLYLINE_2D: kind = 4; break;
       case DWG_TYPE_POINT: kind = 5; break;
-      case DWG_TYPE_3DFACE: kind = 6; break;
+      case DWG_TYPE__3DFACE: kind = 6; break;
       /* Bookkeeping entities, never counted as drawing geometry. */
       case DWG_TYPE_BLOCK:
       case DWG_TYPE_ENDBLK:
