@@ -114,34 +114,62 @@ public final class Cad3dRecoveryJournal {
             throw new IOException("3D recovery contains a noneditable vertex");
     }
 
-    public static void save(File destination,String fingerprint,float[] original,
-        float[] current,int[] lines,int[] slots,Cad3dSaveCheckpoint checkpoint,
-        Set<Integer> touched)throws IOException{
-        if(destination==null||fingerprint==null||fingerprint.length()!=64||
-            original==null||current==null||original.length!=current.length||
+    /**
+     * Captures touched coordinates on the UI thread; no serialization, fsync or
+     * file I/O is performed here. The returned geometry is immutable even if
+     * the editor continues to move vertices before the writer runs.
+     */
+    public static Snapshot capture(float[] original,float[] current,int[] lines,
+        int[] slots,Cad3dSaveCheckpoint checkpoint,Set<Integer> touched)
+        throws IOException {
+        if(original==null||current==null||original.length!=current.length||
             original.length%3!=0||lines==null||slots==null||
             lines.length!=original.length/3||slots.length!=lines.length||
-            checkpoint==null||touched==null||
-            touched.size()>MAX_CHANGED)
+            checkpoint==null||touched==null||touched.size()>MAX_CHANGED)
             throw new IOException("3D recovery snapshot input invalid");
         List<Integer> keys=new ArrayList<>(touched);
         Collections.sort(keys);
-        ByteArrayOutputStream payload=new ByteArrayOutputStream(Math.min(MAX_BYTES,128+keys.size()*28));
+        int[] vertices=new int[keys.size()];
+        float[] live=new float[keys.size()*3],saved=new float[keys.size()*3];
+        for(int k=0;k<keys.size();k++){
+            int vertex=keys.get(k);
+            validateIndex(vertex,original,lines,slots);
+            vertices[k]=vertex;
+            float[] checkpointVertex=checkpoint.savedVertex(vertex);
+            for(int axis=0;axis<3;axis++){
+                float now=current[vertex*3+axis],before=checkpointVertex[axis];
+                if(!valid(now)||!valid(before))
+                    throw new IOException("3D recovery XYZ invalid");
+                live[k*3+axis]=now;
+                saved[k*3+axis]=before;
+            }
+        }
+        return new Snapshot(vertices,live,saved);
+    }
+
+    /** Slow disk operation: call on a serialized background executor, never on UI. */
+    public static void persist(File destination,String fingerprint,int totalVertices,
+        Snapshot captured)throws IOException{
+        if(destination==null||fingerprint==null||!fingerprint.matches("[0-9a-f]{64}")||
+            totalVertices<0||captured==null||captured.vertices.length>MAX_CHANGED)
+            throw new IOException("3D recovery write input invalid");
+        ByteArrayOutputStream payload=new ByteArrayOutputStream(
+            Math.min(MAX_BYTES,128+captured.vertices.length*28));
         try(DataOutputStream out=new DataOutputStream(payload)){
             out.writeInt(MAGIC);out.writeInt(VERSION);
-            out.writeUTF(fingerprint);out.writeInt(original.length/3);
-            out.writeInt(keys.size());
-            for(int vertex:keys){
-                validateIndex(vertex,original,lines,slots);
+            out.writeUTF(fingerprint);out.writeInt(totalVertices);
+            out.writeInt(captured.vertices.length);
+            int previous=-1;
+            for(int k=0;k<captured.vertices.length;k++){
+                int vertex=captured.vertices[k];
+                if(vertex<=previous||vertex>=totalVertices)
+                    throw new IOException("3D recovery snapshot indices invalid");
+                previous=vertex;
                 out.writeInt(vertex);
-                float[] saved=checkpoint.savedVertex(vertex);
-                for(int axis=0;axis<3;axis++){
-                    float now=current[vertex*3+axis];
-                    if(!valid(now)||!valid(saved[axis]))
-                        throw new IOException("3D recovery XYZ invalid");
-                    out.writeFloat(now);
-                }
-                for(float v:saved)out.writeFloat(v);
+                for(int axis=0;axis<3;axis++)
+                    out.writeFloat(captured.current[k*3+axis]);
+                for(int axis=0;axis<3;axis++)
+                    out.writeFloat(captured.checkpoint[k*3+axis]);
             }
         }
         byte[] data=payload.toByteArray();
@@ -160,11 +188,19 @@ public final class Cad3dRecoveryJournal {
                 out.flush();
                 stream.getFD().sync();
             }
-            // Never delete the prior valid journal first. Rename must succeed.
+            // Prior valid journal remains intact until replacement is complete.
             if(!temp.renameTo(destination))
                 throw new IOException("3D recovery atomic replacement failed");
             committed=true;
         }finally{if(!committed)temp.delete();}
+    }
+
+    /** Original synchronous API retained for tests and non-UI callers. */
+    public static void save(File destination,String fingerprint,float[] original,
+        float[] current,int[] lines,int[] slots,Cad3dSaveCheckpoint checkpoint,
+        Set<Integer> touched)throws IOException{
+        Snapshot captured=capture(original,current,lines,slots,checkpoint,touched);
+        persist(destination,fingerprint,original.length/3,captured);
     }
 
     public static Snapshot load(File file,String expectedFingerprint,float[] original,
