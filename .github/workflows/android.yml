@@ -635,7 +635,7 @@ jobs:
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadUcsFrame.java tests/CadUcsFrameTest.java
           java -cp /tmp/musacad-tests CadUcsFrameTest
-          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadUcsProfiles.java tests/CadUcsProfilesTest.java
+          javac -encoding UTF-8 -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadUcsProfiles.java tests/CadUcsProfilesTest.java
           java -cp /tmp/musacad-tests CadUcsProfilesTest
           javac -encoding UTF-8 -d /tmp/musacad-tests tests/CadUcsUiContractTest.java
           java -cp /tmp/musacad-tests CadUcsUiContractTest
