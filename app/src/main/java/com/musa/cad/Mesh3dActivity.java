@@ -25,6 +25,8 @@ public final class Mesh3dActivity extends Activity {
         MODE_RIGHT="right",MODE_WIREFRAME="wireframe",MODE_SURFACE="surface",
         MODE_MEASURE="measure",MODE_EDIT="edit";
     private static final int SAVE_DXF=3103;
+    private static final String UCS_PREFS="musacad_3d_named_ucs";
+    private static final String UCS_DATA="profiles";
     private volatile boolean closing;
     private boolean saving;
     private Dxf3dMesh mesh;
@@ -181,7 +183,8 @@ public final class Mesh3dActivity extends Activity {
     }
     private void showUcsSelector(Button control){
         if(saving)return;
-        String[] options={"WCS (Dünya)","Ön düzlem (XZ)","Sağ düzlem (YZ)","Özel UCS eksenleri"};
+        String[] options={"WCS (Dünya)","Ön düzlem (XZ)","Sağ düzlem (YZ)",
+            "Özel UCS eksenleri","Kayıtlı UCS seç","Geçerli UCS'yi kaydet","Kayıtlı UCS sil"};
         new android.app.AlertDialog.Builder(this)
             .setTitle("3B koordinat sistemi")
             .setItems(options,(dialog,selected)->{
@@ -191,6 +194,9 @@ public final class Mesh3dActivity extends Activity {
                     case 1: editingUcs=CadUcsFrame.front();control.setText("UCS: ÖN / XZ");break;
                     case 2: editingUcs=CadUcsFrame.right();control.setText("UCS: SAĞ / YZ");break;
                     case 3: showCustomUcsInput(control);break;
+                    case 4: showSavedUcsSelector(control);break;
+                    case 5: showSaveUcsDialog(control);break;
+                    case 6: showDeleteUcsDialog();break;
                 }
             })
             .setNegativeButton("İPTAL",null)
@@ -220,6 +226,78 @@ public final class Mesh3dActivity extends Activity {
                         android.widget.Toast.LENGTH_LONG).show();
                 }
             }).show();
+    }
+
+    private String storedUcs(){
+        return getSharedPreferences(UCS_PREFS,MODE_PRIVATE).getString(UCS_DATA,"");
+    }
+    private void storeUcs(String contents){
+        // apply() stores preferences on the device; no drawings or server data are modified.
+        getSharedPreferences(UCS_PREFS,MODE_PRIVATE).edit().putString(UCS_DATA,contents).apply();
+    }
+    private void showSavedUcsSelector(Button control){
+        if(saving)return;
+        java.util.Map<String,CadUcsFrame> saved=CadUcsProfiles.read(storedUcs());
+        if(saved.isEmpty()){
+            android.widget.Toast.makeText(this,"Henüz kayıtlı özel UCS yok",android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] names=saved.keySet().toArray(new String[0]);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Kayıtlı UCS seç")
+            .setItems(names,(dialog,which)->{
+                if(saving||which<0||which>=names.length)return;
+                // Use the immutable frame that was already validated by the preset codec.
+                editingUcs=saved.get(names[which]);
+                control.setText("UCS: "+names[which]);
+            })
+            .setNegativeButton("İPTAL",null).show();
+    }
+    private void showSaveUcsDialog(Button control){
+        if(saving)return;
+        EditText input=new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Örneğin: Çatı Eğimi");
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Geçerli UCS'yi cihazda kaydet")
+            .setMessage("En fazla 12 adlandırılmış UCS kaydedilebilir. Aynı adla kaydetmek eskisini günceller.")
+            .setView(input)
+            .setNegativeButton("İPTAL",null)
+            .setPositiveButton("KAYDET",(dialog,which)->{
+                if(saving)return;
+                try{
+                    String name=CadUcsProfiles.validName(input.getText().toString());
+                    storeUcs(CadUcsProfiles.put(storedUcs(),name,editingUcs));
+                    control.setText("UCS: "+name);
+                    android.widget.Toast.makeText(this,"UCS kaydedildi: "+name,android.widget.Toast.LENGTH_SHORT).show();
+                }catch(IllegalArgumentException ex){
+                    android.widget.Toast.makeText(this,ex.getMessage(),android.widget.Toast.LENGTH_LONG).show();
+                }
+            }).show();
+    }
+    private void showDeleteUcsDialog(){
+        if(saving)return;
+        java.util.Map<String,CadUcsFrame> saved=CadUcsProfiles.read(storedUcs());
+        if(saved.isEmpty()){
+            android.widget.Toast.makeText(this,"Silinecek kayıtlı UCS yok",android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] names=saved.keySet().toArray(new String[0]);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Silinecek UCS seç")
+            .setItems(names,(dialog,which)->{
+                if(saving||which<0||which>=names.length)return;
+                String name=names[which];
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("UCS kaydını sil")
+                    .setMessage(name+" kaydı silinsin mi? Mevcut çizim ve aktif eksenler değişmeyecek.")
+                    .setNegativeButton("İPTAL",null)
+                    .setPositiveButton("SİL",(confirm,button)->{
+                        if(saving)return;
+                        storeUcs(CadUcsProfiles.remove(storedUcs(),name));
+                        android.widget.Toast.makeText(this,"UCS kaydı silindi",android.widget.Toast.LENGTH_SHORT).show();
+                    }).show();
+            }).setNegativeButton("İPTAL",null).show();
     }
 
     @Override protected void onActivityResult(int request,int result,Intent data){
