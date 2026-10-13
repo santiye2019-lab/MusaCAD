@@ -631,6 +631,12 @@ jobs:
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfNumber.java tests/DxfNumberTest.java
           java -cp /tmp/musacad-tests DxfNumberTest
           grep -q 'DxfNumber.format(v)' app/src/main/java/com/musa/cad/DxfWriter.java
+      - name: Test validated UCS coordinate frames and 3D editor axis controls
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadUcsFrame.java tests/CadUcsFrameTest.java
+          java -cp /tmp/musacad-tests CadUcsFrameTest
+          javac -encoding UTF-8 -d /tmp/musacad-tests tests/CadUcsUiContractTest.java
+          java -cp /tmp/musacad-tests CadUcsUiContractTest
       - name: Test 3D DXF surface geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
