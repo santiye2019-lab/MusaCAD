@@ -32,6 +32,9 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        test2dPolylineTiltedOcsElevation();
+        testNested2dPolylineOcs();
+        test3dPolylineIgnores2dOcs();
         testPolygonMesh();
         testInsertedBlockLine();
         testNestedBlockZTransforms();
@@ -59,6 +62,71 @@ public final class Dxf3dMeshTest {
             if(mesh.xyz[2]!=3f||mesh.xyz[5]!=8f||mesh.xyz[11]!=2f||mesh.xyz[14]!=4f)
                 throw new AssertionError("3D line/polyline Z coordinates");
         }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+
+    private static void test2dPolylineTiltedOcsElevation() throws Exception {
+        File file=File.createTempFile("mesh2d-ocs-elevation-", ".dxf");
+        try {
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\nPOLYLINE\n70\n0\n30\n5\n210\n0\n220\n1\n230\n0\n"
+                +"0\nVERTEX\n10\n2\n20\n3\n30\n0\n"
+                +"0\nVERTEX\n10\n4\n20\n3\n30\n0\n"
+                +"0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=6||mesh.edges.length!=2)
+                throw new AssertionError("tilted 2D POLYLINE geometry");
+            // Normal (0,1,0): OCS X=(-1,0,0), Y=(0,0,1), elevation=+5 Y.
+            if(mesh.xyz[0]!=-2f||mesh.xyz[1]!=5f||mesh.xyz[2]!=3f||
+               mesh.xyz[3]!=-4f||mesh.xyz[4]!=5f||mesh.xyz[5]!=3f)
+                throw new AssertionError("tilted 2D POLYLINE OCS/elevation lost");
+            for(int line:mesh.sourceLines)if(line!=-1)
+                throw new AssertionError("OCS vertices must not be saved as WCS source tags");
+        } finally {Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testNested2dPolylineOcs() throws Exception {
+        File file=File.createTempFile("mesh2d-ocs-nested-", ".dxf");
+        try {
+            String dxf="0\nSECTION\n2\nBLOCKS\n"
+                +"0\nBLOCK\n2\nBEND\n10\n0\n20\n0\n30\n0\n"
+                +"0\nPOLYLINE\n70\n0\n30\n5\n210\n0\n220\n1\n230\n0\n"
+                +"0\nVERTEX\n10\n2\n20\n3\n30\n0\n"
+                +"0\nVERTEX\n10\n4\n20\n3\n30\n0\n"
+                +"0\nSEQEND\n0\nENDBLK\n"
+                +"0\nBLOCK\n2\nRISER\n10\n0\n20\n0\n30\n0\n"
+                +"0\nINSERT\n2\nBEND\n10\n0\n20\n0\n30\n2\n"
+                +"0\nENDBLK\n0\nENDSEC\n"
+                +"0\nSECTION\n2\nENTITIES\n"
+                +"0\nINSERT\n2\nRISER\n10\n10\n20\n20\n30\n30\n50\n90\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=6||mesh.edges.length!=2)
+                throw new AssertionError("nested OCS POLYLINE geometry");
+            if(Math.abs(mesh.xyz[0]-5f)>1e-5||Math.abs(mesh.xyz[1]-18f)>1e-5||mesh.xyz[2]!=35f||
+               Math.abs(mesh.xyz[3]-5f)>1e-5||Math.abs(mesh.xyz[4]-16f)>1e-5||mesh.xyz[5]!=35f)
+                throw new AssertionError("nested OCS + INSERT XYZ composition");
+            for(int line:mesh.sourceLines)if(line!=-1)
+                throw new AssertionError("nested OCS vertices must remain read-only");
+        } finally {Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void test3dPolylineIgnores2dOcs() throws Exception {
+        File file=File.createTempFile("mesh3d-polyline-wcs-", ".dxf");
+        try {
+            String dxf="0\nSECTION\n2\nENTITIES\n"
+                +"0\nPOLYLINE\n70\n8\n30\n5\n210\n0\n220\n1\n230\n0\n"
+                +"0\nVERTEX\n10\n2\n20\n3\n30\n7\n"
+                +"0\nVERTEX\n10\n4\n20\n3\n30\n9\n"
+                +"0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=6||mesh.xyz[0]!=2f||mesh.xyz[1]!=3f||mesh.xyz[2]!=7f||
+               mesh.xyz[3]!=4f||mesh.xyz[4]!=3f||mesh.xyz[5]!=9f)
+                throw new AssertionError("3D POLYLINE must use WCS without 2D elevation");
+        } finally {Files.deleteIfExists(file.toPath());}
     }
 
     private static void testPolygonMesh() throws Exception {

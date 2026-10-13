@@ -73,6 +73,7 @@ public final class Dxf3dMesh {
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
         final ArrayList<Face> faces=new ArrayList<>();
         boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
+        DxfBlocks.Transform polylineVertexTransform;
         int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
@@ -86,6 +87,16 @@ public final class Dxf3dMesh {
                 polygonMesh=!polyface&&(flags&16)!=0;
                 polylinePath=!polyface&&!polygonMesh;
                 polylineClosed=(flags&1)!=0;
+                // 2D POLYLINE vertices use OCS XY; the header's group 30 is the
+                // elevation along its extrusion normal. 3D POLYLINE (flag 8),
+                // polyface and polygon mesh vertices are already in WCS.
+                polylineVertexTransform=p.transform;
+                if(polylinePath&&(flags&8)==0){
+                    DxfBlocks.Transform ocs=DxfBlocks.Transform.insertOcs(
+                        0,0,0,1,1,1,0,0,0,r.number(30,0),
+                        r.number(210,0),r.number(220,0),r.number(230,1));
+                    polylineVertexTransform=p.transform.thenLocal(ocs);
+                }
                 meshClosedM=polygonMesh&&(flags&1)!=0;meshClosedN=polygonMesh&&(flags&32)!=0;
                 meshM=polygonMesh?(int)r.number(71,0):0;meshN=polygonMesh?(int)r.number(72,0):0;
                 if(polygonMesh&&(meshM<2||meshN<2||(long)meshM*meshN>MAX_VERTICES))throw new IOException("3B polygon mesh boyutları geçersiz veya sınırı aşıyor");
@@ -106,7 +117,9 @@ public final class Dxf3dMesh {
                     addPoint(points,p,10,20,30);addSource(p,0);vertexCount++;
                 }else{
                     int index=points.n/3;
-                    addPoint(points,p,10,20,30);addSource(p,0);
+                    addPoint(points,p,polylineVertexTransform,10,20,30);
+                    // Do not write projected WCS coordinates back to OCS source tags.
+                    addSource(p,0,polylineVertexTransform);
                     if(firstPathVertex<0)firstPathVertex=index;
                     if(previousPathVertex>=0)appendEdge(explicitEdges,previousPathVertex,index);
                     previousPathVertex=index;vertexCount++;
@@ -172,6 +185,7 @@ public final class Dxf3dMesh {
             }
             polyface=false;polygonMesh=false;polylinePath=false;polylineClosed=false;meshClosedM=false;meshClosedN=false;faces.clear();
             firstPathVertex=-1;previousPathVertex=-1;vertexCount=0;meshM=meshN=0;
+            polylineVertexTransform=null;
         }
 
         private void addSource(DxfBlocks.Placement p,int slot){
