@@ -21,6 +21,14 @@ public final class Cad3dSaveCheckpoint {
         saved = exported.clone();
     }
 
+    /** Immutable checkpoint coordinates for a single edited source vertex. */
+    public float[] savedVertex(int vertex) {
+        if(vertex<0||vertex>=saved.length/3)
+            throw new IllegalArgumentException("Checkpoint vertex out of range");
+        int k=vertex*3;
+        return new float[]{saved[k],saved[k+1],saved[k+2]};
+    }
+
     public boolean hasUnsavedChanges(float[] current) {
         // A missing/invalid model should never silently be considered saved.
         return current == null || !Arrays.equals(saved, current);
