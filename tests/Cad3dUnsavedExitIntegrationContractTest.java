@@ -38,7 +38,8 @@ public final class Cad3dUnsavedExitIntegrationContractTest {
 
         require(activity.contains("final float[] exportSnapshot=Arrays.copyOf(mesh.xyz,mesh.xyz.length)"),
             "save captures the exact geometry it intends to publish");
-        require(activity.contains("if(finishedExport&&saveCheckpoint!=null)saveCheckpoint.markSaved(exportSnapshot)"),
+        require(activity.contains("if(finishedExport&&saveCheckpoint!=null){")&&
+                activity.contains("saveCheckpoint.markSaved(exportSnapshot);"),
             "failed or canceled saves cannot mark edits clean");
         int published=activity.indexOf("Dxf3dSafeSave.publish(staged,output);");
         int success=activity.indexOf("exported=true;",published);
