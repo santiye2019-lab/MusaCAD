@@ -95,7 +95,15 @@ public class DxfBlocksTest {
         if(dim.placements.size()!=1||dim.placements.get(0).directRoot)throw new AssertionError("dimension picture expansion");double[] dimPoint=dim.placements.get(0).transform.point(3,4);if(Math.abs(dimPoint[0]-3)>1e-6||Math.abs(dimPoint[1]-4)>1e-6)throw new AssertionError("dimension default transform");style(dim,"DASHED",70,1d);color(dim,DxfColor.aciArgb(5));
         DxfBlocks.Result movedDim=read(styles,picture,dimension("*D1",12,7,22,-2,8,"STYLE",62,5,6,"DASHED",370,70));double[] movedPoint=movedDim.placements.get(0).transform.point(3,4);if(Math.abs(movedPoint[0]-10)>1e-6||Math.abs(movedPoint[1]-2)>1e-6)throw new AssertionError("dimension group12 translation");
         DxfBlocks.Result missingDim=read("",dimension("*MISSING",13,0,23,0,14,10,24,0));if(missingDim.placements.size()!=1||!"DIMENSION".equals(missingDim.placements.get(0).record.type))throw new AssertionError("dimension fallback");
-        DxfBlocks.Result tiltedDim=read(picture,dimension("*D1",210,1,220,0,230,0,13,0,23,0,14,10,24,0));if(tiltedDim.placements.size()!=1||!"DIMENSION".equals(tiltedDim.placements.get(0).record.type))throw new AssertionError("dimension OCS fallback");
+        DxfBlocks.Result tiltedDim=read(picture,dimension("*D1",210,1,220,0,230,0,13,0,23,0,14,10,24,0));
+        if(tiltedDim.skipped!=0||tiltedDim.placements.size()!=1||
+            !"LINE".equals(tiltedDim.placements.get(0).record.type))
+            throw new AssertionError("tilted dimension picture block should expand");
+        double[] tiltedDimensionXYZ=tiltedDim.placements.get(0).transform.point3d(3,4,0);
+        if(Math.abs(tiltedDimensionXYZ[0])>1e-6||
+           Math.abs(tiltedDimensionXYZ[1]-3)>1e-6||
+           Math.abs(tiltedDimensionXYZ[2]-4)>1e-6)
+            throw new AssertionError("tilted dimension picture XYZ "+Arrays.toString(tiltedDimensionXYZ));
 
         layout(read("",line()),DxfBlocks.MODEL_LAYOUT);
         layout(read("",line(67,1)),DxfBlocks.PAPER_LAYOUT);
