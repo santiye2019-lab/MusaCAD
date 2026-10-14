@@ -202,6 +202,19 @@ class DxfSemanticParityTest(unittest.TestCase):
                 with self.assertRaises(DxfParityError):
                     fingerprint(self.after)
 
+    def test_no_hidden_fields_allowed_after_structural_markers(self):
+        good = drawing(line())
+        cases = (
+            good + pair(1, "hidden data after EOF"),
+            good.replace(pair(0, "EOF"),
+                         pair(1, "hidden data after ENDSEC") + pair(0, "EOF")),
+        )
+        for malformed in cases:
+            with self.subTest(tail=malformed[-50:]):
+                self.before.write_text(malformed, encoding="utf-8")
+                with self.assertRaises(DxfParityError):
+                    fingerprint(self.before)
+
     def test_missing_or_empty_dxf_refused(self):
         with self.assertRaises(DxfParityError):
             fingerprint(self.before)
