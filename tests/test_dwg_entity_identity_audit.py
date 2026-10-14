@@ -108,7 +108,7 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
             manifest_dir = root / "refs"
             manifest_dir.mkdir()
             converter = root / "mock-converter"
-            converter.write_text("#!/bin/sh\\nexit 0\\n", encoding="ascii")
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
             converter.chmod(0o700)
             report = root / "report.json"
             path = manifest_dir / (sha + ".json")
