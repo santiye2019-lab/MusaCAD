@@ -62,6 +62,9 @@ def inventory_dxf(path: Path):
     blocks = {}
     model = Counter()
     block_geometry = Counter()
+    # Raw decoded-DXF attributes, NOT proof that native Canvas displayed them.
+    color_sources = Counter()
+    advanced_entities = Counter()
     has_eof = False
     sections_seen = set()
     total_records = 0
@@ -71,6 +74,44 @@ def inventory_dxf(path: Path):
         if current is None:
             return
         data = {code: val for code, val in fields}
+        is_drawable_entity = (
+            section in ("ENTITIES", "BLOCKS") and
+            current not in ("BLOCK", "ENDBLK", "ENDTAB", "TABLE")
+        )
+        if is_drawable_entity:
+            # DXF 420 overrides ACI 62 when valid. 0=ByBlock, 256/absent
+            # =ByLayer. Record invalid colors separately, never pretend they
+            # are accurate or silently classify them as indexed colors.
+            rgb = data.get(420)
+            aci = data.get(62)
+            if rgb is not None:
+                try:
+                    value = int(rgb)
+                except ValueError:
+                    value = -1
+                color_sources["truecolor" if 0 <= value <= 0xFFFFFF
+                              else "invalid_truecolor"] += 1
+            elif aci is None:
+                color_sources["bylayer"] += 1
+            else:
+                try:
+                    color = int(aci)
+                except ValueError:
+                    color = -1
+                if color == 0:
+                    color_sources["byblock"] += 1
+                elif color == 256:
+                    color_sources["bylayer"] += 1
+                elif 1 <= abs(color) <= 255:
+                    color_sources["explicit_aci"] += 1
+                else:
+                    color_sources["invalid_aci"] += 1
+            if current in (
+                "3DSOLID", "BODY", "REGION", "ACAD_PROXY_ENTITY",
+                "DIMENSION", "HATCH", "MTEXT", "ACAD_TABLE",
+                "INSERT", "IMAGE", "OLE2FRAME", "SPLINE",
+            ):
+                advanced_entities[current] += 1
         if current == "SECTION":
             section = data.get(2, "").upper()
             sections_seen.add(section)
@@ -123,6 +164,9 @@ def inventory_dxf(path: Path):
         "block_geometry_types": dict(sorted(block_geometry.items())),
         "block_inserts": model["INSERT"] + block_geometry["INSERT"],
         "model_proxy_entities": model["ACAD_PROXY_ENTITY"],
+        "converted_dxf_color_sources": dict(sorted(color_sources.items())),
+        "converted_dxf_advanced_entity_counts": dict(sorted(advanced_entities.items())),
+        "color_audit_scope": "DXF entity codes 420/62 only; does NOT validate layer/block inheritance, viewport visibility or rendered screen pixels",
         "inventory_scope": "DWG decoded to DXF by MusaCAD host converter; not independent DWG fidelity proof",
     }
 
