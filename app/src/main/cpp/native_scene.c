@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "config.h"
 #include "native_color.h"
+#include "scene_coord_safety.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,12 +113,17 @@ static SceneColor entity_color(Dwg_Object *obj,SceneColor byBlock,SceneColor lay
 }
 static int emit_line(MusaNativeScene *s,SceneColor color,Affine2 m,double x1,double y1,double x2,double y2){
     double ax,ay,bx,by;map2(m,x1,y1,&ax,&ay);map2(m,x2,y2,&bx,&by);
-    if(!finite2(ax,ay)||!finite2(bx,by)||!reserve_scene(s,4u+color_words(color)))return 0;
+    if(!musa_scene_xy_safe(ax,ay)||!musa_scene_xy_safe(bx,by)){
+        s->truncated=1;return 0;
+    }
+    if(!reserve_scene(s,4u+color_words(color)))return 0;
     push_code(s,1,color);pushf(s,(float)ax);pushf(s,(float)ay);pushf(s,(float)bx);pushf(s,(float)by);
     add_bounds(s,ax,ay);add_bounds(s,bx,by);s->primitives++;return 1;
 }
 static int emit_point(MusaNativeScene *s,SceneColor color,Affine2 m,double x,double y){
-    double ax,ay;map2(m,x,y,&ax,&ay);if(!finite2(ax,ay)||!reserve_scene(s,2u+color_words(color)))return 0;
+    double ax,ay;map2(m,x,y,&ax,&ay);
+    if(!musa_scene_xy_safe(ax,ay)){s->truncated=1;return 0;}
+    if(!reserve_scene(s,2u+color_words(color)))return 0;
     push_code(s,3,color);pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);s->primitives++;return 1;
 }
 static int begin_poly(MusaNativeScene *s,SceneColor color,int closed,int n){
@@ -126,10 +132,14 @@ static int begin_poly(MusaNativeScene *s,SceneColor color,int closed,int n){
 }
 static void emit_poly_point(MusaNativeScene *s,Affine2 m,double x,double y){
     double ax,ay;map2(m,x,y,&ax,&ay);
-    if(!finite2(ax,ay)){ax=0;ay=0;}
+    if(!musa_scene_xy_safe(ax,ay)){
+        // Never invent a vertex at the world origin. The page will roll
+        // back transactionally; full-scene preview stays visibly partial.
+        s->truncated=1;return;
+    }
     pushf(s,(float)ax);pushf(s,(float)ay);add_bounds(s,ax,ay);
 }
-static void finish_poly(MusaNativeScene *s){s->primitives++;}
+static void finish_poly(MusaNativeScene *s){if(!s->truncated)s->primitives++;}
 static double infinite_reach(Dwg_Data *dwg){
     if(dwg){
         double x0=dwg_model_x_min(dwg),y0=dwg_model_y_min(dwg),x1=dwg_model_x_max(dwg),y1=dwg_model_y_max(dwg);
@@ -288,7 +298,12 @@ static void emit_mtext(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_En
 static int emit_curve(MusaNativeScene *s,SceneColor color,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double sweep){
     double wcx,wcy,pu_x,pu_y,pv_x,pv_y;map2(m,cx,cy,&wcx,&wcy);map2(m,cx+ux,cy+uy,&pu_x,&pu_y);map2(m,cx+vx,cy+vy,&pv_x,&pv_y);
     ux=pu_x-wcx;uy=pu_y-wcy;vx=pv_x-wcx;vy=pv_y-wcy;
-    if(!finite2(wcx,wcy)||!finite2(ux,uy)||!finite2(vx,vy)||!isfinite(start)||!isfinite(sweep)||fabs(sweep)<1e-12||!reserve_scene(s,8u+color_words(color)))return 0;
+    if(!musa_scene_xy_safe(wcx,wcy)||!musa_scene_xy_safe(ux,uy)||
+       !musa_scene_xy_safe(vx,vy)||!musa_scene_float_safe(start)||
+       !musa_scene_float_safe(sweep)){
+        s->truncated=1;return 0;
+    }
+    if(fabs(sweep)<1e-12||!reserve_scene(s,8u+color_words(color)))return 0;
     push_code(s,4,color);pushf(s,(float)wcx);pushf(s,(float)wcy);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);pushf(s,(float)start);pushf(s,(float)sweep);
     double rx=hypot(ux,vx),ry=hypot(uy,vy);add_bounds(s,wcx-rx,wcy-ry);add_bounds(s,wcx+rx,wcy+ry);s->primitives++;return 1;
 }
