@@ -47,6 +47,7 @@ public final class Mesh3dActivity extends Activity {
     private Dxf3dMesh mesh;
     private Cad3dSurfaceMetrics.Result openingSurfaceMetrics;
     private Cad3dMeshTopology.Result openingTopology;
+    private Cad3dSignedVolume.Result openingSignedVolume;
     private float[] original;
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
@@ -88,6 +89,13 @@ public final class Mesh3dActivity extends Activity {
                 try{topology=Cad3dMeshTopology.inspect(loaded.xyz,loaded.triangles);}
                 catch(IllegalArgumentException ignored){}
                 final Cad3dMeshTopology.Result initialTopology=topology;
+                Cad3dSignedVolume.Result volume=null;
+                if(topology!=null&&topology.closedOrientedByIndex){
+                    try{volume=Cad3dSignedVolume.measure(
+                            loaded.xyz,loaded.triangles,topology);}
+                    catch(IllegalArgumentException ignored){}
+                }
+                final Cad3dSignedVolume.Result initialVolume=volume;
                 float[] openedOriginal=Arrays.copyOf(loaded.xyz,loaded.xyz.length);
                 File recoveryPath=Cad3dRecoveryJournal.pathFor(
                     new File(getFilesDir(),"musacad-3d-recovery"),sourceFile);
@@ -108,6 +116,7 @@ public final class Mesh3dActivity extends Activity {
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=openedOriginal;
                     openingSurfaceMetrics=initialMetrics;
                     openingTopology=initialTopology;
+                    openingSignedVolume=initialVolume;
                     recoveryFile=recoveryPath;recoveryFingerprint=sourceFingerprint;
                     saveCheckpoint=new Cad3dSaveCheckpoint(original);
                     meshView=new Mesh3dView(this,mesh);
@@ -161,6 +170,15 @@ public final class Mesh3dActivity extends Activity {
                 .append(openingTopology.degenerateTriangles).append(" dejenere üçgen, ")
                 .append(openingTopology.duplicateFaces).append(" yinelenen yüz. ")
                 .append("Kapalı katı olarak kabul edilmez.");
+        }
+        if(openingSignedVolume!=null&&openingSignedVolume.available){
+            text.append("\nAçılışta okunan yönlendirilmiş üçgen ağın cebirsel hacmi: ")
+                .append(String.format(java.util.Locale.getDefault(),
+                        "%.3f",openingSignedVolume.signedVolume))
+                .append(" çizim birimi³ (yalnız ağ hesabı; kesin metraj, ")
+                .append("öz-kesişimsiz B-Rep veya geçerli ACIS katısı garantisi değildir)");
+            if(mesh.acisSolids>0||mesh.unsupportedSolids>0||mesh.solidProxy)
+                text.append(" • ACIS/temsili nesneler bulunduğundan kısmi");
         }
         if(mesh.flatPlan){
             text.append("\n2B plan algılandı: Z aralığı ")
