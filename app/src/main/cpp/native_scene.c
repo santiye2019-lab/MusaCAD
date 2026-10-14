@@ -621,6 +621,18 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
              */
             size_t n=(size_t)e->num_ctrl_pts;
             int degree=(int)e->degree;
+            /* LibreDWG's scenario 2 may carry fit points and tangents but
+             * NO control polygon or knots. A degree-1 segment with exactly
+             * two fit points is mathematically just a line, so it can be
+             * rendered exactly. Higher-order fit-only data are NOT
+             * uniquely reconstructible without a full fitting algorithm;
+             * they remain visibly partial, never a fabricated polyline. */
+            if(!e->ctrl_pts&&!e->knots&&degree==1&&!e->closed_b&&
+               e->num_fit_pts==2&&e->fit_pts){
+                emit_line(s,color,parent,e->fit_pts[0].x,e->fit_pts[0].y,
+                          e->fit_pts[1].x,e->fit_pts[1].y);
+                break;
+            }
             if(n<2||n>MUSA_NURBS_MAX_CONTROL||!e->ctrl_pts||!e->knots||
                degree<1||degree>MUSA_NURBS_MAX_DEGREE||
                (size_t)e->num_knots!=n+(size_t)degree+1u){
