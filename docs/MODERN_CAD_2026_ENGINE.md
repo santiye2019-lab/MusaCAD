@@ -220,3 +220,54 @@ approximate **35%** developed, **65%** remaining; this change improves
 transparency and test coverage, but does not close any of the 18 final
 physical-device/semantic acceptance requirements. Main/release APK remain
 unchanged.
+
+## Inventory #08 — Original-DWG identity and layer parity gate (second increment)
+
+The first increment catalogued supported/unsupported native C dispatch types
+from an **exported** DXF; a successful export is NOT proof that all source DWG
+objects survived. This increment adds a bounded read-only object identity
+audit to `tests/dwg_entity_identity_audit.py` and integrates it into the
+existing `private_dwg_read_audit.py`.
+
+- Records each decoded `ENTITIES`/`BLOCKS` object's DXF handle (group 5),
+  layer (group 8), type and model/block ownership. Hex handles are canonicalized
+  (`00A` equals `A`), invalid/missing/duplicate handles and missing/duplicate
+  layer fields are counted. Report fields are counts **only**; it does not
+  output handles, coordinates or per-object layer labels.
+- Optionally compare against a separately obtained, local **source DWG**
+  object inventory. The external JSON manifest must be named
+  `<source-SHA256>.json`, include `source_sha256` exactly matching the
+  unchanged original DWG and `source_kind: "independent_dwg_reader"`, plus
+  `records` containing `handle`, `space` (`model`/`block`), `type`
+  (DXF-level canonical type), and `layer`. Caller MUST confirm independent
+  reader provenance: a label by itself cannot cryptographically attest it.
+- Missing/extra handles, changed type, changed layer or changed model/block
+  ownership fail the optional parity check. Result is either
+  `identity_metadata_parity_only` or `identity_metadata_mismatch` —
+  **never** "CAD fully accurate". Reports output mismatch counts only,
+  not the source's sensitive per-object identifiers or layer names.
+- Invalid/mismatched/oversized manifests fail closed; only an explicit
+  `--independent-manifest-dir <local-directory>` opt-in loads such data.
+  Neither the source DWG nor reference manifest is uploaded.
+- Synthetic tests cover duplicate/invalid handles, identity drift despite
+  equal counts, model/block changes, independent-SHA gate, privacy and
+  strict reference input validation. Both Android and DWG CI run them.
+
+Example, all paths stay local to the host machine:
+
+```shell
+python3 tests/private_dwg_read_audit.py \
+  --converter build/musacad_dwg_convert \
+  --independent-manifest-dir /private/independent-cad-manifests \
+  --report /private/dwg-object-audit.json /private/project.dwg
+```
+
+**Remaining open:** Independent reader *actual source* data for engineering
+files, link-chain/XREF and hidden-layout parity, semantic geometry/color
+comparisons, and Android first-frame/large-project acceptance. Even a perfect
+identity match does not certify ACIS solids, dynamic block actions, geometry,
+unit scales or written DWG roundtrip. **0/18 final acceptance.**
+
+**Overall progression:** 35% -> 35% estimated developed, 65% remaining
+(AutoCAD 2026 target, ±10 pp); audit infrastructure does not count as full
+native drawing functionality. Draft PR only; main/production APK untouched.
