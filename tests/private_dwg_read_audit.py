@@ -246,6 +246,7 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         r" fit=(\d+)"
         r"(?: duplicate_adjacent=(\d+) nonfinite_fit=(\d+)"
         r" begin_tangent_finite=(\d+) end_tangent_finite=(\d+))?"
+        r"(?: begin_tangent_zero=(\d+) end_tangent_zero=(\d+))?"
     )
     for match in fit_failure_pattern.finditer(diagnostics):
         if len(fit_diagnostics) >= 32:
@@ -257,6 +258,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
             "nonfinite_fit": int(match.group(4)) if match.group(4) else None,
             "begin_tangent_finite": int(match.group(5)) if match.group(5) else None,
             "end_tangent_finite": int(match.group(6)) if match.group(6) else None,
+            "begin_tangent_zero": int(match.group(7)) if match.group(7) else None,
+            "end_tangent_zero": int(match.group(8)) if match.group(8) else None,
         })
     result["native_fit_spline_stage_diagnostics"] = fit_diagnostics
     # A zero converter exit must not hide any native SPLINE rejection.
