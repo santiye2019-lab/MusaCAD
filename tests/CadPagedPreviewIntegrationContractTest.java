@@ -50,6 +50,8 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(view,"experimentalPagedLoader.requestVisibleWorld(","visible reload trigger");
         need(compositor,"visibleWorldBounds(","shared viewport mapping");
         need(compositor,"retainReload(","strict source page reload");
+        need(compositor,"catalog.requireAppend(","preflight before cache eviction");
+        need(compositor,"cache.put(start,next,page.hasMore","validated cache publication");
         need(compositor,"catalog.samePage(","reject changed source");
         need(compositor,"catalog.clear()","clear catalog on source switch");
         need(loader,"latestViewport.getAndSet(null)","latest viewport wins");
