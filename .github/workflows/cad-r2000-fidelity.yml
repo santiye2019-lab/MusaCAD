@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'app/src/main/cpp/dwg_write_pilot.c'
+      - 'app/src/main/cpp/native_scene.c'
+      - 'app/src/main/cpp/native_scene.h'
+      - 'app/src/main/cpp/dwg_bridge.c'
       - 'tests/r2000_generate_variants.py'
       - 'tests/r2000_generate_stress.py'
       - 'tests/private_dwg_read_audit.py'
@@ -207,3 +210,25 @@ jobs:
             exit 1
           fi
           grep -F 'status=-4' /tmp/musa-too-small-page.log
+
+      - name: Nested block continuation host acceptance
+        run: |
+          set -euo pipefail
+          # Public/synthetic drawings only; no user's private engineering files.
+          /usr/bin/time -f "Nested 8192 objects elapsed %e sec RSS %M KiB" \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe /tmp/musa-stress-r2000/mixed-8192.dwg 8192 \
+            2>&1 | tee /tmp/musa-nested-mixed.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-mixed.log
+          /usr/bin/time -f "Nested polyline elapsed %e sec RSS %M KiB" \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 32768 \
+            2>&1 | tee /tmp/musa-nested-poly.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-poly.log
+          if timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --nested-paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+              > /tmp/musa-nested-reject.log 2>&1; then
+            echo 'A single oversized leaf must NOT be silently truncated'
+            exit 1
+          fi
+          grep -E 'status=-4|Nested scene rejected' /tmp/musa-nested-reject.log
