@@ -94,6 +94,25 @@ public final class CadAc1032StagedSaveTest {
                     stubVerifier),"modified original during encoder rejects");
             Files.write(source.toPath(),original);
 
+            // Distinct names may still alias the SAME inode through a hard
+            // link. Source and edit must have independent backing files.
+            Path alias=folder.resolve("alias-edited.dxf");
+            Files.createLink(alias,source.toPath());
+            need(rejected(source,alias.toFile(),destination,stubEncoder,stubVerifier),
+                    "hardlinked DXF alias of the original DWG must be rejected");
+            Files.delete(alias);
+
+            // A buggy/malicious independent reader must not be able to
+            // replace the staged file with a symlink after SHA capture.
+            need(rejected(source,edit,destination,stubEncoder,
+                    (s,e,stage)->{
+                        Files.delete(stage.toPath());
+                        Files.createSymbolicLink(stage.toPath(),s.toPath());
+                        return true;
+                    }),"symlink-swapped stage must be rejected");
+            need(Arrays.equals(Files.readAllBytes(source.toPath()),original),
+                    "symlink-stage cleanup must never remove original DWG");
+
             need(rejected(source,edit,destination,stubEncoder,
                     (s,e,stage)->{
                         byte[] altered=Files.readAllBytes(stage.toPath());
