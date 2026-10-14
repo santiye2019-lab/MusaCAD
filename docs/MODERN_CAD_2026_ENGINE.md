@@ -438,3 +438,24 @@ an FPS increase. Actual Android p50/p95 draw time, frame pacing and
 first-frame RGB correctness must still be measured on physical devices.
 Main and shipping APK are unchanged until the quality gate succeeds and a
 separate release is authorized. Estimate stays 35% (65% remaining).
+
+## Opt-in drawing CPU duration metrics (pan versus settled)
+
+A pure-Java, fixed-memory `CadFrameTimeStats` records the last 256
+`CadView.onDraw` CPU durations for each of navigation (pinch/pan) and
+settled drawing. A developer explicitly calls `cad.enableFrameTiming(true)`
+on the UI thread; normal operation starts with the probe disabled. A
+`cad.frameTimingSnapshot()` exposes per-group sample count, nearest-rank
+p50/p95 draw CPU milliseconds, maximum and frames over 16.667 ms.
+The hot path stores one long in a bounded ring: no per-frame allocations,
+sorting, file persistence, drawing content, remote logging or project names.
+Only an explicit snapshot performs sorting. Calling enableFrameTiming(false)
+discards measurements and returns to the normal path.
+
+A new host JVM regression exercises exact percentiles, separate navigation
+and settled groups, bounded rollover, jank counting and invalid durations,
+and is now part of Android quality gate. The CadView contract also verifies
+the opt-in, finally-block instrumentation. A measurement is CPU `onDraw`
+duration, NOT device refresh/frame pacing, GPU time, total load latency,
+first-frame pixel correctness or throughput. Real device acceptance is still
+required. No release/public logging is enabled; estimate stays 35%.

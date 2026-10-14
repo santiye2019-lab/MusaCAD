@@ -190,6 +190,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/MusaCadVisualPerformanceContractTest.java
           java -cp /tmp/musacad-tests MusaCadVisualPerformanceContractTest
+      - name: Test opt-in CadView CPU frame timing sampler
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadFrameTimeStats.java tests/CadFrameTimeStatsTest.java
+          java -cp /tmp/musacad-tests CadFrameTimeStatsTest
       - name: Test MusaCAD AI natural-language command routing
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/MusaAiCommandRouter.java tests/MusaAiCommandRouterTest.java

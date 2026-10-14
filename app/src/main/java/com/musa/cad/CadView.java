@@ -67,6 +67,8 @@ public class CadView extends View {
     // new float[2] for each measurement marker on every pinch/pan frame.
     private float[] overlayPointScreen=new float[64];
     private final Path overlayPointPath=new Path();
+    /* Null by default: absolutely no sampling during ordinary CAD use. */
+    private CadFrameTimeStats frameTimeStats;
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
     private final ArrayList<CadEdit> edits=new ArrayList<>();
     private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
@@ -955,7 +957,19 @@ public class CadView extends View {
 
     @Override protected void onSizeChanged(int w,int h,int ow,int oh){if(selecting)cancelSelection();if(ow==0)fit();}
 
+    /** Developer-only, in-memory draw timing; not GPU FPS or screen fidelity. */
+    public void enableFrameTiming(boolean enable){
+        frameTimeStats=enable?new CadFrameTimeStats():null;
+    }
+    public CadFrameTimeStats.Snapshot frameTimingSnapshot(){
+        return frameTimeStats==null?null:frameTimeStats.snapshot();
+    }
+
     @Override protected void onDraw(Canvas c){
+        final CadFrameTimeStats metrics=frameTimeStats;
+        final boolean gestureAtStart=fastNavigation;
+        final long drawStarted=metrics==null?0L:System.nanoTime();
+        try{
         super.onDraw(c);
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
@@ -998,6 +1012,7 @@ public class CadView extends View {
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
         int markerCount=points.size();
+        paint.setStyle(Paint.Style.FILL); // Preserve pre-existing empty-marker paint state.
         if(markerCount>0){
             // Android Matrix.mapPoints supports transforming the same array in
             // place. Keep the visible selection/measurement overlay identical.
@@ -1038,6 +1053,9 @@ public class CadView extends View {
         if((!exporting||reportEvidenceExporting)&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}
         if(stylusHover&&!exporting)drawStylusCursor(c);
+        }finally{
+            if(metrics!=null)metrics.sample(System.nanoTime()-drawStarted,gestureAtStart);
+        }
     }
 
     private void drawImageOverlays(Canvas c){

@@ -41,6 +41,9 @@ public final class MusaCadVisualPerformanceContractTest {
         has(vector,"culledDuringMotion","subpixel LOD");
         has(cad,"else vectorDrawing.drawVector(c,imageMatrix","settled full vector renderer");
         has(cad,"private float[] overlayPointScreen=new float[64]","measurement frame scratch is reused");
+        has(cad,"final long drawStarted=metrics==null?0L:System.nanoTime()","opt-in per-frame timing");
+        has(cad,"metrics.sample(System.nanoTime()-drawStarted,gestureAtStart)","draw time samples tied to completed onDraw");
+        has(cad,"frameTimeStats=enable?new CadFrameTimeStats():null","measurement disabled by default");
         has(cad,"private final Path overlayPointPath=new Path()","measurement path is reused");
         has(cad,"imageMatrix.mapPoints(overlayPointScreen,0,overlayPointScreen,0,markerCount)","bulk in-place measurement projection");
         has(cad,"if(mode==Mode.AREA&&markerCount>2)overlayPointPath.close()","area polygon geometry preserved");
