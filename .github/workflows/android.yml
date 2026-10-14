@@ -742,6 +742,20 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
+      - name: Test 3D viewport normals for large and tiny CAD coordinates
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dFaceLighting.java tests/Cad3dFaceLightingTest.java
+          java -cp /tmp/musacad-tests Cad3dFaceLightingTest
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/java/com/musa/cad/Mesh3dView.java").read_text()
+          method=source[source.index("private void drawSurfaces(Canvas canvas)"):
+                        source.index("private float distance(",source.index("private void drawSurfaces(Canvas canvas)"))]
+          assert "Cad3dFaceLighting.brightness(model.xyz,a,b,c)" in method
+          assert "if(light<0d)continue;" in method
+          assert "float nx=uy*vz-uz*vy" not in method
+          PY
+
       - name: Test real 3D triangular surface area in native drawing units
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/Cad3dSurfaceMetricsTest.java
