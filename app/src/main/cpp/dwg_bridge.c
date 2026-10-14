@@ -100,7 +100,54 @@ static int convert_dwg(const char *input,const char *output) {
 }
 
 #ifdef MUSA_HOST
+/*
+ * Non-production paged-scene acceptance probe. All drawing bytes remain local.
+ * The legacy scene is built only for baseline count comparison on this test.
+ */
+static int host_paged_probe(const char *input,const char *budget){
+    char *end=NULL;
+    unsigned long long n=strtoull(budget,&end,10);
+    if(!budget[0]||!end||*end||n<256||n>(9u*1024u*1024u))return 2;
+    int read_error=0;
+    MusaCadSession *session=session_open(input,&read_error);
+    if(!session){fprintf(stderr,"Paged probe open failed: %d\n",read_error);return 1;}
+    MusaNativeScene full={0};
+    int full_status=musa_scene_build(session->dwg,&full);
+    const int full_count=full.primitives;
+    size_t cursor=0,total=0,pages=0;
+    int error=0;
+    while(pages<100000){
+        MusaNativeScene page={0};
+        size_t next=cursor;
+        int status=musa_scene_build_page(session->dwg,&page,cursor,&next,(size_t)n);
+        if(status<0||next<=cursor||page.count>(size_t)n||page.truncated){
+            fprintf(stderr,"Paged probe rejected page=%zu cursor=%zu status=%d next=%zu floats=%zu\n",
+                    pages,cursor,status,next,page.count);
+            musa_scene_free(&page);error=1;break;
+        }
+        total+=(size_t)page.primitives;
+        fprintf(stderr,"Paged scene: page=%zu start=%zu next=%zu primitives=%d floats=%zu more=%d\n",
+                pages,cursor,next,page.primitives,page.count,status==1);
+        musa_scene_free(&page);
+        ++pages;cursor=next;
+        if(status==0)break;
+    }
+    if(pages>=100000||full_status<0||(full_status==0&&total!=(size_t)full_count)||
+       (full_status==1&&total<(size_t)full_count)){
+        fprintf(stderr,"Paged probe count verification failed: full_status=%d full=%d pages=%zu total=%zu\n",
+                full_status,full_count,pages,total);
+        error=1;
+    }
+    if(!error)fprintf(stderr,"Paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
+                      pages,total,full_count,full_status);
+    musa_scene_free(&full);
+    session_close(session);
+    return error?1:0;
+}
+
 int main(int argc,char **argv){
+    if(argc==4&&strcmp(argv[1],"--paged-probe")==0)
+        return host_paged_probe(argv[2],argv[3]);
     if(argc!=3)return 2;
     int read_error=0;
     MusaCadSession *session=session_open(argv[1],&read_error);
