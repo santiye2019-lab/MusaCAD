@@ -32,9 +32,11 @@ public final class NativeViewportReloadGateTest {
                 "inverted viewport denied");
         rejects(()->gate.shouldRequest(0,0,1,1,-1),
                 "negative page count denied");
-        must(gate.shouldRequest(0,0,1,1,50000),
-             "invalid request never alters the last valid key");
         must(!gate.shouldRequest(0,0,1,1,50000),
+             "invalid requests preserve the last accepted signed-zero key");
+        must(gate.shouldRequest(0,0,2,2,50000),
+             "new viewport still accepted after invalid requests");
+        must(!gate.shouldRequest(0,0,2,2,50000),
              "identical valid request suppressed");
         System.out.println("Native viewport decode-generation reload gate PASS");
     }
