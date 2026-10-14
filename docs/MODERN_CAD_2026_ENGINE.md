@@ -416,3 +416,25 @@ ceiling. Such claims await p50/p95 frame-time and screenshot tests on actual
 devices and large private DWG drawings. Main, production APK, Cloudflare and
 default feature switches are untouched.
 General CAD 2026 target estimate remains 35%, with 65% remaining.
+
+## Pan/zoom measurement overlay allocation reduction (CadView)
+
+The ordinary **active Android CadView** previously allocated a fresh
+ArrayList, float[2] and PointF for every existing measurement vertex on
+**every onDraw** (including during pan/pinch). A separate Path was also
+allocated for a multi-vertex measurement. This work was repeated even when
+coordinates had not otherwise changed.
+
+The UI thread now reuses one grow-on-demand packed coordinate buffer and
+one Path; the current imageMatrix transforms all point pairs in place.
+Measure-point order, AREA closing behavior, fixed 8-pixel marker radius,
+snapped-last-point marker and vector/native drawing selection remain
+unchanged. The workflow's visual performance contract asserts that this
+non-allocating path is still used and that the old per-frame allocation
+patterns are absent.
+
+This targets Java object allocation and GC pressure; it is not proof of
+an FPS increase. Actual Android p50/p95 draw time, frame pacing and
+first-frame RGB correctness must still be measured on physical devices.
+Main and shipping APK are unchanged until the quality gate succeeds and a
+separate release is authorized. Estimate stays 35% (65% remaining).

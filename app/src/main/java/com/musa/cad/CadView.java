@@ -63,6 +63,10 @@ public class CadView extends View {
 
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<PointF> points=new ArrayList<>();
+    // UI thread only: grow on point-count change, never allocate PointF or a
+    // new float[2] for each measurement marker on every pinch/pan frame.
+    private float[] overlayPointScreen=new float[64];
+    private final Path overlayPointPath=new Path();
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
     private final ArrayList<CadEdit> edits=new ArrayList<>();
     private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
@@ -993,11 +997,43 @@ public class CadView extends View {
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
-        ArrayList<PointF> screen=new ArrayList<>();for(PointF point:points){float[] xy={point.x,point.y};imageMatrix.mapPoints(xy);screen.add(new PointF(xy[0],xy[1]));}
-        if(screen.size()>1){Path p=new Path();p.moveTo(screen.get(0).x,screen.get(0).y);for(int i=1;i<screen.size();i++)p.lineTo(screen.get(i).x,screen.get(i).y);if(mode==Mode.AREA&&screen.size()>2)p.close();c.drawPath(p,paint);}
-        paint.setStyle(Paint.Style.FILL);for(PointF p:screen)c.drawCircle(p.x,p.y,8,paint);
-
-        if(lastSnapped&&!screen.isEmpty()&&!exporting){PointF point=screen.get(screen.size()-1);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.WHITE);paint.setStrokeWidth(2);c.drawRect(point.x-12,point.y-12,point.x+12,point.y+12,paint);paint.setStyle(Paint.Style.FILL);}
+        int markerCount=points.size();
+        if(markerCount>0){
+            // Android Matrix.mapPoints supports transforming the same array in
+            // place. Keep the visible selection/measurement overlay identical.
+            int words=markerCount*2;
+            if(overlayPointScreen.length<words)
+                overlayPointScreen=Arrays.copyOf(overlayPointScreen,
+                        Math.max(words,overlayPointScreen.length*2));
+            for(int i=0;i<markerCount;i++){
+                PointF point=points.get(i);
+                overlayPointScreen[i*2]=point.x;
+                overlayPointScreen[i*2+1]=point.y;
+            }
+            imageMatrix.mapPoints(overlayPointScreen,0,overlayPointScreen,0,markerCount);
+            if(markerCount>1){
+                overlayPointPath.rewind();
+                overlayPointPath.moveTo(overlayPointScreen[0],overlayPointScreen[1]);
+                for(int i=1;i<markerCount;i++)
+                    overlayPointPath.lineTo(overlayPointScreen[i*2],
+                                            overlayPointScreen[i*2+1]);
+                if(mode==Mode.AREA&&markerCount>2)overlayPointPath.close();
+                c.drawPath(overlayPointPath,paint);
+            }
+            paint.setStyle(Paint.Style.FILL);
+            for(int i=0;i<markerCount;i++)
+                c.drawCircle(overlayPointScreen[i*2],
+                             overlayPointScreen[i*2+1],8,paint);
+            if(lastSnapped&&!exporting){
+                int last=words-2;
+                float x=overlayPointScreen[last],y=overlayPointScreen[last+1];
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(Color.WHITE);
+                paint.setStrokeWidth(2);
+                c.drawRect(x-12,y-12,x+12,y+12,paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+        }
         if(selecting&&draggingSelection&&!exporting){paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.YELLOW);paint.setStrokeWidth(3);c.drawRect(Math.min(selectionX,selectionEndX),Math.min(selectionY,selectionEndY),Math.max(selectionX,selectionEndX),Math.max(selectionY,selectionEndY),paint);paint.setStyle(Paint.Style.FILL);}
         if((!exporting||reportEvidenceExporting)&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}

@@ -40,6 +40,15 @@ public final class MusaCadVisualPerformanceContractTest {
         has(vector,"CadNavigationPolicy.movingMinWorldSpan","adaptive gesture geometry filter");
         has(vector,"culledDuringMotion","subpixel LOD");
         has(cad,"else vectorDrawing.drawVector(c,imageMatrix","settled full vector renderer");
+        has(cad,"private float[] overlayPointScreen=new float[64]","measurement frame scratch is reused");
+        has(cad,"private final Path overlayPointPath=new Path()","measurement path is reused");
+        has(cad,"imageMatrix.mapPoints(overlayPointScreen,0,overlayPointScreen,0,markerCount)","bulk in-place measurement projection");
+        has(cad,"if(mode==Mode.AREA&&markerCount>2)overlayPointPath.close()","area polygon geometry preserved");
+        has(cad,"if(lastSnapped&&!exporting)","snapped marker is preserved");
+        if(cad.contains("ArrayList<PointF> screen=new ArrayList<>()"))
+            throw new AssertionError("measurement overlay allocates one ArrayList per UI frame");
+        if(cad.contains("screen.add(new PointF("))
+            throw new AssertionError("measurement overlay allocates one PointF per marker per frame");
         has(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","actual exported project images");
         has(main,"MusaAiCloudService.analyzeHybridWithContext(","online visual+CAD model call");
         has(main,"GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU","engineering report title");
