@@ -46,6 +46,7 @@ public final class Mesh3dActivity extends Activity {
     private boolean saving;
     private Dxf3dMesh mesh;
     private Cad3dSurfaceMetrics.Result openingSurfaceMetrics;
+    private Cad3dMeshTopology.Result openingTopology;
     private float[] original;
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
@@ -81,6 +82,12 @@ public final class Mesh3dActivity extends Activity {
                 try{measured=Cad3dSurfaceMetrics.measure(loaded.xyz,loaded.triangles);}
                 catch(IllegalArgumentException ignored){}
                 final Cad3dSurfaceMetrics.Result initialMetrics=measured;
+                // Bounded audit: never allocate full 3-edge-per-face maps for
+                // multi-million-face CAD drawings on an Android phone.
+                Cad3dMeshTopology.Result topology=null;
+                try{topology=Cad3dMeshTopology.inspect(loaded.xyz,loaded.triangles);}
+                catch(IllegalArgumentException ignored){}
+                final Cad3dMeshTopology.Result initialTopology=topology;
                 float[] openedOriginal=Arrays.copyOf(loaded.xyz,loaded.xyz.length);
                 File recoveryPath=Cad3dRecoveryJournal.pathFor(
                     new File(getFilesDir(),"musacad-3d-recovery"),sourceFile);
@@ -100,6 +107,7 @@ public final class Mesh3dActivity extends Activity {
                 final String warning=recoveryWarning;
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=openedOriginal;
                     openingSurfaceMetrics=initialMetrics;
+                    openingTopology=initialTopology;
                     recoveryFile=recoveryPath;recoveryFingerprint=sourceFingerprint;
                     saveCheckpoint=new Cad3dSaveCheckpoint(original);
                     meshView=new Mesh3dView(this,mesh);
@@ -139,6 +147,19 @@ public final class Mesh3dActivity extends Activity {
                     .append(" dejenere üçgen");
             if(mesh.solidProxy||mesh.unsupportedSolids>0)
                 text.append(" • Eksik/temsili ACIS geometrisi nedeniyle kısmi");
+        }
+        if(openingTopology!=null&&openingTopology.triangles>0){
+            if(!openingTopology.checked)
+                text.append("\n3B ağ topolojisi: Büyük modelde kontrol atlandı (50.000 üçgen üstü)");
+            else if(openingTopology.closedOrientedByIndex)
+                text.append("\n3B ağ topolojisi: Kapalı ve yönlü üçgen ağı. ")
+                    .append("Bu sonuç geçerli ACIS/B-Rep katı veya kesin hacim garantisi değildir.");
+            else text.append("\n3B ağ topolojisi: ")
+                .append(openingTopology.boundaryEdges).append(" açık kenar, ")
+                .append(openingTopology.orientationConflicts).append(" ters yönlü kenar, ")
+                .append(openingTopology.nonManifoldEdges).append(" çoklu bağlantı, ")
+                .append(openingTopology.degenerateTriangles).append(" dejenere üçgen. ")
+                .append("Kapalı katı olarak kabul edilmez.");
         }
         if(mesh.flatPlan){
             text.append("\n2B plan algılandı: Z aralığı ")
