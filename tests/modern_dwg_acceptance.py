@@ -47,6 +47,17 @@ def failures(report: dict, fixture_name: str = EXPECTED_FIXTURE) -> list[str]:
         problems.append("expected modern BLOCK definitions not observed")
     if not isinstance(row.get("block_inserts"), int) or row["block_inserts"] < 1:
         problems.append("expected modern INSERT records not observed")
+    # The color census must account for each converted entity, rather than
+    # silently losing colored objects. It is not screen-pixel color parity.
+    sources = row.get("converted_dxf_color_sources")
+    if not isinstance(sources, dict):
+        problems.append("missing DXF TrueColor/ACI inheritance census")
+    elif any(not isinstance(v, int) or v < 0 for v in sources.values()):
+        problems.append("invalid color census counts")
+    elif sum(sources.values()) != (
+            row.get("model_entity_count", 0) +
+            row.get("block_geometry_entity_count", 0)):
+        problems.append("DXF entity color census is incomplete")
     return problems
 
 
