@@ -4,7 +4,6 @@ import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -26,7 +25,6 @@ public final class NativePagedScenePreview {
     private final Matrix scratchInverse=new Matrix();
     private final RectF scratchVisible=new RectF();
     private boolean sourceStarted;
-    private long firstTop,firstLeaf;
 
     public NativePagedScenePreview(long maxRetainedBytes,int maxRetainedPages){
         cache=new NativeViewportPageCache<>(maxRetainedBytes,maxRetainedPages);
@@ -40,15 +38,18 @@ public final class NativePagedScenePreview {
         if(!sourceStarted){
             if(startTop!=0||startLeaf!=0)
                 throw new IllegalArgumentException("first page must start at 0:0");
-            worldToContent=page.scene.worldToContentTransform();
-            sourceStarted=true;firstTop=startTop;firstLeaf=startLeaf;
         }
         RectF bbox=page.scene.occupiedWorldBounds();
-        return cache.put(new NativeViewportPageCache.Cursor(startTop,startLeaf),
+        boolean stored=cache.put(new NativeViewportPageCache.Cursor(startTop,startLeaf),
                 new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
                                                   page.nextNestedLeafIndex),
                 page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
                 page.scene.estimatedRetainedBytes(),page.scene);
+        if(stored&&!sourceStarted){
+            worldToContent=page.scene.worldToContentTransform();
+            sourceStarted=true;
+        }
+        return stored;
     }
 
     public synchronized boolean isComplete(){return cache.isComplete();}
@@ -56,7 +57,7 @@ public final class NativePagedScenePreview {
     public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
     public synchronized boolean isPartial(){return !cache.isComplete();}
     public synchronized void clear(){
-        cache.clear();sourceStarted=false;worldToContent=null;firstTop=0;firstLeaf=0;
+        cache.clear();sourceStarted=false;worldToContent=null;
     }
 
     /**
