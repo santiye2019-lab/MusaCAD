@@ -261,7 +261,7 @@ jobs:
           end=source.index("case DWG_TYPE_SOLID:{",start)
           spline=source[start:end]
           assert "musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)" in spline
-          assert "points[i].w=(e->weighted||e->rational)" in spline
+          assert "points[i].w=e->weighted?e->ctrl_pts[i].w:1.0;" in spline
           assert "musa_nurbs_valid" in spline
           assert "musa_nurbs_preview_points" in spline
           assert "s->truncated=1" in spline
