@@ -6,7 +6,9 @@ independent check against the original DWG. The caller must first export
 two DXF inventories through independent readers of (1) the approved edited
 model and (2) the freshly written, independently reopened AC1032 binary.
 
-Compare ALL ordered code/value pairs of every non-HEADER record. This catches
+Compare all ordered code/value pairs of audited DXF records, plus critical
+HEADER variables (units, dimension scales, drawing base and active layer).
+This catches
 silent changes to geometry, layers, color, text, handles, blocks and XREF
 references even when entity counts, extents and filenames are identical.
 Entity order may change; order of group codes/vertices inside an entity MUST
@@ -29,13 +31,21 @@ MAX_RECORDS = 250_000
 MAX_GROUP_PAIRS = 4_000_000
 MAX_PAIRS_PER_RECORD = 100_000
 AUDITED_SECTIONS = frozenset(("TABLES", "BLOCKS", "ENTITIES", "OBJECTS", "CLASSES"))
-SKIPPED_SECTIONS = frozenset(("HEADER", "THUMBNAILIMAGE"))
+SKIPPED_SECTIONS = frozenset(("THUMBNAILIMAGE",))
 UNVERIFIABLE_SECTIONS = frozenset(("ACDSDATA",))
+CRITICAL_HEADER_VARS = frozenset((
+    "$INSUNITS", "$MEASUREMENT", "$LUNITS", "$LUPREC", "$AUNITS",
+    "$AUPREC", "$ANGBASE", "$ANGDIR", "$INSBASE", "$CLAYER",
+    "$CELTYPE", "$CECOLOR", "$CELWEIGHT", "$CELTSCALE",
+    "$LTSCALE", "$PSLTSCALE", "$DIMSCALE", "$DIMLFAC",
+    "$DIMLUNIT", "$DIMAUNIT", "$DIMDEC", "$DIMZIN",
+    "$UCSORG", "$UCSXDIR", "$UCSYDIR", "$DWGCODEPAGE",
+))
 UNVERIFIABLE_ENTITY_CLASSES = frozenset((
     "3DSOLID", "BODY", "REGION", "ACAD_PROXY_ENTITY", "ACAD_PROXY_OBJECT",
     "ACAD_TABLE", "ACSH_BREP_CLASS", "ACSH_BOOLEAN_CLASS",
 ))
-SUPPORTED_SECTIONS = AUDITED_SECTIONS | SKIPPED_SECTIONS | UNVERIFIABLE_SECTIONS
+SUPPORTED_SECTIONS = AUDITED_SECTIONS | SKIPPED_SECTIONS | UNVERIFIABLE_SECTIONS | {"HEADER"}
 STRUCTURAL = frozenset(("SECTION", "ENDSEC", "EOF"))
 HEX_HANDLE_CODES = frozenset((5, 105)) | frozenset(range(320, 370)) | frozenset(range(390, 400))
 INT_CODES = (
@@ -99,6 +109,41 @@ def fingerprint(path: Path) -> dict:
     attrs: list[tuple[int, str]] = []
     has_eof = False
 
+    def fingerprint_header(attrs: list[tuple[int, str]]) -> None:
+        """Capture critical DXF HEADER $VARIABLE groups, not volatile timestamps.
+
+        Values in HEADER follow a 9/$NAME marker inside the SECTION record.
+        Capture ordered typed group codes to detect units, dimensions, drawing
+        insertion base, active layer or world UCS silently changing.
+        """
+        var = None
+        values: list[tuple[int, str]] = []
+        seen = set()
+
+        def store() -> None:
+            if var not in CRITICAL_HEADER_VARS:
+                return
+            if var in seen:
+                raise DxfParityError("duplicate critical DXF HEADER variable")
+            seen.add(var)
+            if not values:
+                raise DxfParityError("empty critical DXF HEADER variable")
+            h = sha256()
+            for code, value in values:
+                h.update(str(code).encode("ascii") + b"\\x00")
+                h.update(value.encode("utf-8") + b"\\x00")
+            records[("HEADER", var, h.hexdigest())] += 1
+            counts[("HEADER", var)] += 1
+
+        for code, raw in attrs:
+            if code == 9:
+                store()
+                var = raw.strip().upper()
+                values = []
+            elif var in CRITICAL_HEADER_VARS and code != 999:
+                values.append((code, _normalized(code, raw)))
+        store()
+
     def finish() -> None:
         nonlocal section, record_count, has_eof
         if kind is None:
@@ -110,7 +155,11 @@ def fingerprint(path: Path) -> dict:
             if len(names) != 1 or names[0] not in SUPPORTED_SECTIONS:
                 raise DxfParityError("unrecognized DXF SECTION")
             section = names[0]
+            if section in sections:
+                raise DxfParityError("duplicate DXF SECTION")
             sections.add(section)
+            if section == "HEADER":
+                fingerprint_header(attrs)
             if section in UNVERIFIABLE_SECTIONS:
                 unverified[section] += 1
             return
@@ -198,7 +247,11 @@ def compare(approved_dxf: Path, reopened_dxf: Path) -> dict:
     missing = source["records"] - result["records"]
     extra = result["records"] - source["records"]
     unverified = source["unverified"] + result["unverified"]
-    identical = not missing and not extra
+    # HEADER variables can be entirely dropped while the DXF geometry and
+    # entity count stay unchanged. The presence of the HEADER section itself
+    # must agree, even if neither export listed our selected variables.
+    header_mismatch = ("HEADER" in source["sections"]) != ("HEADER" in result["sections"])
+    identical = not missing and not extra and not header_mismatch
     passed = identical and not unverified
     # Counts and digests ONLY in diagnostics: never print customer drawing
     # coordinates, text, layer names or raw entity attributes.
@@ -209,6 +262,9 @@ def compare(approved_dxf: Path, reopened_dxf: Path) -> dict:
         "reopened_records": result["record_count"],
         "missing_records": sum(missing.values()),
         "extra_records": sum(extra.values()),
+        "critical_header_mismatch": header_mismatch or any(
+            section == "HEADER" for section, _, _ in missing | extra
+        ),
         "unverifiable_entities": sum(unverified.values()),
         "reason": ("pass" if passed else
                    "unsupported CAD/proxy/ACIS semantics" if unverified else
