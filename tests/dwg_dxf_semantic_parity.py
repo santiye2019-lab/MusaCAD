@@ -130,6 +130,7 @@ def fingerprint(path: Path) -> dict:
     unverified = Counter()
     order_streams = {}
     associative_entities = False
+    structural_parent = None
     pair_count = 0
     record_count = 0
     section = ""
@@ -173,7 +174,7 @@ def fingerprint(path: Path) -> dict:
         store()
 
     def finish() -> None:
-        nonlocal section, record_count, has_eof, associative_entities
+        nonlocal section, record_count, has_eof, associative_entities, structural_parent
         if kind is None:
             return
         if kind == "SECTION":
@@ -194,6 +195,8 @@ def fingerprint(path: Path) -> dict:
         if kind == "ENDSEC":
             if not section or attrs:
                 raise DxfParityError("invalid DXF ENDSEC or hidden section payload")
+            if structural_parent is not None:
+                raise DxfParityError("unclosed BLOCK or TABLE group")
             section = ""
             return
         if kind == "EOF":
@@ -209,6 +212,22 @@ def fingerprint(path: Path) -> dict:
             return
         if section in UNVERIFIABLE_SECTIONS:
             return
+        # Strict writer preflight cannot accept a block's geometry outside its
+        # BLOCK/ENDBLK pair or table rows outside TABLE/ENDTAB. Two files with
+        # the same malformed stream are NOT evidence of valid DWG semantics.
+        if section in ("BLOCKS", "TABLES"):
+            first = "BLOCK" if section == "BLOCKS" else "TABLE"
+            last = "ENDBLK" if section == "BLOCKS" else "ENDTAB"
+            if kind == first:
+                if structural_parent is not None:
+                    raise DxfParityError("nested DXF BLOCK/TABLE")
+                structural_parent = kind
+            elif kind == last:
+                if structural_parent != first:
+                    raise DxfParityError("unmatched DXF ENDBLK/ENDTAB")
+                structural_parent = None
+            elif structural_parent != first:
+                raise DxfParityError("CAD table/block member without owner")
         record_count += 1
         if record_count > MAX_RECORDS:
             raise DxfParityError("too many DXF records")
