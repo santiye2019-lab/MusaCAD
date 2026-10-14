@@ -3,6 +3,7 @@
 #include "native_color.h"
 #include "scene_coord_safety.h"
 #include "native_nurbs.h"
+#include "native_fit_spline.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -631,6 +632,63 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                e->num_fit_pts==2&&e->fit_pts){
                 emit_line(s,color,parent,e->fit_pts[0].x,e->fit_pts[0].y,
                           e->fit_pts[1].x,e->fit_pts[1].y);
+                break;
+            }
+            /* Scenario-2 cubic SPLINE: LibreDWG stores ONLY fit points
+             * without knots/controls. With zero endpoint tangents, the
+             * standard CAD solution is a natural cubic interpolation in
+             * chord-length parameter space. This evaluates the continuous
+             * cubic, not the false piecewise LINE joining fit points.
+             */
+            if(e->scenario==2&&!e->ctrl_pts&&!e->knots&&degree==3&&
+               !e->closed_b&&!e->periodic&&e->fit_pts&&
+               e->num_fit_pts>=3&&
+               e->num_fit_pts<=MUSA_CAD_FIT_MAX_POINTS&&
+               musa_cad_fit_zero_tangent(e->beg_tan_vec.x,
+                   e->beg_tan_vec.y,e->beg_tan_vec.z)&&
+               musa_cad_fit_zero_tangent(e->end_tan_vec.x,
+                   e->end_tan_vec.y,e->end_tan_vec.z)){
+                size_t fit_count=(size_t)e->num_fit_pts;
+                MusaCadFitPoint *fit=(MusaCadFitPoint*)calloc(
+                    fit_count,sizeof(*fit));
+                MusaCadNaturalKnot *samples=(MusaCadNaturalKnot*)calloc(
+                    fit_count,sizeof(*samples));
+                if(!fit||!samples){
+                    s->truncated=1;
+                    free(fit);free(samples);
+                    break;
+                }
+                for(size_t i=0;i<fit_count;i++){
+                    fit[i].x=e->fit_pts[i].x;
+                    fit[i].y=e->fit_pts[i].y;
+                    fit[i].z=e->fit_pts[i].z;
+                }
+                if(!musa_cad_fit_natural_build(fit,fit_count,samples)||
+                   !begin_poly(s,color,0,
+                       1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN)){
+                    s->truncated=1;
+                    free(fit);free(samples);
+                    break;
+                }
+                for(size_t span=0;span+1<fit_count&&!s->truncated;span++){
+                    for(int j=span==0?0:1;
+                        j<=MUSA_CAD_FIT_SAMPLES_PER_SPAN&&!s->truncated;
+                        j++){
+                        double u=j==MUSA_CAD_FIT_SAMPLES_PER_SPAN
+                            ?samples[span+1].t
+                            :samples[span].t+
+                              (samples[span+1].t-samples[span].t)*
+                              ((double)j/MUSA_CAD_FIT_SAMPLES_PER_SPAN);
+                        double x,y;
+                        if(!musa_cad_fit_natural_eval(
+                                samples,fit_count,u,&x,&y)){
+                            s->truncated=1;break;
+                        }
+                        emit_poly_point(s,parent,x,y);
+                    }
+                }
+                finish_poly(s);
+                free(fit);free(samples);
                 break;
             }
             if(n<2||n>MUSA_NURBS_MAX_CONTROL||!e->ctrl_pts||!e->knots||
