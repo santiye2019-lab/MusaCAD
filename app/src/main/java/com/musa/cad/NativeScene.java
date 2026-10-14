@@ -16,6 +16,7 @@ public final class NativeScene {
     private final String[] textValues;
     private final Matrix worldToContent;
     private final RectF worldBounds;
+    private final RectF occupiedWorldBounds;
     private final Grid grid;
     private final Paint drawPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Matrix combinedMatrix=new Matrix(),inverseMatrix=new Matrix(),localMatrix=new Matrix(),targetMatrix=new Matrix();
@@ -91,7 +92,37 @@ public final class NativeScene {
 
     private final int streamVersion;
     private NativeScene(float[] raw,int[] offsets,float[] bounds,String[] textValues,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
-        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.textValues=textValues;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);this.primitiveCount=offsets.length;this.truncated=truncated;this.streamVersion=streamVersion;grid=new Grid(bounds,worldBounds);
+        this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.textValues=textValues;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);
+        RectF occupied=new RectF(Float.MAX_VALUE,Float.MAX_VALUE,-Float.MAX_VALUE,-Float.MAX_VALUE);
+        for(int i=0;i<offsets.length;i++){
+            int k=i*4;
+            occupied.left=Math.min(occupied.left,bounds[k]);
+            occupied.top=Math.min(occupied.top,bounds[k+1]);
+            occupied.right=Math.max(occupied.right,bounds[k+2]);
+            occupied.bottom=Math.max(occupied.bottom,bounds[k+3]);
+        }
+        this.occupiedWorldBounds=occupied;
+        this.primitiveCount=offsets.length;this.truncated=truncated;
+        this.streamVersion=streamVersion;grid=new Grid(bounds,worldBounds);
+    }
+
+    /**
+     * Conservative bounds of ACTUAL primitives on this page (not full DWG extents).
+     * Used only for safe viewport culling; individual primitives are still culled
+     * by the existing spatial grid. Returns a defensive copy.
+     */
+    public RectF occupiedWorldBounds(){return new RectF(occupiedWorldBounds);}
+
+    /** Global normalization transform shared by all pages from the same DWG. */
+    public Matrix worldToContentTransform(){return new Matrix(worldToContent);}
+
+    /**
+     * Conservative page retention estimate, including native float records,
+     * per-primitive indexes, bounds, text refs and spatial-grid overhead.
+     * Not a strict Android heap limit: device-level memory metrics remain needed.
+     */
+    public long estimatedRetainedBytes(){
+        return (long)raw.length*4L+(long)offsets.length*160L+4096L;
     }
 
     public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
