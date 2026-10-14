@@ -512,3 +512,7 @@ inventory is incomplete; no APK, main merge or service deployment was done.
 ## Independent original-DWG layer table comparison (opt-in)
 
 An optional local SHA-256-bound source manifest field named layer_records holds independently read layer names plus original raw DXF group 6/62/70/290/370/420/440 values. The decoded DWG-to-DXF TABLES/LAYER entries are now compared exactly after documented default normalization. Signed ACI (off state), lock/frozen flags, TrueColor, linetype, lineweight, plotting and transparency drift fail closed. Duplicate, missing, extra or invalid layers also fail; diagnostics contain only numeric counts, no private names or color values. This is not a pixel comparison or proof of XREF override, layouts, complete DWG geometry or independent provenance. Physical phone color parity is still pending.
+
+## Incremental implementation credit — 40% (2026-10-15)
+
+The independently sourced DWG layer-table comparison now has 1 code implementation planning point (commit 231f33ae94e4466b2dcd2ac2fd9ca12999bdae3f). The Android native entity-audit unit gate run 38641262457, step 100, passed; full Android and DWG workflows remained in progress at the time of accounting. The weighted implementation estimate moves from 39% to 40%, remaining work from 61% to 60%. This is a development ledger, not 40% verified AutoCAD 2026 equivalence, device performance, or acceptance of unsupported modern DWG Save As/ACIS solids. Release criteria, main, APK and live services remain untouched.

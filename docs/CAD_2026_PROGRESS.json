@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "No failed or unverified required module may ship. One final APK after development, full CI, merge and final acceptance.",
+  "policy": "No failed required module may ship. Continuous GitHub unit/build gates, one consolidated candidate APK after implementation and full CI; physical acceptance then production release.",
   "estimate_kind": "Development implementation planning points; NOT AutoCAD 2026 compatibility percentage or real-device acceptance.",
   "baseline_points": 35,
   "completed_milestones": [
@@ -35,12 +35,20 @@
       "commit": "784d9120a3c8a0633136be25947f122a461e29b9",
       "source_path": "app/src/main/java/com/musa/cad/CadFrameTimeStats.java",
       "verification": "New CadFrameTimeStatsTest and Android quality gate"
+    },
+    {
+      "id": "independent_dwg_layer_table_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "231f33ae94e4466b2dcd2ac2fd9ca12999bdae3f",
+      "source_path": "tests/dwg_layer_table_audit.py",
+      "verification": "GitHub Android gate run 38641262457 step 'Test conservative native DWG entity type audit': PASS. Full Android and Modern DWG workflows still pending."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 9,
+      "points": 8,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },

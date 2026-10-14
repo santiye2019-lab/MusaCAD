@@ -13,8 +13,8 @@ class CadProgressGateTest(unittest.TestCase):
 
     def test_development_percent_increments_and_unfinished_remains(self):
         result = assess(self.data)
-        self.assertEqual(result["implementation_points"], 39)
-        self.assertEqual(result["remaining_points"], 61)
+        self.assertEqual(result["implementation_points"], 40)
+        self.assertEqual(result["remaining_points"], 60)
         self.assertEqual(result["verified_modules"], 0)
         self.assertEqual(result["field_tests_passed"], 0)
 
