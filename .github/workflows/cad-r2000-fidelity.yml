@@ -188,6 +188,10 @@ jobs:
                     "model_entities=", item["model_entity_count"])
           PY
 
+      - name: Native AC1032 MLEADER HATCH and partial-scene safety
+        run: |
+          python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
+
       - name: Native AC1032 POINT payload safety contract
         run: |
           python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
