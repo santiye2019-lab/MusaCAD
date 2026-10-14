@@ -128,6 +128,14 @@ public final class NativeScene {
         return (long)raw.length*4L+(long)offsets.length*160L+4096L;
     }
 
+    /**
+     * Exact native float-word stream digest, including colors and coordinates.
+     * Do not invoke from Canvas.onDraw: O(scene words), worker-only.
+     */
+    public byte[] contentSha256(){
+        return NativeSceneFingerprint.sha256(raw);
+    }
+
     public int contentWidth(){return SIZE;}public int contentHeight(){return SIZE;}
 
     /** Small vector thumbnail without allocating the old full-size raster preview. */
