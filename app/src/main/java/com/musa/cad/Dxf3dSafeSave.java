@@ -21,6 +21,10 @@ public final class Dxf3dSafeSave {
     public static File stage(File source,Dxf3dMesh edited,float[] original,File cacheDir)throws IOException{
         if(source==null||!source.isFile()||edited==null||original==null||cacheDir==null)
             throw new IOException("3B kaynak dosyası veya geçici kayıt alanı bulunamadı");
+        // Verify the original CAD bytes, not only size and mtime.
+        // A concurrent same-length edit must never produce a valid-looking
+        // export based on a different source drawing.
+        CadSaveSourceIntegrity baseline=CadSaveSourceIntegrity.capture(source);
         File staged=File.createTempFile("musacad-3d-", ".dxf", cacheDir);
         boolean ready=false;
         try{
@@ -34,6 +38,10 @@ public final class Dxf3dSafeSave {
                 ||!Arrays.equals(edited.triangles,reopened.triangles)
                 ||!Arrays.equals(edited.edges,reopened.edges))
                 throw new IOException("3B DXF yeniden açıldığında geometri değişti; kayıt yapılmadı");
+            // Validate AFTER output creation and reopening. If another editor
+            // changed the source during the work, never return this stage for
+            // publish to a SAF destination. Failure cleanup runs in finally.
+            baseline.requireUnchanged(source);
             ready=true;
             return staged;
         }finally{
