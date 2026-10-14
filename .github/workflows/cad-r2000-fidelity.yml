@@ -218,19 +218,26 @@ jobs:
           from pathlib import Path
           doc = json.loads(Path("/tmp/musacad-upstream-dwg-reader.json").read_text())
           assert len(doc["files"]) == 2
+          violations=[]
           for item in doc["files"]:
               print("DWG reader audit:", item["dwg_release"],
+                    "status=",item["status"],
                     "scene_status=",item["native_scene_status"],
                     "spline_missing_knots=",item.get("native_spline_fit_only_rejections",0),
                     "spline_bad_weights=",item.get("native_spline_invalid_weight_rejections",0),
                     flush=True)
-              assert item["source_unchanged"]
-              assert item["status"] == "decoded_dxf_inventory", item["status"]
-              assert item["model_entity_count"] + item["block_geometry_entity_count"] > 0
-              print("PASS DWG READER:", item["dwg_release"],
-                    "layers=", item["layer_count"],
-                    "blocks=", item["block_definition_count"],
-                    "model_entities=", item["model_entity_count"])
+              if not item["source_unchanged"]:
+                  violations.append(item["dwg_release"]+": source modified")
+              if item["status"] != "decoded_dxf_inventory":
+                  violations.append(item["dwg_release"]+": decoded scene is incomplete")
+              if item["model_entity_count"] + item["block_geometry_entity_count"] <= 0:
+                  violations.append(item["dwg_release"]+": empty decoded geometry")
+              if item["status"] == "decoded_dxf_inventory":
+                  print("PASS DWG READER:", item["dwg_release"],
+                        "layers=", item["layer_count"],
+                        "blocks=", item["block_definition_count"],
+                        "model_entities=", item["model_entity_count"])
+          assert not violations, violations
           PY
 
       - name: Reject nonrepresentable DWG geometry without false origin vertices
