@@ -24,7 +24,7 @@ a current claim of complete compatibility or superior performance.
 | AC1032 edit/save | Validated writer with 2D/3D/XREF/layout/metadata, original unchanged, saved DWG independently reopened and compared | **Not implemented** |
 | 2D editing | MOVE/COPY/TRIM/EXTEND/FILLET/OFFSET/HATCH/DIM/TEXT/BLOCK and undo/redo, edit+save+reopen | Inventory #249: partial; not accepted |
 | Advanced DWG object semantics | dynamic block visibility/constraints/actions, INSERT transforms, nested XREF, annotative content | Partial read/diagnostics; modern parity **not accepted** |
-| 3D solids | B-Rep/ACIS/SAB, genuine solid boolean/extrude/sweep/revolve/edit, round trip | Polygonal mesh extrusion prototype only; exact kernel **not complete** |
+| 3D solids | B-Rep/ACIS/SAB, genuine solid boolean/extrude/sweep/revolve/edit, round trip | Polygonal mesh extrusion prototype; read-only triangle area and bounded indexed-edge manifold/winding audit added. This **does not** validate true ACIS/B-Rep solids, volume, or file round trips; exact kernel **not complete** |
 | Viewports and performance | no silent omissions; correct first-frame colors; visible-page tile render; p50/p95 frame times, ANR/OOM on phone | Experimental paging, not enabled in production |
 | Engineering AI | evidence-linked discipline detection, full pafta/section/floor coverage, quantities linked to valid current poz book | Partial; case-by-case proof required |
 
