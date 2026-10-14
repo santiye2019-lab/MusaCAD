@@ -232,3 +232,12 @@ jobs:
             exit 1
           fi
           grep -E 'status=-4|Nested scene rejected' /tmp/musa-nested-reject.log
+          # Public LibreDWG TS1 block demonstrates real nested continuation:
+          # the 256-word budget forces one block's child leaves across pages.
+          timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe third_party/libredwg/test/test-data/2000/TS1.dwg 256 \
+            2>&1 | tee /tmp/musa-nested-public-block.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-public-block.log
+          grep -E 'Nested scene page=.*next=[0-9]+:[1-9][0-9]* ' \
+            /tmp/musa-nested-public-block.log
+
