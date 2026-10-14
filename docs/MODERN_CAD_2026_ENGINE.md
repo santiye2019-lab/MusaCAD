@@ -508,3 +508,7 @@ the separate `--release` mode require 18/18 device acceptance. If a final
 device defect is found, it is fixed before production release; no pretense of
 zero defects. The existing manually approved APK stays blocked while the
 inventory is incomplete; no APK, main merge or service deployment was done.
+
+## Independent original-DWG layer table comparison (opt-in)
+
+An optional local SHA-256-bound source manifest field named layer_records holds independently read layer names plus original raw DXF group 6/62/70/290/370/420/440 values. The decoded DWG-to-DXF TABLES/LAYER entries are now compared exactly after documented default normalization. Signed ACI (off state), lock/frozen flags, TrueColor, linetype, lineweight, plotting and transparency drift fail closed. Duplicate, missing, extra or invalid layers also fail; diagnostics contain only numeric counts, no private names or color values. This is not a pixel comparison or proof of XREF override, layouts, complete DWG geometry or independent provenance. Physical phone color parity is still pending.

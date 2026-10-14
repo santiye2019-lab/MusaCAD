@@ -16,6 +16,7 @@ import argparse
 from collections import Counter
 from native_preview_type_audit import audit_types
 from dwg_entity_identity_audit import DwgEntityIdentityAudit
+from dwg_layer_table_audit import DwgLayerTableAudit
 import hashlib
 import json
 import os
@@ -59,7 +60,8 @@ def dxf_pairs(path: Path, encoding="utf-8"):
             yield int(code), value.strip()
 
 
-def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8"):
+def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8",
+                  layer_collector=None):
     section = ""
     current = None
     fields = []
@@ -132,6 +134,8 @@ def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8"):
         elif current == "ENDSEC":
             section = ""
         elif current == "LAYER" and section == "TABLES":
+            if layer_collector is not None:
+                layer_collector.observe(fields)
             name = data.get(2)
             if name:
                 layers[name] = {"color_aci": data.get(62), "flags": data.get(70)}
@@ -189,7 +193,8 @@ def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8"):
 
 def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                 limit_mb: int, independent_reference=None,
-                independent_geometry=None, independent_style=None):
+                independent_geometry=None, independent_style=None,
+                independent_layers=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -321,8 +326,12 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         identity = DwgEntityIdentityAudit(
             geometry_enabled=independent_geometry is not None,
             style_enabled=independent_style is not None)
+        layer_audit = DwgLayerTableAudit() if independent_layers is not None else None
         result.update(inventory_dxf(output, identity_collector=identity,
-                                    text_encoding=output_encoding))
+                                    text_encoding=output_encoding,
+                                    layer_collector=layer_audit))
+        if layer_audit is not None:
+            result.update(layer_audit.compare_independent(independent_layers))
         if independent_reference is not None:
             # Compares decoded handles/types/layers with a separately provided
             # source-DWG inventory. Raw per-object identifiers remain local.
@@ -350,9 +359,12 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory_geometry_mismatch"
         if result.get("independent_style_result") == "entity_style_subset_mismatch":
             result["status"] = "decoded_dxf_inventory_style_mismatch"
+        if result.get("independent_layer_table_result") == "layer_table_metadata_mismatch":
+            result["status"] = "decoded_dxf_inventory_layer_table_mismatch"
         if (result["legacy_dxf_encoding_fallback"] and
                 any(value is not None for value in (
-                    independent_reference, independent_geometry, independent_style))):
+                    independent_reference, independent_geometry,
+                    independent_style, independent_layers))):
             # The mapping is an assumption without source codepage evidence,
             # therefore even equal decoded metadata cannot certify parity.
             result["status"] = "decoded_dxf_inventory_encoding_unverified"
@@ -417,6 +429,7 @@ def main() -> int:
             external_entities = None
             external_geometry = None
             external_style = None
+            external_layers = None
             if args.independent_manifest_dir:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
@@ -441,6 +454,10 @@ def main() -> int:
                         if not isinstance(reference["style_records"], list):
                             raise ValueError("invalid independent style records")
                         external_style = reference["style_records"]
+                    if "layer_records" in reference:
+                        if not isinstance(reference["layer_records"], list):
+                            raise ValueError("invalid independent layer records")
+                        external_layers = reference["layer_records"]
                 except (ValueError, OSError, UnicodeError):
                     row["status"] = "invalid_independent_manifest"
                     failure = True
@@ -451,6 +468,8 @@ def main() -> int:
                         optional_checks["independent_geometry"] = external_geometry
                     if external_style is not None:
                         optional_checks["independent_style"] = external_style
+                    if external_layers is not None:
+                        optional_checks["independent_layers"] = external_layers
                     row.update(convert_one(source, converter, Path(tmp),
                                            args.timeout_sec, args.max_vmem_mb,
                                            external_entities, **optional_checks))
