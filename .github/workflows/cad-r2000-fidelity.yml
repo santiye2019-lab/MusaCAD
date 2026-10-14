@@ -231,6 +231,7 @@ jobs:
                     "spline_missing_knots=",item.get("native_spline_fit_only_rejections",0),
                     "spline_bad_weights=",item.get("native_spline_invalid_weight_rejections",0),
                     "spline_details=", item.get("native_spline_rejection_details",[]),
+                    "fit_stages=", item.get("native_fit_spline_stage_diagnostics",[]),
                     flush=True)
               if not item["source_unchanged"]:
                   violations.append(item["dwg_release"]+": source modified")
