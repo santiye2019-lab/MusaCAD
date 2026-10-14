@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'app/src/main/cpp/dwg_write_pilot.c'
+      - 'tests/r2000_generate_variants.py'
       - 'app/src/main/cpp/dwg_primitive_fidelity.h'
       - 'app/src/main/cpp/dwg_polyline_fidelity.h'
       - '.github/workflows/android.yml'
@@ -11,7 +12,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: r2000-fidelity-\${{ github.ref }}
+  group: r2000-fidelity-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -88,3 +89,22 @@ jobs:
             exit 1
           fi
           test ! -e /tmp/musa-malformed-output.dwg
+
+      - name: R2000 complex polyline and 3DFACE roundtrip acceptance
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musa-advanced-r2000
+          python3 tests/r2000_generate_variants.py \
+            third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-advanced-r2000
+          for kind in bulge-width face3d classic-polyline; do
+            input="/tmp/musa-advanced-r2000/${kind}.dxf"
+            output="/tmp/musa-advanced-r2000/${kind}.dwg"
+            cp "$input" "${input}.original"
+            echo "Checking R2000 roundtrip: ${kind}"
+            /usr/bin/time -f "R2000 ${kind} elapsed %e seconds peak RSS %M KB" \
+              /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output"
+            test -s "$output"
+            test "$(head -c 6 "$output")" = AC1015
+            cmp "$input" "${input}.original"
+          done
+
