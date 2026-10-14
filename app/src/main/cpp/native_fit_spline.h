@@ -83,6 +83,82 @@ static int musa_cad_fit_natural_build(
     return 1;
 }
 
+/* CAD-style chord-length cubic fit with explicitly supplied endpoint
+ * tangent directions. The tangent magnitudes are normalized to the total
+ * source fit-point chord length, matching the common CAD global interpolation
+ * convention. Clamped boundary derivatives keep the intended entry/exit
+ * directions; this MUST NOT be replaced by natural endpoints.
+ *
+ * Equations at the endpoints:
+ *   2*h0*M0 + h0*M1 = 6*(slope0 - tangent0)
+ *   hlast*M[n-2] + 2*hlast*M[n-1] = 6*(tangentN - slopeLast)
+ * Interiors use the natural cubic's tridiagonal equations.
+ */
+static int musa_cad_fit_clamped_build(
+    const MusaCadFitPoint *fit,size_t n,
+    MusaCadFitPoint start_tangent,MusaCadFitPoint end_tangent,
+    MusaCadNaturalKnot *out){
+    if(!musa_cad_fit_natural_build(fit,n,out))return 0;
+    double begin_norm=hypot(hypot(start_tangent.x,start_tangent.y),
+                            start_tangent.z);
+    double end_norm=hypot(hypot(end_tangent.x,end_tangent.y),
+                          end_tangent.z);
+    if(!isfinite(begin_norm)||!isfinite(end_norm)||
+       begin_norm<=0.||end_norm<=0.)return 0;
+    double total=0.;
+    for(size_t i=1;i<n;i++){
+        double dx=fit[i].x-fit[i-1].x;
+        double dy=fit[i].y-fit[i-1].y;
+        double dz=fit[i].z-fit[i-1].z;
+        total+=hypot(hypot(dx,dy),dz);
+        if(!isfinite(total))return 0;
+    }
+    double v0x=(start_tangent.x/begin_norm)*total;
+    double v0y=(start_tangent.y/begin_norm)*total;
+    double vnx=(end_tangent.x/end_norm)*total;
+    double vny=(end_tangent.y/end_norm)*total;
+    if(!isfinite(v0x)||!isfinite(v0y)||!isfinite(vnx)||
+       !isfinite(vny))return 0;
+    double upper[MUSA_CAD_FIT_MAX_POINTS]={0.};
+    double h0=out[1].t-out[0].t;
+    if(h0<1e-12)return 0;
+    double den0=2.*h0;
+    upper[0]=h0/den0;
+    out[0].mx=(6.*((out[1].x-out[0].x)/h0-v0x))/den0;
+    out[0].my=(6.*((out[1].y-out[0].y)/h0-v0y))/den0;
+    if(!isfinite(out[0].mx)||!isfinite(out[0].my))return 0;
+    for(size_t i=1;i+1<n;i++){
+        double a=out[i].t-out[i-1].t;
+        double b=out[i+1].t-out[i].t;
+        if(a<1e-12||b<1e-12)return 0;
+        double diagonal=2.*(a+b)-a*upper[i-1];
+        if(!isfinite(diagonal)||diagonal<=0.)return 0;
+        upper[i]=b/diagonal;
+        double rx=6.*((out[i+1].x-out[i].x)/b-
+                       (out[i].x-out[i-1].x)/a);
+        double ry=6.*((out[i+1].y-out[i].y)/b-
+                       (out[i].y-out[i-1].y)/a);
+        out[i].mx=(rx-a*out[i-1].mx)/diagonal;
+        out[i].my=(ry-a*out[i-1].my)/diagonal;
+        if(!isfinite(out[i].mx)||!isfinite(out[i].my))return 0;
+    }
+    double hn=out[n-1].t-out[n-2].t;
+    if(hn<1e-12)return 0;
+    double den=2.*hn-hn*upper[n-2];
+    if(!isfinite(den)||den<=0.)return 0;
+    double rx=6.*(vnx-(out[n-1].x-out[n-2].x)/hn);
+    double ry=6.*(vny-(out[n-1].y-out[n-2].y)/hn);
+    out[n-1].mx=(rx-hn*out[n-2].mx)/den;
+    out[n-1].my=(ry-hn*out[n-2].my)/den;
+    if(!isfinite(out[n-1].mx)||!isfinite(out[n-1].my))return 0;
+    for(size_t i=n-1;i-->0;){
+        out[i].mx-=upper[i]*out[i+1].mx;
+        out[i].my-=upper[i]*out[i+1].my;
+        if(!isfinite(out[i].mx)||!isfinite(out[i].my))return 0;
+    }
+    return 1;
+}
+
 static int musa_cad_fit_natural_eval(
         const MusaCadNaturalKnot *knots,size_t n,double u,
         double *outx,double *outy){
