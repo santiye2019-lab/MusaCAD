@@ -77,6 +77,7 @@ public class CadView extends View {
     private NativeScene nativeDrawing;
     /* Opt-in only. Never installed by MainActivity's normal DWG/DXF open path. */
     private NativePagedScenePreview experimentalPagedPreview;
+    private NativePagedPreviewLoader experimentalPagedLoader;
     private Mode mode=Mode.PAN;
     private Listener listener;
     private float lastX,lastY,scale=1f,fitScale=1f;
@@ -128,21 +129,41 @@ public class CadView extends View {
     }
 
     /**
-     * Explicit experimental preview attachment; call only from an owner that
-     * has loaded the first native page for THIS drawing. MainActivity does not
-     * call this method. Editor vectors remain authoritative.
+     * Never run this experimental path through the default MainActivity open
+     * flow. The owner supplies the very first native scene of this DWG.
      */
     public void attachExperimentalPagedPreview(NativePagedScenePreview preview){
+        attachExperimentalPagedPreview(preview,null);
+    }
+
+    /**
+     * Opt-in preview with a cancellable worker for loading visible evictions.
+     * A page from another tab/project cannot be attached to this scene.
+     */
+    public void attachExperimentalPagedPreview(NativePagedScenePreview preview,
+                                               NativePagedPreviewLoader loader){
         if(preview==null||preview.pageCount()==0||nativeDrawing==null||vectorDrawing!=null||
            !preview.acceptsFirstScene(nativeDrawing))
             throw new IllegalStateException("Önizleme aktif DWG sahnesiyle eşleşmiyor");
+        if(experimentalPagedLoader!=null&&experimentalPagedLoader!=loader)
+            experimentalPagedLoader.close();
         experimentalPagedPreview=preview;
+        experimentalPagedLoader=loader;
         postInvalidateOnAnimation();
     }
 
+    /** Also cancel the old project's decoder on a drawing/tab handoff. */
+    private void clearExperimentalPagedPreview(){
+        if(experimentalPagedLoader!=null){
+            experimentalPagedLoader.close();
+            experimentalPagedLoader=null;
+        }
+        experimentalPagedPreview=null;
+    }
+
     public void detachExperimentalPagedPreview(){
-        if(experimentalPagedPreview!=null){
-            experimentalPagedPreview=null;
+        if(experimentalPagedPreview!=null||experimentalPagedLoader!=null){
+            clearExperimentalPagedPreview();
             postInvalidateOnAnimation();
         }
     }
@@ -181,7 +202,7 @@ public class CadView extends View {
 
     /** Restores a project and optionally keeps its native fast-navigation scene. */
     public void restoreSessionState(DxfParser.Result vector,NativeScene nativeScene,Bitmap bitmap,SessionState state){
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         stopFastNavigation();
         vectorDrawing=vector;
         nativeDrawing=nativeScene;
@@ -252,7 +273,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=true;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
@@ -281,7 +302,7 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         vectorDrawing=null;nativeDrawing=null;drawing=b;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
@@ -290,7 +311,7 @@ public class CadView extends View {
     public void setNativeDrawing(NativeScene result){
         if(result==null)throw new IllegalArgumentException("Native çizim yok");
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         drawing=null;vectorDrawing=null;nativeDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();notifyValue();
     }
@@ -304,7 +325,7 @@ public class CadView extends View {
             float[]content={screenX,screenY};Matrix inv=new Matrix();
             if(imageMatrix.invert(inv)){inv.mapPoints(content);worldAnchor=oldNative.contentToWorld(content[0],content[1]);worldScreenScale=scale*oldNative.drawingToContentScale();}
         }
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         drawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();aiHighlightedSourceIds.clear();
         if("piksel".equals(unitName)){unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();}
         if(oldNative!=null)oldNative.alignTo(result.drawingToContentMatrix());
@@ -326,7 +347,7 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
-        experimentalPagedPreview=null;
+        clearExperimentalPagedPreview();
         drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
@@ -945,6 +966,11 @@ public class CadView extends View {
         }else if(nativeDrawing!=null){
             if(experimentalPagedPreview!=null){
                 experimentalPagedPreview.draw(c,imageMatrix,fastNavigation);
+                if(experimentalPagedLoader!=null){
+                    RectF viewport=experimentalPagedPreview.visibleWorldBounds(c,imageMatrix);
+                    if(viewport!=null)experimentalPagedLoader.requestVisibleWorld(
+                            viewport.left,viewport.top,viewport.right,viewport.bottom);
+                }
                 if(experimentalPagedPreview.isPartial()){
                     // Incomplete cache is never silently presented as a full DWG.
                     paint.setStyle(Paint.Style.FILL);
