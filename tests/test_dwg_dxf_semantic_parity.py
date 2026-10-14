@@ -292,6 +292,28 @@ class DxfSemanticParityTest(unittest.TestCase):
             result = self.check(data, data, False)
             self.assertEqual(result["unverifiable_entities"], 2)
 
+    def test_external_xref_and_linked_image_require_asset_verification(self):
+        # XREF paths can remain textually equal while referenced drawings
+        # change; the DXF-only gate must NOT promise full project fidelity.
+        for mask in (4, 8, 16, 32):
+            xref = (pair(0, "BLOCK") + pair(2, "ARCH_XREF") +
+                    pair(70, mask) + pair(1, "external/architecture.dwg") +
+                    pair(0, "ENDBLK"))
+            data = drawing(insert("ARCH_XREF"), blocks=xref)
+            with self.subTest(block_flags=mask):
+                result = self.check(data, data, False)
+                self.assertEqual(result["unverifiable_entities"], 2)
+        for entity in ("IMAGE", "OLE2FRAME", "PDFUNDERLAY",
+                       "DGNUNDERLAY", "ACAD_CUSTOM_CLASS", "AEC_WALL"):
+            data = drawing(pair(0, entity) + pair(5, "A1") +
+                           pair(8, "EXTERNALS"))
+            with self.subTest(entity=entity):
+                result = self.check(data, data, False)
+                self.assertEqual(result["unverifiable_entities"], 2)
+        # Normal local blocks are still within the DXF preflight scope.
+        self.check(drawing(insert(), blocks=block()),
+                   drawing(insert(), blocks=block()), True)
+
     def test_acdsdata_section_is_unverifiable_even_if_equal(self):
         base = drawing(line())
         extra = (pair(0, "SECTION") + pair(2, "ACDSDATA") +
