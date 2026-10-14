@@ -17,6 +17,12 @@ typedef struct {
     /* Internal opt-in nested paging. Never part of the v6 wire header. */
     size_t nested_skip, nested_visited;
     int nested_paging;
+    /* Experimental exact-resume checkpoint for a direct INSERT child only.
+     * Never serialized; all pointers belong to the still-live Dwg_Data. */
+    Dwg_Object *resume_root_insert,*resume_direct_child;
+    Dwg_Object *failed_direct_child;
+    size_t resume_leaf_ordinal;
+    int resume_applied;
 } MusaNativeScene;
 
 /*
@@ -71,6 +77,21 @@ int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
                                          size_t max_words,
                                          Dwg_Object *const *model_entities,
                                          size_t model_count);
+/*
+ * Opt-in direct-child resume: the supplied checkpoint must originate from a
+ * prior successful page of the SAME live DWG session. When absent/invalid,
+ * this builds an ordinary indexed page with exact existing semantics.
+ * out_failed_child is a non-owning checkpoint for the next page, or NULL
+ * if the boundary is in deeper nesting or between top-level entities.
+ */
+int musa_scene_build_page_nested_direct_resume(
+         Dwg_Data *dwg,MusaNativeScene *scene,
+         size_t first_index,size_t first_leaf,
+         size_t *next_index,size_t *next_leaf,size_t max_words,
+         Dwg_Object *const *model_entities,size_t model_count,
+         Dwg_Object *resume_root,Dwg_Object *resume_child,
+         Dwg_Object **out_failed_child);
+
 void musa_scene_free(MusaNativeScene *scene);
 
 #endif
