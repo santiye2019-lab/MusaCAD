@@ -40,6 +40,27 @@ static int musa_polyline_cmp(const void *lhs, const void *rhs) {
   return 0;
 }
 
+/*
+ * LibreDWG pinned DXF reader uses bit 4 when it sees group 40 widths, while
+ * the R2000 DWG binary spec uses bit 32 for the per-vertex widths vector
+ * (bit 4 indicates constant width). Make the binary writer's flags agree
+ * with the parsed vector. Refuse contradictory constant + per-vertex widths.
+ */
+static int musa_prepare_lwpolyline_flags(Dwg_Data *dwg) {
+  if (!dwg) return -1;
+  for (BITCODE_BL i=0; i<dwg->num_objects; ++i) {
+    Dwg_Object *obj=&dwg->object[i];
+    if (obj->fixedtype != DWG_TYPE_LWPOLYLINE) continue;
+    if (!obj->tio.entity || !obj->tio.entity->tio.LWPOLYLINE) return -1;
+    Dwg_Entity_LWPOLYLINE *p=obj->tio.entity->tio.LWPOLYLINE;
+    if (p->num_widths) {
+      if (!p->widths || p->const_width != 0.0) return -1;
+      p->flag = (p->flag | 32) & ~4;
+    }
+  }
+  return 0;
+}
+
 static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
   memset(out, 0, sizeof(*out));
   if (!dwg || dwg->num_objects > MUSA_MAX_FIDELITY_OBJECTS) return -1;
@@ -86,7 +107,11 @@ static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
       poly->values=calloc(need,sizeof(double));
       if (!poly->values) goto invalid;
       total_values+=need;
-      MUSA_ADD(p->flag); MUSA_ADD(p->const_width);
+      /* Compare semantic internal flags, not the DXF parser's width alias. */
+      int canonical_flag = p->flag;
+      if (p->num_widths && p->widths && p->const_width == 0.0)
+        canonical_flag = (canonical_flag | 32) & ~4;
+      MUSA_ADD(canonical_flag); MUSA_ADD(p->const_width);
       MUSA_ADD(p->elevation); MUSA_ADD(p->thickness); MUSA_OCS(p->extrusion);
       MUSA_ADD(p->num_points); MUSA_ADD(p->num_bulges);
       MUSA_ADD(p->num_widths);
