@@ -754,6 +754,18 @@ jobs:
           assert "class CadAc1032StagedSave" in source
           PY
 
+      - name: Reject silent CAD geometry color or block loss in future AC1032 output
+        run: |
+          python3 -m unittest discover -s tests -p 'test_dwg_dxf_semantic_parity.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/dwg_dxf_semantic_parity.py").read_text()
+          assert "UNVERIFIABLE_ENTITY_CLASSES" in code
+          assert "records[(section, kind, digest)] += 1" in code
+          assert "if code == 999:" in code
+          assert 'if not has_eof or section or "ENTITIES" not in sections:' in code
+          PY
+
       - name: Verify AC1032 two-phase safe-save protocol (host-only future encoder)
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests \
