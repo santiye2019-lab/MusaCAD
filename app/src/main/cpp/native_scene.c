@@ -699,9 +699,18 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                  * Never turn an incomplete native first paint into PASS. */
                 fprintf(stderr,"MusaCAD spline rejected: scenario=%d degree=%d"
                         " control=%zu knots=%zu fit=%zu weighted=%d rational=%d"
-                        " reason=missing_knots_or_fit_only\n",
+                        " reason=missing_knots_or_fit_only"
+                        " ctrl_pointer=%d knots_pointer=%d"
+                        " closed=%d periodic=%d"
+                        " begin_tangent_zero=%d end_tangent_zero=%d\n",
                         (int)e->scenario,degree,n,(size_t)e->num_knots,
-                        (size_t)e->num_fit_pts,(int)e->weighted,(int)e->rational);
+                        (size_t)e->num_fit_pts,(int)e->weighted,(int)e->rational,
+                        e->ctrl_pts!=NULL,e->knots!=NULL,
+                        (int)e->closed_b,(int)e->periodic,
+                        musa_cad_fit_zero_tangent(e->beg_tan_vec.x,
+                          e->beg_tan_vec.y,e->beg_tan_vec.z),
+                        musa_cad_fit_zero_tangent(e->end_tan_vec.x,
+                          e->end_tan_vec.y,e->end_tan_vec.z));
 #endif
                 s->truncated=1;break;
             }
