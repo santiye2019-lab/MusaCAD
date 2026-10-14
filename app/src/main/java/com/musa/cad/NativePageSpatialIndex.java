@@ -54,7 +54,10 @@ public final class NativePageSpatialIndex {
         int l=0,r=entries.length;
         while(l<r){
             int m=l+(r-l)/2;
-            if(Float.compare(key(entries[m],axis),value)<0)l=m+1;
+            // Numeric comparisons treat +0 and -0 as the same location.
+            // Float.compare would incorrectly exclude boundary-touching
+            // pages whose signed-zero coordinate differs from the viewport.
+            if(key(entries[m],axis)<value)l=m+1;
             else r=m;
         }
         return l;
@@ -65,7 +68,7 @@ public final class NativePageSpatialIndex {
         int l=0,r=entries.length;
         while(l<r){
             int m=l+(r-l)/2;
-            if(Float.compare(key(entries[m],axis),value)<=0)l=m+1;
+            if(key(entries[m],axis)<=value)l=m+1;
             else r=m;
         }
         return l;
