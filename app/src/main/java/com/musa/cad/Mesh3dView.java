@@ -170,13 +170,10 @@ public final class Mesh3dView extends View {
         Arrays.sort(faceOrder);
         for(long key:faceOrder){
             int i=((int)key)*3,a=model.triangles[i],b=model.triangles[i+1],c=model.triangles[i+2];
-            float ax=model.xyz[a*3],ay=model.xyz[a*3+1],az=model.xyz[a*3+2];
-            float ux=model.xyz[b*3]-ax,uy=model.xyz[b*3+1]-ay,uz=model.xyz[b*3+2]-az;
-            float vx=model.xyz[c*3]-ax,vy=model.xyz[c*3+1]-ay,vz=model.xyz[c*3+2]-az;
-            float nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
-            float length=(float)Math.sqrt(nx*nx+ny*ny+nz*nz);
-            if(length<1e-9f)continue;
-            float light=Math.min(1f,Math.abs((.35f*nx-.4f*ny+.8f*nz)/length));
+            // Never overflow normal vectors when large architectural DWGs
+            // are converted to 3D. Preserve legacy two-sided shading style.
+            double light=Cad3dFaceLighting.brightness(model.xyz,a,b,c);
+            if(light<0d)continue;
             surface.setColor(Color.rgb((int)(30+75*light),(int)(77+100*light),(int)(104+105*light)));
             facePath.rewind();facePath.moveTo(screen[a*2],screen[a*2+1]);facePath.lineTo(screen[b*2],screen[b*2+1]);facePath.lineTo(screen[c*2],screen[c*2+1]);facePath.close();canvas.drawPath(facePath,surface);
         }
