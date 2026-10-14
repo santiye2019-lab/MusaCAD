@@ -14,6 +14,9 @@ typedef struct {
     int truncated;
     /* Per-page cap (floats); zero retains the legacy 9 Mi-float budget. */
     size_t max_words;
+    /* Internal opt-in nested paging. Never part of the v6 wire header. */
+    size_t nested_skip, nested_visited;
+    int nested_paging;
 } MusaNativeScene;
 
 /*
@@ -43,6 +46,17 @@ int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene);
 int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
                           size_t first_index,size_t *next_index,
                           size_t max_words);
+/*
+ * Resumable host-only block paging: a two-part cursor (top-level model index,
+ * leaf index inside the recursively expanded top-level entity).
+ * Can split nested INSERT/MINSERT/DIMENSION expansion only at whole leaf
+ * entity boundaries. A single oversized leaf still fails closed with -4.
+ * This experimental replay based path is not yet connected to Android UI.
+ */
+int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
+                                 size_t first_index,size_t first_leaf,
+                                 size_t *next_index,size_t *next_leaf,
+                                 size_t max_words);
 void musa_scene_free(MusaNativeScene *scene);
 
 #endif
