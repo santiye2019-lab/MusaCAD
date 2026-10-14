@@ -28,6 +28,24 @@ a current claim of complete compatibility or superior performance.
 | Viewports and performance | no silent omissions; correct first-frame colors; visible-page tile render; p50/p95 frame times, ANR/OOM on phone | Experimental paging, not enabled in production |
 | Engineering AI | evidence-linked discipline detection, full pafta/section/floor coverage, quantities linked to valid current poz book | Partial; case-by-case proof required |
 
+## Native DWG SPLINE geometry (first-paint, not solid kernel)
+
+The native 2D DWG first-paint path now tessellates **actual rational B-spline**
+curves through LibreDWG's knot vector, control points, degree and positive
+control weights using bounded, homogeneous **de Boor** evaluation
+(`app/src/main/cpp/native_nurbs.h`). The old code incorrectly connected
+SPLINE fit points or control points with straight lines, misrepresenting
+mechanical and architectural curved elements. Supported curves now evaluate
+with 12 samples per nonzero knot span, capped at 8,192 points and 4,096
+control points to bound memory/CPU cost on Android. Unsupported/corrupted
+knot vectors, excessive degrees, invalid weights and fit-only curves that
+cannot be reconstructed **fail closed as a partial preview**, instead of
+inventing false straight segments. The full DXF vector model remains
+authoritative; spline tessellation is a *screen approximation*, not NURBS
+model editing or lossless DWG export. Cubic and weighted rational quarter-arc
+curves have numerical regression tests in host and Android CI. This **does
+not** constitute full dynamic-block or AutoCAD 2026 rendering parity.
+
 ## Version-by-version regression
 
 Test AC1015, AC1018, AC1021, AC1024, AC1027 and **AC1032**.
