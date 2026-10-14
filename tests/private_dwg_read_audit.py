@@ -220,8 +220,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         r"control=(\d+) knots=(\d+) fit=(\d+) "
         r"weighted=(\d+) rational=(\d+) "
         r"reason=(missing_knots_or_fit_only|bad_weights_knots_or_budget)"
-        r"(?: ctrl_pointer=(\\d+) knots_pointer=(\\d+) closed=(\\d+)"
-        r" periodic=(\\d+) begin_tangent_zero=(\\d+) end_tangent_zero=(\\d+))?"
+        r"(?: ctrl_pointer=(\d+) knots_pointer=(\d+) closed=(\d+)"
+        r" periodic=(\d+) begin_tangent_zero=(\d+) end_tangent_zero=(\d+))?"
     )
     for match in spline_pattern.finditer(diagnostics):
         if len(spline_diagnostics) >= 32:
