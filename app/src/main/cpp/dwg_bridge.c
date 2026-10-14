@@ -16,9 +16,6 @@ typedef struct {
     Dwg_Object **model_entities;
     size_t model_count;
     int model_index_state; /* 0 uninitialized, 1 ready, -1 fail/unsupported */
-    /* One-session checkpoint, never persisted or shared between drawings. */
-    Dwg_Object *direct_resume_root,*direct_resume_child;
-    size_t direct_resume_top,direct_resume_leaf;
 } MusaCadSession;
 
 typedef struct {
@@ -199,7 +196,7 @@ static int host_paged_probe(const char *input,const char *budget){
  * Opt-in CI/private acceptance for nested INSERT continuation. The legacy
  * capped scene provides a lower-bound count when it was itself truncated.
  */
-static int host_nested_page_probe(const char *input,const char *budget,int indexed_mode,int direct_mode){
+static int host_nested_page_probe(const char *input,const char *budget,int indexed_mode){
     char *end=NULL;
     unsigned long long n=strtoull(budget,&end,10);
     if(!budget[0]||!end||*end||n<256||n>(9u*1024u*1024u))return 2;
@@ -220,35 +217,12 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
     while(pages<100000){
         MusaNativeScene page={0};
         size_t next_top=top,next_leaf=leaf;
-        Dwg_Object *failed_child=NULL;
-        int checkpoint_matches=direct_mode&&session->direct_resume_child&&
-            session->direct_resume_top==top&&session->direct_resume_leaf==leaf;
-        int status=direct_mode
-                ?musa_scene_build_page_nested_direct_resume(session->dwg,&page,
-                     top,leaf,&next_top,&next_leaf,(size_t)n,
-                     session->model_entities,session->model_count,
-                     checkpoint_matches?session->direct_resume_root:NULL,
-                     checkpoint_matches?session->direct_resume_child:NULL,
-                     &failed_child)
-                :indexed_mode
+        int status=indexed_mode
                 ?musa_scene_build_page_nested_indexed(session->dwg,&page,top,leaf,
                      &next_top,&next_leaf,(size_t)n,
                      session->model_entities,session->model_count)
                 :musa_scene_build_page_nested(session->dwg,&page,top,leaf,
                      &next_top,&next_leaf,(size_t)n);
-        if(direct_mode){
-            if(page.resume_applied)
-                fprintf(stderr,"Direct INSERT child resume used top=%zu leaf=%zu\n",
-                        top,leaf);
-            session->direct_resume_root=NULL;
-            session->direct_resume_child=NULL;
-            if(status==1&&failed_child&&next_top<session->model_count){
-                session->direct_resume_root=session->model_entities[next_top];
-                session->direct_resume_child=failed_child;
-                session->direct_resume_top=next_top;
-                session->direct_resume_leaf=next_leaf;
-            }
-        }
         if(status<0||page.truncated||page.count>(size_t)n||
            (status==1 && (next_top<top||
              (next_top==top&&next_leaf<=leaf))) ||
@@ -286,7 +260,7 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
           stream_at!=(baseline.count>=7?baseline.count-7:0)))||
        (baseline_status==1 && total<(size_t)baseline_count))failure=1;
     if(!failure)fprintf(stderr,"%sNested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
-                        direct_mode?"Direct ":indexed_mode?"Indexed ":"",
+                        indexed_mode?"Indexed ":"",
                         pages,total,baseline_count,baseline_status);
     else fprintf(stderr,"Nested paged scene failed: finished=%d pages=%zu total=%zu legacy=%d status=%d\n",
                  finished,pages,total,baseline_count,baseline_status);
@@ -296,12 +270,10 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
 }
 
 int main(int argc,char **argv){
-    if(argc==4&&strcmp(argv[1],"--direct-child-resume-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3],1,1);
     if(argc==4&&strcmp(argv[1],"--indexed-nested-paged-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3],1,0);
+        return host_nested_page_probe(argv[2],argv[3],1);
     if(argc==4&&strcmp(argv[1],"--nested-paged-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3],0,0);
+        return host_nested_page_probe(argv[2],argv[3],0);
     if(argc==4&&strcmp(argv[1],"--paged-probe")==0)
         return host_paged_probe(argv[2],argv[3]);
     if(argc!=3)return 2;
@@ -464,27 +436,12 @@ JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNestedPageN
     size_t nextTop=(size_t)startTop,nextLeaf=(size_t)startLeaf;
     pthread_mutex_lock(&engine_lock);
     int use_index=session_ensure_model_index(session);
-    const int checkpoint_matches=use_index&&session->direct_resume_child&&
-        session->direct_resume_top==(size_t)startTop&&
-        session->direct_resume_leaf==(size_t)startLeaf;
-    Dwg_Object *failed_child=NULL;
     int status=use_index
-        ?musa_scene_build_page_nested_direct_resume(session->dwg,&page,
+        ?musa_scene_build_page_nested_indexed(session->dwg,&page,
           (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords,
-          session->model_entities,session->model_count,
-          checkpoint_matches?session->direct_resume_root:NULL,
-          checkpoint_matches?session->direct_resume_child:NULL,
-          &failed_child)
+          session->model_entities,session->model_count)
         :musa_scene_build_page_nested(session->dwg,&page,
           (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords);
-    session->direct_resume_root=NULL;
-    session->direct_resume_child=NULL;
-    if(status==1&&use_index&&failed_child&&nextTop<session->model_count){
-        session->direct_resume_root=session->model_entities[nextTop];
-        session->direct_resume_child=failed_child;
-        session->direct_resume_top=nextTop;
-        session->direct_resume_leaf=nextLeaf;
-    }
     pthread_mutex_unlock(&engine_lock);
     if(status<0||page.truncated||page.count>(size_t)maxWords||
        page.count>(size_t)2147483647||
