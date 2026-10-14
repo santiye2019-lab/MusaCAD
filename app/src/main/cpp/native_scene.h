@@ -57,6 +57,20 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
                                  size_t first_index,size_t first_leaf,
                                  size_t *next_index,size_t *next_leaf,
                                  size_t max_words);
+/*
+ * Equivalent bounded page builder with a pre-indexed MODEL-SPACE entity list.
+ * The index contains non-owning Dwg_Object pointers in the precise same
+ * order as get_first/get_next_owned_entity. Its lifetime MUST be shorter
+ * than its Dwg_Data owner. The (top,leaf) cursor and float output are identical
+ * to the non-indexed function; the index skips O(top) prefix walks per page.
+ * Deep INSERT leaf replay is NOT accelerated by this top-level index.
+ */
+int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
+                                         size_t first_index,size_t first_leaf,
+                                         size_t *next_index,size_t *next_leaf,
+                                         size_t max_words,
+                                         Dwg_Object *const *model_entities,
+                                         size_t model_count);
 void musa_scene_free(MusaNativeScene *scene);
 
 #endif
