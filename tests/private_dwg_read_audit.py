@@ -210,6 +210,12 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
     else:
         result["native_scene_status"] = None
         result["native_scene_truncated"] = None
+    # Count-only decoder diagnostics. Never attach potentially sensitive
+    # drawing coordinates, text, filenames or raw converter stderr to JSON.
+    result["native_spline_fit_only_rejections"] = diagnostics.count(
+        "reason=missing_knots_or_fit_only")
+    result["native_spline_invalid_weight_rejections"] = diagnostics.count(
+        "reason=bad_weights_knots_or_budget")
     result["utf8_decode_warning_count"] = diagnostics.count("BAD_CONTINUATION_BYTE")
     converter_match = re.search(r"MusaCAD converter status: (-?\d+)", diagnostics)
     if converter_match:
