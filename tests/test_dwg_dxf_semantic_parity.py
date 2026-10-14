@@ -154,6 +154,90 @@ class DxfSemanticParityTest(unittest.TestCase):
         self.check(orig, drawing(insert(), blocks=block("VALVE")), False)
         self.check(orig, orig, True)
 
+    def test_block_membership_cannot_change_with_same_entity_multiset(self):
+        def definition(name, handle, member):
+            return (pair(0, "BLOCK") + pair(5, handle) + pair(2, name) +
+                    member + pair(0, "ENDBLK"))
+        water_line = line(handle="A1", x="100")
+        drain_line = line(handle="A2", x="200")
+        before_blocks = (definition("WATER", "1A", water_line) +
+                         definition("DRAIN", "1B", drain_line))
+        after_blocks = (definition("WATER", "1A", drain_line) +
+                        definition("DRAIN", "1B", water_line))
+        # Every entity, handle, color and coordinate is unchanged. Only
+        # BLOCK/ENDBLK membership changed (a dangerous false-green before).
+        result = self.check(drawing(insert("WATER"), blocks=before_blocks),
+                            drawing(insert("WATER"), blocks=after_blocks), False)
+        self.assertEqual(result["missing_records"], 0)
+        self.assertEqual(result["extra_records"], 0)
+        self.assertTrue(result["structural_order_mismatch"])
+
+    def test_reordering_whole_block_definitions_is_conservatively_refused(self):
+        # Until an independent block-owner graph can prove equivalence,
+        # reject rearrangements instead of silently accepting reassociation.
+        a = pair(0, "BLOCK") + pair(2, "A") + line("1A") + pair(0, "ENDBLK")
+        b = pair(0, "BLOCK") + pair(2, "B") + line("1B") + pair(0, "ENDBLK")
+        result = self.check(drawing(line(), blocks=a + b),
+                            drawing(line(), blocks=b + a), False)
+        self.assertTrue(result["structural_order_mismatch"])
+
+    def test_attached_attributes_cannot_jump_between_insert_instances(self):
+        def attrib(handle, text):
+            return (pair(0, "ATTRIB") + pair(5, handle) +
+                    pair(1, text) + pair(8, "MECHANICAL"))
+        def end(handle):
+            return pair(0, "SEQEND") + pair(5, handle)
+        a = insert("PUMP") + attrib("AA", "PUMP_1") + end("AC")
+        b = insert("PUMP") + attrib("AB", "PUMP_2") + end("AD")
+        switched = (insert("PUMP") + attrib("AB", "PUMP_2") + end("AC") +
+                    insert("PUMP") + attrib("AA", "PUMP_1") + end("AD"))
+        result = self.check(drawing(a+b), drawing(switched), False)
+        self.assertEqual(result["missing_records"], 0)
+        self.assertEqual(result["extra_records"], 0)
+        self.assertTrue(result["structural_order_mismatch"])
+
+    def test_classic_polyline_vertices_cannot_jump_between_polyline_headers(self):
+        def polyline(handle):
+            return pair(0, "POLYLINE") + pair(5, handle) + pair(70, 0)
+        def vertex(handle, x):
+            return pair(0, "VERTEX") + pair(5, handle) + pair(10, x) + pair(20, 0)
+        def end(handle):
+            return pair(0, "SEQEND") + pair(5, handle)
+        a = polyline("1A") + vertex("2A", 5) + end("3A")
+        b = polyline("1B") + vertex("2B", 50) + end("3B")
+        after = (polyline("1A") + vertex("2B", 50) + end("3A") +
+                 polyline("1B") + vertex("2A", 5) + end("3B"))
+        result = self.check(drawing(a+b), drawing(after), False)
+        self.assertEqual(result["missing_records"], 0)
+        self.assertEqual(result["extra_records"], 0)
+        self.assertTrue(result["structural_order_mismatch"])
+
+    def test_structural_table_record_membership_and_section_presence(self):
+        tables = (pair(0, "TABLE") + pair(2, "LAYER") +
+                  pair(0, "LAYER") + pair(2, "PIPES") +
+                  pair(0, "ENDTAB") +
+                  pair(0, "TABLE") + pair(2, "LTYPE") +
+                  pair(0, "LAYER") + pair(2, "STRUCTURE") +
+                  pair(0, "ENDTAB"))
+        before = drawing(line(), tables=tables)
+        after = drawing(line(), tables=(
+            pair(0, "TABLE") + pair(2, "LAYER") +
+            pair(0, "LAYER") + pair(2, "STRUCTURE") +
+            pair(0, "ENDTAB") +
+            pair(0, "TABLE") + pair(2, "LTYPE") +
+            pair(0, "LAYER") + pair(2, "PIPES") +
+            pair(0, "ENDTAB")))
+        result = self.check(before, after, False)
+        self.assertEqual(result["missing_records"], 0)
+        self.assertEqual(result["extra_records"], 0)
+        self.assertTrue(result["structural_order_mismatch"])
+        empty_blocks = (pair(0, "SECTION") + pair(2, "BLOCKS") +
+                        pair(0, "ENDSEC"))
+        result = self.check(drawing(line()),
+                            drawing(line()).replace(
+                                pair(0, "EOF"), empty_blocks + pair(0, "EOF")), False)
+        self.assertTrue(result["audited_section_mismatch"])
+
     def test_layer_table_inheritance_must_match(self):
         table = pair(0, "TABLE") + pair(2, "LAYER")
         record = pair(0, "LAYER") + pair(2, "PIPES") + pair(62, 7)
