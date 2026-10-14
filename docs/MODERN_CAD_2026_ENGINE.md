@@ -50,8 +50,11 @@ or unreadable objects must be shown explicitly and block destructive saves.
 
 ## AC1032 writer publication barrier (experimental; not an encoder)
 
-`CadAc1032StagedSave` provides only the **future write path's fail-closed
-publication protocol**, and is currently **not called by Android**. It does
+`tests/host/com/musa/cad/CadAc1032StagedSave.java` provides only the
+**future write path's fail-closed publication protocol**. It is deliberately
+**outside Android app sources**: Java NIO hard-link operations require APIs
+above MusaCAD's current Android minSdk 24, and this host-only prototype must
+not accidentally break app lint or be shipped in an APK. It does
 not create valid AC1032 files by itself. A real, licensed/open-source-capable
 AC1032 binary encoder and an independent CAD semantic reader still need to
 be implemented/integrated before any user-facing DWG Save As is possible.
