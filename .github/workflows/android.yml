@@ -449,6 +449,14 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
           java -cp /tmp/musacad-tests RenderPathPolicyTest
+      - name: Test bounded native viewport page cache and completeness
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeViewportPageCache.java tests/NativeViewportPageCacheTest.java
+          java -cp /tmp/musacad-tests NativeViewportPageCacheTest
+          # Android-scene compositor is opt-in only; guard against accidental
+          # replacement of authoritative vector rendering in CadView.
+          grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/NativePagedScenePreview.java
+          ! grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/CadView.java
       - name: Test CAD navigation zoom and culling policy
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java tests/CadNavigationPolicyTest.java
