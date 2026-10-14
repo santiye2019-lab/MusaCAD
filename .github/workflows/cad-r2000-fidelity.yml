@@ -184,3 +184,26 @@ jobs:
                     "blocks=", item["block_definition_count"],
                     "model_entities=", item["model_entity_count"])
           PY
+
+      - name: Paged native scene preserves geometry without unclipping the 9Mi guard
+        run: |
+          set -euo pipefail
+          # Generated synthetic DWGs only. No customer's DWG leaves their private workspace.
+          test -s /tmp/musa-stress-r2000/mixed-8192.dwg
+          /tmp/musa-writer-proof/musacad_dwg_convert \
+            --paged-probe /tmp/musa-stress-r2000/mixed-8192.dwg 8192 \
+            2>&1 | tee /tmp/musa-paged-mixed.log
+          grep -F 'Paged scene verified:' /tmp/musa-paged-mixed.log
+          # One 8192-vertex entity needs a page larger than 16k floats.
+          # It must be retried at a safe larger budget, not partially displayed.
+          /tmp/musa-writer-proof/musacad_dwg_convert \
+            --paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 32768 \
+            2>&1 | tee /tmp/musa-paged-dense.log
+          grep -F 'Paged scene verified:' /tmp/musa-paged-dense.log
+          if /tmp/musa-writer-proof/musacad_dwg_convert \
+              --paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+              > /tmp/musa-too-small-page.log 2>&1; then
+            echo 'Oversized single entity MUST fail closed, never expose partial geometry.'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-too-small-page.log
