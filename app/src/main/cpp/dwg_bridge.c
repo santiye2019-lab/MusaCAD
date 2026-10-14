@@ -342,6 +342,47 @@ JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_scenePageNative(
     return raw;
 }
 
+/*
+ * EXPERIMENTAL opt-in nested paging with a two-component continuation cursor.
+ * JNI and Java do not enable it in the production drawing view yet.
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNestedPageNative(
+        JNIEnv *env,jclass cls,jlong handle,jlong startTop,jlong startLeaf,
+        jint maxWords,jlongArray nextOut){
+    (void)cls;
+    MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
+    if(!session||startTop<0||startLeaf<0||maxWords<256||
+       maxWords>9*1024*1024||!nextOut||(*env)->GetArrayLength(env,nextOut)<3){
+        throw_io(env,"İç blok DWG sahne sayfası parametreleri geçersiz");
+        return NULL;
+    }
+    MusaNativeScene page={0};
+    size_t nextTop=(size_t)startTop,nextLeaf=(size_t)startLeaf;
+    pthread_mutex_lock(&engine_lock);
+    int status=musa_scene_build_page_nested(session->dwg,&page,
+        (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords);
+    pthread_mutex_unlock(&engine_lock);
+    if(status<0||page.truncated||page.count>(size_t)maxWords||
+       page.count>(size_t)2147483647||
+       nextTop<(size_t)startTop||
+       (nextTop==(size_t)startTop&&nextLeaf<=(size_t)startLeaf)){
+        musa_scene_free(&page);
+        char message[128];
+        snprintf(message,sizeof(message),"İç blok DWG sahne sayfası üretilemedi (%d)",status);
+        throw_io(env,message);
+        return NULL;
+    }
+    jlong result[3]={(jlong)nextTop,(jlong)nextLeaf,(jlong)(status==1)};
+    jfloatArray raw=(*env)->NewFloatArray(env,(jsize)page.count);
+    if(raw){
+        (*env)->SetFloatArrayRegion(env,raw,0,(jsize)page.count,(const jfloat*)page.values);
+        if(!(*env)->ExceptionCheck(env))
+            (*env)->SetLongArrayRegion(env,nextOut,0,3,result);
+    }
+    musa_scene_free(&page);
+    return raw;
+}
+
 JNIEXPORT void JNICALL Java_com_musa_cad_NativeCadEngine_closeNative(JNIEnv *env,jclass cls,jlong handle){
     (void)env;(void)cls;
     MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
