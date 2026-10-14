@@ -36,7 +36,7 @@ KNOWN_NON_NATIVE_TYPES = frozenset({
     "ARCALIGNEDTEXT", "MULTIPOLYGON", "VIEWPORT",
 })
 
-SAFE_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
+SAFE_NAME = re.compile(r"(?:[A-Z]|[0-9][A-Z])[A-Z0-9_]{0,62}\Z")
 
 
 def _checked_counter(data):
