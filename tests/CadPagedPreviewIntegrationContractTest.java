@@ -22,6 +22,7 @@ public final class CadPagedPreviewIntegrationContractTest {
         String compositor=read("app/src/main/java/com/musa/cad/NativePagedScenePreview.java");
         String cache=read("app/src/main/java/com/musa/cad/NativeViewportPageCache.java");
         String catalog=read("app/src/main/java/com/musa/cad/NativePageCatalog.java");
+        String transformGuard=read("app/src/main/java/com/musa/cad/NativePageTransformGuard.java");
         String engine=read("app/src/main/java/com/musa/cad/NativeCadEngine.java");
 
         need(view,"attachExperimentalPagedPreview(", "explicit opt-in");
@@ -65,6 +66,16 @@ public final class CadPagedPreviewIntegrationContractTest {
                 "first decode stores SHA-256 before cache eviction");
         need(compositor,"NativeSceneFingerprint.matches(",
                 "reloaded page must match initial SHA-256, not only cursor/bounds/count");
+        need(compositor,"NativePageTransformGuard.requireValid(pageWorldTransform)",
+                "first page cannot establish a singular or corrupt screen transform");
+        need(compositor,"NativePageTransformGuard.requireSame(sharedWorldTransform,pageWorldTransform)",
+                "each native DWG page and reload must use exact global coordinates");
+        need(compositor,"sharedWorldTransform=null",
+                "project/tab reset clears page coordinate identity");
+        need(transformGuard,"determinant==0d",
+                "zero-area native CAD view must fail closed");
+        need(transformGuard,"expected[i]!=candidate[i]",
+                "do not silently apply a different DWG coordinate normalization");
         need(compositor,"pageHashes.clear()",
                 "source switch must discard original page identities");
         need(compositor,"catalog.clear()","clear catalog on source switch");
