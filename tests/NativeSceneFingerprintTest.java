@@ -55,15 +55,14 @@ public final class NativeSceneFingerprintTest {
         // Multi-batch hash path must preserve all source bytes.
         float[] big=new float[32775];
         for(int i=0;i<big.length;i++)big[i]=i*0.03125f;
-        need(NativeSceneFingerprint.matches(
-                NativeSceneFingerprint.sha256(big),
+        byte[] bigBefore=NativeSceneFingerprint.sha256(big);
+        need(NativeSceneFingerprint.matches(bigBefore,
                 NativeSceneFingerprint.sha256(big.clone())),
                 "streaming >8KB fingerprint is stable");
         big[32774]=big[32774]+1f;
-        need(!NativeSceneFingerprint.matches(
-                NativeSceneFingerprint.sha256(new float[]{-0.0f}),
-                NativeSceneFingerprint.sha256(new float[]{0f})),
-                "negative zero preserved in tail tests");
+        need(!NativeSceneFingerprint.matches(bigBefore,
+                NativeSceneFingerprint.sha256(big)),
+                "changed final word in a multi-buffer stream detected");
         System.out.println("Native DWG full page SHA-256: geometry, colors, raw bits and streaming PASS");
     }
 }
