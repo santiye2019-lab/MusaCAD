@@ -742,6 +742,18 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
+      - name: Keep experimental modern-DWG writer outside Android minSdk sources
+        run: |
+          test ! -e app/src/main/java/com/musa/cad/CadAc1032StagedSave.java
+          test -f tests/host/com/musa/cad/CadAc1032StagedSave.java
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/host/com/musa/cad/CadAc1032StagedSave.java").read_text()
+          assert "IndependentReopenVerifier" in source
+          assert "Files.createLink(target,staged)" in source
+          assert "class CadAc1032StagedSave" in source
+          PY
+
       - name: Verify AC1032 two-phase safe-save protocol (host-only future encoder)
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests \
