@@ -1,9 +1,10 @@
 """Synthetic no-private-DWG tests for native entity omission accounting."""
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
-from native_preview_type_audit import audit_types
+from native_preview_type_audit import audit_types, CONDITIONAL_NATIVE_ENTITY_TYPES
 from private_dwg_read_audit import inventory_dxf
 
 
@@ -57,6 +58,30 @@ class NativePreviewTypeAuditTest(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     audit_types(invalid, {})
+
+    def test_native_c_type_dispatch_inventory_is_not_stale(self):
+        scene = Path("app/src/main/cpp/native_scene.c").read_text(encoding="utf-8")
+        start = scene.index("    SceneColor color=entity_color(obj,byBlock,layerColor);")
+        end = scene.index("    if(nested_leaf){", start)
+        dispatched = set()
+        for name in re.findall(r"case DWG_TYPE_([A-Z0-9_]+)\\s*:", scene[start:end]):
+            if name.startswith("DIMENSION_") or name in (
+                    "ARC_DIMENSION", "LARGE_RADIAL_DIMENSION"):
+                dispatched.add("DIMENSION")
+            elif name.startswith("POLYLINE_"):
+                dispatched.add("POLYLINE")
+            elif name == "_3DFACE":
+                dispatched.add("3DFACE")
+            else:
+                dispatched.add(name)
+        self.assertEqual(dispatched, CONDITIONAL_NATIVE_ENTITY_TYPES,
+                         "Update preview type audit when native C dispatch changes")
+
+    def test_native_first_paint_warns_not_all_entity_types_verified(self):
+        activity = Path("app/src/main/java/com/musa/cad/MainActivity.java"
+                        ).read_text(encoding="utf-8")
+        self.assertIn("Renkler ve tüm nesne türleri henüz doğrulanmadı.",
+                      activity)
 
     def test_actual_synthetic_dxf_inventory_integration(self):
         dxf = (
