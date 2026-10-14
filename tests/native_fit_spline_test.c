@@ -1,0 +1,83 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Regression against natural cubic CAD fit-point interpolation with chord
+ * parameters. Expected intermediate coordinates independently calculated
+ * from CAD-style global interpolation, not a fit-point control polygon.
+ */
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "../app/src/main/cpp/native_fit_spline.h"
+
+static void need(int ok,const char *what){
+    if(!ok){fprintf(stderr,"CAD fit spline: %s\n",what);exit(1);}
+}
+static void near(double actual,double expected,double tol,const char *what){
+    need(isfinite(actual)&&fabs(actual-expected)<=tol,what);
+}
+int main(void){
+    MusaCadFitPoint fit5[]={
+        {0,0,0},{1,2,0},{3,1,0},{4,3,0},{6,0,0}
+    };
+    MusaCadNaturalKnot k5[5]={0};
+    need(musa_cad_fit_natural_build(fit5,5,k5),"five fit points solved");
+    double x,y;
+    for(size_t i=0;i<5;i++){
+        need(musa_cad_fit_natural_eval(k5,5,k5[i].t,&x,&y),
+            "fit knot evaluated");
+        near(x,fit5[i].x,1e-10,"passes exactly through fit point x");
+        near(y,fit5[i].y,1e-10,"passes exactly through fit point y");
+    }
+    need(musa_cad_fit_natural_eval(k5,5,.05,&x,&y),
+         "five-point curve at u=.05");
+    near(x,.15615278135433253,1e-9,"natural chord fit: x at 0.05");
+    near(y,.693871875262185,1e-9,"natural chord fit: y at 0.05");
+    need(musa_cad_fit_natural_eval(k5,5,.30,&x,&y),
+         "five-point curve at u=.30");
+    near(x,1.7562893356005087,1e-9,"natural chord fit x at 0.30");
+    near(y,1.610691221825416,1e-9,"natural chord fit y at 0.30");
+    need(musa_cad_fit_natural_eval(k5,5,.72,&x,&y),
+         "five-point curve at u=.72");
+    near(x,4.311732577789597,1e-9,"natural chord fit x at 0.72");
+    near(y,3.1346570906030355,1e-9,"natural chord fit y at 0.72");
+    /* Curve is not the broken line between adjacent fit points: at u=.05
+     * (inside the first chord) it must depart from the straight segment. */
+    need(fabs(y-3.1346570906030355)<1e-9,"curve evaluated, not a polyline");
+
+    MusaCadFitPoint fit6[]={
+        {0,0,0},{1,0,0},{2,1,0},{3,1.5,0},{5,2,0},{8,0,0}
+    };
+    MusaCadNaturalKnot k6[6]={0};
+    need(musa_cad_fit_natural_build(fit6,6,k6),
+         "six-point R2013-sized fit curve");
+    for(size_t i=0;i<6;i++){
+        need(musa_cad_fit_natural_eval(k6,6,k6[i].t,&x,&y),
+             "six-point fit evaluated");
+        near(x,fit6[i].x,1e-10,"six-point x interpolation");
+        near(y,fit6[i].y,1e-10,"six-point y interpolation");
+    }
+    need(k6[0].mx==0&&k6[0].my==0&&
+         k6[5].mx==0&&k6[5].my==0,
+         "natural cubic endpoints have zero second derivative");
+    need(!musa_cad_fit_natural_eval(k6,6,1.1,&x,&y),
+         "out-of-domain interpolation refused");
+    MusaCadFitPoint duplicate[]={
+        {0,0,0},{1,1,0},{1,1,0},{2,0,0}
+    };
+    MusaCadNaturalKnot dupout[4]={0};
+    need(!musa_cad_fit_natural_build(duplicate,4,dupout),
+         "duplicate fit points rejected rather than dividing by zero");
+    MusaCadFitPoint invalid[]={
+        {0,0,0},{1,NAN,0},{2,0,0}
+    };
+    MusaCadNaturalKnot badout[3]={0};
+    need(!musa_cad_fit_natural_build(invalid,3,badout),
+         "nonfinite fit points refused");
+    need(!musa_cad_fit_natural_build(fit5,2,k5),
+         "invalid spline point count refused");
+    need(musa_cad_fit_zero_tangent(0,0,0),
+         "unspecified endpoint tangent detected");
+    need(!musa_cad_fit_zero_tangent(1,0,0),
+         "explicit tangent never silently ignored");
+    puts("Natural cubic DWG fit SPLINE: five/six points, CAD reference, malformed and tangent safety PASS");
+    return 0;
+}
