@@ -23,6 +23,8 @@ public final class CadPagedPreviewIntegrationContractTest {
         String engine=read("app/src/main/java/com/musa/cad/NativeCadEngine.java");
 
         need(view,"attachExperimentalPagedPreview(", "explicit opt-in");
+        need(view,"!preview.acceptsFirstScene(nativeDrawing)","cross-project attachment guard");
+        need(compositor,"WeakReference<NativeScene>","evicted page must not be pinned");
         need(view,"experimentalPagedPreview.draw(c,imageMatrix,fastNavigation)","render path");
         need(view,"experimentalPagedPreview.isPartial()","missing-page marker");
         need(view,"DWG önizleme kısmi", "visible incomplete-state text");
