@@ -111,6 +111,8 @@ def fingerprint(path: Path) -> dict:
                 raise DxfParityError("unrecognized DXF SECTION")
             section = names[0]
             sections.add(section)
+            if section in UNVERIFIABLE_SECTIONS:
+                unverified[section] += 1
             return
         if kind == "ENDSEC":
             if not section:
@@ -129,7 +131,6 @@ def fingerprint(path: Path) -> dict:
         if section in SKIPPED_SECTIONS:
             return
         if section in UNVERIFIABLE_SECTIONS:
-            unverified["ACDSDATA"] += 1
             return
         record_count += 1
         if record_count > MAX_RECORDS:
