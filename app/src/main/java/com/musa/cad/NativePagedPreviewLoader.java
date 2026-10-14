@@ -36,6 +36,12 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final AtomicBoolean cancelled=new AtomicBoolean();
     private final AtomicBoolean started=new AtomicBoolean();
+    /* At most one queued page-update callback during a fast host decode. */
+    private final AtomicBoolean pageNoticePending=new AtomicBoolean();
+    private volatile NativeScene firstScene;
+    private volatile int currentPages;
+    private volatile long currentPrimitives;
+
 
     public NativePagedPreviewLoader(NativeCadEngine engine,NativePagedScenePreview preview,
                                     int maxFloatWords,Listener listener) {
@@ -69,14 +75,18 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
                 if(first==null)first=page.scene;
                 total+=page.scene.primitiveCount;
                 count++;
-                final NativeScene firstVisible=first;
-                final long primitiveTotal=total;
-                final int pagesRead=count;
-                final boolean complete=preview.isComplete();
-                main.post(()->{
-                    if(!cancelled.get())
-                        listener.onPage(preview,firstVisible,pagesRead,primitiveTotal,complete);
-                });
+                firstScene=first;
+                currentPrimitives=total;
+                currentPages=count;
+                // Coalesce page notifications, never queue thousands of draw
+                // callbacks when the worker decodes pages faster than the UI.
+                if(pageNoticePending.compareAndSet(false,true))
+                    main.post(()->{
+                        pageNoticePending.set(false);
+                        if(!cancelled.get())
+                            listener.onPage(preview,firstScene,currentPages,
+                                            currentPrimitives,preview.isComplete());
+                    });
                 top=page.nextTopLevelIndex;
                 leaf=page.nextNestedLeafIndex;
                 if(!page.hasMore) {
