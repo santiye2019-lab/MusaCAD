@@ -64,7 +64,7 @@ class NativePreviewTypeAuditTest(unittest.TestCase):
         start = scene.index("    SceneColor color=entity_color(obj,byBlock,layerColor);")
         end = scene.index("    if(nested_leaf){", start)
         dispatched = set()
-        for name in re.findall(r"case DWG_TYPE_([A-Z0-9_]+)\\s*:", scene[start:end]):
+        for name in re.findall(r"case DWG_TYPE_([A-Z0-9_]+)\s*:", scene[start:end]):
             if name.startswith("DIMENSION_") or name in (
                     "ARC_DIMENSION", "LARGE_RADIAL_DIMENSION"):
                 dispatched.add("DIMENSION")
