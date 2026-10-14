@@ -5,6 +5,7 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.lang.ref.WeakReference;
 
 /**
@@ -22,6 +23,10 @@ import java.lang.ref.WeakReference;
 public final class NativePagedScenePreview {
     private final NativeViewportPageCache<NativeScene> cache;
     private final NativePageCatalog catalog=new NativePageCatalog(100000);
+    // Stores only 32-byte digests, not evicted page geometry. Re-decoded
+    // records must match their original words, including geometry and color.
+    private final HashMap<NativeViewportPageCache.Cursor,byte[]> pageHashes=
+            new HashMap<>();
     private Matrix worldToContent;
     private final Matrix scratchCombined=new Matrix();
     private final Matrix scratchInverse=new Matrix();
@@ -53,12 +58,16 @@ public final class NativePagedScenePreview {
         // A malformed continuation must leave all previous pages untouched.
         catalog.requireAppend(start,next,page.hasMore,bbox.left,bbox.top,
                               bbox.right,bbox.bottom,page.scene.primitiveCount);
+        // Hash on the loader thread before cache eviction; a rejected page
+        // must not displace any other valid cached geometry.
+        byte[] digest=page.scene.contentSha256();
         boolean stored=cache.put(start,next,page.hasMore,
                 bbox.left,bbox.top,bbox.right,bbox.bottom,
                 page.scene.estimatedRetainedBytes(),page.scene);
         if(stored){
             catalog.append(start,next,page.hasMore,bbox.left,bbox.top,
                            bbox.right,bbox.bottom,page.scene.primitiveCount);
+            pageHashes.put(start,digest);
         }
         if(stored&&!sourceStarted){
             worldToContent=page.scene.worldToContentTransform();
@@ -94,6 +103,12 @@ public final class NativePagedScenePreview {
         if(!catalog.samePage(expected.start,next,page.hasMore,bbox.left,bbox.top,
                              bbox.right,bbox.bottom,page.scene.primitiveCount))
             throw new IllegalStateException("DWG sayfası yeniden okumada değişti");
+        // Cursor, count, and bounds alone cannot detect a changed line,
+        // color, handle/order or text inside the SAME bounding rectangle.
+        // Reject before cache.put to avoid replacing/evicting valid pages.
+        if(!NativeSceneFingerprint.matches(
+                pageHashes.get(expected.start),page.scene.contentSha256()))
+            throw new IllegalStateException("DWG sayfası içerik SHA-256 uyuşmuyor");
         return cache.put(expected.start,next,page.hasMore,
                          bbox.left,bbox.top,bbox.right,bbox.bottom,
                          page.scene.estimatedRetainedBytes(),page.scene);
@@ -109,7 +124,8 @@ public final class NativePagedScenePreview {
     public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
     public synchronized boolean isPartial(){return !cache.isComplete();}
     public synchronized void clear(){
-        cache.clear();catalog.clear();sourceStarted=false;worldToContent=null;firstPageRef=null;
+        cache.clear();catalog.clear();pageHashes.clear();
+        sourceStarted=false;worldToContent=null;firstPageRef=null;
     }
 
     /**
