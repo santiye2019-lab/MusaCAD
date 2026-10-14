@@ -31,6 +31,14 @@ MAX_RECORDS = 250_000
 MAX_GROUP_PAIRS = 4_000_000
 MAX_PAIRS_PER_RECORD = 100_000
 AUDITED_SECTIONS = frozenset(("TABLES", "BLOCKS", "ENTITIES", "OBJECTS", "CLASSES"))
+# Entity-level multisets alone cannot prove BLOCK/ENDBLK ownership, TABLE
+# membership, or POLYLINE/VERTEX and INSERT/ATTRIB/SEQEND attachment.
+# Reject order drift in these structural streams, even when all individual
+# entity fields, types and counts happen to match.
+ORDERED_SECTIONS = frozenset(("TABLES", "BLOCKS", "OBJECTS", "CLASSES"))
+ASSOCIATIVE_ENTITY_KINDS = frozenset((
+    "POLYLINE", "VERTEX", "SEQEND", "INSERT", "MINSERT", "ATTRIB", "ATTDEF",
+))
 SKIPPED_SECTIONS = frozenset(("THUMBNAILIMAGE",))
 UNVERIFIABLE_SECTIONS = frozenset(("ACDSDATA",))
 CRITICAL_HEADER_VARS = frozenset((
@@ -120,6 +128,8 @@ def fingerprint(path: Path) -> dict:
     records = Counter()
     counts = Counter()
     unverified = Counter()
+    order_streams = {}
+    associative_entities = False
     pair_count = 0
     record_count = 0
     section = ""
@@ -163,7 +173,7 @@ def fingerprint(path: Path) -> dict:
         store()
 
     def finish() -> None:
-        nonlocal section, record_count, has_eof
+        nonlocal section, record_count, has_eof, associative_entities
         if kind is None:
             return
         if kind == "SECTION":
@@ -215,6 +225,14 @@ def fingerprint(path: Path) -> dict:
         digest = h.hexdigest()
         records[(section, kind, digest)] += 1
         counts[(section, kind)] += 1
+        # Keep cryptographic order of audited records per structure, while
+        # allowing ordinary independent LINE/CIRCLE/etc entities to reorder.
+        # This catches e.g. two blocks trading their LINE contents without
+        # changing the overall set of entities, handles or bounding boxes.
+        stream = order_streams.setdefault(section, sha256())
+        stream.update(bytes.fromhex(digest))
+        if section == "ENTITIES" and kind in ASSOCIATIVE_ENTITY_KINDS:
+            associative_entities = True
 
     with path.open("r", encoding="utf-8", errors="strict", newline=None) as inp:
         while True:
@@ -256,6 +274,11 @@ def fingerprint(path: Path) -> dict:
         "record_count": record_count,
         "pair_count": pair_count,
         "sections": sorted(sections),
+        "order_streams": {
+            name: hash_state.hexdigest()
+            for name, hash_state in order_streams.items()
+        },
+        "associative_entities": associative_entities,
     }
 
 
@@ -269,7 +292,22 @@ def compare(approved_dxf: Path, reopened_dxf: Path) -> dict:
     # entity count stay unchanged. The presence of the HEADER section itself
     # must agree, even if neither export listed our selected variables.
     header_mismatch = ("HEADER" in source["sections"]) != ("HEADER" in result["sections"])
-    identical = not missing and not extra and not header_mismatch
+    # Any structural block/table/OBJECT ordering drift is conservatively
+    # rejected: unordered entity inventory loses parent-child associations.
+    # ENTITIES remains reorderable only for independent, ungrouped primitives.
+    compare_order = set(ORDERED_SECTIONS)
+    if source["associative_entities"] or result["associative_entities"]:
+        compare_order.add("ENTITIES")
+    order_mismatch = sorted(
+        name for name in compare_order
+        if source["order_streams"].get(name) != result["order_streams"].get(name)
+    )
+    audited_section_mismatch = sorted(
+        (set(source["sections"]) ^ set(result["sections"]))
+        & (AUDITED_SECTIONS | {"HEADER"} | UNVERIFIABLE_SECTIONS)
+    )
+    identical = (not missing and not extra and not header_mismatch
+                 and not order_mismatch and not audited_section_mismatch)
     passed = identical and not unverified
     # Counts and digests ONLY in diagnostics: never print customer drawing
     # coordinates, text, layer names or raw entity attributes.
@@ -283,9 +321,13 @@ def compare(approved_dxf: Path, reopened_dxf: Path) -> dict:
         "critical_header_mismatch": header_mismatch or any(
             section == "HEADER" for section, _, _ in missing | extra
         ),
+        "structural_order_mismatch": bool(order_mismatch),
+        "audited_section_mismatch": bool(audited_section_mismatch),
         "unverifiable_entities": sum(unverified.values()),
         "reason": ("pass" if passed else
                    "unsupported CAD/proxy/ACIS semantics" if unverified else
+                   "CAD block/table/entity attachment order changed" if order_mismatch else
+                   "audited DXF section inventory changed" if audited_section_mismatch else
                    "DXF geometry or attribute parity mismatch"),
     }
 
