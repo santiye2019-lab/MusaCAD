@@ -10,6 +10,7 @@
 #include "dwg.h"
 #include "dwg_primitive_fidelity.h"
 #include "dwg_polyline_fidelity.h"
+#include "dwg_source_snapshot.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,11 +65,15 @@ static int equal_geometry(const GeometrySignature *a, const GeometrySignature *b
 }
 
 static int pilot_write(const char *input, const char *output) {
-  struct stat source_before, source_after, target;
+  struct stat source_before, target;
   if (!input || !output || strcmp(input, output) == 0 ||
       stat(input, &source_before) != 0 || !S_ISREG(source_before.st_mode) ||
       source_before.st_size < 16 || source_before.st_size > MAX_INPUT_BYTES ||
       lstat(output, &target) == 0)
+    return 2;
+  MusaDxfSourceSnapshot source_snapshot = {0};
+  if (!musa_dxf_source_capture(input, (size_t)MAX_INPUT_BYTES,
+                               &source_snapshot))
     return 2;
   Dwg_Data drawing = {0};
   drawing.header.version = R_2000;
@@ -80,6 +85,7 @@ static int pilot_write(const char *input, const char *output) {
       musa_prepare_3dface_flags(&drawing) != 0) {
     fprintf(stderr, "Rejecting incomplete/unsupported DXF: status=%d\n", read_status);
     dwg_free(&drawing);
+    musa_dxf_source_release(&source_snapshot);
     return 3;
   }
   /* LibreDWG pinned revision cannot write modern 2007+ binary versions. */
@@ -88,12 +94,22 @@ static int pilot_write(const char *input, const char *output) {
     drawing.header.from_version = R_2000;
 
   size_t n = strlen(output);
-  if (n > 4000) { dwg_free(&drawing); return 4; }
+  if (n > 4000) {
+    dwg_free(&drawing); musa_dxf_source_release(&source_snapshot);
+    return 4;
+  }
   char *stage = malloc(n + 32);
-  if (!stage) { dwg_free(&drawing); return 4; }
+  if (!stage) {
+    dwg_free(&drawing); musa_dxf_source_release(&source_snapshot);
+    return 4;
+  }
   sprintf(stage, "%s.musa-%ld-XXXXXX", output, (long)getpid());
   int fd = mkstemp(stage);
-  if (fd < 0) { free(stage); dwg_free(&drawing); return 4; }
+  if (fd < 0) {
+    free(stage); dwg_free(&drawing);
+    musa_dxf_source_release(&source_snapshot);
+    return 4;
+  }
   close(fd);
   unlink(stage); /* Library requires a fresh path and opens it itself. */
   int write_status = dwg_write_file(stage, &drawing);
@@ -101,7 +117,9 @@ static int pilot_write(const char *input, const char *output) {
   if (write_status >= DWG_ERR_CRITICAL ||
       stat(stage, &target) != 0 || target.st_size < 32) {
     fprintf(stderr, "DWG encoder rejected output: status=%d\n", write_status);
-    unlink(stage); free(stage); return 5;
+    unlink(stage); free(stage);
+    musa_dxf_source_release(&source_snapshot);
+    return 5;
   }
   FILE *fp = fopen(stage, "rb");
   char magic[6] = {0};
@@ -138,12 +156,11 @@ static int pilot_write(const char *input, const char *output) {
     fprintf(stderr, "R2000 audit: polyline path/attribute mismatch\n");
     valid = 0;
   }
-  if (valid) valid = stat(input, &source_after) == 0 &&
-                      source_before.st_size == source_after.st_size &&
-                      source_before.st_mtime == source_after.st_mtime;
+  if (valid) valid = musa_dxf_source_matches(input, &source_snapshot);
   dwg_free(&decoded);
+  musa_dxf_source_release(&source_snapshot);
   if (!valid) {
-    fprintf(stderr, "Rejected DWG round-trip (read=%d, counts/coordinates/mtime).\n", verify_status);
+    fprintf(stderr, "Rejected DWG round-trip (read=%d, counts/coordinates/source bytes).\n", verify_status);
     unlink(stage); free(stage); return 6;
   }
   /* link() is exclusive (EEXIST) and cannot overwrite the destination. */
