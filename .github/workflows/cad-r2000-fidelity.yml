@@ -5,6 +5,7 @@ on:
     paths:
       - 'app/src/main/cpp/dwg_write_pilot.c'
       - 'tests/r2000_generate_variants.py'
+      - 'tests/r2000_generate_stress.py'
       - 'app/src/main/cpp/dwg_primitive_fidelity.h'
       - 'app/src/main/cpp/dwg_polyline_fidelity.h'
       - '.github/workflows/android.yml'
@@ -120,3 +121,41 @@ jobs:
           echo "R2000 advanced acceptance failures: $failures"
           test "$failures" -eq 0
 
+
+      - name: R2000 deterministic mixed-object and dense-polyline stress
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musa-stress-r2000
+          python3 tests/r2000_generate_stress.py \
+            third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-stress-r2000
+          # These are CI acceptance limits, not claimed real-world performance.
+          # 120s per fixture; virtual-memory limit of 1.5 GiB per writer process.
+          ulimit -v 1572864
+          for kind in mixed-512 mixed-8192 dense-polyline-8192; do
+            case "$kind" in
+              mixed-512) expected=513 ;;
+              mixed-8192) expected=8193 ;;
+              dense-polyline-8192) expected=2 ;;
+            esac
+            input="/tmp/musa-stress-r2000/${kind}.dxf"
+            output="/tmp/musa-stress-r2000/${kind}.dwg"
+            log="/tmp/musa-stress-r2000/${kind}.log"
+            metrics="/tmp/musa-stress-r2000/${kind}.time"
+            checksum="$(sha256sum "$input" | cut -d ' ' -f1)"
+            echo "R2000 STRESS START: ${kind} expected_geometry=$expected"
+            /usr/bin/time -f "elapsed_sec=%e peak_rss_kib=%M" -o "$metrics" \
+              timeout --signal=TERM --kill-after=5s 120s \
+              /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output" \
+              >"$log" 2>&1 || { cat "$log"; cat "$metrics"; exit 1; }
+            cat "$log"
+            cat "$metrics"
+            test -s "$output"
+            test "$(head -c 6 "$output")" = AC1015
+            grep -F "geometry entities=$expected)." "$log"
+            test "$(sha256sum "$input" | cut -d ' ' -f1)" = "$checksum"
+            # In addition to timeout and VM ceiling, gate observable peak RSS.
+            peak="$(sed -n 's/.*peak_rss_kib=\([0-9][0-9]*\).*/\1/p' "$metrics")"
+            test -n "$peak"
+            test "$peak" -le 900000
+            echo "PASS R2000 STRESS: ${kind} peak_rss_kib=$peak"
+          done
