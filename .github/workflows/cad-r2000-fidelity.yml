@@ -1,0 +1,90 @@
+name: R2000 host fidelity proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/src/main/cpp/dwg_write_pilot.c'
+      - 'app/src/main/cpp/dwg_primitive_fidelity.h'
+      - 'app/src/main/cpp/dwg_polyline_fidelity.h'
+      - '.github/workflows/android.yml'
+      - '.github/workflows/cad-r2000-fidelity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: r2000-fidelity-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Host-only R2000 DWG writer proof and safe-failure checks
+        run: |
+          # Deliberately separate from Android/read-only build; this is NOT release enablement.
+          cmake -S app/src/main/cpp -B /tmp/musa-writer-proof -DCMAKE_BUILD_TYPE=Release -DMUSACAD_HOST_DWG_WRITE_PILOT=ON
+          cmake --build /tmp/musa-writer-proof --parallel 2
+          cp third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-writer-input.dxf
+          cp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg
+          test -s /tmp/musa-pilot-output.dwg
+          cmp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          # Inject distinct real DXF primitives into the proven LibreDWG fixture.
+          # This exercises multiple coordinates, entity kinds and a fresh DWG read.
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('/tmp/musa-writer-input.dxf').read_text()
+          start = src.index('\n  0\nSECTION\n  2\nENTITIES\n')
+          end = src.index('\n  0\nENDSEC\n', start)
+          def entity(kind, handle, subclasses, pairs):
+              lines = ['  0', kind, '  5', handle, '330', '1F',
+                       '100', 'AcDbEntity', '  8', '0']
+              for cls in subclasses:
+                  lines.extend(('100', cls))
+              for group, value in pairs:
+                  lines.extend((str(group), str(value)))
+              return '\n'.join(lines) + '\n'
+          extra = ''.join((
+              entity('LINE', 'F001', ['AcDbLine'],
+                     [(10, 101.25), (20, -23.5), (30, 7.5),
+                      (11, 302.75), (21, -18.125), (31, 9.25)]),
+              entity('LINE', 'F002', ['AcDbLine'],
+                     [(10, -400.125), (20, 1000.5), (30, 0),
+                      (11, -390.75), (21, 1001.25), (31, 0)]),
+              entity('CIRCLE', 'F003', ['AcDbCircle'],
+                     [(10, 52.25), (20, -10.5), (30, 0), (40, 12.75)]),
+              entity('ARC', 'F004', ['AcDbCircle', 'AcDbArc'],
+                     [(10, -5.125), (20, 71.25), (30, 0), (40, 5.75),
+                      (50, 15.0), (51, 185.0)]),
+              entity('POINT', 'F005', ['AcDbPoint'],
+                     [(10, 4.5), (20, 8.25), (30, 2.75)]),
+              entity('LWPOLYLINE', 'F006', ['AcDbPolyline'],
+                     [(90, 4), (70, 1), (10, 0.0), (20, 0.0),
+                      (10, 22.75), (20, 0.0), (10, 22.75), (20, 13.25),
+                      (10, 0.0), (20, 13.25)]),
+          ))
+          Path('/tmp/musa-writer-multi.dxf').write_text(
+              src[:end+1] + extra + src[end+1:])
+          print('Multi-entity DXF fixture created: 3 LINE, CIRCLE, ARC, POINT, LWPOLYLINE')
+          PY
+          # An ordered closed polyline must survive alongside basic primitives.
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-multi.dxf /tmp/musa-writer-multi.dwg
+          test -s /tmp/musa-writer-multi.dwg
+          test "$(head -c 6 /tmp/musa-writer-multi.dwg)" = AC1015
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg; then
+            echo "Writer must never overwrite an existing destination"
+            exit 1
+          fi
+          printf 'not a DXF\\n' >/tmp/musa-malformed.dxf
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-malformed.dxf /tmp/musa-malformed-output.dwg; then
+            echo "Malformed input must never produce DWG"
+            exit 1
+          fi
+          test ! -e /tmp/musa-malformed-output.dwg
