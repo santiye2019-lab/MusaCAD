@@ -18,6 +18,7 @@ public final class CadPagedPreviewIntegrationContractTest {
         String view=read("app/src/main/java/com/musa/cad/CadView.java");
         String activity=read("app/src/main/java/com/musa/cad/MainActivity.java");
         String loader=read("app/src/main/java/com/musa/cad/NativePagedPreviewLoader.java");
+        String reloadGate=read("app/src/main/java/com/musa/cad/NativeViewportReloadGate.java");
         String compositor=read("app/src/main/java/com/musa/cad/NativePagedScenePreview.java");
         String cache=read("app/src/main/java/com/musa/cad/NativeViewportPageCache.java");
         String engine=read("app/src/main/java/com/musa/cad/NativeCadEngine.java");
@@ -69,6 +70,12 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(loader,"latestViewport.getAndSet(null)","latest viewport wins");
         need(loader,"preview.retainReload(entry,refreshed)","reload validates records");
         need(loader,"MAX_RELOADS_PER_REQUEST","bounded reload work");
+        need(loader,"viewportGate.shouldRequest(", "same view retried as discovery progresses");
+        need(loader,"currentPages", "monotonic page-discovery generation");
+        need(reloadGate,"previousPageCount==decodedPages",
+                "unchanged viewport suppresses duplicate drawing requests");
+        need(reloadGate,"decodedPages<previousPageCount",
+                "cross-source rollback rejected instead of mixed");
 
         need(loader,"pageNoticePending.compareAndSet(false,true)","coalesced UI updates");
         need(loader,"currentPrimitives,preview.isComplete()","fresh callback state");
