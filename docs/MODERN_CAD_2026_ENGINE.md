@@ -84,6 +84,36 @@ stubbed verification**: wrong signature, missing validator, changed source,
 changed DXF, changed stage, preexisting output and no accidental overwrite.
 These are safety tests, NOT a successful AC1032 conversion/round-trip.
 
+### Strict decoded-DXF semantic parity preflight (new)
+
+`tests/dwg_dxf_semantic_parity.py` compares two independently supplied,
+read-only ASCII/UTF-8 DXF exports using an order-independent multiset of
+cryptographic hashes of **whole entity group-code streams**. It checks more
+than counts/bounding boxes: individual coordinates, ordered polyline
+bulges/widths, layer and indexed/TrueColor fields, text, handles,
+BLOCK/INSERT/XREF-related references and TABLES/OBJECTS/CLASSES records.
+Only number *formatting* is canonicalized (e.g. `10.0` = `1e1`).
+Missing/extra entities, changed entity attributes, truncated or malformed
+DXF, unexpected Unicode, proxy/ACIS entities and ACDSDATA all reject
+certification; coordinates and customer text are never printed.
+
+Example, **AFTER** a real future AC1032 encoder and **separate** read-back
+converter have produced their DXF files:
+
+```bash
+python3 tests/dwg_dxf_semantic_parity.py approved-edit.dxf \
+    independently-reopened-ac1032.dxf --report parity.json
+```
+
+This is only a **DXF-level parity preflight**, NOT proof of an independent
+DWG decoder, true AC1032 file validity, unchanged dynamic-block state, ACIS
+or B-Rep persistence. If both DXFs derive from the *same lossy converter*,
+matching output can conceal omitted DWG-only information. An independent
+DWG engine and real AutoCAD/ODA semantic acceptance remain required before
+this can be wired into the host-only `IndependentReopenVerifier` gate,
+let alone enabled as a save action on Android.
+
+
 ## Guardrails
 
 1. Keep working `main`, Android APK and Cloudflare production intact.
