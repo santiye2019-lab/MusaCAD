@@ -16,6 +16,14 @@ public final class Dxf3dSafeSaveIntegrationContractTest {
             throw new AssertionError("3D DXF must validate stage before opening Android output URI and clean cache");
         if(source.substring(callback).contains("Dxf3dEditor.write(new File(path),output,mesh,original)"))
             throw new AssertionError("direct 3D writes to a truncating SAF stream are prohibited");
+        String guardedStage=Files.readString(
+            Path.of("app/src/main/java/com/musa/cad/Dxf3dSafeSave.java"),StandardCharsets.UTF_8);
+        int shaBefore=guardedStage.indexOf("CadSaveSourceIntegrity.capture(source)");
+        int edit=guardedStage.indexOf("Dxf3dEditor.write(source,output,edited,original)");
+        int afterVerify=guardedStage.indexOf("baseline.requireUnchanged(source)");
+        int stageReady=guardedStage.indexOf("ready=true;");
+        if(shaBefore<0||edit<shaBefore||afterVerify<edit||stageReady<afterVerify)
+            throw new AssertionError("SHA-256 snapshot must enclose 3D edit and stage acceptance");
         System.out.println("3D SAF export contract: stage before open/truncate and cleanup");
     }
 }
