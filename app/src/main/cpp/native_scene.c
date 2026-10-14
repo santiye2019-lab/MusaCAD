@@ -793,10 +793,11 @@ int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
  * traversal when resuming; a future stack cursor will remove replay cost.
  * It can still reject a single huge HATCH/POLYLINE leaf with -4, safely.
  */
-int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
+static int musa_scene_build_page_nested_impl(Dwg_Data *dwg,MusaNativeScene *scene,
                                  size_t first_index,size_t first_leaf,
                                  size_t *next_index,size_t *next_leaf,
-                                 size_t max_words){
+                                 size_t max_words,
+                                 Dwg_Object *const *indexed,size_t indexed_count){
     if(!dwg||!scene||!next_index||!next_leaf||
        max_words<256||max_words>MUSA_SCENE_MAX_FLOATS)return -1;
     memset(scene,0,sizeof(*scene));
@@ -806,15 +807,17 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
     for(int h=0;h<7;h++)pushf(scene,0);
     Affine2 identity=identity2();
     SceneColor root=scene_aci(7);
+    const int use_index=indexed!=NULL&&indexed_count>0;
     Dwg_Object_Ref *model=dwg_model_space_ref(dwg);
     Dwg_Object *owner=model?model->obj:NULL;
-    Dwg_Object *obj=owner?get_first_owned_entity(owner):NULL;
-    size_t at=0;
+    Dwg_Object *obj=(!use_index&&owner)?get_first_owned_entity(owner):NULL;
+    /* Indexed pages jump directly to first_index, avoiding prefix rewalks. */
+    size_t at=use_index?first_index:0;
     int more=0;
-    /* Restrict cursors to actual top-level model entities. */
     BITCODE_BL limit=owner?0:dwg->num_objects;
-    for(BITCODE_BL i=0;owner?obj!=NULL:i<limit;){
-        Dwg_Object *current=owner?obj:&dwg->object[i];
+    for(BITCODE_BL i=0;use_index?(at<indexed_count):(owner?obj!=NULL:i<limit);){
+        Dwg_Object *current=use_index?indexed[at]:(owner?obj:&dwg->object[i]);
+        if(!current){musa_scene_free(scene);return -1;}
         if(at>=first_index){
             const size_t before=scene->count;
             const int previous_count=scene->primitives,previous_bounds=scene->has_bounds;
@@ -857,8 +860,10 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
             }
         }
         ++at;
-        if(owner)obj=get_next_owned_entity(owner,obj);
-        else ++i;
+        if(!use_index){
+            if(owner)obj=get_next_owned_entity(owner,obj);
+            else ++i;
+        }
         *next_index=at;
         *next_leaf=0;
     }
@@ -881,6 +886,25 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
     scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;
     scene->values[6]=0;
     return more?1:0;
+}
+
+int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
+                                 size_t first_index,size_t first_leaf,
+                                 size_t *next_index,size_t *next_leaf,
+                                 size_t max_words){
+    return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
+                                              next_index,next_leaf,max_words,NULL,0);
+}
+
+int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
+                                         size_t first_index,size_t first_leaf,
+                                         size_t *next_index,size_t *next_leaf,
+                                         size_t max_words,
+                                         Dwg_Object *const *model_entities,
+                                         size_t model_count){
+    if(!model_entities||!model_count||first_index>=model_count)return -1;
+    return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
+                          next_index,next_leaf,max_words,model_entities,model_count);
 }
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
