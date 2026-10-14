@@ -51,7 +51,7 @@ static int musa_capture_primitives(const Dwg_Data *dwg, MusaPrimitiveList *out) 
     int kind = obj->fixedtype;
     if (kind != DWG_TYPE_LINE && kind != DWG_TYPE_CIRCLE &&
         kind != DWG_TYPE_ARC && kind != DWG_TYPE_POINT &&
-        kind != DWG_TYPE__3DFACE) continue;
+        kind != DWG_TYPE__3DFACE && kind != DWG_TYPE_VERTEX_2D) continue;
     if (!obj->tio.entity) goto invalid;
     MusaPrimitive *rec = &out->items[out->size++];
     rec->kind = kind;
@@ -84,6 +84,15 @@ static int musa_capture_primitives(const Dwg_Data *dwg, MusaPrimitiveList *out) 
         MUSA_VAL(p->x); MUSA_VAL(p->y); MUSA_VAL(p->z);
         MUSA_VAL(p->x_ang); MUSA_VAL(p->thickness);
         MUSA_VEC3(p->extrusion);
+        break;
+      }
+      case DWG_TYPE_VERTEX_2D: {
+        const Dwg_Entity_VERTEX_2D *p = obj->tio.entity->tio.VERTEX_2D;
+        if (!p) goto invalid;
+        MUSA_VEC3(p->point);
+        MUSA_VAL(p->start_width); MUSA_VAL(p->end_width);
+        MUSA_VAL(p->bulge); MUSA_VAL(p->tangent_dir);
+        MUSA_VAL(p->flag);
         break;
       }
       case DWG_TYPE__3DFACE: {
