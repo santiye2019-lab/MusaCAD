@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from native_preview_type_audit import audit_types
+from dwg_entity_identity_audit import DwgEntityIdentityAudit
 import hashlib
 import json
 import os
@@ -63,6 +64,7 @@ def inventory_dxf(path: Path):
     blocks = {}
     model = Counter()
     block_geometry = Counter()
+    identity = DwgEntityIdentityAudit()
     # Raw decoded-DXF attributes, NOT proof that native Canvas displayed them.
     color_sources = Counter()
     advanced_entities = Counter()
@@ -75,6 +77,10 @@ def inventory_dxf(path: Path):
         if current is None:
             return
         data = {code: val for code, val in fields}
+        # Preserve every raw group-5 / group-8 field before collapsing duplicate
+        # codes into the convenience map used by the color/shape inventory.
+        # Never serialize identifiers or layer names into these diagnostics.
+        identity.observe(section,current,fields)
         is_drawable_entity = (
             section in ("ENTITIES", "BLOCKS") and
             current not in ("SECTION", "ENDSEC", "EOF", "BLOCK",
@@ -156,6 +162,7 @@ def inventory_dxf(path: Path):
         raise ValueError("converter emitted no model/block geometry")
     return {
         **audit_types(dict(model), dict(block_geometry)),
+        **identity.summary(),
         "dxf_bytes": path.stat().st_size,
         "section_names": sorted(sections_seen),
         "layer_count": len(layers),
