@@ -128,6 +128,18 @@ public final class NativePageCatalog {
     public synchronized int size(){return ordered.size();}
 
     /**
+     * O(1) cached-completeness key for the compositor's privately owned cache.
+     * ONLY valid when every inserted payload has passed requireAppend(),
+     * append() or samePage() against this catalog, as enforced by the
+     * NativePagedScenePreview retain/reload paths. Not a generic cache check.
+     * Incomplete discovery or any evicted page must never be reported complete.
+     */
+    public synchronized boolean hasCompleteCachedCoverage(int retainedPages){
+        return discoveredAll && !ordered.isEmpty() &&
+               retainedPages==ordered.size();
+    }
+
+    /**
      * Missing pages intersecting the requested viewport. Geometry is absent
      * from the active cache, so exactly these cursor starts can be re-decoded.
      * Sort by distance to viewport center, tie-break by source order.
