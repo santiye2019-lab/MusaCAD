@@ -9,6 +9,7 @@
 #include "config.h"
 #include "dwg.h"
 #include "dwg_primitive_fidelity.h"
+#include "dwg_polyline_fidelity.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,6 +114,7 @@ static int pilot_write(const char *input, const char *output) {
               equal_geometry(&expected, &actual);
   /* Fail closed if decoded primitive coordinates differ from the DXF. */
   if (valid) valid = musa_verify_primitive_coordinates(input, &decoded);
+  if (valid) valid = musa_verify_polylines(input, &decoded);
   if (valid) valid = stat(input, &source_after) == 0 &&
                       source_before.st_size == source_after.st_size &&
                       source_before.st_mtime == source_after.st_mtime;
