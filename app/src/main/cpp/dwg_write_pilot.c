@@ -75,7 +75,8 @@ static int pilot_write(const char *input, const char *output) {
   int read_status = dxf_read_file(input, &drawing);
   GeometrySignature expected;
   if (read_status >= DWG_ERR_CRITICAL ||
-      geometry_signature(&drawing, &expected) != 0) {
+      geometry_signature(&drawing, &expected) != 0 ||
+      musa_prepare_lwpolyline_flags(&drawing) != 0) {
     fprintf(stderr, "Rejecting incomplete/unsupported DXF: status=%d\n", read_status);
     dwg_free(&drawing);
     return 3;
