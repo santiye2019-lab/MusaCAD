@@ -812,7 +812,6 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
     size_t at=0;
     int more=0;
     /* Restrict cursors to actual top-level model entities. */
-    if(first_leaf>0 && first_index==SIZE_MAX){musa_scene_free(scene);return -1;}
     BITCODE_BL limit=owner?0:dwg->num_objects;
     for(BITCODE_BL i=0;owner?obj!=NULL:i<limit;){
         Dwg_Object *current=owner?obj:&dwg->object[i];
@@ -827,6 +826,11 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
             scene->nested_visited=0;
             emit_object(current,scene,identity,0,root,root);
             scene->nested_paging=0;
+            /* Do not accept a stale cursor pointing past the last leaf. */
+            if(skip>0 && scene->nested_visited<skip){
+                musa_scene_free(scene);
+                return -5;
+            }
             if(scene->truncated){
                 const size_t visited=scene->nested_visited;
                 const int kept_nested=visited>skip && scene->count>before;
