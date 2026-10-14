@@ -723,9 +723,10 @@ jobs:
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
       - name: Test 3D DXF surface geometry
         run: |
-          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/CadSaveSourceIntegrityTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
           java -cp /tmp/musacad-tests Dxf3dMeshTest
           java -cp /tmp/musacad-tests Dxf3dSafeSaveTest
+          java -cp /tmp/musacad-tests CadSaveSourceIntegrityTest
           java -cp /tmp/musacad-tests Dxf3dSafeSaveIntegrationContractTest
       - name: Test cancellable file transfer
         run: |
