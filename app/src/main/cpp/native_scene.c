@@ -6,6 +6,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef MUSA_HOST
+#include <stdio.h>
+#endif
 #include "dwg.h"
 #include "dwg_api.h"
 #include "bits.h"
