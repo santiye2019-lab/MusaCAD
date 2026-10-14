@@ -691,12 +691,14 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                     fprintf(stderr,"MusaCAD fit spline rejected:"
                             " stage=build fit=%zu duplicate_adjacent=%zu"
                             " nonfinite_fit=%zu begin_tangent_finite=%d"
-                            " end_tangent_finite=%d\n",
+                            " end_tangent_finite=%d"
+                            " begin_tangent_zero=%d end_tangent_zero=%d\n",
                             fit_count,duplicate_adjacent,nonfinite_fit,
                             isfinite(tangent0.x)&&isfinite(tangent0.y)&&
                                 isfinite(tangent0.z),
                             isfinite(tangent1.x)&&isfinite(tangent1.y)&&
-                                isfinite(tangent1.z));
+                                isfinite(tangent1.z),
+                            begin_unspecified,end_unspecified);
 #endif
                     s->truncated=1;free(fit);free(samples);break;
                 }
