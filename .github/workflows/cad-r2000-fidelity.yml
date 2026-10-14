@@ -18,6 +18,8 @@ on:
       - 'tests/private_dwg_read_audit.py'
       - 'tests/test_private_dwg_spline_diagnostics.py'
       - 'tests/native_preview_type_audit.py'
+      - 'tests/dwg_entity_identity_audit.py'
+      - 'tests/test_dwg_entity_identity_audit.py'
       - 'tests/test_native_preview_type_audit.py'
       - 'tests/dwg_dxf_semantic_parity.py'
       - 'tests/test_dwg_dxf_semantic_parity.py'
@@ -333,6 +335,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_modern_dwg_acceptance.py' -v
           python3 -m unittest discover -s tests -p 'test_modern_color_inventory.py' -v
           python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
           # Actual R2018/AC1032 fixture with dynamic BLOCK/INSERT records;
           # neither R2000 writer PASS nor file name alone proves modern support.
           # Every source hash must remain unchanged, and truncated/unknown
