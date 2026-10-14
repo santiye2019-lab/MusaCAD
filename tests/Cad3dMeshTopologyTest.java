@@ -42,6 +42,16 @@ public final class Cad3dMeshTopologyTest {
         need(!triple.closedOrientedByIndex&&triple.nonManifoldEdges==3,
                 "duplicated face yields three non-manifold edges");
 
+        // Two identical triangles facing opposite directions have all
+        // paired edges, but enclose no solid. Do not certify a zero-thickness
+        // CAD sheet as closed just because its edges pair.
+        Cad3dMeshTopology.Result doubled=Cad3dMeshTopology.inspect(TETRA,
+                new int[]{0,1,2, 0,2,1});
+        need(doubled.boundaryEdges==0&&doubled.orientationConflicts==0,
+                "opposite faces can trick edge-only manifold checks");
+        need(doubled.duplicateFaces==1&&!doubled.closedOrientedByIndex,
+                "duplicate opposing facet prevents false solid certification");
+
         Cad3dMeshTopology.Result collinear=Cad3dMeshTopology.inspect(
                 new float[]{0,0,0, 1,1,1, 2,2,2},
                 new int[]{0,1,2});
