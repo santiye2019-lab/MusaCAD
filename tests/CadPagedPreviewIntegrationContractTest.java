@@ -29,7 +29,11 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(view,"experimentalPagedPreview.isPartial()","missing-page marker");
         need(view,"DWG önizleme kısmi", "visible incomplete-state text");
         need(view,"if(experimentalPagedPreview!=null)","fallback path");
-        need(view,"else nativeDrawing.draw(c,imageMatrix,fastNavigation)","unchanged legacy fallback");
+        // The ordinary native renderer remains available when opt-in paging is
+        // absent. It now also warns when its first-paint scene is incomplete.
+        need(view,"}else{\n                nativeDrawing.draw(c,imageMatrix,fastNavigation);",
+                "legacy native renderer fallback");
+        need(view,"if(nativeDrawing.truncated)", "native incomplete-scene warning");
         // Critical: switching tabs/drawings and vector handoff cannot reuse old DWG pages.
         need(view,"clearExperimentalPagedPreview();\n        stopFastNavigation();\n        vectorDrawing=vector;", "project switch reset");
         need(view,"clearExperimentalPagedPreview();\n        drawing=null;vectorDrawing=result;", "vector upgrade reset");
