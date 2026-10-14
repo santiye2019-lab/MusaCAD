@@ -742,6 +742,21 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
+      - name: Identify genuine DWG version without confusing AutoCAD 2026
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadDwgFormat.java tests/CadDwgFormatTest.java
+          java -cp /tmp/musacad-tests CadDwgFormatTest
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
+          scan=code.index("CadDwgFormat.identify(loaded.file)")
+          decode=code.index("NativeCadEngine.open(loaded.file)",scan)
+          assert scan<decode, "read-only DWG format diagnosis precedes native decoding"
+          assert "if(detected.supportedSignature)" in code
+          assert "final String openedDwgFormat=inputFormat;" in code
+          assert "Önizleme renkleri nihai değildir." in code
+          PY
+
       - name: Test 3D viewport normals for large and tiny CAD coordinates
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dFaceLighting.java tests/Cad3dFaceLightingTest.java
