@@ -48,6 +48,39 @@ color and visibility (ACI/TrueColor/ByBlock/ByLayer), dimension/annotation,
 dynamic-block states, XREF targets, 3D solids and source-file hashes. Unsupported
 or unreadable objects must be shown explicitly and block destructive saves.
 
+## AC1032 writer publication barrier (experimental; not an encoder)
+
+`CadAc1032StagedSave` provides only the **future write path's fail-closed
+publication protocol**, and is currently **not called by Android**. It does
+not create valid AC1032 files by itself. A real, licensed/open-source-capable
+AC1032 binary encoder and an independent CAD semantic reader still need to
+be implemented/integrated before any user-facing DWG Save As is possible.
+
+Required stages, all or nothing:
+
+1. Input original must identify as AC1032. The original DWG and modified DXF
+   remain separate, read-only files and get **SHA-256 source snapshots**.
+2. Encoder streams to a private temporary file alongside a **new** destination.
+   Nothing can overwrite the original DWG, input DXF or an existing target.
+3. Candidate must be nonempty and contain the six-byte **AC1032** signature.
+   **Header alone does not prove a valid DWG.**
+4. A truly **independent** CAD reader must reopen the staged DWG and validate
+   actual geometry, handles, blocks/XREF, layouts, layer/color/visibility and
+   proxy/ACIS semantics against the edited model. A yes/no test stub is not
+   production evidence. Unknown object loss must **reject publication**.
+5. Rehash source, edited DXF and staged DWG after verification. Only then
+   publish by an exclusive same-directory hard link. The destination must
+   not already exist. Filesystems that do not support exclusive hard links
+   fail closed rather than silently falling back to an overwrite/move.
+6. Stage is removed on success or error; genuine DXF and source DWG remain
+   unchanged. Android SAF/cloud destinations require a **separate safe
+   publication protocol**. No user-facing AC1032 writer is wired up.
+
+CI currently checks only the barrier's behavior using **synthetic bytes and
+stubbed verification**: wrong signature, missing validator, changed source,
+changed DXF, changed stage, preexisting output and no accidental overwrite.
+These are safety tests, NOT a successful AC1032 conversion/round-trip.
+
 ## Guardrails
 
 1. Keep working `main`, Android APK and Cloudflare production intact.
