@@ -212,6 +212,26 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         result["native_scene_truncated"] = None
     # Count-only decoder diagnostics. Never attach potentially sensitive
     # drawing coordinates, text, filenames or raw converter stderr to JSON.
+    # These records contain ONLY enumerated numeric spline metadata.
+    # The raw stderr stays local; coordinates/handles/text are never emitted.
+    spline_diagnostics = []
+    spline_pattern = re.compile(
+        r"MusaCAD spline rejected: scenario=(-?\\d+) degree=(-?\\d+) "
+        r"control=(\\d+) knots=(\\d+) fit=(\\d+) "
+        r"weighted=(\\d+) rational=(\\d+) "
+        r"reason=(missing_knots_or_fit_only|bad_weights_knots_or_budget)"
+    )
+    for match in spline_pattern.finditer(diagnostics):
+        if len(spline_diagnostics) >= 32:
+            break
+        scenario, degree, control, knots, fit, weighted, rational = (
+            int(value) for value in match.groups()[:7])
+        spline_diagnostics.append({
+            "scenario": scenario, "degree": degree, "control": control,
+            "knots": knots, "fit": fit, "weighted": weighted,
+            "rational": rational, "reason": match.group(8)
+        })
+    result["native_spline_rejection_details"] = spline_diagnostics
     result["native_spline_fit_only_rejections"] = diagnostics.count(
         "reason=missing_knots_or_fit_only")
     result["native_spline_invalid_weight_rejections"] = diagnostics.count(
