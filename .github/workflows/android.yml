@@ -434,6 +434,9 @@ jobs:
           grep -q 'musa_native_color_token' app/src/main/cpp/native_scene.c
           grep -q 'entity->method' app/src/main/cpp/native_scene.c
           grep -q 'value->method' app/src/main/cpp/native_scene.c
+      - name: Test conservative native DWG entity type audit
+        run: |
+          python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
       - name: Guard native 3D polyline first paint
         run: |
           grep -q 'DWG_TYPE_POLYLINE_3D' app/src/main/cpp/native_scene.c
