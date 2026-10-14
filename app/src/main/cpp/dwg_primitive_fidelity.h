@@ -27,6 +27,24 @@ typedef struct {
   size_t size;
 } MusaPrimitiveList;
 
+/*
+ * Pinned LibreDWG's DXF loader sets has_no_flags=1 for 3DFACE R2000 by
+ * default, including DXF files with a nonzero group-70 invisible-edge mask.
+ * In binary R2000 that suppresses writing the mask. Preserve the explicitly
+ * parsed visibility bits rather than discarding them.
+ */
+static int musa_prepare_3dface_flags(Dwg_Data *dwg) {
+  if (!dwg) return -1;
+  for (BITCODE_BL i=0; i<dwg->num_objects; ++i) {
+    Dwg_Object *obj=&dwg->object[i];
+    if (obj->fixedtype != DWG_TYPE__3DFACE) continue;
+    if (!obj->tio.entity || !obj->tio.entity->tio._3DFACE) return -1;
+    Dwg_Entity__3DFACE *p=obj->tio.entity->tio._3DFACE;
+    if (p->invis_flags) p->has_no_flags = 0;
+  }
+  return 0;
+}
+
 static void musa_free_primitives(MusaPrimitiveList *list) {
   free(list->items);
   list->items = NULL;
