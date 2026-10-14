@@ -128,6 +128,11 @@ public final class NativeViewportPageCache<T> {
         return false;
     }
 
+    /** Lookup without marking an offscreen page as recently displayed. */
+    public synchronized boolean contains(Cursor start){
+        return start!=null&&index.containsKey(start);
+    }
+
     public synchronized int pageCount(){return pages.size();}
     public synchronized long retainedBytes(){return heldBytes;}
     public synchronized boolean hasEvictedPages(){return everEvicted;}
