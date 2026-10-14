@@ -116,6 +116,21 @@ class DxfSemanticParityTest(unittest.TestCase):
             result = self.check(data, data, False)
             self.assertEqual(result["unverifiable_entities"], 2)
 
+    def test_acdsdata_section_is_unverifiable_even_if_equal(self):
+        base = drawing(line())
+        extra = (pair(0, "SECTION") + pair(2, "ACDSDATA") +
+                 pair(0, "ACDSRECORD") + pair(1, "opaque ACIS payload") +
+                 pair(0, "ENDSEC"))
+        with_opaque = base.replace(pair(0, "EOF"), extra + pair(0, "EOF"))
+        result = self.check(with_opaque, with_opaque, False)
+        self.assertEqual(result["unverifiable_entities"], 2)
+
+    def test_numeric_exponent_bomb_rejected(self):
+        malformed = drawing(line(x="1e999999999"))
+        self.before.write_text(malformed, encoding="utf-8")
+        with self.assertRaises(DxfParityError):
+            fingerprint(self.before)
+
     def test_corrupted_and_unclosed_dxf_refused(self):
         good = drawing(line())
         cases = (good[:-6], good + pair(0, "POINT"),
