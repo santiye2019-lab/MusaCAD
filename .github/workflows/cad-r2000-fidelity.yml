@@ -1,4 +1,4 @@
-name: R2000 host fidelity proof
+name: Modern DWG AC1032 reader and legacy writer proof
 on:
   pull_request:
     branches: [main]
@@ -10,6 +10,11 @@ on:
       - 'tests/r2000_generate_variants.py'
       - 'tests/r2000_generate_stress.py'
       - 'tests/private_dwg_read_audit.py'
+      - 'tests/modern_dwg_acceptance.py'
+      - 'tests/test_modern_dwg_acceptance.py'
+      - 'tests/test_modern_color_inventory.py'
+      - 'tests/test_native_point_payload_guard.py'
+      - 'tests/test_native_modern_scene_guards.py'
       - 'app/src/main/cpp/dwg_primitive_fidelity.h'
       - 'app/src/main/cpp/dwg_polyline_fidelity.h'
       - '.github/workflows/android.yml'
@@ -17,7 +22,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: r2000-fidelity-${{ github.ref }}
+  group: modern-dwg-fidelity-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
