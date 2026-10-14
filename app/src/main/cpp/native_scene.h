@@ -3,6 +3,7 @@
 #define MUSACAD_NATIVE_SCENE_H
 #include <stddef.h>
 #include "dwg.h"
+typedef struct MusaSceneLeafContext MusaSceneLeafContext;
 
 typedef struct {
     float *values;
@@ -17,6 +18,10 @@ typedef struct {
     /* Internal opt-in nested paging. Never part of the v6 wire header. */
     size_t nested_skip, nested_visited;
     int nested_paging;
+    /* Used only by a transient collector; not included in v6 float stream. */
+    MusaSceneLeafContext *collector_entries;
+    size_t collector_count, collector_capacity;
+    int collector_only;
 } MusaNativeScene;
 
 /*
@@ -71,6 +76,34 @@ int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
                                          size_t max_words,
                                          Dwg_Object *const *model_entities,
                                          size_t model_count);
+/*
+ * Exact expansion-context index for ONE model-space INSERT/MINSERT/dimension:
+ * all expanded leaf instances are kept in source order with parent affine,
+ * inherited ACI/TrueColor and depth. No geometry words are cached.
+ * Strictly bounded to 65,536 leaves; when too large/unavailable the caller
+ * MUST use normal replay. Non-owning entity pointers die with Dwg_Data.
+ */
+struct MusaSceneLeafContext {
+    Dwg_Object *object;
+    double affine[6];
+    int depth;
+    int by_block_aci, by_block_truecolor;
+    unsigned int by_block_rgb;
+    int layer_aci, layer_truecolor;
+    unsigned int layer_rgb;
+};
+
+int musa_scene_collect_root_leaves(Dwg_Object *root,
+                                    MusaSceneLeafContext **out,
+                                    size_t *out_count);
+int musa_scene_build_page_nested_cached(
+       Dwg_Data *dwg,MusaNativeScene *scene,
+       size_t first_index,size_t first_leaf,
+       size_t *next_index,size_t *next_leaf,size_t max_words,
+       Dwg_Object *const *model_entities,size_t model_count,
+       size_t cached_root_index,Dwg_Object *cached_root,
+       const MusaSceneLeafContext *leaves,size_t leaf_count);
+
 void musa_scene_free(MusaNativeScene *scene);
 
 #endif
