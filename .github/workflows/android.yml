@@ -513,6 +513,8 @@ jobs:
           java -cp /tmp/musacad-tests NativePageSpatialIndexTest
           javac -cp /tmp/musacad-tests -d /tmp/musacad-tests tests/NativePartialViewportIndexTest.java
           java -cp /tmp/musacad-tests NativePartialViewportIndexTest
+          javac -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeViewportReloadGate.java tests/NativeViewportReloadGateTest.java
+          java -cp /tmp/musacad-tests NativeViewportReloadGateTest
           javac -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeVisibleReloadBudget.java tests/NativeVisibleReloadBudgetTest.java
           java -cp /tmp/musacad-tests NativeVisibleReloadBudgetTest
           # Android-scene compositor is opt-in only; guard against accidental
