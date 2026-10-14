@@ -320,3 +320,27 @@ jobs:
             exit 1
           fi
           grep -F 'status=-4' /tmp/musa-context-too-large.log
+
+      - name: Verify whole-stream SHA256 parity across 50 nested pages
+        run: |
+          set -euo pipefail
+          public=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-indexed-all.raw \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe "$public" 4096 \
+            >/tmp/musa-indexed-stream.log 2>&1
+          MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-context-all.raw \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --context-nested-paged-probe "$public" 4096 \
+            >/tmp/musa-context-stream.log 2>&1
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-stream.log
+          cmp /tmp/musa-indexed-all.raw /tmp/musa-context-all.raw
+          sha256sum /tmp/musa-indexed-all.raw /tmp/musa-context-all.raw
+          test "$(stat -c %s /tmp/musa-indexed-all.raw)" -gt 100000
+          # Prevent overwriting a trusted prior stream or any source file.
+          if MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-indexed-all.raw \
+               /tmp/musa-writer-proof/musacad_dwg_convert \
+                 --indexed-nested-paged-probe "$public" 4096 >/dev/null 2>&1; then
+            echo 'Output stream export MUST require an exclusive destination'
+            exit 1
+          fi
