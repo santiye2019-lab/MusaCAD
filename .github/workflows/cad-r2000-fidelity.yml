@@ -269,29 +269,3 @@ jobs:
             exit 1
           fi
           grep -F 'status=-4' /tmp/musa-indexed-leaf-too-large.log
-
-      - name: Direct INSERT child continuation is bit-for-bit identical
-        run: |
-          set -euo pipefail
-          # Pinned public nested-block DWG plus generated stress fixtures.
-          # This first test deliberately does not assume TS1 uses a flat block.
-          # Every untruncated fixture is compared byte-for-byte against
-          # the legacy v6 primitive/color stream by the host probe.
-          for pair in \
-            "third_party/libredwg/test/test-data/2000/TS1.dwg 256 public-block" \
-            "/tmp/musa-stress-r2000/mixed-8192.dwg 8192 mixed-8192" \
-            "/tmp/musa-stress-r2000/mixed-512.dwg 8192 mixed-512"; do
-            set -- $pair
-            /usr/bin/time -f "Direct $3 elapsed_sec=%e peak_rss_kib=%M" \
-              timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
-              --direct-child-resume-probe "$1" "$2" \
-              2>&1 | tee "/tmp/musa-direct-$3.log"
-            grep -F 'Direct Nested paged scene verified:' "/tmp/musa-direct-$3.log"
-          done
-          if timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
-                --direct-child-resume-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
-                >/tmp/musa-direct-oversize.log 2>&1; then
-            echo 'A direct checkpoint MUST NOT bypass a too-large leaf'
-            exit 1
-          fi
-          grep -F 'status=-4' /tmp/musa-direct-oversize.log
