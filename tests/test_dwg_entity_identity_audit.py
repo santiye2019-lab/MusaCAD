@@ -439,9 +439,13 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
                                  style)
 
     def test_r2000_cp1252_fallback_is_explicit_and_modern_dwg_stays_strict(self):
+        legacy_layer = "BÜRO".encode("cp1252")
         payload = (
-            b"0\nSECTION\n2\nENTITIES\n0\nLINE\n5\nA\n8\n"
-            + "BÜRO".encode("cp1252")
+            b"0\nSECTION\n2\nTABLES\n0\nLAYER\n2\n"
+            + legacy_layer
+            + b"\n70\n0\n62\n7\n0\nENDSEC\n"
+              b"0\nSECTION\n2\nENTITIES\n0\nLINE\n5\nA\n8\n"
+            + legacy_layer
             + b"\n10\n0\n20\n0\n11\n12\n21\n3\n"
               b"0\nENDSEC\n0\nEOF\n"
         )
