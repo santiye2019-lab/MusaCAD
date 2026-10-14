@@ -31,10 +31,10 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(view,"if(experimentalPagedPreview!=null)","fallback path");
         need(view,"else nativeDrawing.draw(c,imageMatrix,fastNavigation)","unchanged legacy fallback");
         // Critical: switching tabs/drawings and vector handoff cannot reuse old DWG pages.
-        need(view,"experimentalPagedPreview=null;\n        stopFastNavigation();\n        vectorDrawing=vector;", "project switch reset");
-        need(view,"experimentalPagedPreview=null;\n        drawing=null;vectorDrawing=result;", "vector upgrade reset");
-        need(view,"experimentalPagedPreview=null;\n        drawing=null;nativeDrawing=null;vectorDrawing=result;", "vector reset");
-        need(view,"experimentalPagedPreview=null;\n        drawing=null;vectorDrawing=null;nativeDrawing=result;", "native drawing reset");
+        need(view,"clearExperimentalPagedPreview();\n        stopFastNavigation();\n        vectorDrawing=vector;", "project switch reset");
+        need(view,"clearExperimentalPagedPreview();\n        drawing=null;vectorDrawing=result;", "vector upgrade reset");
+        need(view,"clearExperimentalPagedPreview();\n        drawing=null;nativeDrawing=null;vectorDrawing=result;", "vector reset");
+        need(view,"clearExperimentalPagedPreview();\n        drawing=null;vectorDrawing=null;nativeDrawing=result;", "native drawing reset");
         absent(activity,"attachExperimentalPagedPreview(", "normal APK DWG open path");
         absent(activity,"new NativePagedPreviewLoader(", "normal APK DWG open path");
 
@@ -46,6 +46,16 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(loader,"listener.onEnd(preview.isComplete(),doneTotal)","honest completion");
         need(loader,"listener.onError(","explicit decoding errors");
         need(loader,"worker.shutdownNow()","worker cancellation");
+        need(view,"experimentalPagedLoader.close()","project/tab cancellation");
+        need(view,"experimentalPagedLoader.requestVisibleWorld(","visible reload trigger");
+        need(compositor,"visibleWorldBounds(","shared viewport mapping");
+        need(compositor,"retainReload(","strict source page reload");
+        need(compositor,"catalog.samePage(","reject changed source");
+        need(compositor,"catalog.clear()","clear catalog on source switch");
+        need(loader,"latestViewport.getAndSet(null)","latest viewport wins");
+        need(loader,"preview.retainReload(entry,refreshed)","reload validates records");
+        need(loader,"MAX_RELOADS_PER_REQUEST","bounded reload work");
+
         need(loader,"pageNoticePending.compareAndSet(false,true)","coalesced UI updates");
         need(loader,"currentPrimitives,preview.isComplete()","fresh callback state");
 
