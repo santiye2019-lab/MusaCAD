@@ -131,18 +131,28 @@ static int musa_verify_polylines(const char *input,const Dwg_Data *decoded) {
   MusaPolylines before={0},after={0};
   original.header.version=R_2000;
   int read_result=dxf_read_file(input,&original);
-  int valid=read_result < DWG_ERR_CRITICAL &&
-             musa_polyline_capture(&original,&before)==0 &&
-             musa_polyline_capture(decoded,&after)==0 &&
-             before.length == after.length;
+  int before_ok=read_result < DWG_ERR_CRITICAL &&
+                musa_polyline_capture(&original,&before)==0;
+  int after_ok=before_ok && musa_polyline_capture(decoded,&after)==0;
+  int valid=before_ok && after_ok && before.length == after.length;
+  if (!valid)
+    fprintf(stderr, "R2000 polyline audit: read=%d before_ok=%d after_ok=%d before=%zu after=%zu\n",
+            read_result, before_ok, after_ok, before.length, after.length);
   if (valid) {
     qsort(before.lines,before.length,sizeof(*before.lines),musa_polyline_cmp);
     qsort(after.lines,after.length,sizeof(*after.lines),musa_polyline_cmp);
     for (size_t i=0; i<before.length && valid; ++i) {
       const MusaPolyline *a=&before.lines[i], *b=&after.lines[i];
-      if (a->kind!=b->kind || a->length!=b->length) { valid=0; break; }
+      if (a->kind!=b->kind || a->length!=b->length) {
+        fprintf(stderr, "R2000 polyline audit: type or vertex-path length differs (line=%zu expected_kind=%d actual_kind=%d length=%zu/%zu)\n",
+                i, a->kind, b->kind, a->length, b->length);
+        valid=0; break;
+      }
       for (size_t j=0; j<a->length; ++j) {
         if (!musa_coordinates_near(a->values[j],b->values[j])) {
+          /* CI diagnostics identify a field, never disclose drawing coordinates. */
+          fprintf(stderr, "R2000 polyline audit: field mismatch line=%zu kind=%d index=%zu\n",
+                  i, a->kind, j);
           valid=0; break;
         }
       }
