@@ -193,6 +193,27 @@ jobs:
                     "model_entities=", item["model_entity_count"])
           PY
 
+      - name: Reject nonrepresentable DWG geometry without false origin vertices
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/scene_coord_safety_test.c -lm -o /tmp/scene-coord-safety
+          /tmp/scene-coord-safety
+          python3 - <<'PY'
+          from pathlib import Path
+          code = Path("app/src/main/cpp/native_scene.c").read_text()
+          start = code.index("static void emit_poly_point(")
+          end = code.index("static void finish_poly(", start)
+          poly = code[start:end]
+          assert "musa_scene_xy_safe(ax,ay)" in poly
+          assert "s->truncated=1;return;" in poly
+          assert "ax=0;ay=0;" not in poly, "phantom origin geometry is forbidden"
+          assert "if(!s->truncated)s->primitives++;" in code
+          for keyword in ("static int emit_line(", "static int emit_point(", "static int emit_curve("):
+              begin = code.index(keyword)
+              end = code.index("\n}", begin)
+              assert "musa_scene_" in code[begin:end]
+              assert "s->truncated=1" in code[begin:end]
+          PY
+
       - name: Native AC1032 MLEADER HATCH and partial-scene safety
         run: |
           python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
