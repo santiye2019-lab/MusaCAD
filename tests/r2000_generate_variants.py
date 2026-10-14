@@ -34,6 +34,25 @@ def main():
             (10,0),(20,15),(40,1.0),(41,1.25),(42,0),
         ]),
     ])
+    # Split arc bulges from variable widths so a failed field is isolated.
+    make_case(source, target / "bulge-only.dxf", [
+        entity("LWPOLYLINE", "F105", ["AcDbPolyline"], [
+            (90,4), (70,1),
+            (10,0),(20,0),(42,0.5),
+            (10,25),(20,0),(42,0),
+            (10,25),(20,15),(42,-0.25),
+            (10,0),(20,15),(42,0),
+        ]),
+    ])
+    make_case(source, target / "width-only.dxf", [
+        entity("LWPOLYLINE", "F106", ["AcDbPolyline"], [
+            (90,4), (70,1),
+            (10,0),(20,0),(40,1.25),(41,2.5),
+            (10,25),(20,0),(40,2.5),(41,1.75),
+            (10,25),(20,15),(40,1.75),(41,1.0),
+            (10,0),(20,15),(40,1.0),(41,1.25),
+        ]),
+    ])
     # Non-coplanar 3D face; edge visibility is an important geometry attribute.
     make_case(source, target / "face3d.dxf", [
         entity("3DFACE", "F110", ["AcDbFace"], [
@@ -62,7 +81,7 @@ def main():
         ], owner="F120"),
         entity("SEQEND", "F124", [], [], owner="F120"),
     ])
-    for name in ("bulge-width", "face3d", "classic-polyline"):
+    for name in ("bulge-width", "bulge-only", "width-only", "face3d", "classic-polyline"):
         path=target / f"{name}.dxf"
         assert path.stat().st_size > 16
         print("Prepared R2000 acceptance fixture:", name)
