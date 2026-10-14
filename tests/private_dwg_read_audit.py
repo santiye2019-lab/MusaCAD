@@ -76,7 +76,8 @@ def inventory_dxf(path: Path):
         data = {code: val for code, val in fields}
         is_drawable_entity = (
             section in ("ENTITIES", "BLOCKS") and
-            current not in ("BLOCK", "ENDBLK", "ENDTAB", "TABLE")
+            current not in ("SECTION", "ENDSEC", "EOF", "BLOCK",
+                            "ENDBLK", "ENDTAB", "TABLE")
         )
         if is_drawable_entity:
             # DXF 420 overrides ACI 62 when valid. 0=ByBlock, 256/absent
@@ -97,8 +98,10 @@ def inventory_dxf(path: Path):
                 try:
                     color = int(aci)
                 except ValueError:
-                    color = -1
-                if color == 0:
+                    color = None
+                if color is None:
+                    color_sources["invalid_aci"] += 1
+                elif color == 0:
                     color_sources["byblock"] += 1
                 elif color == 256:
                     color_sources["bylayer"] += 1
