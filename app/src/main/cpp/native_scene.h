@@ -12,6 +12,8 @@ typedef struct {
     double min_x,min_y,max_x,max_y;
     int has_bounds;
     int truncated;
+    /* Per-page cap (floats); zero retains the legacy 9 Mi-float budget. */
+    size_t max_words;
 } MusaNativeScene;
 
 /*
@@ -29,6 +31,18 @@ typedef struct {
  * Java keeps backward parsing for v1/v2/v3/v4/v5 scenes.
  */
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene);
+/*
+ * Incremental scene generator for the host acceptance path.
+ * first_index and next_index are *top-level model entity* cursors, not
+ * primitive offsets. Each page is an independent v6 scene. Returns:
+ * 0 = complete, 1 = more pages, -3 = no drawable model,
+ * -4 = single top-level entity (possibly an expanded block) exceeds page.
+ * Never silently returns a partial top-level entity.
+ * Android's existing first-paint path is unaffected until explicitly wired.
+ */
+int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
+                          size_t first_index,size_t *next_index,
+                          size_t max_words);
 void musa_scene_free(MusaNativeScene *scene);
 
 #endif
