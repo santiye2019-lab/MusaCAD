@@ -675,12 +675,37 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                         fit,fit_count,tangent0,tangent1,samples);
                 /* A single explicit tangent needs mixed constraints; no
                  * unsupported guess or silent loss of its direction. */
-                if(!fitted||!begin_poly(s,color,0,
-                       1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN)){
-                    s->truncated=1;
-                    free(fit);free(samples);
-                    break;
+                if(!fitted){
+#ifdef MUSA_HOST
+                    size_t duplicate_adjacent=0,nonfinite_fit=0;
+                    for(size_t i=0;i<fit_count;i++){
+                        if(!isfinite(fit[i].x)||!isfinite(fit[i].y)||
+                           !isfinite(fit[i].z))nonfinite_fit++;
+                        if(i&&fit[i].x==fit[i-1].x&&
+                           fit[i].y==fit[i-1].y&&fit[i].z==fit[i-1].z)
+                           duplicate_adjacent++;
+                    }
+                    fprintf(stderr,"MusaCAD fit spline rejected:"
+                            " stage=build fit=%zu duplicate_adjacent=%zu"
+                            " nonfinite_fit=%zu begin_tangent_finite=%d"
+                            " end_tangent_finite=%d\n",
+                            fit_count,duplicate_adjacent,nonfinite_fit,
+                            isfinite(tangent0.x)&&isfinite(tangent0.y)&&
+                                isfinite(tangent0.z),
+                            isfinite(tangent1.x)&&isfinite(tangent1.y)&&
+                                isfinite(tangent1.z));
+#endif
+                    s->truncated=1;free(fit);free(samples);break;
                 }
+                if(!begin_poly(s,color,0,
+                       1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN))){
+#ifdef MUSA_HOST
+                    fprintf(stderr,"MusaCAD fit spline rejected:"
+                            " stage=scene_budget fit=%zu\n",fit_count);
+#endif
+                    s->truncated=1;free(fit);free(samples);break;
+                }
+                int interpolation_failed=0;
                 for(size_t span=0;span+1<fit_count&&!s->truncated;span++){
                     for(int j=span==0?0:1;
                         j<=MUSA_CAD_FIT_SAMPLES_PER_SPAN&&!s->truncated;
@@ -693,11 +718,19 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                         double x,y;
                         if(!musa_cad_fit_natural_eval(
                                 samples,fit_count,u,&x,&y)){
+                            interpolation_failed=1;
                             s->truncated=1;break;
                         }
                         emit_poly_point(s,parent,x,y);
                     }
                 }
+#ifdef MUSA_HOST
+                if(s->truncated)
+                    fprintf(stderr,"MusaCAD fit spline rejected:"
+                            " stage=%s fit=%zu\n",
+                            interpolation_failed?"evaluation":"scene_coordinate",
+                            fit_count);
+#endif
                 finish_poly(s);
                 free(fit);free(samples);
                 break;
