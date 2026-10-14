@@ -37,7 +37,10 @@ public final class Cad3dFaceLighting {
         double nx=uy*vz-uz*vy;
         double ny=uz*vx-ux*vz;
         double nz=ux*vy-uy*vx;
-        double length=Math.hypot(Math.hypot(nx,ny),nz);
+        // Inputs are finite float32 coordinates: double-normal squared
+        // magnitudes remain well inside double range. One sqrt is cheaper
+        // than two Math.hypot calls for every shaded triangle every frame.
+        double length=Math.sqrt(nx*nx+ny*ny+nz*nz);
         if(!Double.isFinite(length)||length<=0d)
             return -1d;
         double light=Math.abs((0.35d*nx-0.4d*ny+0.8d*nz)/length);
