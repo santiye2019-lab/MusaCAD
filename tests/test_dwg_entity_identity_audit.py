@@ -1,10 +1,14 @@
 """Synthetic tests for local-only original-DWG handle/layer parity audit."""
+import hashlib
+import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from dwg_entity_identity_audit import DwgEntityIdentityAudit
-from private_dwg_read_audit import inventory_dxf
+from private_dwg_read_audit import inventory_dxf, main
 
 
 def record(kind, *pairs):
@@ -94,6 +98,46 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
         self.assertEqual(result["independent_identity_result"],
                          "identity_metadata_mismatch")
         self.assertEqual(result["independent_layer_mismatches"], 1)
+
+    def test_manifest_sha_gate_refuses_unrelated_dwg_reference(self):
+        with tempfile.TemporaryDirectory(prefix="musa-source-manifest-") as root:
+            root = Path(root)
+            source = root / "fixture.dwg"
+            source.write_bytes(b"AC1032 synthetic readonly DWG signature")
+            sha = hashlib.sha256(source.read_bytes()).hexdigest()
+            manifest_dir = root / "refs"
+            manifest_dir.mkdir()
+            converter = root / "mock-converter"
+            converter.write_text("#!/bin/sh\\nexit 0\\n", encoding="ascii")
+            converter.chmod(0o700)
+            report = root / "report.json"
+            path = manifest_dir / (sha + ".json")
+            manifest = {
+                "source_sha256": "0" * 64,
+                "source_kind": "independent_dwg_reader",
+                "records": [
+                    {"handle": "A", "space": "model",
+                     "type": "LINE", "layer": "SECRET LAYER"}]}
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            args = ["private_dwg_read_audit.py", "--converter", str(converter),
+                    "--independent-manifest-dir", str(manifest_dir),
+                    "--report", str(report), str(source)]
+            with patch.object(sys, "argv", args), patch(
+                    "private_dwg_read_audit.convert_one") as convert:
+                self.assertEqual(main(), 1)
+                convert.assert_not_called()
+            result = json.loads(report.read_text(encoding="utf-8"))["files"][0]
+            self.assertEqual(result["status"], "invalid_independent_manifest")
+            self.assertTrue(result["source_unchanged"])
+            self.assertNotIn("SECRET LAYER", report.read_text(encoding="utf-8"))
+
+            manifest["source_sha256"] = sha
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with patch.object(sys, "argv", args), patch(
+                    "private_dwg_read_audit.convert_one",
+                    return_value={"status":"decoded_dxf_inventory"}) as convert:
+                self.assertEqual(main(), 0)
+                self.assertEqual(convert.call_args.args[-1], manifest["records"])
 
     def test_synthetic_dxf_groups_5_8_audited_without_details(self):
         source = (
