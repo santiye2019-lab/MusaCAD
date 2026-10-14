@@ -673,8 +673,11 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                 else if(!begin_unspecified&&!end_unspecified)
                     fitted=musa_cad_fit_clamped_build(
                         fit,fit_count,tangent0,tangent1,samples);
-                /* A single explicit tangent needs mixed constraints; no
-                 * unsupported guess or silent loss of its direction. */
+                else
+                    fitted=musa_cad_fit_mixed_build(
+                        fit,fit_count,tangent0,tangent1,samples);
+                /* One explicit tangent: natural boundary at the other end;
+                 * no fabricated tangent directions or straight segments. */
                 if(!fitted){
 #ifdef MUSA_HOST
                     size_t duplicate_adjacent=0,nonfinite_fit=0;
