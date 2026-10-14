@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "dwg.h"
 #include "dwg_api.h"
 #include "bits.h"
@@ -243,6 +245,26 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
         return 1;
     }
     if(indexed_mode)fprintf(stderr,"Indexed model entities=%zu\n",session->model_count);
+    /*
+     * Optional LOCAL host-only binary capture of concatenated v6 records
+     * (excluding each independent page header). O_EXCL prevents accidental
+     * overwrite of an input DWG or existing file. The caller may compare
+     * SHA-256 of safe indexed vs new-context output, even when the old
+     * single-scene baseline itself was truncated by the 9M-float budget.
+     */
+    const char *stream_path=getenv("MUSACAD_HOST_SCENE_STREAM_PATH");
+    FILE *stream_file=NULL;
+    if(stream_path&&*stream_path){
+        int fd=open(stream_path,O_WRONLY|O_CREAT|O_EXCL,0600);
+        if(fd<0){
+            fprintf(stderr,"Host scene stream destination unavailable\n");
+            session_close(session);return 2;
+        }
+        stream_file=fdopen(fd,"wb");
+        if(!stream_file){
+            close(fd);unlink(stream_path);session_close(session);return 2;
+        }
+    }
     MusaNativeScene baseline={0};
     int baseline_status=musa_scene_build(session->dwg,&baseline);
     int baseline_count=baseline.primitives;
@@ -292,6 +314,13 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
             }
             if(!failure)stream_at+=words;
         }
+        if(!failure&&stream_file){
+            const size_t words=page.count>=7?page.count-7:0;
+            if(fwrite(page.values+7,sizeof(float),words,stream_file)!=words){
+                fprintf(stderr,"Host scene stream write failed\n");
+                failure=1;
+            }
+        }
         fprintf(stderr,"Nested scene page=%zu top=%zu leaf=%zu next=%zu:%zu primitives=%d words=%zu more=%d\n",
                 pages,top,leaf,next_top,next_leaf,page.primitives,page.count,status==1);
         musa_scene_free(&page);
@@ -308,6 +337,8 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
                         pages,total,baseline_count,baseline_status);
     else fprintf(stderr,"Nested paged scene failed: finished=%d pages=%zu total=%zu legacy=%d status=%d\n",
                  finished,pages,total,baseline_count,baseline_status);
+    if(stream_file&&fclose(stream_file)!=0)failure=1;
+    if(failure&&stream_path&&*stream_path)unlink(stream_path);
     musa_scene_free(&baseline);
     session_close(session);
     return failure?1:0;
