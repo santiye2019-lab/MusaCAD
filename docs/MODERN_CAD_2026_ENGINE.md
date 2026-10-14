@@ -376,3 +376,21 @@ not proof that all R2000/R2004 language-specific codepages are supported.
 Synthetic acceptance reproduces a legacy cp1252 non-ASCII layer name and
 ensures modern files reject the exact same bytes. The public TS1 fixture
 must pass the DWG CI proof again before this patch is accepted.
+
+## Native first-paint ByLayer/ByBlock color resolution regression
+
+Native C color inheritance now has one shared, tested primitive resolver in
+`native_color.h`, used directly by `native_scene.c`. Explicit ACI, RGB
+(including true black), ByLayer and ByBlock now follow the same resolution
+contract in both layer metadata and entity emission. Named layers retain their
+own colors; nested block layer 0 inherits the parent INSERT layer, and
+ByBlock entities inherit the parent's color (including TrueColor). Each path
+is exercised by the native C CI test. Negative ACI index parsing also avoids
+signed integer overflow for malicious edge values.
+
+This is a refactor and regression-hardening of the **actual experimental
+native first-paint renderer**, not a claim that the APK now has perfect
+first-frame color. The live viewport has no new dispatch or wiring and
+no physical-device screenshot/color comparison has passed. Main, production
+APK and Cloudflare remain unchanged. Overall CAD 2026 estimate stays 35%;
+final field acceptance stays 0/18.

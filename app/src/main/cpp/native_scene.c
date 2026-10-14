@@ -28,7 +28,7 @@
 #define MUSA_MAX_BLOCK_DEPTH 24
 
 typedef struct { double a,b,c,d,tx,ty; } Affine2;
-typedef struct { int aci; unsigned int rgb; int truecolor; } SceneColor;
+typedef MusaNativeSceneColor SceneColor;
 
 static Affine2 identity2(void){Affine2 m={1,0,0,1,0,0};return m;}
 static Affine2 multiply2(Affine2 p,Affine2 q){
@@ -85,9 +85,6 @@ static int layer_invisible(Dwg_Object *obj){
 static SceneColor scene_aci(int aci){
     SceneColor out;out.aci=(aci>=1&&aci<=255)?aci:7;out.rgb=0;out.truecolor=0;return out;
 }
-static SceneColor scene_true(unsigned int rgb){
-    SceneColor out;out.aci=7;out.rgb=rgb&0x00ffffffu;out.truecolor=1;return out;
-}
 static Dwg_Object_LAYER *entity_layer(Dwg_Object *obj){
     if(!obj||!obj->tio.entity)return NULL;
     Dwg_Object_Ref *lr=obj->tio.entity->layer;
@@ -97,24 +94,20 @@ static Dwg_Object_LAYER *entity_layer(Dwg_Object *obj){
 static SceneColor color_value(Dwg_Color *value,SceneColor fallback){
     if(!value)return fallback;
     MusaNativeColorToken token=musa_native_color_token((unsigned int)value->method,(int)value->index,(unsigned int)value->rgb);
-    if(token.kind==MUSA_COLOR_RGB)return scene_true(token.rgb);
-    if(token.kind==MUSA_COLOR_ACI)return scene_aci(token.aci);
-    return fallback;
+    return musa_native_color_resolve(token,fallback,fallback);
 }
 static int layer_is_zero(Dwg_Object_LAYER *layer){return layer&&layer->name&&strcmp(layer->name,"0")==0;}
 static SceneColor effective_layer_color(Dwg_Object *obj,SceneColor inheritedLayer,int insideBlock){
     Dwg_Object_LAYER *layer=entity_layer(obj);
-    if(insideBlock&&layer_is_zero(layer))return inheritedLayer;
-    return layer?color_value(&layer->color,scene_aci(7)):inheritedLayer;
+    SceneColor definedLayer=layer?color_value(&layer->color,scene_aci(7)):inheritedLayer;
+    return musa_native_effective_layer_color(
+        insideBlock,layer_is_zero(layer),definedLayer,inheritedLayer);
 }
 static SceneColor entity_color(Dwg_Object *obj,SceneColor byBlock,SceneColor layerColor){
     if(!obj||!obj->tio.entity)return layerColor;
     Dwg_Color *entity=&obj->tio.entity->color;
     MusaNativeColorToken token=musa_native_color_token((unsigned int)entity->method,(int)entity->index,(unsigned int)entity->rgb);
-    if(token.kind==MUSA_COLOR_RGB)return scene_true(token.rgb);
-    if(token.kind==MUSA_COLOR_ACI)return scene_aci(token.aci);
-    if(token.kind==MUSA_COLOR_INHERIT_BLOCK)return byBlock;
-    return layerColor;
+    return musa_native_color_resolve(token,layerColor,byBlock);
 }
 static int emit_line(MusaNativeScene *s,SceneColor color,Affine2 m,double x1,double y1,double x2,double y2){
     double ax,ay,bx,by;map2(m,x1,y1,&ax,&ay);map2(m,x2,y2,&bx,&by);
