@@ -449,6 +449,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
           java -cp /tmp/musacad-tests RenderPathPolicyTest
+      - name: Test incomplete native DWG warning and modern payload guards
+        run: |
+          python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
+
       - name: Test modern DWG scene record overflow and partial-data guard
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeSceneRecordBounds.java tests/NativeSceneRecordBoundsTest.java
