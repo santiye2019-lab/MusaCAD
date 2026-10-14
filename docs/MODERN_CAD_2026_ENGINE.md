@@ -494,3 +494,17 @@ branch; run GitHub CI throughout without manufacturing hundreds of APKs;
 resolve every failed test/module; then perform one consolidated full test
 campaign, merge to main only after successful acceptance, and manually
 build/test a final APK. No automatic merge, release, or Cloudflare deployment.
+
+## Test-APK versus production acceptance ordering correction
+
+The APK candidate gate is **not** conditional on physical tests of the APK
+that has not yet been built. `python3 tests/cad_progress_gate.py --candidate`
+requires 100% code milestones, every module verified, CI green, zero
+failed/skipped checks, independent DWG parity, and user's explicit build
+approval. The `android.yml` manual test-APK step uses this gate. This
+permits **one consolidated candidate APK after coding and host tests**, rather
+than one APK per code change. **Only after installation on a real phone** can
+the separate `--release` mode require 18/18 device acceptance. If a final
+device defect is found, it is fixed before production release; no pretense of
+zero defects. The existing manually approved APK stays blocked while the
+inventory is incomplete; no APK, main merge or service deployment was done.

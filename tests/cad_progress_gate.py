@@ -14,7 +14,9 @@ MANIFEST = ROOT / "docs" / "CAD_2026_PROGRESS.json"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 
 
-def assess(data, *, release=False, root=ROOT):
+def assess(data, *, release=False, candidate=False, root=ROOT):
+    if candidate and release:
+        raise ValueError("use candidate OR final release mode, not both")
     if not isinstance(data, dict) or data.get("schema_version") != 1:
         raise ValueError("missing or unknown progress schema")
     base = data.get("baseline_points")
@@ -74,7 +76,7 @@ def assess(data, *, release=False, root=ROOT):
             raise ValueError("invalid acceptance counter: " + key)
     if acceptance["final_device_tests_passed"] > acceptance["final_device_tests_total"]:
         raise ValueError("more passes than planned tests")
-    if release:
+    if candidate or release:
         errors = []
         if remaining:
             errors.append("remaining unimplemented milestone points")
@@ -82,7 +84,7 @@ def assess(data, *, release=False, root=ROOT):
             errors.append("required modules are not all verified")
         if acceptance.get("full_ci") != "passed":
             errors.append("full CI is not verified green")
-        if acceptance["final_device_tests_total"] < 18 or (
+        if release and (acceptance["final_device_tests_total"] < 18 or
                 acceptance["final_device_tests_passed"] != acceptance["final_device_tests_total"]):
             errors.append("final device acceptance not complete")
         if acceptance["failed_checks"] or acceptance["skipped_checks"]:
@@ -92,7 +94,8 @@ def assess(data, *, release=False, root=ROOT):
         if acceptance.get("release_approved") is not True:
             errors.append("release not explicitly approved")
         if errors:
-            raise ValueError("release blocked: " + "; ".join(errors))
+            raise ValueError(("release blocked: " if release else
+                              "test APK blocked: ") + "; ".join(errors))
     return {"implementation_points": base + credited, "remaining_points": remaining,
             "required_modules": len(modules), "verified_modules":
                 sum(m["status"] == "verified" for m in modules),
@@ -102,16 +105,18 @@ def assess(data, *, release=False, root=ROOT):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--candidate", action="store_true",
+                        help="Require every code module and CI to pass before a consolidated test APK")
     parser.add_argument("--release", action="store_true",
-                        help="Require complete implementation and all final acceptance")
+                        help="Additionally require 18/18 physical device acceptance for production")
     args = parser.parse_args()
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    result = assess(data, release=args.release)
+    result = assess(data, release=args.release, candidate=args.candidate)
     print("MusaCAD development estimate: {implementation_points}% | "
           "remaining {remaining_points}% | verified modules "
           "{verified_modules}/{required_modules} | final device checks "
           "{field_tests_passed}/{field_tests_total}".format(**result))
-    if not args.release:
+    if not args.release and not args.candidate:
         print("Development inventory is valid; incomplete modules are NOT release-approved.")
 
 

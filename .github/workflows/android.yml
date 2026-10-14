@@ -1095,9 +1095,9 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/ApkReleaseApprovalContractTest.java
           java -cp /tmp/musacad-tests ApkReleaseApprovalContractTest
-      - name: Block final APK until all CAD modules and device acceptance pass
+      - name: Block test APK until all CAD code modules and CI pass
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
-        run: python3 tests/cad_progress_gate.py --release
+        run: python3 tests/cad_progress_gate.py --candidate
       - name: Build approved installable MusaCAD APK
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         env:

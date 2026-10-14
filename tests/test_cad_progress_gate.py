@@ -18,9 +18,17 @@ class CadProgressGateTest(unittest.TestCase):
         self.assertEqual(result["verified_modules"], 0)
         self.assertEqual(result["field_tests_passed"], 0)
 
-    def test_final_apk_refused_while_any_module_is_unverified(self):
+    def test_test_apk_refused_until_all_modules_and_ci_pass(self):
+        with self.assertRaisesRegex(ValueError, "test APK blocked"):
+            assess(self.data, candidate=True)
+
+    def test_production_refused_until_device_acceptance_passes(self):
         with self.assertRaisesRegex(ValueError, "release blocked"):
             assess(self.data, release=True)
+
+    def test_candidate_and_final_modes_are_mutually_exclusive(self):
+        with self.assertRaises(ValueError):
+            assess(self.data, release=True, candidate=True)
 
     def test_failed_module_or_spurious_points_refuse_even_development_check(self):
         bad = copy.deepcopy(self.data)
