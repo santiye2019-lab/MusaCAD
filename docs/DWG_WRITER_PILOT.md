@@ -34,12 +34,22 @@ Safety invariants:
   limit, not an intended production project size.
 - Publish is exclusive; on failure the unpublished temporary file is removed.
 
-Counts and partial coordinate checks are still only a pilot: LWPOLYLINE and
-POLYLINE_2D vertex data are **not yet** coordinate-verified, nor are colors,
-layer styles, block transforms, ownership, annotation or metadata. A CI test
-now creates a six-primitive DXF fixture (three LINE, one CIRCLE, one ARC,
-one POINT) and verifies that the DWG can be read back with matching counts
-and audited primitive coordinates. CI passing would not imply full parity. Hence
+Counts and bounded coordinate checks remain an experimental pilot. The
+host-only auditor now compares LINE, CIRCLE, ARC, POINT, 3DFACE and classic
+VERTEX_2D geometry/widths/bulges, plus ordered LWPOLYLINE and POLYLINE_2D
+vertices. LWPOLYLINE arc bulges, per-vertex widths and closure are compared;
+classic POLYLINE_2D also checks ordered vertices and header parameters.
+This is strict: a decoder that cannot reconstruct vertices causes **rejection**.
+
+CI generates a multi-object DXF fixture (three LINE, CIRCLE, ARC, POINT and a
+closed four-vertex LWPOLYLINE) and attempts an R2000 read-after-write audit.
+Check the GitHub CI outcome; code being present does **not** mean passing.
+
+Still NOT checked: colors, layer names and styles, block transforms, entity
+ownership, paperspace/layouts, annotation, metadata, full classic polyline
+topology and ACIS solids. Coordinate comparator tolerances do not prove
+semantic equivalence. Real DWG cross-checks in independent CAD tools and
+physical Android device tests remain release blockers. Hence
 **never treat this proof as a production file-conversion guarantee**.
 
 Before an Android-facing DWG Save As feature can be enabled, add robust
