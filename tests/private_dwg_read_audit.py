@@ -216,9 +216,9 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
     # The raw stderr stays local; coordinates/handles/text are never emitted.
     spline_diagnostics = []
     spline_pattern = re.compile(
-        r"MusaCAD spline rejected: scenario=(-?\\d+) degree=(-?\\d+) "
-        r"control=(\\d+) knots=(\\d+) fit=(\\d+) "
-        r"weighted=(\\d+) rational=(\\d+) "
+        r"MusaCAD spline rejected: scenario=(-?\d+) degree=(-?\d+) "
+        r"control=(\d+) knots=(\d+) fit=(\d+) "
+        r"weighted=(\d+) rational=(\d+) "
         r"reason=(missing_knots_or_fit_only|bad_weights_knots_or_budget)"
     )
     for match in spline_pattern.finditer(diagnostics):
