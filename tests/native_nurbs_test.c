@@ -72,6 +72,18 @@ int main(void){
     assert(musa_nurbs_eval(b,4,k,2,1,&x,&y));
     close_to(x,4,1e-12);close_to(y,0,1e-12);
 
+    /* An interior knot repeated degree+1 times splits the NURBS into
+     * disconnected segments. A single drawn polyline would invent an
+     * artificial bridge; refuse instead of displaying false CAD geometry.
+     * Repeated interior knots up to degree are still valid. */
+    MusaNurbsControl discontinuous_ctrl[]={
+        {0,0,1},{1,1,1},{2,0,1},{100,0,1},{101,1,1},{102,0,1}
+    };
+    double discontinuous_knots[]={0,0,0,.5,.5,.5,1,1,1};
+    assert(!musa_nurbs_valid(discontinuous_ctrl,6,discontinuous_knots,9,2));
+    double joined_knots[]={0,0,0,.5,.5,.8,1,1,1};
+    assert(musa_nurbs_valid(discontinuous_ctrl,6,joined_knots,9,2));
+
     double backwards[]={0,0,0,1,.5,1,1,1};
     assert(!musa_nurbs_valid(cubic,4,backwards,8,3));
     double nan_knots[]={0,0,0,NAN,1,1};
