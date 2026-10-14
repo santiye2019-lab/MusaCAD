@@ -108,13 +108,34 @@ static int pilot_write(const char *input, const char *output) {
   if (fp) fclose(fp);
   Dwg_Data decoded = {0};
   int verify_status = valid_magic ? dwg_read_file(stage, &decoded) : DWG_ERR_CRITICAL;
-  GeometrySignature actual;
-  int valid = valid_magic && verify_status < DWG_ERR_CRITICAL &&
-              geometry_signature(&decoded, &actual) == 0 &&
-              equal_geometry(&expected, &actual);
-  /* Fail closed if decoded primitive coordinates differ from the DXF. */
-  if (valid) valid = musa_verify_primitive_coordinates(input, &decoded);
-  if (valid) valid = musa_verify_polylines(input, &decoded);
+  GeometrySignature actual = {0};
+  int decoded_counts_ok = valid_magic && verify_status < DWG_ERR_CRITICAL &&
+                          geometry_signature(&decoded, &actual) == 0;
+  int counts_match = decoded_counts_ok && equal_geometry(&expected, &actual);
+  if (!counts_match) {
+    static const char *types[GEOM_KINDS] = {
+      "LINE", "CIRCLE", "ARC", "LWPOLYLINE", "POLYLINE_2D",
+      "POINT", "3DFACE", "VERTEX_2D"
+    };
+    fprintf(stderr,
+            "R2000 audit: header=%d decode=%d counts_valid=%d expected_total=%llu actual_total=%llu\n",
+            valid_magic, verify_status, decoded_counts_ok,
+            expected.total, actual.total);
+    for (int k = 0; k < GEOM_KINDS; ++k)
+      if (expected.counts[k] != actual.counts[k])
+        fprintf(stderr, "R2000 audit count mismatch: %s expected=%llu actual=%llu\n",
+                types[k], expected.counts[k], actual.counts[k]);
+  }
+  /* Never publish a file when any required fidelity stage is unverified. */
+  int valid = counts_match;
+  if (valid && !musa_verify_primitive_coordinates(input, &decoded)) {
+    fprintf(stderr, "R2000 audit: primitive coordinate mismatch\n");
+    valid = 0;
+  }
+  if (valid && !musa_verify_polylines(input, &decoded)) {
+    fprintf(stderr, "R2000 audit: polyline path/attribute mismatch\n");
+    valid = 0;
+  }
   if (valid) valid = stat(input, &source_after) == 0 &&
                       source_before.st_size == source_after.st_size &&
                       source_before.st_mtime == source_after.st_mtime;
