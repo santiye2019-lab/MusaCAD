@@ -698,7 +698,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                     s->truncated=1;free(fit);free(samples);break;
                 }
                 if(!begin_poly(s,color,0,
-                       1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN))){
+                       1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN)){
 #ifdef MUSA_HOST
                     fprintf(stderr,"MusaCAD fit spline rejected:"
                             " stage=scene_budget fit=%zu\n",fit_count);
