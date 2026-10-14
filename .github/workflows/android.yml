@@ -456,7 +456,11 @@ jobs:
           # Android-scene compositor is opt-in only; guard against accidental
           # replacement of authoritative vector rendering in CadView.
           grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/NativePagedScenePreview.java
-          ! grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/CadView.java
+          # CadView now has explicit opt-in integration. It MUST stay disabled
+          # from MainActivity's normal open path until real-device acceptance.
+          grep -q 'attachExperimentalPagedPreview' app/src/main/java/com/musa/cad/CadView.java
+          ! grep -q 'attachExperimentalPagedPreview(' app/src/main/java/com/musa/cad/MainActivity.java
+          ! grep -q 'new NativePagedPreviewLoader(' app/src/main/java/com/musa/cad/MainActivity.java
       - name: Test guarded async native preview integration contract
         run: |
           javac -d /tmp/musacad-tests tests/CadPagedPreviewIntegrationContractTest.java
