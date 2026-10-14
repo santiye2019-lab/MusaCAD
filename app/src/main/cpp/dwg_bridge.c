@@ -159,7 +159,7 @@ static int host_nested_page_probe(const char *input,const char *budget){
     MusaNativeScene baseline={0};
     int baseline_status=musa_scene_build(session->dwg,&baseline);
     int baseline_count=baseline.primitives;
-    size_t top=0,leaf=0,total=0,pages=0;
+    size_t top=0,leaf=0,total=0,pages=0,stream_at=0;
     int failure=0,finished=0;
     while(pages<100000){
         MusaNativeScene page={0};
@@ -177,14 +177,30 @@ static int host_nested_page_probe(const char *input,const char *budget){
             break;
         }
         total+=(size_t)page.primitives;
+        /* Bit-for-bit comparison of geometry, color metadata and record order
+         * on an untruncated baseline. Header bounds/counters are per-page. */
+        if(baseline_status==0){
+            const size_t words=page.count>=7?page.count-7:0;
+            const size_t reference=baseline.count>=7?baseline.count-7:0;
+            if(stream_at>reference||words>reference-stream_at||
+               memcmp(baseline.values+7+stream_at,page.values+7,
+                      words*sizeof(float))!=0){
+                fprintf(stderr,"Nested stream fidelity mismatch page=%zu at=%zu words=%zu\n",
+                        pages,stream_at,words);
+                failure=1;
+            }
+            if(!failure)stream_at+=words;
+        }
         fprintf(stderr,"Nested scene page=%zu top=%zu leaf=%zu next=%zu:%zu primitives=%d words=%zu more=%d\n",
                 pages,top,leaf,next_top,next_leaf,page.primitives,page.count,status==1);
         musa_scene_free(&page);
+        if(failure)break;
         top=next_top;leaf=next_leaf;++pages;
         if(status==0){finished=1;break;}
     }
     if(!finished||baseline_status<0||
-       (baseline_status==0 && total!=(size_t)baseline_count)||
+       (baseline_status==0 && (total!=(size_t)baseline_count||
+          stream_at!=(baseline.count>=7?baseline.count-7:0)))||
        (baseline_status==1 && total<(size_t)baseline_count))failure=1;
     if(!failure)fprintf(stderr,"Nested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
                         pages,total,baseline_count,baseline_status);
