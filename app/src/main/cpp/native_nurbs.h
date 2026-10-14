@@ -33,7 +33,17 @@ static int musa_nurbs_valid(const MusaNurbsControl *ctrl,size_t n,
     }
     for(size_t i=0;i<nk;i++)
         if(!isfinite(knots[i])||(i&&knots[i]<knots[i-1]))return 0;
-    return knots[degree]<knots[n];
+    if(!(knots[degree]<knots[n]))return 0;
+    /* Interior multiplicity > degree can introduce discontinuous curve
+     * components. One connected polyline would invent a straight segment
+     * joining those components. Until a multi-contour scene primitive is
+     * available, reject such curves instead of drawing false geometry. */
+    size_t run=1;
+    for(size_t i=(size_t)degree+1u;i<n;i++){
+        run=knots[i]==knots[i-1]?run+1u:1u;
+        if(run>(size_t)degree)return 0;
+    }
+    return 1;
 }
 
 /* Call after musa_nurbs_valid(); only allocated stack buffers (17 points).
