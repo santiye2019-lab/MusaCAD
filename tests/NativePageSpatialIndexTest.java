@@ -59,6 +59,20 @@ public final class NativePageSpatialIndexTest {
         for(NativePageCatalog.Entry e:nearest)
             need(e.intersects(198,28,215,35),"catalog never returns a wrong page");
 
+        // Signed zero is numerically the same viewport coordinate. An index
+        // using Float.compare as a binary-search cutoff can incorrectly drop
+        // a page whose maxX is -0 and viewport minX is +0.
+        NativePageCatalog signedZero=new NativePageCatalog(2);
+        signedZero.append(c(0),c(1),true,-0.0f,-0.0f,-0.0f,-0.0f,1);
+        signedZero.append(c(1),c(2),false,0.0f,0.0f,0.0f,0.0f,1);
+        List<NativePageCatalog.Entry> zeroEntries=new ArrayList<>();
+        zeroEntries.add(signedZero.get(c(0)));
+        zeroEntries.add(signedZero.get(c(1)));
+        NativePageSpatialIndex zeroIndex=new NativePageSpatialIndex(zeroEntries);
+        check(zeroIndex,zeroEntries,0f,0f,0f,0f);
+        need(zeroIndex.candidates(0f,0f,0f,0f).size()==2,
+                "signed-zero touching geometry cannot disappear");
+
         // A partially discovered index must still answer correctly.
         NativePageCatalog partial=new NativePageCatalog(250);
         for(int i=0;i<249;i++)
