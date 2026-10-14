@@ -145,7 +145,59 @@ static int host_paged_probe(const char *input,const char *budget){
     return error?1:0;
 }
 
+/*
+ * Opt-in CI/private acceptance for nested INSERT continuation. The legacy
+ * capped scene provides a lower-bound count when it was itself truncated.
+ */
+static int host_nested_page_probe(const char *input,const char *budget){
+    char *end=NULL;
+    unsigned long long n=strtoull(budget,&end,10);
+    if(!budget[0]||!end||*end||n<256||n>(9u*1024u*1024u))return 2;
+    int read_error=0;
+    MusaCadSession *session=session_open(input,&read_error);
+    if(!session){fprintf(stderr,"Nested probe open failed: %d\n",read_error);return 1;}
+    MusaNativeScene baseline={0};
+    int baseline_status=musa_scene_build(session->dwg,&baseline);
+    int baseline_count=baseline.primitives;
+    size_t top=0,leaf=0,total=0,pages=0;
+    int failure=0,finished=0;
+    while(pages<100000){
+        MusaNativeScene page={0};
+        size_t next_top=top,next_leaf=leaf;
+        int status=musa_scene_build_page_nested(session->dwg,&page,top,leaf,
+                         &next_top,&next_leaf,(size_t)n);
+        if(status<0||page.truncated||page.count>(size_t)n||
+           (status==1 && (next_top<top||
+             (next_top==top&&next_leaf<=leaf))) ||
+           (status==0&&next_top<top)){
+            fprintf(stderr,"Nested scene rejected page=%zu top=%zu leaf=%zu status=%d next=%zu:%zu words=%zu\n",
+                    pages,top,leaf,status,next_top,next_leaf,page.count);
+            failure=1;
+            musa_scene_free(&page);
+            break;
+        }
+        total+=(size_t)page.primitives;
+        fprintf(stderr,"Nested scene page=%zu top=%zu leaf=%zu next=%zu:%zu primitives=%d words=%zu more=%d\n",
+                pages,top,leaf,next_top,next_leaf,page.primitives,page.count,status==1);
+        musa_scene_free(&page);
+        top=next_top;leaf=next_leaf;++pages;
+        if(status==0){finished=1;break;}
+    }
+    if(!finished||baseline_status<0||
+       (baseline_status==0 && total!=(size_t)baseline_count)||
+       (baseline_status==1 && total<(size_t)baseline_count))failure=1;
+    if(!failure)fprintf(stderr,"Nested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
+                        pages,total,baseline_count,baseline_status);
+    else fprintf(stderr,"Nested paged scene failed: finished=%d pages=%zu total=%zu legacy=%d status=%d\n",
+                 finished,pages,total,baseline_count,baseline_status);
+    musa_scene_free(&baseline);
+    session_close(session);
+    return failure?1:0;
+}
+
 int main(int argc,char **argv){
+    if(argc==4&&strcmp(argv[1],"--nested-paged-probe")==0)
+        return host_nested_page_probe(argv[2],argv[3]);
     if(argc==4&&strcmp(argv[1],"--paged-probe")==0)
         return host_paged_probe(argv[2],argv[3]);
     if(argc!=3)return 2;
