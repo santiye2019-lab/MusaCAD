@@ -437,6 +437,7 @@ jobs:
       - name: Test conservative native DWG entity type audit
         run: |
           python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
       - name: Guard native 3D polyline first paint
         run: |
           grep -q 'DWG_TYPE_POLYLINE_3D' app/src/main/cpp/native_scene.c
