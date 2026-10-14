@@ -32,6 +32,36 @@ public final class NativePageCatalog {
         }
     }
 
+    /* While a large DWG is still decoding, the sorted viewportIndex cannot
+     * be finalized. Scanning all discovered pages at every pinch frame can
+     * cause UI stalls. Instead group 128 sequential pages under conservative
+     * occupied-world bounding boxes, maintained once on the decoder thread.
+     * Skipping a non-intersecting group can NEVER skip visible geometry.
+     * This is metadata only; no payloads or DWG bytes are duplicated. */
+    private static final int PARTIAL_GROUP_SIZE=128;
+    private static final class PartialGroup {
+        final int from;
+        int to;
+        float minX,minY,maxX,maxY;
+        PartialGroup(int from,Entry first){
+            this.from=from;
+            this.to=from+1;
+            minX=first.minX;minY=first.minY;
+            maxX=first.maxX;maxY=first.maxY;
+        }
+        void include(Entry entry){
+            to++;
+            minX=Math.min(minX,entry.minX);
+            minY=Math.min(minY,entry.minY);
+            maxX=Math.max(maxX,entry.maxX);
+            maxY=Math.max(maxY,entry.maxY);
+        }
+        boolean intersects(float x0,float y0,float x1,float y1){
+            return maxX>=x0&&maxY>=y0&&minX<=x1&&minY<=y1;
+        }
+    }
+    private final ArrayList<PartialGroup> partialGroups=new ArrayList<>();
+
     private final int maxEntries;
     private final ArrayList<Entry> ordered=new ArrayList<>();
     private final HashMap<NativeViewportPageCache.Cursor,Entry> byStart=new HashMap<>();
@@ -76,6 +106,11 @@ public final class NativePageCatalog {
         requireAppend(start,next,more,minX,minY,maxX,maxY,primitives);
         Entry e=new Entry(start,next,more,minX,minY,maxX,maxY,primitives);
         ordered.add(e);byStart.put(start,e);
+        int pageIndex=ordered.size()-1;
+        if(pageIndex%PARTIAL_GROUP_SIZE==0)
+            partialGroups.add(new PartialGroup(pageIndex,e));
+        else
+            partialGroups.get(partialGroups.size()-1).include(e);
         expected=next;
         if(!more){
             discoveredAll=true;
@@ -130,14 +165,20 @@ public final class NativePageCatalog {
                 }
             }
         }else{
-            // In-progress catalogs are small/append-only and can still be
-            // queried; never block the UI to rebuild a growing index.
-            for(Entry e:ordered){
-                if(!e.intersects(minX,minY,maxX,maxY)||cache.contains(e.start))
-                    continue;
-                if(closest.size()<maxResults)closest.add(e);
-                else if(nearestFirst.compare(e,closest.peek())<0){
-                    closest.remove();closest.add(e);
+            // The catalog may contain tens of thousands of discovered pages
+            // before reaching EOF. Conservative incremental group envelopes
+            // skip whole offscreen ranges without rebuilding a sorted index
+            // during every Android pinch/zoom. Exact page checks are retained.
+            for(PartialGroup group:partialGroups){
+                if(!group.intersects(minX,minY,maxX,maxY))continue;
+                for(int i=group.from;i<group.to;i++){
+                    Entry page=ordered.get(i);
+                    if(!page.intersects(minX,minY,maxX,maxY)||
+                       cache.contains(page.start))continue;
+                    if(closest.size()<maxResults)closest.add(page);
+                    else if(nearestFirst.compare(page,closest.peek())<0){
+                        closest.remove();closest.add(page);
+                    }
                 }
             }
         }
@@ -162,7 +203,7 @@ public final class NativePageCatalog {
     }
 
     public synchronized void clear(){
-        ordered.clear();byStart.clear();
+        ordered.clear();byStart.clear();partialGroups.clear();
         viewportIndex=null;
         expected=new NativeViewportPageCache.Cursor(0,0);
         discoveredAll=false;
