@@ -158,7 +158,8 @@ public final class Mesh3dActivity extends Activity {
                 .append(openingTopology.boundaryEdges).append(" açık kenar, ")
                 .append(openingTopology.orientationConflicts).append(" ters yönlü kenar, ")
                 .append(openingTopology.nonManifoldEdges).append(" çoklu bağlantı, ")
-                .append(openingTopology.degenerateTriangles).append(" dejenere üçgen. ")
+                .append(openingTopology.degenerateTriangles).append(" dejenere üçgen, ")
+                .append(openingTopology.duplicateFaces).append(" yinelenen yüz. ")
                 .append("Kapalı katı olarak kabul edilmez.");
         }
         if(mesh.flatPlan){
