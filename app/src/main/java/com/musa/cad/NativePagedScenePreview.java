@@ -44,17 +44,21 @@ public final class NativePagedScenePreview {
                 throw new IllegalArgumentException("first page must start at 0:0");
         }
         RectF bbox=page.scene.occupiedWorldBounds();
-        boolean stored=cache.put(new NativeViewportPageCache.Cursor(startTop,startLeaf),
+        NativeViewportPageCache.Cursor start=
+                new NativeViewportPageCache.Cursor(startTop,startLeaf);
+        NativeViewportPageCache.Cursor next=
                 new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
-                                                  page.nextNestedLeafIndex),
-                page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
+                                                  page.nextNestedLeafIndex);
+        // Validate cursor/bounds/cap BEFORE cache.put can evict an older page.
+        // A malformed continuation must leave all previous pages untouched.
+        catalog.requireAppend(start,next,page.hasMore,bbox.left,bbox.top,
+                              bbox.right,bbox.bottom,page.scene.primitiveCount);
+        boolean stored=cache.put(start,next,page.hasMore,
+                bbox.left,bbox.top,bbox.right,bbox.bottom,
                 page.scene.estimatedRetainedBytes(),page.scene);
         if(stored){
-            catalog.append(new NativeViewportPageCache.Cursor(startTop,startLeaf),
-                    new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
-                            page.nextNestedLeafIndex),
-                    page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
-                    page.scene.primitiveCount);
+            catalog.append(start,next,page.hasMore,bbox.left,bbox.top,
+                           bbox.right,bbox.bottom,page.scene.primitiveCount);
         }
         if(stored&&!sourceStarted){
             worldToContent=page.scene.worldToContentTransform();
