@@ -394,3 +394,25 @@ first-frame color. The live viewport has no new dispatch or wiring and
 no physical-device screenshot/color comparison has passed. Main, production
 APK and Cloudflare remain unchanged. Overall CAD 2026 estimate stays 35%;
 final field acceptance stays 0/18.
+
+## Render-path allocation fix — NativeScene ARC/TEXT affine scratch
+
+A real hot path in `NativeScene.drawPrimitive` used to allocate a new
+9-float array for **every** ARC and TEXT primitive during every Canvas draw
+of a native DWG scene. This is GC pressure during pinch/pan, especially on
+large engineering drawings with many annotations and curves.
+
+Both shapes now fill a fixed affine scratch array before `Matrix.setValues`.
+The UI render owns one reusable array, and thumbnail generation allocates one
+separate array per thumbnail invocation to avoid concurrent scratch reuse.
+The numeric matrix field order, linework/color decode and visible-primitive
+iteration are unchanged. The already-running
+`MusaCadVisualPerformanceContractTest` now enforces these source invariants,
+including that no per-primitive affine allocation is reintroduced.
+
+This reduces per-primitive allocation churn; it **does not** by itself
+establish higher FPS, real first-frame color parity or an Android memory
+ceiling. Such claims await p50/p95 frame-time and screenshot tests on actual
+devices and large private DWG drawings. Main, production APK, Cloudflare and
+default feature switches are untouched.
+General CAD 2026 target estimate remains 35%, with 65% remaining.

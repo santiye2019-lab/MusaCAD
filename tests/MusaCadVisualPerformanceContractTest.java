@@ -47,6 +47,14 @@ public final class MusaCadVisualPerformanceContractTest {
         has(main,"synthesis.includeTakeoff","metraj only on explicit request");
         has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)",
             "local 2025 poz dictionary source");
+        String nativeScene=source("app/src/main/java/com/musa/cad/NativeScene.java");
+        has(nativeScene,"private final float[] drawAffine=new float[9]","one affine scratch per UI frame");
+        has(nativeScene,"float[]line=new float[4],point=new float[2],affine=new float[9]","thumbnail thread has separate affine scratch");
+        has(nativeScene,"setDrawAffine(local,affine,ux,vx,cx,uy,vy,cy)","arc world transform reuses scratch");
+        has(nativeScene,"setDrawAffine(local,affine,ux,vx,x,uy,vy,y)","text transform reuses scratch");
+        if(nativeScene.contains("local.setValues(new float[]{"))
+            throw new AssertionError("per ARC/TEXT matrix array allocation reintroduced");
+        has(nativeScene,"drawPrimitive(index,c,p,m,line,point,path,local,target,affine)","scratch propagated through spatial grid");
         has(server,"write a REAL inspection record in Turkish","visual evidence requirement");
         System.out.println("MusaCadVisualPerformanceContractTest OK");
     }

@@ -23,6 +23,8 @@ public final class NativeScene {
     private final RectF visibleRect=new RectF();
     private final float[] drawLine=new float[4],drawPoint=new float[2];
     private final Path drawPath=new Path();
+    /** One affine scratch per UI render. Never allocate a 9-float matrix per ARC/TEXT. */
+    private final float[] drawAffine=new float[9];
     public final int primitiveCount;
     public final boolean truncated;
 
@@ -143,9 +145,9 @@ public final class NativeScene {
         int w=Math.max(1,width),h=Math.max(1,height);Bitmap out=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);Canvas canvas=new Canvas(out);canvas.drawColor(CadRenderPalette.SCREEN_BACKGROUND);
         Matrix fit=new Matrix();fit.setRectToRect(new RectF(0f,0f,SIZE,SIZE),new RectF(0f,0f,w,h),Matrix.ScaleToFit.CENTER);
         Matrix combined=new Matrix();combined.setConcat(fit,worldToContent);Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.15f);
-        float[]line=new float[4],point=new float[2];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
+        float[]line=new float[4],point=new float[2],affine=new float[9];Path path=new Path();Matrix local=new Matrix(),target=new Matrix();
         int stride=Math.max(1,(offsets.length+59999)/60000);
-        for(int i=0;i<offsets.length;i+=stride)drawPrimitive(i,canvas,paint,combined,line,point,path,local,target);
+        for(int i=0;i<offsets.length;i+=stride)drawPrimitive(i,canvas,paint,combined,line,point,path,local,target,affine);
         return out;
     }
 
@@ -175,7 +177,7 @@ public final class NativeScene {
         }
         drawPaint.reset();drawPaint.setAntiAlias(true);drawPaint.setStyle(Paint.Style.STROKE);drawPaint.setStrokeWidth(1.15f);
         float minWorldSpan=navigationFast&&visible!=null&&offsets.length>50000&&worldPerPixel>0f?worldPerPixel*.12f:0f;
-        grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,minWorldSpan);
+        grid.draw(canvas,drawPaint,combinedMatrix,visible,drawLine,drawPoint,drawPath,localMatrix,targetMatrix,drawAffine,minWorldSpan);
     }
 
     private int primitiveType(int index){
@@ -185,7 +187,14 @@ public final class NativeScene {
         return encoded;
     }
 
-    private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target){
+    private static void setDrawAffine(Matrix target,float[] values,float a,float b,float c,float d,float tx,float ty){
+        values[0]=a;values[1]=b;values[2]=tx;
+        values[3]=c;values[4]=d;values[5]=ty;
+        values[6]=0f;values[7]=0f;values[8]=1f;
+        target.setValues(values);
+    }
+
+    private void drawPrimitive(int index,Canvas canvas,Paint paint,Matrix matrix,float[] line,float[] point,Path path,Matrix local,Matrix target,float[] affine){
         int p=offsets[index],encoded=Math.round(raw[p++]),type,color;
         if(streamVersion>=4&&encoded<0){
             type=(-encoded-1)>>>8;color=DxfColor.trueColorArgb(Math.round(raw[p++]));
@@ -205,11 +214,11 @@ public final class NativeScene {
         }else if(type==4){
             float cx=raw[p++],cy=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++],start=raw[p++],sweep=raw[p++];
             path.rewind();path.addArc(UNIT_OVAL,(float)Math.toDegrees(start),(float)Math.toDegrees(sweep));
-            local.setValues(new float[]{ux,vx,cx,uy,vy,cy,0f,0f,1f});target.setConcat(matrix,local);path.transform(target);canvas.drawPath(path,paint);
+            setDrawAffine(local,affine,ux,vx,cx,uy,vy,cy);target.setConcat(matrix,local);path.transform(target);canvas.drawPath(path,paint);
         }else if(type==6){
             float x=raw[p++],y=raw[p++],ux=raw[p++],uy=raw[p++],vx=raw[p++],vy=raw[p++];int ha=Math.round(raw[p++]),va=Math.round(raw[p++]);p++;
             String value=textValues!=null&&index<textValues.length?textValues[index]:null;if(value==null||value.isEmpty())return;
-            local.setValues(new float[]{ux,vx,x,uy,vy,y,0f,0f,1f});target.setConcat(matrix,local);
+            setDrawAffine(local,affine,ux,vx,x,uy,vy,y);target.setConcat(matrix,local);
             Paint.Style oldStyle=paint.getStyle();float oldSize=paint.getTextSize();Paint.Align oldAlign=paint.getTextAlign();
             paint.setStyle(Paint.Style.FILL);paint.setTextSize(1f);paint.setTextAlign(ha==2?Paint.Align.RIGHT:(ha==1||ha==3||ha==4||ha==5?Paint.Align.CENTER:Paint.Align.LEFT));
             float ascent=paint.ascent(),descent=paint.descent();float base=va==1?-descent:va==2?-(ascent+descent)*.5f:va==3?-ascent:0f;
@@ -228,18 +237,18 @@ public final class NativeScene {
                 for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++){int at=yy*cells+xx;if(buckets[at]==null)buckets[at]=new IntList();buckets[at].add(i);}
             }
         }
-        void draw(Canvas c,Paint p,Matrix m,RectF visible,float[]line,float[]point,Path path,Matrix local,Matrix target,float minWorldSpan){
+        void draw(Canvas c,Paint p,Matrix m,RectF visible,float[]line,float[]point,Path path,Matrix local,Matrix target,float[] affine,float minWorldSpan){
             int mark=nextMark();
-            if(visible==null){for(int i=0;i<offsets.length;i++)drawOne(i,c,p,m,line,point,path,local,target,mark,null,minWorldSpan);return;}
-            drawList(overflow,c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);if(!overlaps(area,visible,epsilon))return;int x0=x(visible.left),x1=x(visible.right),y0=y(visible.top),y1=y(visible.bottom);for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++)drawList(buckets[yy*cells+xx],c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);
+            if(visible==null){for(int i=0;i<offsets.length;i++)drawOne(i,c,p,m,line,point,path,local,target,affine,mark,null,minWorldSpan);return;}
+            drawList(overflow,c,p,m,line,point,path,local,target,affine,mark,visible,minWorldSpan);if(!overlaps(area,visible,epsilon))return;int x0=x(visible.left),x1=x(visible.right),y0=y(visible.top),y1=y(visible.bottom);for(int yy=y0;yy<=y1;yy++)for(int xx=x0;xx<=x1;xx++)drawList(buckets[yy*cells+xx],c,p,m,line,point,path,local,target,affine,mark,visible,minWorldSpan);
         }
-        void drawList(IntList list,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){if(list==null)return;for(int i=0;i<list.size;i++)drawOne(list.data[i],c,p,m,line,point,path,local,target,mark,visible,minWorldSpan);}
-        void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,int mark,RectF visible,float minWorldSpan){
+        void drawList(IntList list,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,float[] affine,int mark,RectF visible,float minWorldSpan){if(list==null)return;for(int i=0;i<list.size;i++)drawOne(list.data[i],c,p,m,line,point,path,local,target,affine,mark,visible,minWorldSpan);}
+        void drawOne(int index,Canvas c,Paint p,Matrix m,float[]line,float[]point,Path path,Matrix local,Matrix target,float[] affine,int mark,RectF visible,float minWorldSpan){
             if(seen[index]==mark)return;seen[index]=mark;
             if(visible!=null&&!overlaps(bounds,index,visible,epsilon))return;
             int type=primitiveType(index);
             if(minWorldSpan>0f&&type!=3&&type!=6&&tooSmall(bounds,index,minWorldSpan))return;
-            drawPrimitive(index,c,p,m,line,point,path,local,target);
+            drawPrimitive(index,c,p,m,line,point,path,local,target,affine);
         }
         int nextMark(){if(query==Integer.MAX_VALUE){Arrays.fill(seen,0);query=1;}return ++query;}
         int x(float v){return Math.max(0,Math.min(cells-1,(int)((v-area.left)/cw)));}int y(float v){return Math.max(0,Math.min(cells-1,(int)((v-area.top)/ch)));}
