@@ -2,6 +2,7 @@
 #include "config.h"
 #include "native_color.h"
 #include "scene_coord_safety.h"
+#include "native_nurbs.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -608,9 +609,52 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             if(begin_poly(s,color,(e->flag&1)!=0,(int)n)){for(BITCODE_BL i=0;i<n&&!s->truncated;i++)emit_poly_point(s,parent,pts[i].x,pts[i].y);finish_poly(s);}free(pts);break;
         }
         case DWG_TYPE_SPLINE:{
-            Dwg_Entity_SPLINE *e=obj->tio.entity->tio.SPLINE;if(!e)break;
-            if(e->num_fit_pts>=2&&e->fit_pts){int n=(int)e->num_fit_pts;if(begin_poly(s,color,e->closed_b,n)){for(int i=0;i<n&&!s->truncated;i++)emit_poly_point(s,parent,e->fit_pts[i].x,e->fit_pts[i].y);finish_poly(s);}}
-            else if(e->num_ctrl_pts>=2&&e->ctrl_pts){int n=(int)e->num_ctrl_pts;if(begin_poly(s,color,e->closed_b,n)){for(int i=0;i<n&&!s->truncated;i++)emit_poly_point(s,parent,e->ctrl_pts[i].x,e->ctrl_pts[i].y);finish_poly(s);}}
+            Dwg_Entity_SPLINE *e=obj->tio.entity->tio.SPLINE;
+            if(!e)break;
+            /* A spline is NOT the polyline joining fit/control points.
+             * The old first paint silently displayed false geometry.
+             * Render the real weighted B-spline from its knots, or mark
+             * the page incomplete if DWG doesn't supply enough data.
+             */
+            size_t n=(size_t)e->num_ctrl_pts;
+            int degree=(int)e->degree;
+            if(n<2||n>MUSA_NURBS_MAX_CONTROL||!e->ctrl_pts||!e->knots||
+               degree<1||degree>MUSA_NURBS_MAX_DEGREE||
+               (size_t)e->num_knots!=n+(size_t)degree+1u){
+                s->truncated=1;break;
+            }
+            MusaNurbsControl *points=(MusaNurbsControl*)calloc(n,sizeof(*points));
+            if(!points){s->truncated=1;break;}
+            for(size_t i=0;i<n;i++){
+                points[i].x=e->ctrl_pts[i].x;
+                points[i].y=e->ctrl_pts[i].y;
+                points[i].w=(e->weighted||e->rational)?e->ctrl_pts[i].w:1.0;
+            }
+            int sampled=musa_nurbs_valid(points,n,e->knots,
+                                         (size_t)e->num_knots,degree)
+                ?musa_nurbs_preview_points(e->knots,n,degree):0;
+            if(!sampled||!begin_poly(s,color,e->closed_b!=0,sampled)){
+                s->truncated=1;free(points);break;
+            }
+            int first=1;
+            for(size_t i=(size_t)degree;i<n&&!s->truncated;i++){
+                if(e->knots[i+1]<=e->knots[i])continue;
+                int start=first?0:1;
+                for(int j=start;j<=MUSA_NURBS_SAMPLES_PER_KNOT_SPAN&&!s->truncated;j++){
+                    double u=j==MUSA_NURBS_SAMPLES_PER_KNOT_SPAN
+                        ?e->knots[i+1]
+                        :e->knots[i]+(e->knots[i+1]-e->knots[i])*
+                          ((double)j/MUSA_NURBS_SAMPLES_PER_KNOT_SPAN);
+                    double x,y;
+                    if(!musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)){
+                        s->truncated=1;break;
+                    }
+                    emit_poly_point(s,parent,x,y);
+                }
+                first=0;
+            }
+            finish_poly(s);
+            free(points);
             break;
         }
         case DWG_TYPE_SOLID:{
