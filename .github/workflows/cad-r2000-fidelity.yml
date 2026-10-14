@@ -96,15 +96,27 @@ jobs:
           mkdir -p /tmp/musa-advanced-r2000
           python3 tests/r2000_generate_variants.py \
             third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-advanced-r2000
-          for kind in bulge-width face3d classic-polyline; do
+          failures=0
+          for kind in bulge-width bulge-only width-only face3d classic-polyline; do
             input="/tmp/musa-advanced-r2000/${kind}.dxf"
             output="/tmp/musa-advanced-r2000/${kind}.dwg"
             cp "$input" "${input}.original"
             echo "Checking R2000 roundtrip: ${kind}"
-            /usr/bin/time -f "R2000 ${kind} elapsed %e seconds peak RSS %M KB" \
-              /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output"
-            test -s "$output"
-            test "$(head -c 6 "$output")" = AC1015
+            if /usr/bin/time -f "R2000 ${kind} elapsed %e seconds peak RSS %M KB" \
+                /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output"; then
+              if test -s "$output" && test "$(head -c 6 "$output")" = AC1015; then
+                echo "PASS R2000 advanced case: ${kind}"
+              else
+                echo "FAIL R2000 advanced case: ${kind} output/header"
+                failures=$((failures+1))
+              fi
+            else
+              echo "FAIL R2000 advanced case: ${kind} rejected by fidelity audit"
+              test ! -e "$output"
+              failures=$((failures+1))
+            fi
             cmp "$input" "${input}.original"
           done
+          echo "R2000 advanced acceptance failures: $failures"
+          test "$failures" -eq 0
 
