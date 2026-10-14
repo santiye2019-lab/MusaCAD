@@ -449,8 +449,35 @@ static void emit_dimension_block(Dwg_Object *obj,MusaNativeScene *s,Affine2 pare
     while(child&&!s->truncated){emit_object(child,s,combined,depth+1,dimColor,dimLayer);child=get_next_owned_entity(block,child);}
 }
 
+/*
+ * An INSERT/MINSERT/dimension expands to recursively owned entities. In
+ * experimental nested paging, count only drawable LEAVES of that expansion.
+ * This preserves line/polyline/color/transform as an atomic unit; a primitive
+ * inside a leaf is never cut in half. The cursor is stable for the same DWG.
+ */
+static int musa_is_scene_group(int type){
+    switch(type){
+        case DWG_TYPE_INSERT: case DWG_TYPE_MINSERT:
+        case DWG_TYPE_DIMENSION_ORDINATE: case DWG_TYPE_DIMENSION_LINEAR:
+        case DWG_TYPE_DIMENSION_ALIGNED: case DWG_TYPE_DIMENSION_ANG3PT:
+        case DWG_TYPE_DIMENSION_ANG2LN: case DWG_TYPE_DIMENSION_RADIUS:
+        case DWG_TYPE_DIMENSION_DIAMETER: case DWG_TYPE_ARC_DIMENSION:
+        case DWG_TYPE_LARGE_RADIAL_DIMENSION: return 1;
+        default: return 0;
+    }
+}
+
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer){
     if(!obj||s->truncated||obj->supertype!=DWG_SUPERTYPE_ENTITY||layer_invisible(obj))return;
+    const int nested_leaf=s->nested_paging&&depth>0&&!musa_is_scene_group(obj->fixedtype);
+    if(nested_leaf&&s->nested_visited<s->nested_skip){
+        ++s->nested_visited;
+        return;
+    }
+    /* Each nested leaf is transactional even if it emits many primitives. */
+    const size_t leaf_words=s->count;
+    const int leaf_count=s->primitives,leaf_bounds=s->has_bounds;
+    const double bx0=s->min_x,by0=s->min_y,bx1=s->max_x,by1=s->max_y;
     SceneColor layerColor=effective_layer_color(obj,inheritedLayer,depth>0);
     SceneColor color=entity_color(obj,byBlock,layerColor);
     switch(obj->fixedtype){
@@ -653,6 +680,16 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         }
         default: break;
     }
+    if(nested_leaf){
+        if(s->truncated){
+            /* Undo an incomplete leaf; parent recursion stops on truncated. */
+            s->count=leaf_words;s->primitives=leaf_count;
+            s->has_bounds=leaf_bounds;s->min_x=bx0;s->min_y=by0;
+            s->max_x=bx1;s->max_y=by1;
+        }else{
+            ++s->nested_visited;
+        }
+    }
 }
 
 /*
@@ -748,6 +785,98 @@ int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
     scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;
     scene->values[6]=0.0f; /* No partial entity is ever exposed on a page. */
     return has_more?1:0;
+}
+
+/*
+ * EXPERIMENTAL: block-aware, bounded page with (model entity, nested leaf)
+ * resume cursor. This deliberately replays the current block's earlier leaf
+ * traversal when resuming; a future stack cursor will remove replay cost.
+ * It can still reject a single huge HATCH/POLYLINE leaf with -4, safely.
+ */
+int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
+                                 size_t first_index,size_t first_leaf,
+                                 size_t *next_index,size_t *next_leaf,
+                                 size_t max_words){
+    if(!dwg||!scene||!next_index||!next_leaf||
+       max_words<256||max_words>MUSA_SCENE_MAX_FLOATS)return -1;
+    memset(scene,0,sizeof(*scene));
+    scene->max_words=max_words;
+    *next_index=first_index;*next_leaf=first_leaf;
+    if(!reserve_scene(scene,7)){musa_scene_free(scene);return -2;}
+    for(int h=0;h<7;h++)pushf(scene,0);
+    Affine2 identity=identity2();
+    SceneColor root=scene_aci(7);
+    Dwg_Object_Ref *model=dwg_model_space_ref(dwg);
+    Dwg_Object *owner=model?model->obj:NULL;
+    Dwg_Object *obj=owner?get_first_owned_entity(owner):NULL;
+    size_t at=0;
+    int more=0;
+    /* Restrict cursors to actual top-level model entities. */
+    if(first_leaf>0 && first_index==SIZE_MAX){musa_scene_free(scene);return -1;}
+    BITCODE_BL limit=owner?0:dwg->num_objects;
+    for(BITCODE_BL i=0;owner?obj!=NULL:i<limit;){
+        Dwg_Object *current=owner?obj:&dwg->object[i];
+        if(at>=first_index){
+            const size_t before=scene->count;
+            const int previous_count=scene->primitives,previous_bounds=scene->has_bounds;
+            const double x0=scene->min_x,y0=scene->min_y;
+            const double x1=scene->max_x,y1=scene->max_y;
+            const size_t skip=(at==first_index)?first_leaf:0;
+            scene->nested_paging=1;
+            scene->nested_skip=skip;
+            scene->nested_visited=0;
+            emit_object(current,scene,identity,0,root,root);
+            scene->nested_paging=0;
+            if(scene->truncated){
+                const size_t visited=scene->nested_visited;
+                const int kept_nested=visited>skip && scene->count>before;
+                if(kept_nested){
+                    /* Commit complete leaves of the current expanded block. */
+                    scene->truncated=0;
+                    *next_index=at;
+                    *next_leaf=visited;
+                    more=1;
+                    break;
+                }
+                /* Nothing from the current model object may be published. */
+                scene->count=before;
+                scene->primitives=previous_count;
+                scene->has_bounds=previous_bounds;
+                scene->min_x=x0;scene->min_y=y0;
+                scene->max_x=x1;scene->max_y=y1;
+                scene->truncated=0;
+                if(before==7){musa_scene_free(scene);return -4;}
+                *next_index=at;
+                *next_leaf=skip;
+                more=1;
+                break;
+            }
+        }
+        ++at;
+        if(owner)obj=get_next_owned_entity(owner,obj);
+        else ++i;
+        *next_index=at;
+        *next_leaf=0;
+    }
+    if(!scene->has_bounds||scene->primitives<=0){
+        musa_scene_free(scene);
+        return -3;
+    }
+    double ex0=dwg_model_x_min(dwg),ey0=dwg_model_y_min(dwg);
+    double ex1=dwg_model_x_max(dwg),ey1=dwg_model_y_max(dwg);
+    if(isfinite(ex0)&&isfinite(ey0)&&isfinite(ex1)&&isfinite(ey1)&&
+       ex1>ex0&&ey1>ey0&&ex1-ex0<1e30&&ey1-ey0<1e30){
+        scene->min_x=ex0;scene->min_y=ey0;
+        scene->max_x=ex1;scene->max_y=ey1;
+    }
+    if(scene->max_x-scene->min_x<1e-9){scene->min_x-=.5;scene->max_x+=.5;}
+    if(scene->max_y-scene->min_y<1e-9){scene->min_y-=.5;scene->max_y+=.5;}
+    scene->values[0]=MUSA_SCENE_VERSION;
+    scene->values[1]=(float)scene->primitives;
+    scene->values[2]=(float)scene->min_x;scene->values[3]=(float)scene->min_y;
+    scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;
+    scene->values[6]=0;
+    return more?1:0;
 }
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
