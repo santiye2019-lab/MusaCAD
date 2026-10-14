@@ -28,6 +28,8 @@ public final class NativePagedScenePreview {
     private final HashMap<NativeViewportPageCache.Cursor,byte[]> pageHashes=
             new HashMap<>();
     private Matrix worldToContent;
+    /* Deterministic global DWG normalization, not the local page bounding box. */
+    private float[] sharedWorldTransform;
     private final Matrix scratchCombined=new Matrix();
     private final Matrix scratchInverse=new Matrix();
     private final RectF scratchVisible=new RectF();
@@ -58,6 +60,15 @@ public final class NativePagedScenePreview {
         // A malformed continuation must leave all previous pages untouched.
         catalog.requireAppend(start,next,page.hasMore,bbox.left,bbox.top,
                               bbox.right,bbox.bottom,page.scene.primitiveCount);
+        // Fail closed BEFORE cache publication when fallback model extents
+        // make independently decoded pages use different screen transforms.
+        Matrix pageMatrix=page.scene.worldToContentTransform();
+        float[] pageWorldTransform=new float[9];
+        pageMatrix.getValues(pageWorldTransform);
+        if(sourceStarted)
+            NativePageTransformGuard.requireSame(sharedWorldTransform,pageWorldTransform);
+        else
+            NativePageTransformGuard.requireValid(pageWorldTransform);
         // Hash on the loader thread before cache eviction; a rejected page
         // must not displace any other valid cached geometry.
         byte[] digest=page.scene.contentSha256();
@@ -70,7 +81,8 @@ public final class NativePagedScenePreview {
             pageHashes.put(start,digest);
         }
         if(stored&&!sourceStarted){
-            worldToContent=page.scene.worldToContentTransform();
+            worldToContent=pageMatrix;
+            sharedWorldTransform=pageWorldTransform;
             firstPageRef=new WeakReference<>(page.scene);
             sourceStarted=true;
         }
@@ -109,6 +121,10 @@ public final class NativePagedScenePreview {
         if(!NativeSceneFingerprint.matches(
                 pageHashes.get(expected.start),page.scene.contentSha256()))
             throw new IllegalStateException("DWG sayfası içerik SHA-256 uyuşmuyor");
+        Matrix pageMatrix=page.scene.worldToContentTransform();
+        float[] pageWorldTransform=new float[9];
+        pageMatrix.getValues(pageWorldTransform);
+        NativePageTransformGuard.requireSame(sharedWorldTransform,pageWorldTransform);
         return cache.put(expected.start,next,page.hasMore,
                          bbox.left,bbox.top,bbox.right,bbox.bottom,
                          page.scene.estimatedRetainedBytes(),page.scene);
@@ -137,7 +153,7 @@ public final class NativePagedScenePreview {
     public synchronized boolean isPartial(){return !isComplete();}
     public synchronized void clear(){
         cache.clear();catalog.clear();pageHashes.clear();
-        sourceStarted=false;worldToContent=null;firstPageRef=null;
+        sourceStarted=false;worldToContent=null;sharedWorldTransform=null;firstPageRef=null;
     }
 
     /**
