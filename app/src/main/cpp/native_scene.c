@@ -410,6 +410,15 @@ static void emit_insert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     local.ty-=local.b*hdr->base_pt.x+local.d*hdr->base_pt.y;
     Affine2 combined=multiply2(parent,local);
     Dwg_Object *child=get_first_owned_entity(block);
+    if(s->nested_paging&&depth==0&&obj==s->resume_root_insert&&
+       s->resume_direct_child&&s->nested_skip==s->resume_leaf_ordinal){
+        /* This direct child was the first unsent leaf of the preceding
+         * indexed page. The checkpoint is from this same live DWG, so skip
+         * the already committed prefix without expanding it again. */
+        child=s->resume_direct_child;
+        s->nested_visited=s->nested_skip;
+        s->resume_applied=1;
+    }
     while(child&&!s->truncated){emit_object(child,s,combined,depth+1,insertColor,insertLayer);child=get_next_owned_entity(block,child);}
 }
 static void emit_minsert(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor insertColor,SceneColor insertLayer){
@@ -682,6 +691,10 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
     }
     if(nested_leaf){
         if(s->truncated){
+            /* Only depth-one leaves are owned directly by the root INSERT.
+             * A deeper child requires normal replay and MUST NOT be used as
+             * a direct-child checkpoint. */
+            if(depth==1)s->failed_direct_child=obj;
             /* Undo an incomplete leaf; parent recursion stops on truncated. */
             s->count=leaf_words;s->primitives=leaf_count;
             s->has_bounds=leaf_bounds;s->min_x=bx0;s->min_y=by0;
@@ -797,11 +810,19 @@ static int musa_scene_build_page_nested_impl(Dwg_Data *dwg,MusaNativeScene *scen
                                  size_t first_index,size_t first_leaf,
                                  size_t *next_index,size_t *next_leaf,
                                  size_t max_words,
-                                 Dwg_Object *const *indexed,size_t indexed_count){
+                                 Dwg_Object *const *indexed,size_t indexed_count,
+                                 Dwg_Object *resume_root,Dwg_Object *resume_child){
     if(!dwg||!scene||!next_index||!next_leaf||
        max_words<256||max_words>MUSA_SCENE_MAX_FLOATS)return -1;
     memset(scene,0,sizeof(*scene));
     scene->max_words=max_words;
+    if(indexed&&indexed_count&&first_index<indexed_count&&
+       indexed[first_index]==resume_root&&resume_root&&resume_child&&
+       resume_root->fixedtype==DWG_TYPE_INSERT&&first_leaf>0){
+        scene->resume_root_insert=resume_root;
+        scene->resume_direct_child=resume_child;
+        scene->resume_leaf_ordinal=first_leaf;
+    }
     *next_index=first_index;*next_leaf=first_leaf;
     if(!reserve_scene(scene,7)){musa_scene_free(scene);return -2;}
     for(int h=0;h<7;h++)pushf(scene,0);
@@ -893,7 +914,7 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
                                  size_t *next_index,size_t *next_leaf,
                                  size_t max_words){
     return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
-                                              next_index,next_leaf,max_words,NULL,0);
+                                              next_index,next_leaf,max_words,NULL,0,NULL,NULL);
 }
 
 int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
@@ -904,7 +925,28 @@ int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
                                          size_t model_count){
     if(!model_entities||!model_count||first_index>=model_count)return -1;
     return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
-                          next_index,next_leaf,max_words,model_entities,model_count);
+                          next_index,next_leaf,max_words,model_entities,model_count,NULL,NULL);
+}
+
+int musa_scene_build_page_nested_direct_resume(
+         Dwg_Data *dwg,MusaNativeScene *scene,
+         size_t first_index,size_t first_leaf,
+         size_t *next_index,size_t *next_leaf,size_t max_words,
+         Dwg_Object *const *model_entities,size_t model_count,
+         Dwg_Object *resume_root,Dwg_Object *resume_child,
+         Dwg_Object **out_failed_child){
+    if(out_failed_child)*out_failed_child=NULL;
+    if(!model_entities||!model_count||first_index>=model_count)return -1;
+    int status=musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
+            next_index,next_leaf,max_words,model_entities,model_count,
+            resume_root,resume_child);
+    if(status==1&&out_failed_child&&scene->failed_direct_child&&
+       *next_index<model_count&&model_entities[*next_index]->fixedtype==DWG_TYPE_INSERT){
+        /* Publish checkpoint only for a full, committed page whose
+         * continuation remains within the same root INSERT. */
+        *out_failed_child=scene->failed_direct_child;
+    }
+    return status;
 }
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
