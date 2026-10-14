@@ -23,6 +23,7 @@ def baseline():
             "block_geometry_entity_count": 50,
             "block_definition_count": 5,
             "block_inserts": 2,
+            "converted_dxf_color_sources": {"bylayer": 68, "truecolor": 2},
             "conversion_has_quality_warnings": False,
         }],
     }
@@ -65,6 +66,13 @@ class ModernDwgAcceptanceTest(unittest.TestCase):
     def test_fake_success_without_preview_fails(self):
         doc = baseline()
         doc["files"][0]["native_scene_status"] = None
+        self.assertTrue(failures(doc))
+
+    def test_incomplete_color_census_fails(self):
+        doc = baseline()
+        doc["files"][0]["converted_dxf_color_sources"]["bylayer"] = 67
+        self.assertTrue(failures(doc))
+        del doc["files"][0]["converted_dxf_color_sources"]
         self.assertTrue(failures(doc))
 
     def test_wrong_fixture_or_extra_file_fails(self):
