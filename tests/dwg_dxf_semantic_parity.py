@@ -52,7 +52,13 @@ CRITICAL_HEADER_VARS = frozenset((
 UNVERIFIABLE_ENTITY_CLASSES = frozenset((
     "3DSOLID", "BODY", "REGION", "ACAD_PROXY_ENTITY", "ACAD_PROXY_OBJECT",
     "ACAD_TABLE", "ACSH_BREP_CLASS", "ACSH_BOOLEAN_CLASS",
+    # DXF can preserve a LINK or image handle while the external dependency
+    # changes on disk. These demand separate asset/XREF verification.
+    "IMAGE", "IMAGEDEF", "OLE2FRAME", "OLEFRAME",
+    "PDFUNDERLAY", "DWFUNDERLAY", "DGNUNDERLAY", "UNDERLAY",
 ))
+UNVERIFIABLE_CLASS_PREFIXES = ("ACAD_", "ACDB_", "ACSH_", "AEC_", "AECC_")
+XREF_BLOCK_FLAG_MASK = 4 | 8 | 16 | 32
 SUPPORTED_SECTIONS = AUDITED_SECTIONS | SKIPPED_SECTIONS | UNVERIFIABLE_SECTIONS | {"HEADER"}
 STRUCTURAL = frozenset(("SECTION", "ENDSEC", "EOF"))
 HEX_HANDLE_CODES = frozenset((5, 105)) | frozenset(range(320, 370)) | frozenset(range(390, 400))
@@ -231,8 +237,21 @@ def fingerprint(path: Path) -> dict:
         record_count += 1
         if record_count > MAX_RECORDS:
             raise DxfParityError("too many DXF records")
-        if kind in UNVERIFIABLE_ENTITY_CLASSES:
-            unverified[kind] += 1
+        if (kind in UNVERIFIABLE_ENTITY_CLASSES or
+                kind.startswith(UNVERIFIABLE_CLASS_PREFIXES)):
+            unverified["opaque_or_external_entity"] += 1
+        if section == "BLOCKS" and kind == "BLOCK":
+            # DXF block flags: 4=xref, 8=overlay, 16=externally dependent,
+            # 32=resolved xref. Textually identical paths/INSERTs are NOT
+            # proof that referenced CAD files or their units are identical.
+            for code, raw in attrs:
+                if code == 70:
+                    try:
+                        flags = int(_normalized(code, raw))
+                    except ValueError as error:
+                        raise DxfParityError("invalid BLOCK reference flags") from error
+                    if flags & XREF_BLOCK_FLAG_MASK:
+                        unverified["external_xref_block"] += 1
         h = sha256()
         h.update(section.encode("ascii") + b"\x00" + kind.encode("utf-8") + b"\x00")
         for code, raw in attrs:
