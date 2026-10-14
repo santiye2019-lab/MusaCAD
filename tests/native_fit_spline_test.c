@@ -41,7 +41,10 @@ int main(void){
     near(y,3.1346570906030355,1e-9,"natural chord fit y at 0.72");
     /* Curve is not the broken line between adjacent fit points: at u=.05
      * (inside the first chord) it must depart from the straight segment. */
-    need(fabs(y-3.1346570906030355)<1e-9,"curve evaluated, not a polyline");
+    need(musa_cad_fit_natural_eval(k5,5,.05,&x,&y),
+         "cubic quarter segment re-evaluation");
+    double straight_y=2.0*(.05/k5[1].t);
+    need(fabs(y-straight_y)>0.1,"curve must not degrade into fit-point polygon");
 
     MusaCadFitPoint fit6[]={
         {0,0,0},{1,0,0},{2,1,0},{3,1.5,0},{5,2,0},{8,0,0}
