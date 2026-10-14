@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
 
 /**
  * Experimental incremental DWG preview loader (NOT enabled by MainActivity).
@@ -41,6 +43,12 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
     private volatile NativeScene firstScene;
     private volatile int currentPages;
     private volatile long currentPrimitives;
+    private static final int MAX_RELOADS_PER_REQUEST=4;
+    private final AtomicReference<float[]> latestViewport=new AtomicReference<>();
+    private final AtomicBoolean reloadQueued=new AtomicBoolean();
+    /* Only the UI thread requests viewports. Prevent redundant queue flooding. */
+    private float[] previousViewport;
+
 
 
     public NativePagedPreviewLoader(NativeCadEngine engine,NativePagedScenePreview preview,
@@ -56,6 +64,75 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
         if(cancelled.get()||!started.compareAndSet(false,true))
             throw new IllegalStateException("preview loader already started or cancelled");
         worker.execute(this::load);
+    }
+
+    /**
+     * UI-safe scheduling of recently visible world coordinates. This method
+     * never decodes DWG data. Latest viewport wins; old queued requests are
+     * replaced instead of accumulating as thousands of zoom tasks.
+     */
+    public synchronized void requestVisibleWorld(float minX,float minY,
+                                                  float maxX,float maxY){
+        if(!Float.isFinite(minX)||!Float.isFinite(minY)||
+           !Float.isFinite(maxX)||!Float.isFinite(maxY)||
+           maxX<minX||maxY<minY)
+            throw new IllegalArgumentException("invalid DWG viewport bounds");
+        if(cancelled.get()||!started.get())return;
+        float[] coords={minX,minY,maxX,maxY};
+        if(java.util.Arrays.equals(previousViewport,coords))return;
+        previousViewport=coords;
+        latestViewport.set(coords);
+        scheduleReload();
+    }
+
+    private void scheduleReload(){
+        if(!cancelled.get()&&started.get()&&reloadQueued.compareAndSet(false,true)){
+            try{worker.execute(this::reloadMissingVisible);}
+            catch(java.util.concurrent.RejectedExecutionException closed){
+                reloadQueued.set(false);
+            }
+        }
+    }
+
+    private void notifyPageChanged(){
+        if(pageNoticePending.compareAndSet(false,true))
+            main.post(()->{
+                pageNoticePending.set(false);
+                if(!cancelled.get())
+                    listener.onPage(preview,firstScene,currentPages,
+                                    currentPrimitives,preview.isComplete());
+            });
+    }
+
+    private void reloadMissingVisible(){
+        try{
+            /* The single-thread executor runs this only after source discovery.
+             * Each viewport gets a capped batch; no unbounded reload loop. */
+            for(int generation=0;generation<4&&!cancelled.get();generation++){
+                float[] box=latestViewport.getAndSet(null);
+                if(box==null)break;
+                List<NativePageCatalog.Entry> missing=preview.missingViewportPages(
+                        box[0],box[1],box[2],box[3],MAX_RELOADS_PER_REQUEST);
+                for(NativePageCatalog.Entry entry:missing){
+                    if(cancelled.get()||latestViewport.get()!=null)break;
+                    NativeCadEngine.NestedScenePage refreshed=engine.previewNestedPage(
+                            entry.start.top,entry.start.leaf,maxFloatWords);
+                    if(cancelled.get()||latestViewport.get()!=null)break;
+                    if(!preview.retainReload(entry,refreshed))
+                        throw new IOException("DWG önbellek bütçesine sığmıyor");
+                    notifyPageChanged();
+                }
+            }
+        }catch(Exception error){
+            main.post(()->{
+                if(!cancelled.get())
+                    listener.onError("DWG sayfası tekrar yüklenemedi: "+
+                            error.getClass().getSimpleName());
+            });
+        }finally{
+            reloadQueued.set(false);
+            if(latestViewport.get()!=null&&!cancelled.get())scheduleReload();
+        }
     }
 
     private void load() {
@@ -80,13 +157,7 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
                 currentPages=count;
                 // Coalesce page notifications, never queue thousands of draw
                 // callbacks when the worker decodes pages faster than the UI.
-                if(pageNoticePending.compareAndSet(false,true))
-                    main.post(()->{
-                        pageNoticePending.set(false);
-                        if(!cancelled.get())
-                            listener.onPage(preview,firstScene,currentPages,
-                                            currentPrimitives,preview.isComplete());
-                    });
+                notifyPageChanged();
                 top=page.nextTopLevelIndex;
                 leaf=page.nextNestedLeafIndex;
                 if(!page.hasMore) {
@@ -109,6 +180,6 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
     }
 
     public boolean isCancelled(){return cancelled.get();}
-    public void cancel(){cancelled.set(true);worker.shutdownNow();}
+    public void cancel(){cancelled.set(true);latestViewport.set(null);worker.shutdownNow();}
     @Override public void close(){cancel();}
 }
