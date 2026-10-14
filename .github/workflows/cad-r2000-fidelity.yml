@@ -288,3 +288,35 @@ jobs:
           # prohibited until a new design passes this exact public regression.
           ! grep -q 'musa_scene_build_page_nested_direct_resume' \
               app/src/main/cpp/dwg_bridge.c
+
+      - name: Exact transform and color leaf-context continuation acceptance
+        run: |
+          set -euo pipefail
+          # Pin both the real public Dynblocks repro and nested TS1 fixture.
+          # Every v6 primitive/coordinate/color word is compared to the
+          # untruncated baseline; an optimization must actually be exercised.
+          for spec in \
+            "third_party/libredwg/test/test-data/2018/Dynblocks.dwg 4096 dynblocks" \
+            "third_party/libredwg/test/test-data/2000/TS1.dwg 256 ts1" \
+            "/tmp/musa-stress-r2000/mixed-8192.dwg 8192 mixed"; do
+            set -- $spec
+            /usr/bin/time -f "Context $3 elapsed_sec=%e peak_rss_kib=%M" \
+              timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --context-nested-paged-probe "$1" "$2" \
+              2>&1 | tee "/tmp/musa-context-$3.log"
+            grep -F 'Context Nested paged scene verified:' "/tmp/musa-context-$3.log"
+          done
+          # These public DWGs MUST use the cached full-instance contexts,
+          # not merely pass via unoptimized fallback.
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-dynblocks.log
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-ts1.log
+          grep -F 'Context Nested paged scene verified: pages=50 primitives=33479 legacy_count=33479 legacy_status=0' \
+            /tmp/musa-context-dynblocks.log
+          if timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+                --context-nested-paged-probe \
+                /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+                >/tmp/musa-context-too-large.log 2>&1; then
+            echo 'Context mode MUST reject atomic leaf exceeding page budget'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-context-too-large.log
