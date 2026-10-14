@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define GEOM_KINDS 7
+#define GEOM_KINDS 8
 #define MAX_INPUT_BYTES (64LL * 1024 * 1024)
 
 typedef struct {
@@ -43,6 +43,8 @@ static int geometry_signature(const Dwg_Data *dwg, GeometrySignature *sig) {
       case DWG_TYPE_BLOCK:
       case DWG_TYPE_ENDBLK:
       case DWG_TYPE_SEQEND: break;
+      /* Classic POLYLINE vertices have an independent count and geometry audit. */
+      case DWG_TYPE_VERTEX_2D: kind = 7; break;
       default: return -1; /* Not validated for this pilot: fail closed. */
     }
     if (kind >= 0) {
