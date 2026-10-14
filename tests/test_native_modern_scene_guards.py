@@ -47,8 +47,16 @@ class ModernSceneGuardTest(unittest.TestCase):
             body = branch(self.native, kind)
             self.assertIn("&&!s->truncated", body, kind)
         spline = branch(self.native, "SPLINE")
-        self.assertIn("i<n&&!s->truncated;i++)emit_poly_point(s,parent,e->fit_pts", spline)
-        self.assertIn("i<n&&!s->truncated;i++)emit_poly_point(s,parent,e->ctrl_pts", spline)
+        # The previous control-/fit-point walk was intentionally replaced by
+        # true NURBS sampling. Preserve abort-on-truncation without requiring
+        # the old incorrect angular geometry to be reintroduced.
+        self.assertIn("i<n&&!s->truncated;i++)", spline)
+        self.assertIn("j<=MUSA_NURBS_SAMPLES_PER_KNOT_SPAN&&!s->truncated", spline)
+        self.assertIn("musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)", spline)
+        self.assertIn("if(!musa_nurbs_eval", spline)
+        self.assertIn("s->truncated=1;break;", spline)
+        self.assertNotIn("emit_poly_point(s,parent,e->fit_pts", spline)
+        self.assertNotIn("emit_poly_point(s,parent,e->ctrl_pts", spline)
         self.assertNotIn("if(!finite2(ax,ay)){ax=0;ay=0;}", self.native)
 
     def test_partial_native_first_frame_warns_user(self):
