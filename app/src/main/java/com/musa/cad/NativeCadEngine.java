@@ -11,6 +11,7 @@ public final class NativeCadEngine implements AutoCloseable {
     private static native int exportDxfNative(long handle,String output);
     private static native long[] statsNative(long handle);
     private static native float[] sceneNative(long handle);
+    private static native float[] scenePageNative(long handle,long firstIndex,int maxWords,long[] cursor) throws IOException;
     private static native void closeNative(long handle);
 
     public static final class Stats {
@@ -25,6 +26,37 @@ public final class NativeCadEngine implements AutoCloseable {
         }
         public boolean coreOnly(){return entityCount>0&&unsupportedEntityCount==0;}
         public double coreCoverage(){return entityCount<=0?0d:Math.min(1d,Math.max(0d,coreEntityCount/(double)entityCount));}
+    }
+
+    /** One bounded, self-contained native preview page. Cursor is in top-level DWG entities. */
+    public static final class ScenePage {
+        public final NativeScene scene;
+        public final long nextTopLevelIndex;
+        public final boolean hasMore;
+        private ScenePage(NativeScene scene,long nextIndex,boolean more){
+            this.scene=scene;this.nextTopLevelIndex=nextIndex;this.hasMore=more;
+        }
+    }
+
+    /**
+     * Explicit preview paging for very large DWGs, not used by production
+     * first paint until an incremental renderer can consume pages safely.
+     * Use a fixed bounded word budget (e.g., 1,048,576 floats = 4 MiB raw).
+     * An individual expanded INSERT exceeding that budget is rejected, never
+     * partially returned. Such blocks require nested-entity continuation.
+     */
+    public synchronized ScenePage previewPage(long firstIndex,int maxFloatWords)throws IOException{
+        requireOpen();
+        if(firstIndex<0||maxFloatWords<256||maxFloatWords>9*1024*1024)
+            throw new IOException("Geçersiz DWG sayfa sınırı");
+        long[] cursor=new long[2];
+        float[] values=scenePageNative(handle,firstIndex,maxFloatWords,cursor);
+        if(values==null||cursor[0]<=firstIndex)
+            throw new IOException("DWG sahne sayfası alınamadı");
+        NativeScene scene=NativeScene.fromRaw(values);
+        if(scene.truncated)
+            throw new IOException("Eksik DWG sahnesi görüntülenemez");
+        return new ScenePage(scene,cursor[0],cursor[1]!=0);
     }
 
     private long handle;
