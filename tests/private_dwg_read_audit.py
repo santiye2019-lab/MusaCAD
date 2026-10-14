@@ -259,6 +259,12 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
             "end_tangent_finite": int(match.group(6)) if match.group(6) else None,
         })
     result["native_fit_spline_stage_diagnostics"] = fit_diagnostics
+    # A zero converter exit must not hide any native SPLINE rejection.
+    # Keep counts only; never expose source coordinates, names or stderr.
+    result["native_spline_rejection_count"] = (
+        diagnostics.count("MusaCAD spline rejected:") +
+        diagnostics.count("MusaCAD fit spline rejected:")
+    )
 
     result["native_spline_fit_only_rejections"] = diagnostics.count(
         "reason=missing_knots_or_fit_only")
@@ -283,6 +289,10 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         elif result["native_scene_status"] is None:
             # Old/unknown converter cannot certify the native first-paint scene.
             result["status"] = "decoded_dxf_inventory_scene_unverified"
+        elif result["native_scene_status"] != 0 or result["native_spline_rejection_count"]:
+            # Fail closed even if converter exits 0 or an unexpected native
+            # scene status was logged. A decoded DXF is not a complete preview.
+            result["status"] = "decoded_dxf_inventory_scene_incomplete"
         else:
             result["status"] = "decoded_dxf_inventory"
         result["conversion_has_quality_warnings"] = bool(
