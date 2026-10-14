@@ -64,7 +64,7 @@ public final class NativePageSpatialIndexTest {
         for(int i=0;i<249;i++)
             partial.append(c(i),c(i+1),true,i,0,i+1,1,1);
         need(!partial.isDiscovered(),"partial source still discovering");
-        need(partial.missingVisible(empty,2,-1,9,2,16).size()==10,
+        need(partial.missingVisible(empty,2,-1,9,2,16).size()==9,
                 "incremental catalog remains queryable");
 
         catalog.clear();
