@@ -49,8 +49,9 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
     private static final int MAX_RELOAD_PAGES_PER_VIEWPORT=32;
     private final AtomicReference<float[]> latestViewport=new AtomicReference<>();
     private final AtomicBoolean reloadQueued=new AtomicBoolean();
-    /* Only the UI thread requests viewports. Prevent redundant queue flooding. */
-    private float[] previousViewport;
+    /* Dedup by both coordinates AND native page discovery generation.
+     * A newly decoded page may evict old geometry in an unchanged viewport. */
+    private final NativeViewportReloadGate viewportGate=new NativeViewportReloadGate();
 
 
 
@@ -81,10 +82,9 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
            maxX<minX||maxY<minY)
             throw new IllegalArgumentException("invalid DWG viewport bounds");
         if(cancelled.get()||!started.get())return;
-        float[] coords={minX,minY,maxX,maxY};
-        if(java.util.Arrays.equals(previousViewport,coords))return;
-        previousViewport=coords;
-        latestViewport.set(coords);
+        if(!viewportGate.shouldRequest(
+                minX,minY,maxX,maxY,currentPages))return;
+        latestViewport.set(new float[]{minX,minY,maxX,maxY});
         scheduleReload();
     }
 
