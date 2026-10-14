@@ -252,6 +252,44 @@ JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNative(JNIE
     return out;
 }
 
+/*
+ * Opt-in paged preview transport. Existing sceneNative stays untouched.
+ * Each returned float array holds exactly one complete top-level-entity page.
+ * out[0] is next top-level cursor, out[1] is hasMore (1/0).
+ */
+JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_scenePageNative(
+        JNIEnv *env,jclass cls,jlong handle,jlong start,jint maxWords,jlongArray nextOut){
+    (void)cls;
+    MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
+    if(!session||start<0||maxWords<256||maxWords>9*1024*1024||
+       !nextOut||(*env)->GetArrayLength(env,nextOut)<2){
+        throw_io(env,"DWG sahne sayfası parametreleri geçersiz");
+        return NULL;
+    }
+    MusaNativeScene page={0};
+    size_t next=(size_t)start;
+    pthread_mutex_lock(&engine_lock);
+    int status=musa_scene_build_page(session->dwg,&page,(size_t)start,&next,(size_t)maxWords);
+    pthread_mutex_unlock(&engine_lock);
+    if(status<0||next<=(size_t)start||page.count>(size_t)maxWords||
+       page.count>(size_t)2147483647||page.truncated){
+        musa_scene_free(&page);
+        char message[120];
+        snprintf(message,sizeof(message),"DWG sahne sayfası üretilemedi (%d)",status);
+        throw_io(env,message);
+        return NULL;
+    }
+    jlong result[2]={(jlong)next,(jlong)(status==1?1:0)};
+    jfloatArray raw=(*env)->NewFloatArray(env,(jsize)page.count);
+    if(raw){
+        (*env)->SetFloatArrayRegion(env,raw,0,(jsize)page.count,(const jfloat*)page.values);
+        if(!(*env)->ExceptionCheck(env))
+            (*env)->SetLongArrayRegion(env,nextOut,0,2,result);
+    }
+    musa_scene_free(&page);
+    return raw;
+}
+
 JNIEXPORT void JNICALL Java_com_musa_cad_NativeCadEngine_closeNative(JNIEnv *env,jclass cls,jlong handle){
     (void)env;(void)cls;
     MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
