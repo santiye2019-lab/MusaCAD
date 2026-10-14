@@ -3,11 +3,11 @@ package com.musa.cad;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
 /**
  * HOST/EXPERIMENTAL modern DWG two-phase publisher. NOT connected to Android,
@@ -62,6 +62,8 @@ public final class CadAc1032StagedSave {
             throw new IOException("Sembolik bağlantı ile CAD kaydı yasak");
         if(!Files.isRegularFile(source)||!Files.isRegularFile(edit))
             throw new IOException("DWG/DXF kaynak dosyaları bulunamadı");
+        if(Files.isSameFile(source,edit))
+            throw new IOException("Kaynak DWG ve DXF aynı dosyaya bağlı");
         if(!CadDwgFormat.identify(originalDwg).modern2018Family)
             throw new IOException("Kaynak dosya AC1032 değil");
         if(Files.exists(target,LinkOption.NOFOLLOW_LINKS))
@@ -73,14 +75,16 @@ public final class CadAc1032StagedSave {
         CadSaveSourceIntegrity editBefore=CadSaveSourceIntegrity.capture(editedDxf);
         Path staged=Files.createTempFile(parent,".musacad-ac1032-", ".dwg");
         try{
-            try(OutputStream out=Files.newOutputStream(staged,
-                    StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING)){
+            try(FileOutputStream out=new FileOutputStream(staged.toFile(),false)){
                 encoder.encode(originalDwg,editedDxf,out);
                 out.flush();
+                out.getFD().sync();
             }
             sourceBefore.requireUnchanged(originalDwg);
             editBefore.requireUnchanged(editedDxf);
-            if(Files.size(staged)<64||
+            if(Files.isSymbolicLink(staged)||
+               !Files.isRegularFile(staged,LinkOption.NOFOLLOW_LINKS)||
+               Files.size(staged)<64||
                !CadDwgFormat.identify(staged.toFile()).modern2018Family)
                 throw new IOException("Kodlayıcı geçerli AC1032 DWG üretmedi");
             CadSaveSourceIntegrity candidateBefore=
@@ -89,6 +93,9 @@ public final class CadAc1032StagedSave {
                 throw new IOException("AC1032 bağımsız yeniden açma/semantik testi başarısız");
             // A malicious/broken verifier could mutate the staged output,
             // or an editor may modify a source during its longer analysis.
+            if(Files.isSymbolicLink(staged)||
+               !Files.isRegularFile(staged,LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("AC1032 sahne dosyası değiştirildi");
             candidateBefore.requireUnchanged(staged.toFile());
             sourceBefore.requireUnchanged(originalDwg);
             editBefore.requireUnchanged(editedDxf);
