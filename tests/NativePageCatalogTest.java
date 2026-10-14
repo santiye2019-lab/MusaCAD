@@ -51,6 +51,17 @@ public final class NativePageCatalogTest {
         missing=catalog.missingVisible(cache,-10,-10,60,20,2);
         yes(missing.size()==2,"bounded reload batch");
         yes(missing.get(0).start.equals(c(3,0)),"nearest page first");
+        // Preflight must be read-only: invalid page continuations are
+        // rejected before a valid cached page could be evicted.
+        NativePageCatalog staged=new NativePageCatalog(2);
+        staged.requireAppend(c(0,0),c(1,0),true,0,0,1,1,1);
+        yes(staged.size()==0&&!staged.isDiscovered(),
+            "catalog preflight never mutates discovery");
+        reject(()->staged.requireAppend(c(3,0),c(4,0),true,0,0,1,1,1),
+            "preflight rejects a cursor gap");
+        staged.append(c(0,0),c(1,0),true,0,0,1,1,1);
+        staged.requireAppend(c(1,0),c(2,0),false,1,0,2,1,1);
+        yes(staged.size()==1,"preflight leaves existing pages unchanged");
         NativePageCatalog bounded=new NativePageCatalog(1);
         bounded.append(c(0,0),c(1,0),true,0,0,1,1,1);
         reject(()->bounded.append(c(1,0),c(2,0),false,1,0,2,1,1),
