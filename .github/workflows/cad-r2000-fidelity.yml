@@ -16,6 +16,7 @@ on:
       - 'tests/r2000_generate_variants.py'
       - 'tests/r2000_generate_stress.py'
       - 'tests/private_dwg_read_audit.py'
+      - 'tests/test_private_dwg_spline_diagnostics.py'
       - 'tests/dwg_dxf_semantic_parity.py'
       - 'tests/test_dwg_dxf_semantic_parity.py'
       - 'tests/modern_dwg_acceptance.py'
@@ -274,6 +275,7 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror tests/native_fit_spline_test.c -lm \
             -o /tmp/musacad-fit-spline-test
           /tmp/musacad-fit-spline-test
+          python3 -m unittest discover -s tests -p 'test_private_dwg_spline_diagnostics.py' -v
           python3 - <<'PY'
           from pathlib import Path
           code=Path("app/src/main/cpp/native_scene.c").read_text()
