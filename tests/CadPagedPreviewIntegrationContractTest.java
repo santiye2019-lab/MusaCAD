@@ -46,6 +46,9 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(loader,"listener.onEnd(preview.isComplete(),doneTotal)","honest completion");
         need(loader,"listener.onError(","explicit decoding errors");
         need(loader,"worker.shutdownNow()","worker cancellation");
+        need(loader,"pageNoticePending.compareAndSet(false,true)","coalesced UI updates");
+        need(loader,"currentPrimitives,preview.isComplete()","fresh callback state");
+
 
         need(compositor,"cache.visible(","viewport page pruning");
         need(compositor,"cache.isComplete()","partial flag");
