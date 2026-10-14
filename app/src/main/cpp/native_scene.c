@@ -643,7 +643,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                 /* LibreDWG dwg.spec stores w=0 when 'weighted' is false,
                  * even if the rational flag is set. The implicit DXF/NURBS
                  * weight in that case is exactly one. */
-                points[i].w=e->weighted?e->ctrl_pts[i].w:1.0;
+                points[i].w=musa_nurbs_weight(e->ctrl_pts[i].w,e->weighted);
             }
             int sampled=musa_nurbs_valid(points,n,e->knots,
                                          (size_t)e->num_knots,degree)
