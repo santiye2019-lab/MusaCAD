@@ -621,6 +621,15 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             if(n<2||n>MUSA_NURBS_MAX_CONTROL||!e->ctrl_pts||!e->knots||
                degree<1||degree>MUSA_NURBS_MAX_DEGREE||
                (size_t)e->num_knots!=n+(size_t)degree+1u){
+#ifdef MUSA_HOST
+                /* Count-only host diagnosis: no DWG names, text or coords.
+                 * Never turn an incomplete native first paint into PASS. */
+                fprintf(stderr,"MusaCAD spline rejected: scenario=%d degree=%d"
+                        " control=%zu knots=%zu fit=%zu weighted=%d rational=%d"
+                        " reason=missing_knots_or_fit_only\n",
+                        (int)e->scenario,degree,n,(size_t)e->num_knots,
+                        (size_t)e->num_fit_pts,(int)e->weighted,(int)e->rational);
+#endif
                 s->truncated=1;break;
             }
             MusaNurbsControl *points=(MusaNurbsControl*)calloc(n,sizeof(*points));
@@ -628,12 +637,22 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             for(size_t i=0;i<n;i++){
                 points[i].x=e->ctrl_pts[i].x;
                 points[i].y=e->ctrl_pts[i].y;
-                points[i].w=(e->weighted||e->rational)?e->ctrl_pts[i].w:1.0;
+                /* LibreDWG dwg.spec stores w=0 when 'weighted' is false,
+                 * even if the rational flag is set. The implicit DXF/NURBS
+                 * weight in that case is exactly one. */
+                points[i].w=e->weighted?e->ctrl_pts[i].w:1.0;
             }
             int sampled=musa_nurbs_valid(points,n,e->knots,
                                          (size_t)e->num_knots,degree)
                 ?musa_nurbs_preview_points(e->knots,n,degree):0;
             if(!sampled||!begin_poly(s,color,e->closed_b!=0,sampled)){
+#ifdef MUSA_HOST
+                fprintf(stderr,"MusaCAD spline rejected: scenario=%d degree=%d"
+                        " control=%zu knots=%zu fit=%zu weighted=%d rational=%d"
+                        " reason=bad_weights_knots_or_budget\n",
+                        (int)e->scenario,degree,n,(size_t)e->num_knots,
+                        (size_t)e->num_fit_pts,(int)e->weighted,(int)e->rational);
+#endif
                 s->truncated=1;free(points);break;
             }
             int first=1;
