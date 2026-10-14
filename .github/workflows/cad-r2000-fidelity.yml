@@ -12,6 +12,8 @@ on:
       - 'tests/r2000_generate_variants.py'
       - 'tests/r2000_generate_stress.py'
       - 'tests/private_dwg_read_audit.py'
+      - 'tests/dwg_dxf_semantic_parity.py'
+      - 'tests/test_dwg_dxf_semantic_parity.py'
       - 'tests/modern_dwg_acceptance.py'
       - 'tests/test_modern_dwg_acceptance.py'
       - 'tests/test_modern_color_inventory.py'
@@ -39,6 +41,18 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: third_party/libredwg
+      - name: Reject silent CAD geometry color or block loss in future AC1032 output
+        run: |
+          python3 -m unittest discover -s tests -p 'test_dwg_dxf_semantic_parity.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/dwg_dxf_semantic_parity.py").read_text()
+          assert "UNVERIFIABLE_ENTITY_CLASSES" in code
+          assert "records[(section, kind, digest)] += 1" in code
+          assert "if code == 999:" in code
+          assert 'if not has_eof or section or "ENTITIES" not in sections:' in code
+          PY
+
       - name: Exact source-DXF snapshot rejects same-size edits
         run: |
           cc -std=c11 -Wall -Wextra -Werror tests/dwg_source_snapshot_test.c \
