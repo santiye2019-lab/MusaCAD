@@ -8,7 +8,20 @@ compare in memory; summaries report counts only, never handles/layers/text.
 from __future__ import annotations
 
 from collections import Counter
+from decimal import Decimal
+from dwg_dxf_semantic_parity import _normalized
 import re
+
+# Limited geometry comparison for independently supplied ORIGINAL DWG data.
+# Not full CAD fidelity: excludes elevations, colors, thickness, XREF, ACIS,
+# block transforms and viewport appearance beyond the fields listed below.
+_CORE_GEOMETRY = {
+    "LINE": ((10, 20, 11, 21), {30: "0", 31: "0"}),
+    "POINT": ((10, 20), {30: "0", 210: "0", 220: "0", 230: "1"}),
+    "CIRCLE": ((10, 20, 40), {30: "0", 210: "0", 220: "0", 230: "1"}),
+    "ARC": ((10, 20, 40, 50, 51),
+            {30: "0", 210: "0", 220: "0", 230: "1"}),
+}
 
 _HEX_HANDLE = re.compile(r"[0-9A-Fa-f]{1,32}\Z")
 _SPACES = {"ENTITIES": "model", "BLOCKS": "block"}
@@ -18,7 +31,10 @@ _MAX_OBJECTS = 2_000_000
 
 
 class DwgEntityIdentityAudit:
-    def __init__(self):
+    def __init__(self, geometry_enabled=False):
+        self.geometry_enabled = bool(geometry_enabled)
+        self.core_geometry = {} if geometry_enabled else None
+        self.invalid_core_geometry = 0
         self.entities = {}
         self.total = 0
         self.missing_handle = 0
@@ -39,6 +55,49 @@ class DwgEntityIdentityAudit:
             return None
         numeric = int(value, 16)
         return format(numeric, "X") if numeric else None
+
+    @staticmethod
+    def _primitive_geometry(kind, groups, reference=False):
+        """Canonical exact numeric subset; never return values in diagnostics.
+
+        Reference records use a mapping of decimal DXF group-code strings to
+        numeric strings. Source DXF records are ordered (group-code, value)
+        pairs. Missing optional Z and OCS normals use DWG/DXF documented
+        defaults. Fail on missing/duplicate/malformed covered numeric fields.
+        """
+        spec = _CORE_GEOMETRY.get(kind)
+        if spec is None:
+            raise ValueError("unsupported independent geometry type")
+        mandatory, defaults = spec
+        allowed = set(mandatory) | set(defaults)
+        if reference:
+            if not isinstance(groups, dict) or len(groups) > len(allowed):
+                raise ValueError("invalid reference geometry field mapping")
+            pairs = []
+            for key, value in groups.items():
+                if not isinstance(key, str) or not key.isdecimal():
+                    raise ValueError("invalid reference geometry group code")
+                code = int(key)
+                if key != str(code) or code not in allowed:
+                    raise ValueError("unknown reference geometry field")
+                pairs.append((code, value))
+        else:
+            pairs = [(code, value) for code, value in groups if code in allowed]
+        fields = {}
+        for code, value in pairs:
+            if code in fields or not isinstance(value, str) or len(value) > 128:
+                raise ValueError("invalid or duplicate geometry coordinate")
+            fields[code] = value
+        if any(code not in fields for code in mandatory):
+            raise ValueError("incomplete primitive geometry")
+        canonical = []
+        for code in sorted(allowed):
+            raw = fields.get(code, defaults.get(code))
+            value = _normalized(code, raw)
+            if code == 40 and Decimal(value) <= 0:
+                raise ValueError("nonpositive primitive radius")
+            canonical.append((code, value))
+        return tuple(canonical)
 
     @classmethod
     def _space(cls, section, fields):
@@ -98,6 +157,12 @@ class DwgEntityIdentityAudit:
             return
         self.entities[handle] = (space, kind,
                                  layers[0] if layers else None)
+        if self.geometry_enabled and kind in _CORE_GEOMETRY:
+            try:
+                self.core_geometry[handle] = self._primitive_geometry(kind, fields)
+            except ValueError:
+                self.core_geometry[handle] = None
+                self.invalid_core_geometry += 1
 
     def summary(self):
         issues = (self.missing_handle + self.invalid_handle +
@@ -167,5 +232,55 @@ class DwgEntityIdentityAudit:
             "independent_identity_scope": (
                 "Only source handle, entity type, layer, model/paperspace/block. No "
                 "coordinates, colors, text, viewport pixels, or ACIS fidelity."
+            ),
+        }
+
+    def compare_independent_geometry(self, reference_records):
+        """Opt-in exact primitive parameter comparison with independent reader.
+
+        This verifies only explicitly supported numeric DXF groups. It never
+        certifies unrelated classes, whole-drawing quality or DWG Save As.
+        """
+        if not self.geometry_enabled or not isinstance(reference_records, list):
+            raise ValueError("independent geometry audit is not enabled")
+        if not reference_records or len(reference_records) > _MAX_OBJECTS:
+            raise ValueError("empty or oversized independent geometry records")
+        reference = {}
+        for entry in reference_records:
+            if not isinstance(entry, dict) or set(entry) != {"handle", "type", "groups"}:
+                raise ValueError("invalid independent geometry entry")
+            handle = self._handle(entry["handle"])
+            kind = entry["type"]
+            if (handle is None or handle in reference or
+                    not isinstance(kind, str) or kind not in _CORE_GEOMETRY):
+                raise ValueError("invalid independent geometry identity")
+            reference[handle] = (kind, self._primitive_geometry(
+                kind, entry["groups"], reference=True))
+        expected = set(self.core_geometry)
+        supplied = set(reference)
+        missing = len(expected - supplied)
+        extra = len(supplied - expected)
+        drift = sum(self.core_geometry[handle] is None or
+                    self.entities[handle][1] != reference[handle][0] or
+                    self.core_geometry[handle] != reference[handle][1]
+                    for handle in expected & supplied)
+        # Metadata-level mismatch still fails independently in the caller.
+        # A subset proof must never be labeled full geometric equivalence.
+        passed = (not missing and not extra and not drift and
+                  not self.invalid_core_geometry)
+        return {
+            "independent_geometry_result": (
+                "primitive_subset_parity_only" if passed else
+                "primitive_subset_mismatch"),
+            "independent_geometry_checked": len(expected & supplied),
+            "independent_geometry_expected_primitives": len(expected),
+            "independent_geometry_missing_reference": missing,
+            "independent_geometry_unexpected_reference": extra,
+            "independent_geometry_parameter_mismatches": drift,
+            "independent_geometry_invalid_decoded": self.invalid_core_geometry,
+            "independent_geometry_scope": (
+                "LINE endpoints, POINT position/normal, CIRCLE/ARC center/radius/"
+                "angles/normal only. No tolerance, full DWG geometry, color, "
+                "XREF, block transforms, 3DSOLID, or rendering assurance."
             ),
         }

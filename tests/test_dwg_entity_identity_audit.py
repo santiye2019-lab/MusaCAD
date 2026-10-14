@@ -254,6 +254,97 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
                              original_reference)
             self.assertEqual(source.read_bytes(), original)
 
+    def test_independent_primitive_geometry_matches_exact_numeric_values(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        audit.observe("ENTITIES", "LINE", [
+            (5,"A"), (8,"PRIVATE"), (10,"0.00"), (20,"1e0"),
+            (11,"2"), (21,"3"), (30,"0"), (31,"-0")])
+        audit.observe("ENTITIES", "CIRCLE", [
+            (5,"B"), (8,"PRIVATE"), (10,"5"), (20,"7"),
+            (40,"2.5000")])
+        audit.observe("ENTITIES", "ARC", [
+            (5,"C"), (8,"PRIVATE"), (10,"1"), (20,"1"),
+            (40,"3"), (50,"0"), (51,"90")])
+        audit.observe("ENTITIES", "POINT", [
+            (5,"D"), (8,"PRIVATE"), (10,"1"), (20,"4")])
+        refs = [
+            {"handle":"A","type":"LINE","groups":{
+                "10":"0","20":"1","30":"0","11":"2","21":"3","31":"0"}},
+            {"handle":"B","type":"CIRCLE","groups":{
+                "10":"5","20":"7","30":"0","40":"2.5"}},
+            {"handle":"C","type":"ARC","groups":{
+                "10":"1","20":"1","40":"3","50":"0","51":"90"}},
+            {"handle":"D","type":"POINT","groups":{"10":"1","20":"4"}},
+        ]
+        matched = audit.compare_independent_geometry(refs)
+        self.assertEqual(matched["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(matched["independent_geometry_checked"], 4)
+        self.assertNotIn("PRIVATE", str(matched))
+        changed = [dict(row) for row in refs]
+        changed[0] = dict(refs[0], groups=dict(refs[0]["groups"], **{"11":"2.00000000000000001"}))
+        failure = audit.compare_independent_geometry(changed)
+        self.assertEqual(failure["independent_geometry_parameter_mismatches"], 1)
+        self.assertEqual(failure["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_primitive_geometry_missing_or_invalid_reference_is_not_certified(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        audit.observe("ENTITIES", "LINE", [
+            (5,"A"),(8,"0"),(10,"0"),(20,"0"),(11,"1"),(21,"2")])
+        audit.observe("ENTITIES", "POINT", [
+            (5,"B"),(8,"0"),(10,"1"),(20,"1")])
+        line = {"handle":"A","type":"LINE",
+                "groups":{"10":"0","20":"0","11":"1","21":"2"}}
+        incomplete = audit.compare_independent_geometry([line])
+        self.assertEqual(incomplete["independent_geometry_missing_reference"], 1)
+        self.assertEqual(incomplete["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+        for groups in (
+            {"10":"nan","20":"0","11":"1","21":"2"},
+            {"10":"0","20":"0","11":"1","21":"2","999":"5"},
+            {"10":"0","20":"0","11":"1"},
+            {"10":"0","20":"0","11":"1","21":"2","011":"4"},
+        ):
+            with self.subTest(groups=groups):
+                with self.assertRaises(ValueError):
+                    audit.compare_independent_geometry([
+                        dict(line, groups=groups)])
+        audit2 = DwgEntityIdentityAudit(geometry_enabled=True)
+        audit2.observe("ENTITIES", "CIRCLE", [
+            (5,"E"),(8,"0"),(10,"0"),(20,"0"),(40,"0")])
+        bad = audit2.compare_independent_geometry([
+            {"handle":"E","type":"CIRCLE",
+             "groups":{"10":"0","20":"0","40":"1"}}])
+        self.assertEqual(bad["independent_geometry_invalid_decoded"], 1)
+        self.assertEqual(bad["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_optional_independent_geometry_manifest_is_passed_to_reader(self):
+        with tempfile.TemporaryDirectory(prefix="musa-geometry-manifest-") as d:
+            base = Path(d)
+            source = base / "src.dwg"
+            source.write_bytes(b"AC1015 local synthetic fixture")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            refs = base / "refs"
+            refs.mkdir()
+            converter = base / "mock-converter"
+            converter.write_text("#!/bin/sh\\nexit 0\\n",encoding="ascii")
+            converter.chmod(0o700)
+            geo = [{"handle":"A","type":"LINE",
+                    "groups":{"10":"0","20":"0","11":"1","21":"2"}}]
+            (refs / (digest + ".json")).write_text(json.dumps({
+                "source_sha256":digest,"source_kind":"independent_dwg_reader",
+                "records":[],"geometry_records":geo}), encoding="utf-8")
+            args = ["private_dwg_read_audit.py","--converter",str(converter),
+                    "--independent-manifest-dir",str(refs),
+                    "--report",str(base / "report.json"),str(source)]
+            with patch.object(sys,"argv",args), patch(
+                    "private_dwg_read_audit.convert_one",
+                    return_value={"status":"decoded_dxf_inventory"}) as convert:
+                self.assertEqual(main(),0)
+                self.assertEqual(convert.call_args.kwargs.get("independent_geometry"),geo)
+
     def test_synthetic_dxf_groups_5_8_audited_without_details(self):
         source = (
             record("SECTION",(2,"BLOCKS")) +

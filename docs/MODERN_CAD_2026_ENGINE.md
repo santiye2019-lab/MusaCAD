@@ -293,3 +293,34 @@ and original DWG equivalence still require independent assessment.
 No claim of AutoCAD 2026 parity or real-phone performance. Main, APK and
 Cloudflare production remain untouched; overall estimated progress 35%,
 remaining 65%, 0/18 final acceptance items.
+
+## Inventory #08 — opt-in primitive geometry source parity (fourth increment)
+
+An independent CAD reader may supply `geometry_records` in the same
+source-SHA256-locked local manifest. Each item carries an original-DWG handle,
+`type` (LINE, POINT, CIRCLE, ARC) and a `groups` object of numeric-string
+DXF group codes. For example:
+
+```json
+{"handle":"A","type":"LINE",
+ "groups":{"10":"0","20":"0","30":"0","11":"100","21":"0","31":"0"}}
+```
+
+When this **optional** field is present, MusaCAD compares exact canonical
+numeric parameters from the converted DXF with independently supplied
+original-DWG values, with no precision rounding; `1.0` equals `1e0`,
+but a high-precision difference fails. LINE endpoint coordinates, POINT
+position/normal, CIRCLE center/radius/normal and ARC center/radius/angles/normal
+are covered. Optional Z and OCS defaults are normalized conservatively.
+Missing reference entities, duplicate handles, invalid numeric fields and
+incomplete converted geometry fail closed. All geometry diagnostics are
+counts only, never sensitive drawing coordinates.
+
+**Limit:** this is primitive-subset parity, not full DWG geometry verification.
+Unsupported entities, thickness, all colors, XREF, block transforms, dynamic
+blocks, drawing units, ACIS/3DSOLID, actual Android pixels and AutoCAD 2026
+feature equivalence are NOT certified. Without truly independent source values,
+no original-DWG validation takes place. A source-label declaration alone
+does not establish provenance. Full release acceptance remains 0/18;
+general feature-level estimate remains 35% (65% left). No change to
+main, live worker, production APK or default CAD render path.

@@ -185,7 +185,8 @@ def inventory_dxf(path: Path, identity_collector=None):
 
 
 def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
-                limit_mb: int, independent_reference=None):
+                limit_mb: int, independent_reference=None,
+                independent_geometry=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -296,12 +297,16 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         result["status"] = "decode_failed"
         return result
     try:
-        identity = DwgEntityIdentityAudit()
+        identity = DwgEntityIdentityAudit(
+            geometry_enabled=independent_geometry is not None)
         result.update(inventory_dxf(output, identity_collector=identity))
         if independent_reference is not None:
             # Compares decoded handles/types/layers with a separately provided
             # source-DWG inventory. Raw per-object identifiers remain local.
             result.update(identity.compare_independent(independent_reference))
+        if independent_geometry is not None:
+            result.update(identity.compare_independent_geometry(
+                independent_geometry))
         if result.get("native_scene_truncated") is True:
             # The 9 Mi-float native first-paint cap clipped this drawing.
             result["status"] = "decoded_dxf_inventory_scene_truncated"
@@ -316,6 +321,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory"
         if result.get("independent_identity_result") == "identity_metadata_mismatch":
             result["status"] = "decoded_dxf_inventory_identity_mismatch"
+        if result.get("independent_geometry_result") == "primitive_subset_mismatch":
+            result["status"] = "decoded_dxf_inventory_geometry_mismatch"
         result["conversion_has_quality_warnings"] = bool(
             result.get("native_converter_warning_mask", 0)
             or result["utf8_decode_warning_count"]
@@ -374,6 +381,7 @@ def main() -> int:
             row["status"] = "metadata_only_not_geometry_checked"
         else:
             external_entities = None
+            external_geometry = None
             if args.independent_manifest_dir:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
@@ -390,14 +398,24 @@ def main() -> int:
                         not isinstance(reference.get("records"), list)):
                         raise ValueError("independent source identity invalid")
                     external_entities = reference["records"]
+                    if "geometry_records" in reference:
+                        if not isinstance(reference["geometry_records"], list):
+                            raise ValueError("invalid independent geometry records")
+                        external_geometry = reference["geometry_records"]
                 except (ValueError, OSError, UnicodeError):
                     row["status"] = "invalid_independent_manifest"
                     failure = True
             if row.get("status") != "invalid_independent_manifest":
                 with tempfile.TemporaryDirectory(prefix="musacad-private-dwg-") as tmp:
-                    row.update(convert_one(source, converter, Path(tmp),
-                                           args.timeout_sec, args.max_vmem_mb,
-                                           external_entities))
+                    if external_geometry is None:
+                        row.update(convert_one(source, converter, Path(tmp),
+                                               args.timeout_sec, args.max_vmem_mb,
+                                               external_entities))
+                    else:
+                        row.update(convert_one(source, converter, Path(tmp),
+                                               args.timeout_sec, args.max_vmem_mb,
+                                               external_entities,
+                                               independent_geometry=external_geometry))
             if row["status"] != "decoded_dxf_inventory":
                 failure = True
         row["sha256_after"] = sha256_file(source)
