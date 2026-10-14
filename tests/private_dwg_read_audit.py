@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from native_preview_type_audit import audit_types
 import hashlib
 import json
 import os
@@ -154,6 +155,7 @@ def inventory_dxf(path: Path):
     if total_records == 0:
         raise ValueError("converter emitted no model/block geometry")
     return {
+        **audit_types(dict(model), dict(block_geometry)),
         "dxf_bytes": path.stat().st_size,
         "section_names": sorted(sections_seen),
         "layer_count": len(layers),
