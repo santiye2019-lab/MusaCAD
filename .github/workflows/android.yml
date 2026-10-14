@@ -722,6 +722,21 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
+      - name: Test real 3D triangular surface area in native drawing units
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/Cad3dSurfaceMetricsTest.java
+          java -cp /tmp/musacad-tests Cad3dSurfaceMetricsTest
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("app/src/main/java/com/musa/cad/Mesh3dActivity.java").read_text()
+          measured=code.index("Cad3dSurfaceMetrics.measure(loaded.xyz,loaded.triangles)")
+          ui=code.index("runOnUiThread(()->{if(closing)return;mesh=loaded")
+          assert measured<ui, "large CAD mesh area must not block the UI thread"
+          assert "openingSurfaceMetrics=initialMetrics;" in code
+          assert "tam B-Rep yüzeyi veya kesin metraj değildir" in code
+          assert "Eksik/temsili ACIS geometrisi nedeniyle kısmi" in code
+          PY
+
       - name: Test 3D DXF surface geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/CadSaveSourceIntegrityTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java
