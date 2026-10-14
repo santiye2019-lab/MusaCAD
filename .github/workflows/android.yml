@@ -747,14 +747,14 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests \
             app/src/main/java/com/musa/cad/CadDwgFormat.java \
             app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
-            app/src/main/java/com/musa/cad/CadAc1032StagedSave.java \
+            tests/host/com/musa/cad/CadAc1032StagedSave.java \
             tests/CadAc1032StagedSaveTest.java
           java -cp /tmp/musacad-tests CadAc1032StagedSaveTest
           # This is NOT a real AC1032 binary encoder; never enable without
           # an independently re-decoded CAD semantic parity check.
           python3 - <<'PY'
           from pathlib import Path
-          gate=Path("app/src/main/java/com/musa/cad/CadAc1032StagedSave.java").read_text()
+          gate=Path("tests/host/com/musa/cad/CadAc1032StagedSave.java").read_text()
           android=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
           assert "IndependentReopenVerifier" in gate
           assert "CadSaveSourceIntegrity.capture(originalDwg)" in gate
