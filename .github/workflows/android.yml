@@ -804,6 +804,26 @@ jobs:
           assert "Önizleme renkleri nihai değildir." in code
           PY
 
+      - name: Evaluate real DWG SPLINE NURBS curves instead of control polygons
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/native_nurbs_test.c -lm \
+            -o /tmp/musacad-native-nurbs-test
+          /tmp/musacad-native-nurbs-test
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/cpp/native_scene.c").read_text()
+          start=source.index("case DWG_TYPE_SPLINE:{")
+          end=source.index("case DWG_TYPE_SOLID:{",start)
+          spline=source[start:end]
+          assert "musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)" in spline
+          assert "points[i].w=(e->weighted||e->rational)" in spline
+          assert "musa_nurbs_valid" in spline
+          assert "musa_nurbs_preview_points" in spline
+          assert "s->truncated=1" in spline
+          assert "e->fit_pts[i].x" not in spline
+          assert "emit_poly_point(s,parent,e->ctrl_pts[i].x" not in spline
+          PY
+
       - name: Test 3D viewport normals for large and tiny CAD coordinates
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dFaceLighting.java tests/Cad3dFaceLightingTest.java
