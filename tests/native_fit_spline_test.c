@@ -72,6 +72,58 @@ int main(void){
          (MusaCadFitPoint){NAN,0,0},(MusaCadFitPoint){-1,0,0},
          clamped5),"NaN tangent must fail");
 
+    /* One explicit endpoint tangent must not be rejected or guessed.
+     * Reference values computed independently from a mixed natural/clamped
+     * cubic tridiagonal interpolation system with chord-length parameters.
+     */
+    MusaCadNaturalKnot mixed_start[5]={0},mixed_end[5]={0};
+    need(musa_cad_fit_mixed_build(fit5,5,
+         (MusaCadFitPoint){1,0,0},(MusaCadFitPoint){0,0,0},
+         mixed_start),"start-only explicit tangent solved");
+    need(mixed_start[4].mx==0.&&mixed_start[4].my==0.,
+         "unspecified end is natural");
+    need(musa_cad_fit_natural_eval(mixed_start,5,.05,&x,&y),
+         "start clamped curve at .05");
+    near(x,.3887702282714224,1e-9,"mixed start x at .05");
+    near(y,.2417459171111591,1e-9,"mixed start y at .05");
+    need(musa_cad_fit_natural_eval(mixed_start,5,.72,&x,&y),
+         "start clamped curve at .72");
+    near(x,4.302594902400962,1e-9,"mixed start x at .72");
+    near(y,3.1524174963469447,1e-9,"mixed start y at .72");
+
+    need(musa_cad_fit_mixed_build(fit5,5,
+         (MusaCadFitPoint){0,0,0},(MusaCadFitPoint){-1,0,0},
+         mixed_end),"end-only explicit tangent solved");
+    need(mixed_end[0].mx==0.&&mixed_end[0].my==0.,
+         "unspecified start is natural");
+    need(musa_cad_fit_natural_eval(mixed_end,5,.05,&x,&y),
+         "end clamped curve at .05");
+    near(x,.14973151058483003,1e-9,"mixed end x at .05");
+    near(y,.6999043524686044,1e-9,"mixed end y at .05");
+    need(musa_cad_fit_natural_eval(mixed_end,5,.72,&x,&y),
+         "end clamped curve at .72");
+    near(x,4.6566062685003695,1e-9,"mixed end x at .72");
+    near(y,2.8106647294356084,1e-9,"mixed end y at .72");
+    for(size_t i=0;i<5;i++){
+        need(musa_cad_fit_natural_eval(mixed_start,5,mixed_start[i].t,
+              &x,&y),"start-mixed fit knot");
+        near(x,fit5[i].x,1e-10,"start-mixed passes fit x");
+        near(y,fit5[i].y,1e-10,"start-mixed passes fit y");
+        need(musa_cad_fit_natural_eval(mixed_end,5,mixed_end[i].t,
+              &x,&y),"end-mixed fit knot");
+        near(x,fit5[i].x,1e-10,"end-mixed passes fit x");
+        near(y,fit5[i].y,1e-10,"end-mixed passes fit y");
+    }
+    need(!musa_cad_fit_mixed_build(fit5,5,
+         (MusaCadFitPoint){0,0,0},(MusaCadFitPoint){0,0,0},
+         mixed_start),"both natural endpoints need natural builder");
+    need(!musa_cad_fit_mixed_build(fit5,5,
+         (MusaCadFitPoint){1,0,0},(MusaCadFitPoint){-1,0,0},
+         mixed_start),"both explicit endpoints need clamped builder");
+    need(!musa_cad_fit_mixed_build(fit5,5,
+         (MusaCadFitPoint){NAN,0,0},(MusaCadFitPoint){0,0,0},
+         mixed_start),"nonfinite mixed tangent rejected");
+
     MusaCadFitPoint fit6[]={
         {0,0,0},{1,0,0},{2,1,0},{3,1.5,0},{5,2,0},{8,0,0}
     };
