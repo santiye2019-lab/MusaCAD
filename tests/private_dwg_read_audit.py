@@ -56,7 +56,7 @@ def dxf_pairs(path: Path):
             yield int(code), value.strip()
 
 
-def inventory_dxf(path: Path):
+def inventory_dxf(path: Path, identity_collector=None):
     section = ""
     current = None
     fields = []
@@ -64,7 +64,8 @@ def inventory_dxf(path: Path):
     blocks = {}
     model = Counter()
     block_geometry = Counter()
-    identity = DwgEntityIdentityAudit()
+    identity = (identity_collector if identity_collector is not None
+                else DwgEntityIdentityAudit())
     # Raw decoded-DXF attributes, NOT proof that native Canvas displayed them.
     color_sources = Counter()
     advanced_entities = Counter()
@@ -183,7 +184,8 @@ def inventory_dxf(path: Path):
     }
 
 
-def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, limit_mb: int):
+def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
+                limit_mb: int, independent_reference=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -294,7 +296,12 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         result["status"] = "decode_failed"
         return result
     try:
-        result.update(inventory_dxf(output))
+        identity = DwgEntityIdentityAudit()
+        result.update(inventory_dxf(output, identity_collector=identity))
+        if independent_reference is not None:
+            # Compares decoded handles/types/layers with a separately provided
+            # source-DWG inventory. Raw per-object identifiers remain local.
+            result.update(identity.compare_independent(independent_reference))
         if result.get("native_scene_truncated") is True:
             # The 9 Mi-float native first-paint cap clipped this drawing.
             result["status"] = "decoded_dxf_inventory_scene_truncated"
@@ -307,6 +314,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
             result["status"] = "decoded_dxf_inventory_scene_incomplete"
         else:
             result["status"] = "decoded_dxf_inventory"
+        if result.get("independent_identity_result") == "identity_metadata_mismatch":
+            result["status"] = "decoded_dxf_inventory_identity_mismatch"
         result["conversion_has_quality_warnings"] = bool(
             result.get("native_converter_warning_mask", 0)
             or result["utf8_decode_warning_count"]
@@ -323,6 +332,9 @@ def main() -> int:
     parser.add_argument("--converter", type=Path)
     parser.add_argument("--manifest-only", action="store_true")
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--independent-manifest-dir", type=Path,
+                        help="Optional LOCAL external-DWG-reader manifest directory, "
+                             "one <source_sha256>.json file per source; never uploaded.")
     parser.add_argument("--timeout-sec", type=int, default=180)
     parser.add_argument("--max-vmem-mb", type=int, default=1536)
     args = parser.parse_args()
@@ -330,6 +342,10 @@ def main() -> int:
         parser.error("full audit requires --converter; use --manifest-only for signature inventory")
     if args.timeout_sec <= 0 or args.max_vmem_mb <= 0:
         parser.error("time and memory limits must be positive")
+    if args.independent_manifest_dir and args.manifest_only:
+        parser.error("independent DWG manifest requires full conversion")
+    if args.independent_manifest_dir and not args.independent_manifest_dir.is_dir():
+        parser.error("independent DWG manifest directory not found")
     converter = args.converter.resolve() if args.converter else None
     if converter and (not converter.is_file() or not os.access(converter, os.X_OK)):
         parser.error("host converter does not exist or is not executable")
@@ -352,9 +368,29 @@ def main() -> int:
         elif args.manifest_only:
             row["status"] = "metadata_only_not_geometry_checked"
         else:
-            with tempfile.TemporaryDirectory(prefix="musacad-private-dwg-") as tmp:
-                row.update(convert_one(source, converter, Path(tmp),
-                                       args.timeout_sec, args.max_vmem_mb))
+            external_entities = None
+            if args.independent_manifest_dir:
+                # Only caller-supplied, separately collected DWG evidence.
+                # Hash-derived path avoids exposing DWG or project file names.
+                reference_path = args.independent_manifest_dir / (digest + ".json")
+                try:
+                    if not reference_path.is_file() or reference_path.stat().st_size > 64*1024*1024:
+                        raise ValueError("independent manifest missing or oversize")
+                    reference = json.loads(reference_path.read_text(encoding="utf-8"))
+                    if (not isinstance(reference, dict) or
+                        reference.get("source_sha256") != digest or
+                        reference.get("source_kind") != "independent_dwg_reader" or
+                        not isinstance(reference.get("records"), list)):
+                        raise ValueError("independent source identity invalid")
+                    external_entities = reference["records"]
+                except (ValueError, OSError, UnicodeError):
+                    row["status"] = "invalid_independent_manifest"
+                    failure = True
+            if row.get("status") != "invalid_independent_manifest":
+                with tempfile.TemporaryDirectory(prefix="musacad-private-dwg-") as tmp:
+                    row.update(convert_one(source, converter, Path(tmp),
+                                           args.timeout_sec, args.max_vmem_mb,
+                                           external_entities))
             if row["status"] != "decoded_dxf_inventory":
                 failure = True
         row["sha256_after"] = sha256_file(source)
