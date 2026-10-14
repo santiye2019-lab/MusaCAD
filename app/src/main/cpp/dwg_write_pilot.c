@@ -8,6 +8,7 @@
  */
 #include "config.h"
 #include "dwg.h"
+#include "dwg_primitive_fidelity.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,12 +109,14 @@ static int pilot_write(const char *input, const char *output) {
   int valid = valid_magic && verify_status < DWG_ERR_CRITICAL &&
               geometry_signature(&decoded, &actual) == 0 &&
               equal_geometry(&expected, &actual);
+  /* Fail closed if decoded primitive coordinates differ from the DXF. */
+  if (valid) valid = musa_verify_primitive_coordinates(input, &decoded);
   if (valid) valid = stat(input, &source_after) == 0 &&
                       source_before.st_size == source_after.st_size &&
                       source_before.st_mtime == source_after.st_mtime;
   dwg_free(&decoded);
   if (!valid) {
-    fprintf(stderr, "Rejected DWG round-trip (read=%d, signatures/mtime).\n", verify_status);
+    fprintf(stderr, "Rejected DWG round-trip (read=%d, counts/coordinates/mtime).\n", verify_status);
     unlink(stage); free(stage); return 6;
   }
   /* link() is exclusive (EEXIST) and cannot overwrite the destination. */
