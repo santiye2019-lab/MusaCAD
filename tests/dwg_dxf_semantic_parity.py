@@ -80,7 +80,25 @@ def _normalized(code: int, value: str) -> str:
             raise DxfParityError("out-of-budget DXF numeric field")
         if number == 0:
             return "0"
-        return format(number.normalize(), "f")
+        # Decimal.normalize() rounds to the current process context
+        # precision (typically 28 digits). That could accidentally make
+        # two distinct high-precision CAD coordinates compare equal.
+        # Canonicalize via the exact coefficient and exponent instead.
+        triplet = number.as_tuple()
+        coefficient = "".join(str(d) for d in triplet.digits).lstrip("0")
+        exponent = triplet.exponent
+        while coefficient.endswith("0"):
+            coefficient = coefficient[:-1]
+            exponent += 1
+        if exponent >= 0:
+            literal = coefficient + "0" * exponent
+        else:
+            point = len(coefficient) + exponent
+            literal = (
+                coefficient[:point] + "." + coefficient[point:]
+                if point > 0 else "0." + "0" * (-point) + coefficient
+            )
+        return ("-" if triplet.sign else "") + literal
     if code in INT_CODES:
         try:
             return str(int(value, 10))
@@ -130,8 +148,8 @@ def fingerprint(path: Path) -> dict:
                 raise DxfParityError("empty critical DXF HEADER variable")
             h = sha256()
             for code, value in values:
-                h.update(str(code).encode("ascii") + b"\\x00")
-                h.update(value.encode("utf-8") + b"\\x00")
+                h.update(str(code).encode("ascii") + b"\x00")
+                h.update(value.encode("utf-8") + b"\x00")
             records[("HEADER", var, h.hexdigest())] += 1
             counts[("HEADER", var)] += 1
 
