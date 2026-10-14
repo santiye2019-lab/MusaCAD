@@ -182,13 +182,13 @@ def fingerprint(path: Path) -> dict:
                 unverified[section] += 1
             return
         if kind == "ENDSEC":
-            if not section:
-                raise DxfParityError("unmatched DXF ENDSEC")
+            if not section or attrs:
+                raise DxfParityError("invalid DXF ENDSEC or hidden section payload")
             section = ""
             return
         if kind == "EOF":
-            if section or has_eof:
-                raise DxfParityError("unexpected/duplicate DXF EOF")
+            if section or has_eof or attrs:
+                raise DxfParityError("invalid DXF EOF or hidden trailing payload")
             has_eof = True
             return
         if has_eof:
