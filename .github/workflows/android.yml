@@ -802,11 +802,16 @@ jobs:
                       (50, 15.0), (51, 185.0)]),
               entity('POINT', 'F005', ['AcDbPoint'],
                      [(10, 4.5), (20, 8.25), (30, 2.75)]),
+              entity('LWPOLYLINE', 'F006', ['AcDbPolyline'],
+                     [(90, 4), (70, 1), (10, 0.0), (20, 0.0),
+                      (10, 22.75), (20, 0.0), (10, 22.75), (20, 13.25),
+                      (10, 0.0), (20, 13.25)]),
           ))
           Path('/tmp/musa-writer-multi.dxf').write_text(
               src[:end+1] + extra + src[end+1:])
-          print('Multi-entity DXF fixture created: 3 LINE, 1 CIRCLE, 1 ARC, 1 POINT')
+          print('Multi-entity DXF fixture created: 3 LINE, CIRCLE, ARC, POINT, LWPOLYLINE')
           PY
+          # An ordered closed polyline must survive alongside basic primitives.
           /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-multi.dxf /tmp/musa-writer-multi.dwg
           test -s /tmp/musa-writer-multi.dwg
           test "$(head -c 6 /tmp/musa-writer-multi.dwg)" = AC1015
