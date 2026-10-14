@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "dwg.h"
+#include "dwg_api.h"
 #include "bits.h"
 #include "out_dxf.h"
 #include "native_scene.h"
@@ -11,6 +12,10 @@
 typedef struct {
     Dwg_Data *dwg;
     int read_status;
+    /* Optional bounded model-space index; never owns Dwg_Object storage. */
+    Dwg_Object **model_entities;
+    size_t model_count;
+    int model_index_state; /* 0 uninitialized, 1 ready, -1 fail/unsupported */
 } MusaCadSession;
 
 typedef struct {
@@ -44,8 +49,50 @@ static MusaCadSession *session_open(const char *input,int *error_out) {
     return session;
 }
 
+/*
+ * Build the pointer index once per live DWG session, without copying geometry.
+ * The maximum is a strict allocation guard. If unavailable, pages use the
+ * previous linear owner traversal without loss of data. Always called under
+ * engine_lock on Android; host probing is single-threaded.
+ */
+#define MUSA_MAX_MODEL_INDEX_ENTITIES 250000u
+static int session_ensure_model_index(MusaCadSession *session){
+    if(!session||!session->dwg)return 0;
+    if(session->model_index_state!=0)return session->model_index_state==1;
+    Dwg_Object_Ref *model=dwg_model_space_ref(session->dwg);
+    Dwg_Object *owner=model?model->obj:NULL;
+    if(!owner){session->model_index_state=-1;return 0;}
+    size_t cap=1024,count=0;
+    Dwg_Object **entries=malloc(cap*sizeof(*entries));
+    if(!entries){session->model_index_state=-1;return 0;}
+    Dwg_Object *obj=get_first_owned_entity(owner);
+    while(obj){
+        if(count>=MUSA_MAX_MODEL_INDEX_ENTITIES){
+            free(entries);
+            session->model_index_state=-1;
+            return 0;
+        }
+        if(count==cap){
+            size_t grown=cap*2;
+            if(grown>MUSA_MAX_MODEL_INDEX_ENTITIES)
+                grown=MUSA_MAX_MODEL_INDEX_ENTITIES;
+            Dwg_Object **resized=realloc(entries,grown*sizeof(*entries));
+            if(!resized){free(entries);session->model_index_state=-1;return 0;}
+            entries=resized;cap=grown;
+        }
+        entries[count++]=obj;
+        obj=get_next_owned_entity(owner,obj);
+    }
+    if(!count){free(entries);session->model_index_state=-1;return 0;}
+    session->model_entities=entries;
+    session->model_count=count;
+    session->model_index_state=1;
+    return 1;
+}
+
 static void session_close(MusaCadSession *session) {
     if(!session)return;
+    free(session->model_entities);
     if(session->dwg){dwg_free(session->dwg);free(session->dwg);}
     free(session);
 }
@@ -149,13 +196,19 @@ static int host_paged_probe(const char *input,const char *budget){
  * Opt-in CI/private acceptance for nested INSERT continuation. The legacy
  * capped scene provides a lower-bound count when it was itself truncated.
  */
-static int host_nested_page_probe(const char *input,const char *budget){
+static int host_nested_page_probe(const char *input,const char *budget,int indexed_mode){
     char *end=NULL;
     unsigned long long n=strtoull(budget,&end,10);
     if(!budget[0]||!end||*end||n<256||n>(9u*1024u*1024u))return 2;
     int read_error=0;
     MusaCadSession *session=session_open(input,&read_error);
     if(!session){fprintf(stderr,"Nested probe open failed: %d\n",read_error);return 1;}
+    if(indexed_mode&&!session_ensure_model_index(session)){
+        fprintf(stderr,"Model index unavailable (fallback required)\n");
+        session_close(session);
+        return 1;
+    }
+    if(indexed_mode)fprintf(stderr,"Indexed model entities=%zu\n",session->model_count);
     MusaNativeScene baseline={0};
     int baseline_status=musa_scene_build(session->dwg,&baseline);
     int baseline_count=baseline.primitives;
@@ -164,8 +217,12 @@ static int host_nested_page_probe(const char *input,const char *budget){
     while(pages<100000){
         MusaNativeScene page={0};
         size_t next_top=top,next_leaf=leaf;
-        int status=musa_scene_build_page_nested(session->dwg,&page,top,leaf,
-                         &next_top,&next_leaf,(size_t)n);
+        int status=indexed_mode
+                ?musa_scene_build_page_nested_indexed(session->dwg,&page,top,leaf,
+                     &next_top,&next_leaf,(size_t)n,
+                     session->model_entities,session->model_count)
+                :musa_scene_build_page_nested(session->dwg,&page,top,leaf,
+                     &next_top,&next_leaf,(size_t)n);
         if(status<0||page.truncated||page.count>(size_t)n||
            (status==1 && (next_top<top||
              (next_top==top&&next_leaf<=leaf))) ||
@@ -202,7 +259,8 @@ static int host_nested_page_probe(const char *input,const char *budget){
        (baseline_status==0 && (total!=(size_t)baseline_count||
           stream_at!=(baseline.count>=7?baseline.count-7:0)))||
        (baseline_status==1 && total<(size_t)baseline_count))failure=1;
-    if(!failure)fprintf(stderr,"Nested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
+    if(!failure)fprintf(stderr,"%sNested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
+                        indexed_mode?"Indexed ":"",
                         pages,total,baseline_count,baseline_status);
     else fprintf(stderr,"Nested paged scene failed: finished=%d pages=%zu total=%zu legacy=%d status=%d\n",
                  finished,pages,total,baseline_count,baseline_status);
@@ -212,8 +270,10 @@ static int host_nested_page_probe(const char *input,const char *budget){
 }
 
 int main(int argc,char **argv){
+    if(argc==4&&strcmp(argv[1],"--indexed-nested-paged-probe")==0)
+        return host_nested_page_probe(argv[2],argv[3],1);
     if(argc==4&&strcmp(argv[1],"--nested-paged-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3]);
+        return host_nested_page_probe(argv[2],argv[3],0);
     if(argc==4&&strcmp(argv[1],"--paged-probe")==0)
         return host_paged_probe(argv[2],argv[3]);
     if(argc!=3)return 2;
@@ -375,8 +435,13 @@ JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNestedPageN
     MusaNativeScene page={0};
     size_t nextTop=(size_t)startTop,nextLeaf=(size_t)startLeaf;
     pthread_mutex_lock(&engine_lock);
-    int status=musa_scene_build_page_nested(session->dwg,&page,
-        (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords);
+    int use_index=session_ensure_model_index(session);
+    int status=use_index
+        ?musa_scene_build_page_nested_indexed(session->dwg,&page,
+          (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords,
+          session->model_entities,session->model_count)
+        :musa_scene_build_page_nested(session->dwg,&page,
+          (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords);
     pthread_mutex_unlock(&engine_lock);
     if(status<0||page.truncated||page.count>(size_t)maxWords||
        page.count>(size_t)2147483647||
