@@ -533,8 +533,10 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             emit_arc_curve(s,color,parent,c.x,c.y,px.x-c.x,px.y-c.y,py.x-c.x,py.y-c.y,e->start_angle,e->end_angle,0);break;
         }
         case DWG_TYPE_POINT:{
-            Dwg_Entity_POINT *e=obj->tio.entity->tio.POINT;BITCODE_3DPOINT in={e->x,e->y,e->z},p;
-            if(!e)break;transform_OCS(&p,in,e->extrusion);emit_point(s,color,parent,p.x,p.y);break;
+            Dwg_Entity_POINT *e=obj->tio.entity->tio.POINT;
+            if(!e)break; /* Corrupted AC1032/legacy records may lack payloads. */
+            BITCODE_3DPOINT in={e->x,e->y,e->z},p;
+            transform_OCS(&p,in,e->extrusion);emit_point(s,color,parent,p.x,p.y);break;
         }
         case DWG_TYPE_RAY:{
             dwg_ent_ray *e=dwg_object_to_RAY(obj);if(!e)break;
