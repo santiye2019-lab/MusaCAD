@@ -21,6 +21,7 @@ import java.lang.ref.WeakReference;
  */
 public final class NativePagedScenePreview {
     private final NativeViewportPageCache<NativeScene> cache;
+    private final NativePageCatalog catalog=new NativePageCatalog(100000);
     private Matrix worldToContent;
     private final Matrix scratchCombined=new Matrix();
     private final Matrix scratchInverse=new Matrix();
@@ -48,12 +49,50 @@ public final class NativePagedScenePreview {
                                                   page.nextNestedLeafIndex),
                 page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
                 page.scene.estimatedRetainedBytes(),page.scene);
+        if(stored){
+            catalog.append(new NativeViewportPageCache.Cursor(startTop,startLeaf),
+                    new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
+                            page.nextNestedLeafIndex),
+                    page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
+                    page.scene.primitiveCount);
+        }
         if(stored&&!sourceStarted){
             worldToContent=page.scene.worldToContentTransform();
             firstPageRef=new WeakReference<>(page.scene);
             sourceStarted=true;
         }
         return stored;
+    }
+
+    /** Metadata remains available after a payload is evicted by the LRU. */
+    public synchronized boolean isCatalogComplete(){return catalog.isDiscovered();}
+
+    /** A bounded list of source cursors to fetch for a particular visible area. */
+    public synchronized ArrayList<NativePageCatalog.Entry> missingViewportPages(
+            float minX,float minY,float maxX,float maxY,int maxBatch){
+        return new ArrayList<>(catalog.missingVisible(
+                cache,minX,minY,maxX,maxY,maxBatch));
+    }
+
+    /**
+     * Restores ONLY a previously discovered page. Rejects any read that
+     * produces a changed cursor, geometry count or bounding box. This cannot
+     * expand the catalog or silently accept a changed source DWG.
+     */
+    public synchronized boolean retainReload(NativePageCatalog.Entry expected,
+                                             NativeCadEngine.NestedScenePage page){
+        if(expected==null||page==null||page.scene==null||page.scene.truncated)
+            throw new IllegalArgumentException("invalid reloaded DWG page");
+        RectF bbox=page.scene.occupiedWorldBounds();
+        NativeViewportPageCache.Cursor next=
+                new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
+                                                   page.nextNestedLeafIndex);
+        if(!catalog.samePage(expected.start,next,page.hasMore,bbox.left,bbox.top,
+                             bbox.right,bbox.bottom,page.scene.primitiveCount))
+            throw new IllegalStateException("DWG sayfası yeniden okumada değişti");
+        return cache.put(expected.start,next,page.hasMore,
+                         bbox.left,bbox.top,bbox.right,bbox.bottom,
+                         page.scene.estimatedRetainedBytes(),page.scene);
     }
 
     /** The view must hold the exact first scene object from this source. */
@@ -66,7 +105,7 @@ public final class NativePagedScenePreview {
     public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
     public synchronized boolean isPartial(){return !cache.isComplete();}
     public synchronized void clear(){
-        cache.clear();sourceStarted=false;worldToContent=null;firstPageRef=null;
+        cache.clear();catalog.clear();sourceStarted=false;worldToContent=null;firstPageRef=null;
     }
 
     /**
