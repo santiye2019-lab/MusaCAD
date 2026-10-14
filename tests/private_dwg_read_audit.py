@@ -40,9 +40,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def dxf_pairs(path: Path):
-    # ASCII DXF group-code/value pairs. A binary/invalid DXF fails closed.
-    with path.open("r", encoding="utf-8", errors="strict", newline=None) as stream:
+def dxf_pairs(path: Path, encoding="utf-8"):
+    # ASCII group codes + strict, explicit legacy text decoding when selected.
+    # The host converter may emit ANSI text for pre-Unicode R2000/R2004 DWG.
+    if encoding not in ("utf-8", "cp1252"):
+        raise ValueError("unsupported DXF audit text encoding")
+    with path.open("r", encoding=encoding, errors="strict", newline=None) as stream:
         while True:
             key = stream.readline()
             if not key:
@@ -56,7 +59,7 @@ def dxf_pairs(path: Path):
             yield int(code), value.strip()
 
 
-def inventory_dxf(path: Path, identity_collector=None):
+def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8"):
     section = ""
     current = None
     fields = []
@@ -147,7 +150,7 @@ def inventory_dxf(path: Path, identity_collector=None):
             block_geometry[current] += 1
             total_records += 1
 
-    for code, value in dxf_pairs(path):
+    for code, value in dxf_pairs(path, encoding=text_encoding):
         if code == 0:
             finish()
             current = value.upper()
@@ -297,10 +300,29 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         result["status"] = "decode_failed"
         return result
     try:
+        # Pre-Unicode DWG versions can legitimately export non-UTF8 DXF text.
+        # Only retry these older releases with an explicitly identified,
+        # unverified Windows-1252 assumption. Never substitute replacement
+        # characters silently or weaken UTF-8 validation for modern DWGs.
+        with input_path.open("rb") as source_stream:
+            legacy_dwg = source_stream.read(6) in (b"AC1015", b"AC1018")
+        output_encoding = "utf-8"
+        if legacy_dwg:
+            try:
+                with output.open("r", encoding="utf-8", errors="strict") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), ""):
+                        pass
+            except UnicodeDecodeError:
+                output_encoding = "cp1252"
+        result["decoded_dxf_encoding_assumption"] = (
+            "legacy_cp1252_unverified" if output_encoding == "cp1252" else
+            "utf8_strict")
+        result["legacy_dxf_encoding_fallback"] = output_encoding == "cp1252"
         identity = DwgEntityIdentityAudit(
             geometry_enabled=independent_geometry is not None,
             style_enabled=independent_style is not None)
-        result.update(inventory_dxf(output, identity_collector=identity))
+        result.update(inventory_dxf(output, identity_collector=identity,
+                                    text_encoding=output_encoding))
         if independent_reference is not None:
             # Compares decoded handles/types/layers with a separately provided
             # source-DWG inventory. Raw per-object identifiers remain local.
@@ -328,9 +350,16 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory_geometry_mismatch"
         if result.get("independent_style_result") == "entity_style_subset_mismatch":
             result["status"] = "decoded_dxf_inventory_style_mismatch"
+        if (result["legacy_dxf_encoding_fallback"] and
+                any(value is not None for value in (
+                    independent_reference, independent_geometry, independent_style))):
+            # The mapping is an assumption without source codepage evidence,
+            # therefore even equal decoded metadata cannot certify parity.
+            result["status"] = "decoded_dxf_inventory_encoding_unverified"
         result["conversion_has_quality_warnings"] = bool(
             result.get("native_converter_warning_mask", 0)
             or result["utf8_decode_warning_count"]
+            or result["legacy_dxf_encoding_fallback"]
         )
     except (ValueError, OSError) as exc:
         result["status"] = "invalid_converted_dxf"

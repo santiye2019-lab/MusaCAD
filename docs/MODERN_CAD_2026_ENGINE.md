@@ -356,3 +356,23 @@ source manifest is mandatory for an original-DWG claim. This is optional,
 read-only host diagnostic work, not new native viewport functionality.
 No change to main, existing APK, or Cloudflare. Feature-level
 AutoCAD 2026 estimate remains 35% and 0/18 final field acceptance.
+
+## R2000/R2004 legacy DXF codepage compatibility regression
+
+GitHub proof run #38634234519 failed on the public LibreDWG R2000 TS1
+fixture after a strict UTF-8 read was introduced. This is a real regression,
+not evidence that converter geometry changed. The legacy audit now first
+validates strict UTF-8 on R2000/R2004 outputs, and only on decoding failure
+retries with an explicitly labeled **unverified cp1252 assumption**.
+No Unicode replacement characters are silently inserted. The report flags
+\`legacy_dxf_encoding_fallback\`, \`decoded_dxf_encoding_assumption\` and
+\`conversion_has_quality_warnings\`. Independent original-DWG manifest
+validation *cannot pass* when that source codepage assumption was needed;
+the audit requires separately established encoding provenance before a
+source-text identity claim. R2010/R2013/R2018 exports remain strict UTF-8
+and invalid UTF-8 still fails closed. This is provisional compatibility,
+not proof that all R2000/R2004 language-specific codepages are supported.
+
+Synthetic acceptance reproduces a legacy cp1252 non-ASCII layer name and
+ensures modern files reject the exact same bytes. The public TS1 fixture
+must pass the DWG CI proof again before this patch is accepted.

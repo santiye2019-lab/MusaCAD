@@ -5,10 +5,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from dwg_entity_identity_audit import DwgEntityIdentityAudit
-from private_dwg_read_audit import inventory_dxf, main
+from private_dwg_read_audit import inventory_dxf, main, convert_one
 
 
 def record(kind, *pairs):
@@ -437,6 +437,57 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
                 self.assertEqual(main(),0)
                 self.assertEqual(called.call_args.kwargs["independent_style"],
                                  style)
+
+    def test_r2000_cp1252_fallback_is_explicit_and_modern_dwg_stays_strict(self):
+        payload = (
+            b"0\nSECTION\n2\nENTITIES\n0\nLINE\n5\nA\n8\n"
+            + "BÜRO".encode("cp1252")
+            + b"\n10\n0\n20\n0\n11\n12\n21\n3\n"
+              b"0\nENDSEC\n0\nEOF\n"
+        )
+        with tempfile.TemporaryDirectory(prefix="musa-legacy-text-") as directory:
+            root = Path(directory)
+            converter = root / "mock-converter"
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+            converter.chmod(0o700)
+
+            def fake_convert(args, **kwargs):
+                Path(args[2]).write_bytes(payload)
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=5\n")
+                return Mock(returncode=0)
+
+            for signature, expect_legacy in ((b"AC1015", True),
+                                              (b"AC1018", True),
+                                              (b"AC1032", False)):
+                with self.subTest(signature=signature):
+                    original = root / "original.dwg"
+                    original.write_bytes(signature + b" example")
+                    with tempfile.TemporaryDirectory(dir=root) as work:
+                        with patch("private_dwg_read_audit.subprocess.run",
+                                   side_effect=fake_convert):
+                            audit = convert_one(original, converter, Path(work),
+                                                timeout=5, limit_mb=128)
+                    if expect_legacy:
+                        self.assertEqual(audit["status"], "decoded_dxf_inventory")
+                        self.assertTrue(audit["legacy_dxf_encoding_fallback"])
+                        self.assertTrue(audit["conversion_has_quality_warnings"])
+                        self.assertEqual(audit["decoded_dxf_encoding_assumption"],
+                                         "legacy_cp1252_unverified")
+                        self.assertIn("BÜRO", audit["layer_names"])
+                        self.assertNotIn("\ufffd", str(audit))
+                    else:
+                        self.assertEqual(audit["status"], "invalid_converted_dxf")
+                        self.assertEqual(audit["error_type"], "UnicodeDecodeError")
+            original.write_bytes(b"AC1015 sensitive project")
+            with tempfile.TemporaryDirectory(dir=root) as work:
+                with patch("private_dwg_read_audit.subprocess.run",
+                           side_effect=fake_convert):
+                    audit = convert_one(
+                        original, converter, Path(work), timeout=5, limit_mb=128,
+                        independent_reference=[])
+            self.assertEqual(audit["status"],
+                             "decoded_dxf_inventory_encoding_unverified")
 
     def test_invalid_dxf_utf8_rejected_not_replaced(self):
         with tempfile.TemporaryDirectory(prefix="musa-utf8-safe-") as td:
