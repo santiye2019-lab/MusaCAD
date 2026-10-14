@@ -241,3 +241,31 @@ jobs:
           grep -E 'Nested scene page=.*next=[0-9]+:[1-9][0-9]* ' \
             /tmp/musa-nested-public-block.log
 
+
+      - name: Indexed model-space paging matches baseline and nested-block traversal
+        run: |
+          set -euo pipefail
+          # Public/purely synthetic fixture inputs only; no private CAD data.
+          for kind in mixed-512 mixed-8192; do
+            file="/tmp/musa-stress-r2000/$kind.dwg"
+            /usr/bin/time -f "Indexed $kind elapsed_sec=%e peak_rss_kib=%M" \
+              timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --indexed-nested-paged-probe "$file" 8192 \
+              2>&1 | tee "/tmp/musa-indexed-$kind.log"
+            grep -F 'Indexed model entities=' "/tmp/musa-indexed-$kind.log"
+            grep -F 'Indexed Nested paged scene verified:' "/tmp/musa-indexed-$kind.log"
+          done
+          timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe third_party/libredwg/test/test-data/2000/TS1.dwg 256 \
+            2>&1 | tee /tmp/musa-indexed-block.log
+          grep -F 'Indexed Nested paged scene verified:' /tmp/musa-indexed-block.log
+          grep -E 'Nested scene page=.*next=[0-9]+:[1-9][0-9]* ' /tmp/musa-indexed-block.log
+          # The leaf-size guard remains strict even with direct top-level seeks.
+          if timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+                --indexed-nested-paged-probe \
+                /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+                > /tmp/musa-indexed-leaf-too-large.log 2>&1; then
+            echo 'Indexed mode MUST reject oversize leaf without losing geometry'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-indexed-leaf-too-large.log
