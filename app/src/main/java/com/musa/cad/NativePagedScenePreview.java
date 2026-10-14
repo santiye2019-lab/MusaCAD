@@ -5,6 +5,7 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import java.util.ArrayList;
+import java.lang.ref.WeakReference;
 
 /**
  * Opt-in bounded preview compositor. NOT connected to production CadView yet.
@@ -25,6 +26,8 @@ public final class NativePagedScenePreview {
     private final Matrix scratchInverse=new Matrix();
     private final RectF scratchVisible=new RectF();
     private boolean sourceStarted;
+    /* Weak source identity guard: must not pin an evicted first page in RAM. */
+    private WeakReference<NativeScene> firstPageRef;
 
     public NativePagedScenePreview(long maxRetainedBytes,int maxRetainedPages){
         cache=new NativeViewportPageCache<>(maxRetainedBytes,maxRetainedPages);
@@ -47,9 +50,15 @@ public final class NativePagedScenePreview {
                 page.scene.estimatedRetainedBytes(),page.scene);
         if(stored&&!sourceStarted){
             worldToContent=page.scene.worldToContentTransform();
+            firstPageRef=new WeakReference<>(page.scene);
             sourceStarted=true;
         }
         return stored;
+    }
+
+    /** The view must hold the exact first scene object from this source. */
+    public synchronized boolean acceptsFirstScene(NativeScene active) {
+        return active!=null&&firstPageRef!=null&&firstPageRef.get()==active;
     }
 
     public synchronized boolean isComplete(){return cache.isComplete();}
@@ -57,7 +66,7 @@ public final class NativePagedScenePreview {
     public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
     public synchronized boolean isPartial(){return !cache.isComplete();}
     public synchronized void clear(){
-        cache.clear();sourceStarted=false;worldToContent=null;
+        cache.clear();sourceStarted=false;worldToContent=null;firstPageRef=null;
     }
 
     /**
