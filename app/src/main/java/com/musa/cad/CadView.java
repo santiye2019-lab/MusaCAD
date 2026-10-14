@@ -978,7 +978,17 @@ public class CadView extends View {
                     paint.setTextSize(28f);
                     c.drawText("DWG önizleme kısmi • sayfalar yükleniyor",20f,42f,paint);
                 }
-            }else nativeDrawing.draw(c,imageMatrix,fastNavigation);
+            }else{
+                nativeDrawing.draw(c,imageMatrix,fastNavigation);
+                if(nativeDrawing.truncated){
+                    // Initial fast scene can reach its memory/record safety cap.
+                    // It must NEVER be presented as full DWG fidelity.
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.rgb(250,184,49));
+                    paint.setTextSize(28f);
+                    c.drawText("DWG hızlı önizleme kısmi • tam çizim hazırlanıyor",20f,42f,paint);
+                }
+            }
         }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 
