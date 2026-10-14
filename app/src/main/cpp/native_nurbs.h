@@ -14,6 +14,13 @@
 
 typedef struct {double x,y,w;} MusaNurbsControl;
 
+/* LibreDWG's pinned dwg.spec skips the w payload and explicitly sets w=0
+ * for unweighted SPLINE control points. That 0 is a serialization sentinel,
+ * NOT a rational zero weight. Implicit mathematical weight is 1. */
+static double musa_nurbs_weight(double stored,int weighted){
+    return weighted?stored:1.0;
+}
+
 static int musa_nurbs_valid(const MusaNurbsControl *ctrl,size_t n,
                             const double *knots,size_t nk,int degree) {
     if(!ctrl||!knots||n<2||n>MUSA_NURBS_MAX_CONTROL||
