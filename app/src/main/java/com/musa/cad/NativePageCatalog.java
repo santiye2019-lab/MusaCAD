@@ -38,6 +38,8 @@ public final class NativePageCatalog {
     private NativeViewportPageCache.Cursor expected=
             new NativeViewportPageCache.Cursor(0,0);
     private boolean discoveredAll;
+    // Built once on the decoder worker when terminal discovery finishes.
+    private NativePageSpatialIndex viewportIndex;
 
     public NativePageCatalog(int maxEntries){
         if(maxEntries<1||maxEntries>100000)
@@ -75,7 +77,13 @@ public final class NativePageCatalog {
         Entry e=new Entry(start,next,more,minX,minY,maxX,maxY,primitives);
         ordered.add(e);byStart.put(start,e);
         expected=next;
-        if(!more)discoveredAll=true;
+        if(!more){
+            discoveredAll=true;
+            // Do the one-time index construction while loading, never on
+            // the first pinch-zoom request from the Android UI thread.
+            if(ordered.size()>=128)
+                viewportIndex=new NativePageSpatialIndex(ordered);
+        }
     }
 
     public synchronized Entry get(NativeViewportPageCache.Cursor start){
@@ -109,13 +117,28 @@ public final class NativePageCatalog {
         // The max-heap's head is the WORST retained candidate.
         PriorityQueue<Entry> closest=new PriorityQueue<>(
                 maxResults,nearestFirst.reversed());
-        for(Entry e:ordered){
-            if(!e.intersects(minX,minY,maxX,maxY)||cache.contains(e.start))
-                continue;
-            if(closest.size()<maxResults)closest.add(e);
-            else if(nearestFirst.compare(e,closest.peek())<0){
-                closest.remove();
-                closest.add(e);
+        if(viewportIndex!=null){
+            NativePageSpatialIndex.Span candidates=
+                    viewportIndex.candidates(minX,minY,maxX,maxY);
+            for(int i=candidates.from;i<candidates.to;i++){
+                Entry e=candidates.entries[i];
+                if(!e.intersects(minX,minY,maxX,maxY)||cache.contains(e.start))
+                    continue;
+                if(closest.size()<maxResults)closest.add(e);
+                else if(nearestFirst.compare(e,closest.peek())<0){
+                    closest.remove();closest.add(e);
+                }
+            }
+        }else{
+            // In-progress catalogs are small/append-only and can still be
+            // queried; never block the UI to rebuild a growing index.
+            for(Entry e:ordered){
+                if(!e.intersects(minX,minY,maxX,maxY)||cache.contains(e.start))
+                    continue;
+                if(closest.size()<maxResults)closest.add(e);
+                else if(nearestFirst.compare(e,closest.peek())<0){
+                    closest.remove();closest.add(e);
+                }
             }
         }
         ArrayList<Entry> misses=new ArrayList<>(closest);
@@ -140,6 +163,7 @@ public final class NativePageCatalog {
 
     public synchronized void clear(){
         ordered.clear();byStart.clear();
+        viewportIndex=null;
         expected=new NativeViewportPageCache.Cursor(0,0);
         discoveredAll=false;
     }
