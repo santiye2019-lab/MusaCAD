@@ -804,6 +804,27 @@ jobs:
           assert "Önizleme renkleri nihai değildir." in code
           PY
 
+      - name: Verify natural cubic fit-only SPLINE from real DWG scenario 2
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/native_fit_spline_test.c -lm \
+            -o /tmp/musacad-fit-spline-test
+          /tmp/musacad-fit-spline-test
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("app/src/main/cpp/native_scene.c").read_text()
+          a=code.index("case DWG_TYPE_SPLINE:{")
+          b=code.index("case DWG_TYPE_SOLID:{",a)
+          spline=code[a:b]
+          assert "e->scenario==2" in spline
+          assert "musa_cad_fit_zero_tangent" in spline
+          assert "musa_cad_fit_natural_build" in spline
+          assert "musa_cad_fit_natural_eval" in spline
+          assert "MUSA_CAD_FIT_SAMPLES_PER_SPAN" in spline
+          assert "finish_poly(s)" in spline
+          assert "s->truncated=1" in spline
+          assert "emit_poly_point(s,parent,e->fit_pts[i].x" not in spline
+          PY
+
       - name: Evaluate real DWG SPLINE NURBS curves instead of control polygons
         run: |
           cc -std=c11 -Wall -Wextra -Werror tests/native_nurbs_test.c -lm \
