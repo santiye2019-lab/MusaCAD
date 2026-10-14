@@ -742,6 +742,29 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java tests/Cad3dRecoveryAsyncTest.java tests/Cad3dRecoveryAsyncIntegrationContractTest.java
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncTest
           java -cp /tmp/musacad-tests Cad3dRecoveryAsyncIntegrationContractTest
+      - name: Verify AC1032 two-phase safe-save protocol (host-only future encoder)
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests \
+            app/src/main/java/com/musa/cad/CadDwgFormat.java \
+            app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
+            app/src/main/java/com/musa/cad/CadAc1032StagedSave.java \
+            tests/CadAc1032StagedSaveTest.java
+          java -cp /tmp/musacad-tests CadAc1032StagedSaveTest
+          # This is NOT a real AC1032 binary encoder; never enable without
+          # an independently re-decoded CAD semantic parity check.
+          python3 - <<'PY'
+          from pathlib import Path
+          gate=Path("app/src/main/java/com/musa/cad/CadAc1032StagedSave.java").read_text()
+          android=Path("app/src/main/java/com/musa/cad/MainActivity.java").read_text()
+          assert "IndependentReopenVerifier" in gate
+          assert "CadSaveSourceIntegrity.capture(originalDwg)" in gate
+          assert "CadSaveSourceIntegrity.capture(editedDxf)" in gate
+          assert "CadSaveSourceIntegrity.capture(staged.toFile())" in gate
+          assert "Files.createLink(target,staged)" in gate, "no overwrite fallback"
+          assert "CadAc1032StagedSave.publishNew(" not in android, \
+                 "no production AC1032 writer until independently validated"
+          PY
+
       - name: Identify genuine DWG version without confusing AutoCAD 2026
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadDwgFormat.java tests/CadDwgFormatTest.java
