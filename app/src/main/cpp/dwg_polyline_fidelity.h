@@ -52,6 +52,15 @@ static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
     poly->values[index++] = (double)(v); \
   } while (0)
 #define MUSA_VEC(v) do { MUSA_ADD((v).x); MUSA_ADD((v).y); MUSA_ADD((v).z); } while (0)
+/* In the pinned DXF decoder an omitted extrusion is (0,0,0); DWG decoding
+   reports its actual CAD default OCS normal (0,0,1). Normalise only this
+   all-zero sentinel. Any explicit non-default normal remains fully audited. */
+#define MUSA_OCS(v) do { \
+  double musa_ex=(double)(v).x, musa_ey=(double)(v).y, musa_ez=(double)(v).z; \
+  if (musa_ex==0.0 && musa_ey==0.0 && musa_ez==0.0) { \
+    MUSA_ADD(0.0); MUSA_ADD(0.0); MUSA_ADD(1.0); \
+  } else { MUSA_ADD(musa_ex); MUSA_ADD(musa_ey); MUSA_ADD(musa_ez); } \
+} while (0)
   for (BITCODE_BL i=0; i<dwg->num_objects; ++i) {
     const Dwg_Object *obj=&dwg->object[i];
     if (obj->fixedtype != DWG_TYPE_LWPOLYLINE &&
@@ -78,7 +87,7 @@ static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
       if (!poly->values) goto invalid;
       total_values+=need;
       MUSA_ADD(p->flag); MUSA_ADD(p->const_width);
-      MUSA_ADD(p->elevation); MUSA_ADD(p->thickness); MUSA_VEC(p->extrusion);
+      MUSA_ADD(p->elevation); MUSA_ADD(p->thickness); MUSA_OCS(p->extrusion);
       MUSA_ADD(p->num_points); MUSA_ADD(p->num_bulges);
       MUSA_ADD(p->num_widths);
       for (BITCODE_BL j=0; j<p->num_points; ++j) {
@@ -107,7 +116,7 @@ static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
       total_values+=need;
       MUSA_ADD(p->flag); MUSA_ADD(p->curve_type);
       MUSA_ADD(p->start_width); MUSA_ADD(p->end_width);
-      MUSA_ADD(p->thickness); MUSA_ADD(p->elevation); MUSA_VEC(p->extrusion);
+      MUSA_ADD(p->thickness); MUSA_ADD(p->elevation); MUSA_OCS(p->extrusion);
       MUSA_ADD(count);
       for (BITCODE_BL j=0; j<count; ++j) {
         MUSA_ADD(points[j].x); MUSA_ADD(points[j].y);
@@ -118,10 +127,12 @@ static int musa_polyline_capture(const Dwg_Data *dwg, MusaPolylines *out) {
   }
 #undef MUSA_ADD
 #undef MUSA_VEC
+#undef MUSA_OCS
   return 0;
 invalid:
 #undef MUSA_ADD
 #undef MUSA_VEC
+#undef MUSA_OCS
   musa_polyline_free(out);
   return -1;
 }
