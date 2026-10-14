@@ -773,6 +773,43 @@ jobs:
           /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg
           test -s /tmp/musa-pilot-output.dwg
           cmp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          # Inject distinct real DXF primitives into the proven LibreDWG fixture.
+          # This exercises multiple coordinates, entity kinds and a fresh DWG read.
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('/tmp/musa-writer-input.dxf').read_text()
+          start = src.index('\n  0\nSECTION\n  2\nENTITIES\n')
+          end = src.index('\n  0\nENDSEC\n', start)
+          def entity(kind, handle, subclasses, pairs):
+              lines = ['  0', kind, '  5', handle, '330', '1F',
+                       '100', 'AcDbEntity', '  8', '0']
+              for cls in subclasses:
+                  lines.extend(('100', cls))
+              for group, value in pairs:
+                  lines.extend((str(group), str(value)))
+              return '\n'.join(lines) + '\n'
+          extra = ''.join((
+              entity('LINE', 'F001', ['AcDbLine'],
+                     [(10, 101.25), (20, -23.5), (30, 7.5),
+                      (11, 302.75), (21, -18.125), (31, 9.25)]),
+              entity('LINE', 'F002', ['AcDbLine'],
+                     [(10, -400.125), (20, 1000.5), (30, 0),
+                      (11, -390.75), (21, 1001.25), (31, 0)]),
+              entity('CIRCLE', 'F003', ['AcDbCircle'],
+                     [(10, 52.25), (20, -10.5), (30, 0), (40, 12.75)]),
+              entity('ARC', 'F004', ['AcDbCircle', 'AcDbArc'],
+                     [(10, -5.125), (20, 71.25), (30, 0), (40, 5.75),
+                      (50, 15.0), (51, 185.0)]),
+              entity('POINT', 'F005', ['AcDbPoint'],
+                     [(10, 4.5), (20, 8.25), (30, 2.75)]),
+          ))
+          Path('/tmp/musa-writer-multi.dxf').write_text(
+              src[:end+1] + extra + src[end+1:])
+          print('Multi-entity DXF fixture created: 3 LINE, 1 CIRCLE, 1 ARC, 1 POINT')
+          PY
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-multi.dxf /tmp/musa-writer-multi.dwg
+          test -s /tmp/musa-writer-multi.dwg
+          test "$(head -c 6 /tmp/musa-writer-multi.dwg)" = AC1015
           if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg; then
             echo "Writer must never overwrite an existing destination"
             exit 1
