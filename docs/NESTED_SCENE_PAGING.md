@@ -56,3 +56,40 @@ Private host-only acceptance on a real ~4.7 MB R2010 municipal DWG
    times, app responsiveness, OOM avoidance and on-device source integrity.
 
 Until these pass: **no main merge, APK release or public DWG Save As switch**.
+
+## 14 October 2026: incremental partial-page viewport indexing (draft only)
+
+Inventory reference: **#249 / item 07 (large DWG viewport/memory)**,
+with item 06 (first-frame real colors) still **not accepted**.
+
+Before this batch, `NativePageCatalog.missingVisible()` traversed every
+discovered page when the native DWG stream had not reached its terminal page.
+For a complex 2D/3D project, repeated onDraw pinch/zoom events could scan
+many thousands of metadata entries even for a small visible region.
+
+- `NativePageCatalog` now maintains conservative world bounding envelopes
+  for groups of 128 consecutive discovered pages. Incomplete catalogs skip
+  whole non-intersecting groups, then still perform exact per-page checks and
+  rank the nearest visible missing pages. There is **no change to geometry,
+  ACI/TrueColor, record order, DWG bytes or the final completed spatial index**.
+- The loader now keys duplicate viewport reload requests by **viewport bounds
+  plus monotonic discovered page count**, so a newly decoded page that evicts
+  visible cached geometry can trigger a new reload even if pan/zoom coordinates
+  have not changed. Identical redraws within the same generation remain
+  suppressed; the existing max-four-per-batch and max-32-per-viewport limits
+  prevent unbounded refetch loops.
+- Pure-Java synthetic regressions `NativePartialViewportIndexTest` compare
+  indexed missing-page selection with exhaustive nearest-page selection for
+  **32,767** partially discovered pages including offscreen queries, cache
+  hits, invalid cursors and catalog clear/reuse. `NativeViewportReloadGateTest`
+  checks unchanged-viewport re-request across 50,000 page generations and
+  guards invalid/stale inputs. A source contract confirms the default Android
+  `MainActivity` path **still does not instantiate** the opt-in loader.
+- These are **algorithmic correctness proofs**, not phone FPS benchmarks and
+  not proof of correct source colors, XREF, blocks, ACIS or DWG round-trip.
+  This does not accelerate the native decoder itself or the first cold file
+  open, and the final candidate group can overlap a large region. We must
+  measure p50/p95 touch-to-frame and OOM/ANR on a physical Android device
+  before claiming item 07 accepted.
+
+All changes are isolated to draft PR #269. No production APK/main deployment.
