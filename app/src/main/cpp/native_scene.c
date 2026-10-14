@@ -470,6 +470,30 @@ static int musa_is_scene_group(int type){
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer){
     if(!obj||s->truncated||obj->supertype!=DWG_SUPERTYPE_ENTITY||layer_invisible(obj))return;
     const int nested_leaf=s->nested_paging&&depth>0&&!musa_is_scene_group(obj->fixedtype);
+    if(s->collector_only&&nested_leaf){
+        /* Capture a complete leaf INSTANCE, not merely the Dwg_Object pointer.
+         * Different MINSERT rows or nested parents may reuse the SAME object
+         * but have different transforms and by-block/layer color inheritance. */
+        if(s->collector_count==65536u){s->truncated=1;return;}
+        if(s->collector_count==s->collector_capacity){
+            size_t cap=s->collector_capacity?s->collector_capacity*2u:256u;
+            if(cap>65536u)cap=65536u;
+            MusaSceneLeafContext *next=(MusaSceneLeafContext*)realloc(
+                s->collector_entries,cap*sizeof(*next));
+            if(!next){s->truncated=1;return;}
+            s->collector_entries=next;s->collector_capacity=cap;
+        }
+        MusaSceneLeafContext *e=&s->collector_entries[s->collector_count++];
+        e->object=obj;e->depth=depth;
+        e->affine[0]=parent.a;e->affine[1]=parent.b;
+        e->affine[2]=parent.c;e->affine[3]=parent.d;
+        e->affine[4]=parent.tx;e->affine[5]=parent.ty;
+        e->by_block_aci=byBlock.aci;e->by_block_truecolor=byBlock.truecolor;
+        e->by_block_rgb=byBlock.rgb;
+        e->layer_aci=inheritedLayer.aci;e->layer_truecolor=inheritedLayer.truecolor;
+        e->layer_rgb=inheritedLayer.rgb;
+        return;
+    }
     if(nested_leaf&&s->nested_visited<s->nested_skip){
         ++s->nested_visited;
         return;
@@ -788,6 +812,33 @@ int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
 }
 
 /*
+ * Build a complete, bounded leaf-instance index for one expanded top-level
+ * block. This invokes the SAME hierarchy, OCS transforms, layer inheritance
+ * and source traversal as emit_object, but stops before geometry emission at
+ * each leaf. A 65,537th instance fails closed and the caller replays normally.
+ */
+int musa_scene_collect_root_leaves(Dwg_Object *root,
+                                    MusaSceneLeafContext **out,
+                                    size_t *out_count){
+    if(!out||!out_count)return 0;
+    *out=NULL;*out_count=0;
+    if(!root||!musa_is_scene_group(root->fixedtype))return 0;
+    MusaNativeScene scan={0};
+    scan.collector_only=1;
+    scan.nested_paging=1;
+    Affine2 identity=identity2();
+    SceneColor rootColor=scene_aci(7);
+    emit_object(root,&scan,identity,0,rootColor,rootColor);
+    if(scan.truncated||!scan.collector_count){
+        free(scan.collector_entries);
+        return 0;
+    }
+    *out=scan.collector_entries;
+    *out_count=scan.collector_count;
+    return 1;
+}
+
+/*
  * EXPERIMENTAL: block-aware, bounded page with (model entity, nested leaf)
  * resume cursor. This deliberately replays the current block's earlier leaf
  * traversal when resuming; a future stack cursor will remove replay cost.
@@ -797,7 +848,9 @@ static int musa_scene_build_page_nested_impl(Dwg_Data *dwg,MusaNativeScene *scen
                                  size_t first_index,size_t first_leaf,
                                  size_t *next_index,size_t *next_leaf,
                                  size_t max_words,
-                                 Dwg_Object *const *indexed,size_t indexed_count){
+                                 Dwg_Object *const *indexed,size_t indexed_count,
+                                 size_t cached_root_index,Dwg_Object *cached_root,
+                                 const MusaSceneLeafContext *leaves,size_t leaf_count){
     if(!dwg||!scene||!next_index||!next_leaf||
        max_words<256||max_words>MUSA_SCENE_MAX_FLOATS)return -1;
     memset(scene,0,sizeof(*scene));
@@ -827,7 +880,42 @@ static int musa_scene_build_page_nested_impl(Dwg_Data *dwg,MusaNativeScene *scen
             scene->nested_paging=1;
             scene->nested_skip=skip;
             scene->nested_visited=0;
-            emit_object(current,scene,identity,0,root,root);
+            if(use_index&&at==cached_root_index&&current==cached_root&&
+               leaves&&leaf_count&&skip<leaf_count){
+                /* Replay one FULL leaf context at a time, preserving exact
+                 * nested transforms, MINSERT instance placement and colors.
+                 * No pointer-only shortcut and no descendant ancestry loss. */
+                scene->nested_paging=0;
+                scene->nested_visited=skip;
+                for(size_t leaf=skip;leaf<leaf_count;leaf++){
+                    const MusaSceneLeafContext *ctx=&leaves[leaf];
+                    const size_t words_before=scene->count;
+                    const int primitives_before=scene->primitives;
+                    const int bounds_before=scene->has_bounds;
+                    const double minx=scene->min_x,miny=scene->min_y;
+                    const double maxx=scene->max_x,maxy=scene->max_y;
+                    Affine2 affine={ctx->affine[0],ctx->affine[1],ctx->affine[2],
+                                    ctx->affine[3],ctx->affine[4],ctx->affine[5]};
+                    SceneColor byblock={ctx->by_block_aci,ctx->by_block_rgb,
+                                       ctx->by_block_truecolor};
+                    SceneColor inherited={ctx->layer_aci,ctx->layer_rgb,
+                                         ctx->layer_truecolor};
+                    emit_object(ctx->object,scene,affine,ctx->depth,byblock,inherited);
+                    if(scene->truncated){
+                        /* A leaf can write multiple primitives. Roll back its
+                         * entire record and retry the SAME leaf next page. */
+                        scene->count=words_before;
+                        scene->primitives=primitives_before;
+                        scene->has_bounds=bounds_before;
+                        scene->min_x=minx;scene->min_y=miny;
+                        scene->max_x=maxx;scene->max_y=maxy;
+                        break;
+                    }
+                    scene->nested_visited=leaf+1;
+                }
+            }else{
+                emit_object(current,scene,identity,0,root,root);
+            }
             scene->nested_paging=0;
             /* Do not accept a stale cursor pointing past the last leaf. */
             if(skip>0 && scene->nested_visited<skip){
@@ -893,7 +981,8 @@ int musa_scene_build_page_nested(Dwg_Data *dwg,MusaNativeScene *scene,
                                  size_t *next_index,size_t *next_leaf,
                                  size_t max_words){
     return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
-                                              next_index,next_leaf,max_words,NULL,0);
+                                              next_index,next_leaf,max_words,NULL,0,
+                                              SIZE_MAX,NULL,NULL,0);
 }
 
 int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
@@ -904,7 +993,21 @@ int musa_scene_build_page_nested_indexed(Dwg_Data *dwg,MusaNativeScene *scene,
                                          size_t model_count){
     if(!model_entities||!model_count||first_index>=model_count)return -1;
     return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
-                          next_index,next_leaf,max_words,model_entities,model_count);
+                          next_index,next_leaf,max_words,model_entities,model_count,
+                          SIZE_MAX,NULL,NULL,0);
+}
+
+int musa_scene_build_page_nested_cached(
+       Dwg_Data *dwg,MusaNativeScene *scene,
+       size_t first_index,size_t first_leaf,
+       size_t *next_index,size_t *next_leaf,size_t max_words,
+       Dwg_Object *const *model_entities,size_t model_count,
+       size_t cached_root_index,Dwg_Object *cached_root,
+       const MusaSceneLeafContext *leaves,size_t leaf_count){
+    if(!model_entities||!model_count||first_index>=model_count)return -1;
+    return musa_scene_build_page_nested_impl(dwg,scene,first_index,first_leaf,
+                         next_index,next_leaf,max_words,model_entities,model_count,
+                         cached_root_index,cached_root,leaves,leaf_count);
 }
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
