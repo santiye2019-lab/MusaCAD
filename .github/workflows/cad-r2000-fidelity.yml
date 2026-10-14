@@ -269,3 +269,22 @@ jobs:
             exit 1
           fi
           grep -F 'status=-4' /tmp/musa-indexed-leaf-too-large.log
+
+      - name: Public dynamic-block nested page stream regression
+        run: |
+          set -euo pipefail
+          # Pinned LibreDWG upstream 2018/Dynblocks.dwg is distributable:
+          # this file reproduced a duplicate-primitive bug in a direct-child
+          # resume experiment (mismatch on page 1 of 50). The safe indexed
+          # path MUST keep its full v6 primitive/color stream byte-identical
+          # with an untruncated baseline across ALL 50 pages.
+          file=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe "$file" 4096 \
+            2>&1 | tee /tmp/musa-dynblocks-50-page-regression.log
+          grep -F 'Indexed Nested paged scene verified: pages=50 primitives=33479 legacy_count=33479 legacy_status=0' \
+            /tmp/musa-dynblocks-50-page-regression.log
+          # The retired speculative direct-child pointer shortcut is
+          # prohibited until a new design passes this exact public regression.
+          ! grep -q 'musa_scene_build_page_nested_direct_resume' \
+              app/src/main/cpp/dwg_bridge.c
