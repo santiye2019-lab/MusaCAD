@@ -39,12 +39,14 @@ static int finite2(double x,double y){return isfinite(x)&&isfinite(y);}
 
 static int reserve_scene(MusaNativeScene *s,size_t extra){
     if(!s||s->truncated)return 0;
-    if(extra>MUSA_SCENE_MAX_FLOATS||s->count>MUSA_SCENE_MAX_FLOATS-extra){s->truncated=1;return 0;}
+    const size_t limit=s->max_words?s->max_words:MUSA_SCENE_MAX_FLOATS;
+    if(extra>limit||s->count>limit-extra){s->truncated=1;return 0;}
     size_t need=s->count+extra;
     if(need<=s->capacity)return 1;
     size_t cap=s->capacity?s->capacity:4096;
-    while(cap<need&&cap<MUSA_SCENE_MAX_FLOATS)cap*=2;
-    if(cap>MUSA_SCENE_MAX_FLOATS)cap=MUSA_SCENE_MAX_FLOATS;
+    if(cap>limit)cap=limit;
+    while(cap<need&&cap<limit){size_t next=cap*2;if(next<cap){cap=limit;break;}cap=next;}
+    if(cap>limit)cap=limit;
     if(cap<need){s->truncated=1;return 0;}
     float *next=(float*)realloc(s->values,cap*sizeof(float));
     if(!next){s->truncated=1;return 0;}
@@ -651,6 +653,101 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
         }
         default: break;
     }
+}
+
+/*
+ * Transactional top-level paging. A block INSERT can emit dozens of nested
+ * elements, so a page boundary may occur only *between* top-level entities.
+ * On overflow restore the previous primitive/bounds counters and retry that
+ * same entity on the next page; if it cannot fit even in an empty page,
+ * explicitly fail (never drop geometry or silently call the page complete).
+ */
+int musa_scene_build_page(Dwg_Data *dwg,MusaNativeScene *scene,
+                          size_t first_index,size_t *next_index,
+                          size_t max_words){
+    if(!dwg||!scene||!next_index||max_words<256||
+       max_words>MUSA_SCENE_MAX_FLOATS)return -1;
+    memset(scene,0,sizeof(*scene));
+    *next_index=first_index;
+    scene->max_words=max_words;
+    if(!reserve_scene(scene,7)){musa_scene_free(scene);return -2;}
+    for(int h=0;h<7;h++)pushf(scene,0);
+    Affine2 identity=identity2();
+    SceneColor root=scene_aci(7);
+    Dwg_Object_Ref *model=dwg_model_space_ref(dwg);
+    Dwg_Object *owner=model?model->obj:NULL;
+    Dwg_Object *obj=owner?get_first_owned_entity(owner):NULL;
+    size_t at=0;
+    int has_more=0;
+    if(owner){
+        while(obj){
+            if(at>=first_index){
+                const size_t before=scene->count;
+                const int prior_count=scene->primitives;
+                const int prior_bounds=scene->has_bounds;
+                const double x0=scene->min_x,y0=scene->min_y;
+                const double x1=scene->max_x,y1=scene->max_y;
+                emit_object(obj,scene,identity,0,root,root);
+                if(scene->truncated){
+                    scene->count=before;
+                    scene->primitives=prior_count;
+                    scene->has_bounds=prior_bounds;
+                    scene->min_x=x0;scene->min_y=y0;
+                    scene->max_x=x1;scene->max_y=y1;
+                    scene->truncated=0;
+                    if(before==7){musa_scene_free(scene);return -4;}
+                    has_more=1;
+                    break;
+                }
+            }
+            ++at;
+            obj=get_next_owned_entity(owner,obj);
+        }
+    }else{
+        for(BITCODE_BL i=0;i<dwg->num_objects;i++){
+            if(at>=first_index){
+                const size_t before=scene->count;
+                const int prior_count=scene->primitives;
+                const int prior_bounds=scene->has_bounds;
+                const double x0=scene->min_x,y0=scene->min_y;
+                const double x1=scene->max_x,y1=scene->max_y;
+                emit_object(&dwg->object[i],scene,identity,0,root,root);
+                if(scene->truncated){
+                    scene->count=before;
+                    scene->primitives=prior_count;
+                    scene->has_bounds=prior_bounds;
+                    scene->min_x=x0;scene->min_y=y0;
+                    scene->max_x=x1;scene->max_y=y1;
+                    scene->truncated=0;
+                    if(before==7){musa_scene_free(scene);return -4;}
+                    has_more=1;
+                    break;
+                }
+            }
+            ++at;
+        }
+    }
+    *next_index=at;
+    if(!scene->has_bounds||scene->primitives<=0){
+        musa_scene_free(scene);
+        return -3;
+    }
+    /* All pages share stable global extents to prevent fit/zoom shifts. */
+    double ex0=dwg_model_x_min(dwg),ey0=dwg_model_y_min(dwg);
+    double ex1=dwg_model_x_max(dwg),ey1=dwg_model_y_max(dwg);
+    if(isfinite(ex0)&&isfinite(ey0)&&isfinite(ex1)&&isfinite(ey1)&&ex1>ex0&&ey1>ey0&&
+       ex1-ex0<1e30&&ey1-ey0<1e30){
+        scene->min_x=ex0;scene->min_y=ey0;
+        scene->max_x=ex1;scene->max_y=ey1;
+    }
+    if(scene->max_x-scene->min_x<1e-9){scene->min_x-=.5;scene->max_x+=.5;}
+    if(scene->max_y-scene->min_y<1e-9){scene->min_y-=.5;scene->max_y+=.5;}
+    scene->values[0]=MUSA_SCENE_VERSION;
+    scene->values[1]=(float)scene->primitives;
+    scene->values[2]=(float)scene->min_x;scene->values[3]=(float)scene->min_y;
+    scene->values[4]=(float)scene->max_x;scene->values[5]=(float)scene->max_y;
+    scene->values[6]=0.0f; /* No partial entity is ever exposed on a page. */
+    return has_more?1:0;
 }
 
 int musa_scene_build(Dwg_Data *dwg,MusaNativeScene *scene){
