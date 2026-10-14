@@ -82,7 +82,8 @@ class NativeSplineDiagnosticAuditTest(unittest.TestCase):
             "MusaCAD native scene: status=0 primitives=1 floats=12\n"
             "MusaCAD fit spline rejected: stage=build fit=5 "
             "duplicate_adjacent=1 nonfinite_fit=0 "
-            "begin_tangent_finite=1 end_tangent_finite=1\n"
+            "begin_tangent_finite=1 end_tangent_finite=1 "
+            "begin_tangent_zero=1 end_tangent_zero=0\n"
             "MusaCAD fit spline rejected: stage=scene_budget fit=8\n")
         self.assertEqual(result["status"],
                          "decoded_dxf_inventory_scene_incomplete")
@@ -91,10 +92,12 @@ class NativeSplineDiagnosticAuditTest(unittest.TestCase):
             result["native_fit_spline_stage_diagnostics"],
             [{"stage": "build", "fit": 5, "duplicate_adjacent": 1,
               "nonfinite_fit": 0, "begin_tangent_finite": 1,
-              "end_tangent_finite": 1},
+              "end_tangent_finite": 1,
+              "begin_tangent_zero": 1, "end_tangent_zero": 0},
              {"stage": "scene_budget", "fit": 8,
               "duplicate_adjacent": None, "nonfinite_fit": None,
-              "begin_tangent_finite": None, "end_tangent_finite": None}])
+              "begin_tangent_finite": None, "end_tangent_finite": None,
+              "begin_tangent_zero": None, "end_tangent_zero": None}])
 
     def test_nonzero_or_truncated_scene_status_cannot_pass(self):
         for status, expected in (
