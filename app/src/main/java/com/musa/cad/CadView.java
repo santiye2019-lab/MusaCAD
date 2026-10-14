@@ -133,7 +133,8 @@ public class CadView extends View {
      * call this method. Editor vectors remain authoritative.
      */
     public void attachExperimentalPagedPreview(NativePagedScenePreview preview){
-        if(preview==null||preview.pageCount()==0||nativeDrawing==null||vectorDrawing!=null)
+        if(preview==null||preview.pageCount()==0||nativeDrawing==null||vectorDrawing!=null||
+           !preview.acceptsFirstScene(nativeDrawing))
             throw new IllegalStateException("Önizleme aktif DWG sahnesiyle eşleşmiyor");
         experimentalPagedPreview=preview;
         postInvalidateOnAnimation();
