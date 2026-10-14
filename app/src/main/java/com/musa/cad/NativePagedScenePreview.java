@@ -115,22 +115,33 @@ public final class NativePagedScenePreview {
      *
      * Returns count of pages drawn, not a claim that the DWG was complete.
      */
-    public synchronized int draw(Canvas canvas,Matrix contentToScreen,
-                                 boolean fastNavigation){
-        if(canvas==null||contentToScreen==null||worldToContent==null)return 0;
+    /**
+     * Inverse-transform the current Canvas clip to a conservative DWG world
+     * viewport; this same rectangle drives both culling and page reloads.
+     * It is a copied value, never a mutable shared scratch RectF.
+     */
+    public synchronized RectF visibleWorldBounds(Canvas canvas,Matrix contentToScreen){
+        if(canvas==null||contentToScreen==null||worldToContent==null)return null;
         scratchCombined.setConcat(contentToScreen,worldToContent);
-        if(!scratchCombined.invert(scratchInverse))return 0;
+        if(!scratchCombined.invert(scratchInverse))return null;
         Rect clip=canvas.getClipBounds();
-        if(clip==null||clip.isEmpty())return 0;
+        if(clip==null||clip.isEmpty())return null;
         scratchVisible.set(clip);
         scratchInverse.mapRect(scratchVisible);
         float worldPad=Math.max(scratchVisible.width()/Math.max(1,clip.width()),
                                 scratchVisible.height()/Math.max(1,clip.height()))*12f;
         if(Float.isFinite(worldPad)&&worldPad>0f)
             scratchVisible.inset(-worldPad,-worldPad);
+        return new RectF(scratchVisible);
+    }
+
+    public synchronized int draw(Canvas canvas,Matrix contentToScreen,
+                                 boolean fastNavigation){
+        RectF viewport=visibleWorldBounds(canvas,contentToScreen);
+        if(viewport==null)return 0;
         ArrayList<NativeViewportPageCache.Page<NativeScene>> visible=
-                cache.visible(scratchVisible.left,scratchVisible.top,
-                              scratchVisible.right,scratchVisible.bottom);
+                cache.visible(viewport.left,viewport.top,
+                              viewport.right,viewport.bottom);
         for(NativeViewportPageCache.Page<NativeScene> page:visible)
             page.payload.draw(canvas,contentToScreen,fastNavigation);
         return visible.size();
