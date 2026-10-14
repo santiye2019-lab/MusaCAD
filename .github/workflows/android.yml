@@ -457,6 +457,10 @@ jobs:
           # replacement of authoritative vector rendering in CadView.
           grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/NativePagedScenePreview.java
           ! grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/CadView.java
+      - name: Test guarded async native preview integration contract
+        run: |
+          javac -d /tmp/musacad-tests tests/CadPagedPreviewIntegrationContractTest.java
+          java -cp /tmp/musacad-tests CadPagedPreviewIntegrationContractTest
       - name: Test CAD navigation zoom and culling policy
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadNavigationPolicy.java tests/CadNavigationPolicyTest.java
