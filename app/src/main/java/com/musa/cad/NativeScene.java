@@ -57,14 +57,14 @@ public final class NativeScene {
                 int n;
                 if(version>=3){if(p>=values.length)break;n=Math.abs(Math.round(values[p++]));}
                 else{if(p+2>values.length)break;p++;n=Math.round(values[p++]);}
-                if(n<(type==5?3:2)||p+n*2>values.length)break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
+                if(n<(type==5?3:2)||!NativeSceneRecordBounds.hasVertexPairs(p,n,values.length))break;for(int i=0;i<n;i++)add(b,values[p++],values[p++]);
             }else if(type==3){
                 if(p+2>values.length)break;add(b,values[p++],values[p++]);
             }else if(type==4){
                 if(p+8>values.length)break;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
                 float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
             }else if(type==6){
-                if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.max(0,Math.round(values[p++]));int words=(bytes+2)/3;if(p+words>values.length)break;
+                if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.round(values[p++]);int words=NativeSceneRecordBounds.packedTextWords(bytes,values.length-p);if(words<0)break;
                 byte[] utf8=new byte[bytes];int at=0;for(int wi=0;wi<words;wi++){int packed=Math.round(values[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
                 parsedText=DxfText.plain(new String(utf8,java.nio.charset.StandardCharsets.UTF_8)).replace('\n',' ');
                 float width=textMetrics.measureText(parsedText);
@@ -87,7 +87,10 @@ public final class NativeScene {
         int[] offsets=os;float[] bounds=bs;String[] textValues=ts;
         Matrix view=new Matrix();float scale=Math.min((SIZE-2f*MARGIN)/wb.width(),(SIZE-2f*MARGIN)/wb.height());
         view.postTranslate(-wb.left,-wb.bottom);view.postScale(scale,-scale);view.postTranslate(MARGIN+(SIZE-2*MARGIN-wb.width()*scale)/2f,MARGIN+(SIZE-2*MARGIN-wb.height()*scale)/2f);
-        return new NativeScene(values,offsets,bounds,textValues,view,wb,truncated||expected>offsets.length,version);
+        // Treat a malformed/missing/extra record as partial, never complete.
+        return new NativeScene(values,offsets,bounds,textValues,view,wb,
+                truncated||!NativeSceneRecordBounds.countMatches(expected,offsets.length)||p!=values.length,
+                version);
     }
 
     private final int streamVersion;
