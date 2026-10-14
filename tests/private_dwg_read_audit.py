@@ -150,12 +150,44 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         return {"status": "launch_error", "error_type": type(exc).__name__}
     result = {"converter_returncode": status,
               "wall_seconds": round(time.monotonic()-started, 3)}
+    diagnostics = error_log.read_text(encoding="utf-8", errors="replace")
+    scene_match = re.search(
+        r"MusaCAD native scene: status=(-?\d+) primitives=(\d+) floats=(\d+)",
+        diagnostics,
+    )
+    if scene_match:
+        result["native_scene_status"] = int(scene_match.group(1))
+        result["native_scene_primitives"] = int(scene_match.group(2))
+        result["native_scene_floats"] = int(scene_match.group(3))
+        result["native_scene_truncated"] = result["native_scene_status"] == 1
+    else:
+        result["native_scene_status"] = None
+        result["native_scene_truncated"] = None
+    result["utf8_decode_warning_count"] = diagnostics.count("BAD_CONTINUATION_BYTE")
+    converter_match = re.search(r"MusaCAD converter status: (-?\d+)", diagnostics)
+    if converter_match:
+        mask = int(converter_match.group(1))
+        result["native_converter_warning_mask"] = mask
+        result["value_out_of_bounds_warning"] = bool(mask & 64)
+        result["unhandled_class_warning"] = bool(mask & 4)
+        result["other_converter_warnings"] = bool(mask & ~(64 | 4))
     if status != 0 or not output.is_file():
         result["status"] = "decode_failed"
         return result
     try:
         result.update(inventory_dxf(output))
-        result["status"] = "decoded_dxf_inventory"
+        if result.get("native_scene_truncated") is True:
+            # The 9 Mi-float native first-paint cap clipped this drawing.
+            result["status"] = "decoded_dxf_inventory_scene_truncated"
+        elif result["native_scene_status"] is None:
+            # Old/unknown converter cannot certify the native first-paint scene.
+            result["status"] = "decoded_dxf_inventory_scene_unverified"
+        else:
+            result["status"] = "decoded_dxf_inventory"
+        result["conversion_has_quality_warnings"] = bool(
+            result.get("native_converter_warning_mask", 0)
+            or result["utf8_decode_warning_count"]
+        )
     except (ValueError, OSError) as exc:
         result["status"] = "invalid_converted_dxf"
         result["error_type"] = type(exc).__name__
