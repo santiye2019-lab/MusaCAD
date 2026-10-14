@@ -44,6 +44,9 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
     private volatile int currentPages;
     private volatile long currentPrimitives;
     private static final int MAX_RELOADS_PER_REQUEST=4;
+    // An individual viewport can require multiple batches; avoid endless
+    // reload/eviction loops if the visible region exceeds the cache budget.
+    private static final int MAX_RELOAD_PAGES_PER_VIEWPORT=32;
     private final AtomicReference<float[]> latestViewport=new AtomicReference<>();
     private final AtomicBoolean reloadQueued=new AtomicBoolean();
     /* Only the UI thread requests viewports. Prevent redundant queue flooding. */
@@ -106,21 +109,37 @@ public final class NativePagedPreviewLoader implements AutoCloseable {
 
     private void reloadMissingVisible(){
         try{
-            /* The single-thread executor runs this only after source discovery.
-             * Each viewport gets a capped batch; no unbounded reload loop. */
+            /* Sequential source discovery finishes first on this worker. For
+             * each latest viewport, keep fetching small visible batches, but
+             * never retry an evicted cursor twice in the same request. */
             for(int generation=0;generation<4&&!cancelled.get();generation++){
                 float[] box=latestViewport.getAndSet(null);
                 if(box==null)break;
-                List<NativePageCatalog.Entry> missing=preview.missingViewportPages(
-                        box[0],box[1],box[2],box[3],MAX_RELOADS_PER_REQUEST);
-                for(NativePageCatalog.Entry entry:missing){
-                    if(cancelled.get()||latestViewport.get()!=null)break;
-                    NativeCadEngine.NestedScenePage refreshed=engine.previewNestedPage(
-                            entry.start.top,entry.start.leaf,maxFloatWords);
-                    if(cancelled.get()||latestViewport.get()!=null)break;
-                    if(!preview.retainReload(entry,refreshed))
-                        throw new IOException("DWG önbellek bütçesine sığmıyor");
-                    notifyPageChanged();
+                NativeVisibleReloadBudget budget=
+                        new NativeVisibleReloadBudget(MAX_RELOAD_PAGES_PER_VIEWPORT);
+                boolean stopCurrent=false;
+                while(!cancelled.get()&&latestViewport.get()==null&&!stopCurrent){
+                    List<NativePageCatalog.Entry> missing=preview.missingViewportPages(
+                            box[0],box[1],box[2],box[3],MAX_RELOADS_PER_REQUEST);
+                    if(missing.isEmpty())break;
+                    boolean madeProgress=false;
+                    for(NativePageCatalog.Entry entry:missing){
+                        if(cancelled.get()||latestViewport.get()!=null)break;
+                        // A page seen twice was evicted again: viewport does
+                        // not fit. Leave the partial indicator visible.
+                        if(!budget.reserve(entry.start)){
+                            stopCurrent=true;
+                            break;
+                        }
+                        NativeCadEngine.NestedScenePage refreshed=engine.previewNestedPage(
+                                entry.start.top,entry.start.leaf,maxFloatWords);
+                        if(cancelled.get()||latestViewport.get()!=null)break;
+                        if(!preview.retainReload(entry,refreshed))
+                            throw new IOException("DWG önbellek bütçesine sığmıyor");
+                        madeProgress=true;
+                        notifyPageChanged();
+                    }
+                    if(!madeProgress)break;
                 }
             }
         }catch(Exception error){
