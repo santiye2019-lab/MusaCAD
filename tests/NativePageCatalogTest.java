@@ -20,6 +20,14 @@ public final class NativePageCatalogTest {
         catalog.append(c(3,0),c(3,4),true,20,0,30,10,20);
         catalog.append(c(3,4),c(9,0),false,40,0,50,10,30);
         yes(catalog.isDiscovered()&&catalog.size()==3,"discovery complete");
+        yes(!catalog.hasCompleteCachedCoverage(0),
+            "catalog EOF is not retained geometry");
+        yes(catalog.hasCompleteCachedCoverage(3),
+            "all verified pages retained permits constant-time full status");
+        yes(!catalog.hasCompleteCachedCoverage(2),
+            "one evicted page cannot be reported as complete");
+        yes(!catalog.hasCompleteCachedCoverage(4),
+            "extra page count is not a valid complete catalog");
         yes(catalog.samePage(c(3,0),c(3,4),true,20,0,30,10,20),
             "exact reload metadata");
         yes(!catalog.samePage(c(3,0),c(3,5),true,20,0,30,10,20),
@@ -60,6 +68,8 @@ public final class NativePageCatalogTest {
         reject(()->staged.requireAppend(c(3,0),c(4,0),true,0,0,1,1,1),
             "preflight rejects a cursor gap");
         staged.append(c(0,0),c(1,0),true,0,0,1,1,1);
+        yes(!staged.hasCompleteCachedCoverage(1),
+            "in-progress discovery is never fully complete");
         staged.requireAppend(c(1,0),c(2,0),false,1,0,2,1,1);
         yes(staged.size()==1,"preflight leaves existing pages unchanged");
         NativePageCatalog bounded=new NativePageCatalog(1);
@@ -95,6 +105,8 @@ public final class NativePageCatalogTest {
 
         catalog.clear();
         yes(!catalog.isDiscovered()&&catalog.size()==0,"catalog reset");
+        yes(!catalog.hasCompleteCachedCoverage(0),
+            "cleared catalog cannot incorrectly be complete");
         reject(()->catalog.append(c(3,0),c(4,0),false,0,0,1,1,1),
             "no cursor gaps after clear");
         System.out.println("Native DWG page catalog and lossless cursor re-fetch scheduling PASS");
