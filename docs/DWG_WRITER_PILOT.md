@@ -26,10 +26,20 @@ Safety invariants:
 - Destination must **not** already exist, even as a symbolic link.
 - An unpublished same-directory temporary DWG is checked for an R2000 header,
   successful fresh LibreDWG read and exact **per-entity-type counts**.
+- Primitive coordinates and geometry parameters of LINE, CIRCLE, ARC, POINT
+  and 3DFACE are compared after fresh decode, independent of object order.
+  Non-finite values and mismatches reject publication. Tolerance is at most
+  `max(1e-7, 1e-12 * max(abs(before), abs(after)))` in drawing units.
+- Coordinate audit is fail-closed above 250,000 objects; this is a proof
+  limit, not an intended production project size.
 - Publish is exclusive; on failure the unpublished temporary file is removed.
 
-Counts are only a first smoke test: the writer does not yet prove equality of
-all coordinates, colors, layer styles, block transforms or metadata. Hence
+Counts and partial coordinate checks are still only a pilot: LWPOLYLINE and
+POLYLINE_2D vertex data are **not yet** coordinate-verified, nor are colors,
+layer styles, block transforms, ownership, annotation or metadata. A CI test
+now creates a six-primitive DXF fixture (three LINE, one CIRCLE, one ARC,
+one POINT) and verifies that the DWG can be read back with matching counts
+and audited primitive coordinates. CI passing would not imply full parity. Hence
 **never treat this proof as a production file-conversion guarantee**.
 
 Before an Android-facing DWG Save As feature can be enabled, add robust
