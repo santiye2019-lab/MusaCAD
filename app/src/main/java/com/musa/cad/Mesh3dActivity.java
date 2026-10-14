@@ -45,6 +45,7 @@ public final class Mesh3dActivity extends Activity {
     private volatile boolean closing;
     private boolean saving;
     private Dxf3dMesh mesh;
+    private Cad3dSurfaceMetrics.Result openingSurfaceMetrics;
     private float[] original;
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
@@ -73,6 +74,13 @@ public final class Mesh3dActivity extends Activity {
             try{
                 File sourceFile=new File(path);
                 Dxf3dMesh loaded=Dxf3dMesh.read(sourceFile);
+                // Calculate measurements on the loading worker, not on the
+                // Android drawing/gesture thread. Keep the 3D viewport usable
+                // even if a malformed mesh cannot be quantified.
+                Cad3dSurfaceMetrics.Result measured=null;
+                try{measured=Cad3dSurfaceMetrics.measure(loaded.xyz,loaded.triangles);}
+                catch(IllegalArgumentException ignored){}
+                final Cad3dSurfaceMetrics.Result initialMetrics=measured;
                 float[] openedOriginal=Arrays.copyOf(loaded.xyz,loaded.xyz.length);
                 File recoveryPath=Cad3dRecoveryJournal.pathFor(
                     new File(getFilesDir(),"musacad-3d-recovery"),sourceFile);
@@ -91,6 +99,7 @@ public final class Mesh3dActivity extends Activity {
                 final Cad3dRecoveryJournal.Snapshot recovered=candidate;
                 final String warning=recoveryWarning;
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=openedOriginal;
+                    openingSurfaceMetrics=initialMetrics;
                     recoveryFile=recoveryPath;recoveryFingerprint=sourceFingerprint;
                     saveCheckpoint=new Cad3dSaveCheckpoint(original);
                     meshView=new Mesh3dView(this,mesh);
@@ -121,6 +130,16 @@ public final class Mesh3dActivity extends Activity {
         text.append(mesh.triangles.length/3).append(" üçgen  •  ")
             .append(mesh.edges.length/2).append(" kenar  •  ")
             .append(mesh.xyz.length/3).append(" köşe");
+        if(openingSurfaceMetrics!=null&&openingSurfaceMetrics.triangleCount>0){
+            text.append("\nAçılışta okunan üçgen yüzey alanı: ")
+                .append(String.format(java.util.Locale.getDefault(),"%.3f",openingSurfaceMetrics.area))
+                .append(" çizim birimi² (tam B-Rep yüzeyi veya kesin metraj değildir)");
+            if(openingSurfaceMetrics.degenerateCount>0)
+                text.append(" • ").append(openingSurfaceMetrics.degenerateCount)
+                    .append(" dejenere üçgen");
+            if(mesh.solidProxy||mesh.unsupportedSolids>0)
+                text.append(" • Eksik/temsili ACIS geometrisi nedeniyle kısmi");
+        }
         if(mesh.flatPlan){
             text.append("\n2B plan algılandı: Z aralığı ")
                 .append(String.format(java.util.Locale.getDefault(),"%.3f",mesh.minZ))
