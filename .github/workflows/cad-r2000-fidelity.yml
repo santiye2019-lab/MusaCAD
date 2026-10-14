@@ -305,7 +305,7 @@ jobs:
           assert "musa_nurbs_valid" in spline
           assert "musa_nurbs_preview_points" in spline
           assert "s->truncated=1" in spline
-          assert "e->fit_pts[i].x" not in spline
+          assert "emit_poly_point(s,parent,e->fit_pts[i].x" not in spline
           assert "emit_poly_point(s,parent,e->ctrl_pts[i].x" not in spline
           PY
 
