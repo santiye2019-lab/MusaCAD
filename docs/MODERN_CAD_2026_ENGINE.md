@@ -115,6 +115,25 @@ python3 tests/dwg_dxf_semantic_parity.py approved-edit.dxf \
     independently-reopened-ac1032.dxf --report parity.json
 ```
 
+The DXF acceptance preflight now also has two **structural** gates.
+It compares ordered group streams in BLOCKS, TABLES, OBJECTS and CLASSES;
+ENTITIES is order-independent only when it contains no associated
+POLYLINE/VERTEX/SEQEND or INSERT/ATTRIB sequences. This detects swapped
+BLOCK members, wrongly assigned attributes or vertices and changed TABLE
+ownership even if every entity hash, handle and count still matches. Block
+and table open/close markers are checked for missing, nested and orphaned
+groups. Deliberately rejecting harmless reordering in those parent/child
+structures is safer than incorrectly certifying a DWG Save As round trip.
+
+**External project dependencies cannot be certified by equal DXF records.**
+A matching XREF path does not prove the linked DWG still has identical
+geometry, units or layouts; IMAGE/OLE/underlay links can also change behind
+their identifiers. The preflight now fails closed on XREF block flags,
+external raster/underlay entities and known proprietary AEC/AECC/ACAD/
+ACDB/ACSH object classes pending an independent dependency manifest,
+file hashes and semantic validation. These checks are about preventing
+false-green acceptance, **not** adding XREF/ACIS writing functionality.
+
 This is only a **DXF-level parity preflight**, NOT proof of an independent
 DWG decoder, true AC1032 file validity, unchanged dynamic-block state, ACIS
 or B-Rep persistence. If both DXFs derive from the *same lossy converter*,
