@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "policy": "No failed or unverified required module may ship. One final APK after development, full CI, merge and final acceptance.",
+  "estimate_kind": "Development implementation planning points; NOT AutoCAD 2026 compatibility percentage or real-device acceptance.",
+  "baseline_points": 35,
+  "completed_milestones": [
+    {
+      "id": "native_color_inheritance",
+      "points": 1,
+      "status": "implemented",
+      "commit": "769836a7ad74ef41b1507912a30157aec2253a08",
+      "source_path": "app/src/main/cpp/native_color.h",
+      "verification": "Android native color tests plus overall CI must pass"
+    },
+    {
+      "id": "native_arc_text_draw_allocations",
+      "points": 1,
+      "status": "implemented",
+      "commit": "ae233fbc527ea25b73ba075e7da171077f99a6fc",
+      "source_path": "app/src/main/java/com/musa/cad/NativeScene.java",
+      "verification": "Android integration and performance contract CI"
+    },
+    {
+      "id": "cadview_overlay_draw_allocations",
+      "points": 1,
+      "status": "implemented",
+      "commit": "53dcc38e63bf0071e069716dd2e6cfec0c93ad33",
+      "source_path": "app/src/main/java/com/musa/cad/CadView.java",
+      "verification": "Android visual contract CI"
+    },
+    {
+      "id": "opt_in_draw_cpu_sampler",
+      "points": 1,
+      "status": "implemented",
+      "commit": "784d9120a3c8a0633136be25947f122a461e29b9",
+      "source_path": "app/src/main/java/com/musa/cad/CadFrameTimeStats.java",
+      "verification": "New CadFrameTimeStatsTest and Android quality gate"
+    }
+  ],
+  "backlog": [
+    {
+      "id": "ac1032_reader_independent_semantics",
+      "points": 9,
+      "status": "in_progress",
+      "evidence_required": "Original-source geometric and object parity"
+    },
+    {
+      "id": "ac1032_real_writer_save_reopen",
+      "points": 18,
+      "status": "not_started",
+      "evidence_required": "Modern real DWG Save As, independent roundtrip proof"
+    },
+    {
+      "id": "advanced_2d_editing_roundtrip",
+      "points": 8,
+      "status": "in_progress",
+      "evidence_required": "2D tool matrix, save/reopen tests"
+    },
+    {
+      "id": "xref_dynamic_block_layouts",
+      "points": 9,
+      "status": "in_progress",
+      "evidence_required": "Nested XREF, dynamic block and layout semantics"
+    },
+    {
+      "id": "brep_acis_solid_kernel",
+      "points": 11,
+      "status": "not_started",
+      "evidence_required": "True 3D B-Rep booleans, sweeps, revolves, editing"
+    },
+    {
+      "id": "viewport_first_frame_large_dwg",
+      "points": 3,
+      "status": "in_progress",
+      "evidence_required": "Correct first frame RGB, large-DWG smooth pan/zoom, no ANR/OOM"
+    },
+    {
+      "id": "multi_discipline_ai_takeoff",
+      "points": 3,
+      "status": "in_progress",
+      "evidence_required": "Complete evidence-linked discipline/takeoff coverage"
+    }
+  ],
+  "required_modules": [
+    {
+      "id": "modern_dwg_read",
+      "status": "in_progress"
+    },
+    {
+      "id": "modern_dwg_write",
+      "status": "not_started"
+    },
+    {
+      "id": "advanced_2d",
+      "status": "in_progress"
+    },
+    {
+      "id": "xref_dynamic_layout",
+      "status": "in_progress"
+    },
+    {
+      "id": "true_3d_brep",
+      "status": "not_started"
+    },
+    {
+      "id": "native_render_and_navigation",
+      "status": "in_progress"
+    },
+    {
+      "id": "engineering_ai_takeoff",
+      "status": "in_progress"
+    }
+  ],
+  "acceptance": {
+    "full_ci": "in_progress",
+    "final_device_tests_total": 18,
+    "final_device_tests_passed": 0,
+    "failed_checks": 0,
+    "skipped_checks": 0,
+    "independent_dwg_parity": "not_run",
+    "release_approved": false
+  }
+}

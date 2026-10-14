@@ -379,6 +379,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/FinalReleaseReadinessTest.java
           java -cp /tmp/musacad-tests FinalReleaseReadinessTest
+      - name: Validate incremental CAD development progress and zero-failure policy
+        run: |
+          python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
+          python3 tests/cad_progress_gate.py
       - name: Test Google Play yearly renewal policy
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/PlayBillingPolicy.java tests/PlayBillingPolicyTest.java
@@ -1091,6 +1095,9 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests tests/ApkReleaseApprovalContractTest.java
           java -cp /tmp/musacad-tests ApkReleaseApprovalContractTest
+      - name: Block final APK until all CAD modules and device acceptance pass
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
+        run: python3 tests/cad_progress_gate.py --release
       - name: Build approved installable MusaCAD APK
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_approved == true }}
         env:

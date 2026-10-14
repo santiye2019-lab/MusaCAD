@@ -459,3 +459,38 @@ the opt-in, finally-block instrumentation. A measurement is CPU `onDraw`
 duration, NOT device refresh/frame pacing, GPU time, total load latency,
 first-frame pixel correctness or throughput. Real device acceptance is still
 required. No release/public logging is enabled; estimate stays 35%.
+
+## Milestone accounting and **zero-failure** release contract (2026-10-15)
+
+Development completion and final release acceptance are **two distinct metrics**.
+The previous approximate 35% engineering baseline is frozen in the versioned
+`docs/CAD_2026_PROGRESS.json`. Four small, code-implemented milestones
+are now independently credited at **1 planning point each**: native color
+inheritance, native ARC/TEXT allocation reuse, active CAD measurement-overlay
+reuse and opt-in p50/p95 `onDraw` measurement. Hence the **code
+implementation planning estimate is 39%**, remaining **61%**. This weighted
+number is a progress-management estimate, NOT a measured percentage of
+AutoCAD 2026 equivalence; CI and real-device acceptance are separate.
+
+The same JSON inventory assigns all 61 remaining points to major open
+deliverables: independent modern DWG semantics, AC1032 Save As/reopen,
+advanced 2D, XREF/dynamic blocks/layout, B-Rep/ACIS solids, viewport
+performance/initial colors, and engineering AI/takeoff. A new pure-Python
+gate and regression tests reject duplicate modules, bogus point totals,
+credited features without a source/commit, and any module explicitly marked
+as failed. The normal Android quality gate enforces the inventory format on
+every PR/commit, without generating installable APK files.
+
+An approved **final APK** in `android.yml` now has a stricter gate:
+the entire code backlog must be complete; all required module states must
+be `verified`; full CI `passed`; all **18/18** final device checks done;
+no failed or skipped checks; independent original-DWG parity passed; and
+explicit final release approval recorded. Otherwise the executable APK
+build step cannot start. This is a *documented final acceptance barrier*,
+not a claim those tests are currently passed.
+
+**Agreed process:** complete and increment code modules on this draft feature
+branch; run GitHub CI throughout without manufacturing hundreds of APKs;
+resolve every failed test/module; then perform one consolidated full test
+campaign, merge to main only after successful acceptance, and manually
+build/test a final APK. No automatic merge, release, or Cloudflare deployment.
