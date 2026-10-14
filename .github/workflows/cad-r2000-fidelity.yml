@@ -207,12 +207,15 @@ jobs:
       - name: Real DWG reader regression on publicly distributable LibreDWG fixtures
         run: |
           set -euo pipefail
-          # These upstream test files are NOT any user's engineering drawings.
+          # Run the semantic assertions even if the audit returns failure, so
+          # we see *which* real fixture/curve class is incomplete. Never
+          # treat the audit's nonzero exit as a passing reader.
+          audit_exit=0
           python3 tests/private_dwg_read_audit.py \
             --converter /tmp/musa-writer-proof/musacad_dwg_convert \
             --report /tmp/musacad-upstream-dwg-reader.json \
             third_party/libredwg/test/test-data/example_2013.dwg \
-            third_party/libredwg/test/test-data/2000/TS1.dwg
+            third_party/libredwg/test/test-data/2000/TS1.dwg || audit_exit=$?
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -239,6 +242,7 @@ jobs:
                         "model_entities=", item["model_entity_count"])
           assert not violations, violations
           PY
+          test "$audit_exit" -eq 0
 
       - name: Reject nonrepresentable DWG geometry without false origin vertices
         run: |
