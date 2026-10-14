@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - 'app/src/main/cpp/dwg_write_pilot.c'
+      - 'app/src/main/cpp/dwg_source_snapshot.h'
+      - 'tests/dwg_source_snapshot_test.c'
       - 'app/src/main/cpp/native_scene.c'
       - 'app/src/main/cpp/native_scene.h'
       - 'app/src/main/cpp/dwg_bridge.c'
@@ -37,6 +39,23 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: third_party/libredwg
+      - name: Exact source-DXF snapshot rejects same-size edits
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/dwg_source_snapshot_test.c \
+             -o /tmp/musacad-dwg-source-snapshot-test
+          /tmp/musacad-dwg-source-snapshot-test
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/cpp/dwg_write_pilot.c").read_text()
+          capture=source.index("musa_dxf_source_capture(")
+          decode=source.index("dxf_read_file(input, &drawing)")
+          verify=source.index("musa_dxf_source_matches(input, &source_snapshot)")
+          publish=source.index("link(stage, output)")
+          assert capture<decode<verify<publish
+          assert "source_before.st_mtime == source_after.st_mtime" not in source
+          assert "musa_dxf_source_release(&source_snapshot)" in source
+          PY
+
       - name: Host-only R2000 DWG writer proof and safe-failure checks
         run: |
           # Deliberately separate from Android/read-only build; this is NOT release enablement.
