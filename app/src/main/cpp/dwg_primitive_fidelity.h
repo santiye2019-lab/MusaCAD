@@ -9,6 +9,7 @@
 #ifndef MUSACAD_DWG_PRIMITIVE_FIDELITY_H
 #define MUSACAD_DWG_PRIMITIVE_FIDELITY_H
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -140,9 +141,14 @@ static int musa_same_primitives(MusaPrimitiveList *a, MusaPrimitiveList *b) {
   for (size_t i = 0; i < a->size; ++i) {
     if (a->items[i].kind != b->items[i].kind ||
         a->items[i].used != b->items[i].used) return 0;
-    for (unsigned j = 0; j < a->items[i].used; ++j)
-      if (!musa_coordinates_near(a->items[i].value[j], b->items[i].value[j]))
+    for (unsigned j = 0; j < a->items[i].used; ++j) {
+      if (!musa_coordinates_near(a->items[i].value[j], b->items[i].value[j])) {
+        /* No project coordinates exposed to CI; only entity type and field. */
+        fprintf(stderr, "R2000 primitive audit: kind=%d entity=%zu field=%u differs\n",
+                a->items[i].kind, i, j);
         return 0;
+      }
+    }
   }
   return 1;
 }
