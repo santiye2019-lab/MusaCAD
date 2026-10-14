@@ -449,6 +449,16 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/RenderPathPolicy.java tests/RenderPathPolicyTest.java
           java -cp /tmp/musacad-tests RenderPathPolicyTest
+      - name: Test modern DWG scene record overflow and partial-data guard
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeSceneRecordBounds.java tests/NativeSceneRecordBoundsTest.java
+          java -cp /tmp/musacad-tests NativeSceneRecordBoundsTest
+          # The helper must be integrated into the actual Android native scene
+          # decoder; standalone tests alone must not be mistaken for coverage.
+          grep -Fq 'NativeSceneRecordBounds.hasVertexPairs(' app/src/main/java/com/musa/cad/NativeScene.java
+          grep -Fq 'NativeSceneRecordBounds.packedTextWords(' app/src/main/java/com/musa/cad/NativeScene.java
+          grep -Fq 'NativeSceneRecordBounds.countMatches(' app/src/main/java/com/musa/cad/NativeScene.java
+
       - name: Test bounded native viewport page cache and completeness
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeViewportPageCache.java tests/NativeViewportPageCacheTest.java
