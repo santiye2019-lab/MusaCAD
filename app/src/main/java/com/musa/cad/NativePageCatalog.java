@@ -1,0 +1,122 @@
+package com.musa.cad;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/**
+ * Metadata-only catalog of sequential native DWG scene pages.
+ *
+ * The geometry can be evicted from NativeViewportPageCache while the small
+ * cursor/bounds metadata stays available to request that SAME page again.
+ * No payload, DWG source bytes, file paths, images or private coordinates are
+ * uploaded or persisted. An explicit page limit bounds catalog memory.
+ */
+public final class NativePageCatalog {
+    public static final class Entry {
+        public final NativeViewportPageCache.Cursor start,next;
+        public final boolean hasMore;
+        public final float minX,minY,maxX,maxY;
+        public final int primitives;
+        private Entry(NativeViewportPageCache.Cursor start,
+                NativeViewportPageCache.Cursor next,boolean more,
+                float minX,float minY,float maxX,float maxY,int primitives){
+            this.start=start;this.next=next;this.hasMore=more;
+            this.minX=minX;this.minY=minY;this.maxX=maxX;this.maxY=maxY;
+            this.primitives=primitives;
+        }
+        public boolean intersects(float x0,float y0,float x1,float y1){
+            return maxX>=x0 && maxY>=y0 && minX<=x1 && minY<=y1;
+        }
+    }
+
+    private final int maxEntries;
+    private final ArrayList<Entry> ordered=new ArrayList<>();
+    private final HashMap<NativeViewportPageCache.Cursor,Entry> byStart=new HashMap<>();
+    private NativeViewportPageCache.Cursor expected=
+            new NativeViewportPageCache.Cursor(0,0);
+    private boolean discoveredAll;
+
+    public NativePageCatalog(int maxEntries){
+        if(maxEntries<1||maxEntries>100000)
+            throw new IllegalArgumentException("invalid maximum page entries");
+        this.maxEntries=maxEntries;
+    }
+    private static void checkBounds(float minX,float minY,float maxX,float maxY){
+        if(!Float.isFinite(minX)||!Float.isFinite(minY)||
+           !Float.isFinite(maxX)||!Float.isFinite(maxY)||
+           maxX<minX||maxY<minY)throw new IllegalArgumentException("invalid page bounds");
+    }
+
+    /**
+     * Append ONLY the next sequential page. Duplicate, gap and branched
+     * cursors fail closed. The first terminal page finalizes discovery.
+     */
+    public synchronized void append(NativeViewportPageCache.Cursor start,
+            NativeViewportPageCache.Cursor next,boolean more,
+            float minX,float minY,float maxX,float maxY,int primitives){
+        checkBounds(minX,minY,maxX,maxY);
+        if(discoveredAll||ordered.size()>=maxEntries||start==null||next==null||
+           !expected.equals(start)||next.compareTo(start)<=0||primitives<1)
+            throw new IllegalArgumentException("invalid DWG catalog continuation");
+        Entry e=new Entry(start,next,more,minX,minY,maxX,maxY,primitives);
+        ordered.add(e);byStart.put(start,e);
+        expected=next;
+        if(!more)discoveredAll=true;
+    }
+
+    public synchronized Entry get(NativeViewportPageCache.Cursor start){
+        return byStart.get(start);
+    }
+    public synchronized boolean isDiscovered(){return discoveredAll;}
+    public synchronized int size(){return ordered.size();}
+
+    /**
+     * Missing pages intersecting the requested viewport. Geometry is absent
+     * from the active cache, so exactly these cursor starts can be re-decoded.
+     * Sort by distance to viewport center, tie-break by source order.
+     */
+    public synchronized List<Entry> missingVisible(
+            NativeViewportPageCache<?> cache,
+            float minX,float minY,float maxX,float maxY,int maxResults){
+        if(cache==null||maxResults<1||maxResults>256)
+            throw new IllegalArgumentException("invalid missing-page request");
+        checkBounds(minX,minY,maxX,maxY);
+        ArrayList<Entry> misses=new ArrayList<>();
+        for(Entry e:ordered){
+            if(e.intersects(minX,minY,maxX,maxY)&&!cache.contains(e.start))
+                misses.add(e);
+        }
+        final double cx=((double)minX+maxX)*.5,cy=((double)minY+maxY)*.5;
+        misses.sort((a,b)->{
+            double ax=((double)a.minX+a.maxX)*.5-cx;
+            double ay=((double)a.minY+a.maxY)*.5-cy;
+            double bx=((double)b.minX+b.maxX)*.5-cx;
+            double by=((double)b.minY+b.maxY)*.5-cy;
+            int cmp=Double.compare(ax*ax+ay*ay,bx*bx+by*by);
+            return cmp==0?a.start.compareTo(b.start):cmp;
+        });
+        return new ArrayList<>(misses.subList(0,Math.min(maxResults,misses.size())));
+    }
+
+    /**
+     * An eviction reload must return the same next cursor, termination state,
+     * primitive count and page bounds as its first decode. No new branch may
+     * be silently accepted as if it were the original DWG stream.
+     */
+    public synchronized boolean samePage(NativeViewportPageCache.Cursor start,
+            NativeViewportPageCache.Cursor next,boolean more,
+            float minX,float minY,float maxX,float maxY,int primitives){
+        Entry e=byStart.get(start);
+        return e!=null&&e.next.equals(next)&&e.hasMore==more&&
+                e.primitives==primitives&&
+                Float.compare(e.minX,minX)==0&&Float.compare(e.minY,minY)==0&&
+                Float.compare(e.maxX,maxX)==0&&Float.compare(e.maxY,maxY)==0;
+    }
+
+    public synchronized void clear(){
+        ordered.clear();byStart.clear();
+        expected=new NativeViewportPageCache.Cursor(0,0);
+        discoveredAll=false;
+    }
+}
