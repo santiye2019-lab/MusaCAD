@@ -43,6 +43,14 @@
       "commit": "231f33ae94e4466b2dcd2ac2fd9ca12999bdae3f",
       "source_path": "tests/dwg_layer_table_audit.py",
       "verification": "GitHub Android gate run 38641262457 step 'Test conservative native DWG entity type audit': PASS. Full Android and Modern DWG workflows still pending."
+    },
+    {
+      "id": "independent_xref_insert_transform_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "8f9d74ed0a9dd34f05707cd5e6bad5ea09612235",
+      "source_path": "tests/dwg_block_reference_audit.py",
+      "verification": "GitHub Android run 38643459543 'Test conservative native DWG entity type audit': PASS. Complete Android and Modern DWG runs not yet certified at ledger update."
     }
   ],
   "backlog": [
@@ -66,7 +74,7 @@
     },
     {
       "id": "xref_dynamic_block_layouts",
-      "points": 9,
+      "points": 8,
       "status": "in_progress",
       "evidence_required": "Nested XREF, dynamic block and layout semantics"
     },

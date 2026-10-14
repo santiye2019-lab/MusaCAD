@@ -520,3 +520,16 @@ The independently sourced DWG layer-table comparison now has 1 code implementati
 ## Original DWG XREF BLOCK/INSERT transform independent audit
 
 An optional private SHA-256-matched independent source reader manifest now supports *both* block_records and insert_records. Block definitions are compared by name, flags, XREF path and base point; INSERT instances by original handle, referenced block, layer, model/paper/block membership, layout name, position, 3-axis scale and rotation. Exact numeric metadata equality is checked with Decimal without float rounding. Wrong/missing references, duplicate identities and invalid fields fail closed, while diagnostics include only counts (no block names, source paths, sheet names, coordinates or handles). Original sources stay local and unchanged. The proof excludes external DWG file resolution, dynamic-block visibility actions, attribute content, full spatial object transforms and any rendered screen verification. Android and Modern DWG quality gates require the new synthetic host regression; these facts do not yet certify real XREF fidelity or full Layout support.
+
+## XREF/INSERT independent metadata implementation credit — 41%
+
+The read-only independently supplied source BLOCK/XREF definition, INSERT
+instance-transform and layout-space metadata comparison is now credited as
+one implementation planning point (commit 8f9d74ed0a9dd34f05707cd5e6bad5ea09612235). Its dedicated Android
+host regression gate on run 38643459543 passed. The remaining XREF,
+dynamic-block and full Layout functional backlog is 8 points; overall
+weighted implementation becomes **41%**, remaining **59%**. This does
+not certify external XREF resolution, editable dynamic blocks, native
+initial screen color fidelity, or real-device tests. Full workflow result
+and source provenance must still be confirmed separately. No APK,
+main merge or live service change.
