@@ -92,7 +92,17 @@ cryptographic hashes of **whole entity group-code streams**. It checks more
 than counts/bounding boxes: individual coordinates, ordered polyline
 bulges/widths, layer and indexed/TrueColor fields, text, handles,
 BLOCK/INSERT/XREF-related references and TABLES/OBJECTS/CLASSES records.
-Only number *formatting* is canonicalized (e.g. `10.0` = `1e1`).
+Only number *formatting* is canonicalized (e.g. `10.0` = `1e1`),
+without Python's default 28-digit decimal rounding; numeric coordinate
+differences at higher precision therefore still fail comparison. The preflight
+also fingerprints selected **DXF HEADER engineering state**: `$INSUNITS`,
+`$MEASUREMENT`, `$LUNITS`, `$DIMSCALE`, `$DIMLFAC`,
+`$INSBASE`, `$UCSORG`, `$CLAYER`, codepage and related settings.
+A source/output change from millimetres to metres, a lost dimension scale,
+or an altered base point must fail even if every geometric entity and layer
+count matches. If neither export carries a particular header variable,
+this DXF-only preflight cannot independently recover the omitted original
+DWG setting. Independent binary verification remains required.
 Missing/extra entities, changed entity attributes, truncated or malformed
 DXF, unexpected Unicode, proxy/ACIS entities and ACDSDATA all reject
 certification; coordinates and customer text are never printed.
