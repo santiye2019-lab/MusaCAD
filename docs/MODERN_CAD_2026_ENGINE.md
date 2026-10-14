@@ -174,3 +174,49 @@ let alone enabled as a save action on Android.
 Tracked by [#249](https://github.com/santiye2019-lab/MusaCAD/issues/249).
 Experimental implementation remains in draft
 [#269](https://github.com/santiye2019-lab/MusaCAD/pull/269).
+
+## Inventory #08 — Native preview entity-type omission disclosure (draft)
+
+The C native DWG first-paint renderer is **not** the full DXF editing engine.
+It has direct dispatcher cases for only a subset of DWG entities; even
+objects entering such a case may still fail because of incomplete payloads,
+external references, scene limits, unresolved dynamic blocks, or font/asset
+substitution. `NativeCadEngine.Stats.unsupportedEntityCount` historically
+means **all entities other than six core geometric types**, NOT a count of
+truly unrendered native primitives. Do not present that counter as an
+accurate missing-entity count.
+
+The **read-only host audit** `tests/native_preview_type_audit.py`, integrated
+into `tests/private_dwg_read_audit.py`, now classifies the decoded DXF
+`ENTITIES` and `BLOCKS` type inventories into:
+
+- `native_preview_unsupported_entity_types` and
+  `native_preview_unsupported_entity_count`: known classes with no native
+  preview dispatcher (3DSOLID, BODY, REGION, ACAD_PROXY_ENTITY, etc.) or
+  other/unrecognized types, aggregated into a privacy-safe bucket.
+- `native_preview_conditional_entity_types`: classes for which a native
+  dispatcher exists; this is **not** evidence that each instance was drawn.
+- `native_preview_structural_record_count`: subordinate VERTEX/SEQEND DXF
+  records that are not separate rendered primitives.
+- `native_preview_completeness`: either
+  `unsupported_types_detected` or `type_dispatch_only_unverified`.
+  **Neither value means complete source-DWG fidelity.**
+
+The type-list synchronizes automatically with actual native C dispatch cases
+in `test_native_preview_type_audit.py`; tests use synthetic, public DXF,
+never real customer coordinates, names, layers, handles or project text.
+The Android normal-open quick-preview status now explicitly warns that
+colors AND entity-type completeness are not yet verified.
+
+Limits: DXF conversion may itself omit original DWG-only classes; BLOCK
+definitions are counted without resolving per-instance INSERT expansion.
+A type count does not validate visibility, handles, dimensions, object
+metadata, colors, UI pixels or source-vs-export parity. The next gate
+requires original DWG handles/classes, full first-frame render evidence and
+independent CAD semantic comparison before #08 can be accepted.
+
+**Progress checkpoint:** AutoCAD 2026 functionality target remains an
+approximate **35%** developed, **65%** remaining; this change improves
+transparency and test coverage, but does not close any of the 18 final
+physical-device/semantic acceptance requirements. Main/release APK remain
+unchanged.
