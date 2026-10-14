@@ -54,13 +54,24 @@ public final class NativePageCatalog {
      * Append ONLY the next sequential page. Duplicate, gap and branched
      * cursors fail closed. The first terminal page finalizes discovery.
      */
-    public synchronized void append(NativeViewportPageCache.Cursor start,
+    /**
+     * Validate a prospective next page BEFORE updating any geometry cache.
+     * Fail-closed input must not evict a valid page before catalog rejection.
+     * Does not alter discovery state.
+     */
+    public synchronized void requireAppend(NativeViewportPageCache.Cursor start,
             NativeViewportPageCache.Cursor next,boolean more,
             float minX,float minY,float maxX,float maxY,int primitives){
         checkBounds(minX,minY,maxX,maxY);
         if(discoveredAll||ordered.size()>=maxEntries||start==null||next==null||
            !expected.equals(start)||next.compareTo(start)<=0||primitives<1)
             throw new IllegalArgumentException("invalid DWG catalog continuation");
+    }
+
+    public synchronized void append(NativeViewportPageCache.Cursor start,
+            NativeViewportPageCache.Cursor next,boolean more,
+            float minX,float minY,float maxX,float maxY,int primitives){
+        requireAppend(start,next,more,minX,minY,maxX,maxY,primitives);
         Entry e=new Entry(start,next,more,minX,minY,maxX,maxY,primitives);
         ordered.add(e);byStart.put(start,e);
         expected=next;
