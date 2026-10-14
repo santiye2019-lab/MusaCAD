@@ -16,6 +16,10 @@ typedef struct {
     Dwg_Object **model_entities;
     size_t model_count;
     int model_index_state; /* 0 uninitialized, 1 ready, -1 fail/unsupported */
+    /* At most one bounded root expansion at a time; never owns Dwg_Object. */
+    MusaSceneLeafContext *root_leaf_contexts;
+    size_t root_leaf_count,root_leaf_top;
+    Dwg_Object *root_leaf_object;
 } MusaCadSession;
 
 typedef struct {
@@ -90,9 +94,39 @@ static int session_ensure_model_index(MusaCadSession *session){
     return 1;
 }
 
+/*
+ * Materialize up to 65,536 exact LEAF INSTANCES from the same live DWG.
+ * Their affine, inherited color and depth completely define each primitive
+ * emission. Failed/too-large caches automatically use ordinary nested replay.
+ */
+static int session_ensure_root_leaf_contexts(MusaCadSession *session,
+                                              size_t top,size_t leaf){
+    if(!session||session->model_index_state!=1||
+       top>=session->model_count||!leaf)return 0;
+    Dwg_Object *root=session->model_entities[top];
+    if(session->root_leaf_object==root&&session->root_leaf_top==top)
+        return leaf<session->root_leaf_count;
+    free(session->root_leaf_contexts);
+    session->root_leaf_contexts=NULL;
+    session->root_leaf_count=0;
+    session->root_leaf_object=NULL;
+    MusaSceneLeafContext *contexts=NULL;
+    size_t count=0;
+    if(!musa_scene_collect_root_leaves(root,&contexts,&count)||leaf>=count){
+        free(contexts);
+        return 0;
+    }
+    session->root_leaf_contexts=contexts;
+    session->root_leaf_count=count;
+    session->root_leaf_object=root;
+    session->root_leaf_top=top;
+    return 1;
+}
+
 static void session_close(MusaCadSession *session) {
     if(!session)return;
     free(session->model_entities);
+    free(session->root_leaf_contexts);
     if(session->dwg){dwg_free(session->dwg);free(session->dwg);}
     free(session);
 }
@@ -196,7 +230,7 @@ static int host_paged_probe(const char *input,const char *budget){
  * Opt-in CI/private acceptance for nested INSERT continuation. The legacy
  * capped scene provides a lower-bound count when it was itself truncated.
  */
-static int host_nested_page_probe(const char *input,const char *budget,int indexed_mode){
+static int host_nested_page_probe(const char *input,const char *budget,int indexed_mode,int context_mode){
     char *end=NULL;
     unsigned long long n=strtoull(budget,&end,10);
     if(!budget[0]||!end||*end||n<256||n>(9u*1024u*1024u))return 2;
@@ -217,7 +251,17 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
     while(pages<100000){
         MusaNativeScene page={0};
         size_t next_top=top,next_leaf=leaf;
-        int status=indexed_mode
+        int has_context=context_mode&&session_ensure_root_leaf_contexts(session,top,leaf);
+        if(has_context)fprintf(stderr,
+            "Exact leaf-instance context used top=%zu leaf=%zu instances=%zu\n",
+            top,leaf,session->root_leaf_count);
+        int status=has_context
+                ?musa_scene_build_page_nested_cached(session->dwg,&page,top,leaf,
+                     &next_top,&next_leaf,(size_t)n,
+                     session->model_entities,session->model_count,top,
+                     session->root_leaf_object,session->root_leaf_contexts,
+                     session->root_leaf_count)
+                :indexed_mode
                 ?musa_scene_build_page_nested_indexed(session->dwg,&page,top,leaf,
                      &next_top,&next_leaf,(size_t)n,
                      session->model_entities,session->model_count)
@@ -260,7 +304,7 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
           stream_at!=(baseline.count>=7?baseline.count-7:0)))||
        (baseline_status==1 && total<(size_t)baseline_count))failure=1;
     if(!failure)fprintf(stderr,"%sNested paged scene verified: pages=%zu primitives=%zu legacy_count=%d legacy_status=%d\n",
-                        indexed_mode?"Indexed ":"",
+                        context_mode?"Context ":indexed_mode?"Indexed ":"",
                         pages,total,baseline_count,baseline_status);
     else fprintf(stderr,"Nested paged scene failed: finished=%d pages=%zu total=%zu legacy=%d status=%d\n",
                  finished,pages,total,baseline_count,baseline_status);
@@ -270,10 +314,12 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
 }
 
 int main(int argc,char **argv){
+    if(argc==4&&strcmp(argv[1],"--context-nested-paged-probe")==0)
+        return host_nested_page_probe(argv[2],argv[3],1,1);
     if(argc==4&&strcmp(argv[1],"--indexed-nested-paged-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3],1);
+        return host_nested_page_probe(argv[2],argv[3],1,0);
     if(argc==4&&strcmp(argv[1],"--nested-paged-probe")==0)
-        return host_nested_page_probe(argv[2],argv[3],0);
+        return host_nested_page_probe(argv[2],argv[3],0,0);
     if(argc==4&&strcmp(argv[1],"--paged-probe")==0)
         return host_paged_probe(argv[2],argv[3]);
     if(argc!=3)return 2;
@@ -436,7 +482,15 @@ JNIEXPORT jfloatArray JNICALL Java_com_musa_cad_NativeCadEngine_sceneNestedPageN
     size_t nextTop=(size_t)startTop,nextLeaf=(size_t)startLeaf;
     pthread_mutex_lock(&engine_lock);
     int use_index=session_ensure_model_index(session);
-    int status=use_index
+    int use_context=use_index&&session_ensure_root_leaf_contexts(
+        session,(size_t)startTop,(size_t)startLeaf);
+    int status=use_context
+        ?musa_scene_build_page_nested_cached(session->dwg,&page,
+          (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords,
+          session->model_entities,session->model_count,
+          (size_t)startTop,session->root_leaf_object,
+          session->root_leaf_contexts,session->root_leaf_count)
+        :use_index
         ?musa_scene_build_page_nested_indexed(session->dwg,&page,
           (size_t)startTop,(size_t)startLeaf,&nextTop,&nextLeaf,(size_t)maxWords,
           session->model_entities,session->model_count)
