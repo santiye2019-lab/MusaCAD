@@ -818,6 +818,9 @@ jobs:
           assert "e->scenario==2" in spline
           assert "musa_cad_fit_zero_tangent" in spline
           assert "musa_cad_fit_natural_build" in spline
+          assert "musa_cad_fit_clamped_build" in spline
+          assert "begin_unspecified&&end_unspecified" in spline
+          assert "!begin_unspecified&&!end_unspecified" in spline
           assert "musa_cad_fit_natural_eval" in spline
           assert "MUSA_CAD_FIT_SAMPLES_PER_SPAN" in spline
           assert "finish_poly(s)" in spline
