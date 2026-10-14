@@ -238,6 +238,38 @@ class DxfSemanticParityTest(unittest.TestCase):
                                 pair(0, "EOF"), empty_blocks + pair(0, "EOF")), False)
         self.assertTrue(result["audited_section_mismatch"])
 
+    def test_malformed_block_group_refused_even_if_both_exports_agree(self):
+        cases = (
+            line("10"),  # BLOCKS geometry without any BLOCK owner
+            pair(0, "ENDBLK"),  # orphan close
+            pair(0, "BLOCK") + pair(2, "A") + line("10"),  # missing ENDBLK
+            pair(0, "BLOCK") + pair(2, "A") +
+            pair(0, "BLOCK") + pair(2, "B") + pair(0, "ENDBLK"),
+        )
+        for content in cases:
+            with self.subTest(record=content[:60]):
+                self.before.write_text(
+                    drawing(line(), blocks=content), encoding="utf-8")
+                with self.assertRaises(DxfParityError):
+                    fingerprint(self.before)
+
+    def test_malformed_table_group_refused_even_if_both_exports_agree(self):
+        cases = (
+            pair(0, "LAYER") + pair(2, "PIPES"),  # orphan row
+            pair(0, "ENDTAB"),  # orphan close
+            pair(0, "TABLE") + pair(2, "LAYER") +
+            pair(0, "LAYER") + pair(2, "PIPES"),  # missing ENDTAB
+            pair(0, "TABLE") + pair(2, "LAYER") +
+            pair(0, "TABLE") + pair(2, "LTYPE") +
+            pair(0, "ENDTAB"),  # nested TABLE
+        )
+        for content in cases:
+            with self.subTest(record=content[:60]):
+                self.before.write_text(
+                    drawing(line(), tables=content), encoding="utf-8")
+                with self.assertRaises(DxfParityError):
+                    fingerprint(self.before)
+
     def test_layer_table_inheritance_must_match(self):
         table = pair(0, "TABLE") + pair(2, "LAYER")
         record = pair(0, "LAYER") + pair(2, "PIPES") + pair(62, 7)
