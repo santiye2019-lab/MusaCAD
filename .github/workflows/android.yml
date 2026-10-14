@@ -810,7 +810,7 @@ jobs:
           assert scan<decode, "read-only DWG format diagnosis precedes native decoding"
           assert "if(detected.supportedSignature)" in code
           assert "final String openedDwgFormat=inputFormat;" in code
-          assert "Önizleme renkleri nihai değildir." in code
+          assert "Renkler ve tüm nesne türleri henüz doğrulanmadı." in code
           PY
 
       - name: Verify natural cubic fit-only SPLINE from real DWG scenario 2
