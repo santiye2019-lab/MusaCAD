@@ -56,7 +56,15 @@ public final class CadPagedPreviewIntegrationContractTest {
         need(compositor,"retainReload(","strict source page reload");
         need(compositor,"catalog.requireAppend(","preflight before cache eviction");
         need(compositor,"cache.put(start,next,page.hasMore","validated cache publication");
-        need(compositor,"catalog.samePage(","reject changed source");
+        need(compositor,"catalog.samePage(","reject changed source metadata");
+        need(compositor,"page.scene.contentSha256()",
+                "full DWG page content hash from immutable decoded float stream");
+        need(compositor,"pageHashes.put(start,digest)",
+                "first decode stores SHA-256 before cache eviction");
+        need(compositor,"NativeSceneFingerprint.matches(",
+                "reloaded page must match initial SHA-256, not only cursor/bounds/count");
+        need(compositor,"pageHashes.clear()",
+                "source switch must discard original page identities");
         need(compositor,"catalog.clear()","clear catalog on source switch");
         need(loader,"latestViewport.getAndSet(null)","latest viewport wins");
         need(loader,"preview.retainReload(entry,refreshed)","reload validates records");
