@@ -21,6 +21,7 @@ public final class CadPagedPreviewIntegrationContractTest {
         String reloadGate=read("app/src/main/java/com/musa/cad/NativeViewportReloadGate.java");
         String compositor=read("app/src/main/java/com/musa/cad/NativePagedScenePreview.java");
         String cache=read("app/src/main/java/com/musa/cad/NativeViewportPageCache.java");
+        String catalog=read("app/src/main/java/com/musa/cad/NativePageCatalog.java");
         String engine=read("app/src/main/java/com/musa/cad/NativeCadEngine.java");
 
         need(view,"attachExperimentalPagedPreview(", "explicit opt-in");
@@ -82,7 +83,14 @@ public final class CadPagedPreviewIntegrationContractTest {
 
 
         need(compositor,"cache.visible(","viewport page pruning");
-        need(compositor,"cache.isComplete()","partial flag");
+        need(compositor,"catalog.hasCompleteCachedCoverage(cache.pageCount())",
+                "no O(N) page walk on Canvas draw to show partial flag");
+        need(compositor,"public synchronized boolean isPartial(){return !isComplete();}",
+                "cached complete-state predicate used by partial indicator");
+        need(catalog,"discoveredAll && !ordered.isEmpty()",
+                "never claim complete before terminal native page");
+        need(catalog,"retainedPages==ordered.size()",
+                "no missing or extra source page in complete view");
         need(cache,"index.get(cursor)","non-mutating completeness read");
         need(cache,"result.sort((a,b)->a.start.compareTo(b.start))","source draw order");
         need(engine,"previewNestedPage(","native paged cursor interface");
