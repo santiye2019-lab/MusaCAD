@@ -59,6 +59,16 @@ class ModernSceneGuardTest(unittest.TestCase):
         self.assertNotIn("emit_poly_point(s,parent,e->ctrl_pts", spline)
         self.assertNotIn("if(!finite2(ax,ay)){ax=0;ay=0;}", self.native)
 
+    def test_fit_only_spline_never_invents_a_control_polygon(self):
+        spline = branch(self.native, "SPLINE")
+        self.assertIn("degree==1&&!e->closed_b", spline)
+        self.assertIn("e->num_fit_pts==2&&e->fit_pts", spline)
+        self.assertIn("emit_line(s,color,parent,e->fit_pts[0].x", spline)
+        # A fit-point spline of unknown higher degree must be flagged as
+        # partial rather than turned into angular or incorrect geometry.
+        self.assertIn("s->truncated=1;break;", spline)
+        self.assertNotIn("emit_poly_point(s,parent,e->fit_pts", spline)
+
     def test_partial_native_first_frame_warns_user(self):
         # A partially parsed scene must not silently look like the full DWG.
         branch_start = self.view.index("}else if(nativeDrawing!=null){")
