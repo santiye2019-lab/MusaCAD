@@ -15,8 +15,11 @@ def pair(code, value):
     return f"{code}\n{value}\n"
 
 
-def drawing(entities, blocks="", tables=""):
+def drawing(entities, blocks="", tables="", header=""):
     pieces = []
+    if header:
+        pieces.extend([pair(0, "SECTION"), pair(2, "HEADER"), header,
+                       pair(0, "ENDSEC")])
     if tables:
         pieces.extend([pair(0, "SECTION"), pair(2, "TABLES"), tables,
                        pair(0, "ENDSEC")])
@@ -63,6 +66,63 @@ class DxfSemanticParityTest(unittest.TestCase):
         orig = drawing(line(x="10.0", y="20.000"))
         output = drawing(line(x="10.00000", y="2.0e1"))
         self.check(orig, output, True)
+
+    def test_dwg_header_units_and_dimension_scale_are_not_silently_lost(self):
+        # Identical pipe geometry in millimetres vs metres is a critical
+        # engineering measurement discrepancy, even with equal layer counts.
+        metadata = (pair(9, "$INSUNITS") + pair(70, 4) +
+                    pair(9, "$MEASUREMENT") + pair(70, 1) +
+                    pair(9, "$LUNITS") + pair(70, 2) +
+                    pair(9, "$DIMSCALE") + pair(40, "100.0") +
+                    pair(9, "$INSBASE") + pair(10, 0) +
+                    pair(20, 0) + pair(30, 0) +
+                    pair(9, "$CLAYER") + pair(8, "PIPES"))
+        original = drawing(line(), header=metadata)
+        self.check(original, original, True)
+        for before, after in (
+            (pair(70, 4), pair(70, 6)),
+            (pair(40, "100.0"), pair(40, "1.0")),
+            (pair(8, "PIPES"), pair(8, "MECHANICAL")),
+            (pair(30, 0), pair(30, 2)),
+        ):
+            with self.subTest(change=after):
+                result = self.check(
+                    original,
+                    drawing(line(), header=metadata.replace(before, after, 1)),
+                    False)
+                self.assertTrue(result["critical_header_mismatch"])
+
+    def test_dwg_header_numeric_format_and_reordered_variable_groups(self):
+        one = pair(9, "$DIMSCALE") + pair(40, "1.0000") + (
+            pair(9, "$INSUNITS") + pair(70, "4"))
+        two = pair(9, "$INSUNITS") + pair(70, "04") + (
+            pair(9, "$DIMSCALE") + pair(40, "1e0"))
+        self.check(drawing(line(), header=one),
+                   drawing(line(), header=two), True)
+
+    def test_dwg_header_variable_removed_or_empty_is_rejected(self):
+        one = pair(9, "$INSUNITS") + pair(70, 4)
+        self.check(drawing(line(), header=one),
+                   drawing(line()), False)
+        self.check(drawing(line(), header=one),
+                   drawing(line(), header=pair(9, "$LUNITS") + pair(70, 4)),
+                   False)
+        self.before.write_text(
+            drawing(line(), header=pair(9, "$INSUNITS")),
+            encoding="utf-8")
+        with self.assertRaises(DxfParityError):
+            fingerprint(self.before)
+
+    def test_no_decimal_context_rounding_can_hide_coordinate_mutation(self):
+        first = "123456789012345678901234567890.0"
+        second = "123456789012345678901234567891.0"
+        result = self.check(drawing(line(x=first)),
+                            drawing(line(x=second)), False)
+        self.assertEqual(result["missing_records"], 1)
+        self.assertEqual(result["extra_records"], 1)
+        equivalent = "1.23456789012345678901234567890e29"
+        self.check(drawing(line(x=first)),
+                   drawing(line(x=equivalent)), True)
 
     def test_renumbered_entities_keep_order_independent(self):
         a, b = line("A1"), line("A2", x="99", color="1")
