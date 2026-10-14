@@ -345,6 +345,108 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
                 self.assertEqual(main(),0)
                 self.assertEqual(convert.call_args.kwargs.get("independent_geometry"),geo)
 
+    def test_independent_entity_style_parity_and_exact_color_drift(self):
+        audit = DwgEntityIdentityAudit(style_enabled=True)
+        audit.observe("ENTITIES", "LINE", [
+            (5,"A"), (8,"PRIVATE FLOOR"), (62,"256"), (6,"BYLAYER"),
+            (370,"-1"), (48,"1.00"), (60,"0")])
+        audit.observe("ENTITIES", "CIRCLE", [
+            (5,"B"), (8,"PRIVATE FLOOR"), (62,"3"), (420,"16711680"),
+            (440,"335544320"), (430,"PANTONE PRIVATE"), (370,"50")])
+        records = [
+            {"handle":"A","groups":{
+                "62":"256","6":"BYLAYER","370":"-1","48":"1e0","60":"0"}},
+            {"handle":"B","groups":{
+                "62":"3","420":"16711680","440":"335544320",
+                "430":"PANTONE PRIVATE","370":"50"}},
+        ]
+        successful = audit.compare_independent_style(records)
+        self.assertEqual(successful["independent_style_result"],
+                         "entity_style_subset_parity_only")
+        self.assertEqual(successful["independent_style_checked"], 2)
+        self.assertNotIn("PRIVATE", str(successful))
+        modified = [dict(entry) for entry in records]
+        modified[1] = dict(records[1], groups=dict(records[1]["groups"], **{"420":"16711681"}))
+        failure = audit.compare_independent_style(modified)
+        self.assertEqual(failure["independent_style_field_mismatches"], 1)
+        self.assertEqual(failure["independent_style_result"],
+                         "entity_style_subset_mismatch")
+        modified[0] = dict(records[0], groups=dict(records[0]["groups"], **{"48":"1.00000000000000001"}))
+        precision = audit.compare_independent_style(modified)
+        self.assertGreaterEqual(precision["independent_style_field_mismatches"], 1)
+
+    def test_entity_style_malformed_duplicate_and_missing_fail_closed(self):
+        bad_fields = [
+            [(62, "256"), (62, "256")],
+            [(420, "16777216")], [(440, "-1")],
+            [(48, "NaN")], [(48, "0")],
+            [(370, "-4")], [(60, "2")], [(6, "")],
+        ]
+        for extras in bad_fields:
+            with self.subTest(extras=extras):
+                audit = DwgEntityIdentityAudit(style_enabled=True)
+                audit.observe("ENTITIES", "LINE",
+                              [(5,"A"),(8,"0")] + extras)
+                result = audit.compare_independent_style(
+                    [{"handle":"A","groups":{}}])
+                self.assertEqual(result["independent_style_invalid_decoded"], 1)
+                self.assertEqual(result["independent_style_result"],
+                                 "entity_style_subset_mismatch")
+        valid = DwgEntityIdentityAudit(style_enabled=True)
+        valid.observe("ENTITIES","LINE",[(5,"A"),(8,"0")])
+        for bad in (
+            [{"handle":"A","groups":{"420":"16777216"}}],
+            [{"handle":"A","groups":{"62":"Z"}}],
+            [{"handle":"A","groups":{"006":"BYLAYER"}}],
+            [{"handle":"A","groups":{"999":"0"}}],
+            [{"handle":"A","groups":{"48":"1e999999999"}}],
+            [{"handle":"A","groups":{"62":256}}],
+            [{"handle":"A","groups":{}},{"handle":"0A","groups":{}}],
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    valid.compare_independent_style(bad)
+        missing = valid.compare_independent_style(
+            [{"handle":"B","groups":{}}])
+        self.assertEqual(missing["independent_style_missing_reference"], 1)
+        self.assertEqual(missing["independent_style_unexpected_reference"], 1)
+        self.assertEqual(missing["independent_style_result"],
+                         "entity_style_subset_mismatch")
+
+    def test_optional_style_manifest_forwards_without_upload(self):
+        with tempfile.TemporaryDirectory(prefix="musacad-style-refs-") as td:
+            root = Path(td)
+            original = root / "source.dwg"
+            original.write_bytes(b"AC1015 style-only synthetic fixture")
+            digest = hashlib.sha256(original.read_bytes()).hexdigest()
+            manifest_root = root / "private"
+            manifest_root.mkdir()
+            style = [{"handle":"A","groups":{"62":"1"}}]
+            (manifest_root / (digest+".json")).write_text(json.dumps({
+                "source_sha256":digest, "source_kind":"independent_dwg_reader",
+                "records":[], "style_records":style}), encoding="utf-8")
+            converter = root / "mock-converter"
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+            converter.chmod(0o700)
+            args = ["private_dwg_read_audit.py", "--converter",str(converter),
+                    "--independent-manifest-dir",str(manifest_root),
+                    "--report",str(root/"report.json"),str(original)]
+            with patch.object(sys,"argv",args), patch(
+                    "private_dwg_read_audit.convert_one",
+                    return_value={"status":"decoded_dxf_inventory"}) as called:
+                self.assertEqual(main(),0)
+                self.assertEqual(called.call_args.kwargs["independent_style"],
+                                 style)
+
+    def test_invalid_dxf_utf8_rejected_not_replaced(self):
+        with tempfile.TemporaryDirectory(prefix="musa-utf8-safe-") as td:
+            path = Path(td) / "bad.dxf"
+            path.write_bytes(
+                b"0\nSECTION\n2\nENTITIES\n0\nLINE\n5\nA\n8\n" +
+                b"\xffSECRET\n0\nENDSEC\n0\nEOF\n")
+            with self.assertRaises(UnicodeError):
+                inventory_dxf(path)
+
     def test_synthetic_dxf_groups_5_8_audited_without_details(self):
         source = (
             record("SECTION",(2,"BLOCKS")) +

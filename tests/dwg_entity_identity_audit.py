@@ -28,10 +28,17 @@ _SPACES = {"ENTITIES": "model", "BLOCKS": "block"}
 _SKIP = {"SECTION", "ENDSEC", "EOF", "BLOCK", "ENDBLK", "TABLE",
          "ENDTAB"}
 _MAX_OBJECTS = 2_000_000
+# DXF raw per-entity style codes only; layer-level effective color/line type,
+# print styles and viewport overrides still require independent CAD rendering.
+_STYLE_CODES = frozenset((6, 48, 60, 62, 370, 420, 430, 440))
+_STYLE_DEFAULTS = {6: "BYLAYER", 48: "1", 60: "0", 62: "256", 370: "-1"}
 
 
 class DwgEntityIdentityAudit:
-    def __init__(self, geometry_enabled=False):
+    def __init__(self, geometry_enabled=False, style_enabled=False):
+        self.style_enabled = bool(style_enabled)
+        self.core_style = {} if style_enabled else None
+        self.invalid_core_style = 0
         self.geometry_enabled = bool(geometry_enabled)
         self.core_geometry = {} if geometry_enabled else None
         self.invalid_core_geometry = 0
@@ -99,6 +106,56 @@ class DwgEntityIdentityAudit:
             canonical.append((code, value))
         return tuple(canonical)
 
+    @staticmethod
+    def _entity_style(fields, reference=False):
+        """Compare explicit DXF entity appearance fields, never rendered pixels.
+
+        Missing color/linetype/lineweight values use DXF ByLayer defaults;
+        presence/absence of TrueColor and transparency remains distinguishable.
+        No hidden style strings or values leave the count-only report.
+        """
+        if reference:
+            if not isinstance(fields, dict) or len(fields) > len(_STYLE_CODES):
+                raise ValueError("invalid independent entity style")
+            pairs = []
+            for key, value in fields.items():
+                if not isinstance(key, str) or not key.isdecimal():
+                    raise ValueError("invalid style group key")
+                code = int(key)
+                if str(code) != key or code not in _STYLE_CODES:
+                    raise ValueError("unsupported independent style group")
+                pairs.append((code, value))
+        else:
+            pairs = [(code, value) for code, value in fields
+                     if code in _STYLE_CODES]
+        values = {}
+        for code, raw in pairs:
+            if (code in values or not isinstance(raw, str) or
+                    not raw or len(raw) > 256):
+                raise ValueError("invalid or duplicate entity style field")
+            if code in (6, 430):
+                if any(ord(character) < 32 for character in raw):
+                    raise ValueError("invalid style name")
+                val = raw.upper() if code == 6 and raw.upper() in (
+                    "BYLAYER", "BYBLOCK", "CONTINUOUS") else raw
+            else:
+                val = _normalized(code, raw)
+                if code == 62 and not -255 <= int(val) <= 256:
+                    raise ValueError("invalid ACI color")
+                if code == 420 and not 0 <= int(val) <= 0xFFFFFF:
+                    raise ValueError("invalid TrueColor")
+                if code == 440 and not 0 <= int(val) <= 0xFFFFFFFF:
+                    raise ValueError("invalid transparency")
+                if code == 60 and int(val) not in (0, 1):
+                    raise ValueError("invalid visibility")
+                if code == 370 and not -3 <= int(val) <= 211:
+                    raise ValueError("invalid lineweight")
+                if code == 48 and Decimal(val) <= 0:
+                    raise ValueError("invalid linetype scale")
+            values[code] = val
+        return tuple((code, values.get(code, _STYLE_DEFAULTS.get(code)))
+                     for code in sorted(_STYLE_CODES))
+
     @classmethod
     def _space(cls, section, fields):
         """Classify ENTITIES layout space without publishing private sheet names.
@@ -157,6 +214,12 @@ class DwgEntityIdentityAudit:
             return
         self.entities[handle] = (space, kind,
                                  layers[0] if layers else None)
+        if self.style_enabled:
+            try:
+                self.core_style[handle] = self._entity_style(fields)
+            except ValueError:
+                self.core_style[handle] = None
+                self.invalid_core_style += 1
         if self.geometry_enabled and kind in _CORE_GEOMETRY:
             try:
                 self.core_geometry[handle] = self._primitive_geometry(kind, fields)
@@ -282,5 +345,44 @@ class DwgEntityIdentityAudit:
                 "LINE endpoints, POINT position/normal, CIRCLE/ARC center/radius/"
                 "angles/normal only. No tolerance, full DWG geometry, color, "
                 "XREF, block transforms, 3DSOLID, or rendering assurance."
+            ),
+        }
+
+    def compare_independent_style(self, reference_records):
+        """Opt-in exact raw entity style parity; not resolved layer/render color."""
+        if not self.style_enabled or not isinstance(reference_records, list):
+            raise ValueError("independent style audit not enabled")
+        if not reference_records or len(reference_records) > _MAX_OBJECTS:
+            raise ValueError("missing or oversized independent style manifest")
+        references = {}
+        for entry in reference_records:
+            if not isinstance(entry, dict) or set(entry) != {"handle", "groups"}:
+                raise ValueError("invalid independent style entry")
+            handle = self._handle(entry["handle"])
+            if handle is None or handle in references:
+                raise ValueError("invalid or duplicate source style handle")
+            references[handle] = self._entity_style(entry["groups"], reference=True)
+        expected = set(self.core_style)
+        actual = set(references)
+        mismatch = sum(
+            self.core_style[handle] is None or
+            self.core_style[handle] != references[handle]
+            for handle in expected & actual
+        )
+        passed = (not (expected - actual) and not (actual - expected)
+                  and not mismatch and not self.invalid_core_style)
+        return {
+            "independent_style_result": (
+                "entity_style_subset_parity_only" if passed else
+                "entity_style_subset_mismatch"),
+            "independent_style_checked": len(expected & actual),
+            "independent_style_missing_reference": len(expected - actual),
+            "independent_style_unexpected_reference": len(actual - expected),
+            "independent_style_field_mismatches": mismatch,
+            "independent_style_invalid_decoded": self.invalid_core_style,
+            "independent_style_scope": (
+                "Raw entity group 6/48/60/62/370/420/430/440 only. "
+                "Does NOT verify layer tables, effective ByLayer/ByBlock "
+                "inheritance, viewport overrides, plot styles or screen colors."
             ),
         }

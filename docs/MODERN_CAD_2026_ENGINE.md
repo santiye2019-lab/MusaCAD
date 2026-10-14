@@ -324,3 +324,35 @@ no original-DWG validation takes place. A source-label declaration alone
 does not establish provenance. Full release acceptance remains 0/18;
 general feature-level estimate remains 35% (65% left). No change to
 main, live worker, production APK or default CAD render path.
+
+## Inventory #08 — opt-in raw entity style parity (fifth increment)
+
+The local original-DWG SHA256-bound independent reader manifest now optionally
+accepts \`style_records\`: one object per original entity, with a \`handle\` and
+string-valued DXF \`groups\` mapping. Example:
+
+\`\`\`json
+{"handle":"A","groups":{"62":"1","6":"BYLAYER","370":"50","48":"1.0"}}
+\`\`\`
+
+The importer compares entity-level DXF appearance codes: 6 (linetype),
+48 (linetype scale), 60 (visibility), 62 (ACI / ByLayer / ByBlock), 370
+(lineweight), 420 (TrueColor), 430 (color-book label), and 440
+(transparency). Missing ByLayer defaults are normalized; exact numeric
+comparison catches even small scale/TrueColor differences. Repeated codes,
+invalid RGB/ACI/visibility/lineweight, missing original handles and wrong
+source records fail closed. Values, project identifiers, color-book names and
+layer names remain local: diagnostic output is count-only.
+
+Malformed UTF-8 in the converted ASCII/UTF-8 DXF is now rejected instead of
+silently introducing U+FFFD replacement characters that could hide identity or
+style mismatch. Existing text decoding outside this private audit is untouched.
+
+**Limits:** Raw style parity never proves *effective rendered appearance*:
+actual ByLayer/ByBlock resolution, layer table colors/linetypes, plot styles,
+viewport overrides, XREF dependency styles, raster effects, screen RGB output
+and phone first-frame fidelity are still unverified. An independently produced
+source manifest is mandatory for an original-DWG claim. This is optional,
+read-only host diagnostic work, not new native viewport functionality.
+No change to main, existing APK, or Cloudflare. Feature-level
+AutoCAD 2026 estimate remains 35% and 0/18 final field acceptance.

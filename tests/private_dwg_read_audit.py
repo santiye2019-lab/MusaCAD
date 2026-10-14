@@ -42,7 +42,7 @@ def sha256_file(path: Path) -> str:
 
 def dxf_pairs(path: Path):
     # ASCII DXF group-code/value pairs. A binary/invalid DXF fails closed.
-    with path.open("r", encoding="utf-8", errors="replace", newline=None) as stream:
+    with path.open("r", encoding="utf-8", errors="strict", newline=None) as stream:
         while True:
             key = stream.readline()
             if not key:
@@ -186,7 +186,7 @@ def inventory_dxf(path: Path, identity_collector=None):
 
 def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                 limit_mb: int, independent_reference=None,
-                independent_geometry=None):
+                independent_geometry=None, independent_style=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -298,7 +298,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         return result
     try:
         identity = DwgEntityIdentityAudit(
-            geometry_enabled=independent_geometry is not None)
+            geometry_enabled=independent_geometry is not None,
+            style_enabled=independent_style is not None)
         result.update(inventory_dxf(output, identity_collector=identity))
         if independent_reference is not None:
             # Compares decoded handles/types/layers with a separately provided
@@ -307,6 +308,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         if independent_geometry is not None:
             result.update(identity.compare_independent_geometry(
                 independent_geometry))
+        if independent_style is not None:
+            result.update(identity.compare_independent_style(independent_style))
         if result.get("native_scene_truncated") is True:
             # The 9 Mi-float native first-paint cap clipped this drawing.
             result["status"] = "decoded_dxf_inventory_scene_truncated"
@@ -323,6 +326,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory_identity_mismatch"
         if result.get("independent_geometry_result") == "primitive_subset_mismatch":
             result["status"] = "decoded_dxf_inventory_geometry_mismatch"
+        if result.get("independent_style_result") == "entity_style_subset_mismatch":
+            result["status"] = "decoded_dxf_inventory_style_mismatch"
         result["conversion_has_quality_warnings"] = bool(
             result.get("native_converter_warning_mask", 0)
             or result["utf8_decode_warning_count"]
@@ -382,6 +387,7 @@ def main() -> int:
         else:
             external_entities = None
             external_geometry = None
+            external_style = None
             if args.independent_manifest_dir:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
@@ -402,20 +408,23 @@ def main() -> int:
                         if not isinstance(reference["geometry_records"], list):
                             raise ValueError("invalid independent geometry records")
                         external_geometry = reference["geometry_records"]
+                    if "style_records" in reference:
+                        if not isinstance(reference["style_records"], list):
+                            raise ValueError("invalid independent style records")
+                        external_style = reference["style_records"]
                 except (ValueError, OSError, UnicodeError):
                     row["status"] = "invalid_independent_manifest"
                     failure = True
             if row.get("status") != "invalid_independent_manifest":
                 with tempfile.TemporaryDirectory(prefix="musacad-private-dwg-") as tmp:
-                    if external_geometry is None:
-                        row.update(convert_one(source, converter, Path(tmp),
-                                               args.timeout_sec, args.max_vmem_mb,
-                                               external_entities))
-                    else:
-                        row.update(convert_one(source, converter, Path(tmp),
-                                               args.timeout_sec, args.max_vmem_mb,
-                                               external_entities,
-                                               independent_geometry=external_geometry))
+                    optional_checks = {}
+                    if external_geometry is not None:
+                        optional_checks["independent_geometry"] = external_geometry
+                    if external_style is not None:
+                        optional_checks["independent_style"] = external_style
+                    row.update(convert_one(source, converter, Path(tmp),
+                                           args.timeout_sec, args.max_vmem_mb,
+                                           external_entities, **optional_checks))
             if row["status"] != "decoded_dxf_inventory":
                 failure = True
         row["sha256_after"] = sha256_file(source)
