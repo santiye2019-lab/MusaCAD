@@ -220,6 +220,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         r"control=(\d+) knots=(\d+) fit=(\d+) "
         r"weighted=(\d+) rational=(\d+) "
         r"reason=(missing_knots_or_fit_only|bad_weights_knots_or_budget)"
+        r"(?: ctrl_pointer=(\\d+) knots_pointer=(\\d+) closed=(\\d+)"
+        r" periodic=(\\d+) begin_tangent_zero=(\\d+) end_tangent_zero=(\\d+))?"
     )
     for match in spline_pattern.finditer(diagnostics):
         if len(spline_diagnostics) >= 32:
@@ -229,7 +231,13 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int, lim
         spline_diagnostics.append({
             "scenario": scenario, "degree": degree, "control": control,
             "knots": knots, "fit": fit, "weighted": weighted,
-            "rational": rational, "reason": match.group(8)
+            "rational": rational, "reason": match.group(8),
+            "ctrl_pointer": int(match.group(9)) if match.group(9) else None,
+            "knots_pointer": int(match.group(10)) if match.group(10) else None,
+            "closed": int(match.group(11)) if match.group(11) else None,
+            "periodic": int(match.group(12)) if match.group(12) else None,
+            "begin_tangent_zero": int(match.group(13)) if match.group(13) else None,
+            "end_tangent_zero": int(match.group(14)) if match.group(14) else None,
         })
     result["native_spline_rejection_details"] = spline_diagnostics
     result["native_spline_fit_only_rejections"] = diagnostics.count(
