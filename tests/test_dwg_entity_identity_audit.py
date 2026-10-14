@@ -82,13 +82,80 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
             None, {}, "FILE.dwg", [{"handle":"XYZ","space":"model","type":"LINE","layer":"0"}],
             [{"handle":"A","space":"model","type":"LINE","layer":"0"},
              {"handle":"000A","space":"model","type":"LINE","layer":"0"}],
-            [{"handle":"A","space":"paperspace","type":"LINE","layer":"0"}],
+            [{"handle":"A","space":"paper","type":"LINE","layer":"0"}],
             [{"handle":"A","space":"model","type":"LINE","layer":""}],
             [{"handle":"A","space":"model","type":"LINE","layer":"0","x":123}],
         ):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     audit.compare_independent(invalid)
+
+    def test_model_paper_space_parity_and_no_sheet_name_leaks(self):
+        audit = DwgEntityIdentityAudit()
+        audit.observe("ENTITIES", "LINE",
+                      [(5, "10"), (8, "SECRET MODEL"), (67, "0"), (410, "Model")])
+        audit.observe("ENTITIES", "TEXT",
+                      [(5, "11"), (8, "SECRET PAPER"), (67, "1"),
+                       (410, "PRIVATE PAPER SHEET")])
+        audit.observe("ENTITIES", "CIRCLE",
+                      [(5, "12"), (8, "0"), (410, "CONFIDENTIAL LAYOUT")])
+        audit.observe("BLOCKS", "LINE",
+                      [(5, "13"), (8, "0"), (67, "1"), (410, "PRIVATE PAPER SHEET")])
+        reference = [
+            {"handle":"10","space":"model","type":"LINE","layer":"SECRET MODEL"},
+            {"handle":"11","space":"paperspace","type":"TEXT","layer":"SECRET PAPER"},
+            {"handle":"12","space":"paperspace","type":"CIRCLE","layer":"0"},
+            {"handle":"13","space":"block","type":"LINE","layer":"0"},
+        ]
+        self.assertEqual(audit.summary()["decoded_identity_invalid_space_fields"], 0)
+        result = audit.compare_independent(reference)
+        self.assertEqual(result["independent_identity_result"],
+                         "identity_metadata_parity_only")
+        self.assertNotIn("PRIVATE", str(result))
+        self.assertNotIn("SECRET", str(audit.summary()))
+        modified = [dict(entry) for entry in reference]
+        modified[1]["space"] = "model"
+        mismatch = audit.compare_independent(modified)
+        self.assertEqual(mismatch["independent_space_mismatches"], 1)
+        self.assertEqual(mismatch["independent_identity_result"],
+                         "identity_metadata_mismatch")
+
+    def test_conflicting_or_malformed_paperspace_flags_fail_closed(self):
+        invalid = (
+            [(67, "2")], [(67, "X")], [(67, "1"), (67, "1")],
+            [(67, "1"), (410, "Model")],
+            [(67, "0"), (410, "PRIVATE LAYOUT")],
+            [(410, "")], [(410, "A"), (410, "B")],
+        )
+        for extra in invalid:
+            with self.subTest(extra=extra):
+                audit = DwgEntityIdentityAudit()
+                audit.observe("ENTITIES", "LINE", [(5, "A"), (8, "0")] + extra)
+                status = audit.summary()
+                self.assertEqual(status["decoded_identity_invalid_space_fields"], 1)
+                self.assertEqual(status["decoded_identity_status"],
+                                 "decoded_records_have_identity_issues")
+                result = audit.compare_independent(
+                    [{"handle":"A","space":"model","type":"LINE","layer":"0"}])
+                self.assertEqual(result["independent_identity_result"],
+                                 "identity_metadata_mismatch")
+
+    def test_dxf_paperspace_inventory_hides_layout_name(self):
+        source = (record("SECTION", (2, "ENTITIES")) +
+                  record("LINE", (5, "A"), (8, "SECRET LAYER"),
+                         (67, "1"), (410, "CONFIDENTIAL SHEET")) +
+                  record("ENDSEC") + record("EOF"))
+        with tempfile.TemporaryDirectory(prefix="musacad-dxf-layout-") as directory:
+            path = Path(directory) / "fixture.dxf"
+            path.write_text(source, encoding="ascii")
+            inventory = inventory_dxf(path)
+        self.assertEqual(inventory["decoded_identity_invalid_space_fields"], 0)
+        self.assertEqual(inventory["decoded_identity_status"],
+                         "decoded_identity_well_formed_source_unverified")
+        identity_fields = {key: value for key, value in inventory.items()
+                           if key.startswith("decoded_identity_")}
+        self.assertNotIn("SECRET", str(identity_fields))
+        self.assertNotIn("CONFIDENTIAL", str(identity_fields))
 
     def test_missing_decoded_layer_cannot_pass_even_if_reference_matches(self):
         audit = DwgEntityIdentityAudit()

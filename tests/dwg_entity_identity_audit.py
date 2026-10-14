@@ -1,7 +1,7 @@
 """Local-only DWG/DXF object identity integrity and source-manifest parity.
 
 The decoded DXF is NOT the authoritative DWG. Capture entity handles (group 5),
-layers (group 8), type and model/block ownership without returning their values
+layers (group 8), type and model/paperspace/block identity without returning their values
 in diagnostics. An independent DWG reader may supply a source manifest to
 compare in memory; summaries report counts only, never handles/layers/text.
 """
@@ -27,6 +27,7 @@ class DwgEntityIdentityAudit:
         self.missing_layer = 0
         self.duplicate_handle_field = 0
         self.duplicate_layer_field = 0
+        self.invalid_space_fields = 0
 
     @staticmethod
     def _one(fields, code):
@@ -39,6 +40,35 @@ class DwgEntityIdentityAudit:
         numeric = int(value, 16)
         return format(numeric, "X") if numeric else None
 
+    @classmethod
+    def _space(cls, section, fields):
+        """Classify ENTITIES layout space without publishing private sheet names.
+
+        DXF 67 is the paper-space flag; 410 is the layout name. BLOCKS
+        records represent block definition content, not paper-space instances.
+        Contradictory, duplicate or invalid space metadata fails closed.
+        """
+        if section == "BLOCKS":
+            return "block", True
+        flags = cls._one(fields, 67)
+        layouts = cls._one(fields, 410)
+        if len(flags) > 1 or len(layouts) > 1:
+            return "invalid", False
+        by_flag = None
+        if flags:
+            by_flag = {"0": "model", "1": "paperspace"}.get(flags[0])
+            if by_flag is None:
+                return "invalid", False
+        by_layout = None
+        if layouts:
+            if not layouts[0]:
+                return "invalid", False
+            by_layout = ("model" if layouts[0].casefold() == "model"
+                         else "paperspace")
+        if by_flag and by_layout and by_flag != by_layout:
+            return "invalid", False
+        return by_flag or by_layout or "model", True
+
     def observe(self, section, kind, fields):
         if section not in _SPACES or kind in _SKIP:
             return
@@ -47,6 +77,9 @@ class DwgEntityIdentityAudit:
             raise ValueError("object identity audit safety cap exceeded")
         handles = self._one(fields, 5)
         layers = self._one(fields, 8)
+        space, valid_space = self._space(section, fields)
+        if not valid_space:
+            self.invalid_space_fields += 1
         if len(handles) > 1:
             self.duplicate_handle_field += 1
         if len(layers) > 1:
@@ -63,13 +96,14 @@ class DwgEntityIdentityAudit:
         if handle in self.entities:
             self.duplicate_handle += 1
             return
-        self.entities[handle] = (_SPACES[section], kind,
+        self.entities[handle] = (space, kind,
                                  layers[0] if layers else None)
 
     def summary(self):
         issues = (self.missing_handle + self.invalid_handle +
                   self.duplicate_handle + self.missing_layer +
-                  self.duplicate_handle_field + self.duplicate_layer_field)
+                  self.duplicate_handle_field + self.duplicate_layer_field +
+                  self.invalid_space_fields)
         return {
             "decoded_identity_entity_records": self.total,
             "decoded_identity_unique_handles": len(self.entities),
@@ -79,6 +113,7 @@ class DwgEntityIdentityAudit:
             "decoded_identity_missing_layers": self.missing_layer,
             "decoded_identity_duplicate_handle_fields": self.duplicate_handle_field,
             "decoded_identity_duplicate_layer_fields": self.duplicate_layer_field,
+            "decoded_identity_invalid_space_fields": self.invalid_space_fields,
             "decoded_identity_status": (
                 "decoded_records_have_identity_issues" if issues else
                 "decoded_identity_well_formed_source_unverified"),
@@ -103,7 +138,7 @@ class DwgEntityIdentityAudit:
                 raise ValueError("invalid independent CAD entry")
             handle = self._handle(entry["handle"])
             if (handle is None or handle in reference or
-                entry["space"] not in ("model", "block") or
+                entry["space"] not in ("model", "paperspace", "block") or
                 not isinstance(entry["type"], str) or not entry["type"] or
                 not isinstance(entry["layer"], str) or not entry["layer"]):
                 raise ValueError("invalid independent CAD handle/type/layer")
@@ -130,7 +165,7 @@ class DwgEntityIdentityAudit:
                 "identity_metadata_parity_only" if parity else
                 "identity_metadata_mismatch"),
             "independent_identity_scope": (
-                "Only source handle, entity type, layer, model/block. No "
+                "Only source handle, entity type, layer, model/paperspace/block. No "
                 "coordinates, colors, text, viewport pixels, or ACIS fidelity."
             ),
         }

@@ -274,3 +274,22 @@ unit scales or written DWG roundtrip. **0/18 final acceptance.**
 **Overall progression:** 35% -> 35% estimated developed, 65% remaining
 (AutoCAD 2026 target, ±10 pp); audit infrastructure does not count as full
 native drawing functionality. Draft PR only; main/production APK untouched.
+
+## Inventory #08 — model/paperspace identity distinction (third increment)
+
+Independent manifest comparison now recognizes `ENTITIES` records in `model`
+and `paperspace` using DXF group 67 and group 410. Contradictory/duplicated
+layout metadata is counted as invalid and forces metadata-parity failure.
+The private sheet name is never emitted in identity diagnostics. Contents
+of block definitions (`BLOCKS`) remain classified as `block`.
+
+Independent reader manifests can specify `space: "paperspace"` as well
+as `model` and `block`. Synthetic tests cover sheet/model mismatch,
+conflicting space fields, and identity-diagnostic confidentiality.
+
+**Limit:** paper-space categorization is not verification of which sheet
+owns an entity; group-330 owner links, viewport semantics, hidden layouts
+and original DWG equivalence still require independent assessment.
+No claim of AutoCAD 2026 parity or real-phone performance. Main, APK and
+Cloudflare production remain untouched; overall estimated progress 35%,
+remaining 65%, 0/18 final acceptance items.
