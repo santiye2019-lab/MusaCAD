@@ -46,6 +46,32 @@ int main(void){
     double straight_y=2.0*(.05/k5[1].t);
     need(fabs(y-straight_y)>0.1,"curve must not degrade into fit-point polygon");
 
+    /* Independent CAD-style global interpolation reference with explicit
+     * endpoint tangent directions. The derivatives have chord-length
+     * magnitude and differ materially from the natural endpoint curve. */
+    MusaCadNaturalKnot clamped5[5]={0};
+    need(musa_cad_fit_clamped_build(fit5,5,
+         (MusaCadFitPoint){1,0,0},(MusaCadFitPoint){-1,0,0},
+         clamped5),"both explicit end tangents solved");
+    need(musa_cad_fit_natural_eval(clamped5,5,.05,&x,&y),
+         "clamped spline at .05");
+    near(x,.3866749624061828,1e-9,"tangent clamped x at .05");
+    near(y,.24372559551065884,1e-9,"tangent clamped y at .05");
+    need(musa_cad_fit_natural_eval(clamped5,5,.30,&x,&y),
+         "clamped spline at .30");
+    near(x,1.7101663427222205,1e-9,"tangent clamped x at .30");
+    near(y,1.7263552158487832,1e-9,"tangent clamped y at .30");
+    need(musa_cad_fit_natural_eval(clamped5,5,.72,&x,&y),
+         "clamped spline at .72");
+    near(x,4.6491903440757785,1e-9,"tangent clamped x at .72");
+    near(y,2.8249423436076784,1e-9,"tangent clamped y at .72");
+    need(!musa_cad_fit_clamped_build(fit5,5,
+         (MusaCadFitPoint){0,0,0},(MusaCadFitPoint){-1,0,0},
+         clamped5),"zero-length explicit tangent must fail");
+    need(!musa_cad_fit_clamped_build(fit5,5,
+         (MusaCadFitPoint){NAN,0,0},(MusaCadFitPoint){-1,0,0},
+         clamped5),"NaN tangent must fail");
+
     MusaCadFitPoint fit6[]={
         {0,0,0},{1,0,0},{2,1,0},{3,1.5,0},{5,2,0},{8,0,0}
     };
