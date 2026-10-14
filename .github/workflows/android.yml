@@ -453,6 +453,8 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeViewportPageCache.java tests/NativeViewportPageCacheTest.java
           java -cp /tmp/musacad-tests NativeViewportPageCacheTest
+          javac -cp /tmp/musacad-tests -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativePageCatalog.java tests/NativePageCatalogTest.java
+          java -cp /tmp/musacad-tests NativePageCatalogTest
           # Android-scene compositor is opt-in only; guard against accidental
           # replacement of authoritative vector rendering in CadView.
           grep -q 'NativePagedScenePreview' app/src/main/java/com/musa/cad/NativePagedScenePreview.java
