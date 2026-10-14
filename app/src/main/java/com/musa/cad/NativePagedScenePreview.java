@@ -1,0 +1,89 @@
+package com.musa.cad;
+
+import android.graphics.Canvas;
+import android.graphics.Matrix;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import java.io.IOException;
+import java.util.ArrayList;
+
+/**
+ * Opt-in bounded preview compositor. NOT connected to production CadView yet.
+ *
+ * Loading is strictly off the UI thread via NativeCadEngine.previewNestedPage();
+ * draw() is called only from the Android UI renderer. Its native scene pages
+ * contain immutable geometry, but each NativeScene has Canvas scratch objects,
+ * therefore NEVER draw one page simultaneously on two threads.
+ *
+ * When a page is evicted the compositor reports isComplete()==false; a caller
+ * must fetch the missing pages or show a partial-loading indicator. It must not
+ * pretend that missing geometry is outside the viewport.
+ */
+public final class NativePagedScenePreview {
+    private final NativeViewportPageCache<NativeScene> cache;
+    private Matrix worldToContent;
+    private final Matrix scratchCombined=new Matrix();
+    private final Matrix scratchInverse=new Matrix();
+    private final RectF scratchVisible=new RectF();
+    private boolean sourceStarted;
+    private long firstTop,firstLeaf;
+
+    public NativePagedScenePreview(long maxRetainedBytes,int maxRetainedPages){
+        cache=new NativeViewportPageCache<>(maxRetainedBytes,maxRetainedPages);
+    }
+
+    /** Adds one page generated from the full two-part source cursor. */
+    public synchronized boolean retain(long startTop,long startLeaf,
+                                          NativeCadEngine.NestedScenePage page){
+        if(page==null||page.scene==null||page.scene.truncated)
+            throw new IllegalArgumentException("incomplete or missing CAD page");
+        if(!sourceStarted){
+            if(startTop!=0||startLeaf!=0)
+                throw new IllegalArgumentException("first page must start at 0:0");
+            worldToContent=page.scene.worldToContentTransform();
+            sourceStarted=true;firstTop=startTop;firstLeaf=startLeaf;
+        }
+        RectF bbox=page.scene.occupiedWorldBounds();
+        return cache.put(new NativeViewportPageCache.Cursor(startTop,startLeaf),
+                new NativeViewportPageCache.Cursor(page.nextTopLevelIndex,
+                                                  page.nextNestedLeafIndex),
+                page.hasMore,bbox.left,bbox.top,bbox.right,bbox.bottom,
+                page.scene.estimatedRetainedBytes(),page.scene);
+    }
+
+    public synchronized boolean isComplete(){return cache.isComplete();}
+    public synchronized int pageCount(){return cache.pageCount();}
+    public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
+    public synchronized boolean isPartial(){return !cache.isComplete();}
+    public synchronized void clear(){
+        cache.clear();sourceStarted=false;worldToContent=null;firstTop=0;firstLeaf=0;
+    }
+
+    /**
+     * Renders only pages whose conservative geometry bounds intersect the
+     * viewport. Every selected NativeScene also uses its own existing spatial
+     * grid to cull individual primitives. No work to decode a DWG page here.
+     *
+     * Returns count of pages drawn, not a claim that the DWG was complete.
+     */
+    public synchronized int draw(Canvas canvas,Matrix contentToScreen,
+                                 boolean fastNavigation){
+        if(canvas==null||contentToScreen==null||worldToContent==null)return 0;
+        scratchCombined.setConcat(contentToScreen,worldToContent);
+        if(!scratchCombined.invert(scratchInverse))return 0;
+        Rect clip=canvas.getClipBounds();
+        if(clip==null||clip.isEmpty())return 0;
+        scratchVisible.set(clip);
+        scratchInverse.mapRect(scratchVisible);
+        float worldPad=Math.max(scratchVisible.width()/Math.max(1,clip.width()),
+                                scratchVisible.height()/Math.max(1,clip.height()))*12f;
+        if(Float.isFinite(worldPad)&&worldPad>0f)
+            scratchVisible.inset(-worldPad,-worldPad);
+        ArrayList<NativeViewportPageCache.Page<NativeScene>> visible=
+                cache.visible(scratchVisible.left,scratchVisible.top,
+                              scratchVisible.right,scratchVisible.bottom);
+        for(NativeViewportPageCache.Page<NativeScene> page:visible)
+            page.payload.draw(canvas,contentToScreen,fastNavigation);
+        return visible.size();
+    }
+}
