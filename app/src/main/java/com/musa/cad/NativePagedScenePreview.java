@@ -119,10 +119,22 @@ public final class NativePagedScenePreview {
         return active!=null&&firstPageRef!=null&&firstPageRef.get()==active;
     }
 
-    public synchronized boolean isComplete(){return cache.isComplete();}
+    /*
+     * The compositor is the ONLY writer to its private cache: each retained
+     * page was first appended to this strictly sequential catalog, and each
+     * reloaded page was verified against its original source SHA-256.
+     * Thus, once discovery reached EOF, matching page counts prove that no
+     * catalogued page is missing. Avoid walking up to 100,000 cursors and
+     * allocating a HashSet on EVERY Canvas frame to display the partial badge.
+     * Generic NativeViewportPageCache.isComplete() keeps its strict chain
+     * check for callers without this validated catalog ownership.
+     */
+    public synchronized boolean isComplete(){
+        return catalog.hasCompleteCachedCoverage(cache.pageCount());
+    }
     public synchronized int pageCount(){return cache.pageCount();}
     public synchronized long retainedEstimateBytes(){return cache.retainedBytes();}
-    public synchronized boolean isPartial(){return !cache.isComplete();}
+    public synchronized boolean isPartial(){return !isComplete();}
     public synchronized void clear(){
         cache.clear();catalog.clear();pageHashes.clear();
         sourceStarted=false;worldToContent=null;firstPageRef=null;
