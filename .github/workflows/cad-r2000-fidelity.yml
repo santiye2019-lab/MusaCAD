@@ -219,6 +219,11 @@ jobs:
           doc = json.loads(Path("/tmp/musacad-upstream-dwg-reader.json").read_text())
           assert len(doc["files"]) == 2
           for item in doc["files"]:
+              print("DWG reader audit:", item["dwg_release"],
+                    "scene_status=",item["native_scene_status"],
+                    "spline_missing_knots=",item.get("native_spline_fit_only_rejections",0),
+                    "spline_bad_weights=",item.get("native_spline_invalid_weight_rejections",0),
+                    flush=True)
               assert item["source_unchanged"]
               assert item["status"] == "decoded_dxf_inventory", item["status"]
               assert item["model_entity_count"] + item["block_geometry_entity_count"] > 0
