@@ -772,6 +772,23 @@ jobs:
           assert "Kapalı katı olarak kabul edilmez." in code
           PY
 
+      - name: Test CAD mesh signed-volume math without false ACIS claims
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java tests/Cad3dSignedVolumeTest.java
+          java -cp /tmp/musacad-tests Cad3dSignedVolumeTest
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/java/com/musa/cad/Mesh3dActivity.java").read_text()
+          a=source.index("Cad3dMeshTopology.inspect(loaded.xyz,loaded.triangles)")
+          b=source.index("Cad3dSignedVolume.measure(")
+          ui=source.index("runOnUiThread(()->{if(closing)return;mesh=loaded")
+          assert a<b<ui, "topology-gated volume must compute off the UI thread"
+          assert "if(topology!=null&&topology.closedOrientedByIndex)" in source
+          assert "openingSignedVolume=initialVolume;" in source
+          assert "öz-kesişimsiz B-Rep veya geçerli ACIS katısı garantisi değildir" in source
+          assert "ACIS/temsili nesneler bulunduğundan kısmi" in source
+          PY
+
       - name: Test 3D DXF surface geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/Dxf3dEditor.java app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dMeshTest.java tests/Dxf3dSafeSaveTest.java tests/CadSaveSourceIntegrityTest.java tests/Dxf3dSafeSaveIntegrationContractTest.java tests/Cad3dSurfaceDxfIntegrationTest.java
