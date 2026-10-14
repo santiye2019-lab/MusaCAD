@@ -249,6 +249,9 @@ existing `private_dwg_read_audit.py`.
 - Invalid/mismatched/oversized manifests fail closed; only an explicit
   `--independent-manifest-dir <local-directory>` opt-in loads such data.
   Neither the source DWG nor reference manifest is uploaded.
+- The report destination must not resolve to an input DWG or the matching
+  independent reference manifest, including through a symlink. New regression
+  tests reject these collisions before conversion and preserve original bytes.
 - Synthetic tests cover duplicate/invalid handles, identity drift despite
   equal counts, model/block changes, independent-SHA gate, privacy and
   strict reference input validation. Both Android and DWG CI run them.

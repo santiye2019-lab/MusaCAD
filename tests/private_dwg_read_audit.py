@@ -352,6 +352,11 @@ def main() -> int:
     report = {"schema_version": 1, "privacy": "private local file analysis; no uploads",
               "source_is_read_only": True, "files": []}
     failure = False
+    # The audit is read-only for input drawings. Canonicalize before writing
+    # anything so --report cannot replace a DWG through a direct or alias path.
+    report_target = args.report.resolve()
+    if any(source.resolve() == report_target for source in args.drawings):
+        parser.error("report output must not overwrite a source DWG")
     for source in args.drawings:
         if not source.is_file():
             parser.error("missing input drawing: " + str(source))
@@ -373,6 +378,8 @@ def main() -> int:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
                 reference_path = args.independent_manifest_dir / (digest + ".json")
+                if reference_path.resolve() == report_target:
+                    parser.error("report output must not overwrite an independent manifest")
                 try:
                     if not reference_path.is_file() or reference_path.stat().st_size > 64*1024*1024:
                         raise ValueError("independent manifest missing or oversize")

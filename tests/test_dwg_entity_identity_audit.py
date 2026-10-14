@@ -139,6 +139,54 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
                 self.assertEqual(main(), 0)
                 self.assertEqual(convert.call_args.args[-1], manifest["records"])
 
+    def test_report_output_cannot_replace_original_dwg_or_symlink_alias(self):
+        with tempfile.TemporaryDirectory(prefix="musa-report-safety-") as directory:
+            folder = Path(directory)
+            source = folder / "source.dwg"
+            original = b"AC1015 synthetic drawing that must remain byte-identical"
+            source.write_bytes(original)
+            alias = folder / "report-alias.json"
+            alias.symlink_to(source)
+            for report_path in (source, alias):
+                args = ["private_dwg_read_audit.py", "--manifest-only",
+                        "--report", str(report_path), str(source)]
+                with patch.object(sys, "argv", args), patch("sys.stderr"):
+                    with self.assertRaises(SystemExit) as caught:
+                        main()
+                self.assertEqual(caught.exception.code, 2)
+                self.assertEqual(source.read_bytes(), original)
+            self.assertTrue(alias.is_symlink())
+
+    def test_report_output_cannot_replace_external_source_manifest(self):
+        with tempfile.TemporaryDirectory(prefix="musa-reference-safety-") as directory:
+            folder = Path(directory)
+            source = folder / "fixture.dwg"
+            original = b"AC1015 synthetic readonly fixture"
+            source.write_bytes(original)
+            manifest_dir = folder / "refs"
+            manifest_dir.mkdir()
+            digest = hashlib.sha256(original).hexdigest()
+            reference_path = manifest_dir / (digest + ".json")
+            manifest = {"source_sha256": digest,
+                        "source_kind": "independent_dwg_reader", "records": []}
+            original_reference = json.dumps(manifest)
+            reference_path.write_text(original_reference, encoding="utf-8")
+            converter = folder / "mock-converter"
+            converter.write_text("#!/bin/sh\\nexit 0\\n", encoding="ascii")
+            converter.chmod(0o700)
+            args = ["private_dwg_read_audit.py", "--converter", str(converter),
+                    "--independent-manifest-dir", str(manifest_dir),
+                    "--report", str(reference_path), str(source)]
+            with patch.object(sys, "argv", args), patch("sys.stderr"), patch(
+                    "private_dwg_read_audit.convert_one") as convert:
+                with self.assertRaises(SystemExit) as caught:
+                    main()
+                convert.assert_not_called()
+            self.assertEqual(caught.exception.code, 2)
+            self.assertEqual(reference_path.read_text(encoding="utf-8"),
+                             original_reference)
+            self.assertEqual(source.read_bytes(), original)
+
     def test_synthetic_dxf_groups_5_8_audited_without_details(self):
         source = (
             record("SECTION",(2,"BLOCKS")) +
