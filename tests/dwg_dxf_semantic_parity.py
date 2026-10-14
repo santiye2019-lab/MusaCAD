@@ -29,12 +29,13 @@ MAX_RECORDS = 250_000
 MAX_GROUP_PAIRS = 4_000_000
 MAX_PAIRS_PER_RECORD = 100_000
 AUDITED_SECTIONS = frozenset(("TABLES", "BLOCKS", "ENTITIES", "OBJECTS", "CLASSES"))
-SKIPPED_SECTIONS = frozenset(("HEADER", "THUMBNAILIMAGE", "ACDSDATA"))
+SKIPPED_SECTIONS = frozenset(("HEADER", "THUMBNAILIMAGE"))
+UNVERIFIABLE_SECTIONS = frozenset(("ACDSDATA",))
 UNVERIFIABLE_ENTITY_CLASSES = frozenset((
     "3DSOLID", "BODY", "REGION", "ACAD_PROXY_ENTITY", "ACAD_PROXY_OBJECT",
     "ACAD_TABLE", "ACSH_BREP_CLASS", "ACSH_BOOLEAN_CLASS",
 ))
-SUPPORTED_SECTIONS = AUDITED_SECTIONS | SKIPPED_SECTIONS
+SUPPORTED_SECTIONS = AUDITED_SECTIONS | SKIPPED_SECTIONS | UNVERIFIABLE_SECTIONS
 STRUCTURAL = frozenset(("SECTION", "ENDSEC", "EOF"))
 HEX_HANDLE_CODES = frozenset((5, 105)) | frozenset(range(320, 370)) | frozenset(range(390, 400))
 INT_CODES = (
@@ -63,6 +64,10 @@ def _normalized(code: int, value: str) -> str:
             raise DxfParityError("invalid numeric DXF coordinate") from error
         if not number.is_finite():
             raise DxfParityError("nonfinite DXF numeric field")
+        # Refuse exponent bombs: a short "1e999999999" must not allocate
+        # gigabytes when canonicalized to a fixed-point decimal string.
+        if abs(number.as_tuple().exponent) > 512 or len(number.as_tuple().digits) > 10000:
+            raise DxfParityError("out-of-budget DXF numeric field")
         if number == 0:
             return "0"
         return format(number.normalize(), "f")
@@ -93,21 +98,19 @@ def fingerprint(path: Path) -> dict:
     kind = None
     attrs: list[tuple[int, str]] = []
     has_eof = False
-    have_section_start = False
 
     def finish() -> None:
-        nonlocal section, record_count, have_section_start, has_eof
+        nonlocal section, record_count, has_eof
         if kind is None:
             return
         if kind == "SECTION":
-            if section or have_section_start:
+            if section:
                 raise DxfParityError("nested DXF SECTION")
             names = [v.upper() for k, v in attrs if k == 2]
             if len(names) != 1 or names[0] not in SUPPORTED_SECTIONS:
                 raise DxfParityError("unrecognized DXF SECTION")
             section = names[0]
             sections.add(section)
-            have_section_start = False
             return
         if kind == "ENDSEC":
             if not section:
@@ -125,10 +128,13 @@ def fingerprint(path: Path) -> dict:
             raise DxfParityError("entity outside DXF SECTION")
         if section in SKIPPED_SECTIONS:
             return
+        if section in UNVERIFIABLE_SECTIONS:
+            unverified["ACDSDATA"] += 1
+            return
         record_count += 1
         if record_count > MAX_RECORDS:
             raise DxfParityError("too many DXF records")
-        if section in ("ENTITIES", "BLOCKS") and kind in UNVERIFIABLE_ENTITY_CLASSES:
+        if kind in UNVERIFIABLE_ENTITY_CLASSES:
             unverified[kind] += 1
         h = sha256()
         h.update(section.encode("ascii") + b"\x00" + kind.encode("utf-8") + b"\x00")
