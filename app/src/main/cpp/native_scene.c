@@ -628,9 +628,13 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             Dwg_Entity_MULTILEADER *e=obj->tio.entity->tio.MULTILEADER;
             if(!e)break;
             Dwg_MLEADER_AnnotContext *ctx=&e->ctx;
+            // Corrupt modern DWGs can declare leaders without backing storage.
+            // Fail closed rather than returning a falsely complete first paint.
+            if(ctx->num_leaders>0&&!ctx->leaders){s->truncated=1;break;}
             double default_arrow=(isfinite(ctx->arrow_size)&&ctx->arrow_size>0)?ctx->arrow_size:((isfinite(e->arrow_size)&&e->arrow_size>0)?e->arrow_size:1.0);
             for(BITCODE_BL li=0;li<ctx->num_leaders&&!s->truncated;li++){
                 Dwg_LEADER_Node *node=&ctx->leaders[li];
+                if(node->num_lines>0&&!node->lines){s->truncated=1;break;}
                 for(BITCODE_BL lj=0;lj<node->num_lines&&!s->truncated;lj++){
                     Dwg_LEADER_Line *line=&node->lines[lj];
                     double arrow=(isfinite(line->arrow_size)&&line->arrow_size>0)?line->arrow_size:default_arrow;
@@ -642,6 +646,8 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                     emit_line(s,color,parent,x1,y1,x2,y2);
                 }
             }
+            // Missing leader-line arrays invalidate the whole preview leaf.
+            if(s->truncated)break;
             if(ctx->has_content_txt&&ctx->content.txt.type==2&&isfinite(ctx->content.txt.location.x)&&isfinite(ctx->content.txt.location.y)){
                 for(BITCODE_BL li=0;li<ctx->num_leaders&&!s->truncated;li++){
                     Dwg_LEADER_Node *node=&ctx->leaders[li];
@@ -680,6 +686,11 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
             Dwg_Entity_HATCH *e=obj->tio.entity->tio.HATCH;if(!e||!e->paths||e->num_paths<=0)break;
             for(BITCODE_BL pi=0;pi<e->num_paths&&!s->truncated;pi++){
                 Dwg_HATCH_Path *path=&e->paths[pi];BITCODE_BL n=path->num_segs_or_paths;
+                if(n>0&&((path->flag&2)?!path->polyline_paths:!path->segs)){
+                    // Referenced boundary data is missing: never silently
+                    // produce an incomplete HATCH as a complete CAD scene.
+                    s->truncated=1;break;
+                }
                 if((path->flag&2)&&path->polyline_paths&&n>=2){
                     if(path->bulges_present){
                         BITCODE_BL segments=path->closed?n:n-1;
