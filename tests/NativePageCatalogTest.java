@@ -57,6 +57,31 @@ public final class NativePageCatalogTest {
             "metadata memory cap");
         reject(()->catalog.missingVisible(cache,2,2,1,1,1),
             "inverted viewport rejected");
+        // Regression: a large drawing must return the exact nearest K pages
+        // without collecting/sorting all missing scene payloads on every zoom.
+        final int stressCount=20000;
+        NativePageCatalog stress=new NativePageCatalog(stressCount);
+        NativeViewportPageCache<String> emptyCache=new NativeViewportPageCache<>(1024,4);
+        for(int i=0;i<stressCount;i++){
+            stress.append(c(i,0),c(i+1L,0),i+1<stressCount,
+                    i,0,i+1,1,1);
+        }
+        List<NativePageCatalog.Entry> closest=stress.missingVisible(
+                emptyCache,-1,-1,stressCount+1,2,4);
+        yes(closest.size()==4,"large drawing keeps requested batch size");
+        long[] expected={9999,10000,9998,10001};
+        for(int i=0;i<expected.length;i++)
+            yes(closest.get(i).start.equals(c(expected[i],0)),
+                "large drawing nearest-page ordering "+i);
+        // Already cached center page must be skipped without changing LRU.
+        emptyCache.put(c(9999,0),c(10000,0),true,9999,0,10000,1,10,"center");
+        closest=stress.missingVisible(emptyCache,-1,-1,stressCount+1,2,4);
+        long[] missingExpected={10000,9998,10001,9997};
+        for(int i=0;i<missingExpected.length;i++)
+            yes(closest.get(i).start.equals(c(missingExpected[i],0)),
+                "large drawing cached-page exclusion "+i);
+        yes(emptyCache.contains(c(9999,0)),"catalog query does not evict cache");
+
         catalog.clear();
         yes(!catalog.isDiscovered()&&catalog.size()==0,"catalog reset");
         reject(()->catalog.append(c(3,0),c(4,0),false,0,0,1,1,1),
