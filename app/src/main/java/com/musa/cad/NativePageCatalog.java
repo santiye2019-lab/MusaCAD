@@ -3,6 +3,8 @@ package com.musa.cad;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 
 /**
  * Metadata-only catalog of sequential native DWG scene pages.
@@ -82,21 +84,32 @@ public final class NativePageCatalog {
         if(cache==null||maxResults<1||maxResults>256)
             throw new IllegalArgumentException("invalid missing-page request");
         checkBounds(minX,minY,maxX,maxY);
-        ArrayList<Entry> misses=new ArrayList<>();
-        for(Entry e:ordered){
-            if(e.intersects(minX,minY,maxX,maxY)&&!cache.contains(e.start))
-                misses.add(e);
-        }
         final double cx=((double)minX+maxX)*.5,cy=((double)minY+maxY)*.5;
-        misses.sort((a,b)->{
+        Comparator<Entry> nearestFirst=(a,b)->{
             double ax=((double)a.minX+a.maxX)*.5-cx;
             double ay=((double)a.minY+a.maxY)*.5-cy;
             double bx=((double)b.minX+b.maxX)*.5-cx;
             double by=((double)b.minY+b.maxY)*.5-cy;
             int cmp=Double.compare(ax*ax+ay*ay,bx*bx+by*by);
             return cmp==0?a.start.compareTo(b.start):cmp;
-        });
-        return new ArrayList<>(misses.subList(0,Math.min(maxResults,misses.size())));
+        };
+        // Keep only the closest maxResults pages. Sorting every missing page
+        // could allocate/sort 100,000 entries on each pinch/zoom redraw.
+        // The max-heap's head is the WORST retained candidate.
+        PriorityQueue<Entry> closest=new PriorityQueue<>(
+                maxResults,nearestFirst.reversed());
+        for(Entry e:ordered){
+            if(!e.intersects(minX,minY,maxX,maxY)||cache.contains(e.start))
+                continue;
+            if(closest.size()<maxResults)closest.add(e);
+            else if(nearestFirst.compare(e,closest.peek())<0){
+                closest.remove();
+                closest.add(e);
+            }
+        }
+        ArrayList<Entry> misses=new ArrayList<>(closest);
+        misses.sort(nearestFirst);
+        return misses;
     }
 
     /**
