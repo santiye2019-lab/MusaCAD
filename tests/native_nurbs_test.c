@@ -14,6 +14,22 @@ static void close_to(double found,double expected,double tol){
 }
 int main(void){
     double x,y;
+    /* Pinned LibreDWG encodes no weight bytes for weighted=false and
+     * forcibly leaves serialized control-point w=0 in memory. Regardless
+     * of the rational flag, mathematically this means w=1. */
+    close_to(musa_nurbs_weight(0.0,0),1.0,0.0);
+    close_to(musa_nurbs_weight(42.0,0),1.0,0.0);
+    close_to(musa_nurbs_weight(sqrt(.5),1),sqrt(.5),0.0);
+    MusaNurbsControl implicit[]={
+        {1,0,musa_nurbs_weight(0,0)},
+        {1,1,musa_nurbs_weight(0,0)},
+        {0,1,musa_nurbs_weight(0,0)}
+    };
+    double implicit_knots[]={0,0,0,1,1,1};
+    assert(musa_nurbs_valid(implicit,3,implicit_knots,6,2));
+    assert(musa_nurbs_eval(implicit,3,implicit_knots,2,.5,&x,&y));
+    close_to(x,.75,1e-12);
+    close_to(y,.75,1e-12);
     /* Degree 3 Bezier, not the broken control-point polygon.
      * P0=(0,0), P1=(0,3), P2=(3,3), P3=(3,0).
      * At u=.5, exact curve=(1.5, 2.25).
