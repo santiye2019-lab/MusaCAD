@@ -634,20 +634,16 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                           e->fit_pts[1].x,e->fit_pts[1].y);
                 break;
             }
-            /* Scenario-2 cubic SPLINE: LibreDWG stores ONLY fit points
-             * without knots/controls. With zero endpoint tangents, the
-             * standard CAD solution is a natural cubic interpolation in
-             * chord-length parameter space. This evaluates the continuous
-             * cubic, not the false piecewise LINE joining fit points.
+            /* Scenario-2 cubic SPLINE: LibreDWG stores fit points without
+             * knots/controls. Interpolate by chord-length parameters:
+             * natural C''=0 endpoints if both tangents are unspecified,
+             * clamped first derivatives when BOTH end tangent directions
+             * are explicitly supplied. Mixed/unknown conditions fail closed.
              */
             if(e->scenario==2&&!e->ctrl_pts&&!e->knots&&degree==3&&
                !e->closed_b&&!e->periodic&&e->fit_pts&&
                e->num_fit_pts>=3&&
-               e->num_fit_pts<=MUSA_CAD_FIT_MAX_POINTS&&
-               musa_cad_fit_zero_tangent(e->beg_tan_vec.x,
-                   e->beg_tan_vec.y,e->beg_tan_vec.z)&&
-               musa_cad_fit_zero_tangent(e->end_tan_vec.x,
-                   e->end_tan_vec.y,e->end_tan_vec.z)){
+               e->num_fit_pts<=MUSA_CAD_FIT_MAX_POINTS){
                 size_t fit_count=(size_t)e->num_fit_pts;
                 MusaCadFitPoint *fit=(MusaCadFitPoint*)calloc(
                     fit_count,sizeof(*fit));
@@ -663,8 +659,23 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                     fit[i].y=e->fit_pts[i].y;
                     fit[i].z=e->fit_pts[i].z;
                 }
-                if(!musa_cad_fit_natural_build(fit,fit_count,samples)||
-                   !begin_poly(s,color,0,
+                MusaCadFitPoint tangent0={
+                    e->beg_tan_vec.x,e->beg_tan_vec.y,e->beg_tan_vec.z};
+                MusaCadFitPoint tangent1={
+                    e->end_tan_vec.x,e->end_tan_vec.y,e->end_tan_vec.z};
+                int begin_unspecified=musa_cad_fit_zero_tangent(
+                    tangent0.x,tangent0.y,tangent0.z);
+                int end_unspecified=musa_cad_fit_zero_tangent(
+                    tangent1.x,tangent1.y,tangent1.z);
+                int fitted=0;
+                if(begin_unspecified&&end_unspecified)
+                    fitted=musa_cad_fit_natural_build(fit,fit_count,samples);
+                else if(!begin_unspecified&&!end_unspecified)
+                    fitted=musa_cad_fit_clamped_build(
+                        fit,fit_count,tangent0,tangent1,samples);
+                /* A single explicit tangent needs mixed constraints; no
+                 * unsupported guess or silent loss of its direction. */
+                if(!fitted||!begin_poly(s,color,0,
                        1+(int)(fit_count-1)*MUSA_CAD_FIT_SAMPLES_PER_SPAN)){
                     s->truncated=1;
                     free(fit);free(samples);
