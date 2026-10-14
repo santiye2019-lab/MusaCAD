@@ -474,6 +474,26 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
 
+      - name: Test full SHA-256 identity of decoded native DWG scene pages
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeSceneFingerprint.java tests/NativeSceneFingerprintTest.java
+          java -cp /tmp/musacad-tests NativeSceneFingerprintTest
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/java/com/musa/cad/NativePagedScenePreview.java").read_text()
+          first=source.index("byte[] digest=page.scene.contentSha256()")
+          initial_put=source.index("boolean stored=cache.put(",first)
+          same=source.index("if(!catalog.samePage(")
+          hashcheck=source.index("if(!NativeSceneFingerprint.matches(",same)
+          reload_put=source.index("return cache.put(",same)
+          assert first<initial_put, "first decode must be hashed before cache eviction"
+          assert same<hashcheck<reload_put, "changed geometry must be rejected before replacing cache"
+          assert "pageHashes.put(start,digest)" in source
+          assert "pageHashes.clear()" in source
+          scene=Path("app/src/main/java/com/musa/cad/NativeScene.java").read_text()
+          assert "return NativeSceneFingerprint.sha256(raw);" in scene
+          PY
+
       - name: Test modern DWG scene record overflow and partial-data guard
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeSceneRecordBounds.java tests/NativeSceneRecordBoundsTest.java
