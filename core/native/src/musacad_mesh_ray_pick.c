@@ -61,7 +61,7 @@ int musa_core_mesh_ray_pick_f32(const float *xyz,size_t point_count,
         for(int j=0;j<3;j++){
             e1[j]=pts[1][j]-pts[0][j];
             e2[j]=pts[2][j]-pts[0][j];
-            from[j]=pts[0][j]-origin[j];
+            from[j]=origin[j]-pts[0][j];
         }
         if(!valid3(e1)||!valid3(e2)||!valid3(from))return -1;
         double p[3];cross3(d,e2,p);
