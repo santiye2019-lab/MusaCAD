@@ -107,6 +107,14 @@
       "commit": "7567d47e326e0033ba8fc9e36c2518e12e949a43",
       "source_path": "app/src/main/java/com/musa/cad/Mesh3dActivity.java",
       "verification": "GitHub fast CAD regression 38704873533 PASS (Dxf3dSafeSaveTest: same-length same-mtime metadata drift detected despite identical rendered geometry, plus Android save API source-contract test updated). Completes source-byte integrity prerequisite for save/reopen; still DXF only, no real AC1032 writer or physical device acceptance."
+    },
+    {
+      "id": "verified_3d_saf_staging_to_publication",
+      "points": 1,
+      "status": "implemented",
+      "commit": "f678ec3f4f415e9b423a0ff2b721ff87e6fb9b6c",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
+      "verification": "GitHub fast CAD regression run 38705779069 PASS: immutable SHA-256 stage identity, deferred Android SAF open, stage tamper rejection before destination open, checked after transfer. DXF-only publication safety prerequisite; AC1032 encoder and independent production DWG reader remain unavailable; Android full gate and physical tests pending."
     }
   ],
   "backlog": [
@@ -118,7 +126,7 @@
     },
     {
       "id": "ac1032_real_writer_save_reopen",
-      "points": 16,
+      "points": 15,
       "status": "not_started",
       "evidence_required": "Modern real DWG Save As, independent roundtrip proof"
     },
