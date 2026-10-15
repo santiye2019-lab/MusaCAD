@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Bounded XYZ geometry reader for MusaCAD 3D.
  * Expands ordinary INSERT blocks and supports:
- * 3DFACE, polyface/polygon mesh, LINE, CIRCLE/ARC sampled outlines,
+ * 3DFACE, polyface/polygon mesh, LINE, LWPOLYLINE with bulge arcs, CIRCLE/ARC sampled outlines,
  * ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
@@ -129,6 +129,8 @@ public final class Dxf3dMesh {
                 addPoint(points,p,10,20,30);addSource(p,0);
                 addPoint(points,p,11,21,31);addSource(p,1);
                 appendEdge(explicitEdges,start,start+1);
+            }else if("LWPOLYLINE".equals(r.type)){
+                appendLightweightPolyline(this,p);
             }else if("CIRCLE".equals(r.type)||"ARC".equals(r.type)){
                 appendCurvedOutline(this,p,"CIRCLE".equals(r.type));
                 approximateCurves++;
@@ -194,6 +196,131 @@ public final class Dxf3dMesh {
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
+    }
+
+    private static final class LwPoint {
+        final double x;
+        double y,bulge;
+        boolean hasY;
+        LwPoint(double x){this.x=x;}
+    }
+
+    /** 2D OCS vertices at elevation 38; bulge belongs to its START vertex. */
+    private static void appendLightweightPolyline(Collector c,DxfBlocks.Placement p)
+            throws IOException{
+        DxfBlocks.Record r=p.record;
+        ArrayList<LwPoint> vertices=new ArrayList<>();
+        List<String> tags=r.tags();
+        for(int i=r.from;i+1<r.to;i+=2){
+            int code;
+            try{code=Integer.parseInt(tags.get(i).trim());}
+            catch(NumberFormatException e){throw new IOException("LWPOLYLINE DXF etiketi geçersiz",e);}
+            if(code!=10&&code!=20&&code!=42)continue;
+            double value;
+            try{value=Double.parseDouble(tags.get(i+1).trim());}
+            catch(NumberFormatException e){throw new IOException("LWPOLYLINE koordinatı geçersiz",e);}
+            if(!Double.isFinite(value))throw new IOException("LWPOLYLINE koordinatı sonlu değil");
+            if(code==10){
+                if(!vertices.isEmpty()&&!vertices.get(vertices.size()-1).hasY)
+                    throw new IOException("LWPOLYLINE eksik Y koordinatı");
+                if(vertices.size()>=MAX_VERTICES)
+                    throw new IOException("LWPOLYLINE köşe sayısı sınırı aşıldı");
+                vertices.add(new LwPoint(value));
+            }else{
+                if(vertices.isEmpty())throw new IOException("LWPOLYLINE ilk X bulunamadı");
+                LwPoint point=vertices.get(vertices.size()-1);
+                if(code==20){
+                    if(point.hasY)throw new IOException("LWPOLYLINE yinelenen Y");
+                    point.y=value;point.hasY=true;
+                }else{
+                    if(!point.hasY)throw new IOException("LWPOLYLINE yay bilgisi Y'den önce geldi");
+                    point.bulge=value;
+                }
+            }
+        }
+        int count=vertices.size();
+        if(count<2||!vertices.get(count-1).hasY||r.integer(90,count)!=count)
+            throw new IOException("LWPOLYLINE köşe sayısı eksik veya uyuşmuyor");
+        int flags=r.integer(70,0);
+        boolean closed=(flags&1)!=0;
+        double elev=r.number(38,0);
+        double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+        DxfBlocks.SpatialTransform frame;
+        try{frame=p.spatial.thenLocal(DxfBlocks.SpatialTransform.insert(
+            0,0,0,1,1,1,0,0,0,0,nx,ny,nz));}
+        catch(IllegalArgumentException bad){throw new IOException("LWPOLYLINE OCS normal vektörü geçersiz",bad);}
+        if(!frame.isFinite())throw new IOException("LWPOLYLINE OCS dönüşümü geçersiz");
+        int pairs=closed?count:count-1;
+        int[] steps=new int[pairs];
+        long requiredVertices=1,requiredEdges=0;
+        for(int i=0;i<pairs;i++){
+            LwPoint a=vertices.get(i),b=vertices.get((i+1)%count);
+            double bulge=a.bulge;
+            int segments=1;
+            if(bulge!=0){
+                double chord=Math.hypot(b.x-a.x,b.y-a.y);
+                if(!(chord>0)||!Double.isFinite(chord)||Math.abs(bulge)>1e6)
+                    throw new IOException("LWPOLYLINE yay kiriş/bulge değeri geçersiz");
+                double sweep=4*Math.atan(bulge);
+                segments=Math.max(1,(int)Math.ceil(Math.abs(sweep)/Math.toRadians(7.5)));
+            }
+            steps[i]=segments;
+            requiredEdges+=segments;
+            requiredVertices+=segments-(closed&&i==pairs-1?1:0);
+        }
+        if(requiredVertices+(long)c.points.n/3>MAX_VERTICES||
+           requiredEdges+(long)c.explicitEdges.n/2>MAX_EDGES)
+            throw new IOException("LWPOLYLINE örnekleme sınırı aşıldı");
+        int first=c.points.n/3,previous=first;
+        LwPoint firstPoint=vertices.get(0);
+        addLwSample(c,frame,firstPoint.x,firstPoint.y,elev);
+        for(int i=0;i<pairs;i++){
+            LwPoint a=vertices.get(i),b=vertices.get((i+1)%count);
+            double bulge=a.bulge;
+            int segments=steps[i];
+            double centerX=0,centerY=0,radius=0,startAngle=0,sweep=0;
+            if(bulge!=0){
+                double dx=b.x-a.x,dy=b.y-a.y,chord=Math.hypot(dx,dy);
+                double offset=chord*(1d/bulge-bulge)/4d;
+                centerX=(a.x+b.x)*.5d-dy/chord*offset;
+                centerY=(a.y+b.y)*.5d+dx/chord*offset;
+                radius=Math.hypot(a.x-centerX,a.y-centerY);
+                startAngle=Math.atan2(a.y-centerY,a.x-centerX);
+                sweep=4d*Math.atan(bulge);
+                if(!Double.isFinite(radius)||!Double.isFinite(centerX)||
+                   !Double.isFinite(centerY)||!(radius>0))
+                    throw new IOException("LWPOLYLINE yay geometrisi geçersiz");
+                c.approximateCurves++;
+            }
+            for(int step=1;step<=segments;step++){
+                boolean isClosing=closed&&i==pairs-1&&step==segments;
+                if(isClosing){appendEdge(c.explicitEdges,previous,first);continue;}
+                double px,py;
+                if(step==segments){px=b.x;py=b.y;}
+                else{
+                    double theta=startAngle+sweep*((double)step/segments);
+                    px=centerX+radius*Math.cos(theta);
+                    py=centerY+radius*Math.sin(theta);
+                }
+                int next=c.points.n/3;
+                addLwSample(c,frame,px,py,elev);
+                appendEdge(c.explicitEdges,previous,next);
+                previous=next;
+            }
+        }
+    }
+
+    /** Tessellated polyline vertices are visual-only, never raw DXF tag edits. */
+    private static void addLwSample(Collector c,DxfBlocks.SpatialTransform frame,
+            double x,double y,double z)throws IOException{
+        double[] xyz=frame.point(x,y,z);
+        for(int axis=0;axis<3;axis++){
+            if(!Double.isFinite(xyz[axis])||Math.abs(xyz[axis])>1e9)
+                throw new IOException("LWPOLYLINE 3B koordinat sınırı aşıldı");
+            c.points.add((float)xyz[axis]);
+        }
+        c.sourceLines.add(-1);
+        c.coordinateSlots.add(-1);
     }
 
     /**
