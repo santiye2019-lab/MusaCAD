@@ -186,13 +186,13 @@ public final class DxfBlocks {
         result.layoutNames.add(placement.layout);if(result.sink!=null)result.sink.accept(placement);else result.placements.add(placement);
     }
     private static void expandMembers(Block block,Transform transform,HeightTransform height,String layer,String layout,int color,String lineType,int lineWeight,double lineScale,String[] visibilityGates,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
-        if(block.file==null){for(Record member:block.members)expand(member,transform,height,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
+        if(block.file==null){for(Record member:block.members)expand(member,transform,height,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
         try(DxfStream input=new DxfStream(block.file,block.charset)){
             input.seek(block.offset,block.offsetLine);Record member;boolean ended=false;
             while((member=input.next())!=null){
                 if("ENDBLK".equals(member.type)){ended=true;break;}
                 if("ENDSEC".equals(member.type)||"EOF".equals(member.type)||"BLOCK".equals(member.type))break;
-                expand(member,transform,height,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+                expand(member,transform,height,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
             if(!ended)throw new IOException("DXF blok sonu bulunamadı");
         }
