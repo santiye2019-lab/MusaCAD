@@ -136,6 +136,13 @@ public final class CadEdit {
                         textStyleName,textFamilyHint,textShx,textHeight,
                         textWidthFactor,textOblique,textGenerationFlags,layerOverride);
             }
+            case POLYLINE:{
+                float[] out=offsetPolyline(xy,closed,distance);
+                if(out==null)return null;
+                return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,
+                        textStyleName,textFamilyHint,textShx,textHeight,
+                        textWidthFactor,textOblique,textGenerationFlags,layerOverride);
+            }
             case RECTANGLE:{
                 if(xy.length<4)return null;float l=Math.min(xy[0],xy[2])-distance,r=Math.max(xy[0],xy[2])+distance,t=Math.min(xy[1],xy[3])-distance,b=Math.max(xy[1],xy[3])+distance;
                 if(r-l<=1e-6f||b-t<=1e-6f)return null;
@@ -145,6 +152,114 @@ public final class CadEdit {
             default:return null;
         }
     }
+
+    /**
+     * Conservative straight-segment POLYLINE offset.
+     * Positive distance offsets to the left of traversal; negative to right.
+     * Returns null rather than inventing intersections when an offset would
+     * reverse edges, self-cross, collapse a corner, or exceed the miter bound.
+     * Closed contours are limited to strictly convex simple polygons.
+     * Bulge arcs and complex concave contour offset require a curve solver.
+     */
+    private static float[] offsetPolyline(float[] points,boolean closed,double distance){
+        if(points==null||points.length<4||(points.length&1)!=0||!Double.isFinite(distance)||
+                Math.abs(distance)<1e-6)return null;
+        int n=points.length/2;
+        if(n>2048||closed&&n<3)return null; // keep interactive O(n²) safety audit bounded
+        int segs=closed?n:n-1;
+        double[] ux=new double[segs],uy=new double[segs],nx=new double[segs],ny=new double[segs];
+        for(int i=0;i<n;i++){
+            if(!Float.isFinite(points[2*i])||!Float.isFinite(points[2*i+1])||
+                    Math.abs((double)points[2*i])>1e9||Math.abs((double)points[2*i+1])>1e9)return null;
+        }
+        for(int i=0;i<segs;i++){
+            int j=(i+1)%n;
+            double dx=(double)points[2*j]-points[2*i],dy=(double)points[2*j+1]-points[2*i+1];
+            double len=Math.hypot(dx,dy);
+            if(!(len>1e-6)||!Double.isFinite(len))return null;
+            ux[i]=dx/len;uy[i]=dy/len;nx[i]=-uy[i];ny[i]=ux[i];
+        }
+        if(polylineSelfCrosses(points,closed))return null;
+        if(closed){
+            double turnSum=0d,turnSign=0d;
+            for(int i=0;i<n;i++){
+                int prev=(i+n-1)%n,next=i;
+                double cross=ux[prev]*uy[next]-uy[prev]*ux[next];
+                double dot=ux[prev]*ux[next]+uy[prev]*uy[next];
+                if(Math.abs(cross)<1e-8)return null; // strictly convex, no collinear turns
+                if(turnSign==0d)turnSign=Math.signum(cross);
+                else if(cross*turnSign<=0d)return null;
+                turnSum+=Math.atan2(cross,dot);
+            }
+            if(Math.abs(Math.abs(turnSum)-2*Math.PI)>1e-5)return null;
+        }
+        float[] result=new float[points.length];
+        for(int i=0;i<n;i++){
+            double x=points[2*i],y=points[2*i+1],tx,ty;
+            if(!closed&&i==0){
+                tx=x+nx[0]*distance;ty=y+ny[0]*distance;
+            }else if(!closed&&i==n-1){
+                tx=x+nx[segs-1]*distance;ty=y+ny[segs-1]*distance;
+            }else{
+                int p=(i+segs-1)%segs,q=i%segs;
+                double cross=ux[p]*uy[q]-uy[p]*ux[q];
+                double dot=ux[p]*ux[q]+uy[p]*uy[q];
+                if(Math.abs(cross)<1e-8){
+                    if(dot<=0d)return null; // 180-degree reversal
+                    tx=x+nx[p]*distance;ty=y+ny[p]*distance;
+                }else{
+                    double deltaX=(nx[q]-nx[p])*distance;
+                    double deltaY=(ny[q]-ny[p])*distance;
+                    double along=(deltaX*uy[q]-deltaY*ux[q])/cross;
+                    tx=x+nx[p]*distance+ux[p]*along;
+                    ty=y+ny[p]*distance+uy[p]*along;
+                    if(Math.hypot(tx-x,ty-y)>Math.abs(distance)*8d)return null;
+                }
+            }
+            if(!Double.isFinite(tx)||!Double.isFinite(ty)||Math.abs(tx)>1e9||Math.abs(ty)>1e9)return null;
+            result[2*i]=(float)tx;result[2*i+1]=(float)ty;
+        }
+        // Prevent collapsed/reversed edges or a translated offset loop.
+        boolean changed=false;
+        for(int i=0;i<n;i++)if(result[2*i]!=points[2*i]||result[2*i+1]!=points[2*i+1])changed=true;
+        if(!changed||polylineSelfCrosses(result,closed))return null;
+        for(int i=0;i<segs;i++){
+            int j=(i+1)%n;
+            double vx=(double)result[2*j]-result[2*i],vy=(double)result[2*j+1]-result[2*i+1];
+            if(Math.hypot(vx,vy)<=1e-6||vx*ux[i]+vy*uy[i]<=1e-6)return null;
+        }
+        return result;
+    }
+
+    private static boolean polylineSelfCrosses(float[] xy,boolean closed){
+        int n=xy.length/2,segs=closed?n:n-1;
+        for(int i=0;i<segs;i++){
+            int a=(i+1)%n;
+            for(int j=i+1;j<segs;j++){
+                if(j==i+1||closed&&i==0&&j==segs-1)continue;
+                int b=(j+1)%n;
+                if(segmentsTouch(xy[2*i],xy[2*i+1],xy[2*a],xy[2*a+1],
+                        xy[2*j],xy[2*j+1],xy[2*b],xy[2*b+1]))return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean segmentsTouch(double ax,double ay,double bx,double by,
+                                         double cx,double cy,double dx,double dy){
+        if(Math.max(ax,bx)<Math.min(cx,dx)||Math.max(cx,dx)<Math.min(ax,bx)||
+                Math.max(ay,by)<Math.min(cy,dy)||Math.max(cy,dy)<Math.min(ay,by))return false;
+        double abx=bx-ax,aby=by-ay,cdx=dx-cx,cdy=dy-cy;
+        double c1=abx*(cy-ay)-aby*(cx-ax),c2=abx*(dy-ay)-aby*(dx-ax);
+        double c3=cdx*(ay-cy)-cdy*(ax-cx),c4=cdx*(by-cy)-cdy*(bx-cx);
+        if(((c1>0&&c2<0)||(c1<0&&c2>0))&&
+           ((c3>0&&c4<0)||(c3<0&&c4>0)))return true;
+        return (c1==0&&cx>=Math.min(ax,bx)&&cx<=Math.max(ax,bx)&&cy>=Math.min(ay,by)&&cy<=Math.max(ay,by))||
+               (c2==0&&dx>=Math.min(ax,bx)&&dx<=Math.max(ax,bx)&&dy>=Math.min(ay,by)&&dy<=Math.max(ay,by))||
+               (c3==0&&ax>=Math.min(cx,dx)&&ax<=Math.max(cx,dx)&&ay>=Math.min(cy,dy)&&ay<=Math.max(cy,dy))||
+               (c4==0&&bx>=Math.min(cx,dx)&&bx<=Math.max(cx,dx)&&by>=Math.min(cy,dy)&&by<=Math.max(cy,dy));
+    }
+
     public CadEdit withTextHeight(float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,height,textWidthFactor,textOblique,textGenerationFlags,layerOverride);}
     public CadEdit withTextStyle(String styleName,String familyHint,boolean shx,float height){return new CadEdit(type,xy.clone(),text,strokeWidth,closed,rotationDegrees,styleName,familyHint,shx,height,textWidthFactor,textOblique,textGenerationFlags,layerOverride);}
     public CadEdit withClosed(boolean value){return new CadEdit(type,xy.clone(),text,strokeWidth,value,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerOverride);}

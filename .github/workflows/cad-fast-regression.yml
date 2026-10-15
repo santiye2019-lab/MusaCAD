@@ -57,6 +57,12 @@ jobs:
           mkdir -p /tmp/musacad-arc-offset-tests
           javac -encoding UTF-8 -d /tmp/musacad-arc-offset-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadArcOffsetTest.java
           java -cp /tmp/musacad-arc-offset-tests CadArcOffsetTest
+      - name: Fast safe straight POLYLINE offset with miter joins
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-poly-offset-tests
+          javac -encoding UTF-8 -d /tmp/musacad-poly-offset-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadPolylineOffsetTest.java
+          java -cp /tmp/musacad-poly-offset-tests CadPolylineOffsetTest
       - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
         run: |
           set -euo pipefail

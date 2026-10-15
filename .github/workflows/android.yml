@@ -90,6 +90,10 @@ jobs:
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadArcOffsetTest.java
           java -cp /tmp/musacad-tests CadArcOffsetTest
+      - name: Test safe 2D polyline miter offset
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadPolylineOffsetTest.java
+          java -cp /tmp/musacad-tests CadPolylineOffsetTest
       - name: Test block and insert geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadBlock.java tests/CadBlockTest.java
