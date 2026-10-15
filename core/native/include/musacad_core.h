@@ -42,6 +42,25 @@ int musa_core_nurbs_evaluate_validated(
 int musa_core_nurbs_preview_points(const double *knots,size_t control_count,
                                   size_t knot_count,
                                   int degree);
+/*
+ * Signed volume/centroid of a PRE-VALIDATED closed oriented indexed triangle
+ * shell in native drawing units. Mirrors Android Cad3dSignedVolume's robust,
+ * origin-shifted compensated tetrahedron integrals.
+ * This function does NOT validate mesh topology or prove a CAD 3DSOLID:
+ * the caller must have separately checked watertight incidence, winding,
+ * degenerate and duplicate faces before setting topology_prevalidated = 1.
+ * Return 1 for nonzero volume, 0 on invalid/unsupported inputs without
+ * changing *out; no invented centroid for an open/zero-volume shell.
+ */
+typedef struct MusaCoreMeshMass {
+    double signed_volume;
+    double centroid_x,centroid_y,centroid_z;
+    size_t triangle_count;
+} MusaCoreMeshMass;
+int musa_core_mesh_mass_f32(const float *xyz,size_t point_count,
+                            const int *triangles,size_t face_count,
+                            int topology_prevalidated,
+                            MusaCoreMeshMass *out);
 #ifdef __cplusplus
 }
 #endif
