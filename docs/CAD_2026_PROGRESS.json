@@ -131,6 +131,14 @@
       "commit": "4e0e6116c48c9768b616cd3fc9f1fc5d8cc933f7",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD regression 38707436249 PASS: DXF CIRCLE and ARC 3D sampled wire paths with OCS normals, translated/rotated INSERT, angle wrap, read-only generated vertices, malformed radii/normals rejection. 3D UI warns tessellation is approximate; reopened DXF curve count is checked. This tests DWG-derived DXF visualization, NOT AC1032 independent DWG geometric parity or exact arc measurement. Android/full modern DWG and device acceptance remain pending."
+    },
+    {
+      "id": "lwpolyline_3d_ocs_bulge_and_safe_reopen",
+      "points": 1,
+      "status": "implemented",
+      "commit": "1be2d67a5f64fc32b57ebadb5f079772e76f248c",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression 38708384002 PASS: 3D LWPOLYLINE straight/closed, sparse signed bulge arcs, OCS elevation and rotated INSERT; invalid, duplicate and nonfinite values rejected. Tessellated points are read-only. Dxf3dSafeSaveTest verifies independent LINE Z edit preserves LWP bulge/elevation and reopens unchanged. This is 3D DXF-based display/roundtrip only: not native modern DWG editing, exact curve rendering or full Android/physical acceptance."
     }
   ],
   "backlog": [
@@ -148,7 +156,7 @@
     },
     {
       "id": "advanced_2d_editing_roundtrip",
-      "points": 8,
+      "points": 7,
       "status": "in_progress",
       "evidence_required": "2D tool matrix, save/reopen tests"
     },
