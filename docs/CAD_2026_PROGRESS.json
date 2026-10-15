@@ -115,12 +115,20 @@
       "commit": "f678ec3f4f415e9b423a0ff2b721ff87e6fb9b6c",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
       "verification": "GitHub fast CAD regression run 38705779069 PASS: immutable SHA-256 stage identity, deferred Android SAF open, stage tamper rejection before destination open, checked after transfer. DXF-only publication safety prerequisite; AC1032 encoder and independent production DWG reader remain unavailable; Android full gate and physical tests pending."
+    },
+    {
+      "id": "3dface_invisible_edges_and_quad_outline",
+      "points": 1,
+      "status": "implemented",
+      "commit": "fcf615d50412a37dc6bf5e8ffaef352c07663dcb",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression run 38706786138 PASS: 3DFACE group-70 hidden edges, triangle 4=3 semantics, quad internal diagonal omitted from wireframe, edited XYZ/edge visibility survives DXF save/reopen, invalid flags fail closed. Full Android, native DWG and physical device acceptance remain separate."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 7,
+      "points": 6,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
