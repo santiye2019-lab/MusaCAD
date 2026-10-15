@@ -353,13 +353,14 @@ public final class Dxf3dMesh {
         if(degree<1||degree>7||flags<0)
             throw new IOException("SPLINE derece/bayrak desteklenmiyor");
         ArrayList<Double> knots=new ArrayList<>(),weights=new ArrayList<>();
-        ArrayList<SplineControl> controls=new ArrayList<>();
+        ArrayList<SplineControl> controls=new ArrayList<>(),fitPoints=new ArrayList<>();
         List<String> tags=r.tags();
         for(int i=r.from;i+1<r.to;i+=2){
             int code;
             try{code=Integer.parseInt(tags.get(i).trim());}
             catch(NumberFormatException e){throw new IOException("SPLINE DXF etiketi geçersiz",e);}
-            if(code!=40&&code!=41&&code!=10&&code!=20&&code!=30)continue;
+            if(code!=40&&code!=41&&code!=10&&code!=20&&code!=30&&
+               code!=11&&code!=21&&code!=31)continue;
             double value;
             try{value=Double.parseDouble(tags.get(i+1).trim());}
             catch(NumberFormatException e){throw new IOException("SPLINE sayısal değeri geçersiz",e);}
@@ -372,6 +373,25 @@ public final class Dxf3dMesh {
                 case 41:
                     if(weights.size()>=4096)throw new IOException("SPLINE ağırlık sınırı aşıldı");
                     weights.add(value);
+                    break;
+                case 11:
+                    if(!fitPoints.isEmpty()&&!fitPoints.get(fitPoints.size()-1).hasY)
+                        throw new IOException("SPLINE fit noktasında Y eksik");
+                    if(fitPoints.size()>=128)
+                        throw new IOException("SPLINE fit noktası sınırı aşıldı");
+                    fitPoints.add(new SplineControl(value));
+                    break;
+                case 21:
+                case 31:
+                    if(fitPoints.isEmpty())throw new IOException("SPLINE ilk fit X bulunamadı");
+                    SplineControl fit=fitPoints.get(fitPoints.size()-1);
+                    if(code==21){
+                        if(fit.hasY)throw new IOException("SPLINE yinelenen fit Y koordinatı");
+                        fit.y=value;fit.hasY=true;
+                    }else{
+                        if(fit.hasZ)throw new IOException("SPLINE yinelenen fit Z koordinatı");
+                        fit.z=value;fit.hasZ=true;
+                    }
                     break;
                 case 10:
                     if(!controls.isEmpty()&&!controls.get(controls.size()-1).hasY)
@@ -395,6 +415,10 @@ public final class Dxf3dMesh {
             }
         }
         int count=controls.size();
+        if(count==0&&knots.isEmpty()&&weights.isEmpty()&&!fitPoints.isEmpty()){
+            appendFitOnlySpline(c,p,fitPoints,degree,flags);
+            return;
+        }
         if(count<degree+1||count<2||r.integer(73,count)!=count||
             r.integer(72,knots.size())!=knots.size()||
             knots.size()!=count+degree+1)
@@ -500,6 +524,99 @@ public final class Dxf3dMesh {
             appendSplineSample(c,p,controls,knots,weights,degree,end);
             appendEdge(c.explicitEdges,first+generated-1,first+generated);
         }
+    }
+
+    /**
+     * Fit-only DXF SPLINE has no control polygon or knot vector to evaluate.
+     * Render an interpolation through the supplied WCS fit points.
+     *
+     * Cubic mode uses chord-parameterized Hermite segments (C1) and is an
+     * explicitly approximate preview, not Autodesk's source B-spline.
+     * Linear mode follows each fit-point segment directly.
+     *
+     * Reject endpoint tangents, closed/periodic flags and unsupported degrees
+     * rather than silently inventing a precise CAD spline.
+     */
+    private static void appendFitOnlySpline(Collector c,DxfBlocks.Placement placement,
+            ArrayList<SplineControl> fitPoints,int degree,int flags)throws IOException{
+        DxfBlocks.Record r=placement.record;
+        int count=fitPoints.size();
+        if(count<2||count>128||r.integer(74,count)!=count||r.integer(73,0)!=0||
+           r.integer(72,0)!=0||((flags&3)!=0)||r.has(12)||r.has(22)||
+           r.has(32)||r.has(13)||r.has(23)||r.has(33)||
+           (degree!=1&&degree!=3)||((flags&16)!=0&&degree!=1))
+            throw new IOException("SPLINE fit-only derecesi, bayrağı veya teğeti desteklenmiyor");
+        double[][] points=new double[count][3];
+        double[] param=new double[count];
+        for(int i=0;i<count;i++){
+            SplineControl pt=fitPoints.get(i);
+            if(!pt.hasY)throw new IOException("SPLINE fit noktasının Y koordinatı eksik");
+            points[i][0]=pt.x;points[i][1]=pt.y;points[i][2]=pt.z;
+            if(i>0){
+                double dx=pt.x-fitPoints.get(i-1).x;
+                double dy=pt.y-fitPoints.get(i-1).y;
+                double dz=pt.z-fitPoints.get(i-1).z;
+                double chord=Math.hypot(Math.hypot(dx,dy),dz);
+                if(!(chord>1e-12)||!Double.isFinite(chord))
+                    throw new IOException("SPLINE fit noktaları tekrarlı veya geçersiz");
+                // Chord-length parameterization preserves interpolation at
+                // every fit point and avoids divide-by-zero Hermite tangents.
+                param[i]=param[i-1]+chord;
+                if(!Double.isFinite(param[i])||param[i]<=param[i-1])
+                    throw new IOException("SPLINE fit parametresi sınırı aşıldı");
+            }
+        }
+        int steps=degree==1?1:12;
+        int segments=(count-1)*steps;
+        long vertices=(long)segments+1;
+        if(c.points.n/3+vertices>MAX_VERTICES||
+           c.explicitEdges.n/2+(long)segments>MAX_EDGES)
+            throw new IOException("SPLINE fit örnekleme sınırı aşıldı");
+        double[][] tangent=new double[count][3];
+        if(degree==3){
+            for(int i=0;i<count;i++){
+                int prev=Math.max(0,i-1),next=Math.min(count-1,i+1);
+                double duration=param[next]-param[prev];
+                for(int axis=0;axis<3;axis++)
+                    tangent[i][axis]=(points[next][axis]-points[prev][axis])/duration;
+            }
+        }
+        int first=c.points.n/3,generated=0;
+        for(int interval=0;interval<count-1;interval++){
+            double dt=param[interval+1]-param[interval];
+            for(int part=0;part<steps;part++){
+                double u=(double)part/steps;
+                double[] xyz=new double[3];
+                for(int axis=0;axis<3;axis++){
+                    if(degree==1){
+                        xyz[axis]=points[interval][axis]*(1-u)+points[interval+1][axis]*u;
+                    }else{
+                        double u2=u*u,u3=u2*u;
+                        xyz[axis]=(2*u3-3*u2+1)*points[interval][axis]+
+                            (u3-2*u2+u)*dt*tangent[interval][axis]+
+                            (-2*u3+3*u2)*points[interval+1][axis]+
+                            (u3-u2)*dt*tangent[interval+1][axis];
+                    }
+                }
+                appendFitPointSample(c,placement,xyz);
+                if(generated>0)appendEdge(c.explicitEdges,first+generated-1,first+generated);
+                generated++;
+            }
+        }
+        appendFitPointSample(c,placement,points[count-1]);
+        appendEdge(c.explicitEdges,first+generated-1,first+generated);
+    }
+
+    private static void appendFitPointSample(Collector c,DxfBlocks.Placement p,double[] fit)
+            throws IOException{
+        double[] transformed=p.spatial.point(fit[0],fit[1],fit[2]);
+        for(double coordinate:transformed){
+            if(!Double.isFinite(coordinate)||Math.abs(coordinate)>1e9)
+                throw new IOException("SPLINE fit 3B koordinat sınırı aşıldı");
+            c.points.add((float)coordinate);
+        }
+        c.sourceLines.add(-1);
+        c.coordinateSlots.add(-1);
     }
 
     private static void appendSplineSample(Collector c,DxfBlocks.Placement p,
