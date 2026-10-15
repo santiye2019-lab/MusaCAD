@@ -67,6 +67,21 @@ Path: `core/native/`
   plus iPhoneOS arm64 object-only. Android's existing Java output is unchanged
   until an independently tested adapter is selected. This is NOT analytic
   ACIS face area or certified engineering metraj.
+- Android-only optional surface JNI bridge `mesh_surface_jni.c` and
+  `Cad3dNativeMeshSurface.java` now compare shared C11 area/area-weighted
+  centroid/face counts against unchanged Java `Cad3dSurfaceMetrics`.
+  Open/degenerate meshes, NaN centroids, large world coordinates and missing
+  JNI are guarded by host JVM/host JNI compilation tests. This opt-in
+  bridge does not replace existing Android result, execute on the drawing UI
+  thread or certify an exact B-Rep surface.
+- Portable 3D indexed-mesh **topology preflight** now mirrors the Android
+  `Cad3dMeshTopology` screening in `musacad_mesh_topology.c`. It reports
+  open edges, inconsistent winding, non-manifold edges, degenerate faces and
+  duplicate/zero-thickness opposed facets. It rejects invalid indices and
+  nonfinite coordinates; meshes exceeding 50,000 triangles remain explicitly
+  unaudited. The same C ABI can gate `musa_core_mesh_mass_f32` on all
+  platforms. Separate real-file cross-tests and geometric self-intersection
+  validation are still required before certified solid/metraj claims.
 - A new cross-platform `core/native/include/musacad_affine3.h`
   provides common **3D WCS affine composition, point/vector mapping,
   mirrored/nonuniform scale handling, inverse transform and orientation

@@ -77,6 +77,25 @@ typedef struct MusaCoreMeshSurface {
 int musa_core_mesh_surface_f32(const float *xyz,size_t point_count,
                               const int *triangles,size_t face_count,
                               MusaCoreMeshSurface *out);
+/*
+ * Independently audit indexed 3D triangle connectivity before signed-mass
+ * calculations. Untrusted meshes are NEVER certified solely by edge count.
+ * Mirrors Android Cad3dMeshTopology: index-shared edges, winding, duplicate
+ * faces and zero-area facets. This is not an ACIS/B-Rep certification:
+ * self-intersection and coincident disconnected surfaces require further
+ * geometric tests. Geometry exceeding 50,000 triangles returns checked=0.
+ *
+ * Return 1 with an audit result; 0 for invalid arguments/indices/NaN or
+ * allocation failure. *out remains unchanged on failure.
+ */
+typedef struct MusaCoreMeshTopology {
+    int checked,closed_oriented_by_index;
+    size_t triangles,boundary_edges,orientation_conflicts;
+    size_t non_manifold_edges,degenerate_triangles,duplicate_faces;
+} MusaCoreMeshTopology;
+int musa_core_mesh_topology_f32(const float *xyz,size_t point_count,
+                               const int *triangles,size_t face_count,
+                               MusaCoreMeshTopology *out);
 #ifdef __cplusplus
 }
 #endif
