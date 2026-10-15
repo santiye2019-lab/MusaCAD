@@ -288,6 +288,122 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
         self.assertEqual(failure["independent_geometry_result"],
                          "primitive_subset_mismatch")
 
+    def test_independent_lwpolyline_vertex_bulge_ocs_and_width_parity(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        curved = [
+            (90,"3"),(70,"1"),(38,"4.25"),(43,"0.5"),
+            (210,"0"),(220,"1"),(230,"0"),
+            (10,"0"),(20,"0"),(42,"1"),(91,"10"),
+            (10,"4"),(20,"0"),(40,"0.4"),(41,"0.8"),(91,"11"),
+            (10,"4"),(20,"3"),(42,"-0.4142135623730950488"),(91,"12")
+        ]
+        simple = [
+            (90,"2"),(70,"0"),(10,"1"),(20,"2"),(10,"3"),(20,"4")
+        ]
+        audit.observe("ENTITIES", "LWPOLYLINE",
+                      [(5,"AC"),(8,"PRIVATE_MEP")] + curved)
+        audit.observe("BLOCKS", "LWPOLYLINE",
+                      [(5,"BD"),(8,"PRIVATE_SITE")] + simple)
+
+        def ref(handle, fields):
+            return {"handle":handle,"type":"LWPOLYLINE",
+                    "groups":[[str(code),value] for code,value in fields]}
+
+        expected = [ref("AC",curved),ref("BD",simple)]
+        verified = audit.compare_independent_geometry(expected)
+        self.assertEqual(verified["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(verified["independent_geometry_checked"],2)
+        self.assertNotIn("PRIVATE",str(verified))
+        self.assertNotIn("0.4142135623730950488",str(verified))
+        for index, value in (
+                (2,"4.25000000000000001"),  # elevation
+                (9,"1.000000000000000000001"), # signed bulge
+                (12,"4.00000000000001"), # XY vertex drift
+                (14,"0.400000000001"), # start width drift
+                (18,"-0.4142135623730950489"), # closing bulge drift
+                (19,"13")): # per-vertex identity drift
+            with self.subTest(index=index):
+                changed = [dict(r,groups=[v.copy() for v in r["groups"]])
+                           for r in expected]
+                changed[0]["groups"][index][1]=value
+                report=audit.compare_independent_geometry(changed)
+                self.assertEqual(report["independent_geometry_parameter_mismatches"],1)
+                self.assertEqual(report["independent_geometry_result"],
+                                 "primitive_subset_mismatch")
+        # Even with the same counts, moving a valid signed bulge onto
+        # a different vertex is a real geometric change.
+        displaced = [dict(r,groups=[v.copy() for v in r["groups"]])
+                     for r in expected]
+        displaced[0]["groups"][9][1]="0"
+        displaced[0]["groups"][18][1]="0.5857864376269049512"
+        self.assertEqual(audit.compare_independent_geometry(displaced)[
+            "independent_geometry_parameter_mismatches"],1)
+
+        for invalid in (
+                {"handle":"AC","type":"LWPOLYLINE","groups":{"90":"3"}},
+                ref("AC",curved[:1]+[(90,"3")]+curved[1:]),
+                ref("AC",[(90,"2")]+curved[1:]),
+                ref("AC",curved[:-1]+[(42,"-0.2")]),
+                ref("AC",curved[:10]+[(42,"2")]+curved[10:]),
+                ref("AC",curved[:9]+[(20,"0")]+curved[9:]),
+                ref("AC",[(90,"3"),(70,"4")]+curved[2:]),
+                ref("AC",[(90,"3"),(43,"-1")]+curved[2:]),
+                ref("AC",[(90,"3"),(210,"0"),(220,"0"),(230,"0")]+curved[7:]),
+                ref("AC",[(90,"3")]+curved[1:9]+[(42,"NaN")]+curved[10:]),
+                ref("AC",[(90,"3")]+curved[1:9]+[(42,"1e99999")]+curved[10:])
+        ):
+            with self.subTest(case=str(invalid["groups"])[:90]):
+                with self.assertRaises(ValueError):
+                    audit.compare_independent_geometry([invalid,expected[1]])
+
+        decoded_bad=DwgEntityIdentityAudit(geometry_enabled=True)
+        decoded_bad.observe("ENTITIES","LWPOLYLINE",[(5,"AC"),(8,"PRIVATE_MEP")]+
+                           curved[:1]+[(90,"3")]+curved[1:])
+        mismatch=decoded_bad.compare_independent_geometry([expected[0]])
+        self.assertEqual(mismatch["independent_geometry_invalid_decoded"],1)
+        self.assertEqual(mismatch["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_independent_lwpolyline_pipeline_rejects_subtle_bulge_drift(self):
+        lw = [(5,"AA"),(8,"PRIVATE_PIPE"),(90,"2"),(70,"1"),
+              (10,"0"),(20,"0"),(42,"0.4142135623730950488"),
+              (10,"4"),(20,"0"),(42,"-0.25")]
+        dxf = (record("SECTION",(2,"ENTITIES")) +
+               record("LWPOLYLINE",*lw) +
+               record("ENDSEC") + record("EOF"))
+        source = [{"handle":"AA","type":"LWPOLYLINE",
+                   "groups":[[str(k),v] for k,v in lw if k not in (5,8)]}]
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            original=root/"read-only.dwg"
+            original.write_bytes(b"AC1032 synthetic only")
+            converter=root/"mock-converter"
+            converter.write_text("#!/bin/sh\nexit 0\n",encoding="ascii")
+            converter.chmod(0o700)
+
+            def converted(*args,**kwargs):
+                Path(args[0][2]).write_text(dxf,encoding="utf-8")
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=9\n")
+                return Mock(returncode=0)
+
+            with patch("private_dwg_read_audit.subprocess.run",side_effect=converted):
+                with tempfile.TemporaryDirectory(dir=root) as temp:
+                    good=convert_one(original,converter,Path(temp),5,128,
+                                     independent_geometry=source)
+                drift=[dict(source[0],groups=[pair.copy() for pair in source[0]["groups"]])]
+                drift[0]["groups"][4][1]="0.4142135623730950489"
+                with tempfile.TemporaryDirectory(dir=root) as temp:
+                    bad=convert_one(original,converter,Path(temp),5,128,
+                                    independent_geometry=drift)
+        self.assertEqual(good["independent_geometry_result"],"primitive_subset_parity_only")
+        self.assertEqual(good["status"],"decoded_dxf_inventory")
+        self.assertEqual(bad["independent_geometry_parameter_mismatches"],1)
+        self.assertEqual(bad["status"],"decoded_dxf_inventory_geometry_mismatch")
+        self.assertNotIn("PRIVATE_PIPE",str(good))
+        self.assertNotIn("0.4142135623730950488",str(bad))
+
     def test_independent_ordered_spline_knots_weights_fit_and_control_parity(self):
         audit = DwgEntityIdentityAudit(geometry_enabled=True)
         controls = [
