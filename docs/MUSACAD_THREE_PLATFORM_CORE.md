@@ -123,6 +123,15 @@ Path: `core/native/`
   native C11 geometry facility for Android/Windows/iOS, not an Android
   3D UI integration, guaranteed performance claim, editable solids, or
   AutoCAD 2026 equivalence certification.
+- Object-local BVH instances can now be selected from real drawing
+  **WCS rays with nested INSERT transforms** via `musacad_bvh_wcs.h`.
+  The same BVH index is reused under mirror, translation, rotation,
+  shear and nonuniform scale; WCS distances and hit coordinates are
+  returned without confusing object-space units. Host cross-platform
+  regression tests cover identity, odd reflections, 90-degree rotation,
+  1,000,000+ unit translated drawings, invalid/singular transforms and
+  result preservation. A common C11 math capability, NOT a shipped
+  Android hit-selection UI or proof of AutoCAD 2026 object parity.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
