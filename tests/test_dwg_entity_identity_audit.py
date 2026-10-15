@@ -367,7 +367,7 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
             converter.chmod(0o700)
 
             def converted(*args, **kwargs):
-                Path(args[2]).write_text(dxf, encoding="utf-8")
+                Path(args[0][2]).write_text(dxf, encoding="utf-8")
                 kwargs["stderr"].write(
                     b"MusaCAD native scene: status=0 primitives=1 floats=9\n")
                 return Mock(returncode=0)
