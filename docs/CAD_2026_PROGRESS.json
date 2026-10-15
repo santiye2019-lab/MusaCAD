@@ -176,7 +176,7 @@
       "id": "fit_only_spline_bounded_3d_preview",
       "points": 1,
       "status": "implemented",
-      "commit": "9071a6dcd0806d3b7caa621cd63b5bdc498d637",
+      "commit": "9071a6dcd0806d3b7caa621cd63b5bdc498d637a",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD run 38733845233 PASS: bounded degree-1 line and degree-3 chord-parametric Hermite preview through DXF fit points, 3D rotated INSERT, read-only samples, invalid fit counts/duplicate points/tangents/unsupported degrees rejected, and staged DXF independent LINE edit preserves original fit records and reopens sampled geometry. This is not exact originating CAD fit spline reconstruction, fully editable spline control, independent original DWG parity, or modern binary DWG writing; Android and physical device acceptance separate."
     }
