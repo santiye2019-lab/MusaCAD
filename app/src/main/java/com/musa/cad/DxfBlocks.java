@@ -17,6 +17,8 @@ public final class DxfBlocks {
         public double scale(){double sx=Math.hypot(a,b),sy=Math.hypot(c,d);double value=(sx+sy)/2d;return Double.isFinite(value)&&value>0d?value:1d;}
         public boolean isIdentity(){return Math.abs(a-1d)<1e-12&&Math.abs(d-1d)<1e-12&&Math.abs(b)<1e-12&&Math.abs(c)<1e-12&&Math.abs(x)<1e-12&&Math.abs(y)<1e-12;}
         public Transform thenLocal(Transform t){return new Transform(a*t.a+c*t.b,b*t.a+d*t.b,a*t.c+c*t.d,b*t.c+d*t.d,a*t.x+c*t.y+x,b*t.x+d*t.y+y);}
+        /** Check affine coefficients after compositions that may overflow. */
+        public boolean isFinite(){return Double.isFinite(a)&&Double.isFinite(b)&&Double.isFinite(c)&&Double.isFinite(d)&&Double.isFinite(x)&&Double.isFinite(y);}
         static Transform translate(double x,double y){return new Transform(1,0,0,1,x,y);}
         static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);}
     }
@@ -225,6 +227,26 @@ public final class DxfBlocks {
         }
         double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
+        // Finite DXF values may overflow during rotation, array spacing, or
+        // parent composition. Check all four grid corners before emitting any
+        // block member, so invalid arrays never produce partial NaN geometry.
+        if(!Double.isFinite(angle)||!Double.isFinite(co)||!Double.isFinite(si)){
+            result.skipped++;return;
+        }
+        int[] edgeRows={0,rows-1},edgeColumns={0,columns-1};
+        for(int checkRow:edgeRows)for(int checkColumn:edgeColumns){
+            double dx=checkColumn*columnSpacing,dy=checkRow*rowSpacing;
+            double checkX=ix+co*dx-si*dy,checkY=iy+si*dx+co*dy;
+            if(!Double.isFinite(checkX)||!Double.isFinite(checkY)){
+                result.skipped++;return;
+            }
+            Transform checkLocal=negativeZ
+                ?Transform.insert(bx,by,-sx,sy,-degrees,-checkX,checkY)
+                :Transform.insert(bx,by,sx,sy,degrees,checkX,checkY);
+            if(!checkLocal.isFinite()||!parent.thenLocal(checkLocal).isFinite()){
+                result.skipped++;return;
+            }
+        }
         // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
         // the whole array; spacing is a drawing-unit distance and is not block-scaled.
         stack.add(name);
