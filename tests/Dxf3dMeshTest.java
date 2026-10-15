@@ -34,6 +34,9 @@ public final class Dxf3dMeshTest {
         testLineAndPolyline();
         testPolygonMesh();
         testInsertedBlockLine();
+        testAxialZBlockHeightAndNestedScaling();
+        testNegativeZMinsert();
+        testRejectedOverflowedHeightTransform();
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
@@ -94,6 +97,74 @@ public final class Dxf3dMeshTest {
             if(Math.abs(mesh.xyz[3]-10f)>1e-5||Math.abs(mesh.xyz[4]-22f)>1e-5||mesh.xyz[5]!=3f)
                 throw new AssertionError("insert transform end");
             if(mesh.sourceLines[0]!=-1||mesh.sourceLines[1]!=-1)throw new AssertionError("inserted geometry must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void assertNear(float actual,double expected,String scenario){
+        if(!Float.isFinite(actual)||Math.abs(actual-expected)>0.0001)
+            throw new AssertionError(scenario+": "+actual+" != "+expected);
+    }
+
+    private static void testAxialZBlockHeightAndNestedScaling() throws Exception {
+        File file=File.createTempFile("mesh3d-zscale-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nLEVEL\n10\n0\n20\n0\n30\n2\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n3\n11\n2\n21\n0\n31\n5\n"+
+                "0\nENDBLK\n"+
+                "0\nBLOCK\n2\nPARENT\n10\n0\n20\n0\n30\n0\n"+
+                "0\nINSERT\n2\nLEVEL\n10\n0\n20\n0\n30\n10\n43\n2\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nPARENT\n10\n10\n20\n20\n30\n100\n43\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=6||result.edges.length!=2)
+                throw new AssertionError("nested block vertex count");
+            assertNear(result.xyz[2],136,"nested block base Z and Z-scale");
+            assertNear(result.xyz[5],148,"nested block second Z");
+            assertNear(result.xyz[0],10,"nested block X");
+            if(result.sourceLines[0]!=-1||result.sourceLines[1]!=-1)
+                throw new AssertionError("expanded INSERT must remain read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testNegativeZMinsert() throws Exception {
+        File file=File.createTempFile("mesh3d-negative-z-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nDUP\n10\n0\n20\n0\n30\n0\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n1\n11\n1\n21\n0\n31\n2\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nDUP\n10\n10\n20\n20\n30\n10\n"+
+                "43\n2\n70\n2\n71\n1\n44\n5\n230\n-1\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=12||result.edges.length!=4)
+                throw new AssertionError("MINSERT must emit two 3D lines");
+            assertNear(result.xyz[0],-10,"negative-Z X mirroring");
+            assertNear(result.xyz[2],-12,"negative-Z first Z");
+            assertNear(result.xyz[5],-14,"negative-Z second Z");
+            assertNear(result.xyz[6],-15,"negative-Z X array spacing");
+            assertNear(result.xyz[8],-12,"negative-Z repeated Z");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testRejectedOverflowedHeightTransform() throws Exception {
+        File file=File.createTempFile("mesh3d-overflow-z-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nBAD\n30\n1e308\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n1\n11\n1\n21\n0\n31\n2\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nBAD\n30\n-1e308\n43\n1e308\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n1\n11\n1\n21\n0\n31\n2\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=6||result.edges.length!=2)
+                throw new AssertionError("overflowed INSERT must not emit invalid vertices");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
