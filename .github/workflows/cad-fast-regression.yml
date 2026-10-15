@@ -1,0 +1,51 @@
+name: MusaCAD fast CAD regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/**'
+      - 'app/src/main/cpp/**'
+      - 'app/src/main/java/**'
+      - 'docs/CAD_2026_PROGRESS.json'
+      - '.github/workflows/cad-fast-regression.yml'
+  workflow_dispatch:
+
+# Keep only the newest short feedback pass. This is NOT the full release gate.
+concurrency:
+  group: musacad-cad-fast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-cad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: DWG audit and parity unit regressions
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layer_table_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_block_reference_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layout_viewport_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
+      - name: CAD progress and source safety regressions
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_color_test.c -o /tmp/musa-fast-native-color
+          /tmp/musa-fast-native-color
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/scene_coord_safety_test.c -lm -o /tmp/musa-fast-scene-safety
+          /tmp/musa-fast-scene-safety
+      - name: Mark full CI and final APK as independent required gates
+        run: |
+          echo "Fast CAD regression passed for this commit."
+          echo "This is NOT Modern DWG end-to-end proof, Android build acceptance, or physical-device acceptance."
+          echo "Every required module still needs its full CI pass before being counted done."
+          echo "No APK is built or published by this workflow."
