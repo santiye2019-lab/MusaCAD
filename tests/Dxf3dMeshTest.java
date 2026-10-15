@@ -40,6 +40,8 @@ public final class Dxf3dMeshTest {
         testEllipticalArcsAndFullEllipse();
         testQuadraticAndRationalSpline();
         testNonuniformAndRepeatedSplineKnots();
+        testVerifiedPeriodicRationalSpline();
+        testFalsePeriodicSplineSeamsRejected();
         testClosedSplineAndRotatedBlock();
         testUnsupportedAndMalformedSplinesFailClosed();
         testTiltedEllipseWithinRotatedBlock();
@@ -176,6 +178,69 @@ public final class Dxf3dMeshTest {
                 Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,before);
                 throw new AssertionError("tessellated SPLINE must not write as DXF control point");
             }catch(java.io.IOException expected){}
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testVerifiedPeriodicRationalSpline() throws Exception {
+        File file=File.createTempFile("mesh3d-periodic-spline-", ".dxf");
+        try{
+            // Periodic degree-2 nonclamped knot vector with cyclic controls
+            // A,B,C,A,B and repeated rational weights on matching controls.
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n6\n71\n2\n72\n8\n73\n5\n"+
+                "40\n0\n40\n1\n40\n2\n40\n3\n"+
+                "40\n4\n40\n5\n40\n6\n40\n7\n"+
+                "41\n1\n41\n0.5\n41\n1\n41\n1\n41\n0.5\n"+
+                "10\n0\n20\n0\n30\n4\n"+
+                "10\n2\n20\n0\n30\n4\n"+
+                "10\n1\n20\n2\n30\n4\n"+
+                "10\n0\n20\n0\n30\n4\n"+
+                "10\n2\n20\n0\n30\n4\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=1||mesh.triangles.length!=0||
+                mesh.xyz.length!=48*3||mesh.edges.length!=48*2)
+                throw new AssertionError("periodic spline must close with 48 bounded wire segments");
+            assertCurveNear(mesh.xyz[0],2d/3d,"rational periodic seam X");
+            assertCurveNear(mesh.xyz[1],0,"rational periodic seam Y");
+            assertCurveNear(mesh.xyz[2],4,"rational periodic elevation");
+            assertCurveNear(mesh.xyz[16*3],4d/3d,"rational interior knot X");
+            assertCurveNear(mesh.xyz[16*3+1],4d/3d,"rational interior knot Y");
+            assertCurveNear(mesh.xyz[32*3],0.5,"rational second interior knot X");
+            assertCurveNear(mesh.xyz[32*3+1],1,"rational second interior knot Y");
+            if(mesh.edges[mesh.edges.length-2]!=47||
+                mesh.edges[mesh.edges.length-1]!=0)
+                throw new AssertionError("periodic spline must reconnect to the first point");
+            for(int i=0;i<mesh.sourceLines.length;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("periodic samples are not source DXF edit vertices");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testFalsePeriodicSplineSeamsRejected() throws Exception {
+        File file=File.createTempFile("mesh3d-false-periodic-", ".dxf");
+        try{
+            String prefix="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n2\n71\n2\n72\n8\n73\n5\n"+
+                "40\n0\n40\n1\n40\n2\n40\n3\n"+
+                "40\n4\n40\n5\n40\n6\n40\n7\n";
+            String firstThree="10\n0\n20\n0\n10\n2\n20\n0\n10\n1\n20\n2\n";
+            String[] invalidSuffix={
+                // Periodic flag with controls that do NOT meet at the seam.
+                "10\n4\n20\n0\n10\n2\n20\n0\n",
+                // Endpoints meet geometrically but their directions oppose:
+                // no invented zero-order seam/cusp for degree >= 2.
+                "10\n2\n20\n0\n10\n0\n20\n0\n"
+            };
+            for(String suffix:invalidSuffix){
+                Files.writeString(file.toPath(),prefix+firstThree+suffix+
+                    "0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+                boolean refused=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+                if(!refused)
+                    throw new AssertionError("false periodic seam must not silently wrap");
+            }
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
