@@ -168,6 +168,13 @@ public final class Mesh3dActivity extends Activity {
             text.append("\nAçılışta okunan üçgen yüzey alanı: ")
                 .append(String.format(java.util.Locale.getDefault(),"%.3f",openingSurfaceMetrics.area))
                 .append(" çizim birimi² (tam B-Rep yüzeyi veya kesin metraj değildir)");
+            if(openingSurfaceMetrics.area>0d){
+                text.append("\nAçılışta okunan üçgenlerin alan ağırlıklı yüzey merkezi (XYZ): ")
+                    .append(String.format(java.util.Locale.getDefault(),
+                        "(%.3f, %.3f, %.3f)",openingSurfaceMetrics.centroidX,
+                        openingSurfaceMetrics.centroidY,openingSurfaceMetrics.centroidZ))
+                    .append(" çizim birimi (açık yüzeylerde de hesaplanır; katı hacim merkezi / ACIS MASSPROP değildir)");
+            }
             if(openingSurfaceMetrics.degenerateCount>0)
                 text.append(" • ").append(openingSurfaceMetrics.degenerateCount)
                     .append(" dejenere üçgen");
