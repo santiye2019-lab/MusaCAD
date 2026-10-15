@@ -42,6 +42,14 @@ Path: `core/native/`
   geometry and first-paint color rendering are unchanged. Host C tests and
   iPhoneOS object-only compilation cover this shared math. This is not yet
   CAD viewport clipping or an editable 3D B-Rep kernel.
+- A new independent portable 3D signed indexed-mesh mass kernel
+  (`core/native/src/musacad_mesh_mass.c`) exposes volume and XYZ centroid
+  with compensated origin-shifted sums. It mirrors the existing Java
+  `Cad3dSignedVolume` calculations, uses the same unit-tetra/cube/WCS tests,
+  and requires separately audited closed oriented topology. The existing
+  Android Java implementation stays in place until the JNI integration and
+  real-file equivalence tests are separately approved. This is NOT a
+  complete ACIS 3DSOLID/B-Rep kernel or certified quantity takeoff.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
