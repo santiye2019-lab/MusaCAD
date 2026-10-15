@@ -25,6 +25,11 @@ int musa_core_nurbs_evaluate(const MusaCoreNurbsControl *controls,size_t n,
     if(!musa_nurbs_valid(controls,n,knots,nk,degree))return 0;
     return musa_nurbs_eval(controls,n,knots,degree,u,x,y);
 }
+int musa_core_nurbs_evaluate_validated(const MusaCoreNurbsControl *controls,
+                            size_t n,const double *knots,int degree,double u,
+                            double *x,double *y) {
+    return musa_nurbs_eval(controls,n,knots,degree,u,x,y);
+}
 int musa_core_nurbs_preview_points(const double *knots,size_t n,size_t nk,int degree) {
     if(!knots||n<2||n>MUSA_NURBS_MAX_CONTROL||degree<1||
        degree>MUSA_NURBS_MAX_DEGREE||n<=(size_t)degree||
