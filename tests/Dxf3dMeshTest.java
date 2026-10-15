@@ -39,6 +39,8 @@ public final class Dxf3dMeshTest {
         testCircularAndArcOutlines();
         testEllipticalArcsAndFullEllipse();
         testQuadraticAndRationalSpline();
+        testFitOnlySplineInterpolationAndInsert();
+        testMalformedFitOnlySplines();
         testNonuniformAndRepeatedSplineKnots();
         testVerifiedPeriodicRationalSpline();
         testFalsePeriodicSplineSeamsRejected();
@@ -136,6 +138,86 @@ public final class Dxf3dMeshTest {
     private static void assertCurveNear(float actual,double expected,String why){
         if(!Float.isFinite(actual)||Math.abs(actual-expected)>0.0002)
             throw new AssertionError(why+": "+actual+" != "+expected);
+    }
+
+    private static void testFitOnlySplineInterpolationAndInsert() throws Exception {
+        File file=File.createTempFile("mesh3d-fit-spline-", ".dxf");
+        try{
+            String linear="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n0\n71\n1\n72\n0\n73\n0\n74\n3\n"+
+                "11\n0\n21\n0\n31\n2\n"+
+                "11\n3\n21\n0\n31\n2\n"+
+                "11\n3\n21\n4\n31\n2\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),linear,StandardCharsets.UTF_8);
+            Dxf3dMesh line=Dxf3dMesh.read(file);
+            if(line.approximateCurves!=1||line.xyz.length!=9||
+               line.edges.length!=4||line.triangles.length!=0)
+                throw new AssertionError("linear fit-only SPLINE must join all fit points");
+            assertCurveNear(line.xyz[0],0,"linear fit first X");
+            assertCurveNear(line.xyz[3],3,"linear fit middle X");
+            assertCurveNear(line.xyz[4],0,"linear fit middle Y");
+            assertCurveNear(line.xyz[6],3,"linear fit last X");
+            assertCurveNear(line.xyz[7],4,"linear fit last Y");
+            String cubic="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nFIT_PIPE\n10\n0\n20\n0\n30\n0\n"+
+                "0\nSPLINE\n70\n8\n71\n3\n72\n0\n73\n0\n74\n3\n"+
+                "11\n0\n21\n0\n31\n1\n"+
+                "11\n4\n21\n4\n31\n1\n"+
+                "11\n8\n21\n0\n31\n1\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nFIT_PIPE\n10\n10\n20\n20\n30\n30\n50\n90\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),cubic,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=1||mesh.xyz.length!=25*3||
+               mesh.edges.length!=24*2||mesh.triangles.length!=0)
+                throw new AssertionError("cubic fit-only SPLINE must sample 2 chord-length segments");
+            assertCurveNear(mesh.xyz[0],10,"rotated fit start X");
+            assertCurveNear(mesh.xyz[1],20,"rotated fit start Y");
+            assertCurveNear(mesh.xyz[2],31,"rotated fit start Z");
+            assertCurveNear(mesh.xyz[12*3],6,"rotated fit middle X");
+            assertCurveNear(mesh.xyz[12*3+1],24,"rotated fit middle Y");
+            assertCurveNear(mesh.xyz[24*3],10,"rotated fit end X");
+            assertCurveNear(mesh.xyz[24*3+1],28,"rotated fit end Y");
+            float[] original=mesh.xyz.clone();
+            for(int i=0;i<mesh.sourceLines.length;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("fit-only preview vertices must not be editable");
+            mesh.xyz[0]+=1;
+            boolean rejected=false;
+            try{Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,original);}
+            catch(java.io.IOException expected){rejected=true;}
+            if(!rejected)throw new AssertionError("fit-only SPLINE sample edit must be rejected");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMalformedFitOnlySplines() throws Exception {
+        File file=File.createTempFile("mesh3d-bad-fit-spline-", ".dxf");
+        try{
+            String fit="11\n0\n21\n0\n11\n2\n21\n2\n11\n4\n21\n0\n";
+            String[] invalid={
+                "71\n3\n74\n2\n"+fit,          // incorrect fit count
+                "71\n3\n74\n3\n11\n0\n21\n0\n11\n2\n11\n4\n21\n0\n",
+                "71\n3\n74\n3\n11\n0\n21\n0\n11\n0\n21\n0\n11\n4\n21\n0\n",
+                "71\n2\n74\n3\n"+fit,          // degree 2 undefined by preview
+                "70\n1\n71\n3\n74\n3\n"+fit,   // closed fit-only unsupported
+                "70\n2\n71\n3\n74\n3\n"+fit,   // periodic fit-only unsupported
+                "71\n3\n74\n3\n12\n1\n22\n1\n"+fit, // tangent requires exact solver
+                "71\n3\n74\n3\n"+fit+"11\n6\n21\n0\n",
+                "71\n3\n74\n3\n"+fit+"40\n0\n",
+                "71\n3\n74\n3\n"+fit+"10\n0\n20\n0\n",
+                "71\n3\n74\n3\n11\nNaN\n21\n0\n11\n2\n21\n0\n11\n4\n21\n0\n"
+            };
+            for(String groups:invalid){
+                Files.writeString(file.toPath(),
+                    "0\nSECTION\n2\nENTITIES\n0\nSPLINE\n"+
+                    groups+"0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+                boolean rejected=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){rejected=true;}
+                if(!rejected)throw new AssertionError("malformed fit-only SPLINE must fail closed");
+            }
+        }finally{Files.deleteIfExists(file.toPath());}
     }
 
     private static void testQuadraticAndRationalSpline() throws Exception {
