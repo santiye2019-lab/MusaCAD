@@ -37,7 +37,21 @@ _CORE_GEOMETRY = {
     # form: a reference list of [group-code, value] pairs, not a dict.
     "SPLINE": ((), {}),
     "LWPOLYLINE": ((), {}),
+    # Linked POLYLINE/VERTEX records are compared per stable source
+    # handle. The parent/SEQEND ordering remains a separate proof.
+    "POLYLINE": ((), {}),
+    "VERTEX": ((), {}),
 }
+_POLYLINE_HEADER_CODES = frozenset((
+    10, 20, 30, 39, 40, 41, 66, 70, 71, 72, 73, 74, 75,
+    210, 220, 230,
+))
+_VERTEX_CODES = frozenset((
+    10, 20, 30, 40, 41, 42, 50, 70, 71, 72, 73, 74,
+))
+_VERTEX_INTS = frozenset((70, 71, 72, 73, 74))
+_POLYLINE_HEADER_INTS = frozenset((66, 70, 71, 72, 73, 74, 75))
+
 _LWPOLYLINE_GROUPS = frozenset((
     90, 70, 38, 39, 43, 210, 220, 230,
     10, 20, 40, 41, 42, 91,
@@ -256,6 +270,73 @@ class DwgEntityIdentityAudit:
         return tuple(normalized)
 
     @staticmethod
+    def _linked_polyline_geometry(kind, groups, reference=False):
+        """Exact per-handle POLYLINE header and VERTEX numeric fields.
+
+        A zero-valued coordinate on a face-index VERTEX may be implicit;
+        this is why we preserve group presence as well as normalized numbers.
+        Never synthesize child ordering or claim POLYLINE/SEQEND ownership.
+        """
+        allowed = (_VERTEX_CODES if kind == "VERTEX" else
+                   _POLYLINE_HEADER_CODES)
+        if reference:
+            if not isinstance(groups, dict) or len(groups) > len(allowed):
+                raise ValueError("invalid independent linked polyline mapping")
+            pairs = []
+            for key, raw in groups.items():
+                if (not isinstance(key, str) or not key.isdecimal() or
+                    key != str(int(key)) or int(key) not in allowed):
+                    raise ValueError("invalid linked polyline source group")
+                pairs.append((int(key), raw))
+        else:
+            pairs = [(code, raw) for code, raw in groups if code in allowed]
+        if not pairs:
+            raise ValueError("empty linked polyline geometry")
+        fields = {}
+        for code, raw in pairs:
+            if code in fields or not isinstance(raw, str) or not 1 <= len(raw) <= 128:
+                raise ValueError("duplicate or invalid linked polyline field")
+            fields[code] = _normalized(code, raw)
+        if kind == "POLYLINE":
+            flags = int(fields.get(70, "0"))
+            if flags < 0 or flags > 255:
+                raise ValueError("invalid POLYLINE flags")
+            if 66 in fields and int(fields[66]) not in (0, 1):
+                raise ValueError("invalid POLYLINE entities-follow flag")
+            for code in (71, 72, 73, 74, 75):
+                if code in fields and not 0 <= int(fields[code]) <= 65535:
+                    raise ValueError("POLYLINE mesh/smooth parameter invalid")
+            if 39 in fields and Decimal(fields[39]) < 0:
+                raise ValueError("negative POLYLINE thickness")
+            for code in (40, 41):
+                if code in fields and Decimal(fields[code]) < 0:
+                    raise ValueError("negative POLYLINE width")
+            normal = tuple(Decimal(fields.get(code, default))
+                           for code, default in ((210, "0"), (220, "0"),
+                                                 (230, "1")))
+            if not any(normal):
+                raise ValueError("zero POLYLINE extrusion vector")
+        else:
+            flags = int(fields.get(70, "0"))
+            if not 0 <= flags <= 255:
+                raise ValueError("invalid VERTEX flags")
+            face_indices = [code for code in (71,72,73,74) if code in fields]
+            if face_indices:
+                if not (flags & 128) or 71 not in fields or 72 not in fields:
+                    raise ValueError("face indices require polyface VERTEX and two corners")
+                for code in face_indices:
+                    if not -32767 <= int(fields[code]) <= 32767:
+                        raise ValueError("invalid signed polyface face index")
+                if 10 in fields and 20 not in fields or 20 in fields and 10 not in fields:
+                    raise ValueError("partial polyface face vertex position")
+            elif 10 not in fields or 20 not in fields:
+                raise ValueError("VERTEX lacks X/Y position")
+            for code in (40,41):
+                if code in fields and Decimal(fields[code]) < 0:
+                    raise ValueError("negative VERTEX width")
+        return tuple(sorted(fields.items()))
+
+    @staticmethod
     def _primitive_geometry(kind, groups, reference=False):
         """Canonical exact numeric subset; never return values in diagnostics.
 
@@ -268,6 +349,9 @@ class DwgEntityIdentityAudit:
             return DwgEntityIdentityAudit._spline_geometry(groups, reference)
         if kind == "LWPOLYLINE":
             return DwgEntityIdentityAudit._lwpolyline_geometry(groups, reference)
+        if kind in ("POLYLINE", "VERTEX"):
+            return DwgEntityIdentityAudit._linked_polyline_geometry(
+                kind, groups, reference)
         spec = _CORE_GEOMETRY.get(kind)
         if spec is None:
             raise ValueError("unsupported independent geometry type")
@@ -573,7 +657,9 @@ class DwgEntityIdentityAudit:
                 "radius/angles/normal, ELLIPSE WCS center/axis/ratio/radian "
                 "parameters/normal, 3DFACE XYZ corners/hidden edges, and "
                 "ordered SPLINE knot/control/fit/weight and LWPOLYLINE vertex/"
-                "signed-bulge/width/OCS parameter groups only. "
+                "signed-bulge/width/OCS parameters, and per-handle linked POLYLINE/"
+                "VERTEX XYZ, flags, widths, bulges and signed polyface "
+                "indices only. POLYLINE parent/SEQEND order is NOT proven. "
                 "Exact parameter strings after numeric normalization; no "
                 "evaluated curve or full DWG geometry, color, "
                 "XREF, block transforms, 3DSOLID, or rendering assurance."
