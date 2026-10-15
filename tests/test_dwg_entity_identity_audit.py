@@ -322,7 +322,7 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
         self.assertNotIn("0.7071067811865475244", str(passing))
         # Exact repeated groups must remain ordered; a mapping would erase
         # all but the final knot, weight and coordinate.
-        for slot, new_value in ((8, "1.00000000000000000000000001"),
+        for slot, new_value in ((8, "0.99999999999999999999999999"),
                                 (13, "0.7071067811865475245"),
                                 (17, "1.0000000001")):
             with self.subTest(slot=slot):
