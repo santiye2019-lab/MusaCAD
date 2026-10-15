@@ -9,3 +9,14 @@ target_include_directories(musacad_core PUBLIC "${CMAKE_CURRENT_LIST_DIR}/includ
 if(UNIX AND NOT APPLE)
     target_link_libraries(musacad_core PUBLIC m)
 endif()
+
+# Unit tests only when this directory is configured as its own project.
+# Android/host DWG builds must not automatically create extra test binaries.
+if(PROJECT_IS_TOP_LEVEL)
+    include(CTest)
+    if(BUILD_TESTING)
+        add_executable(musacad_core_api_test tests/core_api_test.c)
+        target_link_libraries(musacad_core_api_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_abi_v1_nurbs COMMAND musacad_core_api_test)
+    endif()
+endif()
