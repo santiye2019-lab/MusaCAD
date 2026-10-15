@@ -163,6 +163,14 @@
       "commit": "01a2fde570dfbb5e568005a48de78c7b0bd71476",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD regression run 38710272134 PASS: knot-aware sampled rational/de Boor SPLINE points include short nonuniform spans, repeated degree-2 interior knot corners and reject degree+1 interior knot discontinuities. Exact evaluation at knots prevents missed kinks, but tessellated wires are approximate, read-only; fit-point-only, periodic, native modern DWG Save As and independent project parity remain unfinished."
+    },
+    {
+      "id": "spline_periodic_degree12_verified_seam",
+      "points": 1,
+      "status": "implemented",
+      "commit": "a71f08e15f910630f81f2e384b381685a1e78c85",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD run 38732978733 PASS: knot/control-defined degree-1/2 periodic (including rational degree-2) 3D sampled spline; verifies closed seam, degree-2 tangent continuity, rejects false seam under huge coordinate translations and higher unvalidated periodic degree. Test saves independent LINE edit while retaining periodic knots, weights and reopen geometry. Fit-only spline, degree-3+ periodic, AC1032 native DWG writing, independent real-DWG parity and physical-device acceptance remain unverified."
     }
   ],
   "backlog": [
@@ -180,7 +188,7 @@
     },
     {
       "id": "advanced_2d_editing_roundtrip",
-      "points": 4,
+      "points": 3,
       "status": "in_progress",
       "evidence_required": "2D tool matrix, save/reopen tests"
     },
