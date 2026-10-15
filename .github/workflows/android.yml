@@ -882,7 +882,7 @@ jobs:
           assert "musa_core_nurbs_evaluate_validated(points,n,e->knots,degree,u,&x,&y)" in spline
           assert "points[i].w=musa_core_effective_weight(e->ctrl_pts[i].w,e->weighted);" in spline
           assert "musa_core_nurbs_validate(points,n,e->knots" in spline
-assert spline.index("musa_core_nurbs_validate(points,n,e->knots") < spline.index("musa_core_nurbs_evaluate_validated(points,n")
+          assert spline.index("musa_core_nurbs_validate(points,n,e->knots") < spline.index("musa_core_nurbs_evaluate_validated(points,n")
           assert "musa_core_nurbs_preview_points(e->knots,n,(size_t)e->num_knots,degree)" in spline
           assert "s->truncated=1" in spline
           assert "emit_poly_point(s,parent,e->fit_pts[i].x" not in spline
