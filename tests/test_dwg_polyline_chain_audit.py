@@ -129,6 +129,9 @@ class DwgPolylineChainAuditTests(unittest.TestCase):
         no_vertices=copy.deepcopy(reference)
         no_vertices[0]["vertices"]=[]
         variants.append(no_vertices)
+        same_closing_handle=copy.deepcopy(reference)
+        same_closing_handle[0]["seqend"]="AA"
+        variants.append(same_closing_handle)
         for records in variants:
             with self.subTest(records=records), self.assertRaises(ValueError):
                 self.inspect(self.drawing(), records)
