@@ -37,6 +37,9 @@ public final class Dxf3dMeshTest {
         testTiltedLwPolylineInRotatedBlock();
         testMalformedLwPolylineFailClosed();
         testCircularAndArcOutlines();
+        testEllipticalArcsAndFullEllipse();
+        testTiltedEllipseWithinRotatedBlock();
+        testMalformedEllipseFailClosed();
         testTiltedCircularOcsAndNestedInsert();
         testInvalidCurvesFailClosed();
         test3dFaceInvisibleEdgesAndSafeRoundtrip();
@@ -127,6 +130,97 @@ public final class Dxf3dMeshTest {
     private static void assertCurveNear(float actual,double expected,String why){
         if(!Float.isFinite(actual)||Math.abs(actual-expected)>0.0002)
             throw new AssertionError(why+": "+actual+" != "+expected);
+    }
+
+    private static void testEllipticalArcsAndFullEllipse() throws Exception {
+        File file=File.createTempFile("mesh3d-ellipse-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nELLIPSE\n10\n10\n20\n20\n30\n30\n"+
+                "11\n3\n21\n0\n31\n0\n40\n0.5\n"+
+                "0\nELLIPSE\n10\n0\n20\n0\n30\n4\n"+
+                "11\n4\n21\n0\n31\n0\n40\n0.25\n"+
+                "41\n1.5707963267948966\n42\n3.141592653589793\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=2||mesh.triangles.length!=0||
+                mesh.xyz.length!=61*3||mesh.edges.length!=60*2)
+                throw new AssertionError("ELLIPSE full/partial path must close only full ellipse");
+            assertCurveNear(mesh.xyz[0],13,"ellipse first X");
+            assertCurveNear(mesh.xyz[1],20,"ellipse first Y");
+            assertCurveNear(mesh.xyz[2],30,"ellipse first Z");
+            assertCurveNear(mesh.xyz[12*3],10,"ellipse quarter X");
+            assertCurveNear(mesh.xyz[12*3+1],21.5,"ellipse quarter Y");
+            if(mesh.edges[94]!=47||mesh.edges[95]!=0)
+                throw new AssertionError("full ELLIPSE must close without duplicate endpoint");
+            assertCurveNear(mesh.xyz[48*3],0,"partial ellipse first X");
+            assertCurveNear(mesh.xyz[48*3+1],1,"partial ellipse first Y");
+            assertCurveNear(mesh.xyz[60*3],-4,"partial ellipse last X");
+            assertCurveNear(mesh.xyz[60*3+1],0,"partial ellipse last Y");
+            for(int i=0;i<mesh.xyz.length/3;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("sampled ellipse vertices must be read-only");
+            float[] original=mesh.xyz.clone();
+            mesh.xyz[0]+=1;
+            try{
+                Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,original);
+                throw new AssertionError("sampled ellipse is not a raw DXF vertex");
+            }catch(java.io.IOException expected){}
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testTiltedEllipseWithinRotatedBlock() throws Exception {
+        File file=File.createTempFile("mesh3d-ellipse-block-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nELLIPTIC_PIPE\n10\n0\n20\n0\n30\n0\n"+
+                "0\nELLIPSE\n10\n1\n20\n2\n30\n3\n"+
+                "11\n0\n21\n0\n31\n4\n40\n0.5\n"+
+                "210\n0\n220\n1\n230\n0\n"+
+                "0\nENDBLK\n0\nENDSEC\n"+
+                "0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nELLIPTIC_PIPE\n10\n10\n20\n20\n30\n30\n50\n90\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=48*3||mesh.edges.length!=48*2||mesh.approximateCurves!=1)
+                throw new AssertionError("tilted ELLIPSE inside INSERT missing");
+            // Source point at (1,2,7); 90 degree INSERT -> (8,21,37).
+            assertCurveNear(mesh.xyz[0],8,"insert ellipse first X");
+            assertCurveNear(mesh.xyz[1],21,"insert ellipse first Y");
+            assertCurveNear(mesh.xyz[2],37,"insert ellipse first Z");
+            // Normal (0,1,0), major (0,0,4), minor (2,0,0):
+            // quarter local (3,2,3) => (8,23,33).
+            assertCurveNear(mesh.xyz[12*3],8,"insert ellipse quarter X");
+            assertCurveNear(mesh.xyz[12*3+1],23,"insert ellipse quarter Y");
+            assertCurveNear(mesh.xyz[12*3+2],33,"insert ellipse quarter Z");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMalformedEllipseFailClosed() throws Exception {
+        File file=File.createTempFile("mesh3d-bad-ellipse-", ".dxf");
+        try{
+            String[] invalid={
+                "11\n0\n21\n0\n31\n0\n40\n0.5\n",
+                "11\n1\n21\n0\n31\n0\n40\n0\n",
+                "11\n1\n21\n0\n31\n0\n40\n1.1\n",
+                "11\n1\n21\n0\n31\n0\n40\n0.3\n210\n0\n220\n0\n230\n0\n",
+                "11\n1\n21\n0\n31\n1\n40\n0.3\n",
+                "11\n1\n21\n0\n31\n0\n40\n0.3\n41\n0\n42\n0\n",
+                "11\n1\n21\n0\n31\n0\n40\n0.3\n41\n0\n42\n8\n",
+                "11\nNaN\n21\n0\n31\n0\n40\n0.3\n"
+            };
+            for(String values:invalid){
+                Files.writeString(file.toPath(),
+                    "0\nSECTION\n2\nENTITIES\n0\nELLIPSE\n"+
+                    "10\n1\n20\n2\n30\n3\n"+values+"0\nENDSEC\n0\nEOF\n",
+                    StandardCharsets.UTF_8);
+                boolean refused=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+                if(!refused)throw new AssertionError("invalid ELLIPSE must fail closed");
+            }
+        }finally{Files.deleteIfExists(file.toPath());}
     }
 
     private static void testCircularAndArcOutlines() throws Exception {
