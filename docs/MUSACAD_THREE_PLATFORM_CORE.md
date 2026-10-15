@@ -74,6 +74,21 @@ Path: `core/native/`
   JNI are guarded by host JVM/host JNI compilation tests. This opt-in
   bridge does not replace existing Android result, execute on the drawing UI
   thread or certify an exact B-Rep surface.
+- Portable 3D indexed-mesh **topology preflight** now mirrors the Android
+  `Cad3dMeshTopology` screening in `musacad_mesh_topology.c`. It reports
+  open edges, inconsistent winding, non-manifold edges, degenerate faces and
+  duplicate/zero-thickness opposed facets. It rejects invalid indices and
+  nonfinite coordinates; meshes exceeding 50,000 triangles remain explicitly
+  unaudited. The same C ABI can gate `musa_core_mesh_mass_f32` on all
+  platforms. Separate real-file cross-tests and geometric self-intersection
+  validation are still required before certified solid/metraj claims.
+- A new cross-platform `core/native/include/musacad_affine3.h`
+  provides common **3D WCS affine composition, point/vector mapping,
+  mirrored/nonuniform scale handling, inverse transform and orientation
+  determinant**. These are directly tested on Linux/Windows/macOS and
+  syntax-compiled for iPhoneOS arm64. This is reusable 3D BLOCK/UCS math
+  groundwork; the current Android 3D rendering/editing implementation
+  is not replaced, and AutoCAD 2026 3D UCS command parity is NOT claimed.
 - A read-only native 3D **ray-versus-triangle picking** API
   `musa_core_mesh_ray_pick_f32` now locates the nearest triangle and
   returns drawing-unit distance, WCS hit point, barycentric parameters,
