@@ -25,6 +25,21 @@ public final class Dxf3dSafeSave {
         // A concurrent same-length edit must never produce a valid-looking
         // export based on a different source drawing.
         CadSaveSourceIntegrity baseline=CadSaveSourceIntegrity.capture(source);
+        // A caller may have opened the drawing hours earlier. Hashing the
+        // source only at save time cannot detect changes predating stage().
+        // Reopen the source and match the exact geometry/identity that the
+        // edit session originally read before applying any coordinate patch.
+        Dxf3dMesh current=Dxf3dMesh.read(source);
+        if(!Arrays.equals(current.xyz,original)||
+            !Arrays.equals(current.triangles,edited.triangles)||
+            !Arrays.equals(current.edges,edited.edges)||
+            !Arrays.equals(current.sourceLines,edited.sourceLines)||
+            !Arrays.equals(current.coordinateSlots,edited.coordinateSlots)||
+            current.acisSolids!=edited.acisSolids||
+            current.unsupportedSolids!=edited.unsupportedSolids||
+            current.skippedBlockReferences!=edited.skippedBlockReferences)
+            throw new IOException("3B kaynak çizim açıldıktan sonra değişmiş; yeniden açmadan kayıt yapılamaz");
+        baseline.requireUnchanged(source);
         File staged=File.createTempFile("musacad-3d-", ".dxf", cacheDir);
         boolean ready=false;
         try{
@@ -36,7 +51,12 @@ public final class Dxf3dSafeSave {
             Dxf3dMesh reopened=Dxf3dMesh.read(staged);
             if(!Arrays.equals(edited.xyz,reopened.xyz)
                 ||!Arrays.equals(edited.triangles,reopened.triangles)
-                ||!Arrays.equals(edited.edges,reopened.edges))
+                ||!Arrays.equals(edited.edges,reopened.edges)
+                ||!Arrays.equals(edited.sourceLines,reopened.sourceLines)
+                ||!Arrays.equals(edited.coordinateSlots,reopened.coordinateSlots)
+                ||edited.acisSolids!=reopened.acisSolids
+                ||edited.unsupportedSolids!=reopened.unsupportedSolids
+                ||edited.skippedBlockReferences!=reopened.skippedBlockReferences)
                 throw new IOException("3B DXF yeniden açıldığında geometri değişti; kayıt yapılmadı");
             // Validate AFTER output creation and reopening. If another editor
             // changed the source during the work, never return this stage for
