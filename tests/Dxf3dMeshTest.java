@@ -320,6 +320,7 @@ public final class Dxf3dMeshTest {
                 "90\n2\n10\n0\n20\n0\n10\n4\n",
                 "90\n2\n10\n0\n42\n1\n20\n0\n10\n4\n20\n0\n",
                 "90\n2\n10\n0\n20\n0\n42\n1\n10\n0\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n42\n1\n42\n-1\n10\n4\n20\n0\n",
                 "90\n2\n10\n0\n20\n0\n42\nNaN\n10\n4\n20\n0\n",
                 "90\n2\n10\n0\n20\n0\n10\n4\n20\n0\n210\n0\n220\n0\n230\n0\n",
                 "90\n2\n10\n0\n20\n0\n10\n1e308\n20\n0\n",
