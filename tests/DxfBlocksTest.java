@@ -35,12 +35,22 @@ public class DxfBlocksTest {
         points(arrayInsert,12,22,17,22,12,29,17,29);
         if(arrayInsert.blockInsertions.size()!=1||!"A".equals(arrayInsert.blockInsertions.get(0).name)||arrayInsert.blockInsertions.get(0).count!=4)throw new AssertionError("Root block insertion metadata");
         points(read(b,insert("A",10,10,20,20,50,90,70,2,71,2,44,5,45,7)),8,22,8,27,1,22,1,27);
+        // Negative row/column spacing must retain placement order after rotation.
+        points(read(b,insert("A",10,10,20,20,50,90,70,2,71,2,44,-5,45,-7)),
+               8,22,8,17,15,22,15,17);
         points(read(b,insert("A",10,10,20,20,41,2,70,2,44,5)),14,22,19,22);
         // Mirrored OCS normals must preserve MINSERT array order and spacing.
         points(read(b,insert("A",10,10,20,20,70,2,44,5,230,-1)),-12,22,-17,22);
         // Extreme but finite DXF values must not produce NaN or partial placements.
         skipped(read(b,insert("A",10,-1e308,20,20,41,1e308)));
-        skipped(read(b,insert("A",10,1e308,20,20,70,2,44,1e308)));
+        DxfBlocks.Result rejectedArray=read(b,insert("A",10,1e308,20,20,70,2,44,1e308));
+        skipped(rejectedArray);
+        if(!rejectedArray.blockInsertions.isEmpty())
+            throw new AssertionError("Rejected MINSERT must not inflate quantity takeoff");
+        DxfBlocks.Result rejectedTransform=read(b,insert("A",10,-1e308,20,20,41,1e308));
+        skipped(rejectedTransform);
+        if(!rejectedTransform.blockInsertions.isEmpty())
+            throw new AssertionError("Rejected INSERT must not be counted");
         skipped(read(b,insert("A",10,0,20,20,41,1e308,42,1e308,50,90)));
         String nestedOverflow=b+block("OVERFLOW",insert("A",41,1e308));
         skipped(read(nestedOverflow,insert("OVERFLOW",41,1e308)));
