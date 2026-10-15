@@ -51,6 +51,7 @@ public final class Dxf3dMeshTest {
         testTiltedCircularOcsAndNestedInsert();
         testInvalidCurvesFailClosed();
         test3dFaceInvisibleEdgesAndSafeRoundtrip();
+        testSolidTraceReversedLastCornerAndPreservedDxfRoundtrip();
         testPolyfaceSignedInvisibleEdgesAndQuadWireframe();
         testPolygonMesh();
         testPolygonMeshWireGridOpenClosedAndShortSource();
@@ -139,6 +140,82 @@ public final class Dxf3dMeshTest {
                 if(!rejected)throw new AssertionError(
                         "malformed polyface index accepted: case "+k);
             }
+        }finally{
+            Files.deleteIfExists(file.toPath());
+            Files.deleteIfExists(saved.toPath());
+        }
+    }
+
+    private static void testSolidTraceReversedLastCornerAndPreservedDxfRoundtrip()
+            throws Exception {
+        File file=File.createTempFile("mesh3d-solid-trace-order-", ".dxf");
+        File saved=File.createTempFile("mesh3d-solid-trace-saved-", ".dxf");
+        try{
+            String head="0\nSECTION\n2\nENTITIES\n";
+            String end="0\nENDSEC\n0\nEOF\n";
+            // Raw DXF SOLID/TRACE source order: 0=(0,0), 1=(4,0),
+            // 2=(0,3), 3=(4,3). The physical perimeter is 0,1,3,2.
+            String reversed="10\n0\n20\n0\n30\n0\n"+
+                "11\n4\n21\n0\n31\n0\n"+
+                "12\n0\n22\n3\n32\n0\n"+
+                "13\n4\n23\n3\n33\n0\n";
+            int[] expectedTriangles={0,1,3,0,3,2};
+            int[] expectedEdges={0,1,1,3,3,2,2,0};
+            for(String type:new String[]{"SOLID","TRACE"}){
+                String dxf=head+"0\n"+type+"\n"+reversed+end;
+                Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+                Dxf3dMesh mesh=Dxf3dMesh.read(file);
+                if(mesh.xyz.length!=12||
+                   !java.util.Arrays.equals(mesh.triangles,expectedTriangles)||
+                   !java.util.Arrays.equals(mesh.edges,expectedEdges))
+                    throw new AssertionError(type+" reversed fourth/third order or wireframe wrong");
+                float[] opened=mesh.xyz.clone();
+                mesh.xyz[8]=2f; // source DXF 12/22/32 third corner
+                ByteArrayOutputStream output=new ByteArrayOutputStream();
+                Dxf3dEditor.write(file,output,mesh,opened);
+                Files.write(saved.toPath(),output.toByteArray());
+                String written=output.toString(StandardCharsets.UTF_8);
+                if(!written.contains("12\n0\n22\n3\n32\n2.0\n"))
+                    throw new AssertionError(type+" third DXF source corner was not preserved");
+                Dxf3dMesh reopened=Dxf3dMesh.read(saved);
+                if(reopened.xyz[8]!=2f||
+                   !java.util.Arrays.equals(reopened.triangles,expectedTriangles)||
+                   !java.util.Arrays.equals(reopened.edges,expectedEdges))
+                    throw new AssertionError(type+" save/reopen changed original corner order");
+
+                // No fourth corner: true triangle (0,1,2).
+                Files.writeString(file.toPath(),
+                        head+"0\n"+type+"\n"+reversed.substring(0,reversed.indexOf("13\n"))+end,
+                        StandardCharsets.UTF_8);
+                mesh=Dxf3dMesh.read(file);
+                if(mesh.triangles.length!=3||mesh.edges.length!=6)
+                    throw new AssertionError(type+" 3-corner face must remain triangle");
+
+                // Autodesk DXF also repeats the third vertex as the fourth
+                // for some triangular SOLID/TRACE records. No zero-area
+                // extra triangulation or duplicated perimeter edge.
+                Files.writeString(file.toPath(),
+                        head+"0\n"+type+"\n"+
+                        reversed.replace("13\n4\n23\n3\n33\n0\n",
+                                         "13\n0\n23\n3\n33\n0\n")+end,
+                        StandardCharsets.UTF_8);
+                mesh=Dxf3dMesh.read(file);
+                if(mesh.triangles.length!=3||mesh.edges.length!=6)
+                    throw new AssertionError(type+" duplicated corner must not create a quad");
+            }
+
+            // Unlike SOLID/TRACE, 3DFACE stores its last two vertices in
+            // ordinary perimeter order, and this MUST NOT be swapped.
+            String ordinary="10\n0\n20\n0\n30\n0\n"+
+                "11\n4\n21\n0\n31\n0\n"+
+                "12\n4\n22\n3\n32\n0\n"+
+                "13\n0\n23\n3\n33\n0\n";
+            Files.writeString(file.toPath(),
+                    head+"0\n3DFACE\n"+ordinary+end,StandardCharsets.UTF_8);
+            Dxf3dMesh face=Dxf3dMesh.read(file);
+            if(!java.util.Arrays.equals(face.triangles,new int[]{0,1,2,0,2,3})||
+               !java.util.Arrays.equals(face.edges,new int[]{0,1,1,2,2,3,3,0}))
+                throw new AssertionError("3DFACE must keep original 0,1,2,3 vertex order");
         }finally{
             Files.deleteIfExists(file.toPath());
             Files.deleteIfExists(saved.toPath());

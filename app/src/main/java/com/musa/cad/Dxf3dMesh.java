@@ -157,24 +157,40 @@ public final class Dxf3dMesh {
                 int hidden=(int)rawMask;
                 int start=points.n/3,firstTriangle=triangles.n/3;
                 for(int k=0;k<3;k++){addPoint(points,p,10+k,20+k,30+k);addSource(p,k);}
-                boolean quad=r.has(13)&&r.has(23);
-                if(quad){
+                // 3DFACE stores its perimeter as 0,1,2,3. DXF SOLID
+                // and TRACE use 0,1,3,2 (the last pair is reversed).
+                // Preserve the original record/sourceSlots and only change
+                // the rendering indices, so source DXF edits stay correct.
+                boolean hasFourth=r.has(13)&&r.has(23);
+                if(hasFourth){
                     addPoint(points,p,13,23,33);addSource(p,3);
-                    appendTriangle(triangles,start,start+1,start+2);
-                    appendTriangle(triangles,start,start+2,start+3);
-                }else{
-                    appendTriangle(triangles,start,start+1,start+2);
                 }
+                // DXF permits a triangle encoded with a fourth corner
+                // identical to the third. Avoid a fabricated degenerate face.
+                boolean triangleFourth=hasFourth&&
+                    r.number(12,Double.NaN)==r.number(13,Double.NaN)&&
+                    r.number(22,Double.NaN)==r.number(23,Double.NaN)&&
+                    r.number(32,0)==r.number(33,0);
+                boolean quad=hasFourth&&!triangleFourth;
+                int[] perimeter=quad
+                    ?(face3d?new int[]{start,start+1,start+2,start+3}
+                            :new int[]{start,start+1,start+3,start+2})
+                    :new int[]{start,start+1,start+2};
+                appendTriangle(triangles,perimeter[0],perimeter[1],perimeter[2]);
+                if(quad)
+                    appendTriangle(triangles,perimeter[0],perimeter[2],perimeter[3]);
                 outlineOnlyTriangles.set(firstTriangle,triangles.n/3);
-                // In the DXF spec, group-70 bits 1,2,4,8 hide edges
-                // 1-2,2-3,3-4,4-1 respectively. When vertex 4 is omitted,
-                // it is equal to vertex 3, so the last edge is 3-1.
-                if((hidden&1)==0)appendEdge(explicitEdges,start,start+1);
-                if((hidden&2)==0)appendEdge(explicitEdges,start+1,start+2);
-                if(quad){
-                    if((hidden&4)==0)appendEdge(explicitEdges,start+2,start+3);
-                    if((hidden&8)==0)appendEdge(explicitEdges,start+3,start);
-                }else if((hidden&8)==0)appendEdge(explicitEdges,start+2,start);
+                // Only 3DFACE uses the invisible-edge mask. Its fourth
+                // closing edge is controlled by bit 8. SOLID/TRACE always
+                // outline their authored perimeter, never the tessellation
+                // diagonal.
+                for(int edgeIndex=0;edgeIndex<perimeter.length;edgeIndex++){
+                    int mask=1<<edgeIndex;
+                    if(perimeter.length==3&&edgeIndex==2)mask=8;
+                    if((hidden&mask)==0)
+                        appendEdge(explicitEdges,perimeter[edgeIndex],
+                                   perimeter[(edgeIndex+1)%perimeter.length]);
+                }
             }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type)){
                 solids++;
                 ArrayList<String> chunks=new ArrayList<>();
