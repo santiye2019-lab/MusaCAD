@@ -532,6 +532,124 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
             self.assertNotIn("PRIVATE_SPLINE", str(good))
             self.assertNotIn("0.7", str(good))
 
+    def test_legacy_polyline_vertex_and_polyface_numeric_parity(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        header = [(5, "AA"), (8, "PRIVATE_PIPE"), (70, "8"),
+                  (10, "0"), (20, "0"), (30, "2"),
+                  (210, "0"), (220, "0"), (230, "1")]
+        edge = [(5, "AB"), (8, "PRIVATE_PIPE"), (70, "32"),
+                (10, "1"), (20, "2"), (30, "3"),
+                (40, "0.5"), (41, "0.8"), (42, "-0.4142135623730950488")]
+        face = [(5, "AC"), (8, "PRIVATE_STRUCTURAL"), (70, "128"),
+                (71, "1"), (72, "-2"), (73, "3"), (74, "0")]
+        audit.observe("ENTITIES", "POLYLINE", header)
+        audit.observe("ENTITIES", "VERTEX", edge)
+        audit.observe("BLOCKS", "VERTEX", face)
+        records = [
+            {"handle": "AA", "type": "POLYLINE", "groups": {
+                "70": "8", "10": "0", "20": "0", "30": "2",
+                "210": "0", "220": "0", "230": "1"}},
+            {"handle": "AB", "type": "VERTEX", "groups": {
+                "70": "32", "10": "1", "20": "2", "30": "3",
+                "40": "0.5", "41": "0.8",
+                "42": "-0.4142135623730950488"}},
+            {"handle": "AC", "type": "VERTEX", "groups": {
+                "70": "128", "71": "1", "72": "-2", "73": "3", "74": "0"}},
+        ]
+        matched = audit.compare_independent_geometry(records)
+        self.assertEqual(matched["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(matched["independent_geometry_checked"], 3)
+        self.assertNotIn("PRIVATE", str(matched))
+        self.assertNotIn("-0.4142135623730950488", str(matched))
+
+        for position, code, value in (
+                (0, "30", "2.0000000000000000001"),
+                (0, "210", "0.001"),
+                (1, "42", "-0.4142135623730950489"),
+                (1, "40", "0.50000000000001"),
+                (1, "30", "3.0000000000000001"),
+                (2, "72", "2"),  # negative sign is hidden-face information
+                (2, "73", "4"),
+                (2, "70", "192"),
+        ):
+            with self.subTest(code=code, position=position):
+                change = [dict(item, groups=dict(item["groups"]))
+                          for item in records]
+                change[position]["groups"][code] = value
+                report = audit.compare_independent_geometry(change)
+                self.assertEqual(report["independent_geometry_parameter_mismatches"], 1)
+                self.assertEqual(report["independent_geometry_result"],
+                                 "primitive_subset_mismatch")
+
+        for position, bad in (
+                (0, dict(records[0]["groups"], **{"70": "256"})),
+                (0, dict(records[0]["groups"], **{"210": "0",
+                                                 "220": "0", "230": "0"})),
+                (0, dict(records[0]["groups"], **{"40": "-1"})),
+                (1, dict(records[1]["groups"], **{"40": "-0.1"})),
+                (1, dict(records[1]["groups"], **{"10": "NaN"})),
+                (1, dict(records[1]["groups"], **{"70": "999"})),
+                (2, dict(records[2]["groups"], **{"70": "0"})),
+                (2, dict(records[2]["groups"], **{"72": "-40000"})),
+                (2, dict(records[2]["groups"], **{"71": "0",
+                                                 "72": "0", "73": "0",
+                                                 "74": "0", "011": "1"})),
+        ):
+            with self.subTest(position=position, data=bad), self.assertRaises(ValueError):
+                reference = [dict(item, groups=dict(item["groups"]))
+                             for item in records]
+                reference[position]["groups"] = bad
+                audit.compare_independent_geometry(reference)
+        invalid = DwgEntityIdentityAudit(geometry_enabled=True)
+        invalid.observe("ENTITIES", "VERTEX", [
+            (5, "AB"), (8, "PRIVATE"), (70, "32"),
+            (10, "1"), (20, "2"), (30, "3"), (42, "NaN")])
+        mismatch = invalid.compare_independent_geometry([records[1]])
+        self.assertEqual(mismatch["independent_geometry_invalid_decoded"], 1)
+        self.assertEqual(mismatch["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_legacy_polyline_vertex_independent_pipeline(self):
+        pairs = [(5, "AA"), (8, "PRIVATE PIPE"), (70, "32"),
+                 (10, "0"), (20, "0"), (30, "5"),
+                 (42, "-0.25")]
+        dxf = (record("SECTION", (2, "ENTITIES")) +
+               record("VERTEX", *pairs) + record("ENDSEC") + record("EOF"))
+        source = [{"handle": "AA", "type": "VERTEX", "groups": {
+            str(code): val for code, val in pairs if code not in (5, 8)
+        }}]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            drawing = root / "read-only.dwg"
+            drawing.write_bytes(b"AC1032 synthetic-only fixture")
+            converter = root / "mock"
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+            converter.chmod(0o700)
+
+            def converted(*args, **kwargs):
+                Path(args[0][2]).write_text(dxf, encoding="utf-8")
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=9\n")
+                return Mock(returncode=0)
+
+            with patch("private_dwg_read_audit.subprocess.run", side_effect=converted):
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    good = convert_one(drawing, converter, Path(tmp), 5, 128,
+                                       independent_geometry=source)
+                changed = [dict(source[0], groups=dict(source[0]["groups"]))]
+                changed[0]["groups"]["42"] = "-0.250000000000001"
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    bad = convert_one(drawing, converter, Path(tmp), 5, 128,
+                                      independent_geometry=changed)
+        self.assertEqual(good["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(good["status"], "decoded_dxf_inventory")
+        self.assertEqual(bad["independent_geometry_parameter_mismatches"], 1)
+        self.assertEqual(bad["status"], "decoded_dxf_inventory_geometry_mismatch")
+        self.assertNotIn("PRIVATE PIPE", str(good))
+        self.assertNotIn("-0.250000000000001", str(bad))
+
     def test_independent_ellipse_wcs_axis_ratio_and_radian_parameter_parity(self):
         audit = DwgEntityIdentityAudit(geometry_enabled=True)
         # The major axis is WCS relative to center; a tilted ellipse's
