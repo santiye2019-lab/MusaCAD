@@ -25,6 +25,11 @@ public final class CadPrismBrepRoundtripTest {
     public static void main(String[]args)throws Exception{
         double[] square={0,0,2,0,2,2,0,2};
         CadPrismBrep.Solid solid=CadPrismBrep.extrude(square,5,3);
+        near(solid.centroidX,1,1e-12,"analytic prism centroid x");
+        near(solid.centroidY,1,1e-12,"analytic prism centroid y");
+        near(solid.centroidZ,6.5,1e-12,"analytic prism centroid z");
+        near(solid.perimeter,8,1e-12,"analytic perimeter");
+        near(solid.surfaceArea,32,1e-12,"analytic total surface");
         float[] coords=asFloat(solid.xyz);
         Cad3dMeshTopology.Result topology=Cad3dMeshTopology.inspect(coords,solid.triangles);
         expect(topology.checked&&topology.closedOrientedByIndex,
