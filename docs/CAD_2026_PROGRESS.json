@@ -171,6 +171,14 @@
       "commit": "a71f08e15f910630f81f2e384b381685a1e78c85",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD run 38732978733 PASS: knot/control-defined degree-1/2 periodic (including rational degree-2) 3D sampled spline; verifies closed seam, degree-2 tangent continuity, rejects false seam under huge coordinate translations and higher unvalidated periodic degree. Test saves independent LINE edit while retaining periodic knots, weights and reopen geometry. Fit-only spline, degree-3+ periodic, AC1032 native DWG writing, independent real-DWG parity and physical-device acceptance remain unverified."
+    },
+    {
+      "id": "fit_only_spline_bounded_3d_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "9071a6dcd0806d3b7caa621cd63b5bdc498d637",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD run 38733845233 PASS: bounded degree-1 line and degree-3 chord-parametric Hermite preview through DXF fit points, 3D rotated INSERT, read-only samples, invalid fit counts/duplicate points/tangents/unsupported degrees rejected, and staged DXF independent LINE edit preserves original fit records and reopens sampled geometry. This is not exact originating CAD fit spline reconstruction, fully editable spline control, independent original DWG parity, or modern binary DWG writing; Android and physical device acceptance separate."
     }
   ],
   "backlog": [
@@ -188,7 +196,7 @@
     },
     {
       "id": "advanced_2d_editing_roundtrip",
-      "points": 3,
+      "points": 2,
       "status": "in_progress",
       "evidence_required": "2D tool matrix, save/reopen tests"
     },
