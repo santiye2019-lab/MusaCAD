@@ -929,7 +929,8 @@ jobs:
           assert "if(topology!=null&&topology.closedOrientedByIndex)" in source
           assert "openingSignedVolume=initialVolume;" in source
           assert "öz-kesişimsiz B-Rep veya geçerli ACIS katısı garantisi değildir" in source
-          assert "ACIS/temsili nesneler bulunduğundan kısmi" in source
+          assert "Eksik blok/ACIS geometrisi nedeniyle kısmi" in source
+          assert "mesh.skippedBlockReferences>0" in source
           PY
 
       - name: Test 3D DXF surface geometry
