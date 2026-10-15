@@ -36,13 +36,25 @@ XREF resolution, layouts, dimensions, measurements, exact solids or printing.
 For each original DWG, a separately trusted reader may provide a **local-only**
 JSON manifest named `<source_sha256>.json` in an external directory, containing
 `source_sha256`, `source_kind: "independent_dwg_reader"`, `records: []`,
-and `geometry_records`. Each geometry entry includes a source handle, entity
-type and string-valued DXF group-code map; use `--independent-manifest-dir`
-when running `tests/private_dwg_read_audit.py`.
+and `geometry_records`. Each geometry entry includes a source handle,
+entity type and numeric DXF group values; use `--independent-manifest-dir`
+when running `tests/private_dwg_read_audit.py`. For the simple primitives
+below, `groups` is a string-valued DXF group-code map. For **SPLINE**,
+repeated knot, weight and vertex codes cannot be represented as a mapping:
+`groups` must instead be an **ordered array of string pairs**, such as
+`[["70","8"],["71","2"],["72","6"],["73","3"],["40","0"],...]`.
+The independent reader must preserve the covered source group order;
+inventing source control points from MusaCAD's own converted DXF is not
+independent evidence.
 
 This optional source-bound comparison now covers **LINE** XYZ endpoints,
 **POINT** position/normal, **CIRCLE/ARC** center/radius/angle/normal and
-**3DFACE** XYZ corners plus group 70 invisible-edge bits. Absent fourth
+**3DFACE** XYZ corners plus group 70 invisible-edge bits, and the
+numeric **SPLINE parameter subset** (degree, flags, ordered knot vector,
+control/fit XYZ, rational weights and declared counts). This catches source
+curve-definition drift even when entity counts and overall extents match;
+it does **not** evaluate curve shape, certify fit-only reconstruction, or prove
+real-DWG parity without an independently obtained source manifest. Absent fourth
 3DFACE corner means the third corner repeats, while partial fourth-corner
 data is rejected. Missing or changed source values produce
 `decoded_dxf_inventory_geometry_mismatch`; only aggregate counts appear
