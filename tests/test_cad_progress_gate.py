@@ -13,8 +13,15 @@ class CadProgressGateTest(unittest.TestCase):
 
     def test_development_percent_increments_and_unfinished_remains(self):
         result = assess(self.data)
-        self.assertEqual(result["implementation_points"], 41)
-        self.assertEqual(result["remaining_points"], 59)
+        completed = sum(m["points"] for m in self.data["completed_milestones"])
+        outstanding = sum(m["points"] for m in self.data["backlog"])
+        self.assertEqual(result["implementation_points"],
+                         self.data["baseline_points"] + completed)
+        self.assertEqual(result["remaining_points"], outstanding)
+        # Reject a regression to earlier implementation inventories without
+        # freezing this test to one specific progress percentage forever.
+        self.assertGreaterEqual(result["implementation_points"], 42)
+        self.assertEqual(result["implementation_points"] + result["remaining_points"], 100)
         self.assertEqual(result["verified_modules"], 0)
         self.assertEqual(result["field_tests_passed"], 0)
 
