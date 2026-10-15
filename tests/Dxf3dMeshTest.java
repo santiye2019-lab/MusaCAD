@@ -39,6 +39,7 @@ public final class Dxf3dMeshTest {
         testCircularAndArcOutlines();
         testEllipticalArcsAndFullEllipse();
         testQuadraticAndRationalSpline();
+        testNonuniformAndRepeatedSplineKnots();
         testClosedSplineAndRotatedBlock();
         testUnsupportedAndMalformedSplinesFailClosed();
         testTiltedEllipseWithinRotatedBlock();
@@ -175,6 +176,56 @@ public final class Dxf3dMeshTest {
                 Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,before);
                 throw new AssertionError("tessellated SPLINE must not write as DXF control point");
             }catch(java.io.IOException expected){}
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testNonuniformAndRepeatedSplineKnots() throws Exception {
+        File file=File.createTempFile("mesh3d-knot-corners-", ".dxf");
+        try{
+            // A knot at 0.001 would be missed by naive 1/36 sampling.
+            // Each distinct knot must be sampled exactly, preserving corners.
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n0\n71\n1\n72\n6\n73\n4\n"+
+                "40\n0\n40\n0\n40\n0.001\n40\n0.75\n40\n1\n40\n1\n"+
+                "10\n0\n20\n0\n10\n0\n20\n10\n"+
+                "10\n10\n20\n10\n10\n10\n20\n0\n"+
+                "0\nSPLINE\n70\n0\n71\n2\n72\n8\n73\n5\n"+
+                "40\n0\n40\n0\n40\n0\n40\n0.03\n40\n0.03\n"+
+                "40\n1\n40\n1\n40\n1\n"+
+                "10\n0\n20\n0\n10\n1\n20\n0\n10\n2\n20\n0\n"+
+                "10\n2\n20\n2\n10\n3\n20\n2\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=2||mesh.triangles.length!=0||
+                mesh.xyz.length!=(37+49)*3||mesh.edges.length!=(36+48)*2)
+                throw new AssertionError("SPLINE knot-aware sampling vertex budget changed");
+            // degree-1 sharp turns occur exactly on nonuniform knots.
+            assertCurveNear(mesh.xyz[12*3],0,"first tightly spaced knot X");
+            assertCurveNear(mesh.xyz[12*3+1],10,"first tightly spaced knot Y");
+            assertCurveNear(mesh.xyz[24*3],10,"second nonuniform knot X");
+            assertCurveNear(mesh.xyz[24*3+1],10,"second nonuniform knot Y");
+            // Repeated degree-2 interior knot (C0) is also explicitly
+            // sampled and does not get smoothed over in the wireframe.
+            int kink=37+24;
+            assertCurveNear(mesh.xyz[kink*3],2,"repeated knot X");
+            assertCurveNear(mesh.xyz[kink*3+1],0,"repeated knot Y");
+            if(mesh.sourceLines[kink]!=-1)
+                throw new AssertionError("knot-aware tessellation is not directly editable");
+
+            // Multiplicity degree+1 inside a spline is discontinuous and
+            // requires separate subpaths, which this reader cannot represent.
+            // Reject it rather than silently draw an invented connecting edge.
+            String discontinuous="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n0\n71\n1\n72\n6\n73\n4\n"+
+                "40\n0\n40\n0\n40\n0.5\n40\n0.5\n40\n1\n40\n1\n"+
+                "10\n0\n20\n0\n10\n1\n20\n0\n"+
+                "10\n5\n20\n0\n10\n6\n20\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),discontinuous,StandardCharsets.UTF_8);
+            boolean rejected=false;
+            try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){rejected=true;}
+            if(!rejected)throw new AssertionError("discontinuous SPLINE must fail closed");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
