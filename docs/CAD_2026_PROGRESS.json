@@ -123,12 +123,20 @@
       "commit": "fcf615d50412a37dc6bf5e8ffaef352c07663dcb",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD regression run 38706786138 PASS: 3DFACE group-70 hidden edges, triangle 4=3 semantics, quad internal diagonal omitted from wireframe, edited XYZ/edge visibility survives DXF save/reopen, invalid flags fail closed. Full Android, native DWG and physical device acceptance remain separate."
+    },
+    {
+      "id": "three_d_circle_arc_ocs_wireframe",
+      "points": 1,
+      "status": "implemented",
+      "commit": "4e0e6116c48c9768b616cd3fc9f1fc5d8cc933f7",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression 38707436249 PASS: DXF CIRCLE and ARC 3D sampled wire paths with OCS normals, translated/rotated INSERT, angle wrap, read-only generated vertices, malformed radii/normals rejection. 3D UI warns tessellation is approximate; reopened DXF curve count is checked. This tests DWG-derived DXF visualization, NOT AC1032 independent DWG geometric parity or exact arc measurement. Android/full modern DWG and device acceptance remain pending."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 6,
+      "points": 5,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
