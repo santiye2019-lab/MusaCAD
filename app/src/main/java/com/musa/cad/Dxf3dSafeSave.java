@@ -18,9 +18,14 @@ public final class Dxf3dSafeSave {
     private Dxf3dSafeSave(){}
 
     /** Caller owns the staged cache file and must delete it in a finally block. */
-    public static File stage(File source,Dxf3dMesh edited,float[] original,File cacheDir)throws IOException{
-        if(source==null||!source.isFile()||edited==null||original==null||cacheDir==null)
+    public static File stage(File source,Dxf3dMesh edited,float[] original,File cacheDir,
+            CadSaveSourceIntegrity openedSource)throws IOException{
+        if(source==null||!source.isFile()||edited==null||original==null||cacheDir==null||openedSource==null)
             throw new IOException("3B kaynak dosyası veya geçici kayıt alanı bulunamadı");
+        // Refuse a source changed any time after the 3D Activity opened it,
+        // including layer names, XREF paths and other unrendered DXF data.
+        // A geometry-only preflight cannot detect those modifications.
+        openedSource.requireUnchanged(source);
         // Verify the original CAD bytes, not only size and mtime.
         // A concurrent same-length edit must never produce a valid-looking
         // export based on a different source drawing.
@@ -40,6 +45,7 @@ public final class Dxf3dSafeSave {
             current.skippedBlockReferences!=edited.skippedBlockReferences)
             throw new IOException("3B kaynak çizim açıldıktan sonra değişmiş; yeniden açmadan kayıt yapılamaz");
         baseline.requireUnchanged(source);
+        openedSource.requireUnchanged(source);
         File staged=File.createTempFile("musacad-3d-", ".dxf", cacheDir);
         boolean ready=false;
         try{
@@ -62,6 +68,7 @@ public final class Dxf3dSafeSave {
             // changed the source during the work, never return this stage for
             // publish to a SAF destination. Failure cleanup runs in finally.
             baseline.requireUnchanged(source);
+            openedSource.requireUnchanged(source);
             ready=true;
             return staged;
         }finally{
