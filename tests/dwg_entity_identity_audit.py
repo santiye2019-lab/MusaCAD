@@ -13,14 +13,20 @@ from dwg_dxf_semantic_parity import _normalized
 import re
 
 # Limited geometry comparison for independently supplied ORIGINAL DWG data.
-# Not full CAD fidelity: excludes elevations, colors, thickness, XREF, ACIS,
-# block transforms and viewport appearance beyond the fields listed below.
+# Covered XYZ and 3DFACE vertices are compared, but this is not full CAD fidelity:
+# excluded are thickness, XREF, ACIS, block transforms, true rendering, and
+# viewport appearance beyond the fields listed below.
 _CORE_GEOMETRY = {
     "LINE": ((10, 20, 11, 21), {30: "0", 31: "0"}),
     "POINT": ((10, 20), {30: "0", 210: "0", 220: "0", 230: "1"}),
     "CIRCLE": ((10, 20, 40), {30: "0", 210: "0", 220: "0", 230: "1"}),
     "ARC": ((10, 20, 40, 50, 51),
             {30: "0", 210: "0", 220: "0", 230: "1"}),
+    # 3DFACE: first three WCS vertices required; Z defaults to zero.
+    # Fourth corner is optional and then exactly repeats the third corner.
+    # Group 70 contains independent edge-visibility bits 1/2/4/8.
+    "3DFACE": ((10, 20, 11, 21, 12, 22),
+               {30: "0", 31: "0", 32: "0", 70: "0"}),
 }
 
 _HEX_HANDLE = re.compile(r"[0-9A-Fa-f]{1,32}\Z")
@@ -77,6 +83,8 @@ class DwgEntityIdentityAudit:
             raise ValueError("unsupported independent geometry type")
         mandatory, defaults = spec
         allowed = set(mandatory) | set(defaults)
+        if kind == "3DFACE":
+            allowed.update((13, 23, 33))
         if reference:
             if not isinstance(groups, dict) or len(groups) > len(allowed):
                 raise ValueError("invalid reference geometry field mapping")
@@ -97,12 +105,25 @@ class DwgEntityIdentityAudit:
             fields[code] = value
         if any(code not in fields for code in mandatory):
             raise ValueError("incomplete primitive geometry")
+        if kind == "3DFACE":
+            # No fourth corner denotes a triangle: 4th vertex = 3rd.
+            # A standalone Z or a partially specified XY corner cannot
+            # safely define the fourth vertex and must fail closed.
+            if (13 in fields) != (23 in fields) or (33 in fields and 13 not in fields):
+                raise ValueError("partial 3DFACE fourth corner")
+            if 13 not in fields:
+                fields[13], fields[23] = fields[12], fields[22]
+                fields[33] = fields.get(32, "0")
+            else:
+                fields.setdefault(33, "0")
         canonical = []
         for code in sorted(allowed):
             raw = fields.get(code, defaults.get(code))
             value = _normalized(code, raw)
             if code == 40 and Decimal(value) <= 0:
                 raise ValueError("nonpositive primitive radius")
+            if kind == "3DFACE" and code == 70 and not 0 <= int(value) <= 15:
+                raise ValueError("invalid 3DFACE invisible edge bits")
             canonical.append((code, value))
         return tuple(canonical)
 
@@ -342,8 +363,9 @@ class DwgEntityIdentityAudit:
             "independent_geometry_parameter_mismatches": drift,
             "independent_geometry_invalid_decoded": self.invalid_core_geometry,
             "independent_geometry_scope": (
-                "LINE endpoints, POINT position/normal, CIRCLE/ARC center/radius/"
-                "angles/normal only. No tolerance, full DWG geometry, color, "
+                "LINE XYZ endpoints, POINT position/normal, CIRCLE/ARC center/"
+                "radius/angles/normal, 3DFACE XYZ corners and invisible-edge "
+                "flags only. Exact numeric values; no full DWG geometry, color, "
                 "XREF, block transforms, 3DSOLID, or rendering assurance."
             ),
         }
