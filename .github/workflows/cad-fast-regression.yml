@@ -8,6 +8,7 @@ on:
       - 'app/src/main/cpp/**'
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
+      - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
       - '.github/workflows/cad-fast-regression.yml'
   workflow_dispatch:
 
@@ -51,10 +52,12 @@ jobs:
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveTest
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/Dxf3dSafeSaveIntegrationContractTest.java
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveIntegrationContractTest
-      - name: CAD progress and source safety regressions
+      - name: CAD progress and AutoCAD 2026 parity claims audit
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
+          python3 -m unittest discover -s tests -p 'test_autocad_2026_parity_gate.py' -v
+          python3 tests/autocad_2026_parity_gate.py
           cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_color_test.c -o /tmp/musa-fast-native-color
           /tmp/musa-fast-native-color
           cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/scene_coord_safety_test.c -lm -o /tmp/musa-fast-scene-safety
