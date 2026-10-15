@@ -605,7 +605,7 @@ public class MainActivity extends AppCompatActivity {
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
         AlertDialog dialog=new AlertDialog.Builder(this)
             .setTitle("OFFSET • Paralel kopya")
-            .setMessage("Çizgi, daire ve dikdörtgen desteklenir. Negatif değer karşı yön / iç tarafa ofset uygular.")
+            .setMessage("Çizgi, daire, yay (ARC) ve dikdörtgen desteklenir. Negatif değer karşı yön / iç tarafa ofset uygular.")
             .setView(input)
             .setPositiveButton("UYGULA",null)
             .setNegativeButton("İPTAL",null)
@@ -3867,7 +3867,7 @@ public class MainActivity extends AppCompatActivity {
             "E / ERASE / DELETE • Sil\n"+
             "SC / SCALE • Seçili nesneyi ölçekle\n"+
             "MI / MIRROR • Seçili nesneyi aynala\n"+
-            "O / OFFSET • Çizgi/daire/dikdörtgen ofseti\n"+
+            "O / OFFSET • Çizgi/daire/yay/dikdörtgen ofseti\n"+
             "AR / ARRAY • Dikdörtgen dizi\n"+
             "X / EXPLODE • Çoklu çizgi/dikdörtgeni parçala\n"+
             "OS / OSNAP • Nesne yakalamayı aç/kapat\n"+
