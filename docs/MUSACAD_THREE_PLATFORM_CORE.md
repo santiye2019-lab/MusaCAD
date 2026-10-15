@@ -26,6 +26,19 @@ Path: `core/native/`
   This is color evaluation, not yet a general multi-platform 2D renderer.
 - The previous Android native include is now just a forwarding compatibility
   header for existing native regressions.
+- Native DWG INSERT/MINSERT's 2D WCS affine composition now delegates to
+  `core/native/include/musacad_affine.h` (identity, composition, mapping,
+  checked inverse). The same C11 header is compiled by host tests; it is
+  **not** a full 3D UCS kernel or multi-platform scene UI.
+- Native DWG LWPOLYLINE/HATCH bulge-to-arc construction delegates to
+  `core/native/include/musacad_bulge.h`. It keeps signed CW/CCW curvature,
+  the existing Android OCS transform and safe line fallback for invalid
+  arc geometry; shared unit tests cover both branches, translated coordinates,
+  degenerate/NaN/overflow inputs, and source-safe failure.
+- The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
+  bulge unit sources; it does **not** run them on a phone or constitute
+  Windows/iOS app delivery.
+
 - Core has no JNI, Android UI, Apple SDK, Win32, or LibreDWG headers. Native
   DWG I/O remains an **adapter** using pinned LibreDWG, with its own binary
   format support and licensing requirements.
