@@ -7,6 +7,8 @@ on:
       - 'app/src/main/cpp/dwg_source_snapshot.h'
       - 'tests/dwg_source_snapshot_test.c'
       - 'app/src/main/cpp/native_scene.c'
+      - 'app/src/main/cpp/native_color.h'
+      - 'core/native/**'
       - 'app/src/main/cpp/native_nurbs.h'
       - 'tests/native_nurbs_test.c'
       - 'tests/native_fit_spline_test.c'
