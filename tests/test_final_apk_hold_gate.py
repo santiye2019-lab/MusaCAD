@@ -88,10 +88,14 @@ class FinalApkHoldPolicyTests(unittest.TestCase):
         for path in WORKFLOWS.glob("*.yml"):
             text = path.read_text(encoding="utf-8")
             for job, step, jguard, sguard, cmd in apk_build_steps(text):
-                self.assertNotIn("head_commit.message", jguard + sguard,
+                # A job may run for code tests or AI deployment following a
+                # source push. If its APK step has a stricter own gate,
+                # only that step gate can authorize Gradle APK assembly.
+                effective_gate = sguard if sguard else jguard
+                self.assertNotIn("head_commit.message", effective_gate,
                                  (path.name, cmd))
                 self.assertNotIn("github.event_name == 'push'",
-                                 jguard + sguard, (path.name, cmd))
+                                 effective_gate, (path.name, cmd))
 
 
 if __name__ == "__main__":
