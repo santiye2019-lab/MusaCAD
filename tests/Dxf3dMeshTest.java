@@ -175,7 +175,7 @@ public final class Dxf3dMeshTest {
                 Dxf3dEditor.write(file,output,mesh,opened);
                 Files.write(saved.toPath(),output.toByteArray());
                 String written=output.toString(StandardCharsets.UTF_8);
-                if(!written.contains("12\n0\n22\n3\n32\n2\n"))
+                if(!written.contains("12\n0\n22\n3\n32\n2.0\n"))
                     throw new AssertionError(type+" third DXF source corner was not preserved");
                 Dxf3dMesh reopened=Dxf3dMesh.read(saved);
                 if(reopened.xyz[8]!=2f||
