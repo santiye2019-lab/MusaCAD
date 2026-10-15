@@ -147,6 +147,12 @@ public final class Mesh3dActivity extends Activity {
         text.append(mesh.triangles.length/3).append(" üçgen  •  ")
             .append(mesh.edges.length/2).append(" kenar  •  ")
             .append(mesh.xyz.length/3).append(" köşe");
+        if(mesh.skippedBlockReferences>0){
+            text.append("\nUYARI: ")
+                .append(mesh.skippedBlockReferences)
+                .append(" blok başvurusu açılamadı (eksik XREF/blok, geçersiz dönüşüm veya çevrim). ")
+                .append("3B görünüm ve ölçümler eksiktir; tüm proje için tam metraj/uygunluk kanıtı değildir.");
+        }
         if(openingSurfaceMetrics!=null&&openingSurfaceMetrics.triangleCount>0){
             text.append("\nAçılışta okunan üçgen yüzey alanı: ")
                 .append(String.format(java.util.Locale.getDefault(),"%.3f",openingSurfaceMetrics.area))
@@ -154,8 +160,8 @@ public final class Mesh3dActivity extends Activity {
             if(openingSurfaceMetrics.degenerateCount>0)
                 text.append(" • ").append(openingSurfaceMetrics.degenerateCount)
                     .append(" dejenere üçgen");
-            if(mesh.solidProxy||mesh.unsupportedSolids>0)
-                text.append(" • Eksik/temsili ACIS geometrisi nedeniyle kısmi");
+            if(mesh.solidProxy||mesh.unsupportedSolids>0||mesh.skippedBlockReferences>0)
+                text.append(" • Eksik blok/ACIS geometrisi nedeniyle kısmi");
         }
         if(openingTopology!=null&&openingTopology.triangles>0){
             if(!openingTopology.checked)
@@ -177,8 +183,8 @@ public final class Mesh3dActivity extends Activity {
                         "%.3f",openingSignedVolume.signedVolume))
                 .append(" çizim birimi³ (yalnız ağ hesabı; kesin metraj, ")
                 .append("öz-kesişimsiz B-Rep veya geçerli ACIS katısı garantisi değildir)");
-            if(mesh.acisSolids>0||mesh.unsupportedSolids>0||mesh.solidProxy)
-                text.append(" • ACIS/temsili nesneler bulunduğundan kısmi");
+            if(mesh.acisSolids>0||mesh.unsupportedSolids>0||mesh.solidProxy||mesh.skippedBlockReferences>0)
+                text.append(" • Eksik blok/ACIS geometrisi nedeniyle kısmi");
         }
         if(mesh.flatPlan){
             text.append("\n2B plan algılandı: Z aralığı ")
