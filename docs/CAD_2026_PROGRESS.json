@@ -179,12 +179,20 @@
       "commit": "9071a6dcd0806d3b7caa621cd63b5bdc498d637a",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD run 38733845233 PASS: bounded degree-1 line and degree-3 chord-parametric Hermite preview through DXF fit points, 3D rotated INSERT, read-only samples, invalid fit counts/duplicate points/tangents/unsupported degrees rejected, and staged DXF independent LINE edit preserves original fit records and reopens sampled geometry. This is not exact originating CAD fit spline reconstruction, fully editable spline control, independent original DWG parity, or modern binary DWG writing; Android and physical device acceptance separate."
+    },
+    {
+      "id": "independent_spline_knot_weight_definition_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "d12c87549c6f71edfe14eac1b7ae7bc56584a206",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD regression run 38734949132 PASS: independently supplied original-DWG source manifest has ordered SPLINE knot, degree, weight, control/fit XYZ and parameter subset; detects exact source-vs-DXF definition drift, rejects malformed/negative/nonmonotone knot and weight records, and validates private-manifest integration with count-only redaction. Real original-DWG baselines are NOT supplied; 3D curve rendering, AC1032 native writing and device acceptance are separately unverified."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 5,
+      "points": 4,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
