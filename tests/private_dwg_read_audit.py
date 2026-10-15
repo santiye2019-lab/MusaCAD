@@ -18,6 +18,7 @@ from native_preview_type_audit import audit_types
 from dwg_entity_identity_audit import DwgEntityIdentityAudit
 from dwg_layer_table_audit import DwgLayerTableAudit
 from dwg_block_reference_audit import DwgBlockReferenceAudit
+from dwg_layout_viewport_audit import DwgLayoutViewportAudit
 import hashlib
 import json
 import os
@@ -62,7 +63,8 @@ def dxf_pairs(path: Path, encoding="utf-8"):
 
 
 def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8",
-                  layer_collector=None, block_collector=None):
+                  layer_collector=None, block_collector=None,
+                  layout_collector=None):
     section = ""
     current = None
     fields = []
@@ -90,6 +92,8 @@ def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8",
         identity.observe(section,current,fields)
         if block_collector is not None:
             block_collector.observe(section,current,fields)
+        if layout_collector is not None:
+            layout_collector.observe(section,current,fields)
         is_drawable_entity = (
             section in ("ENTITIES", "BLOCKS") and
             current not in ("SECTION", "ENDSEC", "EOF", "BLOCK",
@@ -198,7 +202,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                 limit_mb: int, independent_reference=None,
                 independent_geometry=None, independent_style=None,
                 independent_layers=None, independent_blocks=None,
-                independent_inserts=None):
+                independent_inserts=None, independent_layouts=None,
+                independent_viewports=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -333,15 +338,21 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
         layer_audit = DwgLayerTableAudit() if independent_layers is not None else None
         block_audit = (DwgBlockReferenceAudit()
                        if independent_blocks is not None else None)
+        layout_audit = (DwgLayoutViewportAudit()
+                        if independent_layouts is not None else None)
         result.update(inventory_dxf(output, identity_collector=identity,
                                     text_encoding=output_encoding,
                                     layer_collector=layer_audit,
-                                    block_collector=block_audit))
+                                    block_collector=block_audit,
+                                    layout_collector=layout_audit))
         if layer_audit is not None:
             result.update(layer_audit.compare_independent(independent_layers))
         if block_audit is not None:
             result.update(block_audit.compare_independent(
                 independent_blocks, independent_inserts))
+        if layout_audit is not None:
+            result.update(layout_audit.compare_independent(
+                independent_layouts, independent_viewports))
         if independent_reference is not None:
             # Compares decoded handles/types/layers with a separately provided
             # source-DWG inventory. Raw per-object identifiers remain local.
@@ -373,11 +384,14 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory_layer_table_mismatch"
         if result.get("independent_block_reference_result") == "block_reference_metadata_mismatch":
             result["status"] = "decoded_dxf_inventory_block_reference_mismatch"
+        if result.get("independent_layout_viewport_result") == "layout_viewport_metadata_mismatch":
+            result["status"] = "decoded_dxf_inventory_layout_viewport_mismatch"
         if (result["legacy_dxf_encoding_fallback"] and
                 any(value is not None for value in (
                     independent_reference, independent_geometry,
                     independent_style, independent_layers,
-                    independent_blocks, independent_inserts))):
+                    independent_blocks, independent_inserts,
+                    independent_layouts, independent_viewports))):
             # The mapping is an assumption without source codepage evidence,
             # therefore even equal decoded metadata cannot certify parity.
             result["status"] = "decoded_dxf_inventory_encoding_unverified"
@@ -445,6 +459,8 @@ def main() -> int:
             external_layers = None
             external_blocks = None
             external_inserts = None
+            external_layouts = None
+            external_viewports = None
             if args.independent_manifest_dir:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
@@ -479,6 +495,12 @@ def main() -> int:
                             raise ValueError("both BLOCK and INSERT inventories are required")
                         external_blocks = reference["block_records"]
                         external_inserts = reference["insert_records"]
+                    if "layout_records" in reference or "viewport_records" in reference:
+                        if (not isinstance(reference.get("layout_records"), list)
+                                or not isinstance(reference.get("viewport_records"), list)):
+                            raise ValueError("both LAYOUT and VIEWPORT inventories required")
+                        external_layouts = reference["layout_records"]
+                        external_viewports = reference["viewport_records"]
                 except (ValueError, OSError, UnicodeError):
                     row["status"] = "invalid_independent_manifest"
                     failure = True
@@ -494,6 +516,9 @@ def main() -> int:
                     if external_blocks is not None:
                         optional_checks["independent_blocks"] = external_blocks
                         optional_checks["independent_inserts"] = external_inserts
+                    if external_layouts is not None:
+                        optional_checks["independent_layouts"] = external_layouts
+                        optional_checks["independent_viewports"] = external_viewports
                     row.update(convert_one(source, converter, Path(tmp),
                                            args.timeout_sec, args.max_vmem_mb,
                                            external_entities, **optional_checks))
