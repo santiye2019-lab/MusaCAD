@@ -48,6 +48,15 @@ The LWPOLYLINE subset includes declared vertex counts, open/closed flag,
 elevation, thickness, constant/vertex widths, signed per-vertex bulges,
 optional vertex IDs and OCS normals. A swapped bulge can change the curve
 without changing endpoints; the audit checks the original ordered values.
+Legacy **POLYLINE** header and **VERTEX** entities are additionally checked
+by their original DWG *entity handles*: each reference's `groups` is an
+ordinary numeric group-code map. POLYLINE checks header flags, elevation,
+widths, mesh settings and normal. VERTEX checks XYZ, widths, signed bulge,
+tangent, flags and signed polyface indices (negative indices encode hidden
+edges). A missing or changed vertex record must fail the subset comparison.
+**This is per-record parity only:** the sequence of VERTEX children under a
+POLYLINE parent, the terminating SEQEND and complete polyface topology are
+NOT yet independently verified. Do not present this as full mesh validation.
 ELLIPSE references instead use the ordinary numeric group mapping, e.g.
 `{"10":"1","20":"2","11":"4","21":"0","40":"0.5","41":"0","42":"1.5707963267948966"}`.
 Missing start/end parameters are deliberately rejected rather than guessed;
@@ -63,7 +72,9 @@ explicit start/end parameters in **radians**, and plane normal; also
 **3DFACE** XYZ corners plus group 70 invisible-edge bits, and the
 numeric **SPLINE parameter subset** (degree, flags, ordered knot vector,
 control/fit XYZ, rational weights and declared counts), plus **LWPOLYLINE**
-ordered vertices, signed bulges, widths and OCS/elevation. This catches source
+ordered vertices, signed bulges, widths and OCS/elevation, plus
+per-handle legacy POLYLINE header and VERTEX parameters including signed
+polyface face indices. This catches source
 curve-definition drift even when entity counts and overall extents match;
 it does **not** evaluate curve shape, certify fit-only reconstruction, or prove
 real-DWG parity without an independently obtained source manifest. Absent fourth
