@@ -161,7 +161,7 @@ public final class Dxf3dMesh {
         }
 
         private void addSource(DxfBlocks.Placement p,int slot){
-            boolean editable=p.directRoot&&p.transform.isIdentity();
+            boolean editable=p.directRoot&&p.transform.isIdentity()&&p.height.isIdentity();
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
@@ -172,7 +172,7 @@ public final class Dxf3dMesh {
         for(int i=0;i+2<mesh.xyz.length;i+=3){
             if(c.points.n/3>=MAX_VERTICES)throw new IOException("ACIS 3B köşe sayısı sınırı aşıldı");
             double[] xy=p.transform.point(mesh.xyz[i],mesh.xyz[i+1]);
-            double z=mesh.xyz[i+2];
+            double z=p.height.point(mesh.xyz[i+2]);
             if(!Double.isFinite(xy[0])||!Double.isFinite(xy[1])||!Double.isFinite(z)||
                 Math.abs(xy[0])>1e9||Math.abs(xy[1])>1e9||Math.abs(z)>1e9)
                 throw new IOException("ACIS 3B koordinat sınırı aşıldı");
@@ -246,8 +246,8 @@ public final class Dxf3dMesh {
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
         DxfBlocks.Record r=p.record;
         double[] xy=p.transform.point(r.number(x,0),r.number(y,0));
-        double c=r.number(z,0),a=xy[0],b=xy[1];
-        if(Math.abs(a)>1e9||Math.abs(b)>1e9||Math.abs(c)>1e9)throw new IOException("3B koordinat sınırı aşıldı");
+        double c=p.height.point(r.number(z,0)),a=xy[0],b=xy[1];
+        if(!Double.isFinite(a)||!Double.isFinite(b)||!Double.isFinite(c)||Math.abs(a)>1e9||Math.abs(b)>1e9||Math.abs(c)>1e9)throw new IOException("3B koordinat sınırı aşıldı");
         out.add((float)a);out.add((float)b);out.add((float)c);
     }
 
