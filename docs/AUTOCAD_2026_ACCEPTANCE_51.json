@@ -1,0 +1,3283 @@
+{
+  "schema_version": 1,
+  "product": "AutoCAD 2026",
+  "notice": "51 capability families are a preliminary coverage audit, NOT exhaustive command/option tests and NOT certified parity.",
+  "evidence_scope": "Committed redacted machine-readable artifacts with SHA-256 checksums; private original DWG files MUST NOT be placed in this public repository.",
+  "independent_approval_policy": "An approval requires complete per-family scenario coverage, real AutoCAD 2026 and MusaCAD same-input comparison, independent DWG read/reopen, three platform runs, successful CI and an independently reviewed evidence package. Any missing/failed gate is not an approval.",
+  "required_gates": [
+    "autocad_2026_reference",
+    "musacad_same_input",
+    "semantic_comparison",
+    "independent_dwg_roundtrip",
+    "android_physical",
+    "windows_desktop",
+    "ios_physical",
+    "continuous_integration"
+  ],
+  "cases": [
+    {
+      "id": "file_01",
+      "area": "file",
+      "capability": "DWG binary read AC1015/AC1032+",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Compare independent AutoCAD 2026 entity, layer, layout, block and solid preservation across versions",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_01-baseline-01",
+          "procedure": "Compare independent AutoCAD 2026 entity, layer, layout, block and solid preservation across versions",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "file_02",
+      "area": "file",
+      "capability": "Lossless modern DWG Save As / reopen",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Native modern DWG write; independent AutoCAD open, edit, save, object-level and byte-safe roundtrip",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_02-baseline-01",
+          "procedure": "Native modern DWG write; independent AutoCAD open, edit, save, object-level and byte-safe roundtrip",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "file_03",
+      "area": "file",
+      "capability": "DXF read / drawing import",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All supported DXF versions, objects, attributes, text and geometry independently compare",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_03-baseline-01",
+          "procedure": "All supported DXF versions, objects, attributes, text and geometry independently compare",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "file_04",
+      "area": "file",
+      "capability": "Editable DXF save / reopen",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Full entity mutation and source preservation across independent AutoCAD reopen",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_04-baseline-01",
+          "procedure": "Full entity mutation and source preservation across independent AutoCAD reopen",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "file_05",
+      "area": "file",
+      "capability": "Complete drawing metadata / ownership preservation",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Handles, reactors, dictionaries, groups, xdata, proxy and version metadata roundtrip",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_05-baseline-01",
+          "procedure": "Handles, reactors, dictionaries, groups, xdata, proxy and version metadata roundtrip",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "file_06",
+      "area": "file",
+      "capability": "DWG recovery, audit and drawing repair",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Run equivalent RECOVER/AUDIT and verify repaired DWG with Autodesk",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "file_06-baseline-01",
+          "procedure": "Run equivalent RECOVER/AUDIT and verify repaired DWG with Autodesk",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_07",
+      "area": "draw",
+      "capability": "2D LINE / PLINE / CIRCLE / ARC primitives",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-61E4FFAA-8D30-4D10-9DC6-C1D47B29187B.htm",
+      "reference_equivalence_test": "Create and modify each geometry variant with same coordinate precision",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_07-baseline-01",
+          "procedure": "Create and modify each geometry variant with same coordinate precision",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_08",
+      "area": "draw",
+      "capability": "ELLIPSE / SPLINE / HELIX and curved objects",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-61E4FFAA-8D30-4D10-9DC6-C1D47B29187B.htm",
+      "reference_equivalence_test": "All creation/edit options and exact fitted geometry, not sampled read-only wires",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_08-baseline-01",
+          "procedure": "All creation/edit options and exact fitted geometry, not sampled read-only wires",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_09",
+      "area": "draw",
+      "capability": "HATCH / boundary / gradients / associative patterns",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Reference hatch patterns, islands, associative edits and save/reopen",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_09-baseline-01",
+          "procedure": "Reference hatch patterns, islands, associative edits and save/reopen",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_10",
+      "area": "draw",
+      "capability": "TRIM / EXTEND / BREAK / FILLET / CHAMFER",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-8166C151-3B88-49D2-B7A3-1B7CFCC4E3FD.htm",
+      "reference_equivalence_test": "Multiple intersecting cases, all modes, source edit and independent parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_10-baseline-01",
+          "procedure": "Multiple intersecting cases, all modes, source edit and independent parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_11",
+      "area": "draw",
+      "capability": "OFFSET / ARRAY / MIRROR / STRETCH / PEDIT",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-8166C151-3B88-49D2-B7A3-1B7CFCC4E3FD.htm",
+      "reference_equivalence_test": "All object types, control points, constraints, preview and undo semantics",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_11-baseline-01",
+          "procedure": "All object types, control points, constraints, preview and undo semantics",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_12",
+      "area": "draw",
+      "capability": "Grip editing, multi-select and properties",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-8166C151-3B88-49D2-B7A3-1B7CFCC4E3FD.htm",
+      "reference_equivalence_test": "Multi-entity grip subobject editing, coordinate exactness and UI workflow",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_12-baseline-01",
+          "procedure": "Multi-entity grip subobject editing, coordinate exactness and UI workflow",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_13",
+      "area": "draw",
+      "capability": "Object snaps, object tracking, grid, ortho and polar",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All OSNAP modes, tracking/ortho/polar combinations and 3D OSNAP",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_13-baseline-01",
+          "procedure": "All OSNAP modes, tracking/ortho/polar combinations and 3D OSNAP",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "draw_14",
+      "area": "draw",
+      "capability": "Parametric geometric and dimensional constraints",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Constrained sketches solve and preserve same degrees of freedom",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "draw_14-baseline-01",
+          "procedure": "Constrained sketches solve and preserve same degrees of freedom",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "annotation_15",
+      "area": "annotation",
+      "capability": "TEXT/MTEXT formatting and SHX fonts",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Paragraph controls, SHX/TTF fidelity, symbols, font paths, save/reopen",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "annotation_15-baseline-01",
+          "procedure": "Paragraph controls, SHX/TTF fidelity, symbols, font paths, save/reopen",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "annotation_16",
+      "area": "annotation",
+      "capability": "Associative dimensions and DIMSTYLE",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All dimension types, overrides, associativity, editing and annotation scales",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "annotation_16-baseline-01",
+          "procedure": "All dimension types, overrides, associativity, editing and annotation scales",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "annotation_17",
+      "area": "annotation",
+      "capability": "LEADER / MLEADER / annotation scales",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Multileader styles, grips, content blocks and annotative scales parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "annotation_17-baseline-01",
+          "procedure": "Multileader styles, grips, content blocks and annotative scales parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "annotation_18",
+      "area": "annotation",
+      "capability": "TABLE, FIELD, spreadsheet and data extraction",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Editable table objects, formula fields, extraction/data link roundtrip",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "annotation_18-baseline-01",
+          "procedure": "Editable table objects, formula fields, extraction/data link roundtrip",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "annotation_19",
+      "area": "annotation",
+      "capability": "Revision clouds and drawing markups",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "REVCLOUD editing, trace/markup import and threaded review workflows",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "annotation_19-baseline-01",
+          "procedure": "REVCLOUD editing, trace/markup import and threaded review workflows",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "blocks_20",
+      "area": "blocks",
+      "capability": "BLOCK/INSERT nested transforms, attributes",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Roundtrip all nested block attributes, inheritance, clipping and instances",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "blocks_20-baseline-01",
+          "procedure": "Roundtrip all nested block attributes, inheritance, clipping and instances",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "blocks_21",
+      "area": "blocks",
+      "capability": "Dynamic blocks, constraints and visibility states",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Create/edit/read/write dynamic block definitions/actions and test in AutoCAD",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "blocks_21-baseline-01",
+          "procedure": "Create/edit/read/write dynamic block definitions/actions and test in AutoCAD",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "blocks_22",
+      "area": "blocks",
+      "capability": "Smart Blocks detect, place and replace (2026)",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Official 2026 Smart Blocks creation/recognition and replacement reference tests",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "blocks_22-baseline-01",
+          "procedure": "Official 2026 Smart Blocks creation/recognition and replacement reference tests",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "blocks_23",
+      "area": "blocks",
+      "capability": "XREF attach/reload/bind/overlay/paths",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "File-based nested XREFs, external assets, cycles, state and property retention",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "blocks_23-baseline-01",
+          "procedure": "File-based nested XREFs, external assets, cycles, state and property retention",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "documents_24",
+      "area": "documents",
+      "capability": "Model/paper space layouts and viewports",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All viewport properties, clipping, layer freeze and annotation/scale behavior",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "documents_24-baseline-01",
+          "procedure": "All viewport properties, clipping, layer freeze and annotation/scale behavior",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "documents_25",
+      "area": "documents",
+      "capability": "PLOT/print, PDF/A0–A4 to scale",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Print parity for vectors, fonts, lineweights, colors and physical printer",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "documents_25-baseline-01",
+          "procedure": "Print parity for vectors, fonts, lineweights, colors and physical printer",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "documents_26",
+      "area": "documents",
+      "capability": "Sheet Set Manager and batch publish",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Open, edit, publish and reconcile complete sheet sets",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "documents_26-baseline-01",
+          "procedure": "Open, edit, publish and reconcile complete sheet sets",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "documents_27",
+      "area": "documents",
+      "capability": "PDFIMPORT (PDF -> CAD entities)",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Reference PDF text, hatches, raster and vector conversion as editable entities",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "documents_27-baseline-01",
+          "procedure": "Reference PDF text, hatches, raster and vector conversion as editable entities",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "documents_28",
+      "area": "documents",
+      "capability": "Raster image attach, underlays and clipping",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Raster / PDF / DGN underlays, paths, clipping, transparency and reprojection",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "documents_28-baseline-01",
+          "procedure": "Raster / PDF / DGN underlays, paths, clipping, transparency and reprojection",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_29",
+      "area": "3d",
+      "capability": "3D orbit, UCS and object visualization",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All UCS modes, arbitrary 3D views, hidden line and crosshair behavior",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_29-baseline-01",
+          "procedure": "All UCS modes, arbitrary 3D views, hidden line and crosshair behavior",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_30",
+      "area": "3d",
+      "capability": "B-Rep/ACIS SAT/SAB read and preserve",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm",
+      "reference_equivalence_test": "Exact solid surface/edge topology, SAB from DWG, precision and save/reopen",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_30-baseline-01",
+          "procedure": "Exact solid surface/edge topology, SAB from DWG, precision and save/reopen",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_31",
+      "area": "3d",
+      "capability": "EXTRUDE / REVOLVE / SWEEP / LOFT solids",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm",
+      "reference_equivalence_test": "Exact editable ACIS solid outputs from curves/surfaces, AutoCAD compare",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_31-baseline-01",
+          "procedure": "Exact editable ACIS solid outputs from curves/surfaces, AutoCAD compare",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_32",
+      "area": "3d",
+      "capability": "UNION / SUBTRACT / INTERSECT Boolean solids",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm",
+      "reference_equivalence_test": "Robust B-Rep CSG including tolerances, self-intersections and topology",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_32-baseline-01",
+          "procedure": "Robust B-Rep CSG including tolerances, self-intersections and topology",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_33",
+      "area": "3d",
+      "capability": "SOLIDEDIT face/edge/shell/imprint tools",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm",
+      "reference_equivalence_test": "All SOLIDEDIT operations on valid solids with independent CAD parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_33-baseline-01",
+          "procedure": "All SOLIDEDIT operations on valid solids with independent CAD parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_34",
+      "area": "3d",
+      "capability": "Mesh/surface modeling and conversions",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm",
+      "reference_equivalence_test": "Mesh primitives, smoothing, conversion, editing and constraints",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_34-baseline-01",
+          "procedure": "Mesh primitives, smoothing, conversion, editing and constraints",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_35",
+      "area": "3d",
+      "capability": "3D materials, light, camera and photoreal render",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Materials/UV/cameras/lights/render presets and reference image parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_35-baseline-01",
+          "procedure": "Materials/UV/cameras/lights/render presets and reference image parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "3d_36",
+      "area": "3d",
+      "capability": "3D measurement, volume and mass properties",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Exact B-Rep volume, mass properties and unit precision parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "3d_36-baseline-01",
+          "procedure": "Exact B-Rep volume, mass properties and unit precision parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "automation_37",
+      "area": "automation",
+      "capability": "AutoLISP / Visual LISP compatible programs",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Customization/files/GUID-E69C877D-F84B-4282-807D-E084C931D533.htm",
+      "reference_equivalence_test": "Load and run representative Autodesk 2026 AutoLISP suites, APIs and DCL",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "automation_37-baseline-01",
+          "procedure": "Load and run representative Autodesk 2026 AutoLISP suites, APIs and DCL",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "automation_38",
+      "area": "automation",
+      "capability": "ObjectARX/.NET/VBA plugin interfaces",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Customization/files/GUID-E69C877D-F84B-4282-807D-E084C931D533.htm",
+      "reference_equivalence_test": "API compatibility and independent third-party extension conformance",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "automation_38-baseline-01",
+          "procedure": "API compatibility and independent third-party extension conformance",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "automation_39",
+      "area": "automation",
+      "capability": "Action recorder, scripts, macros and customization",
+      "official_reference": "https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Customization/files/GUID-E69C877D-F84B-4282-807D-E084C931D533.htm",
+      "reference_equivalence_test": "Run parameterized AutoCAD scripts, alias profiles and extensibility workflows",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "automation_39-baseline-01",
+          "procedure": "Run parameterized AutoCAD scripts, alias profiles and extensibility workflows",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "collaboration_40",
+      "area": "collaboration",
+      "capability": "DWG COMPARE and XREF comparison",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Reference object-level diff, compare UI and merge operations",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "collaboration_40-baseline-01",
+          "procedure": "Reference object-level diff, compare UI and merge operations",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "collaboration_41",
+      "area": "collaboration",
+      "capability": "TRACE, markup import/assist and activity insights",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Full 2026 markup, trace sharing and activity history compatibility",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "collaboration_41-baseline-01",
+          "procedure": "Full 2026 markup, trace sharing and activity history compatibility",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "collaboration_42",
+      "area": "collaboration",
+      "capability": "Autodesk Docs/cloud support files/linked files",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Actual Autodesk Docs integration, web/mobile synced reference drawings",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "collaboration_42-baseline-01",
+          "procedure": "Actual Autodesk Docs integration, web/mobile synced reference drawings",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "collaboration_43",
+      "area": "collaboration",
+      "capability": "Autodesk Assistant and in-product insights",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Do not equate bespoke engineering AI with Autodesk Assistant feature parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "collaboration_43-baseline-01",
+          "procedure": "Do not equate bespoke engineering AI with Autodesk Assistant feature parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "geo_44",
+      "area": "geo",
+      "capability": "Geolocation, ArcGIS basemaps, point clouds",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Georeferenced basemap and point-cloud workflows from Autodesk reference",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "geo_44-baseline-01",
+          "procedure": "Georeferenced basemap and point-cloud workflows from Autodesk reference",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_45",
+      "area": "toolsets",
+      "capability": "Architecture toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "All Architecture object types, styles, workflows and templates",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_45-baseline-01",
+          "procedure": "All Architecture object types, styles, workflows and templates",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_46",
+      "area": "toolsets",
+      "capability": "Mechanical toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Mechanical annotations, parts, content and standards",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_46-baseline-01",
+          "procedure": "Mechanical annotations, parts, content and standards",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_47",
+      "area": "toolsets",
+      "capability": "Electrical toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Wire/circuit/symbol/panel/report lifecycle parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_47-baseline-01",
+          "procedure": "Wire/circuit/symbol/panel/report lifecycle parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_48",
+      "area": "toolsets",
+      "capability": "MEP toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Native ducts, pipes, equipment, connectors, schedules and calculations",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_48-baseline-01",
+          "procedure": "Native ducts, pipes, equipment, connectors, schedules and calculations",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_49",
+      "area": "toolsets",
+      "capability": "Plant 3D / P&ID toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "3D piping catalog, isometric, P&ID/data manager and export parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_49-baseline-01",
+          "procedure": "3D piping catalog, isometric, P&ID/data manager and export parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_50",
+      "area": "toolsets",
+      "capability": "Map 3D toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "GIS spatial connections and coordinate transformation parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_50-baseline-01",
+          "procedure": "GIS spatial connections and coordinate transformation parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    },
+    {
+      "id": "toolsets_51",
+      "area": "toolsets",
+      "capability": "Raster Design toolset",
+      "official_reference": "https://www.autodesk.com/tr/products/autocad/features",
+      "reference_equivalence_test": "Raster cleanup, vectorization, coordinate/image functionality parity",
+      "scenario_inventory_complete": false,
+      "scenarios": [
+        {
+          "id": "toolsets_51-baseline-01",
+          "procedure": "Raster cleanup, vectorization, coordinate/image functionality parity",
+          "status": "not_run"
+        }
+      ],
+      "gates": {
+        "autocad_2026_reference": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "musacad_same_input": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "semantic_comparison": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "independent_dwg_roundtrip": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "android_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "windows_desktop": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "ios_physical": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        },
+        "continuous_integration": {
+          "status": "not_run",
+          "artifact": null,
+          "sha256": null
+        }
+      },
+      "review": {
+        "decision": "pending",
+        "independent_reviewer": null,
+        "reviewed_at": null,
+        "attestation_path": null,
+        "attestation_sha256": null
+      }
+    }
+  ]
+}

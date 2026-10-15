@@ -10,6 +10,8 @@ on:
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
+      - 'docs/AUTOCAD_2026_ACCEPTANCE_51.json'
+      - 'docs/autocad2026_evidence/**'
       - 'docs/AUTOCAD_2026_COMMAND_CATALOG.json'
       - '.github/workflows/cad-fast-regression.yml'
   workflow_dispatch:
@@ -113,6 +115,8 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
           python3 -m unittest discover -s tests -p 'test_autocad_2026_parity_gate.py' -v
+          python3 -m unittest discover -s tests -p 'test_autocad_2026_51_acceptance.py' -v
+          python3 tests/autocad_2026_51_acceptance.py
           python3 -m unittest discover -s tests -p 'test_final_apk_hold_gate.py' -v
           python3 tests/autocad_2026_parity_gate.py
           cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_color_test.c -o /tmp/musa-fast-native-color
