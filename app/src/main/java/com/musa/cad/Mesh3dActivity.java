@@ -573,14 +573,13 @@ public final class Mesh3dActivity extends Activity {
         final float[] exportSnapshot=Arrays.copyOf(mesh.xyz,mesh.xyz.length);
         Uri uri=data.getData();String path=getIntent().getStringExtra(EXTRA_DXF);saving=true;
         refresh3dUndoButtons();
-        new Thread(()->{String message;File staged=null;boolean exported=false;
+        new Thread(()->{String message;Dxf3dSafeSave.VerifiedStage staged=null;boolean exported=false;
             try{
                 // Prepare and verify the full DXF before opening Android's potentially truncating URI.
                 staged=Dxf3dSafeSave.stage(path==null?null:new File(path),mesh,original,getCacheDir(),openedSourceIntegrity);
-                try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
-                    if(output==null)throw new java.io.IOException("Dosya açılamadı");
-                    Dxf3dSafeSave.publish(staged,output);
-                }
+                // VerifiedStage checks its SHA-256 before SAF may truncate a URI.
+                Dxf3dSafeSave.publish(staged,
+                    ()->getContentResolver().openOutputStream(uri,"wt"));
                 exported=true;
                 message="3B DXF kopyası kaydedildi";
             }catch(Exception e){message="3B kayıt başarısız: "+e.getMessage();}
