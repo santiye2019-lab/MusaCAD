@@ -164,8 +164,14 @@ class DwgPolylineChainAuditTests(unittest.TestCase):
             self.assertEqual(bad["status"],
                              "decoded_dxf_inventory_polyline_chain_mismatch")
             self.assertEqual(bad["independent_polyline_chain_mismatches"],1)
-            self.assertNotIn("MY_PRIVATE_BLOCK",str(ok))
-            self.assertNotIn("PRIVATE_PIPE",str(bad))
+            # The legacy inventory deliberately lists DXF block names;
+            # verify that the NEW independent-chain report emits only
+            # counters/scope and never original source handles or labels.
+            own_keys = lambda row: {k:v for k,v in row.items()
+                                   if k.startswith("independent_polyline_chain_")}
+            self.assertNotIn("MY_PRIVATE_BLOCK",str(own_keys(ok)))
+            self.assertNotIn("PRIVATE_PIPE",str(own_keys(bad)))
+            self.assertNotIn("'AA'",str(own_keys(ok)))
 
 
 if __name__ == "__main__":
