@@ -85,4 +85,9 @@ jobs:
             -c core/native/tests/core_curve_bounds_test.c \
             -o "$RUNNER_TEMP/musacad-curve-bounds-iphoneos-arm64.o"
           test -s "$RUNNER_TEMP/musacad-curve-bounds-iphoneos-arm64.o"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
+            -c core/native/tests/core_affine3_test.c \
+            -o "$RUNNER_TEMP/musacad-affine3-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-affine3-iphoneos-arm64.o"
           echo "NURBS, affine and bulge sources compiled for iPhoneOS arm64; no signed app/device execution."

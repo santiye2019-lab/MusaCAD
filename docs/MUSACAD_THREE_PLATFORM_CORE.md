@@ -67,6 +67,13 @@ Path: `core/native/`
   plus iPhoneOS arm64 object-only. Android's existing Java output is unchanged
   until an independently tested adapter is selected. This is NOT analytic
   ACIS face area or certified engineering metraj.
+- A new cross-platform `core/native/include/musacad_affine3.h`
+  provides common **3D WCS affine composition, point/vector mapping,
+  mirrored/nonuniform scale handling, inverse transform and orientation
+  determinant**. These are directly tested on Linux/Windows/macOS and
+  syntax-compiled for iPhoneOS arm64. This is reusable 3D BLOCK/UCS math
+  groundwork; the current Android 3D rendering/editing implementation
+  is not replaced, and AutoCAD 2026 3D UCS command parity is NOT claimed.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
