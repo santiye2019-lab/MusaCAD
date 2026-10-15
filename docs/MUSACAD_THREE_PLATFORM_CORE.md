@@ -141,6 +141,18 @@ Path: `core/native/`
   earlier hit. Diagnostic counters collect real BVH node and face checks.
   Full DWG layer/xref resolution, UI object-selection integration and
   platform performance acceptance remain outside this primitive.
+- Multi-instance **WCS AABB coarse rejection** now avoids traversing the
+  indexed mesh BVH for 3D objects that cannot meet the selection ray.
+  `musa_core_mesh_bvh_bounds` exposes the immutable local root box;
+  eight affine-transformed corners yield a conservative world-space
+  box under translation, rotation, mirror, shear and nonuniform scaling.
+  Validity and invertibility of every visible instance is checked before
+  coarse rejection, so corrupt off-screen objects cannot be silently
+  accepted. Diagnostic `bounds_rejected_instances` counters are
+  cross-platform tested using 32 far-away instances, nearest WCS hit,
+  mirrored shear and fail-closed singular transforms. It is still a
+  linear walk over scene instances; a separate scene-level BVH and
+  real-DWG phone benchmarks are future work.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.

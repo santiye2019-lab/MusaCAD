@@ -32,6 +32,8 @@ typedef struct MusaCoreBVHSceneHit {
 typedef struct MusaCoreBVHSceneStats {
     size_t visible_instances,visited_instances;
     size_t visited_nodes,rejected_nodes,exact_triangle_tests;
+    /* Separate WCS whole-object bounds rejected before BVH traversal. */
+    size_t bounds_rejected_instances;
 } MusaCoreBVHSceneStats;
 /*
  * Return 1 hit, 0 miss, -1 invalid input or arithmetic overflow.
