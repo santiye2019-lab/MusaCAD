@@ -187,12 +187,20 @@
       "commit": "d12c87549c6f71edfe14eac1b7ae7bc56584a206",
       "source_path": "tests/dwg_entity_identity_audit.py",
       "verification": "GitHub fast CAD regression run 38734949132 PASS: independently supplied original-DWG source manifest has ordered SPLINE knot, degree, weight, control/fit XYZ and parameter subset; detects exact source-vs-DXF definition drift, rejects malformed/negative/nonmonotone knot and weight records, and validates private-manifest integration with count-only redaction. Real original-DWG baselines are NOT supplied; 3D curve rendering, AC1032 native writing and device acceptance are separately unverified."
+    },
+    {
+      "id": "independent_lwpolyline_vertex_bulge_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "6886c97394dd2008d21d7e846c4045e0cf864a4e",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD run 38735638873 PASS: source-bound LWPOLYLINE ordered DXF vertex XY, signed bulge, elevation, widths, vertex IDs, OCS and flags in independent reference geometry; changes detected with unchanged entity counts, malformed/duplicated records rejected. Source-manifest and private-converter integration synthetic tests; original external DWG parity, binary writer and Android device acceptance not run."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 4,
+      "points": 3,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
