@@ -16,9 +16,14 @@ public final class Cad3dSurfaceMetrics {
     public static final class Result {
         public final double area;
         public final int triangleCount,degenerateCount;
-        private Result(double area,int triangleCount,int degenerateCount){
+        // Triangle-area-weighted surface centroid; NOT the solid's mass center.
+        // Zero-area and empty meshes expose NaN instead of fabricated XYZ.
+        public final double centroidX,centroidY,centroidZ;
+        private Result(double area,int triangleCount,int degenerateCount,
+                       double centroidX,double centroidY,double centroidZ){
             this.area=area;this.triangleCount=triangleCount;
             this.degenerateCount=degenerateCount;
+            this.centroidX=centroidX;this.centroidY=centroidY;this.centroidZ=centroidZ;
         }
     }
 
@@ -27,7 +32,21 @@ public final class Cad3dSurfaceMetrics {
            triangles.length%3!=0)
             throw new IllegalArgumentException("invalid CAD triangle arrays");
         final int vertices=xyz.length/3;
+        // Translate moment calculations near the mesh, so large CAD WCS
+        // coordinates do not dominate much smaller model dimensions.
+        int first=triangles.length>0?triangles[0]:-1;
+        if(first>=vertices||first< -1)
+            throw new IllegalArgumentException("CAD reference vertex out of range");
+        if(first<0&&triangles.length>0)
+            throw new IllegalArgumentException("CAD reference vertex out of range");
+        double ox=first>=0?xyz[3*first]:0d;
+        double oy=first>=0?xyz[3*first+1]:0d;
+        double oz=first>=0?xyz[3*first+2]:0d;
+        if(!Double.isFinite(ox)||!Double.isFinite(oy)||!Double.isFinite(oz))
+            throw new IllegalArgumentException("invalid CAD surface reference");
         double sum=0,correction=0;
+        double momentX=0,momentY=0,momentZ=0;
+        double compX=0,compY=0,compZ=0;
         int degenerate=0;
         for(int i=0;i<triangles.length;i+=3){
             int a=triangles[i],b=triangles[i+1],c=triangles[i+2];
@@ -60,10 +79,30 @@ public final class Cad3dSurfaceMetrics {
             if(Math.abs(sum)>=Math.abs(face))correction+=(sum-next)+face;
             else correction+=(face-next)+sum;
             sum=next;
+            if(face>0d){
+                double localX=(((double)xyz[ax]-ox)+((double)xyz[bx]-ox)+((double)xyz[cx]-ox))/3d;
+                double localY=(((double)xyz[ax+1]-oy)+((double)xyz[bx+1]-oy)+((double)xyz[cx+1]-oy))/3d;
+                double localZ=(((double)xyz[ax+2]-oz)+((double)xyz[bx+2]-oz)+((double)xyz[cx+2]-oz))/3d;
+                double fx=face*localX,fy=face*localY,fz=face*localZ;
+                if(!Double.isFinite(fx)||!Double.isFinite(fy)||!Double.isFinite(fz))
+                    throw new IllegalArgumentException("CAD surface centroid moment overflow");
+                double nextX=momentX+fx,nextY=momentY+fy,nextZ=momentZ+fz;
+                compX+=(Math.abs(momentX)>=Math.abs(fx))?(momentX-nextX)+fx:(fx-nextX)+momentX;
+                compY+=(Math.abs(momentY)>=Math.abs(fy))?(momentY-nextY)+fy:(fy-nextY)+momentY;
+                compZ+=(Math.abs(momentZ)>=Math.abs(fz))?(momentZ-nextZ)+fz:(fz-nextZ)+momentZ;
+                momentX=nextX;momentY=nextY;momentZ=nextZ;
+            }
         }
         double total=sum+correction;
         if(!Double.isFinite(total))
             throw new IllegalArgumentException("CAD surface area overflow");
-        return new Result(total,triangles.length/3,degenerate);
+        if(total==0d)return new Result(0d,triangles.length/3,degenerate,
+                Double.NaN,Double.NaN,Double.NaN);
+        double centerX=ox+(momentX+compX)/total;
+        double centerY=oy+(momentY+compY)/total;
+        double centerZ=oz+(momentZ+compZ)/total;
+        if(!Double.isFinite(centerX)||!Double.isFinite(centerY)||!Double.isFinite(centerZ))
+            throw new IllegalArgumentException("CAD surface centroid overflow");
+        return new Result(total,triangles.length/3,degenerate,centerX,centerY,centerZ);
     }
 }
