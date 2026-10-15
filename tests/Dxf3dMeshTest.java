@@ -32,6 +32,10 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        testLwPolylineBulgeAndSparseVertices();
+        testLwPolylineClosedArcAndNegativeBulge();
+        testTiltedLwPolylineInRotatedBlock();
+        testMalformedLwPolylineFailClosed();
         testCircularAndArcOutlines();
         testTiltedCircularOcsAndNestedInsert();
         testInvalidCurvesFailClosed();
@@ -218,6 +222,116 @@ public final class Dxf3dMeshTest {
                 boolean refused=false;
                 try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
                 if(!refused)throw new AssertionError("invalid CIRCLE/ARC must fail closed");
+            }
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testLwPolylineBulgeAndSparseVertices() throws Exception {
+        File file=File.createTempFile("mesh3d-lw-bulge-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nLWPOLYLINE\n90\n3\n70\n0\n38\n7\n"+
+                "10\n0\n20\n0\n42\n1\n"+
+                "10\n4\n20\n0\n"+
+                "10\n4\n20\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=1||mesh.triangles.length!=0||
+               mesh.xyz.length!=26*3||mesh.edges.length!=25*2)
+                throw new AssertionError("LWPOLYLINE semicircle + line count");
+            assertCurveNear(mesh.xyz[0],0,"LWP first X");
+            assertCurveNear(mesh.xyz[2],7,"LWP elevation");
+            assertCurveNear(mesh.xyz[12*3],2,"LWP semicircle X");
+            assertCurveNear(mesh.xyz[12*3+1],-2,"LWP positive bulge turns below XY chord");
+            assertCurveNear(mesh.xyz[24*3],4,"LWP end of bulge X");
+            assertCurveNear(mesh.xyz[25*3+1],3,"LWP straight end Y");
+            for(int i=0;i<mesh.sourceLines.length;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("LWP visual points must not be directly editable");
+            float[] opened=mesh.xyz.clone();
+            mesh.xyz[12*3+1]+=1;
+            boolean refused=false;
+            try{Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,opened);}
+            catch(java.io.IOException expected){refused=true;}
+            if(!refused)throw new AssertionError("LWP tessellation must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testLwPolylineClosedArcAndNegativeBulge() throws Exception {
+        File file=File.createTempFile("mesh3d-lw-closed-", ".dxf");
+        try{
+            String negative="0\nSECTION\n2\nENTITIES\n"+
+                "0\nLWPOLYLINE\n90\n2\n"+
+                "10\n0\n20\n0\n42\n-1\n10\n4\n20\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),negative,StandardCharsets.UTF_8);
+            Dxf3dMesh mirrored=Dxf3dMesh.read(file);
+            if(mirrored.xyz.length!=25*3||mirrored.edges.length!=24*2||
+               mirrored.approximateCurves!=1)
+                throw new AssertionError("negative bulge must draw a semicircular open arc");
+            assertCurveNear(mirrored.xyz[12*3],2,"negative bulge midpoint X");
+            assertCurveNear(mirrored.xyz[12*3+1],2,"negative bulge midpoint Y");
+
+            String closed="0\nSECTION\n2\nENTITIES\n"+
+                "0\nLWPOLYLINE\n90\n3\n70\n1\n"+
+                "10\n0\n20\n0\n10\n4\n20\n0\n"+
+                "10\n4\n20\n3\n42\n0.4142135623730950\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),closed,StandardCharsets.UTF_8);
+            Dxf3dMesh shape=Dxf3dMesh.read(file);
+            if(shape.approximateCurves!=1||shape.triangles.length!=0||
+               shape.xyz.length!=14*3||shape.edges.length!=14*2)
+                throw new AssertionError("closed LWPOLYLINE must wrap last bulge to first without duplicate vertex");
+            if(shape.edges[shape.edges.length-1]!=0)
+                throw new AssertionError("closed bulge must reconnect original first vertex");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testTiltedLwPolylineInRotatedBlock() throws Exception {
+        File file=File.createTempFile("mesh3d-lw-block-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nLWPIPE\n10\n0\n20\n0\n30\n0\n"+
+                "0\nLWPOLYLINE\n90\n2\n38\n5\n"+
+                "210\n0\n220\n1\n230\n0\n"+
+                "10\n1\n20\n2\n10\n3\n20\n2\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nLWPIPE\n10\n10\n20\n20\n30\n30\n50\n90\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=6||mesh.edges.length!=2||mesh.approximateCurves!=0)
+                throw new AssertionError("straight LWP in tilted OCS and INSERT must render");
+            assertCurveNear(mesh.xyz[0],5,"OCS + rotated INSERT start X");
+            assertCurveNear(mesh.xyz[1],19,"OCS + rotated INSERT start Y");
+            assertCurveNear(mesh.xyz[2],32,"OCS + rotated INSERT start Z");
+            assertCurveNear(mesh.xyz[3],5,"OCS + rotated INSERT end X");
+            assertCurveNear(mesh.xyz[4],17,"OCS + rotated INSERT end Y");
+            assertCurveNear(mesh.xyz[5],32,"OCS + rotated INSERT end Z");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testMalformedLwPolylineFailClosed() throws Exception {
+        File file=File.createTempFile("mesh3d-lw-malformed-", ".dxf");
+        try{
+            String[] records={
+                "90\n3\n10\n0\n20\n0\n10\n4\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n10\n4\n",
+                "90\n2\n10\n0\n42\n1\n20\n0\n10\n4\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n42\n1\n10\n0\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n42\nNaN\n10\n4\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n10\n4\n20\n0\n210\n0\n220\n0\n230\n0\n",
+                "90\n2\n10\n0\n20\n0\n10\n1e308\n20\n0\n",
+                "90\n2\n10\n0\n20\n0\n42\n1e9\n10\n4\n20\n0\n"
+            };
+            for(String groups:records){
+                Files.writeString(file.toPath(),
+                    "0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n"+
+                    groups+"0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+                boolean refused=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+                if(!refused)throw new AssertionError("malformed LWPOLYLINE must be rejected");
             }
         }finally{Files.deleteIfExists(file.toPath());}
     }
