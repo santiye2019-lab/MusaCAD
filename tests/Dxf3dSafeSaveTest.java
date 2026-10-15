@@ -143,6 +143,43 @@ public final class Dxf3dSafeSaveTest {
                     Arrays.equals(mixedAgain.edges,mixed.edges),
                     "save/reopen must retain curve plus editable LINE geometry");
             }finally{mixedStaged.delete();}
+
+            // A LINE coordinate edit must leave the original ELLIPSE axes
+            // and rational SPLINE knots/weights byte-identical. The curved
+            // tessellation is display-only and must reopen to the same XYZ.
+            String ellSpline="0\nSECTION\n2\nENTITIES\n"+
+                "0\nELLIPSE\n10\n1\n20\n2\n30\n3\n"+
+                "11\n4\n21\n0\n31\n0\n40\n0.5\n"+
+                "0\nSPLINE\n70\n4\n71\n2\n72\n6\n73\n3\n"+
+                "40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n"+
+                "41\n1\n41\n0.7071067811865476\n41\n1\n"+
+                "10\n1\n20\n0\n10\n1\n20\n1\n10\n0\n20\n1\n"+
+                "0\nLINE\n10\n0\n20\n1\n30\n2\n11\n2\n21\n1\n31\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(source.toPath(),ellSpline,StandardCharsets.UTF_8);
+            CadSaveSourceIntegrity newSession=CadSaveSourceIntegrity.capture(source);
+            Dxf3dMesh curved=Dxf3dMesh.read(source);
+            yes(curved.approximateCurves==2&&curved.xyz.length==75*3,
+                "ELLIPSE/SPLINE source geometry must be visible");
+            float[] curvedOriginal=curved.xyz.clone();
+            int sourceLine=73;
+            yes(curved.sourceLines[sourceLine]>=0,
+                "editable LINE must follow the read-only ELLIPSE/SPLINE samples");
+            curved.xyz[sourceLine*3+2]=8f;
+            Dxf3dSafeSave.VerifiedStage curvesSaved=
+                Dxf3dSafeSave.stage(source,curved,curvedOriginal,cache,newSession);
+            try{
+                String out=Files.readString(curvesSaved.file().toPath(),StandardCharsets.UTF_8);
+                yes(out.contains("41\n0.7071067811865476\n")&&
+                    out.contains("11\n4\n21\n0\n31\n0\n40\n0.5\n"),
+                    "safe save must retain rational spline weights and ellipse axes");
+                Dxf3dMesh reopenedCurves=Dxf3dMesh.read(curvesSaved.file());
+                yes(reopenedCurves.approximateCurves==2&&
+                    Arrays.equals(curved.xyz,reopenedCurves.xyz)&&
+                    Arrays.equals(curved.edges,reopenedCurves.edges)&&
+                    Arrays.equals(curved.sourceLines,reopenedCurves.sourceLines),
+                    "save/reopen must retain exact sampled curve geometry while editing independent LINE");
+            }finally{curvesSaved.delete();}
         }finally{
             Files.deleteIfExists(source.toPath());
             File[] abandoned=cache.listFiles();
