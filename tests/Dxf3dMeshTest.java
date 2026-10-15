@@ -53,6 +53,7 @@ public final class Dxf3dMeshTest {
         test3dFaceInvisibleEdgesAndSafeRoundtrip();
         testPolyfaceSignedInvisibleEdgesAndQuadWireframe();
         testPolygonMesh();
+        testPolygonMeshWireGridOpenClosedAndShortSource();
         testInsertedBlockLine();
         testAxialZBlockHeightAndNestedScaling();
         testNegativeZMinsert();
@@ -868,8 +869,55 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh mesh=Dxf3dMesh.read(file);
             if(mesh.xyz.length!=12)throw new AssertionError("polygon mesh vertex count");
             if(mesh.triangles.length!=6)throw new AssertionError("polygon mesh must create two triangles");
-            if(mesh.edges.length!=10)throw new AssertionError("polygon mesh edge count");
+            if(mesh.edges.length!=8||!java.util.Arrays.equals(mesh.edges,new int[]{0,1,2,3,0,2,1,3}))
+                throw new AssertionError("polygon mesh must render only four authored grid edges, not diagonal");
             if(mesh.xyz[8]!=1f||mesh.xyz[11]!=2f)throw new AssertionError("polygon mesh Z coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testPolygonMeshWireGridOpenClosedAndShortSource() throws Exception {
+        File file=File.createTempFile("mesh3d-mesh-grid-", ".dxf");
+        try{
+            String vertices=
+                meshVertex(0,0,0)+meshVertex(2,0,0)+meshVertex(4,0,0)+
+                meshVertex(0,2,0)+meshVertex(2,2,1)+meshVertex(4,2,0)+
+                meshVertex(0,4,0)+meshVertex(2,4,0)+meshVertex(4,4,0);
+            String[] flags={"16","17","48","49"};
+            int[] gridEdgeCounts={12,15,15,18};
+            for(int i=0;i<flags.length;i++){
+                String dxf="0\nSECTION\n2\nENTITIES\n"+
+                    "0\nPOLYLINE\n70\n"+flags[i]+"\n71\n3\n72\n3\n"+
+                    vertices+"0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+                Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+                Dxf3dMesh mesh=Dxf3dMesh.read(file);
+                int expectedCells=(i==3?9:i==1||i==2?6:4);
+                if(mesh.xyz.length!=27||mesh.triangles.length!=expectedCells*6||
+                   mesh.edges.length!=gridEdgeCounts[i]*2)
+                    throw new AssertionError("polygon mesh open/closed grid mismatch case "+i);
+                for(int k=0;k<mesh.edges.length;k+=2){
+                    int a=mesh.edges[k],b=mesh.edges[k+1];
+                    int rowA=a/3,rowB=b/3,colA=a%3,colB=b%3;
+                    boolean neighborInRow=rowA==rowB&&
+                        (Math.abs(colA-colB)==1||(i==1||i==3)&&Math.abs(colA-colB)==2);
+                    boolean neighborInColumn=colA==colB&&
+                        (Math.abs(rowA-rowB)==1||(i==2||i==3)&&Math.abs(rowA-rowB)==2);
+                    if(!neighborInRow&&!neighborInColumn)
+                        throw new AssertionError("synthetic polygon mesh diagonal leaked to wireframe");
+                }
+            }
+            String base="0\nSECTION\n2\nENTITIES\n0\nPOLYLINE\n70\n16\n71\n3\n72\n3\n";
+            String closing="0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            String fewer=meshVertex(0,0,0)+meshVertex(2,0,0)+
+                meshVertex(4,0,0)+meshVertex(0,2,0)+
+                meshVertex(2,2,1)+meshVertex(4,2,0)+
+                meshVertex(0,4,0)+meshVertex(2,4,0);
+            String[] malformed={base+fewer+closing,base+vertices+meshVertex(6,6,6)+closing};
+            for(int i=0;i<malformed.length;i++){
+                Files.writeString(file.toPath(),malformed[i],StandardCharsets.UTF_8);
+                boolean rejected=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){rejected=true;}
+                if(!rejected)throw new AssertionError("polygon mesh missing/extra grid rows accepted");
+            }
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
