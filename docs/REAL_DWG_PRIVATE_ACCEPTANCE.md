@@ -31,6 +31,28 @@ A decoded_dxf_inventory result confirms a conversion and inventory only:
 it does not prove lossless geometry, true color, layer visibility, blocks,
 XREF resolution, layouts, dimensions, measurements, exact solids or printing.
 
+### Independent primitive geometry cross-check (optional)
+
+For each original DWG, a separately trusted reader may provide a **local-only**
+JSON manifest named `<source_sha256>.json` in an external directory, containing
+`source_sha256`, `source_kind: "independent_dwg_reader"`, `records: []`,
+and `geometry_records`. Each geometry entry includes a source handle, entity
+type and string-valued DXF group-code map; use `--independent-manifest-dir`
+when running `tests/private_dwg_read_audit.py`.
+
+This optional source-bound comparison now covers **LINE** XYZ endpoints,
+**POINT** position/normal, **CIRCLE/ARC** center/radius/angle/normal and
+**3DFACE** XYZ corners plus group 70 invisible-edge bits. Absent fourth
+3DFACE corner means the third corner repeats, while partial fourth-corner
+data is rejected. Missing or changed source values produce
+`decoded_dxf_inventory_geometry_mismatch`; only aggregate counts appear
+in the report, never drawing coordinates, layers or handles. This is a
+primitive **subset** proof, not whole-file DWG semantics or a live verification
+of private projects. An untrusted baseline derived from MusaCAD's own DXF
+output does not count as independent evidence. ACIS/B-Rep, XREF resolution,
+dynamic blocks, spline evaluation and real rendering still require separate
+acceptance.
+
 For a complete acceptance, export independent baselines from AutoCAD or a
 second trusted CAD reader. Compare drawing entity counts, layer/state/color,
 blocks/attributes, layout geometry, annotations, coordinates and XREF files.
