@@ -35,6 +35,12 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
           python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
+      - name: Fast DXF INSERT/MINSERT geometry and material-count safety
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-block-tests
+          javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-block-tests DxfBlocksTest
       - name: CAD progress and source safety regressions
         run: |
           set -euo pipefail
