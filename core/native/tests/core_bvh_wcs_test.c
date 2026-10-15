@@ -59,6 +59,21 @@ int main(void){
     near(world.wcs_z,3000030,1e-8);
     near(world.distance,8,1e-8);
 
+    /* Sheared building-block instance with nonuniform XYZ scaling. */
+    const MusaCoreAffine3 shear={{2,.5,0,100,
+                                  0,3,0,200,
+                                  0,0,4,300}};
+    const double sh_origin[]={101.25,201.5,312};
+    const double down[]={0,0,-1};
+    assert(musa_core_mesh_bvh_pick_wcs(b,&shear,sh_origin,down,15,
+                                       &world,&stats)==1);
+    near(world.distance,12,1e-10);
+    near(world.wcs_x,101.25,1e-10);
+    near(world.wcs_y,201.5,1e-10);
+    near(world.wcs_z,300,1e-10);
+    near(world.barycentric_u,.25,1e-10);
+    near(world.barycentric_v,.25,1e-10);
+
     /* Rotation through 90 degrees (XZ vertical face), direction along X. */
     const MusaCoreAffine3 turn={{0,0,1,5,
                                   0,1,0,4,
