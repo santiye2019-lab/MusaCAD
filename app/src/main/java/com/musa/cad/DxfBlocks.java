@@ -36,6 +36,60 @@ public final class DxfBlocks {
         }
     }
 
+
+    /** Opt-in 3D affine OCS/WCS transformation; null in the normal 2D path. */
+    public static final class SpatialTransform {
+        private final double[] m; // 3 rows x 4 coefficients
+        private SpatialTransform(double... coefficients){m=coefficients;}
+        public SpatialTransform(){this(1,0,0,0, 0,1,0,0, 0,0,1,0);}
+        public boolean isIdentity(){
+            return java.util.Arrays.equals(m,new double[]{1,0,0,0,0,1,0,0,0,0,1,0});
+        }
+        public boolean isFinite(){for(double x:m)if(!Double.isFinite(x))return false;return true;}
+        public double[] point(double x,double y,double z){
+            return new double[]{m[0]*x+m[1]*y+m[2]*z+m[3],
+                m[4]*x+m[5]*y+m[6]*z+m[7],
+                m[8]*x+m[9]*y+m[10]*z+m[11]};
+        }
+        public SpatialTransform thenLocal(SpatialTransform t){
+            double[] v=new double[12];
+            for(int row=0;row<3;row++){
+                int k=row*4;
+                for(int col=0;col<3;col++)
+                    v[k+col]=m[k]*t.m[col]+m[k+1]*t.m[4+col]+m[k+2]*t.m[8+col];
+                v[k+3]=m[k]*t.m[3]+m[k+1]*t.m[7]+m[k+2]*t.m[11]+m[k+3];
+            }
+            return new SpatialTransform(v);
+        }
+        public static SpatialTransform translate(double x,double y,double z){
+            return new SpatialTransform(1,0,0,x, 0,1,0,y, 0,0,1,z);
+        }
+        public static SpatialTransform insert(double bx,double by,double bz,
+                double sx,double sy,double sz,double degrees,
+                double ix,double iy,double iz,double nx,double ny,double nz){
+            double len=Math.hypot(Math.hypot(nx,ny),nz);
+            if(!Double.isFinite(len)||len<=1e-30)throw new IllegalArgumentException("invalid OCS normal");
+            nx/=len;ny/=len;nz/=len;
+            double ax,ay,az;
+            if(Math.abs(nx)<1d/64d&&Math.abs(ny)<1d/64d){
+                ax=nz;ay=0;az=-nx;
+            }else{ax=-ny;ay=nx;az=0;}
+            double alen=Math.hypot(Math.hypot(ax,ay),az);
+            if(!Double.isFinite(alen)||alen<=1e-30)throw new IllegalArgumentException("invalid OCS basis");
+            ax/=alen;ay/=alen;az/=alen;
+            double ux=ny*az-nz*ay,uy=nz*ax-nx*az,uz=nx*ay-ny*ax;
+            double rad=Math.toRadians(degrees),co=Math.cos(rad),si=Math.sin(rad);
+            double[] colX={(ax*co+ux*si)*sx,(ay*co+uy*si)*sx,(az*co+uz*si)*sx};
+            double[] colY={(-ax*si+ux*co)*sy,(-ay*si+uy*co)*sy,(-az*si+uz*co)*sy};
+            double[] colZ={nx*sz,ny*sz,nz*sz};
+            double[] origin={ax*ix+ux*iy+nx*iz,ay*ix+uy*iy+ny*iz,az*ix+uz*iy+nz*iz};
+            return new SpatialTransform(
+                colX[0],colY[0],colZ[0],origin[0]-colX[0]*bx-colY[0]*by-colZ[0]*bz,
+                colX[1],colY[1],colZ[1],origin[1]-colX[1]*bx-colY[1]*by-colZ[1]*bz,
+                colX[2],colY[2],colZ[2],origin[2]-colX[2]*bx-colY[2]*by-colZ[2]*bz);
+        }
+    }
+
     public static final class Record {
         public final String type;public final int from,to,sourceFrom,sourceStart,sourceTo;final List<String>tags;
         Record(String type,List<String>tags,int from,int to){this(type,tags,from,to,from,Math.max(0,from-2),to);}
@@ -51,8 +105,8 @@ public final class DxfBlocks {
     }
 
     public static final class Placement {
-        public final Record record;public final Transform transform;public final HeightTransform height;public final String layer,layout;public final int color;public final String lineType;public final double lineTypeScale;public final int lineWeight;public final double blockScale;public final boolean directRoot;public final String[] visibilityLayerKeys;
-        Placement(Record record,Transform transform,HeightTransform height,String layer,String layout,int color,String lineType,double lineTypeScale,int lineWeight,boolean directRoot,String[] visibilityLayerKeys){this.record=record;this.transform=transform;this.height=height;this.layer=layer;this.layout=normalizeLayout(layout);this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=lineTypeScale;this.lineWeight=lineWeight;this.blockScale=transform.scale();this.directRoot=directRoot;this.visibilityLayerKeys=visibilityLayerKeys==null?new String[0]:visibilityLayerKeys.clone();}
+        public final Record record;public final Transform transform;public final HeightTransform height;public final SpatialTransform spatial;public final String layer,layout;public final int color;public final String lineType;public final double lineTypeScale;public final int lineWeight;public final double blockScale;public final boolean directRoot;public final String[] visibilityLayerKeys;
+        Placement(Record record,Transform transform,HeightTransform height,SpatialTransform spatial,String layer,String layout,int color,String lineType,double lineTypeScale,int lineWeight,boolean directRoot,String[] visibilityLayerKeys){this.record=record;this.transform=transform;this.height=height;this.spatial=spatial;this.layer=layer;this.layout=normalizeLayout(layout);this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=lineTypeScale;this.lineWeight=lineWeight;this.blockScale=transform.scale();this.directRoot=directRoot;this.visibilityLayerKeys=visibilityLayerKeys==null?new String[0]:visibilityLayerKeys.clone();}
     }
 
     /** Root INSERT metadata kept separately from expanded block geometry for quantity takeoff. */
@@ -98,7 +152,7 @@ public final class DxfBlocks {
             else if(section.equals("ENTITIES"))roots.add(record);
         }
         if(!layerColorLookup.containsKey("0")){int color=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);layerColorLookup.put("0",color);layerLineTypeLookup.put("0",DxfLineStyle.CONTINUOUS);layerLineWeightLookup.put("0",defaultWeight);result.layerColors.put("0",color);result.layerLineTypes.put("0",DxfLineStyle.CONTINUOUS);result.layerLineWeights.put("0",defaultWeight);}
-        int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);for(Record root:roots)expand(root,new Transform(),new HeightTransform(),"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,defaultWeight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,defaultWeight,new HashSet<>(),result);if(result.layoutNames.isEmpty())result.layoutNames.add(MODEL_LAYOUT);return result;
+        int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);for(Record root:roots)expand(root,new Transform(),new HeightTransform(),null,"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,defaultWeight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,defaultWeight,new HashSet<>(),result);if(result.layoutNames.isEmpty())result.layoutNames.add(MODEL_LAYOUT);return result;
     }
 
 
@@ -107,6 +161,13 @@ public final class DxfBlocks {
      * TABLES/BLOCKS are indexed in pass one; ENTITIES are expanded record-by-record in pass two.
      */
     public static Result expand(File file,Charset charset,Sink sink)throws IOException{
+        return expandFile(file,charset,sink,false);
+    }
+    /** Explicit 3D-only block expansion with an arbitrary-axis OCS transform. */
+    public static Result expand3d(File file,Charset charset,Sink sink)throws IOException{
+        return expandFile(file,charset,sink,true);
+    }
+    private static Result expandFile(File file,Charset charset,Sink sink,boolean threeDimensional)throws IOException{
         if(file==null||sink==null)throw new IOException("Streaming DXF girişi eksik");
         Map<String,Block>blocks=new HashMap<>();Map<String,Integer>layerColorLookup=new HashMap<>();Map<String,String>layerLineTypeLookup=new HashMap<>();Map<String,Integer>layerLineWeightLookup=new HashMap<>();
         Result result=new Result();result.lineTypes.put(DxfLineStyle.CONTINUOUS,new DxfLineStyle.Pattern(DxfLineStyle.CONTINUOUS,new double[0],false));result.textStyles.put(DxfTextStyle.STANDARD,DxfTextStyle.defaultStyle());
@@ -150,13 +211,13 @@ public final class DxfBlocks {
         result.sink=sink;sink.begin(result);result.visits=0;
         int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);
         try(DxfStream input=new DxfStream(file,charset)){
-            section="";Record r;Transform identity=new Transform();HeightTransform height=new HeightTransform();Set<String>stack=new HashSet<>();
+            section="";Record r;Transform identity=new Transform();HeightTransform height=new HeightTransform();SpatialTransform spatial=threeDimensional?new SpatialTransform():null;Set<String>stack=new HashSet<>();
             while((r=input.next())!=null){
                 FileTransfer.checkCancelled();
                 if("SECTION".equals(r.type)){section=r.text(2,"");continue;}
                 if("ENDSEC".equals(r.type)){section="";continue;}
                 if("EOF".equals(r.type))break;
-                if("ENTITIES".equals(section))expand(r,identity,height,"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,result.defaultLineweight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,result.defaultLineweight,stack,result);
+                if("ENTITIES".equals(section))expand(r,identity,height,spatial,"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,result.defaultLineweight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,result.defaultLineweight,stack,result);
             }
         }finally{
             try{sink.finish();}finally{result.sink=null;}
@@ -185,25 +246,25 @@ public final class DxfBlocks {
     private static void emit(Result result,Placement placement)throws IOException{
         result.layoutNames.add(placement.layout);if(result.sink!=null)result.sink.accept(placement);else result.placements.add(placement);
     }
-    private static void expandMembers(Block block,Transform transform,HeightTransform height,String layer,String layout,int color,String lineType,int lineWeight,double lineScale,String[] visibilityGates,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
-        if(block.file==null){for(Record member:block.members)expand(member,transform,height,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
+    private static void expandMembers(Block block,Transform transform,HeightTransform height,SpatialTransform spatial,String layer,String layout,int color,String lineType,int lineWeight,double lineScale,String[] visibilityGates,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
+        if(block.file==null){for(Record member:block.members)expand(member,transform,height,spatial,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
         try(DxfStream input=new DxfStream(block.file,block.charset)){
             input.seek(block.offset,block.offsetLine);Record member;boolean ended=false;
             while((member=input.next())!=null){
                 if("ENDBLK".equals(member.type)){ended=true;break;}
                 if("ENDSEC".equals(member.type)||"EOF".equals(member.type)||"BLOCK".equals(member.type))break;
-                expand(member,transform,height,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+                expand(member,transform,height,spatial,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
             if(!ended)throw new IOException("DXF blok sonu bulunamadı");
         }
     }
 
-    private static void expand(Record r,Transform parent,HeightTransform parentHeight,String parentLayer,String parentLayout,int parentBlockColor,String parentBlockLineType,int parentBlockLineWeight,double parentLineTypeScale,String[] parentVisibilityGates,boolean directRoot,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
+    private static void expand(Record r,Transform parent,HeightTransform parentHeight,SpatialTransform parentSpatial,String parentLayer,String parentLayout,int parentBlockColor,String parentBlockLineType,int parentBlockLineWeight,double parentLineTypeScale,String[] parentVisibilityGates,boolean directRoot,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");if(++result.visits>2000000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;String[] visibilityGates=DxfLayerState.addGate(parentVisibilityGates,layer);String layout=entityLayout(r,parentLayout);int color=entityColor(r,layer,parentBlockColor,layerColors);String lineType=entityLineType(r,layer,parentBlockLineType,layerLineTypes);int lineWeight=entityLineweight(r,layer,parentBlockLineWeight,layerLineWeights,defaultLineweight);double ownScale=r.number(48,1d);if(!Double.isFinite(ownScale)||ownScale<=0d)ownScale=1d;double effectiveLineTypeScale=parentLineTypeScale*ownScale;
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
-            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,parentHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,parentHeight,parentSpatial==null?null:parentSpatial.thenLocal(SpatialTransform.translate(r.number(12,0),r.number(22,0),0)),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
@@ -220,11 +281,11 @@ public final class DxfBlocks {
                 ?Transform.insert(bx,by,-1,1,-degrees,-ix,iy)
                 :Transform.insert(bx,by,1,1,degrees,ix,iy);
             stack.add(name);
-            try{expandMembers(block,parent.thenLocal(local),parentHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
+            try{expandMembers(block,parent.thenLocal(local),parentHeight,parentSpatial==null?null:parentSpatial.thenLocal(SpatialTransform.insert(bx,by,0,1,1,1,degrees,ix,iy,0,nx,ny,nz)),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
             finally{stack.remove(name);}
             return;
         }
-        if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,parentHeight,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
+        if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,parentHeight,parentSpatial,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
         boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
@@ -232,7 +293,7 @@ public final class DxfBlocks {
         // 2D MusaCAD rendering deliberately ignores entity/block elevation (group 30);
         // elevation must not make ordinary plan blocks disappear. Only non-planar OCS is skipped.
         int columns=r.integer(70,1),rows=r.integer(71,1);
-        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
+        if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ&&parentSpatial==null)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
         double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
         double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
@@ -245,7 +306,7 @@ public final class DxfBlocks {
         double baseZ=block.header.number(30,0),insertZ=r.number(30,0),scaleZ=r.number(43,1);
         double axisSign=negativeZ?-1d:1d;
         HeightTransform childHeight=parentHeight.thenInsert(baseZ,axisSign*scaleZ,axisSign*insertZ);
-        if(!childHeight.isFinite()){result.skipped++;return;}
+        if(!childHeight.isFinite()&&parentSpatial==null){result.skipped++;return;}
         int[] edgeRows={0,rows-1},edgeColumns={0,columns-1};
         for(int checkRow:edgeRows)for(int checkColumn:edgeColumns){
             double dx=checkColumn*columnSpacing,dy=checkRow*rowSpacing;
@@ -258,6 +319,13 @@ public final class DxfBlocks {
                 :Transform.insert(bx,by,sx,sy,degrees,checkX,checkY);
             if(!checkLocal.isFinite()||!parent.thenLocal(checkLocal).isFinite()){
                 result.skipped++;return;
+            }
+            if(parentSpatial!=null){
+                SpatialTransform probe;
+                try{probe=parentSpatial.thenLocal(SpatialTransform.insert(
+                    bx,by,baseZ,sx,sy,scaleZ,degrees,checkX,checkY,insertZ,nx,ny,nz));}
+                catch(IllegalArgumentException error){result.skipped++;return;}
+                if(!probe.isFinite()){result.skipped++;return;}
             }
         }
         // Keep takeoff counts in sync with accepted geometry: an INSERT rejected
@@ -278,7 +346,9 @@ public final class DxfBlocks {
                     ?Transform.insert(bx,by,-sx,sy,-degrees,-arrayX,arrayY)
                     :Transform.insert(bx,by,sx,sy,degrees,arrayX,arrayY);
                 Transform transform=parent.thenLocal(local);
-                expandMembers(block,transform,childHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+                SpatialTransform spatial=null;
+                if(parentSpatial!=null)spatial=parentSpatial.thenLocal(SpatialTransform.insert(bx,by,baseZ,sx,sy,scaleZ,degrees,arrayX,arrayY,insertZ,nx,ny,nz));
+                expandMembers(block,transform,childHeight,spatial,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
         }finally{stack.remove(name);}
     }
