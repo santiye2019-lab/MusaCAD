@@ -104,7 +104,7 @@ class DwgPolylineChainAudit:
             handle = self._handle(rec["handle"])
             end = self._handle(rec["seqend"])
             children = rec["vertices"]
-            if (not handle or not end or handle in reference or
+            if (not handle or not end or handle == end or handle in reference or
                     rec["space"] not in ("model", "paperspace", "block") or
                     not isinstance(children, list) or not children or
                     len(children) > _MAX_VERTICES):
