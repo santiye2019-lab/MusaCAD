@@ -132,6 +132,15 @@ Path: `core/native/`
   1,000,000+ unit translated drawings, invalid/singular transforms and
   result preservation. A common C11 math capability, NOT a shipped
   Android hit-selection UI or proof of AutoCAD 2026 object parity.
+- Read-only multi-object **3D visible scene picking** now lives in
+  `musacad_bvh_scene.h` and `musacad_mesh_bvh_scene.c`. One
+  indexed mesh may be reused across independent BLOCK/INSERT instances,
+  each carrying its own WCS affine transform, source object ID and
+  externally resolved visibility. The nearest visible WCS hit is
+  deterministic; invalid visible geometry fails without publishing any
+  earlier hit. Diagnostic counters collect real BVH node and face checks.
+  Full DWG layer/xref resolution, UI object-selection integration and
+  platform performance acceptance remain outside this primitive.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
