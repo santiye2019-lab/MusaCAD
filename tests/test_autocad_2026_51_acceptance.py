@@ -111,7 +111,7 @@ class IndependentAcceptance51Test(unittest.TestCase):
                     "input_sha256": "a" * 64,
                     "normalized_result": result,
                 }
-                binary = (json.dumps(payload, sort_keys=True) + "\\n").encode()
+                binary = (json.dumps(payload, sort_keys=True) + chr(10)).encode()
                 path = "docs/autocad2026_evidence/" + gate + ".json"
                 (evidence / (gate + ".json")).write_bytes(binary)
                 return {"status":"passed", "artifact":path,
@@ -131,7 +131,7 @@ class IndependentAcceptance51Test(unittest.TestCase):
                 "autocad_reference_sha256":a["sha256"],
                 "musacad_output_sha256":m["sha256"],
             }
-            encoded=(json.dumps(comp, sort_keys=True)+"\\n").encode()
+            encoded=(json.dumps(comp, sort_keys=True)+chr(10)).encode()
             (evidence / "semantic_comparison.json").write_bytes(encoded)
             row={"status":"passed",
                  "artifact":"docs/autocad2026_evidence/semantic_comparison.json",
