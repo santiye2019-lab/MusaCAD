@@ -3,10 +3,11 @@ package com.musa.cad;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Bounded 360-degree polygonal REVOLVE of a simple closed radial/Z section.
+ * Bounded polygonal full-turn / partial-sector REVOLVE of a simple closed radial/Z section.
  * Every profile radius must be strictly positive (axis-touching profiles
  * require separate apex topology). This is a triangle mesh, NOT an ACIS
  * 3DSOLID or editable native AutoCAD REVOLVE feature.
@@ -20,12 +21,12 @@ public final class CadRevolveShell {
         public final double[] xyz;
         public final int[] triangles;
         public final int sectionVertices,angularSegments;
-        public final double profileArea;
+        public final double profileArea,sweepDegrees;
         private Solid(double[] xyz,int[] triangles,int sectionVertices,
-                      int angularSegments,double profileArea){
+                      int angularSegments,double profileArea,double sweepDegrees){
             this.xyz=xyz;this.triangles=triangles;
             this.sectionVertices=sectionVertices;this.angularSegments=angularSegments;
-            this.profileArea=profileArea;
+            this.profileArea=profileArea;this.sweepDegrees=sweepDegrees;
         }
 
         /** All oriented triangle edges occur exactly twice with opposite direction. */
@@ -77,6 +78,19 @@ public final class CadRevolveShell {
      * the Z axis through axisX,axisY. The returned mesh has no seam slit.
      */
     public static Solid revolve(double[] profileRZ,double axisX,double axisY,int angularSegments){
+        return revolve(profileRZ,axisX,axisY,angularSegments,360d);
+    }
+
+    /**
+     * Positive partial sweeps close BOTH radial end sections with triangulated
+     * caps. Only [5,360] degrees; negative sweeps and profiles touching the
+     * rotation axis still require a separate geometry implementation.
+     */
+    public static Solid revolve(double[] profileRZ,double axisX,double axisY,
+                                int angularSegments,double sweepDegrees){
+        if(!Double.isFinite(sweepDegrees)||sweepDegrees<5d||sweepDegrees>360d)
+            throw new IllegalArgumentException("Invalid REVOLVE sweep angle");
+        final boolean fullTurn=sweepDegrees==360d;
         if(profileRZ==null||profileRZ.length<6||(profileRZ.length&1)!=0||
            profileRZ.length/2>MAX_PROFILE_POINTS||
            angularSegments<MIN_SEGMENTS||angularSegments>MAX_SEGMENTS||
@@ -122,12 +136,13 @@ public final class CadRevolveShell {
             }
             area2=-area2;
         }
-        double[] xyz=new double[3*n*angularSegments];
-        int[] faces=new int[6*n*angularSegments];
+        int slices=fullTurn?angularSegments:angularSegments+1;
+        double[] xyz=new double[3*n*slices];
+        int[] faces=new int[6*n*angularSegments+(fullTurn?0:6*(n-2))];
         for(int i=0;i<n;i++){
-            for(int k=0;k<angularSegments;k++){
-                double theta=2d*Math.PI*k/angularSegments;
-                int index=3*(i*angularSegments+k);
+            for(int k=0;k<slices;k++){
+                double theta=Math.toRadians(sweepDegrees)*k/angularSegments;
+                int index=3*(i*slices+k);
                 xyz[index]=axisX+p[2*i]*Math.cos(theta);
                 xyz[index+1]=axisY+p[2*i]*Math.sin(theta);
                 xyz[index+2]=p[2*i+1];
@@ -140,18 +155,70 @@ public final class CadRevolveShell {
         for(int i=0;i<n;i++){
             int next=(i+1)%n;
             for(int k=0;k<angularSegments;k++){
-                int k1=(k+1)%angularSegments;
-                int a=i*angularSegments+k,b=i*angularSegments+k1;
-                int c=next*angularSegments+k1,d=next*angularSegments+k;
+                int k1=fullTurn?(k+1)%slices:k+1;
+                int a=i*slices+k,b=i*slices+k1;
+                int c=next*slices+k1,d=next*slices+k;
                 // For CCW R/Z profiles, increasing theta then increasing
                 // section parameter makes the normals face the material exterior.
                 faces[at++]=a;faces[at++]=b;faces[at++]=c;
                 faces[at++]=a;faces[at++]=c;faces[at++]=d;
             }
         }
-        Solid solid=new Solid(xyz,faces,n,angularSegments,area2/2d);
+        if(!fullTurn){
+            // Start section faces the -theta tangent; end section faces
+            // +theta. Reversed caps exactly pair all open side perimeter edges.
+            int[] cap=triangulateSection(p,n);
+            for(int i=0;i<cap.length;i+=3){
+                int a=cap[i]*slices,b=cap[i+1]*slices,c=cap[i+2]*slices;
+                faces[at++]=a;faces[at++]=b;faces[at++]=c;
+                faces[at++]=c+angularSegments;
+                faces[at++]=b+angularSegments;
+                faces[at++]=a+angularSegments;
+            }
+        }
+        if(at!=faces.length)throw new IllegalArgumentException("REVOLVE triangulation mismatch");
+        Solid solid=new Solid(xyz,faces,n,angularSegments,area2/2d,sweepDegrees);
         if(!solid.isWatertight())throw new IllegalArgumentException("Nonmanifold REVOLVE shell");
         return solid;
+    }
+
+
+    /** Bounded ear-clipping of the already validated CCW radial/Z section. */
+    private static int[] triangulateSection(double[] p,int n){
+        ArrayList<Integer> ring=new ArrayList<>(n);
+        for(int i=0;i<n;i++)ring.add(i);
+        int[] triangles=new int[3*(n-2)];
+        int used=0;
+        double minR=Double.POSITIVE_INFINITY,minZ=Double.POSITIVE_INFINITY;
+        double maxR=Double.NEGATIVE_INFINITY,maxZ=Double.NEGATIVE_INFINITY;
+        for(int i=0;i<n;i++){
+            minR=Math.min(minR,p[2*i]);maxR=Math.max(maxR,p[2*i]);
+            minZ=Math.min(minZ,p[2*i+1]);maxZ=Math.max(maxZ,p[2*i+1]);
+        }
+        double epsilon=1e-12*(maxR-minR)*(maxZ-minZ);
+        while(ring.size()>3){
+            boolean found=false;
+            int size=ring.size();
+            for(int i=0;i<size;i++){
+                int a=ring.get((i+size-1)%size),b=ring.get(i),c=ring.get((i+1)%size);
+                if(orient(p,a,b,c)<=epsilon)continue;
+                boolean blocked=false;
+                for(int j=0;j<size;j++){
+                    int v=ring.get(j);
+                    if(v==a||v==b||v==c)continue;
+                    if(orient(p,a,b,v)>=-epsilon&&orient(p,b,c,v)>=-epsilon&&
+                       orient(p,c,a,v)>=-epsilon){blocked=true;break;}
+                }
+                if(blocked)continue;
+                triangles[used++]=a;triangles[used++]=b;triangles[used++]=c;
+                ring.remove(i);found=true;break;
+            }
+            if(!found)throw new IllegalArgumentException("REVOLVE cap triangulation failed");
+        }
+        triangles[used++]=ring.get(0);
+        triangles[used++]=ring.get(1);
+        triangles[used++]=ring.get(2);
+        return triangles;
     }
 
     private static boolean bounded(double a){return Double.isFinite(a)&&Math.abs(a)<=LIMIT;}
