@@ -112,6 +112,30 @@ public final class CadEdit {
                 float k=nr/r;
                 return new CadEdit(type,new float[]{xy[0],xy[1],xy[0]+dx*k,xy[1]+dy*k},text,strokeWidth,closed,rotationDegrees,textStyleName,textFamilyHint,textShx,textHeight,textWidthFactor,textOblique,textGenerationFlags,layerOverride);
             }
+            case ARC:{
+                // Keep the source arc's center and angular sweep. Offset is
+                // concentric: positive expands radius; negative contracts it.
+                // Rebuild all three points, never flatten an arc to a chord.
+                if(xy.length<8)return null;
+                double cx=xy[6],cy=xy[7];
+                double radius=Math.hypot((double)xy[0]-cx,(double)xy[1]-cy);
+                double newRadius=radius+distance;
+                if(!(radius>1e-6d)||!(newRadius>1e-6d)||
+                        !Double.isFinite(radius)||!Double.isFinite(newRadius))
+                    return null;
+                double ratio=newRadius/radius;
+                float[] out=xy.clone();
+                for(int i=0;i<6;i+=2){
+                    double x=cx+((double)xy[i]-cx)*ratio;
+                    double y=cy+((double)xy[i+1]-cy)*ratio;
+                    if(!Double.isFinite(x)||!Double.isFinite(y)||
+                            Math.abs(x)>1e9d||Math.abs(y)>1e9d)return null;
+                    out[i]=(float)x;out[i+1]=(float)y;
+                }
+                return new CadEdit(type,out,text,strokeWidth,closed,rotationDegrees,
+                        textStyleName,textFamilyHint,textShx,textHeight,
+                        textWidthFactor,textOblique,textGenerationFlags,layerOverride);
+            }
             case RECTANGLE:{
                 if(xy.length<4)return null;float l=Math.min(xy[0],xy[2])-distance,r=Math.max(xy[0],xy[2])+distance,t=Math.min(xy[1],xy[3])-distance,b=Math.max(xy[1],xy[3])+distance;
                 if(r-l<=1e-6f||b-t<=1e-6f)return null;
