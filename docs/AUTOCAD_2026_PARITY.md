@@ -27,6 +27,29 @@ kopyalamak değil, bağımsız ve işlevsel olarak eşdeğer ürün amaçlanır.
    %0 çalıştığı anlamına GELMEZ. Ayrıca 23/51 oranını eşdeğerlik
    yüzdesi diye sunmak da yanlıştır.
 
+## AutoCAD 2026 resmî komut dizini – birinci karşılaştırma dilimi
+
+`docs/AUTOCAD_2026_COMMAND_CATALOG.json` dosyası, Autodesk'in
+**AutoCAD 2026 resmî alfabetik komut dizininden** alınmış **247 ayrı
+komut/komut satırı varyantını** içerir. Kapsam şu an: `+`/`-` komut
+satırı varyantları, `3D*`, A, B ve C harfinin başlangıcı. Bu,
+AutoCAD 2026'nın tüm komutları değildir; C–Z'nin kalan bölümleri,
+sistem değişkenleri, alt-komut seçenekleri, UI davranışları ve sektör
+araç setlerinin ayrı kataloglarının eklenmesi zorunludur.
+
+`tests/autocad_2026_parity_gate.py` hiçbir komutun yalnız ismen
+bulunması veya kodda bir eyleme eşlenmesiyle eşdeğer sayılmasına izin
+vermez. Komut bazında bağımsız **gerçek AutoCAD 2026 davranışı, gerçek
+DWG kaydet–yeniden açma ve Android telefon testi** gerekir.
+`tests/AutoCAD2026CommandRouterSmokeTest.java` içindeki 25 adın
+**11 tanesi yalnızca komut yönlendiricide tanınmaktadır**,
+**14 tanesi mevcut yönlendiricide henüz eyleme eşlenmiyor**.
+Bu testler **işlevsel eşdeğerlik testi değildir**, hiçbir komuta
+`verified` durumu vermez.
+
+Autodesk'in 2026 komut listesi: 
+https://help.autodesk.com/view/ACD/2026/ENU/?page=commands&q=*
+
 ## Ölçüm kuralı
 
 1. Autodesk'in **AutoCAD 2026 sürümüne ait resmî** komut, alt-komut,
@@ -74,14 +97,12 @@ kopyalamak değil, bağımsız ve işlevsel olarak eşdeğer ürün amaçlanır.
 
 - Autodesk'in 2026 özellik ve yedi sektör araç seti tanıtımı:
   https://www.autodesk.com/tr/products/autocad/features
-- Resmî AutoCAD 2026 eğrisel çizim komutları:
-  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-61E4FFAA-8D30-4D10-9DC6-C1D47B29187B.htm
-- Resmî düzenleme komutları:
-  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-8166C151-3B88-49D2-B7A3-1B7CFCC4E3FD.htm
-- Resmî 3B katı model düzenleme:
-  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-D54C266B-2B68-4660-ACA5-0579432F149C.htm
-- Resmî özelleştirme/API uyumluluğu:
-  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Customization/files/GUID-E69C877D-F84B-4282-807D-E084C931D533.htm
+- Autodesk resmî AutoCAD 2026 alfabetik komut dizini:
+  https://help.autodesk.com/view/ACD/2026/ENU/?page=commands&q=*
+- Autodesk 2026 çoklu çizgi semantiği (PEDIT ve legacy POLYLINE ayrımı):
+  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-392BF13C-D9E7-47A8-8E07-435296332279.htm
+- Autodesk 2026 çoklu ölçüm seçenekleri (MEASUREGEOM):
+  https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core/files/GUID-5D5B0EE1-DD90-47AE-8A55-642FBFF5E4E4.htm
 
 **Güvenlik:** Son kabulden önce `main` birleştirmesi, üretim APK
 dağıtımı ve canlı servis değişikliği yapılmaz. Yeni envanter yalnız
