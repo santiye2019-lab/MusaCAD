@@ -6,6 +6,7 @@ on:
     paths:
       - 'tests/**'
       - 'app/src/main/cpp/**'
+      - 'core/native/**'
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
@@ -27,6 +28,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Shared C ABI 1 core, independent of Android/LibreDWG
+        run: |
+          set -euo pipefail
+          cmake -S core/native -B /tmp/musacad-shared-core-fast -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build /tmp/musacad-shared-core-fast -j2
+          ctest --test-dir /tmp/musacad-shared-core-fast -C Debug --output-on-failure
       - name: DWG audit and parity unit regressions
         run: |
           set -euo pipefail
