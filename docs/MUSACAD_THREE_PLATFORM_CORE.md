@@ -18,6 +18,12 @@ Path: `core/native/`
 - First migrated actual production feature: **rational NURBS curve
   validation/evaluation/preview bounds**. Android's DWG scene now calls the
   same C ABI functions, not a separately maintained NURBS algorithm.
+- Next migrated existing production feature: **DWG ACI/TrueColor, ByLayer,
+  ByBlock and layer-0 INSERT color inheritance**. The Android compatibility
+  include forwards to `core/native/include/musacad_color.h`. Its canonical
+  color classification and resolution functions are compiled unchanged by
+  Linux, Windows, and macOS C tests, plus the original Android native test.
+  This is color evaluation, not yet a general multi-platform 2D renderer.
 - The previous Android native include is now just a forwarding compatibility
   header for existing native regressions.
 - Core has no JNI, Android UI, Apple SDK, Win32, or LibreDWG headers. Native
