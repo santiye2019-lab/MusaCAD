@@ -155,6 +155,14 @@
       "commit": "472da0a28173fe6d16c583caafdfb9b8f1f003ef",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "Fast CAD regression run 38709519673 PASS: degree-1/2 nonperiodic knot-defined SPLINE, rational homogeneous de Boor, nested INSERT, closed loops, invalid knot/weights rejection; ELLIPSE+SPLINE controls retained on 3D DXF safe save/reopen with unrelated LINE edit. Fit-only/periodic spline is explicitly unsupported; triangulation approximates only, not exact length or full DWG parity. Android/full modern DWG/device acceptance pending."
+    },
+    {
+      "id": "spline_nonuniform_interior_knot_fidelity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "01a2fde570dfbb5e568005a48de78c7b0bd71476",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression run 38710272134 PASS: knot-aware sampled rational/de Boor SPLINE points include short nonuniform spans, repeated degree-2 interior knot corners and reject degree+1 interior knot discontinuities. Exact evaluation at knots prevents missed kinks, but tessellated wires are approximate, read-only; fit-point-only, periodic, native modern DWG Save As and independent project parity remain unfinished."
     }
   ],
   "backlog": [
@@ -172,7 +180,7 @@
     },
     {
       "id": "advanced_2d_editing_roundtrip",
-      "points": 5,
+      "points": 4,
       "status": "in_progress",
       "evidence_required": "2D tool matrix, save/reopen tests"
     },
