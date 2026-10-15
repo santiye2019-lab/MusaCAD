@@ -50,6 +50,15 @@ Path: `core/native/`
   Android Java implementation stays in place until the JNI integration and
   real-file equivalence tests are separately approved. This is NOT a
   complete ACIS 3DSOLID/B-Rep kernel or certified quantity takeoff.
+- A new **opt-in Android JNI adapter** (`mesh_mass_jni.c` and
+  `Cad3dNativeMeshMass.java`) connects the existing checked triangle mesh
+  to the same portable 3D mass C ABI. It compares the native volume/XYZ
+  centroid with the existing Java `Cad3dSignedVolume` result and exposes a
+  clear diagnostic (pass, mismatch, native unavailable, rejected). Existing
+  Java/UI CAD volume behavior remains authoritative and unchanged until
+  real-device accuracy/performance tests allow switching. Host JVM tests
+  prove no native library is required for fallback. Android's native bridge
+  is **not** a Windows/iOS application or ACIS-solid implementation.
 - A portable 3D triangle **surface-area and area-weighted centroid** engine
   (`musa_core_mesh_surface_f32`) now mirrors the existing read-only Android
   Java `Cad3dSurfaceMetrics` math, including compensated sums and WCS origin
