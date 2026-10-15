@@ -24,7 +24,7 @@ GATES = (
 )
 STATES = {"not_run", "passed", "failed", "blocked"}
 HEX64 = re.compile(r"^[a-fA-F0-9]{64}$")
-TIMESTAMP = re.compile(r"^20\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d")
+TIMESTAMP = re.compile(r"^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}")
 SOURCE_TOOLS = {
     "autocad_2026_reference": "AutoCAD 2026",
     "musacad_same_input": "MusaCAD",
