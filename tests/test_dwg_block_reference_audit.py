@@ -98,7 +98,7 @@ class BlockReferenceAuditTest(unittest.TestCase):
         self.assertEqual(audit.compare_independent(source_blocks(),source_inserts())[
             "independent_block_reference_result"],"block_reference_metadata_parity_only")
         for code,value in (("70","3"),("71","4"),("44","120"),
-                           ("45","-50"),("210","0.25"),("220","1"),("230","0")):
+                           ("45","-50"),("210","0.25"),("220","1"),("230","-1")):
             changed=source_inserts()
             changed[0]["groups"][code]=value
             self.assertEqual(audit.compare_independent(source_blocks(),changed)[
