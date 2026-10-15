@@ -41,6 +41,12 @@ jobs:
           mkdir -p /tmp/musacad-block-tests
           javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-block-tests DxfBlocksTest
+      - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-zinsert-tests
+          javac -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java tests/Dxf3dMeshTest.java
+          java -cp /tmp/musacad-zinsert-tests Dxf3dMeshTest
       - name: CAD progress and source safety regressions
         run: |
           set -euo pipefail
