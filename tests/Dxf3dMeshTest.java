@@ -241,6 +241,32 @@ public final class Dxf3dMeshTest {
                 if(!refused)
                     throw new AssertionError("false periodic seam must not silently wrap");
             }
+            // Translating all invalid controls to far-away map coordinates
+            // must NOT dilute the tangent mismatch tolerance.
+            String translated=prefix+
+                "10\n100000000\n20\n100000000\n"+
+                "10\n100000002\n20\n100000000\n"+
+                "10\n100000001\n20\n100000002\n"+
+                "10\n100000002\n20\n100000000\n"+
+                "10\n100000000\n20\n100000000\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),translated,StandardCharsets.UTF_8);
+            boolean refused=false;
+            try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+            if(!refused)
+                throw new AssertionError("translated false periodic seam must be rejected");
+
+            // C2+ continuity is not yet proven for degree 3+ periodic curves;
+            // rejecting these is safer than showing a false smooth seam.
+            String cubic=prefix.replace("71\n2\n72\n8\n73\n5\n",
+                "71\n3\n72\n9\n73\n5\n").replace("40\n7\n","40\n7\n40\n8\n");
+            Files.writeString(file.toPath(),cubic+firstThree+
+                "10\n0\n20\n0\n10\n2\n20\n0\n"+
+                "0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+            refused=false;
+            try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+            if(!refused)
+                throw new AssertionError("unverified degree-3 periodic spline must reject");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
