@@ -78,6 +78,16 @@ jobs:
           mkdir -p /tmp/musacad-surface-centroid-tests
           javac -encoding UTF-8 -d /tmp/musacad-surface-centroid-tests app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/Cad3dSurfaceMetricsTest.java
           java -cp /tmp/musacad-surface-centroid-tests Cad3dSurfaceMetricsTest
+      - name: Optional Android 3D native mesh mass adapter preserves Java fallback
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-native-mass-jvm
+          javac -encoding UTF-8 -d /tmp/musacad-native-mass-jvm \
+            app/src/main/java/com/musa/cad/Cad3dMeshTopology.java \
+            app/src/main/java/com/musa/cad/Cad3dSignedVolume.java \
+            app/src/main/java/com/musa/cad/Cad3dNativeMeshMass.java \
+            tests/Cad3dNativeMeshMassTest.java
+          java -cp /tmp/musacad-native-mass-jvm Cad3dNativeMeshMassTest
       - name: Polygonal EXTRUDE shell, volumes and DXF reopen parity
         run: |
           set -euo pipefail
