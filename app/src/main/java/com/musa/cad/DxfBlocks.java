@@ -221,10 +221,6 @@ public final class DxfBlocks {
         int columns=r.integer(70,1),rows=r.integer(71,1);
         if(columns<1||rows<1||(long)columns*rows>100000L||(!positiveZ&&!negativeZ)||(((int)block.header.number(70,0))&12)!=0||!block.header.text(1,"").isEmpty()){result.skipped++;return;}
         double sx=r.number(41,1),sy=r.number(42,1);if(sx==0||sy==0){result.skipped++;return;}
-        if(directRoot){
-            String rawName=r.text(2,"").trim();
-            if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
-        }
         double bx=block.header.number(10,0),by=block.header.number(20,0),degrees=r.number(50,0),ix=r.number(10,0),iy=r.number(20,0);
         double columnSpacing=r.number(44,0),rowSpacing=r.number(45,0),angle=Math.toRadians(degrees),co=Math.cos(angle),si=Math.sin(angle);
         // Finite DXF values may overflow during rotation, array spacing, or
@@ -246,6 +242,12 @@ public final class DxfBlocks {
             if(!checkLocal.isFinite()||!parent.thenLocal(checkLocal).isFinite()){
                 result.skipped++;return;
             }
+        }
+        // Keep takeoff counts in sync with accepted geometry: an INSERT rejected
+        // by transform preflight must not appear in the material schedule.
+        if(directRoot){
+            String rawName=r.text(2,"").trim();
+            if(!rawName.isEmpty())result.blockInsertions.add(new BlockInsertion(rawName,layer,layout,columns*rows));
         }
         // MINSERT/INSERT arrays repeat the insertion point in OCS. Rotation applies to
         // the whole array; spacing is a drawing-unit distance and is not block-scaled.
