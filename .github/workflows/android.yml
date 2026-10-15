@@ -895,7 +895,9 @@ jobs:
           assert measured<ui, "large CAD mesh area must not block the UI thread"
           assert "openingSurfaceMetrics=initialMetrics;" in code
           assert "tam B-Rep yüzeyi veya kesin metraj değildir" in code
-          assert "Eksik/temsili ACIS geometrisi nedeniyle kısmi" in code
+          assert "Eksik blok/ACIS geometrisi nedeniyle kısmi" in code
+          assert "mesh.skippedBlockReferences>0" in code
+          assert "blok başvurusu açılamadı" in code
           PY
 
       - name: Test 3D triangle shell topology and honest solid diagnostics
