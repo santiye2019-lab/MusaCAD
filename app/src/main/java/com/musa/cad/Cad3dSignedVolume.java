@@ -53,7 +53,7 @@ public final class Cad3dSignedVolume {
         // coordinates may be millions of drawing units from (0,0,0).
         // Cross products about global zero lose accuracy catastrophically.
         double sum=0d,correction=0d;
-        double mx=0d,my=0d,mz=0d,cx=0d,cy=0d,cz=0d;
+        double mx=0d,my=0d,mz=0d,centroidCorrectionX=0d,centroidCorrectionY=0d,centroidCorrectionZ=0d;
         for(int i=0;i<triangles.length;i+=3){
             int ia=triangles[i],ib=triangles[i+1],ic=triangles[i+2];
             if(ia<0||ib<0||ic<0||ia>=vertices||ib>=vertices||ic>=vertices)
@@ -85,9 +85,9 @@ public final class Cad3dSignedVolume {
             if(!Double.isFinite(tx)||!Double.isFinite(ty)||!Double.isFinite(tz))
                 throw new IllegalArgumentException("CAD centroid moment overflow");
             double nx=mx+tx,ny=my+ty,nz=mz+tz;
-            cx+=(Math.abs(mx)>=Math.abs(tx))?(mx-nx)+tx:(tx-nx)+mx;
-            cy+=(Math.abs(my)>=Math.abs(ty))?(my-ny)+ty:(ty-ny)+my;
-            cz+=(Math.abs(mz)>=Math.abs(tz))?(mz-nz)+tz:(tz-nz)+mz;
+            centroidCorrectionX+=(Math.abs(mx)>=Math.abs(tx))?(mx-nx)+tx:(tx-nx)+mx;
+            centroidCorrectionY+=(Math.abs(my)>=Math.abs(ty))?(my-ny)+ty:(ty-ny)+my;
+            centroidCorrectionZ+=(Math.abs(mz)>=Math.abs(tz))?(mz-nz)+tz:(tz-nz)+mz;
             mx=nx;my=ny;mz=nz;
         }
         double signed=sum+correction;
@@ -96,9 +96,9 @@ public final class Cad3dSignedVolume {
         // Indexed shell with 0 algebraic volume cannot be certified as an
         // enclosing mesh (e.g. offsetting/orientation cancellations).
         if(signed==0d)return new Result(false,0d,faces,Double.NaN,Double.NaN,Double.NaN);
-        double centerX=ox+(mx+cx)/signed;
-        double centerY=oy+(my+cy)/signed;
-        double centerZ=oz+(mz+cz)/signed;
+        double centerX=ox+(mx+centroidCorrectionX)/signed;
+        double centerY=oy+(my+centroidCorrectionY)/signed;
+        double centerZ=oz+(mz+centroidCorrectionZ)/signed;
         if(!Double.isFinite(centerX)||!Double.isFinite(centerY)||!Double.isFinite(centerZ))
             throw new IllegalArgumentException("CAD shell centroid overflow");
         return new Result(true,signed,faces,centerX,centerY,centerZ);
