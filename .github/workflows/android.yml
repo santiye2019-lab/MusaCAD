@@ -448,6 +448,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_layer_table_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_block_reference_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layout_viewport_audit.py' -v
       - name: Guard native 3D polyline first paint
         run: |
           grep -q 'DWG_TYPE_POLYLINE_3D' app/src/main/cpp/native_scene.c
