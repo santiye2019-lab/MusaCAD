@@ -50,6 +50,14 @@ Path: `core/native/`
   Android Java implementation stays in place until the JNI integration and
   real-file equivalence tests are separately approved. This is NOT a
   complete ACIS 3DSOLID/B-Rep kernel or certified quantity takeoff.
+- A portable 3D triangle **surface-area and area-weighted centroid** engine
+  (`musa_core_mesh_surface_f32`) now mirrors the existing read-only Android
+  Java `Cad3dSurfaceMetrics` math, including compensated sums and WCS origin
+  shifts. The common C core includes open surface, cube, large WCS, zero-area
+  and malformed mesh regression tests. It is compiled on Linux/Windows/macOS,
+  plus iPhoneOS arm64 object-only. Android's existing Java output is unchanged
+  until an independently tested adapter is selected. This is NOT analytic
+  ACIS face area or certified engineering metraj.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.

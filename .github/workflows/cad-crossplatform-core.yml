@@ -62,6 +62,11 @@ jobs:
             -c core/native/src/musacad_mesh_mass.c \
             -o "$RUNNER_TEMP/musacad-mesh-mass-iphoneos-arm64.o"
           test -s "$RUNNER_TEMP/musacad-mesh-mass-iphoneos-arm64.o"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
+            -c core/native/src/musacad_mesh_surface.c \
+            -o "$RUNNER_TEMP/musacad-mesh-surface-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-mesh-surface-iphoneos-arm64.o"
           # Compile the same geometry unit sources for iPhoneOS too. Object-only
           # checks catch missing C headers/platform assumptions; they are NOT
           # a simulator run or iPhone acceptance.
