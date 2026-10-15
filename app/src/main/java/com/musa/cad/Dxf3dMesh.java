@@ -16,7 +16,7 @@ import java.util.List;
  * Bounded XYZ geometry reader for MusaCAD 3D.
  * Expands ordinary INSERT blocks and supports:
  * 3DFACE, polyface/polygon mesh, LINE, LWPOLYLINE with bulge arcs,
- * CIRCLE/ARC and ELLIPSE sampled outlines,
+ * CIRCLE/ARC, ELLIPSE and knot-defined (rational) SPLINE sampled outlines,
  * ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
@@ -132,6 +132,9 @@ public final class Dxf3dMesh {
                 appendEdge(explicitEdges,start,start+1);
             }else if("LWPOLYLINE".equals(r.type)){
                 appendLightweightPolyline(this,p);
+            }else if("SPLINE".equals(r.type)){
+                appendSplineOutline(this,p);
+                approximateCurves++;
             }else if("ELLIPSE".equals(r.type)){
                 appendEllipseOutline(this,p);
                 approximateCurves++;
@@ -327,6 +330,161 @@ public final class Dxf3dMesh {
         }
         c.sourceLines.add(-1);
         c.coordinateSlots.add(-1);
+    }
+
+    private static final class SplineControl {
+        final double x;
+        double y,z;
+        boolean hasY,hasZ;
+        SplineControl(double x){this.x=x;}
+    }
+
+    /**
+     * DXF SPLINE uses WCS control vertices, degree (71), nondecreasing knots
+     * (40), and optional rational weights (41). Evaluate its true rational
+     * B-spline with homogeneous de Boor; only the visible tessellation is
+     * approximate. A fit-point-only or periodic SPLINE cannot be faithfully
+     * reconstructed by this evaluator and is explicitly rejected.
+     */
+    private static void appendSplineOutline(Collector c,DxfBlocks.Placement p)
+            throws IOException{
+        DxfBlocks.Record r=p.record;
+        int degree=r.integer(71,0),flags=r.integer(70,0);
+        if(degree<1||degree>7||flags<0||((flags&2)!=0))
+            throw new IOException("SPLINE derece/bayrak desteklenmiyor (periyodik eğri dahil)");
+        ArrayList<Double> knots=new ArrayList<>(),weights=new ArrayList<>();
+        ArrayList<SplineControl> controls=new ArrayList<>();
+        List<String> tags=r.tags();
+        for(int i=r.from;i+1<r.to;i+=2){
+            int code;
+            try{code=Integer.parseInt(tags.get(i).trim());}
+            catch(NumberFormatException e){throw new IOException("SPLINE DXF etiketi geçersiz",e);}
+            if(code!=40&&code!=41&&code!=10&&code!=20&&code!=30)continue;
+            double value;
+            try{value=Double.parseDouble(tags.get(i+1).trim());}
+            catch(NumberFormatException e){throw new IOException("SPLINE sayısal değeri geçersiz",e);}
+            if(!Double.isFinite(value))throw new IOException("SPLINE sayısal değeri sonlu değil");
+            switch(code){
+                case 40:
+                    if(knots.size()>=4096+8)throw new IOException("SPLINE knot sınırı aşıldı");
+                    knots.add(value);
+                    break;
+                case 41:
+                    if(weights.size()>=4096)throw new IOException("SPLINE ağırlık sınırı aşıldı");
+                    weights.add(value);
+                    break;
+                case 10:
+                    if(!controls.isEmpty()&&!controls.get(controls.size()-1).hasY)
+                        throw new IOException("SPLINE kontrol noktasında Y eksik");
+                    if(controls.size()>=4096)throw new IOException("SPLINE kontrol noktası sınırı aşıldı");
+                    controls.add(new SplineControl(value));
+                    break;
+                case 20:
+                case 30:
+                    if(controls.isEmpty())throw new IOException("SPLINE ilk kontrol X bulunamadı");
+                    SplineControl point=controls.get(controls.size()-1);
+                    if(code==20){
+                        if(point.hasY)throw new IOException("SPLINE yinelenen Y koordinatı");
+                        point.y=value;point.hasY=true;
+                    }else{
+                        if(point.hasZ)throw new IOException("SPLINE yinelenen Z koordinatı");
+                        point.z=value;point.hasZ=true;
+                    }
+                    break;
+                default:break;
+            }
+        }
+        int count=controls.size();
+        if(count<degree+1||count<2||r.integer(73,count)!=count||
+            r.integer(72,knots.size())!=knots.size()||
+            knots.size()!=count+degree+1)
+            throw new IOException("SPLINE knot/kontrol noktası sayısı eksik veya geçersiz");
+        if(!controls.get(count-1).hasY)
+            throw new IOException("SPLINE son kontrol noktasında Y eksik");
+        if(!weights.isEmpty()&&weights.size()!=count)
+            throw new IOException("SPLINE rasyonel ağırlık sayısı geçersiz");
+        for(int i=0;i<count;i++){
+            if(!controls.get(i).hasY)
+                throw new IOException("SPLINE kontrol noktasında Y eksik");
+            if(!weights.isEmpty()&&(!(weights.get(i)>0)||weights.get(i)>1e12))
+                throw new IOException("SPLINE rasyonel ağırlığı geçersiz");
+        }
+        for(int i=1;i<knots.size();i++){
+            if(knots.get(i)<knots.get(i-1))
+                throw new IOException("SPLINE knot dizisi azalan sırada");
+        }
+        double begin=knots.get(degree),end=knots.get(count);
+        if(!(end>begin)||!Double.isFinite(end-begin))
+            throw new IOException("SPLINE geçerli parametre aralığı yok");
+        boolean closed=(flags&1)!=0;
+        // Closed, nonperiodic splines must evaluate to the same geometric
+        // endpoint. Do not invent a closing segment across an open path.
+        if(closed){
+            double[] a=evaluateSpline(controls,knots,weights,degree,begin);
+            double[] b=evaluateSpline(controls,knots,weights,degree,end);
+            if(Math.hypot(Math.hypot(a[0]-b[0],a[1]-b[1]),a[2]-b[2])>1e-6)
+                throw new IOException("SPLINE kapalı bayrağı uç noktaları eşleştirmiyor");
+        }
+        int segments=Math.min(2048,Math.max(24,(count-1)*12));
+        long vertices=closed?segments:segments+1;
+        if(c.points.n/3+vertices>MAX_VERTICES||
+           c.explicitEdges.n/2+(long)segments>MAX_EDGES)
+            throw new IOException("SPLINE yaklaşık görüntüleme sınırı aşıldı");
+        int first=c.points.n/3;
+        for(int i=0;i<vertices;i++){
+            double u=begin+(end-begin)*((double)i/segments);
+            double[] point=evaluateSpline(controls,knots,weights,degree,u);
+            double[] world=p.spatial.point(point[0],point[1],point[2]);
+            for(int axis=0;axis<3;axis++){
+                if(!Double.isFinite(world[axis])||Math.abs(world[axis])>1e9)
+                    throw new IOException("SPLINE 3B koordinat sınırı aşıldı");
+                c.points.add((float)world[axis]);
+            }
+            c.sourceLines.add(-1);
+            c.coordinateSlots.add(-1);
+            if(i>0)appendEdge(c.explicitEdges,first+i-1,first+i);
+        }
+        if(closed)appendEdge(c.explicitEdges,first+segments-1,first);
+    }
+
+    /** Rational B-spline point from homogeneous de Boor evaluation. */
+    private static double[] evaluateSpline(ArrayList<SplineControl> cp,
+            ArrayList<Double> knots,ArrayList<Double> weights,int degree,double u)
+            throws IOException{
+        int n=cp.size()-1,span=n;
+        if(u<knots.get(n+1)){
+            int low=degree,high=n+1;
+            while(high-low>1){
+                int mid=(low+high)>>>1;
+                if(u<knots.get(mid))high=mid;else low=mid;
+            }
+            span=low;
+        }
+        double[][] d=new double[degree+1][4];
+        for(int j=0;j<=degree;j++){
+            int index=span-degree+j;
+            SplineControl p=cp.get(index);
+            double weight=weights.isEmpty()?1d:weights.get(index);
+            d[j][0]=p.x*weight;d[j][1]=p.y*weight;d[j][2]=p.z*weight;d[j][3]=weight;
+        }
+        for(int order=1;order<=degree;order++){
+            for(int j=degree;j>=order;j--){
+                int k=span-degree+j;
+                double denominator=knots.get(k+degree-order+1)-knots.get(k);
+                double alpha=denominator==0?0:(u-knots.get(k))/denominator;
+                if(!Double.isFinite(alpha))throw new IOException("SPLINE knot oranı geçersiz");
+                for(int c=0;c<4;c++)
+                    d[j][c]=(1-alpha)*d[j-1][c]+alpha*d[j][c];
+            }
+        }
+        double w=d[degree][3];
+        if(!Double.isFinite(w)||!(w>0))
+            throw new IOException("SPLINE homojen ağırlık geçersiz");
+        double[] point={d[degree][0]/w,d[degree][1]/w,d[degree][2]/w};
+        for(double coordinate:point)
+            if(!Double.isFinite(coordinate))
+                throw new IOException("SPLINE homojen koordinat geçersiz");
+        return point;
     }
 
     /**
