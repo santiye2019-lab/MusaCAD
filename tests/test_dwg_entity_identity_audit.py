@@ -288,6 +288,134 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
         self.assertEqual(failure["independent_geometry_result"],
                          "primitive_subset_mismatch")
 
+    def test_independent_ordered_spline_knots_weights_fit_and_control_parity(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        controls = [
+            (70, "8"), (71, "2"), (72, "6"), (73, "3"), (74, "0"),
+            (40, "0"), (40, "0"), (40, "0"), (40, "1"), (40, "1"), (40, "1"),
+            (41, "1"), (41, "0.7071067811865475244"), (41, "1"),
+            (10, "1"), (20, "0"), (30, "3"),
+            (10, "1"), (20, "1"), (30, "3"),
+            (10, "0"), (20, "1"), (30, "3"),
+        ]
+        fitted = [
+            (70, "8"), (71, "3"), (72, "0"), (73, "0"), (74, "3"),
+            (11, "0"), (21, "0"), (31, "2"),
+            (11, "3"), (21, "4"), (31, "2"),
+            (11, "6"), (21, "0"), (31, "2"),
+        ]
+        audit.observe("ENTITIES", "SPLINE",
+                      [(5, "AB"), (8, "PRIVATE MECHANICAL")] + controls)
+        audit.observe("BLOCKS", "SPLINE",
+                      [(5, "BC"), (8, "PRIVATE STRUCTURAL")] + fitted)
+
+        def ref(handle, values):
+            return {"handle":handle, "type":"SPLINE",
+                    "groups":[[str(code), value] for code, value in values]}
+
+        source = [ref("AB", controls), ref("BC", fitted)]
+        passing = audit.compare_independent_geometry(source)
+        self.assertEqual(passing["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(passing["independent_geometry_checked"], 2)
+        self.assertNotIn("PRIVATE", str(passing))
+        self.assertNotIn("0.7071067811865475244", str(passing))
+        # Exact repeated groups must remain ordered; a mapping would erase
+        # all but the final knot, weight and coordinate.
+        for slot, new_value in ((8, "1.00000000000000000000000001"),
+                                (13, "0.7071067811865475245"),
+                                (17, "1.0000000001")):
+            with self.subTest(slot=slot):
+                modified = [dict(row, groups=[pair.copy() for pair in row["groups"]])
+                            for row in source]
+                modified[0]["groups"][slot][1] = new_value
+                report = audit.compare_independent_geometry(modified)
+                self.assertEqual(report["independent_geometry_parameter_mismatches"], 1)
+                self.assertEqual(report["independent_geometry_result"],
+                                 "primitive_subset_mismatch")
+        # One fit-coordinate mismatch must be noticed even when all control
+        # point and knot counts remain unchanged.
+        modified = [dict(row, groups=[pair.copy() for pair in row["groups"]])
+                    for row in source]
+        modified[1]["groups"][8][1] = "3.0000000000000001"
+        self.assertEqual(audit.compare_independent_geometry(modified)[
+            "independent_geometry_parameter_mismatches"], 1)
+
+        invalids = (
+            {"handle":"AB", "type":"SPLINE", "groups":{"40":"1"}},
+            ref("AB", controls[:]),
+            ref("AB", controls[:]),
+            ref("AB", controls[:]),
+            ref("AB", controls[:]),
+            ref("AB", controls[:]),
+        )
+        invalids[1]["groups"][0] = ["070", "8"]
+        invalids[2]["groups"][5][1] = "NaN"
+        invalids[3]["groups"][3][1] = "4"  # wrong control count
+        invalids[4]["groups"][9][1] = "0.9"  # nonmonotonic knot
+        invalids[5]["groups"][13][1] = "0"  # invalid rational weight
+        for entry in invalids:
+            with self.subTest(case=str(entry["groups"])[:60]):
+                with self.assertRaises(ValueError):
+                    audit.compare_independent_geometry([entry, source[1]])
+        duplicate_scalar = controls[:2]+[controls[1]]+controls[2:]
+        with self.assertRaises(ValueError):
+            audit.compare_independent_geometry([ref("AB", duplicate_scalar),source[1]])
+
+        broken = DwgEntityIdentityAudit(geometry_enabled=True)
+        broken.observe("ENTITIES","SPLINE",
+                       [(5, "AB"), (8, "PRIVATE MECHANICAL")] +
+                       controls[:3]+[(72, "5")]+controls[4:])
+        report = broken.compare_independent_geometry([source[0]])
+        self.assertEqual(report["independent_geometry_invalid_decoded"], 1)
+        self.assertEqual(report["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_independent_spline_pipeline_detects_weight_and_fit_drift(self):
+        spline = [
+            (5,"AA"),(8,"PRIVATE_SPLINE"),(70,"8"),(71,"2"),
+            (72,"6"),(73,"3"),(74,"0"),
+            (40,"0"),(40,"0"),(40,"0"),(40,"1"),(40,"1"),(40,"1"),
+            (41,"1"),(41,"0.7"),(41,"1"),
+            (10,"1"),(20,"0"),(10,"1"),(20,"1"),(10,"0"),(20,"1")
+        ]
+        dxf = (record("SECTION", (2, "ENTITIES")) +
+               record("SPLINE", *spline) + record("ENDSEC") + record("EOF"))
+        geom = [[str(code),value] for code,value in spline if code not in (5,8)]
+        reference = [{"handle":"AA","type":"SPLINE","groups":geom}]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            original = root / "read-only.dwg"
+            original.write_bytes(b"AC1032 synthetic-only file")
+            converter = root / "mock"
+            converter.write_text("#!/bin/sh\\nexit 0\\n", encoding="ascii")
+            converter.chmod(0o700)
+
+            def converted(*args, **kwargs):
+                Path(args[0][2]).write_text(dxf,encoding="utf-8")
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=9\\n")
+                return Mock(returncode=0)
+
+            with patch("private_dwg_read_audit.subprocess.run",side_effect=converted):
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    good = convert_one(original,converter,Path(tmp),5,128,
+                                       independent_geometry=reference)
+                changed = [dict(reference[0], groups=[g.copy() for g in geom])]
+                changed[0]["groups"][13][1] = "0.70000000000001"
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    drift = convert_one(original,converter,Path(tmp),5,128,
+                                        independent_geometry=changed)
+            self.assertEqual(good["independent_geometry_result"],
+                             "primitive_subset_parity_only")
+            self.assertEqual(good["status"],"decoded_dxf_inventory")
+            self.assertEqual(drift["independent_geometry_result"],
+                             "primitive_subset_mismatch")
+            self.assertEqual(drift["status"],
+                             "decoded_dxf_inventory_geometry_mismatch")
+            self.assertNotIn("PRIVATE_SPLINE", str(good))
+            self.assertNotIn("0.7", str(good))
+
     def test_independent_3dface_xyz_and_edge_visibility_parity(self):
         audit = DwgEntityIdentityAudit(geometry_enabled=True)
         # The converted triangular face omits corner four. It is exactly
