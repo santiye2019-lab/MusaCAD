@@ -11,8 +11,13 @@ from dwg_entity_identity_audit import DwgEntityIdentityAudit
 _LIMIT=250_000
 _HEX=re.compile(r"[0-9A-Fa-f]{1,32}\Z")
 _INTEGER=re.compile(r"[+-]?\d+\Z")
-_FLOAT_GROUPS=(10,20,30,41,42,43,50)
-_DEFAULT_INSERT={30:"0",41:"1",42:"1",43:"1",50:"0"}
+# Extended INSERT coverage: MINSERT grid and extrusion affect displayed geometry.
+_FLOAT_GROUPS=(10,20,30,41,42,43,44,45,50,210,220,230)
+_INTEGER_INSERT_GROUPS=(70,71)
+_DEFAULT_INSERT={
+    30:"0",41:"1",42:"1",43:"1",44:"0",45:"0",50:"0",
+    210:"0",220:"0",230:"1",
+}
 
 class DwgBlockReferenceAudit:
     def __init__(self):
@@ -96,7 +101,21 @@ class DwgBlockReferenceAudit:
                     raise ValueError("incomplete INSERT coordinates")
         if any(groups[code]==0 for code in (41,42,43)):
             raise ValueError("zero INSERT scale invalid")
-        return (name,layer,space,layout,tuple((c,groups[c]) for c in _FLOAT_GROUPS))
+        if all(groups[code]==0 for code in (210,220,230)):
+            raise ValueError("zero INSERT extrusion direction invalid")
+        counts={}
+        for code in _INTEGER_INSERT_GROUPS:
+            value=cls._once(pairs,code)
+            value="1" if value is None else value
+            if not isinstance(value,str) or not _INTEGER.fullmatch(value):
+                raise ValueError("invalid MINSERT array count")
+            count=int(value)
+            if count<1 or count>65535:
+                raise ValueError("out-of-range MINSERT array count")
+            counts[code]=count
+        return (name,layer,space,layout,
+                tuple((c,groups[c]) for c in _FLOAT_GROUPS),
+                tuple((c,counts[c]) for c in _INTEGER_INSERT_GROUPS))
 
     @classmethod
     def _handle(cls,raw):
@@ -160,7 +179,7 @@ class DwgBlockReferenceAudit:
             if handle in inserts:
                 raise ValueError("duplicate original INSERT")
             inserts[handle]=self._insert(handle,r["name"],r["layer"],r["space"],r["layout"],
-                self._reference_pairs(r["groups"],_FLOAT_GROUPS))
+                self._reference_pairs(r["groups"],_FLOAT_GROUPS+_INTEGER_INSERT_GROUPS))
         a,b=set(self.blocks),set(blocks)
         ia,ib=set(self.inserts),set(inserts)
         changed_blocks=sum(self.blocks[name]!=blocks[name] for name in a&b)
@@ -188,7 +207,8 @@ class DwgBlockReferenceAudit:
             "independent_duplicate_decoded_inserts":self.duplicate_inserts,
             "independent_block_reference_scope":(
                 "BLOCK flags/XREF source path/origin and INSERT handle/name/layer/"
-                "space/layout/2D-3D position/XYZ scale/rotation only. "
+                "space/layout/2D-3D position/XYZ scale/rotation/MINSERT grid/"
+                "extrusion direction only. "
                 "No XREF resolution, dynamic block evaluation, or screen parity."),
         }
 
