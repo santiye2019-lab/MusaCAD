@@ -113,6 +113,36 @@ public final class Dxf3dSafeSaveTest {
             catch(IOException expected){rejected=true;}
             yes(rejected&&cache.listFiles()!=null&&cache.listFiles().length==0,
                 "non-finite geometry must not produce a staged or destination file");
+
+            // An independent source LINE edit must not rewrite LWPOLYLINE
+            // bulges, elevation or tessellated non-editable helper vertices.
+            String withPolyline="0\nSECTION\n2\nENTITIES\n"+
+                "0\nLWPOLYLINE\n90\n2\n38\n4\n"+
+                "10\n0\n20\n0\n42\n1\n10\n4\n20\n0\n"+
+                "0\nLINE\n10\n0\n20\n1\n30\n2\n11\n2\n21\n1\n31\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(source.toPath(),withPolyline,StandardCharsets.UTF_8);
+            CadSaveSourceIntegrity polylineOpened=CadSaveSourceIntegrity.capture(source);
+            Dxf3dMesh mixed=Dxf3dMesh.read(source);
+            yes(mixed.approximateCurves==1&&mixed.xyz.length==27*3,
+                "mixed DXF must read bulge path and editable straight line");
+            float[] mixOriginal=mixed.xyz.clone();
+            int editableLineVertex=25;
+            yes(mixed.sourceLines[editableLineVertex]>=0,
+                "source LINE must remain editable after polyline tessellation");
+            mixed.xyz[editableLineVertex*3+2]=8f;
+            Dxf3dSafeSave.VerifiedStage mixedStaged=
+                Dxf3dSafeSave.stage(source,mixed,mixOriginal,cache,polylineOpened);
+            try{
+                String output=Files.readString(mixedStaged.file().toPath(),StandardCharsets.UTF_8);
+                yes(output.contains("42\n1\n")&&output.contains("38\n4\n"),
+                    "safe save must keep original LWP bulge and elevation tags");
+                Dxf3dMesh mixedAgain=Dxf3dMesh.read(mixedStaged.file());
+                yes(mixedAgain.approximateCurves==1&&
+                    Arrays.equals(mixedAgain.xyz,mixed.xyz)&&
+                    Arrays.equals(mixedAgain.edges,mixed.edges),
+                    "save/reopen must retain curve plus editable LINE geometry");
+            }finally{mixedStaged.delete();}
         }finally{
             Files.deleteIfExists(source.toPath());
             File[] abandoned=cache.listFiles();
