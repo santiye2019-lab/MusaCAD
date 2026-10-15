@@ -39,10 +39,15 @@ JSON manifest named `<source_sha256>.json` in an external directory, containing
 and `geometry_records`. Each geometry entry includes a source handle,
 entity type and numeric DXF group values; use `--independent-manifest-dir`
 when running `tests/private_dwg_read_audit.py`. For the simple primitives
-below, `groups` is a string-valued DXF group-code map. For **SPLINE**,
-repeated knot, weight and vertex codes cannot be represented as a mapping:
-`groups` must instead be an **ordered array of string pairs**, such as
-`[["70","8"],["71","2"],["72","6"],["73","3"],["40","0"],...]`.
+below, `groups` is a string-valued DXF group-code map. For **SPLINE**
+and **LWPOLYLINE**, repeated values cannot be represented as a mapping:
+`groups` must instead be an **ordered array of string pairs**. SPLINE
+example: `[["70","8"],["71","2"],["72","6"],["73","3"],["40","0"],...]`.
+LWPOLYLINE example: `[["90","2"],["70","1"],["10","0"],["20","0"],["42","1"],["10","4"],["20","0"]]`.
+The LWPOLYLINE subset includes declared vertex counts, open/closed flag,
+elevation, thickness, constant/vertex widths, signed per-vertex bulges,
+optional vertex IDs and OCS normals. A swapped bulge can change the curve
+without changing endpoints; the audit checks the original ordered values.
 The independent reader must preserve the covered source group order;
 inventing source control points from MusaCAD's own converted DXF is not
 independent evidence.
@@ -51,7 +56,8 @@ This optional source-bound comparison now covers **LINE** XYZ endpoints,
 **POINT** position/normal, **CIRCLE/ARC** center/radius/angle/normal and
 **3DFACE** XYZ corners plus group 70 invisible-edge bits, and the
 numeric **SPLINE parameter subset** (degree, flags, ordered knot vector,
-control/fit XYZ, rational weights and declared counts). This catches source
+control/fit XYZ, rational weights and declared counts), plus **LWPOLYLINE**
+ordered vertices, signed bulges, widths and OCS/elevation. This catches source
 curve-definition drift even when entity counts and overall extents match;
 it does **not** evaluate curve shape, certify fit-only reconstruction, or prove
 real-DWG parity without an independently obtained source manifest. Absent fourth
