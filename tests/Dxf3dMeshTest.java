@@ -32,6 +32,9 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        testCircularAndArcOutlines();
+        testTiltedCircularOcsAndNestedInsert();
+        testInvalidCurvesFailClosed();
         test3dFaceInvisibleEdgesAndSafeRoundtrip();
         testPolygonMesh();
         testInsertedBlockLine();
@@ -115,6 +118,108 @@ public final class Dxf3dMeshTest {
             Files.deleteIfExists(file.toPath());
             Files.deleteIfExists(saved.toPath());
         }
+    }
+
+    private static void assertCurveNear(float actual,double expected,String why){
+        if(!Float.isFinite(actual)||Math.abs(actual-expected)>0.0002)
+            throw new AssertionError(why+": "+actual+" != "+expected);
+    }
+
+    private static void testCircularAndArcOutlines() throws Exception {
+        File file=File.createTempFile("mesh3d-circle-arc-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nCIRCLE\n10\n10\n20\n20\n30\n30\n40\n2\n"+
+                "0\nARC\n10\n0\n20\n0\n30\n5\n40\n10\n50\n350\n51\n10\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=2||mesh.triangles.length!=0||
+               mesh.xyz.length!=52*3||mesh.edges.length!=51*2)
+                throw new AssertionError("CIRCLE/ARC must expand to bounded wire-only vertices/edges");
+            assertCurveNear(mesh.xyz[0],12,"circle first X");
+            assertCurveNear(mesh.xyz[1],20,"circle first Y");
+            assertCurveNear(mesh.xyz[2],30,"circle first Z");
+            assertCurveNear(mesh.xyz[12*3],10,"circle quarter X");
+            assertCurveNear(mesh.xyz[12*3+1],22,"circle quarter Y");
+            if(mesh.edges[94]!=47||mesh.edges[95]!=0)
+                throw new AssertionError("circle must close exactly, not add a degenerate last vertex");
+            assertCurveNear(mesh.xyz[48*3],10*Math.cos(Math.toRadians(350)),"wrapped arc first X");
+            assertCurveNear(mesh.xyz[48*3+1],10*Math.sin(Math.toRadians(350)),"wrapped arc first Y");
+            assertCurveNear(mesh.xyz[51*3],10*Math.cos(Math.toRadians(10)),"wrapped arc last X");
+            assertCurveNear(mesh.xyz[51*3+1],10*Math.sin(Math.toRadians(10)),"wrapped arc last Y");
+            if(mesh.edges[mesh.edges.length-2]!=50||mesh.edges[mesh.edges.length-1]!=51)
+                throw new AssertionError("ARC must remain open");
+            for(int i=0;i<mesh.sourceLines.length;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("sampled curve point must not be edited as a source DXF XYZ");
+
+            float[] original=mesh.xyz.clone();
+            mesh.xyz[0]+=1f;
+            boolean refused=false;
+            try{
+                Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,original);
+            }catch(java.io.IOException expected){refused=true;}
+            if(!refused)throw new AssertionError("sampled arc/circle XYZ must be read-only");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testTiltedCircularOcsAndNestedInsert() throws Exception {
+        File file=File.createTempFile("mesh3d-circle-ocs-", ".dxf");
+        try{
+            // Normal (0,1,0) has OCS X=(-1,0,0), Y=(0,0,1).
+            String tilted="0\nSECTION\n2\nENTITIES\n"+
+                "0\nCIRCLE\n10\n4\n20\n5\n30\n6\n40\n2\n"+
+                "210\n0\n220\n1\n230\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),tilted,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=1||mesh.edges.length!=96)
+                throw new AssertionError("tilted circle path not generated");
+            assertCurveNear(mesh.xyz[0],-6,"tilted OCS X");
+            assertCurveNear(mesh.xyz[1],6,"tilted OCS Y");
+            assertCurveNear(mesh.xyz[2],5,"tilted OCS Z");
+            assertCurveNear(mesh.xyz[12*3],-4,"tilted circle quarter X");
+            assertCurveNear(mesh.xyz[12*3+1],6,"tilted circle quarter Y");
+            assertCurveNear(mesh.xyz[12*3+2],7,"tilted circle quarter Z");
+
+            String nested="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nPIPE_CURVE\n10\n0\n20\n0\n30\n0\n"+
+                "0\nCIRCLE\n10\n1\n20\n0\n30\n2\n40\n1\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nPIPE_CURVE\n10\n10\n20\n20\n30\n30\n50\n90\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),nested,StandardCharsets.UTF_8);
+            Dxf3dMesh viaBlock=Dxf3dMesh.read(file);
+            if(viaBlock.approximateCurves!=1||viaBlock.edges.length!=96)
+                throw new AssertionError("inserted circle must expand to complete 3D path");
+            assertCurveNear(viaBlock.xyz[0],10,"insert rotated first X");
+            assertCurveNear(viaBlock.xyz[1],22,"insert rotated first Y");
+            assertCurveNear(viaBlock.xyz[2],32,"insert rotated first Z");
+            assertCurveNear(viaBlock.xyz[12*3],9,"insert rotated quarter X");
+            assertCurveNear(viaBlock.xyz[12*3+1],21,"insert rotated quarter Y");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testInvalidCurvesFailClosed() throws Exception {
+        File file=File.createTempFile("mesh3d-invalid-curve-", ".dxf");
+        try{
+            String[] invalid={
+                "0\nCIRCLE\n10\n0\n20\n0\n40\n0\n",
+                "0\nCIRCLE\n10\n0\n20\n0\n40\n4\n210\n0\n220\n0\n230\n0\n",
+                "0\nARC\n10\n0\n20\n0\n40\n4\n50\n90\n51\n90\n",
+                "0\nCIRCLE\n10\n0\n20\n0\n40\nNaN\n",
+                "0\nCIRCLE\n10\n0\n20\n0\n40\n1e308\n"
+            };
+            for(String entity:invalid){
+                Files.writeString(file.toPath(),
+                    "0\nSECTION\n2\nENTITIES\n"+entity+"0\nENDSEC\n0\nEOF\n",
+                    StandardCharsets.UTF_8);
+                boolean refused=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){refused=true;}
+                if(!refused)throw new AssertionError("invalid CIRCLE/ARC must fail closed");
+            }
+        }finally{Files.deleteIfExists(file.toPath());}
     }
 
     private static void testLineAndPolyline() throws Exception {
