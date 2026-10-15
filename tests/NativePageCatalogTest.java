@@ -1,0 +1,114 @@
+import com.musa.cad.NativePageCatalog;
+import com.musa.cad.NativeViewportPageCache;
+import java.util.List;
+
+public final class NativePageCatalogTest {
+    static NativeViewportPageCache.Cursor c(long top,long leaf){
+        return new NativeViewportPageCache.Cursor(top,leaf);
+    }
+    static void yes(boolean ok,String name){
+        if(!ok)throw new AssertionError(name);
+    }
+    static void reject(Runnable action,String name){
+        try{action.run();throw new AssertionError("expected rejection "+name);}
+        catch(IllegalArgumentException expected){}
+    }
+    public static void main(String[] args){
+        NativeViewportPageCache<String> cache=new NativeViewportPageCache<>(200,2);
+        NativePageCatalog catalog=new NativePageCatalog(10);
+        catalog.append(c(0,0),c(3,0),true,0,0,10,10,11);
+        catalog.append(c(3,0),c(3,4),true,20,0,30,10,20);
+        catalog.append(c(3,4),c(9,0),false,40,0,50,10,30);
+        yes(catalog.isDiscovered()&&catalog.size()==3,"discovery complete");
+        yes(!catalog.hasCompleteCachedCoverage(0),
+            "catalog EOF is not retained geometry");
+        yes(catalog.hasCompleteCachedCoverage(3),
+            "all verified pages retained permits constant-time full status");
+        yes(!catalog.hasCompleteCachedCoverage(2),
+            "one evicted page cannot be reported as complete");
+        yes(!catalog.hasCompleteCachedCoverage(4),
+            "extra page count is not a valid complete catalog");
+        yes(catalog.samePage(c(3,0),c(3,4),true,20,0,30,10,20),
+            "exact reload metadata");
+        yes(!catalog.samePage(c(3,0),c(3,5),true,20,0,30,10,20),
+            "no cursor drift");
+        yes(!catalog.samePage(c(3,0),c(3,4),true,21,0,30,10,20),
+            "no bounds drift");
+        yes(!catalog.samePage(c(3,0),c(3,4),true,20,0,30,10,21),
+            "no primitive loss");
+        reject(()->catalog.append(c(9,0),c(10,0),false,60,0,70,10,1),
+            "no append after terminal");
+        cache.put(c(0,0),c(3,0),true,0,0,10,10,100,"A");
+        cache.put(c(3,0),c(3,4),true,20,0,30,10,100,"B");
+        cache.visible(0,0,10,10);
+        cache.put(c(3,4),c(9,0),false,40,0,50,10,100,"C");
+        yes(!cache.contains(c(3,0)),"middle page evicted");
+        yes(catalog.get(c(3,0))!=null,"catalog metadata survives eviction");
+        yes(!cache.isComplete(),"cache stays honestly incomplete");
+        List<NativePageCatalog.Entry> missing=catalog.missingVisible(
+                cache,19,-1,31,11,3);
+        yes(missing.size()==1&&missing.get(0).start.equals(c(3,0)),
+            "only missing viewport page selected");
+        yes(cache.put(c(3,0),c(3,4),true,20,0,30,10,100,"B Reloaded"),
+            "restore evicted page");
+        yes(catalog.missingVisible(cache,19,-1,31,11,3).isEmpty(),
+            "re-fetched page no longer requested");
+        yes(!cache.contains(c(0,0)),"reload may evict a different page");
+        // Different page bounds: always choose central visible pages first.
+        cache.clear();
+        missing=catalog.missingVisible(cache,-10,-10,60,20,2);
+        yes(missing.size()==2,"bounded reload batch");
+        yes(missing.get(0).start.equals(c(3,0)),"nearest page first");
+        // Preflight must be read-only: invalid page continuations are
+        // rejected before a valid cached page could be evicted.
+        NativePageCatalog staged=new NativePageCatalog(2);
+        staged.requireAppend(c(0,0),c(1,0),true,0,0,1,1,1);
+        yes(staged.size()==0&&!staged.isDiscovered(),
+            "catalog preflight never mutates discovery");
+        reject(()->staged.requireAppend(c(3,0),c(4,0),true,0,0,1,1,1),
+            "preflight rejects a cursor gap");
+        staged.append(c(0,0),c(1,0),true,0,0,1,1,1);
+        yes(!staged.hasCompleteCachedCoverage(1),
+            "in-progress discovery is never fully complete");
+        staged.requireAppend(c(1,0),c(2,0),false,1,0,2,1,1);
+        yes(staged.size()==1,"preflight leaves existing pages unchanged");
+        NativePageCatalog bounded=new NativePageCatalog(1);
+        bounded.append(c(0,0),c(1,0),true,0,0,1,1,1);
+        reject(()->bounded.append(c(1,0),c(2,0),false,1,0,2,1,1),
+            "metadata memory cap");
+        reject(()->catalog.missingVisible(cache,2,2,1,1,1),
+            "inverted viewport rejected");
+        // Regression: a large drawing must return the exact nearest K pages
+        // without collecting/sorting all missing scene payloads on every zoom.
+        final int stressCount=20000;
+        NativePageCatalog stress=new NativePageCatalog(stressCount);
+        NativeViewportPageCache<String> emptyCache=new NativeViewportPageCache<>(1024,4);
+        for(int i=0;i<stressCount;i++){
+            stress.append(c(i,0),c(i+1L,0),i+1<stressCount,
+                    i,0,i+1,1,1);
+        }
+        List<NativePageCatalog.Entry> closest=stress.missingVisible(
+                emptyCache,-1,-1,stressCount+1,2,4);
+        yes(closest.size()==4,"large drawing keeps requested batch size");
+        long[] expected={9999,10000,9998,10001};
+        for(int i=0;i<expected.length;i++)
+            yes(closest.get(i).start.equals(c(expected[i],0)),
+                "large drawing nearest-page ordering "+i);
+        // Already cached center page must be skipped without changing LRU.
+        emptyCache.put(c(9999,0),c(10000,0),true,9999,0,10000,1,10,"center");
+        closest=stress.missingVisible(emptyCache,-1,-1,stressCount+1,2,4);
+        long[] missingExpected={10000,9998,10001,9997};
+        for(int i=0;i<missingExpected.length;i++)
+            yes(closest.get(i).start.equals(c(missingExpected[i],0)),
+                "large drawing cached-page exclusion "+i);
+        yes(emptyCache.contains(c(9999,0)),"catalog query does not evict cache");
+
+        catalog.clear();
+        yes(!catalog.isDiscovered()&&catalog.size()==0,"catalog reset");
+        yes(!catalog.hasCompleteCachedCoverage(0),
+            "cleared catalog cannot incorrectly be complete");
+        reject(()->catalog.append(c(3,0),c(4,0),false,0,0,1,1,1),
+            "no cursor gaps after clear");
+        System.out.println("Native DWG page catalog and lossless cursor re-fetch scheduling PASS");
+    }
+}

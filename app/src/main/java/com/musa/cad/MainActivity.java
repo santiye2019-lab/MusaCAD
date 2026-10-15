@@ -4221,8 +4221,21 @@ public class MainActivity extends AppCompatActivity {
                 // Progressive DWG opening: show the native scene immediately while
                 // the full editable DXF is converted in the loader thread.
                 // Unlike a bitmap handoff, the preview retains native geometry.
+                // Show the actual DWG FILE family, never infer application
+                // version from its ACxxxx signature. AC1032 is shared by
+                // AutoCAD 2018 through AutoCAD 2026.
+                String inputFormat="";
+                try{
+                    CadDwgFormat.Info detected=CadDwgFormat.identify(loaded.file);
+                    if(detected.supportedSignature)
+                        inputFormat=" • "+detected.label();
+                }catch(IOException ignored){
+                    // The existing native decoder remains authoritative for
+                    // input acceptance; version diagnosis must not break opens.
+                }
+                final String openedDwgFormat=inputFormat;
                 runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())
-                    task.progress.setText("DWG hızlı görünüm hazırlanıyor…");});
+                    task.progress.setText("DWG hızlı görünüm hazırlanıyor"+openedDwgFormat+"…");});
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     FileTransfer.checkCancelled();
                     NativeScene provisional=null;
@@ -4253,8 +4266,8 @@ public class MainActivity extends AppCompatActivity {
                                 activeLoad=null;
                                 if(task.dialog!=null)task.dialog.dismiss();
                                 activateProject(project);
-                                result.setText("DWG hızlı önizleme açık • tam vektör hazırlanıyor. "+
-                                    "Önizleme renkleri nihai değildir.");
+                                result.setText("DWG hızlı önizleme açık"+openedDwgFormat+
+                                    " • tam vektör hazırlanıyor. Renkler ve tüm nesne türleri henüz doğrulanmadı.");
                                 // NativeScene owns mutable Canvas/Paint scratch buffers;
                                 // never thumbnail it from another thread while the UI draws.
                                 scheduleRecentMetadataRecord(uri,loaded.name);

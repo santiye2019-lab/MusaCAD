@@ -40,6 +40,18 @@ public final class MusaCadVisualPerformanceContractTest {
         has(vector,"CadNavigationPolicy.movingMinWorldSpan","adaptive gesture geometry filter");
         has(vector,"culledDuringMotion","subpixel LOD");
         has(cad,"else vectorDrawing.drawVector(c,imageMatrix","settled full vector renderer");
+        has(cad,"private float[] overlayPointScreen=new float[64]","measurement frame scratch is reused");
+        has(cad,"final long drawStarted=metrics==null?0L:System.nanoTime()","opt-in per-frame timing");
+        has(cad,"metrics.sample(System.nanoTime()-drawStarted,gestureAtStart)","draw time samples tied to completed onDraw");
+        has(cad,"frameTimeStats=enable?new CadFrameTimeStats():null","measurement disabled by default");
+        has(cad,"private final Path overlayPointPath=new Path()","measurement path is reused");
+        has(cad,"imageMatrix.mapPoints(overlayPointScreen,0,overlayPointScreen,0,markerCount)","bulk in-place measurement projection");
+        has(cad,"if(mode==Mode.AREA&&markerCount>2)overlayPointPath.close()","area polygon geometry preserved");
+        has(cad,"if(lastSnapped&&!exporting)","snapped marker is preserved");
+        if(cad.contains("ArrayList<PointF> screen=new ArrayList<>()"))
+            throw new AssertionError("measurement overlay allocates one ArrayList per UI frame");
+        if(cad.contains("screen.add(new PointF("))
+            throw new AssertionError("measurement overlay allocates one PointF per marker per frame");
         has(main,"MusaAiVisualEvidence.renderBatch(drawing,batch","actual exported project images");
         has(main,"MusaAiCloudService.analyzeHybridWithContext(","online visual+CAD model call");
         has(main,"GÖRSEL MÜHENDİSLİK PROJE DENETİM RAPORU","engineering report title");
@@ -47,6 +59,14 @@ public final class MusaCadVisualPerformanceContractTest {
         has(main,"synthesis.includeTakeoff","metraj only on explicit request");
         has(main,"MusaAiYfk2025Library.suggestForTakeoff(this,measured)",
             "local 2025 poz dictionary source");
+        String nativeScene=source("app/src/main/java/com/musa/cad/NativeScene.java");
+        has(nativeScene,"private final float[] drawAffine=new float[9]","one affine scratch per UI frame");
+        has(nativeScene,"float[]line=new float[4],point=new float[2],affine=new float[9]","thumbnail thread has separate affine scratch");
+        has(nativeScene,"setDrawAffine(local,affine,ux,vx,cx,uy,vy,cy)","arc world transform reuses scratch");
+        has(nativeScene,"setDrawAffine(local,affine,ux,vx,x,uy,vy,y)","text transform reuses scratch");
+        if(nativeScene.contains("local.setValues(new float[]{"))
+            throw new AssertionError("per ARC/TEXT matrix array allocation reintroduced");
+        has(nativeScene,"drawPrimitive(index,c,p,m,line,point,path,local,target,affine)","scratch propagated through spatial grid");
         has(server,"write a REAL inspection record in Turkish","visual evidence requirement");
         System.out.println("MusaCadVisualPerformanceContractTest OK");
     }

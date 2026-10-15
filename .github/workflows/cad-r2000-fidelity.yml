@@ -1,0 +1,517 @@
+name: Modern DWG AC1032 reader and legacy writer proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/src/main/cpp/dwg_write_pilot.c'
+      - 'app/src/main/cpp/dwg_source_snapshot.h'
+      - 'tests/dwg_source_snapshot_test.c'
+      - 'app/src/main/cpp/native_scene.c'
+      - 'app/src/main/cpp/native_nurbs.h'
+      - 'tests/native_nurbs_test.c'
+      - 'tests/native_fit_spline_test.c'
+      - 'app/src/main/cpp/native_fit_spline.h'
+      - 'app/src/main/cpp/native_scene.h'
+      - 'app/src/main/cpp/dwg_bridge.c'
+      - 'tests/r2000_generate_variants.py'
+      - 'tests/r2000_generate_stress.py'
+      - 'tests/private_dwg_read_audit.py'
+      - 'tests/test_private_dwg_spline_diagnostics.py'
+      - 'tests/native_preview_type_audit.py'
+      - 'tests/dwg_entity_identity_audit.py'
+      - 'tests/test_dwg_entity_identity_audit.py'
+      - 'tests/dwg_layer_table_audit.py'
+      - 'tests/test_dwg_layer_table_audit.py'
+      - 'tests/dwg_block_reference_audit.py'
+      - 'tests/test_dwg_block_reference_audit.py'
+      - 'tests/dwg_layout_viewport_audit.py'
+      - 'tests/test_dwg_layout_viewport_audit.py'
+      - 'tests/test_native_preview_type_audit.py'
+      - 'tests/dwg_dxf_semantic_parity.py'
+      - 'tests/test_dwg_dxf_semantic_parity.py'
+      - 'tests/modern_dwg_acceptance.py'
+      - 'tests/test_modern_dwg_acceptance.py'
+      - 'tests/test_modern_color_inventory.py'
+      - 'tests/test_native_point_payload_guard.py'
+      - 'tests/test_native_modern_scene_guards.py'
+      - 'app/src/main/cpp/dwg_primitive_fidelity.h'
+      - 'app/src/main/cpp/dwg_polyline_fidelity.h'
+      - '.github/workflows/android.yml'
+      - '.github/workflows/cad-r2000-fidelity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: modern-dwg-fidelity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Reject silent CAD geometry color or block loss in future AC1032 output
+        run: |
+          python3 -m unittest discover -s tests -p 'test_dwg_dxf_semantic_parity.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/dwg_dxf_semantic_parity.py").read_text()
+          assert "UNVERIFIABLE_ENTITY_CLASSES" in code
+          assert "records[(section, kind, digest)] += 1" in code
+          assert "if code == 999:" in code
+          assert 'if not has_eof or section or "ENTITIES" not in sections:' in code
+          PY
+
+      - name: Exact source-DXF snapshot rejects same-size edits
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/dwg_source_snapshot_test.c \
+             -o /tmp/musacad-dwg-source-snapshot-test
+          /tmp/musacad-dwg-source-snapshot-test
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/cpp/dwg_write_pilot.c").read_text()
+          capture=source.index("musa_dxf_source_capture(")
+          decode=source.index("dxf_read_file(input, &drawing)")
+          verify=source.index("musa_dxf_source_matches(input, &source_snapshot)")
+          publish=source.index("link(stage, output)")
+          assert capture<decode<verify<publish
+          assert "source_before.st_mtime == source_after.st_mtime" not in source
+          assert "musa_dxf_source_release(&source_snapshot)" in source
+          PY
+
+      - name: Host-only R2000 DWG writer proof and safe-failure checks
+        run: |
+          # Deliberately separate from Android/read-only build; this is NOT release enablement.
+          cmake -S app/src/main/cpp -B /tmp/musa-writer-proof -DCMAKE_BUILD_TYPE=Release -DMUSACAD_HOST_DWG_WRITE_PILOT=ON
+          cmake --build /tmp/musa-writer-proof --parallel 2
+          cp third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-writer-input.dxf
+          cp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg
+          test -s /tmp/musa-pilot-output.dwg
+          cmp /tmp/musa-writer-input.dxf /tmp/musa-writer-reference.dxf
+          # Inject distinct real DXF primitives into the proven LibreDWG fixture.
+          # This exercises multiple coordinates, entity kinds and a fresh DWG read.
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('/tmp/musa-writer-input.dxf').read_text()
+          start = src.index('\n  0\nSECTION\n  2\nENTITIES\n')
+          end = src.index('\n  0\nENDSEC\n', start)
+          def entity(kind, handle, subclasses, pairs):
+              lines = ['  0', kind, '  5', handle, '330', '1F',
+                       '100', 'AcDbEntity', '  8', '0']
+              for cls in subclasses:
+                  lines.extend(('100', cls))
+              for group, value in pairs:
+                  lines.extend((str(group), str(value)))
+              return '\n'.join(lines) + '\n'
+          extra = ''.join((
+              entity('LINE', 'F001', ['AcDbLine'],
+                     [(10, 101.25), (20, -23.5), (30, 7.5),
+                      (11, 302.75), (21, -18.125), (31, 9.25)]),
+              entity('LINE', 'F002', ['AcDbLine'],
+                     [(10, -400.125), (20, 1000.5), (30, 0),
+                      (11, -390.75), (21, 1001.25), (31, 0)]),
+              entity('CIRCLE', 'F003', ['AcDbCircle'],
+                     [(10, 52.25), (20, -10.5), (30, 0), (40, 12.75)]),
+              entity('ARC', 'F004', ['AcDbCircle', 'AcDbArc'],
+                     [(10, -5.125), (20, 71.25), (30, 0), (40, 5.75),
+                      (50, 15.0), (51, 185.0)]),
+              entity('POINT', 'F005', ['AcDbPoint'],
+                     [(10, 4.5), (20, 8.25), (30, 2.75)]),
+              entity('LWPOLYLINE', 'F006', ['AcDbPolyline'],
+                     [(90, 4), (70, 1), (10, 0.0), (20, 0.0),
+                      (10, 22.75), (20, 0.0), (10, 22.75), (20, 13.25),
+                      (10, 0.0), (20, 13.25)]),
+          ))
+          Path('/tmp/musa-writer-multi.dxf').write_text(
+              src[:end+1] + extra + src[end+1:])
+          print('Multi-entity DXF fixture created: 3 LINE, CIRCLE, ARC, POINT, LWPOLYLINE')
+          PY
+          # An ordered closed polyline must survive alongside basic primitives.
+          /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-multi.dxf /tmp/musa-writer-multi.dwg
+          test -s /tmp/musa-writer-multi.dwg
+          test "$(head -c 6 /tmp/musa-writer-multi.dwg)" = AC1015
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-writer-input.dxf /tmp/musa-pilot-output.dwg; then
+            echo "Writer must never overwrite an existing destination"
+            exit 1
+          fi
+          printf 'not a DXF\\n' >/tmp/musa-malformed.dxf
+          if /tmp/musa-writer-proof/musacad_dxf2dwg_pilot /tmp/musa-malformed.dxf /tmp/musa-malformed-output.dwg; then
+            echo "Malformed input must never produce DWG"
+            exit 1
+          fi
+          test ! -e /tmp/musa-malformed-output.dwg
+
+      - name: R2000 complex polyline and 3DFACE roundtrip acceptance
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musa-advanced-r2000
+          python3 tests/r2000_generate_variants.py \
+            third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-advanced-r2000
+          failures=0
+          for kind in bulge-width bulge-only width-only face3d classic-polyline; do
+            input="/tmp/musa-advanced-r2000/${kind}.dxf"
+            output="/tmp/musa-advanced-r2000/${kind}.dwg"
+            cp "$input" "${input}.original"
+            echo "Checking R2000 roundtrip: ${kind}"
+            if /usr/bin/time -f "R2000 ${kind} elapsed %e seconds peak RSS %M KB" \
+                /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output"; then
+              if test -s "$output" && test "$(head -c 6 "$output")" = AC1015; then
+                echo "PASS R2000 advanced case: ${kind}"
+              else
+                echo "FAIL R2000 advanced case: ${kind} output/header"
+                failures=$((failures+1))
+              fi
+            else
+              echo "FAIL R2000 advanced case: ${kind} rejected by fidelity audit"
+              test ! -e "$output"
+              failures=$((failures+1))
+            fi
+            cmp "$input" "${input}.original"
+          done
+          echo "R2000 advanced acceptance failures: $failures"
+          test "$failures" -eq 0
+
+
+      - name: R2000 deterministic mixed-object and dense-polyline stress
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musa-stress-r2000
+          python3 tests/r2000_generate_stress.py \
+            third_party/libredwg/test/test-data/2007/Line.dxf /tmp/musa-stress-r2000
+          # These are CI acceptance limits, not claimed real-world performance.
+          # 120s per fixture; virtual-memory limit of 1.5 GiB per writer process.
+          ulimit -v 1572864
+          for kind in mixed-512 mixed-8192 dense-polyline-8192; do
+            case "$kind" in
+              mixed-512) expected=513 ;;
+              mixed-8192) expected=8193 ;;
+              dense-polyline-8192) expected=2 ;;
+            esac
+            input="/tmp/musa-stress-r2000/${kind}.dxf"
+            output="/tmp/musa-stress-r2000/${kind}.dwg"
+            log="/tmp/musa-stress-r2000/${kind}.log"
+            metrics="/tmp/musa-stress-r2000/${kind}.time"
+            checksum="$(sha256sum "$input" | cut -d ' ' -f1)"
+            echo "R2000 STRESS START: ${kind} expected_geometry=$expected"
+            /usr/bin/time -f "elapsed_sec=%e peak_rss_kib=%M" -o "$metrics" \
+              timeout --signal=TERM --kill-after=5s 120s \
+              /tmp/musa-writer-proof/musacad_dxf2dwg_pilot "$input" "$output" \
+              >"$log" 2>&1 || { cat "$log"; cat "$metrics"; exit 1; }
+            cat "$log"
+            cat "$metrics"
+            test -s "$output"
+            test "$(head -c 6 "$output")" = AC1015
+            grep -F "geometry entities=$expected)." "$log"
+            test "$(sha256sum "$input" | cut -d ' ' -f1)" = "$checksum"
+            # In addition to timeout and VM ceiling, gate observable peak RSS.
+            peak="$(sed -n 's/.*peak_rss_kib=\([0-9][0-9]*\).*/\1/p' "$metrics")"
+            test -n "$peak"
+            test "$peak" -le 900000
+            echo "PASS R2000 STRESS: ${kind} peak_rss_kib=$peak"
+          done
+
+      - name: Real DWG reader regression on publicly distributable LibreDWG fixtures
+        run: |
+          set -euo pipefail
+          # Run the semantic assertions even if the audit returns failure, so
+          # we see *which* real fixture/curve class is incomplete. Never
+          # treat the audit's nonzero exit as a passing reader.
+          audit_exit=0
+          python3 tests/private_dwg_read_audit.py \
+            --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+            --report /tmp/musacad-upstream-dwg-reader.json \
+            third_party/libredwg/test/test-data/example_2013.dwg \
+            third_party/libredwg/test/test-data/2000/TS1.dwg || audit_exit=$?
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          doc = json.loads(Path("/tmp/musacad-upstream-dwg-reader.json").read_text())
+          assert len(doc["files"]) == 2
+          violations=[]
+          for item in doc["files"]:
+              print("DWG reader audit:", item["dwg_release"],
+                    "status=",item["status"],
+                    "scene_status=",item["native_scene_status"],
+                    "spline_missing_knots=",item.get("native_spline_fit_only_rejections",0),
+                    "spline_bad_weights=",item.get("native_spline_invalid_weight_rejections",0),
+                    "spline_details=", item.get("native_spline_rejection_details",[]),
+                    "fit_stages=", item.get("native_fit_spline_stage_diagnostics",[]),
+                    flush=True)
+              if not item["source_unchanged"]:
+                  violations.append(item["dwg_release"]+": source modified")
+              if item["status"] != "decoded_dxf_inventory":
+                  violations.append(item["dwg_release"]+": decoded scene is incomplete")
+              if item["model_entity_count"] + item["block_geometry_entity_count"] <= 0:
+                  violations.append(item["dwg_release"]+": empty decoded geometry")
+              if item["status"] == "decoded_dxf_inventory":
+                  print("PASS DWG READER:", item["dwg_release"],
+                        "layers=", item["layer_count"],
+                        "blocks=", item["block_definition_count"],
+                        "model_entities=", item["model_entity_count"])
+          assert not violations, violations
+          PY
+          test "$audit_exit" -eq 0
+
+      - name: Reject nonrepresentable DWG geometry without false origin vertices
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/scene_coord_safety_test.c -lm -o /tmp/scene-coord-safety
+          /tmp/scene-coord-safety
+          python3 - <<'PY'
+          from pathlib import Path
+          code = Path("app/src/main/cpp/native_scene.c").read_text()
+          start = code.index("static void emit_poly_point(")
+          end = code.index("static void finish_poly(", start)
+          poly = code[start:end]
+          assert "musa_scene_xy_safe(ax,ay)" in poly
+          assert "s->truncated=1;return;" in poly
+          assert "ax=0;ay=0;" not in poly, "phantom origin geometry is forbidden"
+          assert "if(!s->truncated)s->primitives++;" in code
+          for keyword in ("static int emit_line(", "static int emit_point(", "static int emit_curve("):
+              begin = code.index(keyword)
+              end = code.index("\n}", begin)
+              assert "musa_scene_" in code[begin:end]
+              assert "s->truncated=1" in code[begin:end]
+          PY
+
+      - name: Verify natural cubic fit-only SPLINE from real DWG scenario 2
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/native_fit_spline_test.c -lm \
+            -o /tmp/musacad-fit-spline-test
+          /tmp/musacad-fit-spline-test
+          python3 -m unittest discover -s tests -p 'test_private_dwg_spline_diagnostics.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("app/src/main/cpp/native_scene.c").read_text()
+          a=code.index("case DWG_TYPE_SPLINE:{")
+          b=code.index("case DWG_TYPE_SOLID:{",a)
+          spline=code[a:b]
+          assert "e->scenario==2" in spline
+          assert "musa_cad_fit_zero_tangent" in spline
+          assert "musa_cad_fit_natural_build" in spline
+          assert "musa_cad_fit_clamped_build" in spline
+          assert "musa_cad_fit_mixed_build" in spline
+          assert "begin_unspecified&&end_unspecified" in spline
+          assert "!begin_unspecified&&!end_unspecified" in spline
+          assert "fitted=musa_cad_fit_mixed_build" in spline
+          assert "musa_cad_fit_natural_eval" in spline
+          assert "MUSA_CAD_FIT_SAMPLES_PER_SPAN" in spline
+          assert "finish_poly(s)" in spline
+          assert "s->truncated=1" in spline
+          assert "emit_poly_point(s,parent,e->fit_pts[i].x" not in spline
+          PY
+
+      - name: Evaluate real DWG SPLINE NURBS curves instead of control polygons
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror tests/native_nurbs_test.c -lm \
+            -o /tmp/musacad-native-nurbs-test
+          /tmp/musacad-native-nurbs-test
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("app/src/main/cpp/native_scene.c").read_text()
+          start=source.index("case DWG_TYPE_SPLINE:{")
+          end=source.index("case DWG_TYPE_SOLID:{",start)
+          spline=source[start:end]
+          assert "musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)" in spline
+          assert "points[i].w=musa_nurbs_weight(e->ctrl_pts[i].w,e->weighted);" in spline
+          assert "musa_nurbs_valid" in spline
+          assert "musa_nurbs_preview_points" in spline
+          assert "s->truncated=1" in spline
+          assert "emit_poly_point(s,parent,e->fit_pts[i].x" not in spline
+          assert "emit_poly_point(s,parent,e->ctrl_pts[i].x" not in spline
+          PY
+
+      - name: Native AC1032 MLEADER HATCH and partial-scene safety
+        run: |
+          python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
+
+      - name: Native AC1032 POINT payload safety contract
+        run: |
+          python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
+
+      - name: AC1032 modern DWG reader first-class acceptance (public fixture)
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_modern_dwg_acceptance.py' -v
+          python3 -m unittest discover -s tests -p 'test_modern_color_inventory.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layer_table_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_block_reference_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layout_viewport_audit.py' -v
+          # Actual R2018/AC1032 fixture with dynamic BLOCK/INSERT records;
+          # neither R2000 writer PASS nor file name alone proves modern support.
+          # Every source hash must remain unchanged, and truncated/unknown
+          # native first paint is a FAIL rather than green.
+          file=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          test "$(head -c 6 "$file")" = AC1032
+          python3 tests/private_dwg_read_audit.py \
+            --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+            --report /tmp/musacad-public-ac1032-audit.json "$file"
+          python3 tests/modern_dwg_acceptance.py \
+            /tmp/musacad-public-ac1032-audit.json --fixture Dynblocks.dwg
+          # The native scene exact-stream regression for the same fixture
+          # remains in the existing 50-page parity gate below.
+
+      - name: Paged native scene preserves geometry without unclipping the 9Mi guard
+        run: |
+          set -euo pipefail
+          # Generated synthetic DWGs only. No customer's DWG leaves their private workspace.
+          test -s /tmp/musa-stress-r2000/mixed-8192.dwg
+          /tmp/musa-writer-proof/musacad_dwg_convert \
+            --paged-probe /tmp/musa-stress-r2000/mixed-8192.dwg 8192 \
+            2>&1 | tee /tmp/musa-paged-mixed.log
+          grep -F 'Paged scene verified:' /tmp/musa-paged-mixed.log
+          # One 8192-vertex entity needs a page larger than 16k floats.
+          # It must be retried at a safe larger budget, not partially displayed.
+          /tmp/musa-writer-proof/musacad_dwg_convert \
+            --paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 32768 \
+            2>&1 | tee /tmp/musa-paged-dense.log
+          grep -F 'Paged scene verified:' /tmp/musa-paged-dense.log
+          if /tmp/musa-writer-proof/musacad_dwg_convert \
+              --paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+              > /tmp/musa-too-small-page.log 2>&1; then
+            echo 'Oversized single entity MUST fail closed, never expose partial geometry.'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-too-small-page.log
+
+      - name: Nested block continuation host acceptance
+        run: |
+          set -euo pipefail
+          # Public/synthetic drawings only; no user's private engineering files.
+          /usr/bin/time -f "Nested 8192 objects elapsed %e sec RSS %M KiB" \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe /tmp/musa-stress-r2000/mixed-8192.dwg 8192 \
+            2>&1 | tee /tmp/musa-nested-mixed.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-mixed.log
+          /usr/bin/time -f "Nested polyline elapsed %e sec RSS %M KiB" \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 32768 \
+            2>&1 | tee /tmp/musa-nested-poly.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-poly.log
+          if timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --nested-paged-probe /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+              > /tmp/musa-nested-reject.log 2>&1; then
+            echo 'A single oversized leaf must NOT be silently truncated'
+            exit 1
+          fi
+          grep -E 'status=-4|Nested scene rejected' /tmp/musa-nested-reject.log
+          # Public LibreDWG TS1 block demonstrates real nested continuation:
+          # the 256-word budget forces one block's child leaves across pages.
+          timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --nested-paged-probe third_party/libredwg/test/test-data/2000/TS1.dwg 256 \
+            2>&1 | tee /tmp/musa-nested-public-block.log
+          grep -F 'Nested paged scene verified:' /tmp/musa-nested-public-block.log
+          grep -E 'Nested scene page=.*next=[0-9]+:[1-9][0-9]* ' \
+            /tmp/musa-nested-public-block.log
+
+
+      - name: Indexed model-space paging matches baseline and nested-block traversal
+        run: |
+          set -euo pipefail
+          # Public/purely synthetic fixture inputs only; no private CAD data.
+          for kind in mixed-512 mixed-8192; do
+            file="/tmp/musa-stress-r2000/$kind.dwg"
+            /usr/bin/time -f "Indexed $kind elapsed_sec=%e peak_rss_kib=%M" \
+              timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --indexed-nested-paged-probe "$file" 8192 \
+              2>&1 | tee "/tmp/musa-indexed-$kind.log"
+            grep -F 'Indexed model entities=' "/tmp/musa-indexed-$kind.log"
+            grep -F 'Indexed Nested paged scene verified:' "/tmp/musa-indexed-$kind.log"
+          done
+          timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe third_party/libredwg/test/test-data/2000/TS1.dwg 256 \
+            2>&1 | tee /tmp/musa-indexed-block.log
+          grep -F 'Indexed Nested paged scene verified:' /tmp/musa-indexed-block.log
+          grep -E 'Nested scene page=.*next=[0-9]+:[1-9][0-9]* ' /tmp/musa-indexed-block.log
+          # The leaf-size guard remains strict even with direct top-level seeks.
+          if timeout 60s /tmp/musa-writer-proof/musacad_dwg_convert \
+                --indexed-nested-paged-probe \
+                /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+                > /tmp/musa-indexed-leaf-too-large.log 2>&1; then
+            echo 'Indexed mode MUST reject oversize leaf without losing geometry'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-indexed-leaf-too-large.log
+
+      - name: Public dynamic-block nested page stream regression
+        run: |
+          set -euo pipefail
+          # Pinned LibreDWG upstream 2018/Dynblocks.dwg is distributable:
+          # this file reproduced a duplicate-primitive bug in a direct-child
+          # resume experiment (mismatch on page 1 of 50). The safe indexed
+          # path MUST keep its full v6 primitive/color stream byte-identical
+          # with an untruncated baseline across ALL 50 pages.
+          file=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe "$file" 4096 \
+            2>&1 | tee /tmp/musa-dynblocks-50-page-regression.log
+          grep -F 'Indexed Nested paged scene verified: pages=50 primitives=33479 legacy_count=33479 legacy_status=0' \
+            /tmp/musa-dynblocks-50-page-regression.log
+          # The retired speculative direct-child pointer shortcut is
+          # prohibited until a new design passes this exact public regression.
+          ! grep -q 'musa_scene_build_page_nested_direct_resume' \
+              app/src/main/cpp/dwg_bridge.c
+
+      - name: Exact transform and color leaf-context continuation acceptance
+        run: |
+          set -euo pipefail
+          # Pin both the real public Dynblocks repro and nested TS1 fixture.
+          # Every v6 primitive/coordinate/color word is compared to the
+          # untruncated baseline; an optimization must actually be exercised.
+          for spec in \
+            "third_party/libredwg/test/test-data/2018/Dynblocks.dwg 4096 dynblocks" \
+            "third_party/libredwg/test/test-data/2000/TS1.dwg 256 ts1" \
+            "/tmp/musa-stress-r2000/mixed-8192.dwg 8192 mixed"; do
+            set -- $spec
+            /usr/bin/time -f "Context $3 elapsed_sec=%e peak_rss_kib=%M" \
+              timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+              --context-nested-paged-probe "$1" "$2" \
+              2>&1 | tee "/tmp/musa-context-$3.log"
+            grep -F 'Context Nested paged scene verified:' "/tmp/musa-context-$3.log"
+          done
+          # These public DWGs MUST use the cached full-instance contexts,
+          # not merely pass via unoptimized fallback.
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-dynblocks.log
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-ts1.log
+          grep -F 'Context Nested paged scene verified: pages=50 primitives=33479 legacy_count=33479 legacy_status=0' \
+            /tmp/musa-context-dynblocks.log
+          if timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+                --context-nested-paged-probe \
+                /tmp/musa-stress-r2000/dense-polyline-8192.dwg 1024 \
+                >/tmp/musa-context-too-large.log 2>&1; then
+            echo 'Context mode MUST reject atomic leaf exceeding page budget'
+            exit 1
+          fi
+          grep -F 'status=-4' /tmp/musa-context-too-large.log
+
+      - name: Verify whole-stream SHA256 parity across 50 nested pages
+        run: |
+          set -euo pipefail
+          public=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-indexed-all.raw \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --indexed-nested-paged-probe "$public" 4096 \
+            >/tmp/musa-indexed-stream.log 2>&1
+          MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-context-all.raw \
+            timeout 120s /tmp/musa-writer-proof/musacad_dwg_convert \
+            --context-nested-paged-probe "$public" 4096 \
+            >/tmp/musa-context-stream.log 2>&1
+          grep -F 'Exact leaf-instance context used' /tmp/musa-context-stream.log
+          cmp /tmp/musa-indexed-all.raw /tmp/musa-context-all.raw
+          sha256sum /tmp/musa-indexed-all.raw /tmp/musa-context-all.raw
+          test "$(stat -c %s /tmp/musa-indexed-all.raw)" -gt 100000
+          # Prevent overwriting a trusted prior stream or any source file.
+          if MUSACAD_HOST_SCENE_STREAM_PATH=/tmp/musa-indexed-all.raw \
+               /tmp/musa-writer-proof/musacad_dwg_convert \
+                 --indexed-nested-paged-probe "$public" 4096 >/dev/null 2>&1; then
+            echo 'Output stream export MUST require an exclusive destination'
+            exit 1
+          fi

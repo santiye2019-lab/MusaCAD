@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "policy": "No failed required module may ship. Continuous GitHub unit/build gates, one consolidated candidate APK after implementation and full CI; physical acceptance then production release.",
+  "estimate_kind": "Development implementation planning points; NOT AutoCAD 2026 compatibility percentage or real-device acceptance.",
+  "baseline_points": 35,
+  "completed_milestones": [
+    {
+      "id": "native_color_inheritance",
+      "points": 1,
+      "status": "implemented",
+      "commit": "769836a7ad74ef41b1507912a30157aec2253a08",
+      "source_path": "app/src/main/cpp/native_color.h",
+      "verification": "Android native color tests plus overall CI must pass"
+    },
+    {
+      "id": "native_arc_text_draw_allocations",
+      "points": 1,
+      "status": "implemented",
+      "commit": "ae233fbc527ea25b73ba075e7da171077f99a6fc",
+      "source_path": "app/src/main/java/com/musa/cad/NativeScene.java",
+      "verification": "Android integration and performance contract CI"
+    },
+    {
+      "id": "cadview_overlay_draw_allocations",
+      "points": 1,
+      "status": "implemented",
+      "commit": "53dcc38e63bf0071e069716dd2e6cfec0c93ad33",
+      "source_path": "app/src/main/java/com/musa/cad/CadView.java",
+      "verification": "Android visual contract CI"
+    },
+    {
+      "id": "opt_in_draw_cpu_sampler",
+      "points": 1,
+      "status": "implemented",
+      "commit": "784d9120a3c8a0633136be25947f122a461e29b9",
+      "source_path": "app/src/main/java/com/musa/cad/CadFrameTimeStats.java",
+      "verification": "New CadFrameTimeStatsTest and Android quality gate"
+    },
+    {
+      "id": "independent_dwg_layer_table_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "231f33ae94e4466b2dcd2ac2fd9ca12999bdae3f",
+      "source_path": "tests/dwg_layer_table_audit.py",
+      "verification": "GitHub Android gate run 38641262457 step 'Test conservative native DWG entity type audit': PASS. Full Android and Modern DWG workflows still pending."
+    },
+    {
+      "id": "independent_xref_insert_transform_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "8f9d74ed0a9dd34f05707cd5e6bad5ea09612235",
+      "source_path": "tests/dwg_block_reference_audit.py",
+      "verification": "GitHub Android run 38643459543 'Test conservative native DWG entity type audit': PASS. Complete Android and Modern DWG runs not yet certified at ledger update."
+    },
+    {
+      "id": "minsert_preflight_takeoff_integrity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "b6a7f775293415d4f06afd3389d8b028ebf46b37",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "GitHub fast CAD regression run 38692750685: DXF INSERT/MINSERT geometry and quantity-safety PASS. Full Android and independent DWG acceptance still pending."
+    },
+    {
+      "id": "axial_z_nested_insert_mesh",
+      "points": 1,
+      "status": "implemented",
+      "commit": "77f1aa7d7992cd0ada97d843318f75f526d4ac5a",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "Fast CAD regression run 38694083576 PASS, including Dxf3dMeshTest for nested axial-Z 3D transforms, negative-Z MINSERT and overflow safety. Android quality and modern DWG workflows still require independent confirmation."
+    },
+    {
+      "id": "tilted_ocs_3d_block_transform",
+      "points": 1,
+      "status": "implemented",
+      "commit": "99a0b2d89babe6ab8f7e1c4d0e0da78476b41507",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "Targeted GitHub fast CAD run 38694881436 PASS: 3D arbitrary OCS INSERT, nested tilted MINSERT, invalid normal rejection and unchanged 2D block tests. Android full CI, private DWG cross-reader parity, physical-device and all 3D modeling acceptance remain separate."
+    },
+    {
+      "id": "3d_missing_xref_block_visibility",
+      "points": 1,
+      "status": "implemented",
+      "commit": "45fc75009831c34876a2f39dd248c2a470a4c4b4",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD run 38695493466: PASS for missing XREF, unknown block, invalid OCS and overflow reference-count regressions. Mesh3dActivity warns of partial model and unreliable full-project quantities. Full Android CI, independent native DWG proof and physical device acceptance not yet established."
+    },
+    {
+      "id": "independent_3dface_xyz_edge_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "3ad1b77bc3e203fc857aad861cc642868d997191",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD run 38696236256 PASS: 3DFACE XYZ corners, optional fourth vertex, group-70 edge visibility, high-precision drift, malformed source, private converter integration. Full Android/modern DWG tests and independently supplied real project baseline remain pending."
+    },
+    {
+      "id": "three_d_stale_source_save_reopen_guard",
+      "points": 1,
+      "status": "implemented",
+      "commit": "6136041a3cf6dec5dcda7c6a874f78ede52b21de",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
+      "verification": "GitHub fast CAD run 38703445106 PASS: 3D DXF staged save verifies session's original source geometry, topology, object references and reopened result; same-size/same-mtime source mutation is rejected. This is only an input-integrity building block for future DWG Save As, not a modern binary DWG writer or full Android acceptance."
+    },
+    {
+      "id": "3d_on_open_full_byte_source_integrity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "7567d47e326e0033ba8fc9e36c2518e12e949a43",
+      "source_path": "app/src/main/java/com/musa/cad/Mesh3dActivity.java",
+      "verification": "GitHub fast CAD regression 38704873533 PASS (Dxf3dSafeSaveTest: same-length same-mtime metadata drift detected despite identical rendered geometry, plus Android save API source-contract test updated). Completes source-byte integrity prerequisite for save/reopen; still DXF only, no real AC1032 writer or physical device acceptance."
+    },
+    {
+      "id": "verified_3d_saf_staging_to_publication",
+      "points": 1,
+      "status": "implemented",
+      "commit": "f678ec3f4f415e9b423a0ff2b721ff87e6fb9b6c",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
+      "verification": "GitHub fast CAD regression run 38705779069 PASS: immutable SHA-256 stage identity, deferred Android SAF open, stage tamper rejection before destination open, checked after transfer. DXF-only publication safety prerequisite; AC1032 encoder and independent production DWG reader remain unavailable; Android full gate and physical tests pending."
+    },
+    {
+      "id": "3dface_invisible_edges_and_quad_outline",
+      "points": 1,
+      "status": "implemented",
+      "commit": "fcf615d50412a37dc6bf5e8ffaef352c07663dcb",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression run 38706786138 PASS: 3DFACE group-70 hidden edges, triangle 4=3 semantics, quad internal diagonal omitted from wireframe, edited XYZ/edge visibility survives DXF save/reopen, invalid flags fail closed. Full Android, native DWG and physical device acceptance remain separate."
+    },
+    {
+      "id": "three_d_circle_arc_ocs_wireframe",
+      "points": 1,
+      "status": "implemented",
+      "commit": "4e0e6116c48c9768b616cd3fc9f1fc5d8cc933f7",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression 38707436249 PASS: DXF CIRCLE and ARC 3D sampled wire paths with OCS normals, translated/rotated INSERT, angle wrap, read-only generated vertices, malformed radii/normals rejection. 3D UI warns tessellation is approximate; reopened DXF curve count is checked. This tests DWG-derived DXF visualization, NOT AC1032 independent DWG geometric parity or exact arc measurement. Android/full modern DWG and device acceptance remain pending."
+    },
+    {
+      "id": "lwpolyline_3d_ocs_bulge_and_safe_reopen",
+      "points": 1,
+      "status": "implemented",
+      "commit": "1be2d67a5f64fc32b57ebadb5f079772e76f248c",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression 38708384002 PASS: 3D LWPOLYLINE straight/closed, sparse signed bulge arcs, OCS elevation and rotated INSERT; invalid, duplicate and nonfinite values rejected. Tessellated points are read-only. Dxf3dSafeSaveTest verifies independent LINE Z edit preserves LWP bulge/elevation and reopens unchanged. This is 3D DXF-based display/roundtrip only: not native modern DWG editing, exact curve rendering or full Android/physical acceptance."
+    },
+    {
+      "id": "ellipse_wcs_3d_curve_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "e6b92a0f5ed9e5da54544b74056c96b928697483",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "Fast CAD regression run 38708933124 PASS: ELLIPSE full/partial parameter arcs, WCS major/minor axes, inclined plane normal and INSERT, malformed values and read-only samples. This is sampled 3D DXF display, not native DWG writer or exact ELLIPSE B-Rep."
+    },
+    {
+      "id": "rational_spline_deboor_3d_curve_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "472da0a28173fe6d16c583caafdfb9b8f1f003ef",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "Fast CAD regression run 38709519673 PASS: degree-1/2 nonperiodic knot-defined SPLINE, rational homogeneous de Boor, nested INSERT, closed loops, invalid knot/weights rejection; ELLIPSE+SPLINE controls retained on 3D DXF safe save/reopen with unrelated LINE edit. Fit-only/periodic spline is explicitly unsupported; triangulation approximates only, not exact length or full DWG parity. Android/full modern DWG/device acceptance pending."
+    },
+    {
+      "id": "spline_nonuniform_interior_knot_fidelity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "01a2fde570dfbb5e568005a48de78c7b0bd71476",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD regression run 38710272134 PASS: knot-aware sampled rational/de Boor SPLINE points include short nonuniform spans, repeated degree-2 interior knot corners and reject degree+1 interior knot discontinuities. Exact evaluation at knots prevents missed kinks, but tessellated wires are approximate, read-only; fit-point-only, periodic, native modern DWG Save As and independent project parity remain unfinished."
+    },
+    {
+      "id": "spline_periodic_degree12_verified_seam",
+      "points": 1,
+      "status": "implemented",
+      "commit": "a71f08e15f910630f81f2e384b381685a1e78c85",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD run 38732978733 PASS: knot/control-defined degree-1/2 periodic (including rational degree-2) 3D sampled spline; verifies closed seam, degree-2 tangent continuity, rejects false seam under huge coordinate translations and higher unvalidated periodic degree. Test saves independent LINE edit while retaining periodic knots, weights and reopen geometry. Fit-only spline, degree-3+ periodic, AC1032 native DWG writing, independent real-DWG parity and physical-device acceptance remain unverified."
+    },
+    {
+      "id": "fit_only_spline_bounded_3d_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "9071a6dcd0806d3b7caa621cd63b5bdc498d637a",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "GitHub fast CAD run 38733845233 PASS: bounded degree-1 line and degree-3 chord-parametric Hermite preview through DXF fit points, 3D rotated INSERT, read-only samples, invalid fit counts/duplicate points/tangents/unsupported degrees rejected, and staged DXF independent LINE edit preserves original fit records and reopens sampled geometry. This is not exact originating CAD fit spline reconstruction, fully editable spline control, independent original DWG parity, or modern binary DWG writing; Android and physical device acceptance separate."
+    },
+    {
+      "id": "independent_spline_knot_weight_definition_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "d12c87549c6f71edfe14eac1b7ae7bc56584a206",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD regression run 38734949132 PASS: independently supplied original-DWG source manifest has ordered SPLINE knot, degree, weight, control/fit XYZ and parameter subset; detects exact source-vs-DXF definition drift, rejects malformed/negative/nonmonotone knot and weight records, and validates private-manifest integration with count-only redaction. Real original-DWG baselines are NOT supplied; 3D curve rendering, AC1032 native writing and device acceptance are separately unverified."
+    },
+    {
+      "id": "independent_lwpolyline_vertex_bulge_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "6886c97394dd2008d21d7e846c4045e0cf864a4e",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD run 38735638873 PASS: source-bound LWPOLYLINE ordered DXF vertex XY, signed bulge, elevation, widths, vertex IDs, OCS and flags in independent reference geometry; changes detected with unchanged entity counts, malformed/duplicated records rejected. Source-manifest and private-converter integration synthetic tests; original external DWG parity, binary writer and Android device acceptance not run."
+    },
+    {
+      "id": "independent_ellipse_wcs_source_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "6cb84f1199e211e36f027a700458a2bf8d5c6d71",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD regression 38736439050 PASS: independent ORIGINAL DWG manifest ELLIPSE numeric source parameter comparison (WCS center XYZ, major-axis XYZ, 40 ratio, 41/42 radian parameters, OCS normal). Detects tiny definition drift, invalid axes/ratio/normal/incomplete fields, and exercises private synthetic conversion pipeline with redacted diagnostics. No actual independent source DWG geometrical parity or modern AC1032 writer completion; Android/full modern workflows and physical-device acceptance separate."
+    },
+    {
+      "id": "independent_legacy_polyline_vertex_numeric_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "a8711a81d9d4104d396b809545bf03a22a03095d",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD regression run 38737631650 PASS: independent original-DWG source manifest per-handle POLYLINE/ VERTEX numeric parameter parity covers XYZ, signed bulge, flags, widths, 3D OCS and signed polyface face indices. Pipeline synthetic conversion detects numeric drift; invalid/duplicate records and nonfinite values rejected. It does NOT prove parent/SEQEND chain topology, independent private original DWG parity, modern DWG binary Save As, full Android quality or physical device acceptance."
+    }
+  ],
+  "backlog": [
+    {
+      "id": "ac1032_reader_independent_semantics",
+      "points": 1,
+      "status": "in_progress",
+      "evidence_required": "Original-source geometric and object parity"
+    },
+    {
+      "id": "ac1032_real_writer_save_reopen",
+      "points": 15,
+      "status": "not_started",
+      "evidence_required": "Modern real DWG Save As, independent roundtrip proof"
+    },
+    {
+      "id": "advanced_2d_editing_roundtrip",
+      "points": 2,
+      "status": "in_progress",
+      "evidence_required": "2D tool matrix, save/reopen tests"
+    },
+    {
+      "id": "xref_dynamic_block_layouts",
+      "points": 4,
+      "status": "in_progress",
+      "evidence_required": "Nested XREF, dynamic block and layout semantics"
+    },
+    {
+      "id": "brep_acis_solid_kernel",
+      "points": 11,
+      "status": "not_started",
+      "evidence_required": "True 3D B-Rep booleans, sweeps, revolves, editing"
+    },
+    {
+      "id": "viewport_first_frame_large_dwg",
+      "points": 3,
+      "status": "in_progress",
+      "evidence_required": "Correct first frame RGB, large-DWG smooth pan/zoom, no ANR/OOM"
+    },
+    {
+      "id": "multi_discipline_ai_takeoff",
+      "points": 3,
+      "status": "in_progress",
+      "evidence_required": "Complete evidence-linked discipline/takeoff coverage"
+    }
+  ],
+  "required_modules": [
+    {
+      "id": "modern_dwg_read",
+      "status": "in_progress"
+    },
+    {
+      "id": "modern_dwg_write",
+      "status": "not_started"
+    },
+    {
+      "id": "advanced_2d",
+      "status": "in_progress"
+    },
+    {
+      "id": "xref_dynamic_layout",
+      "status": "in_progress"
+    },
+    {
+      "id": "true_3d_brep",
+      "status": "not_started"
+    },
+    {
+      "id": "native_render_and_navigation",
+      "status": "in_progress"
+    },
+    {
+      "id": "engineering_ai_takeoff",
+      "status": "in_progress"
+    }
+  ],
+  "acceptance": {
+    "full_ci": "in_progress",
+    "final_device_tests_total": 18,
+    "final_device_tests_passed": 0,
+    "failed_checks": 0,
+    "skipped_checks": 0,
+    "independent_dwg_parity": "not_run",
+    "release_approved": false
+  }
+}

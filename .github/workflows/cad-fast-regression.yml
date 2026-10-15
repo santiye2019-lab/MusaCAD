@@ -1,0 +1,80 @@
+name: MusaCAD fast CAD regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/**'
+      - 'app/src/main/cpp/**'
+      - 'app/src/main/java/**'
+      - 'docs/CAD_2026_PROGRESS.json'
+      - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
+      - 'docs/AUTOCAD_2026_COMMAND_CATALOG.json'
+      - '.github/workflows/cad-fast-regression.yml'
+  workflow_dispatch:
+
+# Keep only the newest short feedback pass. This is NOT the full release gate.
+concurrency:
+  group: musacad-cad-fast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  targeted-cad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: DWG audit and parity unit regressions
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_polyline_chain_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_polyface_topology_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layer_table_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_block_reference_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_layout_viewport_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
+          python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
+      - name: Fast DXF INSERT/MINSERT geometry and material-count safety
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-block-tests
+          javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          java -cp /tmp/musacad-block-tests DxfBlocksTest
+      - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-zinsert-tests
+          javac -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java tests/Dxf3dMeshTest.java
+          javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dSafeSaveTest.java
+          java -cp /tmp/musacad-zinsert-tests Dxf3dMeshTest
+          java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveTest
+          javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/Dxf3dSafeSaveIntegrationContractTest.java
+          java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveIntegrationContractTest
+      - name: AutoCAD 2026 indexed command router recognition smoke
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-autocad2026-router-smoke
+          javac -d /tmp/musacad-autocad2026-router-smoke app/src/main/java/com/musa/cad/CadCommand.java tests/AutoCAD2026CommandRouterSmokeTest.java
+          java -cp /tmp/musacad-autocad2026-router-smoke AutoCAD2026CommandRouterSmokeTest
+          echo 'Parsing command names is NOT equivalent to working AutoCAD 2026 operations.'
+      - name: CAD progress and AutoCAD 2026 parity claims audit
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
+          python3 -m unittest discover -s tests -p 'test_autocad_2026_parity_gate.py' -v
+          python3 tests/autocad_2026_parity_gate.py
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_color_test.c -o /tmp/musa-fast-native-color
+          /tmp/musa-fast-native-color
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/scene_coord_safety_test.c -lm -o /tmp/musa-fast-scene-safety
+          /tmp/musa-fast-scene-safety
+      - name: Mark full CI and final APK as independent required gates
+        run: |
+          echo "Fast CAD regression passed for this commit."
+          echo "This is NOT Modern DWG end-to-end proof, Android build acceptance, or physical-device acceptance."
+          echo "Every required module still needs its full CI pass before being counted done."
+          echo "No APK is built or published by this workflow."

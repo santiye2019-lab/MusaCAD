@@ -63,6 +63,12 @@ public class CadView extends View {
 
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final ArrayList<PointF> points=new ArrayList<>();
+    // UI thread only: grow on point-count change, never allocate PointF or a
+    // new float[2] for each measurement marker on every pinch/pan frame.
+    private float[] overlayPointScreen=new float[64];
+    private final Path overlayPointPath=new Path();
+    /* Null by default: absolutely no sampling during ordinary CAD use. */
+    private CadFrameTimeStats frameTimeStats;
     private final ArrayList<PointF> freehandPoints=new ArrayList<>();
     private final ArrayList<CadEdit> edits=new ArrayList<>();
     private final ArrayDeque<CadEdit> redoEdits=new ArrayDeque<>();
@@ -75,6 +81,9 @@ public class CadView extends View {
     private Bitmap drawing;
     private DxfParser.Result vectorDrawing;
     private NativeScene nativeDrawing;
+    /* Opt-in only. Never installed by MainActivity's normal DWG/DXF open path. */
+    private NativePagedScenePreview experimentalPagedPreview;
+    private NativePagedPreviewLoader experimentalPagedLoader;
     private Mode mode=Mode.PAN;
     private Listener listener;
     private float lastX,lastY,scale=1f,fitScale=1f;
@@ -125,6 +134,48 @@ public class CadView extends View {
         });
     }
 
+    /**
+     * Never run this experimental path through the default MainActivity open
+     * flow. The owner supplies the very first native scene of this DWG.
+     */
+    public void attachExperimentalPagedPreview(NativePagedScenePreview preview){
+        attachExperimentalPagedPreview(preview,null);
+    }
+
+    /**
+     * Opt-in preview with a cancellable worker for loading visible evictions.
+     * A page from another tab/project cannot be attached to this scene.
+     */
+    public void attachExperimentalPagedPreview(NativePagedScenePreview preview,
+                                               NativePagedPreviewLoader loader){
+        if(preview==null||preview.pageCount()==0||nativeDrawing==null||vectorDrawing!=null||
+           !preview.acceptsFirstScene(nativeDrawing))
+            throw new IllegalStateException("Önizleme aktif DWG sahnesiyle eşleşmiyor");
+        if(experimentalPagedLoader!=null&&experimentalPagedLoader!=loader)
+            experimentalPagedLoader.close();
+        experimentalPagedPreview=preview;
+        experimentalPagedLoader=loader;
+        postInvalidateOnAnimation();
+    }
+
+    /** Also cancel the old project's decoder on a drawing/tab handoff. */
+    private void clearExperimentalPagedPreview(){
+        if(experimentalPagedLoader!=null){
+            experimentalPagedLoader.close();
+            experimentalPagedLoader=null;
+        }
+        experimentalPagedPreview=null;
+    }
+
+    public void detachExperimentalPagedPreview(){
+        if(experimentalPagedPreview!=null||experimentalPagedLoader!=null){
+            clearExperimentalPagedPreview();
+            postInvalidateOnAnimation();
+        }
+    }
+
+    public boolean hasExperimentalPagedPreview(){return experimentalPagedPreview!=null;}
+
     private boolean hasDrawing(){return drawing!=null||vectorDrawing!=null||nativeDrawing!=null;}
     private boolean canUseNativeFastScene(){return RenderPathPolicy.useNativeFast(vectorDrawing!=null,nativeDrawing!=null,nativeDrawing!=null&&nativeDrawing.truncated,sourceEdits.modifiedCount());}
     private boolean canUseFastVectorPreview(){return vectorDrawing!=null&&vectorDrawing.bitmap!=null&&!vectorDrawing.bitmap.isRecycled();}
@@ -157,6 +208,7 @@ public class CadView extends View {
 
     /** Restores a project and optionally keeps its native fast-navigation scene. */
     public void restoreSessionState(DxfParser.Result vector,NativeScene nativeScene,Bitmap bitmap,SessionState state){
+        clearExperimentalPagedPreview();
         stopFastNavigation();
         vectorDrawing=vector;
         nativeDrawing=nativeScene;
@@ -227,6 +279,7 @@ public class CadView extends View {
 
     public void replaceVisibleDrawing(DxfParser.Result result){
         if(vectorDrawing==null||result==null)throw new IllegalArgumentException("Vektör çizim bulunamadı");
+        clearExperimentalPagedPreview();
         stopFastNavigation();vectorDrawing=result;nativeDrawing=null;drawing=null;authoritativeVectorFramePending=true;aiHighlightedSourceIds.clear();selecting=false;draggingSelection=false;points.clear();freehandPoints.clear();moveSelectedArmed=false;
         int selected=sourceEdits.selectedId();DxfParser.SourceEntity source=result.sourceById(selected);
         if(source==null||!result.isSourceVisible(selected))sourceEdits.clearSelection();
@@ -255,6 +308,7 @@ public class CadView extends View {
 
     public void setDrawing(Bitmap b){
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        clearExperimentalPagedPreview();
         vectorDrawing=null;nativeDrawing=null;drawing=b;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
@@ -263,6 +317,7 @@ public class CadView extends View {
     public void setNativeDrawing(NativeScene result){
         if(result==null)throw new IllegalArgumentException("Native çizim yok");
         stopFastNavigation();snapPoints=new float[0];lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        clearExperimentalPagedPreview();
         drawing=null;vectorDrawing=null;nativeDrawing=result;authoritativeVectorFramePending=false;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();aiHighlightedSourceIds.clear();selectedImageIndex=-1;unitsPerImagePixel=1;unitName="piksel";mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();notifyValue();
     }
@@ -276,6 +331,7 @@ public class CadView extends View {
             float[]content={screenX,screenY};Matrix inv=new Matrix();
             if(imageMatrix.invert(inv)){inv.mapPoints(content);worldAnchor=oldNative.contentToWorld(content[0],content[1]);worldScreenScale=scale*oldNative.drawingToContentScale();}
         }
+        clearExperimentalPagedPreview();
         drawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;snapPoints=result.snapPoints.clone();lastSnapped=false;sourceEdits.clearSelection();aiHighlightedSourceIds.clear();
         if("piksel".equals(unitName)){unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();}
         if(oldNative!=null)oldNative.alignTo(result.drawingToContentMatrix());
@@ -297,6 +353,7 @@ public class CadView extends View {
     public void setVectorDrawing(DxfParser.Result result){
         if(result==null)throw new IllegalArgumentException("Çizim yok");
         stopFastNavigation();snapPoints=result.snapPoints.clone();lastSnapped=false;selecting=false;draggingSelection=false;moveSelectedArmed=false;
+        clearExperimentalPagedPreview();
         drawing=null;nativeDrawing=null;vectorDrawing=result;authoritativeVectorFramePending=true;edits.clear();redoEdits.clear();userBlocks.clear();imageOverlays.clear();sourceEdits.clear();selectedImageIndex=-1;unitsPerImagePixel=result.drawingDistanceFromContent(1d);unitName=result.drawingUnitName();mode=Mode.PAN;points.clear();freehandPoints.clear();pendingBlockName="";
         imageMatrix.reset();fit();invalidate();
     }
@@ -900,7 +957,19 @@ public class CadView extends View {
 
     @Override protected void onSizeChanged(int w,int h,int ow,int oh){if(selecting)cancelSelection();if(ow==0)fit();}
 
+    /** Developer-only, in-memory draw timing; not GPU FPS or screen fidelity. */
+    public void enableFrameTiming(boolean enable){
+        frameTimeStats=enable?new CadFrameTimeStats():null;
+    }
+    public CadFrameTimeStats.Snapshot frameTimingSnapshot(){
+        return frameTimeStats==null?null:frameTimeStats.snapshot();
+    }
+
     @Override protected void onDraw(Canvas c){
+        final CadFrameTimeStats metrics=frameTimeStats;
+        final boolean gestureAtStart=fastNavigation;
+        final long drawStarted=metrics==null?0L:System.nanoTime();
+        try{
         super.onDraw(c);
         if(vectorDrawing!=null){
             if(authoritativeVectorFramePending){
@@ -912,19 +981,81 @@ public class CadView extends View {
             }else if(fastNavigation){
                 vectorDrawing.drawVectorNavigation(c,imageMatrix,sourceEdits.hiddenSourceIds());
             }else vectorDrawing.drawVector(c,imageMatrix,sourceEdits.hiddenSourceIds());
-        }else if(nativeDrawing!=null)nativeDrawing.draw(c,imageMatrix,fastNavigation);else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
+        }else if(nativeDrawing!=null){
+            if(experimentalPagedPreview!=null){
+                experimentalPagedPreview.draw(c,imageMatrix,fastNavigation);
+                if(experimentalPagedLoader!=null){
+                    RectF viewport=experimentalPagedPreview.visibleWorldBounds(c,imageMatrix);
+                    if(viewport!=null)experimentalPagedLoader.requestVisibleWorld(
+                            viewport.left,viewport.top,viewport.right,viewport.bottom);
+                }
+                if(experimentalPagedPreview.isPartial()){
+                    // Incomplete cache is never silently presented as a full DWG.
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.rgb(250,184,49));
+                    paint.setTextSize(28f);
+                    c.drawText("DWG önizleme kısmi • sayfalar yükleniyor",20f,42f,paint);
+                }
+            }else{
+                nativeDrawing.draw(c,imageMatrix,fastNavigation);
+                if(nativeDrawing.truncated){
+                    // Initial fast scene can reach its memory/record safety cap.
+                    // It must NEVER be presented as full DWG fidelity.
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.rgb(250,184,49));
+                    paint.setTextSize(28f);
+                    c.drawText("DWG hızlı önizleme kısmi • tam çizim hazırlanıyor",20f,42f,paint);
+                }
+            }
+        }else if(drawing!=null)c.drawBitmap(drawing,imageMatrix,paint);else drawWelcome(c);
         drawImageOverlays(c);drawEdits(c);drawLiveFreehand(c);
 
         paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setColor(editMode()?Color.rgb(255,193,7):Color.rgb(25,181,165));
-        ArrayList<PointF> screen=new ArrayList<>();for(PointF point:points){float[] xy={point.x,point.y};imageMatrix.mapPoints(xy);screen.add(new PointF(xy[0],xy[1]));}
-        if(screen.size()>1){Path p=new Path();p.moveTo(screen.get(0).x,screen.get(0).y);for(int i=1;i<screen.size();i++)p.lineTo(screen.get(i).x,screen.get(i).y);if(mode==Mode.AREA&&screen.size()>2)p.close();c.drawPath(p,paint);}
-        paint.setStyle(Paint.Style.FILL);for(PointF p:screen)c.drawCircle(p.x,p.y,8,paint);
-
-        if(lastSnapped&&!screen.isEmpty()&&!exporting){PointF point=screen.get(screen.size()-1);paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.WHITE);paint.setStrokeWidth(2);c.drawRect(point.x-12,point.y-12,point.x+12,point.y+12,paint);paint.setStyle(Paint.Style.FILL);}
+        int markerCount=points.size();
+        paint.setStyle(Paint.Style.FILL); // Preserve pre-existing empty-marker paint state.
+        if(markerCount>0){
+            // Android Matrix.mapPoints supports transforming the same array in
+            // place. Keep the visible selection/measurement overlay identical.
+            int words=markerCount*2;
+            if(overlayPointScreen.length<words)
+                overlayPointScreen=Arrays.copyOf(overlayPointScreen,
+                        Math.max(words,overlayPointScreen.length*2));
+            for(int i=0;i<markerCount;i++){
+                PointF point=points.get(i);
+                overlayPointScreen[i*2]=point.x;
+                overlayPointScreen[i*2+1]=point.y;
+            }
+            imageMatrix.mapPoints(overlayPointScreen,0,overlayPointScreen,0,markerCount);
+            if(markerCount>1){
+                overlayPointPath.rewind();
+                overlayPointPath.moveTo(overlayPointScreen[0],overlayPointScreen[1]);
+                for(int i=1;i<markerCount;i++)
+                    overlayPointPath.lineTo(overlayPointScreen[i*2],
+                                            overlayPointScreen[i*2+1]);
+                if(mode==Mode.AREA&&markerCount>2)overlayPointPath.close();
+                c.drawPath(overlayPointPath,paint);
+            }
+            paint.setStyle(Paint.Style.FILL);
+            for(int i=0;i<markerCount;i++)
+                c.drawCircle(overlayPointScreen[i*2],
+                             overlayPointScreen[i*2+1],8,paint);
+            if(lastSnapped&&!exporting){
+                int last=words-2;
+                float x=overlayPointScreen[last],y=overlayPointScreen[last+1];
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setColor(Color.WHITE);
+                paint.setStrokeWidth(2);
+                c.drawRect(x-12,y-12,x+12,y+12,paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+        }
         if(selecting&&draggingSelection&&!exporting){paint.setStyle(Paint.Style.STROKE);paint.setColor(Color.YELLOW);paint.setStrokeWidth(3);c.drawRect(Math.min(selectionX,selectionEndX),Math.min(selectionY,selectionEndY),Math.max(selectionX,selectionEndX),Math.max(selectionY,selectionEndY),paint);paint.setStyle(Paint.Style.FILL);}
         if((!exporting||reportEvidenceExporting)&&!aiHighlightedSourceIds.isEmpty())drawAiHighlights(c);
         if(mode==Mode.SELECT_ENTITY&&!exporting){if(selectedIsImage())drawSelectedImage(c);else if(sourceEdits.hasSelection())drawSelectedSource(c);}
         if(stylusHover&&!exporting)drawStylusCursor(c);
+        }finally{
+            if(metrics!=null)metrics.sample(System.nanoTime()-drawStarted,gestureAtStart);
+        }
     }
 
     private void drawImageOverlays(Canvas c){

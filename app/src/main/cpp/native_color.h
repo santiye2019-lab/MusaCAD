@@ -14,6 +14,14 @@ typedef struct {
     unsigned int rgb;
 } MusaNativeColorToken;
 
+/* Shared encoded scene color for native first paint. Field order is stable
+ * because scene paging saves/restores each color as ACI, RGB and truecolor. */
+typedef struct {
+    int aci;
+    unsigned int rgb;
+    int truecolor;
+} MusaNativeSceneColor;
+
 /*
  * Normalize LibreDWG CMC colors before the fast native first paint.
  *
@@ -30,7 +38,7 @@ static inline MusaNativeColorToken musa_native_color_token(unsigned int method,i
 
     unsigned int m=method&0xffu;
     if(!m&&(rgb&0xff000000u))m=(rgb>>24)&0xffu;
-    int aci=index<0?-index:index;
+    unsigned int aci=index<0?(unsigned int)(-(long long)index):(unsigned int)index;
 
     if(m==0xc0u){
         out.kind=MUSA_COLOR_INHERIT_LAYER;return out;
@@ -66,6 +74,28 @@ static inline MusaNativeColorToken musa_native_color_token(unsigned int method,i
     }
 
     return out;
+}
+
+/* Exactly one resolution contract for every native first-paint path:
+ * entity ByLayer -> effective layer; entity ByBlock -> parent INSERT;
+ * indexed ACI and explicit RGB retain their own colors. The caller determines
+ * effective layer 0 before invoking this resolver. */
+static inline MusaNativeSceneColor musa_native_color_resolve(
+    MusaNativeColorToken token, MusaNativeSceneColor byLayer,
+    MusaNativeSceneColor byBlock){
+    if(token.kind==MUSA_COLOR_RGB){
+        MusaNativeSceneColor value={7,token.rgb&0x00ffffffu,1};return value;
+    }
+    if(token.kind==MUSA_COLOR_ACI){
+        MusaNativeSceneColor value={token.aci,0u,0};return value;
+    }
+    if(token.kind==MUSA_COLOR_INHERIT_BLOCK)return byBlock;
+    return byLayer;
+}
+static inline MusaNativeSceneColor musa_native_effective_layer_color(
+    int insideBlock,int layerIsZero,MusaNativeSceneColor definedLayer,
+    MusaNativeSceneColor inheritedLayer){
+    return insideBlock&&layerIsZero?inheritedLayer:definedLayer;
 }
 
 #endif
