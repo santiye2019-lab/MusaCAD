@@ -79,6 +79,11 @@ jobs:
           test -s "$RUNNER_TEMP/musacad-mesh-ray-pick-iphoneos-arm64.o"
           xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
             -I core/native/include \
+            -c core/native/src/musacad_mesh_bvh.c \
+            -o "$RUNNER_TEMP/musacad-mesh-bvh-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-mesh-bvh-iphoneos-arm64.o"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
             -c core/native/tests/core_ray_aabb_test.c \
             -o "$RUNNER_TEMP/musacad-ray-aabb-iphoneos-arm64.o"
           test -s "$RUNNER_TEMP/musacad-ray-aabb-iphoneos-arm64.o"
