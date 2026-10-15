@@ -425,26 +425,59 @@ public final class Dxf3dMesh {
             if(Math.hypot(Math.hypot(a[0]-b[0],a[1]-b[1]),a[2]-b[2])>1e-6)
                 throw new IOException("SPLINE kapalı bayrağı uç noktaları eşleştirmiyor");
         }
+        // Uniform parameter sampling can jump over tightly clustered knots
+        // and erase bends/corners. Visit EVERY distinct active knot exactly.
+        // Repeated interior knots above degree would make a discontinuous
+        // curve: do not invent a visible line joining disconnected pieces.
+        ArrayList<double[]> spans=new ArrayList<>();
+        int interiorMultiplicity=1;
+        for(int i=degree;i<count;i++){
+            double left=knots.get(i),right=knots.get(i+1);
+            if(i>degree){
+                if(left==knots.get(i-1))interiorMultiplicity++;
+                else interiorMultiplicity=1;
+                if(left>begin&&left<end&&interiorMultiplicity>degree)
+                    throw new IOException("SPLINE kesintili iç düğüm desteklenmiyor");
+            }
+            if(right>left)spans.add(new double[]{left,right});
+        }
         int segments=Math.min(2048,Math.max(24,(count-1)*12));
+        if(spans.isEmpty()||spans.size()>segments)
+            throw new IOException("SPLINE düğüm aralığı örnekleme sınırı aşıldı");
         long vertices=closed?segments:segments+1;
         if(c.points.n/3+vertices>MAX_VERTICES||
            c.explicitEdges.n/2+(long)segments>MAX_EDGES)
             throw new IOException("SPLINE yaklaşık görüntüleme sınırı aşıldı");
-        int first=c.points.n/3;
-        for(int i=0;i<vertices;i++){
-            double u=begin+(end-begin)*((double)i/segments);
-            double[] point=evaluateSpline(controls,knots,weights,degree,u);
-            double[] world=p.spatial.point(point[0],point[1],point[2]);
-            for(int axis=0;axis<3;axis++){
-                if(!Double.isFinite(world[axis])||Math.abs(world[axis])>1e9)
-                    throw new IOException("SPLINE 3B koordinat sınırı aşıldı");
-                c.points.add((float)world[axis]);
+        int first=c.points.n/3,generated=0;
+        for(int span=0;span<spans.size();span++){
+            double[] knotSpan=spans.get(span);
+            int steps=segments/spans.size()+(span<segments%spans.size()?1:0);
+            for(int step=0;step<steps;step++){
+                double u=knotSpan[0]+(knotSpan[1]-knotSpan[0])*((double)step/steps);
+                appendSplineSample(c,p,controls,knots,weights,degree,u);
+                if(generated>0)appendEdge(c.explicitEdges,first+generated-1,first+generated);
+                generated++;
             }
-            c.sourceLines.add(-1);
-            c.coordinateSlots.add(-1);
-            if(i>0)appendEdge(c.explicitEdges,first+i-1,first+i);
         }
-        if(closed)appendEdge(c.explicitEdges,first+segments-1,first);
+        if(closed)appendEdge(c.explicitEdges,first+generated-1,first);
+        else{
+            appendSplineSample(c,p,controls,knots,weights,degree,end);
+            appendEdge(c.explicitEdges,first+generated-1,first+generated);
+        }
+    }
+
+    private static void appendSplineSample(Collector c,DxfBlocks.Placement p,
+            ArrayList<SplineControl> controls,ArrayList<Double> knots,
+            ArrayList<Double> weights,int degree,double u)throws IOException{
+        double[] point=evaluateSpline(controls,knots,weights,degree,u);
+        double[] world=p.spatial.point(point[0],point[1],point[2]);
+        for(int axis=0;axis<3;axis++){
+            if(!Double.isFinite(world[axis])||Math.abs(world[axis])>1e9)
+                throw new IOException("SPLINE 3B koordinat sınırı aşıldı");
+            c.points.add((float)world[axis]);
+        }
+        c.sourceLines.add(-1);
+        c.coordinateSlots.add(-1);
     }
 
     /** Rational B-spline point from homogeneous de Boor evaluation. */
