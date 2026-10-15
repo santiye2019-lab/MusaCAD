@@ -2,7 +2,7 @@
 #include "config.h"
 #include "native_color.h"
 #include "scene_coord_safety.h"
-#include "native_nurbs.h"
+#include "musacad_core.h"
 #include "native_fit_spline.h"
 #include <math.h>
 #include <stdlib.h>
@@ -756,7 +756,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
 #endif
                 s->truncated=1;break;
             }
-            MusaNurbsControl *points=(MusaNurbsControl*)calloc(n,sizeof(*points));
+            MusaCoreNurbsControl *points=(MusaCoreNurbsControl*)calloc(n,sizeof(*points));
             if(!points){s->truncated=1;break;}
             for(size_t i=0;i<n;i++){
                 points[i].x=e->ctrl_pts[i].x;
@@ -764,11 +764,11 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                 /* LibreDWG dwg.spec stores w=0 when 'weighted' is false,
                  * even if the rational flag is set. The implicit DXF/NURBS
                  * weight in that case is exactly one. */
-                points[i].w=musa_nurbs_weight(e->ctrl_pts[i].w,e->weighted);
+                points[i].w=musa_core_effective_weight(e->ctrl_pts[i].w,e->weighted);
             }
-            int sampled=musa_nurbs_valid(points,n,e->knots,
+            int sampled=musa_core_nurbs_validate(points,n,e->knots,
                                          (size_t)e->num_knots,degree)
-                ?musa_nurbs_preview_points(e->knots,n,degree):0;
+                ?musa_core_nurbs_preview_points(e->knots,n,degree):0;
             if(!sampled||!begin_poly(s,color,e->closed_b!=0,sampled)){
 #ifdef MUSA_HOST
                 fprintf(stderr,"MusaCAD spline rejected: scenario=%d degree=%d"
@@ -789,7 +789,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                         :e->knots[i]+(e->knots[i+1]-e->knots[i])*
                           ((double)j/MUSA_NURBS_SAMPLES_PER_KNOT_SPAN);
                     double x,y;
-                    if(!musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)){
+                    if(!musa_core_nurbs_evaluate(points,n,e->knots,degree,u,&x,&y)){
                         s->truncated=1;break;
                     }
                     emit_poly_point(s,parent,x,y);
