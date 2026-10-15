@@ -789,7 +789,7 @@ static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int de
                         :e->knots[i]+(e->knots[i+1]-e->knots[i])*
                           ((double)j/MUSA_CORE_NURBS_SAMPLES_PER_KNOT_SPAN);
                     double x,y;
-                    if(!musa_core_nurbs_evaluate(points,n,e->knots,(size_t)e->num_knots,degree,u,&x,&y)){
+                    if(!musa_core_nurbs_evaluate_validated(points,n,e->knots,degree,u,&x,&y)){
                         s->truncated=1;break;
                     }
                     emit_poly_point(s,parent,x,y);
