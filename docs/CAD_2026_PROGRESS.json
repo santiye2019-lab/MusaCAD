@@ -83,12 +83,20 @@
       "commit": "45fc75009831c34876a2f39dd248c2a470a4c4b4",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD run 38695493466: PASS for missing XREF, unknown block, invalid OCS and overflow reference-count regressions. Mesh3dActivity warns of partial model and unreliable full-project quantities. Full Android CI, independent native DWG proof and physical device acceptance not yet established."
+    },
+    {
+      "id": "independent_3dface_xyz_edge_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "3ad1b77bc3e203fc857aad861cc642868d997191",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD run 38696236256 PASS: 3DFACE XYZ corners, optional fourth vertex, group-70 edge visibility, high-precision drift, malformed source, private converter integration. Full Android/modern DWG tests and independently supplied real project baseline remain pending."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 8,
+      "points": 7,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
