@@ -62,6 +62,22 @@ int musa_core_mesh_mass_f32(const float *xyz,size_t point_count,
                             int topology_prevalidated,
                             MusaCoreMeshMass *out);
 /*
+ * Triangle-mesh SURFACE metrics (not signed enclosed volume).
+ * Reads float XYZ vertices + indexed triangles; returns total area and
+ * area-weighted centroid in WCS drawing units, plus degenerate face count.
+ * Open shells are supported. An empty/zero-area set has NaN centroids.
+ * Invalid indices, nonfinite vertices or overflow return 0 and leave *out
+ * intact. No conclusion is made about solids, watertight B-Rep or metraj.
+ */
+typedef struct MusaCoreMeshSurface {
+    double area;
+    double centroid_x,centroid_y,centroid_z;
+    size_t triangle_count,degenerate_count;
+} MusaCoreMeshSurface;
+int musa_core_mesh_surface_f32(const float *xyz,size_t point_count,
+                              const int *triangles,size_t face_count,
+                              MusaCoreMeshSurface *out);
+/*
  * Independently audit indexed 3D triangle connectivity before signed-mass
  * calculations. Untrusted meshes are NEVER certified solely by edge count.
  * Mirrors Android Cad3dMeshTopology: index-shared edges, winding, duplicate

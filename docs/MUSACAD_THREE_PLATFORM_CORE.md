@@ -59,6 +59,14 @@ Path: `core/native/`
   real-device accuracy/performance tests allow switching. Host JVM tests
   prove no native library is required for fallback. Android's native bridge
   is **not** a Windows/iOS application or ACIS-solid implementation.
+- A portable 3D triangle **surface-area and area-weighted centroid** engine
+  (`musa_core_mesh_surface_f32`) now mirrors the existing read-only Android
+  Java `Cad3dSurfaceMetrics` math, including compensated sums and WCS origin
+  shifts. The common C core includes open surface, cube, large WCS, zero-area
+  and malformed mesh regression tests. It is compiled on Linux/Windows/macOS,
+  plus iPhoneOS arm64 object-only. Android's existing Java output is unchanged
+  until an independently tested adapter is selected. This is NOT analytic
+  ACIS face area or certified engineering metraj.
 - Portable 3D indexed-mesh **topology preflight** now mirrors the Android
   `Cad3dMeshTopology` screening in `musacad_mesh_topology.c`. It reports
   open edges, inconsistent winding, non-manifold edges, degenerate faces and
