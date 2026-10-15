@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.22)
+project(musacad_affine_geometry LANGUAGES C)
+enable_testing()
+add_executable(musacad_affine_test ../tests/core_affine_test.c)
+target_compile_features(musacad_affine_test PRIVATE c_std_11)
+target_include_directories(musacad_affine_test PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/../include")
+if(UNIX AND NOT APPLE)
+    target_link_libraries(musacad_affine_test PRIVATE m)
+endif()
+add_test(NAME musacad_shared_affine_nested_blocks COMMAND musacad_affine_test)
