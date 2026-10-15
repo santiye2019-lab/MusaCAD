@@ -201,7 +201,7 @@ public final class Dxf3dMesh {
     private static final class LwPoint {
         final double x;
         double y,bulge;
-        boolean hasY;
+        boolean hasY,hasBulge;
         LwPoint(double x){this.x=x;}
     }
 
@@ -234,7 +234,9 @@ public final class Dxf3dMesh {
                     point.y=value;point.hasY=true;
                 }else{
                     if(!point.hasY)throw new IOException("LWPOLYLINE yay bilgisi Y'den önce geldi");
-                    point.bulge=value;
+                    if(point.hasBulge)
+                        throw new IOException("LWPOLYLINE yinelenen yay değeri");
+                    point.bulge=value;point.hasBulge=true;
                 }
             }
         }
