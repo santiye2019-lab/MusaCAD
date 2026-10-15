@@ -51,6 +51,14 @@
       "commit": "8f9d74ed0a9dd34f05707cd5e6bad5ea09612235",
       "source_path": "tests/dwg_block_reference_audit.py",
       "verification": "GitHub Android run 38643459543 'Test conservative native DWG entity type audit': PASS. Complete Android and Modern DWG runs not yet certified at ledger update."
+    },
+    {
+      "id": "minsert_preflight_takeoff_integrity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "b6a7f775293415d4f06afd3389d8b028ebf46b37",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "GitHub fast CAD regression run 38692750685: DXF INSERT/MINSERT geometry and quantity-safety PASS. Full Android and independent DWG acceptance still pending."
     }
   ],
   "backlog": [
@@ -74,7 +82,7 @@
     },
     {
       "id": "xref_dynamic_block_layouts",
-      "points": 8,
+      "points": 7,
       "status": "in_progress",
       "evidence_required": "Nested XREF, dynamic block and layout semantics"
     },
