@@ -27,7 +27,17 @@ _CORE_GEOMETRY = {
     # Group 70 contains independent edge-visibility bits 1/2/4/8.
     "3DFACE": ((10, 20, 11, 21, 12, 22),
                {30: "0", 31: "0", 32: "0", 70: "0"}),
+    # Ordered repeated numeric group codes require a distinct source record
+    # form: a reference list of [group-code, value] pairs, not a dict.
+    "SPLINE": ((), {}),
 }
+_SPLINE_GROUPS = frozenset((
+    70, 71, 72, 73, 74, 40, 41,
+    10, 20, 30, 11, 21, 31,
+    12, 22, 32, 13, 23, 33, 42, 43, 44, 210, 220, 230,
+))
+_SPLINE_SCALARS = frozenset((70, 71, 72, 73, 74, 42, 43, 44, 210, 220, 230))
+_SPLINE_MAX_PAIRS = 25_000
 
 _HEX_HANDLE = re.compile(r"[0-9A-Fa-f]{1,32}\Z")
 _SPACES = {"ENTITIES": "model", "BLOCKS": "block"}
@@ -70,6 +80,100 @@ class DwgEntityIdentityAudit:
         return format(numeric, "X") if numeric else None
 
     @staticmethod
+    def _spline_geometry(groups, reference=False):
+        """Source-bound, exact ordered DXF parameter subset for SPLINE.
+
+        The external independent reader must export an ordered list of
+        numeric group-code/value pairs (no private handles/layers/text), NOT
+        a mapping: knots, weights and control/fit XYZ recur. This compares
+        definitions, not mathematically evaluated curves or source DWG pixels.
+        """
+        if reference:
+            if not isinstance(groups, list):
+                raise ValueError("ordered SPLINE reference pairs required")
+            pairs = []
+            for item in groups:
+                if (not isinstance(item, list) or len(item) != 2 or
+                        not isinstance(item[0], str) or not item[0].isdecimal() or
+                        str(int(item[0])) != item[0] or
+                        int(item[0]) not in _SPLINE_GROUPS):
+                    raise ValueError("invalid source SPLINE numeric group")
+                pairs.append((int(item[0]), item[1]))
+        else:
+            pairs = [(code, raw) for code, raw in groups if code in _SPLINE_GROUPS]
+        if not pairs or len(pairs) > _SPLINE_MAX_PAIRS:
+            raise ValueError("empty or oversized SPLINE fields")
+        normalized = []
+        scalars = {}
+        knots, weights, controls, fits = [], [], [], []
+        current_control, current_fit = None, None
+        for code, raw in pairs:
+            if not isinstance(raw, str) or not 1 <= len(raw) <= 128:
+                raise ValueError("invalid SPLINE numeric value")
+            value = _normalized(code, raw)
+            if code in _SPLINE_SCALARS:
+                if code in scalars:
+                    raise ValueError("duplicate SPLINE scalar")
+                scalars[code] = value
+            elif code == 40:
+                knots.append(Decimal(value))
+                if len(knots) > 4104:
+                    raise ValueError("too many SPLINE knots")
+            elif code == 41:
+                weights.append(Decimal(value))
+                if len(weights) > 4096:
+                    raise ValueError("too many SPLINE weights")
+            elif code in (10, 20, 30):
+                if code == 10:
+                    if current_control is not None and 20 not in current_control:
+                        raise ValueError("incomplete SPLINE control vertex")
+                    current_control = {10:value}
+                    controls.append(current_control)
+                elif current_control is None or code in current_control or (
+                        code == 30 and 20 not in current_control):
+                    raise ValueError("invalid SPLINE control field order")
+                else:
+                    current_control[code] = value
+                if len(controls) > 4096:
+                    raise ValueError("too many SPLINE control vertices")
+            elif code in (11, 21, 31):
+                if code == 11:
+                    if current_fit is not None and 21 not in current_fit:
+                        raise ValueError("incomplete SPLINE fit vertex")
+                    current_fit = {11:value}
+                    fits.append(current_fit)
+                elif current_fit is None or code in current_fit or (
+                        code == 31 and 21 not in current_fit):
+                    raise ValueError("invalid SPLINE fit field order")
+                else:
+                    current_fit[code] = value
+                if len(fits) > 4096:
+                    raise ValueError("too many SPLINE fit vertices")
+            normalized.append((code, value))
+        if (71 not in scalars or 72 not in scalars or 73 not in scalars or
+                current_control is not None and 20 not in current_control or
+                current_fit is not None and 21 not in current_fit):
+            raise ValueError("SPLINE missing degree/count/XYZ data")
+        degree = int(scalars[71])
+        if degree < 1 or degree > 32:
+            raise ValueError("SPLINE degree outside audit bounds")
+        if (int(scalars[72]) != len(knots) or
+                int(scalars[73]) != len(controls) or
+                int(scalars.get(74, str(len(fits)))) != len(fits) or
+                weights and len(weights) != len(controls) or
+                any(weight <= 0 for weight in weights) or
+                any(knots[i] > knots[i+1] for i in range(len(knots)-1))):
+            raise ValueError("SPLINE declared count, knot or weight invalid")
+        if controls:
+            if len(controls) < degree+1 or len(knots) != len(controls)+degree+1:
+                raise ValueError("SPLINE knot/control relation invalid")
+        elif knots or weights or len(fits) < 2:
+            raise ValueError("SPLINE missing fit-only or control definition")
+        if int(scalars.get(70, "0")) < 0:
+            raise ValueError("invalid SPLINE flag")
+        return tuple(normalized)
+
+    @staticmethod
     def _primitive_geometry(kind, groups, reference=False):
         """Canonical exact numeric subset; never return values in diagnostics.
 
@@ -78,6 +182,8 @@ class DwgEntityIdentityAudit:
         pairs. Missing optional Z and OCS normals use DWG/DXF documented
         defaults. Fail on missing/duplicate/malformed covered numeric fields.
         """
+        if kind == "SPLINE":
+            return DwgEntityIdentityAudit._spline_geometry(groups, reference)
         spec = _CORE_GEOMETRY.get(kind)
         if spec is None:
             raise ValueError("unsupported independent geometry type")
@@ -364,8 +470,10 @@ class DwgEntityIdentityAudit:
             "independent_geometry_invalid_decoded": self.invalid_core_geometry,
             "independent_geometry_scope": (
                 "LINE XYZ endpoints, POINT position/normal, CIRCLE/ARC center/"
-                "radius/angles/normal, 3DFACE XYZ corners and invisible-edge "
-                "flags only. Exact numeric values; no full DWG geometry, color, "
+                "radius/angles/normal, 3DFACE XYZ corners/hidden edges, and "
+                "ordered SPLINE knot/control/fit/weight parameter groups only. "
+                "Exact parameter strings after numeric normalization; no "
+                "evaluated curve or full DWG geometry, color, "
                 "XREF, block transforms, 3DSOLID, or rendering assurance."
             ),
         }
