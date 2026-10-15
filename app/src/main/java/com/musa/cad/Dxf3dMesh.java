@@ -200,7 +200,8 @@ public final class Dxf3dMesh {
                     appendFace(triangles,explicitEdges,outlineOnlyTriangles,
                                face.index,face.base,vertexCount);
             }else if(polygonMesh){
-                appendPolygonMesh(triangles,base,vertexCount,meshM,meshN,meshClosedM,meshClosedN);
+                appendPolygonMesh(triangles,explicitEdges,outlineOnlyTriangles,
+                                  base,vertexCount,meshM,meshN,meshClosedM,meshClosedN);
             }else if(polylinePath&&polylineClosed&&firstPathVertex>=0&&previousPathVertex>=0&&firstPathVertex!=previousPathVertex){
                 appendEdge(explicitEdges,previousPathVertex,firstPathVertex);
             }
@@ -934,16 +935,42 @@ public final class Dxf3dMesh {
             appendEdge(visibleEdges,base+point[i]-1,base+point[next]-1);
         }
     }
-    private static void appendPolygonMesh(IntBuffer out,int base,int vertexCount,int m,int n,boolean closedM,boolean closedN)throws IOException{
-        if(m<2||n<2||vertexCount<m*n)return;
+    private static void appendPolygonMesh(IntBuffer triangles,IntBuffer visibleEdges,
+                                          BitSet outlineOnlyTriangles,int base,int vertexCount,
+                                          int m,int n,boolean closedM,boolean closedN)throws IOException{
+        if(m<2||n<2||(long)m*n!=vertexCount)
+            throw new IOException("3B polygon mesh köşe tablosu tamamlanmamış veya boyutu tutarsız");
         boolean wrapM=closedM&&m>2,wrapN=closedN&&n>2;
         int mCells=wrapM?m:m-1,nCells=wrapN?n:n-1;
         for(int row=0;row<nCells;row++){
             int nextRow=(row+1)%n;
             for(int column=0;column<mCells;column++){
                 int nextColumn=(column+1)%m;
-                int a=base+row*m+column,b=base+row*m+nextColumn,c=base+nextRow*m+nextColumn,d=base+nextRow*m+column;
-                appendTriangle(out,a,b,c);appendTriangle(out,a,c,d);
+                int a=base+row*m+column,b=base+row*m+nextColumn;
+                int c=base+nextRow*m+nextColumn,d=base+nextRow*m+column;
+                int firstTriangle=triangles.n/3;
+                appendTriangle(triangles,a,b,c);
+                appendTriangle(triangles,a,c,d);
+                // Triangle edges are for shading only. A POLYGON MESH's
+                // actual wireframe is its M/N vertex grid, never the
+                // artificial diagonal between opposite quad corners.
+                outlineOnlyTriangles.set(firstTriangle,triangles.n/3);
+            }
+        }
+        // Build each authored grid edge exactly once; the closed M/N modes
+        // add wrap edges without duplicating two-vertex seam segments.
+        for(int row=0;row<n;row++){
+            for(int column=0;column<mCells;column++){
+                int nextColumn=(column+1)%m;
+                appendEdge(visibleEdges,base+row*m+column,
+                           base+row*m+nextColumn);
+            }
+        }
+        for(int row=0;row<nCells;row++){
+            int nextRow=(row+1)%n;
+            for(int column=0;column<m;column++){
+                appendEdge(visibleEdges,base+row*m+column,
+                           base+nextRow*m+column);
             }
         }
     }
