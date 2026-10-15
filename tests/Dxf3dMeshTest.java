@@ -38,6 +38,9 @@ public final class Dxf3dMeshTest {
         testMalformedLwPolylineFailClosed();
         testCircularAndArcOutlines();
         testEllipticalArcsAndFullEllipse();
+        testQuadraticAndRationalSpline();
+        testClosedSplineAndRotatedBlock();
+        testUnsupportedAndMalformedSplinesFailClosed();
         testTiltedEllipseWithinRotatedBlock();
         testMalformedEllipseFailClosed();
         testTiltedCircularOcsAndNestedInsert();
@@ -130,6 +133,107 @@ public final class Dxf3dMeshTest {
     private static void assertCurveNear(float actual,double expected,String why){
         if(!Float.isFinite(actual)||Math.abs(actual-expected)>0.0002)
             throw new AssertionError(why+": "+actual+" != "+expected);
+    }
+
+    private static void testQuadraticAndRationalSpline() throws Exception {
+        File file=File.createTempFile("mesh3d-spline-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n8\n71\n2\n72\n6\n73\n3\n"+
+                "40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n"+
+                "10\n0\n20\n0\n30\n1\n"+
+                "10\n2\n20\n2\n30\n3\n"+
+                "10\n4\n20\n0\n30\n5\n"+
+                "0\nSPLINE\n70\n12\n71\n2\n72\n6\n73\n3\n"+
+                "40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n"+
+                "41\n1\n41\n0.7071067811865476\n41\n1\n"+
+                "10\n1\n20\n0\n10\n1\n20\n1\n10\n0\n20\n1\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=2||mesh.triangles.length!=0||
+               mesh.xyz.length!=50*3||mesh.edges.length!=48*2)
+                throw new AssertionError("two quadratic SPLINE curves must sample 24 segments each");
+            assertCurveNear(mesh.xyz[0],0,"B-spline first X");
+            assertCurveNear(mesh.xyz[2],1,"B-spline first Z");
+            assertCurveNear(mesh.xyz[12*3],2,"B-spline midpoint X");
+            assertCurveNear(mesh.xyz[12*3+1],1,"B-spline midpoint Y");
+            assertCurveNear(mesh.xyz[12*3+2],3,"B-spline midpoint Z");
+            assertCurveNear(mesh.xyz[24*3],4,"B-spline end X");
+            assertCurveNear(mesh.xyz[24*3+2],5,"B-spline end Z");
+            assertCurveNear(mesh.xyz[25*3],1,"rational start X");
+            assertCurveNear(mesh.xyz[37*3],Math.sqrt(0.5),"rational quarter circle midpoint X");
+            assertCurveNear(mesh.xyz[37*3+1],Math.sqrt(0.5),"rational midpoint Y");
+            assertCurveNear(mesh.xyz[49*3],0,"rational end X");
+            assertCurveNear(mesh.xyz[49*3+1],1,"rational end Y");
+            for(int i=0;i<mesh.xyz.length/3;i++)
+                if(mesh.sourceLines[i]!=-1||mesh.coordinateSlots[i]!=-1)
+                    throw new AssertionError("SPLINE sample must remain read-only");
+            float[] before=mesh.xyz.clone();
+            mesh.xyz[0]+=1;
+            try{
+                Dxf3dEditor.write(file,new ByteArrayOutputStream(),mesh,before);
+                throw new AssertionError("tessellated SPLINE must not write as DXF control point");
+            }catch(java.io.IOException expected){}
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testClosedSplineAndRotatedBlock() throws Exception {
+        File file=File.createTempFile("mesh3d-closed-spline-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nSPLINE_PIPE\n10\n0\n20\n0\n30\n0\n"+
+                "0\nSPLINE\n70\n1\n71\n1\n72\n6\n73\n4\n"+
+                "40\n0\n40\n0\n40\n1\n40\n2\n40\n3\n40\n3\n"+
+                "10\n0\n20\n0\n30\n2\n"+
+                "10\n2\n20\n0\n30\n2\n"+
+                "10\n2\n20\n2\n30\n2\n"+
+                "10\n0\n20\n0\n30\n2\n"+
+                "0\nENDBLK\n0\nENDSEC\n"+
+                "0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nSPLINE_PIPE\n10\n10\n20\n20\n30\n30\n50\n90\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.approximateCurves!=1||mesh.triangles.length!=0||
+               mesh.xyz.length!=36*3||mesh.edges.length!=36*2)
+                throw new AssertionError("closed SPLINE must reconnect without duplicate sample");
+            assertCurveNear(mesh.xyz[0],10,"rotated closed spline first X");
+            assertCurveNear(mesh.xyz[1],20,"rotated closed spline first Y");
+            assertCurveNear(mesh.xyz[2],32,"rotated closed spline first Z");
+            if(mesh.edges[mesh.edges.length-2]!=35||mesh.edges[mesh.edges.length-1]!=0)
+                throw new AssertionError("closed B-spline must close on first point");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testUnsupportedAndMalformedSplinesFailClosed() throws Exception {
+        File file=File.createTempFile("mesh3d-bad-spline-", ".dxf");
+        try{
+            String valid="71\n2\n72\n6\n73\n3\n"+
+                "40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n"+
+                "10\n0\n20\n0\n10\n1\n20\n1\n10\n2\n20\n0\n";
+            String[] invalid={
+                valid.replace("71\n2\n","71\n8\n"),
+                valid.replace("72\n6\n","72\n5\n"),
+                valid.replace("40\n0\n40\n0\n40\n0\n40\n1\n",
+                              "40\n0\n40\n0\n40\n1\n40\n0\n"),
+                valid.replace("10\n1\n20\n1\n","10\n1\n"),
+                valid.replace("40\n1\n40\n1\n40\n1\n","40\n1\n40\n1\n40\nNaN\n"),
+                valid+"41\n1\n41\n0\n41\n1\n",
+                valid+"41\n1\n41\n1\n",
+                "71\n2\n72\n0\n73\n0\n11\n1\n21\n1\n",
+                "70\n2\n"+valid,
+                "70\n1\n"+valid
+            };
+            for(String groups:invalid){
+                Files.writeString(file.toPath(),"0\nSECTION\n2\nENTITIES\n"+
+                    "0\nSPLINE\n"+groups+"0\nENDSEC\n0\nEOF\n",
+                    StandardCharsets.UTF_8);
+                boolean rejected=false;
+                try{Dxf3dMesh.read(file);}catch(java.io.IOException expected){rejected=true;}
+                if(!rejected)throw new AssertionError("unsupported or malformed SPLINE must fail closed");
+            }
+        }finally{Files.deleteIfExists(file.toPath());}
     }
 
     private static void testEllipticalArcsAndFullEllipse() throws Exception {
