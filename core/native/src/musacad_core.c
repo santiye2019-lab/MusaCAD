@@ -17,14 +17,17 @@ int musa_core_nurbs_validate(const MusaCoreNurbsControl *controls,size_t n,
     return musa_nurbs_valid(controls,n,knots,nk,degree);
 }
 int musa_core_nurbs_evaluate(const MusaCoreNurbsControl *controls,size_t n,
-                            const double *knots,int degree,double u,
+                            const double *knots,size_t nk,int degree,double u,
                             double *x,double *y) {
     /* Reject malformed definitions even if caller bypassed validation. */
-    if(!controls||!knots||!x||!y||n<(size_t)(degree+1)||
-       degree<1||degree>MUSA_NURBS_MAX_DEGREE)return 0;
-    if(!musa_nurbs_valid(controls,n,knots,n+(size_t)degree+1u,degree))return 0;
+    if(!controls||!knots||!x||!y||degree<1||
+       degree>MUSA_NURBS_MAX_DEGREE||n<=(size_t)degree)return 0;
+    if(!musa_nurbs_valid(controls,n,knots,nk,degree))return 0;
     return musa_nurbs_eval(controls,n,knots,degree,u,x,y);
 }
-int musa_core_nurbs_preview_points(const double *knots,size_t n,int degree) {
+int musa_core_nurbs_preview_points(const double *knots,size_t n,size_t nk,int degree) {
+    if(!knots||n<2||n>MUSA_NURBS_MAX_CONTROL||degree<1||
+       degree>MUSA_NURBS_MAX_DEGREE||n<=(size_t)degree||
+       nk!=n+(size_t)degree+1u)return 0;
     return musa_nurbs_preview_points(knots,n,degree);
 }
