@@ -94,6 +94,12 @@ jobs:
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadPolylineOffsetTest.java
           java -cp /tmp/musacad-tests CadPolylineOffsetTest
+      - name: Verify polygonal EXTRUDE modeled shell and DXF reopen
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepTest.java
+          java -cp /tmp/musacad-tests CadPrismBrepTest
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/CadPrismBrepRoundtripTest.java
+          java -cp /tmp/musacad-tests CadPrismBrepRoundtripTest
       - name: Test block and insert geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadBlock.java tests/CadBlockTest.java
