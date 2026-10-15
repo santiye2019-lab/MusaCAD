@@ -203,12 +203,20 @@
       "commit": "6cb84f1199e211e36f027a700458a2bf8d5c6d71",
       "source_path": "tests/dwg_entity_identity_audit.py",
       "verification": "GitHub fast CAD regression 38736439050 PASS: independent ORIGINAL DWG manifest ELLIPSE numeric source parameter comparison (WCS center XYZ, major-axis XYZ, 40 ratio, 41/42 radian parameters, OCS normal). Detects tiny definition drift, invalid axes/ratio/normal/incomplete fields, and exercises private synthetic conversion pipeline with redacted diagnostics. No actual independent source DWG geometrical parity or modern AC1032 writer completion; Android/full modern workflows and physical-device acceptance separate."
+    },
+    {
+      "id": "independent_legacy_polyline_vertex_numeric_parity",
+      "points": 1,
+      "status": "implemented",
+      "commit": "a8711a81d9d4104d396b809545bf03a22a03095d",
+      "source_path": "tests/dwg_entity_identity_audit.py",
+      "verification": "GitHub fast CAD regression run 38737631650 PASS: independent original-DWG source manifest per-handle POLYLINE/ VERTEX numeric parameter parity covers XYZ, signed bulge, flags, widths, 3D OCS and signed polyface face indices. Pipeline synthetic conversion detects numeric drift; invalid/duplicate records and nonfinite values rejected. It does NOT prove parent/SEQEND chain topology, independent private original DWG parity, modern DWG binary Save As, full Android quality or physical device acceptance."
     }
   ],
   "backlog": [
     {
       "id": "ac1032_reader_independent_semantics",
-      "points": 2,
+      "points": 1,
       "status": "in_progress",
       "evidence_required": "Original-source geometric and object parity"
     },
