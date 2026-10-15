@@ -17,8 +17,31 @@ import java.util.Arrays;
 public final class Dxf3dSafeSave {
     private Dxf3dSafeSave(){}
 
+    /** Opens the destination only after the validated stage is checked again. */
+    public interface DestinationOpener {
+        OutputStream open() throws IOException;
+    }
+
+    /** Carries the verified byte identity across the stage/publish boundary. */
+    public static final class VerifiedStage {
+        private final File file;
+        private final CadSaveSourceIntegrity verifiedBytes;
+        private VerifiedStage(File file)throws IOException{
+            this.file=file;
+            this.verifiedBytes=CadSaveSourceIntegrity.capture(file);
+        }
+        public File file(){return file;}
+        public void verify()throws IOException{
+            // Android API 24 compatible symlink guard (no java.nio.file).
+            if(!file.isFile()||!file.getCanonicalFile().equals(file.getAbsoluteFile()))
+                throw new IOException("Doğrulanmış 3B geçici dosya değiştirildi");
+            verifiedBytes.requireUnchanged(file);
+        }
+        public boolean delete(){return file.delete();}
+    }
+
     /** Caller owns the staged cache file and must delete it in a finally block. */
-    public static File stage(File source,Dxf3dMesh edited,float[] original,File cacheDir,
+    public static VerifiedStage stage(File source,Dxf3dMesh edited,float[] original,File cacheDir,
             CadSaveSourceIntegrity openedSource)throws IOException{
         if(source==null||!source.isFile()||edited==null||original==null||cacheDir==null||openedSource==null)
             throw new IOException("3B kaynak dosyası veya geçici kayıt alanı bulunamadı");
@@ -69,19 +92,29 @@ public final class Dxf3dSafeSave {
             // publish to a SAF destination. Failure cleanup runs in finally.
             baseline.requireUnchanged(source);
             openedSource.requireUnchanged(source);
+            VerifiedStage checked=new VerifiedStage(staged);
+            checked.verify();
             ready=true;
-            return staged;
+            return checked;
         }finally{
             if(!ready)staged.delete();
         }
     }
 
-    /** The destination stream is opened by the caller only after stage() succeeds. */
-    public static long publish(File staged,OutputStream destination)throws IOException{
-        if(staged==null||!staged.isFile()||staged.length()==0||destination==null)
+    /**
+     * Never call SAF's potentially truncating openOutputStream until the staged
+     * bytes are reauthenticated. No unverified File/output-stream overload.
+     */
+    public static long publish(VerifiedStage staged,DestinationOpener opener)throws IOException{
+        if(staged==null||opener==null)
             throw new IOException("Doğrulanmış 3B DXF veya kayıt hedefi bulunamadı");
-        try(BufferedInputStream input=new BufferedInputStream(new FileInputStream(staged))){
-            return FileTransfer.copy(input,destination,0,null);
+        staged.verify(); // MUST run before opening/truncating the destination.
+        try(BufferedInputStream input=new BufferedInputStream(new FileInputStream(staged.file));
+            OutputStream destination=opener.open()){
+            if(destination==null)throw new IOException("3B DXF kayıt hedefi açılamadı");
+            long copied=FileTransfer.copy(input,destination,0,null);
+            staged.verify(); // detect concurrent mutation during the transfer
+            return copied;
         }
     }
 }
