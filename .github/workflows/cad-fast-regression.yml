@@ -9,6 +9,7 @@ on:
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
+      - 'docs/AUTOCAD_2026_COMMAND_CATALOG.json'
       - '.github/workflows/cad-fast-regression.yml'
   workflow_dispatch:
 
@@ -52,6 +53,13 @@ jobs:
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveTest
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/Dxf3dSafeSaveIntegrationContractTest.java
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveIntegrationContractTest
+      - name: AutoCAD 2026 indexed command router recognition smoke
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-autocad2026-router-smoke
+          javac -d /tmp/musacad-autocad2026-router-smoke app/src/main/java/com/musa/cad/CadCommand.java tests/AutoCAD2026CommandRouterSmokeTest.java
+          java -cp /tmp/musacad-autocad2026-router-smoke AutoCAD2026CommandRouterSmokeTest
+          echo 'Parsing command names is NOT equivalent to working AutoCAD 2026 operations.'
       - name: CAD progress and AutoCAD 2026 parity claims audit
         run: |
           set -euo pipefail
