@@ -10,9 +10,9 @@ public final class Dxf3dSafeSaveIntegrationContractTest {
         int callback=source.indexOf("if(request!=SAVE_DXF");
         int stage=source.indexOf("Dxf3dSafeSave.stage(",callback);
         int opened=source.indexOf("openOutputStream(uri,\"wt\")",callback);
-        int published=source.indexOf("Dxf3dSafeSave.publish(staged,output)",callback);
+        int published=source.indexOf("Dxf3dSafeSave.publish(staged,",callback);
         int deleted=source.indexOf("finally{if(staged!=null)staged.delete();}",callback);
-        if(callback<0||stage<callback||opened<stage||published<opened||deleted<published)
+        if(callback<0||stage<callback||published<stage||opened<published||deleted<opened)
             throw new AssertionError("3D DXF must validate stage before opening Android output URI and clean cache");
         if(source.substring(callback).contains("Dxf3dEditor.write(new File(path),output,mesh,original)"))
             throw new AssertionError("direct 3D writes to a truncating SAF stream are prohibited");
@@ -34,6 +34,17 @@ public final class Dxf3dSafeSaveIntegrationContractTest {
         if(openedHash<0||openedMesh<openedHash||openedVerified<openedMesh||
             openedAssigned<openedVerified||!source.contains("getCacheDir(),openedSourceIntegrity)"))
             throw new AssertionError("3D Activity must hash original bytes across load and guarded export");
+        int stageCreated=guardedStage.indexOf("new VerifiedStage(staged)");
+        int stageChecked=guardedStage.indexOf("checked.verify()",stageCreated);
+        int publishMethod=guardedStage.indexOf("publish(VerifiedStage staged,DestinationOpener opener)");
+        int preOpenCheck=guardedStage.indexOf("staged.verify()",publishMethod);
+        int openerCall=guardedStage.indexOf("opener.open()",publishMethod);
+        int transfer=guardedStage.indexOf("FileTransfer.copy(",publishMethod);
+        int postCopyCheck=guardedStage.indexOf("staged.verify()",transfer);
+        if(stageCreated<0||stageChecked<stageCreated||publishMethod<stageChecked||
+            preOpenCheck<publishMethod||openerCall<preOpenCheck||
+            transfer<openerCall||postCopyCheck<transfer)
+            throw new AssertionError("3D SAF must carry immutable staged checksum until transfer finishes");
         System.out.println("3D SAF export contract: stage before open/truncate and cleanup");
     }
 }
