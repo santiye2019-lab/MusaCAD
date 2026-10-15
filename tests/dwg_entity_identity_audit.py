@@ -22,6 +22,12 @@ _CORE_GEOMETRY = {
     "CIRCLE": ((10, 20, 40), {30: "0", 210: "0", 220: "0", 230: "1"}),
     "ARC": ((10, 20, 40, 50, 51),
             {30: "0", 210: "0", 220: "0", 230: "1"}),
+    # WCS center XYZ and relative major-axis vector XYZ, minor/major
+    # ratio, and start/end parameters in RADIANS (not ARC degrees).
+    # Requiring explicit arc parameters prevents a missing/incorrect
+    # full-ellipse arc definition from being marked independently equal.
+    "ELLIPSE": ((10, 20, 11, 21, 40, 41, 42),
+                {30: "0", 31: "0", 210: "0", 220: "0", 230: "1"}),
     # 3DFACE: first three WCS vertices required; Z defaults to zero.
     # Fourth corner is optional and then exactly repeats the third corner.
     # Group 70 contains independent edge-visibility bits 1/2/4/8.
@@ -305,10 +311,26 @@ class DwgEntityIdentityAudit:
             raw = fields.get(code, defaults.get(code))
             value = _normalized(code, raw)
             if code == 40 and Decimal(value) <= 0:
-                raise ValueError("nonpositive primitive radius")
+                raise ValueError("nonpositive primitive radius/ellipse axis ratio")
+            if kind == "ELLIPSE" and code == 40 and Decimal(value) > 1:
+                raise ValueError("ELLIPSE minor/major ratio exceeds one")
             if kind == "3DFACE" and code == 70 and not 0 <= int(value) <= 15:
                 raise ValueError("invalid 3DFACE invisible edge bits")
             canonical.append((code, value))
+        if kind == "ELLIPSE":
+            values = dict(canonical)
+            axis = tuple(Decimal(values[c]) for c in (11, 21, 31))
+            normal = tuple(Decimal(values[c]) for c in (210, 220, 230))
+            axis_size = max(abs(x) for x in axis)
+            normal_size = max(abs(x) for x in normal)
+            if not axis_size or not normal_size:
+                raise ValueError("ELLIPSE major axis or plane normal is zero")
+            # The CAD major axis is in the plane normal's perpendicular
+            # plane. Reject a clearly non-coplanar axis, without rounding
+            # high-precision coordinates to binary floats in the audit.
+            orthogonality = sum(x*y for x,y in zip(axis, normal))
+            if abs(orthogonality) > (axis_size*normal_size*Decimal("0.00000001")):
+                raise ValueError("ELLIPSE major axis outside extrusion plane")
         return tuple(canonical)
 
     @staticmethod
@@ -548,7 +570,8 @@ class DwgEntityIdentityAudit:
             "independent_geometry_invalid_decoded": self.invalid_core_geometry,
             "independent_geometry_scope": (
                 "LINE XYZ endpoints, POINT position/normal, CIRCLE/ARC center/"
-                "radius/angles/normal, 3DFACE XYZ corners/hidden edges, and "
+                "radius/angles/normal, ELLIPSE WCS center/axis/ratio/radian "
+                "parameters/normal, 3DFACE XYZ corners/hidden edges, and "
                 "ordered SPLINE knot/control/fit/weight and LWPOLYLINE vertex/"
                 "signed-bulge/width/OCS parameter groups only. "
                 "Exact parameter strings after numeric normalization; no "
