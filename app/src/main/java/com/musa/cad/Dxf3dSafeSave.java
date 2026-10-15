@@ -65,7 +65,8 @@ public final class Dxf3dSafeSave {
             !Arrays.equals(current.coordinateSlots,edited.coordinateSlots)||
             current.acisSolids!=edited.acisSolids||
             current.unsupportedSolids!=edited.unsupportedSolids||
-            current.skippedBlockReferences!=edited.skippedBlockReferences)
+            current.skippedBlockReferences!=edited.skippedBlockReferences||
+            current.approximateCurves!=edited.approximateCurves)
             throw new IOException("3B kaynak çizim açıldıktan sonra değişmiş; yeniden açmadan kayıt yapılamaz");
         baseline.requireUnchanged(source);
         openedSource.requireUnchanged(source);
@@ -85,7 +86,8 @@ public final class Dxf3dSafeSave {
                 ||!Arrays.equals(edited.coordinateSlots,reopened.coordinateSlots)
                 ||edited.acisSolids!=reopened.acisSolids
                 ||edited.unsupportedSolids!=reopened.unsupportedSolids
-                ||edited.skippedBlockReferences!=reopened.skippedBlockReferences)
+                ||edited.skippedBlockReferences!=reopened.skippedBlockReferences
+                ||edited.approximateCurves!=reopened.approximateCurves)
                 throw new IOException("3B DXF yeniden açıldığında geometri değişti; kayıt yapılmadı");
             // Validate AFTER output creation and reopening. If another editor
             // changed the source during the work, never return this stage for
