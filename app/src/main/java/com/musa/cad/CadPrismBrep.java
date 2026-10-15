@@ -29,10 +29,20 @@ public final class CadPrismBrep {
         public final int[] triangles;
         public final double volume;
         public final int ringVertices;
+        /** Planar polygon perimeter in native drawing units. */
+        public final double perimeter;
+        /** 2*profile area + perimeter*extrusion height (no internal holes). */
+        public final double surfaceArea;
+        /** Exact centroid of this uniform-density polygonal prism in WCS. */
+        public final double centroidX,centroidY,centroidZ;
 
-        private Solid(double[] xyz, int[] triangles, double volume, int ringVertices) {
+        private Solid(double[] xyz,int[] triangles,double volume,int ringVertices,
+                      double perimeter,double surfaceArea,
+                      double centroidX,double centroidY,double centroidZ){
             this.xyz=xyz;this.triangles=triangles;this.volume=volume;
-            this.ringVertices=ringVertices;
+            this.ringVertices=ringVertices;this.perimeter=perimeter;
+            this.surfaceArea=surfaceArea;
+            this.centroidX=centroidX;this.centroidY=centroidY;this.centroidZ=centroidZ;
         }
 
         /** Every unoriented mesh edge must occur exactly twice, oppositely oriented. */
@@ -144,7 +154,34 @@ public final class CadPrismBrep {
             tris[out++]=i;tris[out++]=j;tris[out++]=n+j;
             tris[out++]=i;tris[out++]=n+j;tris[out++]=n+i;
         }
-        Solid solid=new Solid(xyz,tris,0.5*area2*(hi-lo),n);
+        // Analytic mass properties of a constant-section polygonal prism.
+        // Use coordinates relative to the WCS bounding corner to avoid
+        // cancellation when georeferenced drawings sit far from (0,0,0).
+        double centroidMomentX=0d,centroidMomentY=0d;
+        double checkArea2=0d,perimeter=0d;
+        for(int i=0;i<n;i++){
+            int next=(i+1)%n;
+            double x=ring[2*i]-minX,y=ring[2*i+1]-minY;
+            double xNext=ring[2*next]-minX,yNext=ring[2*next+1]-minY;
+            double cross=x*yNext-xNext*y;
+            checkArea2+=cross;
+            centroidMomentX+=(x+xNext)*cross;
+            centroidMomentY+=(y+yNext)*cross;
+            perimeter+=Math.hypot(ring[2*next]-ring[2*i],
+                                  ring[2*next+1]-ring[2*i+1]);
+        }
+        if(!(checkArea2>eps)||Math.abs(checkArea2-area2)>Math.max(eps,area2*1e-10))
+            throw new IllegalArgumentException("Inconsistent extrusion profile area");
+        double centroidX=minX+centroidMomentX/(3d*checkArea2);
+        double centroidY=minY+centroidMomentY/(3d*checkArea2);
+        double centroidZ=lo+(hi-lo)*0.5d;
+        double totalSurface=area2+perimeter*(hi-lo);
+        if(!Double.isFinite(centroidX)||!Double.isFinite(centroidY)||
+           !Double.isFinite(centroidZ)||!Double.isFinite(perimeter)||
+           !Double.isFinite(totalSurface)||!(perimeter>0)||!(totalSurface>0))
+            throw new IllegalArgumentException("Extrusion mass properties overflow");
+        Solid solid=new Solid(xyz,tris,0.5*area2*(hi-lo),n,perimeter,
+                              totalSurface,centroidX,centroidY,centroidZ);
         if(!solid.isWatertight())throw new IllegalArgumentException("Non-manifold generated shell");
         // A signed surface volume independently checks face normals.
         double sixVolume=0,ox=xyz[0],oy=xyz[1],oz=xyz[2];
