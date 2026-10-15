@@ -155,7 +155,7 @@ public final class Mesh3dActivity extends Activity {
             .append(mesh.xyz.length/3).append(" köşe");
         if(mesh.approximateCurves>0){
             text.append("\n").append(mesh.approximateCurves)
-                .append(" daire, yay veya çoklu çizgi yay bölümü yaklaşık çizgi parçalarıyla gösterildi. ")
+                .append(" daire, yay, elips, spline veya çoklu çizgi yay bölümü yaklaşık çizgi parçalarıyla gösterildi. ")
                 .append("Bu köşeler salt okunurdur; görünen yay uzunluğu kesin CAD ölçüsü veya metraj değildir.");
         }
         if(mesh.skippedBlockReferences>0){
