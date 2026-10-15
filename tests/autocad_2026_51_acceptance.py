@@ -77,22 +77,40 @@ def validate_passed_gate(entry, gate, record, root=ROOT):
         raise ValueError("Missing tool version")
     if gate in SOURCE_TOOLS and tool != SOURCE_TOOLS[gate]:
         raise ValueError("Reference/candidate produced by wrong tool")
+    if gate in ("autocad_2026_reference", "musacad_same_input"):
+        if (not HEX64.fullmatch(str(content.get("input_sha256", "")))
+                or not isinstance(content.get("normalized_result"), dict)
+                or not content["normalized_result"]):
+            raise ValueError("Actual shared-input digest and structured reference output needed")
     if gate == "semantic_comparison":
         if content.get("difference_count") != 0:
             raise ValueError("Geometric/semantic differences not resolved")
-        r = entry["gates"]["autocad_2026_reference"].get("sha256")
-        m = entry["gates"]["musacad_same_input"].get("sha256")
-        if (not r or not m or content.get("autocad_reference_sha256") != r
-                or content.get("musacad_output_sha256") != m):
-            raise ValueError("Comparison is not bound to the actual reference files")
-        if content.get("input_sha256") in (None, ""):
-            raise ValueError("Reference must identify the same input fixture")
+        a = entry["gates"]["autocad_2026_reference"]
+        m = entry["gates"]["musacad_same_input"]
+        if a["status"] != "passed" or m["status"] != "passed":
+            raise ValueError("Both real application output artifacts must exist first")
+        if (content.get("autocad_reference_sha256") != a.get("sha256")
+                or content.get("musacad_output_sha256") != m.get("sha256")):
+            raise ValueError("Comparison is not bound to original reference/candidate artifacts")
+        reference = validate_passed_gate(entry, "autocad_2026_reference", a, root)
+        candidate = validate_passed_gate(entry, "musacad_same_input", m, root)
+        digest = reference.get("input_sha256")
+        if (content.get("input_sha256") != digest
+                or candidate.get("input_sha256") != digest):
+            raise ValueError("Reference and MusaCAD were not tested with the same input")
+        # Independently compare the canonical object/operation data itself.
+        # An asserted zero-differences number is insufficient evidence.
+        if reference["normalized_result"] != candidate["normalized_result"]:
+            raise ValueError("Actual reference/candidate semantic data differ")
     if gate == "independent_dwg_roundtrip":
+        before = content.get("source_entity_digest")
+        after = content.get("reopened_entity_digest")
         if (content.get("independent_reader") in (None, "", "MusaCAD")
                 or content.get("object_semantic_equal") is not True
-                or not content.get("source_dwg_sha256")
-                or not HEX64.fullmatch(str(content.get("source_dwg_sha256")))):
-            raise ValueError("Independent real DWG reopen proof required")
+                or not HEX64.fullmatch(str(content.get("source_dwg_sha256", "")))
+                or not HEX64.fullmatch(str(before))
+                or before != after):
+            raise ValueError("Independent reader semantic DWG roundtrip required")
     if gate in ("android_physical", "ios_physical", "windows_desktop"):
         platform = gate.split("_", 1)[0]
         if content.get("platform") != platform or content.get("real_hardware") is not True:
