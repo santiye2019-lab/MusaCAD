@@ -8,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 import re
 
 _LIMIT = 250_000
-_HEX = re.compile(r"[0-9a-fA-F]{1,32}\\Z")
-_INT = re.compile(r"[+-]?[0-9]+\\Z")
+_HEX = re.compile(r"[0-9a-fA-F]{1,32}\Z")
+_INT = re.compile(r"[+-]?[0-9]+\Z")
 _LAYOUT_NUMERIC = frozenset((10, 20, 11, 21, 40, 41))
 _LAYOUT_INTEGER = frozenset((70, 71))
 _LAYOUT_HANDLES = frozenset((330, 340))
