@@ -89,6 +89,15 @@ Path: `core/native/`
   syntax-compiled for iPhoneOS arm64. This is reusable 3D BLOCK/UCS math
   groundwork; the current Android 3D rendering/editing implementation
   is not replaced, and AutoCAD 2026 3D UCS command parity is NOT claimed.
+- A read-only native 3D **ray-versus-triangle picking** API
+  `musa_core_mesh_ray_pick_f32` now locates the nearest triangle and
+  returns drawing-unit distance, WCS hit point, barycentric parameters,
+  face index and winding orientation. It is common C11 math with no
+  Android/Win32/Swift dependencies. Unit tests cover nearest-face ordering,
+  backfaces, large WCS offsets, degenerate triangles and invalid geometry,
+  and CI compiles the same source on Linux, Windows, macOS and iPhoneOS
+  arm64. Scene acceleration/BVH, rendering, physical-device hit targets,
+  ACIS/B-Rep and complete object selection are future work.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.

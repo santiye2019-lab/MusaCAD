@@ -96,6 +96,31 @@ typedef struct MusaCoreMeshTopology {
 int musa_core_mesh_topology_f32(const float *xyz,size_t point_count,
                                const int *triangles,size_t face_count,
                                MusaCoreMeshTopology *out);
+/*
+ * Read-only nearest triangle hit test for CAD 3D mesh selection.
+ * Ray direction need not be normalized; distance is always measured in
+ * drawing WCS units. front_facing means the ray meets outward winding.
+ *  1: nearest hit and *out is written;
+ *  0: no hit, *out unchanged;
+ * -1: invalid/nonfinite input, resource guard or arithmetic overflow.
+ *
+ * This does not establish B-Rep, hidden-line picking, occlusion by other
+ * scene objects or certified 3D object selection. Triangle vertices must be
+ * the decoded mesh, and the caller retains ownership of all arrays.
+ */
+typedef struct MusaCoreMeshRayHit {
+    size_t triangle_index;
+    double distance;
+    double barycentric_u,barycentric_v;
+    double wcs_x,wcs_y,wcs_z;
+    int front_facing;
+} MusaCoreMeshRayHit;
+int musa_core_mesh_ray_pick_f32(const float *xyz,size_t point_count,
+                               const int *triangles,size_t face_count,
+                               const double origin[3],
+                               const double direction[3],
+                               double max_distance,
+                               MusaCoreMeshRayHit *out);
 #ifdef __cplusplus
 }
 #endif
