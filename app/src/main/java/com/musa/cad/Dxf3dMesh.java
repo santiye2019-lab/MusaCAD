@@ -15,7 +15,8 @@ import java.util.List;
 /**
  * Bounded XYZ geometry reader for MusaCAD 3D.
  * Expands ordinary INSERT blocks and supports:
- * 3DFACE, polyface/polygon mesh, LINE, LWPOLYLINE with bulge arcs, CIRCLE/ARC sampled outlines,
+ * 3DFACE, polyface/polygon mesh, LINE, LWPOLYLINE with bulge arcs,
+ * CIRCLE/ARC and ELLIPSE sampled outlines,
  * ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
@@ -131,6 +132,9 @@ public final class Dxf3dMesh {
                 appendEdge(explicitEdges,start,start+1);
             }else if("LWPOLYLINE".equals(r.type)){
                 appendLightweightPolyline(this,p);
+            }else if("ELLIPSE".equals(r.type)){
+                appendEllipseOutline(this,p);
+                approximateCurves++;
             }else if("CIRCLE".equals(r.type)||"ARC".equals(r.type)){
                 appendCurvedOutline(this,p,"CIRCLE".equals(r.type));
                 approximateCurves++;
@@ -323,6 +327,67 @@ public final class Dxf3dMesh {
         }
         c.sourceLines.add(-1);
         c.coordinateSlots.add(-1);
+    }
+
+    /**
+     * DXF ELLIPSE stores WCS center and relative WCS major-axis vector.
+     * The minor axis is cross(plane-normal, major-unit) * major-length * ratio.
+     * Parameter 41/42 is in radians, not degrees, and is not an ARC angle.
+     */
+    private static void appendEllipseOutline(Collector c,DxfBlocks.Placement p)
+            throws IOException{
+        DxfBlocks.Record r=p.record;
+        double cx=r.number(10,0),cy=r.number(20,0),cz=r.number(30,0);
+        double mx=r.number(11,0),my=r.number(21,0),mz=r.number(31,0);
+        double radius=Math.hypot(Math.hypot(mx,my),mz);
+        double ratio=r.number(40,0);
+        if(!(radius>0)||radius>1e9||!(ratio>0)||ratio>1)
+            throw new IOException("ELLIPSE büyük ekseni veya küçük/büyük eksen oranı geçersiz");
+        double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+        double length=Math.hypot(Math.hypot(nx,ny),nz);
+        if(!Double.isFinite(length)||length<=1e-30)
+            throw new IOException("ELLIPSE düzlem normal vektörü geçersiz");
+        nx/=length;ny/=length;nz/=length;
+        // The major axis must lie in the ellipse's normal plane.
+        if(Math.abs(mx*nx+my*ny+mz*nz)>1e-7*radius)
+            throw new IOException("ELLIPSE ekseni normal düzlemine dik değil");
+        double minorX=(ny*mz-nz*my)*ratio;
+        double minorY=(nz*mx-nx*mz)*ratio;
+        double minorZ=(nx*my-ny*mx)*ratio;
+        double begin=r.number(41,0),end=r.number(42,Math.PI*2);
+        double full=2*Math.PI;
+        if(Math.abs(begin)>1e7||Math.abs(end)>1e7)
+            throw new IOException("ELLIPSE parametresi sınırı aşıldı");
+        double rawSweep=end-begin;
+        if(!Double.isFinite(rawSweep)||Math.abs(rawSweep)>full+1e-9||rawSweep==0)
+            throw new IOException("ELLIPSE başlangıç/bitiş parametresi geçersiz");
+        double sweep=rawSweep;
+        if(sweep<0)sweep+=full;
+        boolean closed=Math.abs(sweep-full)<1e-8;
+        if(!(sweep>0))throw new IOException("ELLIPSE yay aralığı boş");
+        int segments=Math.max(1,(int)Math.ceil(sweep/(Math.PI/24)));
+        long count=closed?segments:segments+1;
+        if(c.points.n/3+count>MAX_VERTICES||
+            c.explicitEdges.n/2+(long)segments>MAX_EDGES)
+            throw new IOException("ELLIPSE yaklaşık çizim sınırı aşıldı");
+        int first=c.points.n/3;
+        for(int i=0;i<count;i++){
+            double theta=begin+sweep*((double)i/segments);
+            double co=Math.cos(theta),si=Math.sin(theta);
+            double[] xyz=p.spatial.point(
+                cx+mx*co+minorX*si,
+                cy+my*co+minorY*si,
+                cz+mz*co+minorZ*si);
+            for(int axis=0;axis<3;axis++){
+                if(!Double.isFinite(xyz[axis])||Math.abs(xyz[axis])>1e9)
+                    throw new IOException("ELLIPSE 3B koordinat sınırı aşıldı");
+                c.points.add((float)xyz[axis]);
+            }
+            c.sourceLines.add(-1);
+            c.coordinateSlots.add(-1);
+            if(i>0)appendEdge(c.explicitEdges,first+i-1,first+i);
+        }
+        if(closed)appendEdge(c.explicitEdges,first+segments-1,first);
     }
 
     /**
