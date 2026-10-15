@@ -36,6 +36,9 @@ public final class Dxf3dMeshTest {
         testInsertedBlockLine();
         testAxialZBlockHeightAndNestedScaling();
         testNegativeZMinsert();
+        testTiltedOcsBlockPlacement();
+        testNestedTiltedMinsert();
+        testInvalidTiltNormalDoesNotLeakGeometry();
         testRejectedOverflowedHeightTransform();
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
@@ -165,6 +168,73 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh result=Dxf3dMesh.read(file);
             if(result.xyz.length!=6||result.edges.length!=2)
                 throw new AssertionError("overflowed INSERT must not emit invalid vertices");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+
+    private static void testTiltedOcsBlockPlacement() throws Exception {
+        File file=File.createTempFile("mesh3d-tilted-ocs-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nAXIS\n10\n0\n20\n0\n30\n0\n"+
+                "0\nLINE\n10\n1\n20\n2\n30\n3\n11\n4\n21\n5\n31\n6\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nAXIS\n10\n10\n20\n20\n30\n7\n"+
+                "210\n0\n220\n1\n230\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=6||result.edges.length!=2)
+                throw new AssertionError("tilted INSERT lost block geometry");
+            assertNear(result.xyz[0],-11,"tilted point X");
+            assertNear(result.xyz[1],10,"tilted point Y");
+            assertNear(result.xyz[2],22,"tilted point Z");
+            assertNear(result.xyz[3],-14,"tilted endpoint X");
+            assertNear(result.xyz[4],13,"tilted endpoint Y");
+            assertNear(result.xyz[5],25,"tilted endpoint Z");
+            if(result.sourceLines[0]!=-1)
+                throw new AssertionError("tilted INSERT cannot be edited as raw coordinates");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testNestedTiltedMinsert() throws Exception {
+        File file=File.createTempFile("mesh3d-tilted-array-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nPART\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n0\n11\n2\n21\n0\n31\n1\n"+
+                "0\nENDBLK\n"+
+                "0\nBLOCK\n2\nASSEMBLY\n"+
+                "0\nINSERT\n2\nPART\n10\n1\n20\n2\n30\n3\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nASSEMBLY\n10\n10\n20\n20\n30\n7\n"+
+                "210\n0\n220\n1\n230\n0\n70\n2\n71\n1\n44\n5\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=12||result.edges.length!=4)
+                throw new AssertionError("tilted nested MINSERT array count");
+            double[] expected={-11,10,22, -13,11,22, -16,10,22, -18,11,22};
+            for(int i=0;i<expected.length;i++)
+                assertNear(result.xyz[i],expected[i],"nested OCS coordinate "+i);
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testInvalidTiltNormalDoesNotLeakGeometry() throws Exception {
+        File file=File.createTempFile("mesh3d-tilted-invalid-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nBAD\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n0\n11\n2\n21\n0\n31\n0\n"+
+                "0\nENDBLK\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nBAD\n10\n10\n20\n20\n"+
+                "210\n0\n220\n0\n230\n0\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n0\n11\n1\n21\n0\n31\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=6||result.edges.length!=2)
+                throw new AssertionError("invalid extrusion must not invent vertices");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
