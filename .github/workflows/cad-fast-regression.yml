@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_dwg_entity_identity_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_polyline_chain_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_dwg_polyface_topology_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_layer_table_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_block_reference_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_dwg_layout_viewport_audit.py' -v
