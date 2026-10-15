@@ -48,12 +48,18 @@ The LWPOLYLINE subset includes declared vertex counts, open/closed flag,
 elevation, thickness, constant/vertex widths, signed per-vertex bulges,
 optional vertex IDs and OCS normals. A swapped bulge can change the curve
 without changing endpoints; the audit checks the original ordered values.
+ELLIPSE references instead use the ordinary numeric group mapping, e.g.
+`{"10":"1","20":"2","11":"4","21":"0","40":"0.5","41":"0","42":"1.5707963267948966"}`.
+Missing start/end parameters are deliberately rejected rather than guessed;
+coordinate Z and extrusion defaults are handled by the audited subset.
 The independent reader must preserve the covered source group order;
 inventing source control points from MusaCAD's own converted DXF is not
 independent evidence.
 
 This optional source-bound comparison now covers **LINE** XYZ endpoints,
-**POINT** position/normal, **CIRCLE/ARC** center/radius/angle/normal and
+**POINT** position/normal, **CIRCLE/ARC** center/radius/angle/normal,
+**ELLIPSE** WCS center, relative major-axis XYZ, minor/major ratio, required
+explicit start/end parameters in **radians**, and plane normal; also
 **3DFACE** XYZ corners plus group 70 invisible-edge bits, and the
 numeric **SPLINE parameter subset** (degree, flags, ordered knot vector,
 control/fit XYZ, rational weights and declared counts), plus **LWPOLYLINE**
