@@ -22,7 +22,7 @@ kopyalamak değil, bağımsız ve işlevsel olarak eşdeğer ürün amaçlanır.
 2. AutoCAD 2026 işlevsel eşdeğerlik yüzdesi, **henüz ölçülebilir değil**.
    `AUTOCAD_2026_PARITY_MATRIX.json` başlangıç düzeyinde **51 yetenek
    ailesi** içerir; tam komut/seçenek/senaryo envanteri değildir. Şu an
-   23'ü kısmi kod, 7'si belgelenmiş engel, 21'i inceleme bekliyor.
+   24'ü kısmi kod, 6'sı belgelenmiş engel, 21'i inceleme bekliyor.
    Hiçbirine bağımsız referans eşdeğerlik onayı verilmedi. Bu, yazılımın
    %0 çalıştığı anlamına GELMEZ. Ayrıca 23/51 oranını eşdeğerlik
    yüzdesi diye sunmak da yanlıştır.
@@ -107,3 +107,15 @@ https://help.autodesk.com/view/ACD/2026/ENU/?page=commands&q=*
 **Güvenlik:** Son kabulden önce `main` birleştirmesi, üretim APK
 dağıtımı ve canlı servis değişikliği yapılmaz. Yeni envanter yalnız
 geliştirme dalında saklanır.
+
+## 51 aile için bağımsız kabul kapısı
+
+Ailelerin her biri artık `docs/AUTOCAD_2026_ACCEPTANCE_51.json` ile
+teker teker izlenir. Yalnızca kısa bir kanıt metni yazılması veya birim
+testin yeşil olması onay sağlamaz. `tests/autocad_2026_51_acceptance.py`
+referans, aynı girdide MusaCAD, karşılaştırma, bağımsız DWG yeniden açma,
+Android/Windows/iOS gerçek donanım ve CI için dosya+SHA256 kanıtı;
+üstelik senaryo kapsamının tamamlanmasını ve bağımsız inceleyen onayını
+şart koşar. Ayrıntı: `docs/AUTOCAD_2026_51_VERIFICATION.md`.
+Bu dosyalar yalnız kabul sürecini kurar; lisanslı AutoCAD 2026 karşılaştırması
+ve cihaz çalıştırmaları elde edilmeden hiçbir ailenin onayı verilmez.

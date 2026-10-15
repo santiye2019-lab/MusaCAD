@@ -77,6 +77,11 @@ def validate_matrix(data, root=ROOT):
             raise ValueError("Nonverified feature cannot claim parity evidence")
     if "toolsets" not in {entry["area"] for entry in caps}:
         raise ValueError("Bundled specialist toolsets omitted from full AutoCAD target")
+    # A few strings in the old proof dictionary are NOT acceptance: cross-
+    # check the 51 actual evidence gates, original inputs and independent signoff.
+    from autocad_2026_51_acceptance import LEDGER, validate_ledger
+    ledger = json.loads((root / "docs" / LEDGER.name).read_text(encoding="utf-8"))
+    validate_ledger(data, ledger, root)
     return statuses
 
 
