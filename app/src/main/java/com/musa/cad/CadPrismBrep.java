@@ -91,6 +91,92 @@ public final class CadPrismBrep {
         }
     }
 
+    /**
+     * Straight-path SWEEP of a validated XY polygon by a 3D displacement.
+     * Supports an oblique extrusion vector with nonzero Z component.
+     *
+     * The top/bottom caps are translated copies of the same planar profile,
+     * connected by planar parallelograms. This is exact polygonal geometry,
+     * but NOT ACIS 3DSOLID/SWEEP, profile twist, curved-path sweeping,
+     * spline surfaces or a native binary DWG writer.
+     */
+    public static Solid sweepLinear(double[] ringXY,double baseZ,
+                                    double displacementX,double displacementY,
+                                    double displacementZ){
+        if(!bounded(displacementX)||!bounded(displacementY)||
+           !bounded(displacementZ)||Math.abs(displacementZ)<=1e-9d)
+            throw new IllegalArgumentException("SWEEP displacement invalid or coplanar");
+        // Existing EXTRUDE first validates winding, triangulation, edge
+        // incidence, polygon self-intersection, and signed closed volume.
+        Solid axial=extrude(ringXY,baseZ,displacementZ);
+        final int n=axial.ringVertices;
+        double[] vertices=Arrays.copyOf(axial.xyz,axial.xyz.length);
+        // extrude() always stores the lower-Z ring before the higher one.
+        // Move the destination ring, not simply the higher ring: the path
+        // may point downwards and still needs the requested XY displacement.
+        int target=displacementZ>0d?n:0;
+        for(int i=0;i<n;i++){
+            int at=3*(target+i);
+            double x=vertices[at]+displacementX;
+            double y=vertices[at+1]+displacementY;
+            if(!bounded(x)||!bounded(y))
+                throw new IllegalArgumentException("SWEEP displaced vertex out of bounds");
+            vertices[at]=x;vertices[at+1]=y;
+        }
+
+        // Surface is both unchanged polygonal end caps plus the exact
+        // parallelogram side area. Each original XY segment u spans the
+        // displacement v; the side is ||u cross v||. This catches shear
+        // rather than reporting the incorrect axial perimeter*height.
+        double caps=2d*(axial.volume/Math.abs(displacementZ));
+        double side=0d,sideCorrection=0d;
+        for(int i=0;i<n;i++){
+            int j=(i+1)%n;
+            double ux=axial.xyz[3*j]-axial.xyz[3*i];
+            double uy=axial.xyz[3*j+1]-axial.xyz[3*i+1];
+            double area=Math.hypot(Math.hypot(uy*displacementZ,
+                                             ux*displacementZ),
+                                   ux*displacementY-uy*displacementX);
+            if(!Double.isFinite(area))
+                throw new IllegalArgumentException("SWEEP side area overflow");
+            double next=side+area;
+            if(Math.abs(side)>=Math.abs(area))sideCorrection+=(side-next)+area;
+            else sideCorrection+=(area-next)+side;
+            side=next;
+        }
+        double surface=caps+side+sideCorrection;
+        double cx=axial.centroidX+displacementX*0.5d;
+        double cy=axial.centroidY+displacementY*0.5d;
+        if(!Double.isFinite(surface)||!(surface>0d)||
+           !bounded(cx)||!bounded(cy))
+            throw new IllegalArgumentException("SWEEP analytic properties invalid");
+
+        Solid result=new Solid(vertices,Arrays.copyOf(axial.triangles,axial.triangles.length),
+                                axial.volume,n,axial.perimeter,surface,
+                                cx,cy,axial.centroidZ);
+        if(!result.isWatertight())
+            throw new IllegalArgumentException("SWEEP nonmanifold mesh");
+
+        // Independent signed-tetrahedron check: oblique shearing must not
+        // change volume or turn an oriented shell inside out.
+        double sixVolume=0d;
+        double ox=vertices[0],oy=vertices[1],oz=vertices[2];
+        for(int t=0;t<result.triangles.length;t+=3){
+            int a=result.triangles[t]*3,b=result.triangles[t+1]*3,
+                c=result.triangles[t+2]*3;
+            double ax=vertices[a]-ox,ay=vertices[a+1]-oy,az=vertices[a+2]-oz;
+            double bx=vertices[b]-ox,by=vertices[b+1]-oy,bz=vertices[b+2]-oz;
+            double cx0=vertices[c]-ox,cy0=vertices[c+1]-oy,cz0=vertices[c+2]-oz;
+            sixVolume+=ax*(by*cz0-bz*cy0)+
+                       ay*(bz*cx0-bx*cz0)+az*(bx*cy0-by*cx0);
+        }
+        double measured=sixVolume/6d;
+        if(!(measured>0d)||!Double.isFinite(measured)||
+           Math.abs(measured-result.volume)>Math.max(1e-8,result.volume*1e-8))
+            throw new IllegalArgumentException("SWEEP shell signed volume mismatch");
+        return result;
+    }
+
     /** ringXY is a simple, hole-free polygon; height can be positive or negative. */
     public static Solid extrude(double[] ringXY,double baseZ,double height) {
         if(ringXY==null||ringXY.length<6||ringXY.length%2!=0||
