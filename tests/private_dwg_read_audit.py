@@ -16,6 +16,7 @@ import argparse
 from collections import Counter
 from native_preview_type_audit import audit_types
 from dwg_entity_identity_audit import DwgEntityIdentityAudit
+from dwg_polyline_chain_audit import DwgPolylineChainAudit
 from dwg_layer_table_audit import DwgLayerTableAudit
 from dwg_block_reference_audit import DwgBlockReferenceAudit
 from dwg_layout_viewport_audit import DwgLayoutViewportAudit
@@ -64,7 +65,7 @@ def dxf_pairs(path: Path, encoding="utf-8"):
 
 def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8",
                   layer_collector=None, block_collector=None,
-                  layout_collector=None):
+                  layout_collector=None, polyline_collector=None):
     section = ""
     current = None
     fields = []
@@ -90,6 +91,8 @@ def inventory_dxf(path: Path, identity_collector=None, text_encoding="utf-8",
         # codes into the convenience map used by the color/shape inventory.
         # Never serialize identifiers or layer names into these diagnostics.
         identity.observe(section,current,fields)
+        if polyline_collector is not None:
+            polyline_collector.observe(section,current,fields)
         if block_collector is not None:
             block_collector.observe(section,current,fields)
         if layout_collector is not None:
@@ -203,7 +206,7 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                 independent_geometry=None, independent_style=None,
                 independent_layers=None, independent_blocks=None,
                 independent_inserts=None, independent_layouts=None,
-                independent_viewports=None):
+                independent_viewports=None, independent_polyline_chains=None):
     output = temp / "converted.dxf"
     error_log = temp / "converter.stderr"
     def memory_limit():
@@ -340,11 +343,17 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                        if independent_blocks is not None else None)
         layout_audit = (DwgLayoutViewportAudit()
                         if independent_layouts is not None else None)
+        polyline_audit = (DwgPolylineChainAudit()
+                          if independent_polyline_chains is not None else None)
         result.update(inventory_dxf(output, identity_collector=identity,
                                     text_encoding=output_encoding,
                                     layer_collector=layer_audit,
                                     block_collector=block_audit,
-                                    layout_collector=layout_audit))
+                                    layout_collector=layout_audit,
+                                    polyline_collector=polyline_audit))
+        if polyline_audit is not None:
+            result.update(polyline_audit.compare_independent(
+                independent_polyline_chains))
         if layer_audit is not None:
             result.update(layer_audit.compare_independent(independent_layers))
         if block_audit is not None:
@@ -378,6 +387,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
             result["status"] = "decoded_dxf_inventory_identity_mismatch"
         if result.get("independent_geometry_result") == "primitive_subset_mismatch":
             result["status"] = "decoded_dxf_inventory_geometry_mismatch"
+        if result.get("independent_polyline_chain_result") == "polyline_chain_mismatch":
+            result["status"] = "decoded_dxf_inventory_polyline_chain_mismatch"
         if result.get("independent_style_result") == "entity_style_subset_mismatch":
             result["status"] = "decoded_dxf_inventory_style_mismatch"
         if result.get("independent_layer_table_result") == "layer_table_metadata_mismatch":
@@ -391,7 +402,8 @@ def convert_one(input_path: Path, converter: Path, temp: Path, timeout: int,
                     independent_reference, independent_geometry,
                     independent_style, independent_layers,
                     independent_blocks, independent_inserts,
-                    independent_layouts, independent_viewports))):
+                    independent_layouts, independent_viewports,
+                    independent_polyline_chains))):
             # The mapping is an assumption without source codepage evidence,
             # therefore even equal decoded metadata cannot certify parity.
             result["status"] = "decoded_dxf_inventory_encoding_unverified"
@@ -461,6 +473,7 @@ def main() -> int:
             external_inserts = None
             external_layouts = None
             external_viewports = None
+            external_polyline_chains = None
             if args.independent_manifest_dir:
                 # Only caller-supplied, separately collected DWG evidence.
                 # Hash-derived path avoids exposing DWG or project file names.
@@ -501,6 +514,10 @@ def main() -> int:
                             raise ValueError("both LAYOUT and VIEWPORT inventories required")
                         external_layouts = reference["layout_records"]
                         external_viewports = reference["viewport_records"]
+                    if "polyline_chain_records" in reference:
+                        if not isinstance(reference["polyline_chain_records"], list):
+                            raise ValueError("invalid independent POLYLINE chains")
+                        external_polyline_chains = reference["polyline_chain_records"]
                 except (ValueError, OSError, UnicodeError):
                     row["status"] = "invalid_independent_manifest"
                     failure = True
@@ -509,6 +526,8 @@ def main() -> int:
                     optional_checks = {}
                     if external_geometry is not None:
                         optional_checks["independent_geometry"] = external_geometry
+                    if external_polyline_chains is not None:
+                        optional_checks["independent_polyline_chains"] = external_polyline_chains
                     if external_style is not None:
                         optional_checks["independent_style"] = external_style
                     if external_layers is not None:
