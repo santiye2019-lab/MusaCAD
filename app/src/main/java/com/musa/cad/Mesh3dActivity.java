@@ -49,6 +49,7 @@ public final class Mesh3dActivity extends Activity {
     private Cad3dMeshTopology.Result openingTopology;
     private Cad3dSignedVolume.Result openingSignedVolume;
     private float[] original;
+    private CadSaveSourceIntegrity openedSourceIntegrity;
     private Mesh3dView meshView;
     private CadUcsFrame editingUcs=CadUcsFrame.world();
     private final Cad3dEditHistory editHistory=new Cad3dEditHistory();
@@ -75,7 +76,11 @@ public final class Mesh3dActivity extends Activity {
         RECOVERY_IO.execute(()->{
             try{
                 File sourceFile=new File(path);
+                // Capture original bytes BEFORE parsing and verify after parsing.
+                // The open session is never allowed to silently mix two source revisions.
+                CadSaveSourceIntegrity openedIntegrity=CadSaveSourceIntegrity.capture(sourceFile);
                 Dxf3dMesh loaded=Dxf3dMesh.read(sourceFile);
+                openedIntegrity.requireUnchanged(sourceFile);
                 // Calculate measurements on the loading worker, not on the
                 // Android drawing/gesture thread. Keep the 3D viewport usable
                 // even if a malformed mesh cannot be quantified.
@@ -114,6 +119,7 @@ public final class Mesh3dActivity extends Activity {
                 final Cad3dRecoveryJournal.Snapshot recovered=candidate;
                 final String warning=recoveryWarning;
                 runOnUiThread(()->{if(closing)return;mesh=loaded;original=openedOriginal;
+                    openedSourceIntegrity=openedIntegrity;
                     openingSurfaceMetrics=initialMetrics;
                     openingTopology=initialTopology;
                     openingSignedVolume=initialVolume;
@@ -570,7 +576,7 @@ public final class Mesh3dActivity extends Activity {
         new Thread(()->{String message;File staged=null;boolean exported=false;
             try{
                 // Prepare and verify the full DXF before opening Android's potentially truncating URI.
-                staged=Dxf3dSafeSave.stage(path==null?null:new File(path),mesh,original,getCacheDir());
+                staged=Dxf3dSafeSave.stage(path==null?null:new File(path),mesh,original,getCacheDir(),openedSourceIntegrity);
                 try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
                     if(output==null)throw new java.io.IOException("Dosya açılamadı");
                     Dxf3dSafeSave.publish(staged,output);
