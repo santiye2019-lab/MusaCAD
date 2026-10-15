@@ -39,9 +39,9 @@ public class DxfBlocksTest {
         // Mirrored OCS normals must preserve MINSERT array order and spacing.
         points(read(b,insert("A",10,10,20,20,70,2,44,5,230,-1)),-12,22,-17,22);
         // Extreme but finite DXF values must not produce NaN or partial placements.
-        skipped(read(b,insert("A",10,10,20,20,50,1e308)));
+        skipped(read(b,insert("A",10,-1e308,20,20,41,1e308)));
         skipped(read(b,insert("A",10,1e308,20,20,70,2,44,1e308)));
-        skipped(read(b,insert("A",10,1e308,20,20,41,1e308)));
+        skipped(read(b,insert("A",10,0,20,20,41,1e308,42,1e308,50,90)));
         String nestedOverflow=b+block("OVERFLOW",insert("A",41,1e308));
         skipped(read(nestedOverflow,insert("OVERFLOW",41,1e308)));
         String nested=b+block("B",insert("A",10,5,20,6));point(read(nested,insert("B",10,10,20,20)),16,26);
