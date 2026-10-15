@@ -288,6 +288,109 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
         self.assertEqual(failure["independent_geometry_result"],
                          "primitive_subset_mismatch")
 
+    def test_independent_3dface_xyz_and_edge_visibility_parity(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        # The converted triangular face omits corner four. It is exactly
+        # equivalent to an explicit fourth corner repeating the third.
+        audit.observe("ENTITIES", "3DFACE", [
+            (5, "AA"), (8, "PRIVATE_FACE_LAYER"), (10, "0"), (20, "0"), (30, "1"),
+            (11, "5"), (21, "0"), (31, "2"),
+            (12, "0"), (22, "6"), (32, "3"), (70, "5")])
+        audit.observe("BLOCKS", "3DFACE", [
+            (5, "BB"), (8, "PRIVATE_BLOCK_LAYER"), (10, "0"), (20, "0"),
+            (11, "2"), (21, "0"), (12, "2"), (22, "2"),
+            (13, "0"), (23, "2"), (33, "4"), (70, "0")])
+        faces = [
+            {"handle": "AA", "type": "3DFACE", "groups": {
+                "10": "0.0", "20": "0", "30": "1.00",
+                "11": "5", "21": "0", "31": "2", "12": "0", "22": "6",
+                "32": "3", "13": "0", "23": "6", "33": "3", "70": "5"}},
+            {"handle": "BB", "type": "3DFACE", "groups": {
+                "10": "0", "20": "0", "11": "2", "21": "0",
+                "12": "2", "22": "2", "13": "0", "23": "2", "33": "4"}}
+        ]
+        matched = audit.compare_independent_geometry(faces)
+        self.assertEqual(matched["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(matched["independent_geometry_checked"], 2)
+        self.assertNotIn("PRIVATE_FACE_LAYER", str(matched))
+        for index, code, changed_value in (
+                (0, "30", "1.00000000000000000001"),
+                (0, "31", "3"),
+                (0, "33", "5"),
+                (0, "70", "4"),
+                (1, "33", "0")):
+            with self.subTest(index=index, code=code):
+                changed = [dict(row, groups=dict(row["groups"])) for row in faces]
+                changed[index]["groups"][code] = changed_value
+                drift = audit.compare_independent_geometry(changed)
+                self.assertEqual(drift["independent_geometry_parameter_mismatches"], 1)
+                self.assertEqual(drift["independent_geometry_result"],
+                                 "primitive_subset_mismatch")
+
+        # Do not quietly infer a WCS fourth corner from a partial XY/Z set.
+        for groups in (
+                {"10":"0","20":"0","11":"1","21":"0","12":"0","22":"1","13":"1"},
+                {"10":"0","20":"0","11":"1","21":"0","12":"0","22":"1","33":"3"},
+                {"10":"0","20":"0","11":"1","21":"0","12":"0","22":"1","70":"16"},
+                {"10":"0","20":"0","11":"1","21":"0","12":"0","22":"1","70":"-1"},
+                {"10":"0","20":"0","11":"1","21":"0","12":"0","22":"1","32":"NaN"}):
+            with self.subTest(groups=groups), self.assertRaises(ValueError):
+                audit.compare_independent_geometry([
+                    {"handle":"AA", "type":"3DFACE", "groups":groups},
+                    faces[1]])
+        malformed = DwgEntityIdentityAudit(geometry_enabled=True)
+        malformed.observe("ENTITIES", "3DFACE", [
+            (5,"AA"),(8,"0"),(10,"0"),(20,"0"),(11,"1"),(21,"0"),
+            (12,"0"),(22,"1"),(13,"2")])
+        bad = malformed.compare_independent_geometry([faces[0]])
+        self.assertEqual(bad["independent_geometry_invalid_decoded"], 1)
+        self.assertEqual(bad["independent_geometry_result"], "primitive_subset_mismatch")
+
+    def test_independent_3dface_pipeline_detects_hidden_z_drift(self):
+        dxf = (record("SECTION", (2, "ENTITIES")) +
+               record("3DFACE", (5,"AA"), (8,"PRIVATE_FACE"),
+                      (10,"0"),(20,"0"),(30,"0"),
+                      (11,"1"),(21,"0"),(31,"0"),
+                      (12,"0"),(22,"1"),(32,"2")) +
+               record("ENDSEC") + record("EOF"))
+        reference = [{"handle":"AA", "type":"3DFACE", "groups":{
+            "10":"0","20":"0","30":"0",
+            "11":"1","21":"0","31":"0",
+            "12":"0","22":"1","32":"2"}}]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            original = root / "private.dwg"
+            original.write_bytes(b"AC1032 synthetic fixture")
+            converter = root / "mock"
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+            converter.chmod(0o700)
+
+            def converted(*args, **kwargs):
+                Path(args[2]).write_text(dxf, encoding="utf-8")
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=9\n")
+                return Mock(returncode=0)
+
+            with patch("private_dwg_read_audit.subprocess.run", side_effect=converted):
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    same = convert_one(original, converter, Path(tmp), 5, 128,
+                                       independent_geometry=reference)
+                changed = [dict(reference[0], groups=dict(reference[0]["groups"]))]
+                changed[0]["groups"]["32"] = "3"
+                with tempfile.TemporaryDirectory(dir=root) as tmp:
+                    drift = convert_one(original, converter, Path(tmp), 5, 128,
+                                        independent_geometry=changed)
+            self.assertEqual(same["independent_geometry_result"],
+                             "primitive_subset_parity_only")
+            self.assertEqual(same["status"], "decoded_dxf_inventory")
+            self.assertEqual(drift["independent_geometry_result"],
+                             "primitive_subset_mismatch")
+            self.assertEqual(drift["status"],
+                             "decoded_dxf_inventory_geometry_mismatch")
+            self.assertNotIn("PRIVATE_FACE", str(same))
+            self.assertNotIn("PRIVATE_FACE", str(drift))
+
     def test_primitive_geometry_missing_or_invalid_reference_is_not_certified(self):
         audit = DwgEntityIdentityAudit(geometry_enabled=True)
         audit.observe("ENTITIES", "LINE", [
