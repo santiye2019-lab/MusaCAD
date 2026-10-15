@@ -74,6 +74,14 @@ Path: `core/native/`
   JNI are guarded by host JVM/host JNI compilation tests. This opt-in
   bridge does not replace existing Android result, execute on the drawing UI
   thread or certify an exact B-Rep surface.
+- Portable 3D indexed-mesh **topology preflight** now mirrors the Android
+  `Cad3dMeshTopology` screening in `musacad_mesh_topology.c`. It reports
+  open edges, inconsistent winding, non-manifold edges, degenerate faces and
+  duplicate/zero-thickness opposed facets. It rejects invalid indices and
+  nonfinite coordinates; meshes exceeding 50,000 triangles remain explicitly
+  unaudited. The same C ABI can gate `musa_core_mesh_mass_f32` on all
+  platforms. Separate real-file cross-tests and geometric self-intersection
+  validation are still required before certified solid/metraj claims.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
