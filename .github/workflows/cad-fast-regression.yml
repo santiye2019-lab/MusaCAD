@@ -88,6 +88,22 @@ jobs:
             app/src/main/java/com/musa/cad/Cad3dNativeMeshMass.java \
             tests/Cad3dNativeMeshMassTest.java
           java -cp /tmp/musacad-native-mass-jvm Cad3dNativeMeshMassTest
+      - name: Optional Android 3D surface-area JNI adapter and JVM fallback tests
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-native-surface-jvm
+          javac -encoding UTF-8 -d /tmp/musacad-native-surface-jvm \
+            app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java \
+            app/src/main/java/com/musa/cad/Cad3dNativeMeshSurface.java \
+            tests/Cad3dNativeMeshSurfaceTest.java
+          java -cp /tmp/musacad-native-surface-jvm Cad3dNativeMeshSurfaceTest
+          JHOME="${JAVA_HOME_17_X64:-${JAVA_HOME:-}}"
+          if [ -z "$JHOME" ]; then
+            JHOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+          fi
+          cc -std=c11 -Wall -Wextra -Werror -fsyntax-only \
+            -I "$JHOME/include" -I "$JHOME/include/linux" \
+            -I core/native/include app/src/main/cpp/mesh_surface_jni.c
       - name: Polygonal EXTRUDE shell, volumes and DXF reopen parity
         run: |
           set -euo pipefail
