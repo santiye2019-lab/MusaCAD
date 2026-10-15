@@ -218,6 +218,39 @@ public final class Dxf3dSafeSaveTest {
                     Arrays.equals(reopenedPeriodic.edges,periodicMesh.edges),
                     "periodic SPLINE/LINE geometry must survive staged DXF reopen");
             }finally{periodicOutput.delete();}
+
+            // Fit-point-only SPLINE is an approximate read-only preview.
+            // Editing a separate raw LINE must retain original DXF fit tags.
+            String fitDrawing="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n8\n71\n3\n72\n0\n73\n0\n74\n3\n"+
+                "11\n0\n21\n0\n31\n1\n"+
+                "11\n4\n21\n4\n31\n1\n"+
+                "11\n8\n21\n0\n31\n1\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n2\n11\n2\n21\n0\n31\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(source.toPath(),fitDrawing,StandardCharsets.UTF_8);
+            CadSaveSourceIntegrity fitOpened=CadSaveSourceIntegrity.capture(source);
+            Dxf3dMesh fitted=Dxf3dMesh.read(source);
+            yes(fitted.approximateCurves==1&&fitted.xyz.length==27*3,
+                "fit-point SPLINE and editable LINE must coexist");
+            float[] fitBefore=fitted.xyz.clone();
+            yes(fitted.sourceLines[25]>=0&&fitted.sourceLines[24]<0,
+                "only original LINE coordinates may be saved");
+            fitted.xyz[25*3+2]=9f;
+            Dxf3dSafeSave.VerifiedStage fitStaged=
+                Dxf3dSafeSave.stage(source,fitted,fitBefore,cache,fitOpened);
+            try{
+                String savedFit=Files.readString(fitStaged.file().toPath(),StandardCharsets.UTF_8);
+                yes(savedFit.contains("74\n3\n11\n0\n21\n0\n31\n1\n")&&
+                    savedFit.contains("11\n4\n21\n4\n31\n1\n"),
+                    "save must preserve source fit points unchanged");
+                Dxf3dMesh fitReopen=Dxf3dMesh.read(fitStaged.file());
+                yes(fitReopen.approximateCurves==1&&
+                    Arrays.equals(fitReopen.xyz,fitted.xyz)&&
+                    Arrays.equals(fitReopen.edges,fitted.edges)&&
+                    Arrays.equals(fitReopen.sourceLines,fitted.sourceLines),
+                    "save/reopen must preserve fit curve and independent LINE edit");
+            }finally{fitStaged.delete();}
         }finally{
             Files.deleteIfExists(source.toPath());
             File[] abandoned=cache.listFiles();
