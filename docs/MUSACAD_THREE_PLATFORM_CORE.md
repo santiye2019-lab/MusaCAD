@@ -98,6 +98,15 @@ Path: `core/native/`
   and CI compiles the same source on Linux, Windows, macOS and iPhoneOS
   arm64. Scene acceleration/BVH, rendering, physical-device hit targets,
   ACIS/B-Rep and complete object selection are future work.
+- The `musacad_bounds3.h` pure-C **conservative AABB broad phase**
+  now rejects many obviously out-of-ray triangles before detailed picking
+  in `musacad_mesh_ray_pick.c`. Float-WCS tolerance deliberately favors
+  false positives rather than missed geometry, and later bad triangles are
+  still independently validated. Separate regression tests exercise large
+  drawing coordinates, zero-thickness bounds, edge hits and invalid inputs.
+  This is a per-face shortcut: computational complexity remains O(faces);
+  full BVH acceleration, phone performance acceptance and GPU-based picking
+  are future work.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.

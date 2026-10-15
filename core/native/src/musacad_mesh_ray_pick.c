@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_core.h"
+#include "musacad_bounds3.h"
 #include <math.h>
 #include <stdint.h>
 
@@ -57,6 +58,23 @@ int musa_core_mesh_ray_pick_f32(const float *xyz,size_t point_count,
                 pts[j][axis]=xyz[k+axis];
             }
         }
+        /*
+         * Conservative early rejection before expensive ray-triangle math.
+         * Still validates ALL face indices/coordinates above, so a later
+         * corrupt face can never be concealed by an earlier visible hit.
+         */
+        double minimum[3],maximum[3];
+        for(int axis=0;axis<3;axis++){
+            minimum[axis]=fmin(pts[0][axis],
+                         fmin(pts[1][axis],pts[2][axis]));
+            maximum[axis]=fmax(pts[0][axis],
+                         fmax(pts[1][axis],pts[2][axis]));
+        }
+        const double limit=has_hit?fmin(max_distance,best.distance):max_distance;
+        const int maybe=musa_core_bounds3_ray_maybe(
+                minimum,maximum,origin,d,limit);
+        if(maybe<0)return -1;
+        if(maybe==0)continue;
         double e1[3],e2[3],from[3];
         for(int j=0;j<3;j++){
             e1[j]=pts[1][j]-pts[0][j];
