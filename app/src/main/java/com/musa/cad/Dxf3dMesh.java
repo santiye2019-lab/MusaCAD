@@ -15,18 +15,19 @@ import java.util.List;
 /**
  * Bounded XYZ geometry reader for MusaCAD 3D.
  * Expands ordinary INSERT blocks and supports:
- * 3DFACE, polyface/polygon mesh, LINE, ordinary/3D POLYLINE, TRACE and SOLID geometry.
+ * 3DFACE, polyface/polygon mesh, LINE, CIRCLE/ARC sampled outlines,
+ * ordinary/3D POLYLINE, TRACE and SOLID geometry.
  */
 public final class Dxf3dMesh {
     private static final int MAX_VERTICES=2_000_000,MAX_TRIANGLES=4_000_000,MAX_EDGES=4_000_000;
     public final float[] xyz;
     public final int[] triangles,edges,sourceLines,coordinateSlots;
     public final float cx,cy,cz,radius,minZ,maxZ;
-    public final int acisSolids,unsupportedSolids,skippedBlockReferences;
+    public final int acisSolids,unsupportedSolids,skippedBlockReferences,approximateCurves;
     public final boolean flatPlan,solidProxy;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,BitSet outlineOnlyTriangles,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,int skippedBlockReferences,boolean solidProxy){
-        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.acisSolids=acisSolids;this.unsupportedSolids=unsupportedSolids;this.skippedBlockReferences=skippedBlockReferences;this.solidProxy=solidProxy;
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,BitSet outlineOnlyTriangles,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,int skippedBlockReferences,int approximateCurves,boolean solidProxy){
+        this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.acisSolids=acisSolids;this.unsupportedSolids=unsupportedSolids;this.skippedBlockReferences=skippedBlockReferences;this.approximateCurves=approximateCurves;this.solidProxy=solidProxy;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i+1<explicitEdges.length;i+=2)edge(seen,lines,explicitEdges[i],explicitEdges[i+1]);
         for(int i=0;i+2<triangles.length;i+=3){
@@ -69,7 +70,7 @@ public final class Dxf3dMesh {
                 :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.outlineOnlyTriangles,collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),expansion.skipped,collector.solidProxy
+            collector.outlineOnlyTriangles,collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),expansion.skipped,collector.approximateCurves,collector.solidProxy
         );
     }
 
@@ -79,7 +80,7 @@ public final class Dxf3dMesh {
         final ArrayList<Face> faces=new ArrayList<>();
         final BitSet outlineOnlyTriangles=new BitSet();
         boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
-        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids;
+        int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids,approximateCurves;
 
         @Override public void accept(DxfBlocks.Placement p)throws IOException{
             if(!DxfBlocks.MODEL_LAYOUT.equalsIgnoreCase(p.layout))return;
@@ -128,6 +129,9 @@ public final class Dxf3dMesh {
                 addPoint(points,p,10,20,30);addSource(p,0);
                 addPoint(points,p,11,21,31);addSource(p,1);
                 appendEdge(explicitEdges,start,start+1);
+            }else if("CIRCLE".equals(r.type)||"ARC".equals(r.type)){
+                appendCurvedOutline(this,p,"CIRCLE".equals(r.type));
+                approximateCurves++;
             }else if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
                 boolean face3d="3DFACE".equals(r.type);
                 double rawMask=face3d?r.number(70,0):0;
@@ -190,6 +194,63 @@ public final class Dxf3dMesh {
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
+    }
+
+    /**
+     * Displays a DXF CIRCLE or ARC as a bounded 3D wire path. This is a
+     * visual approximation; generated vertices have no editable DXF XYZ tags.
+     * For an entity normal 210/220/230, center and angles are OCS values.
+     * Compose the entity OCS basis with its containing INSERT's 3D transform.
+     */
+    private static void appendCurvedOutline(Collector c,DxfBlocks.Placement p,
+            boolean circle)throws IOException{
+        DxfBlocks.Record r=p.record;
+        double radius=r.number(40,0);
+        if(!(radius>0)||radius>1e9)
+            throw new IOException("3B daire/yay yarıçapı geçersiz");
+        double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
+        DxfBlocks.SpatialTransform entityFrame;
+        try{
+            entityFrame=p.spatial.thenLocal(DxfBlocks.SpatialTransform.insert(
+                0,0,0,1,1,1,0,0,0,0,nx,ny,nz));
+        }catch(IllegalArgumentException badNormal){
+            throw new IOException("3B daire/yay normal vektörü geçersiz",badNormal);
+        }
+        if(!entityFrame.isFinite())
+            throw new IOException("3B daire/yay koordinat dönüşümü geçersiz");
+        double x=r.number(10,0),y=r.number(20,0),z=r.number(30,0);
+        double begin=circle?0:r.number(50,0);
+        double end=circle?360:r.number(51,0);
+        double sweep=360;
+        if(!circle){
+            sweep=(end-begin)%360d;
+            if(sweep<0)sweep+=360d;
+            if(sweep==0)
+                throw new IOException("3B yay başlangıç/bitiş açıları çakışıyor");
+        }
+        // At most 48 straight segments per full circle (7.5 degrees each);
+        // bounded allocation even for giant drawings. Curvature/arc length
+        // measurements from tessellation are NOT exact CAD measurements.
+        int segments=Math.max(1,(int)Math.ceil(sweep/7.5d));
+        if(c.points.n/3+(long)segments+1>MAX_VERTICES||
+           c.explicitEdges.n/2+(long)segments>MAX_EDGES)
+            throw new IOException("3B eğri görüntüleme sınırı aşıldı");
+        int first=c.points.n/3;
+        int lastPoint=circle?segments-1:segments;
+        for(int i=0;i<=lastPoint;i++){
+            double theta=Math.toRadians(begin+sweep*((double)i/segments));
+            double[] pt=entityFrame.point(x+radius*Math.cos(theta),
+                                           y+radius*Math.sin(theta),z);
+            for(int axis=0;axis<3;axis++){
+                if(!Double.isFinite(pt[axis])||Math.abs(pt[axis])>1e9)
+                    throw new IOException("3B eğri koordinat sınırı aşıldı");
+                c.points.add((float)pt[axis]);
+            }
+            c.sourceLines.add(-1);
+            c.coordinateSlots.add(-1);
+            if(i>0)appendEdge(c.explicitEdges,first+i-1,first+i);
+        }
+        if(circle)appendEdge(c.explicitEdges,first+segments-1,first);
     }
 
     private static void appendAcis(Collector c,DxfBlocks.Placement p,AcisSatMesh.Result mesh)throws IOException{
