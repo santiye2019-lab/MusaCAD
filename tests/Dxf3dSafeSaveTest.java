@@ -34,6 +34,24 @@ public final class Dxf3dSafeSaveTest {
                     "publish must copy the validated staged file");
             }finally{staged.delete();}
 
+            // Source geometry changed before staging: same-sized bytes and
+            // restored mtime would have passed a save-time SHA snapshot alone.
+            // The new Z at the edited vertex could otherwise be masked by the
+            // pending edit, allowing a false-success DXF round-trip.
+            long originalStamp=source.lastModified();
+            String stale=dxf.replace("30\n1\n11\n3\n","30\n2\n11\n3\n");
+            yes(!stale.equals(dxf)&&stale.length()==dxf.length(),
+                "stale source test must preserve source byte count");
+            Files.writeString(source.toPath(),stale,StandardCharsets.UTF_8);
+            source.setLastModified(originalStamp);
+            boolean staleRejected=false;
+            try{Dxf3dSafeSave.stage(source,mesh,before,cache);}
+            catch(IOException expected){staleRejected=true;}
+            yes(staleRejected,"changed source geometry must reject stale 3D edits");
+            yes(cache.listFiles()!=null&&cache.listFiles().length==0,
+                "stale source must not leave a temporary export");
+            Files.write(source.toPath(),originalBytes);
+
             // Missing edited DXF tag: stage must fail, never touching an existing destination.
             Files.writeString(source.toPath(),dxf.replace("30\n1\n",""),StandardCharsets.UTF_8);
             ByteArrayOutputStream existing=new ByteArrayOutputStream();
