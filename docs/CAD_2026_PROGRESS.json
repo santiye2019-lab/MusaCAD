@@ -59,6 +59,14 @@
       "commit": "b6a7f775293415d4f06afd3389d8b028ebf46b37",
       "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
       "verification": "GitHub fast CAD regression run 38692750685: DXF INSERT/MINSERT geometry and quantity-safety PASS. Full Android and independent DWG acceptance still pending."
+    },
+    {
+      "id": "axial_z_nested_insert_mesh",
+      "points": 1,
+      "status": "implemented",
+      "commit": "77f1aa7d7992cd0ada97d843318f75f526d4ac5a",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "Fast CAD regression run 38694083576 PASS, including Dxf3dMeshTest for nested axial-Z 3D transforms, negative-Z MINSERT and overflow safety. Android quality and modern DWG workflows still require independent confirmation."
     }
   ],
   "backlog": [
@@ -82,7 +90,7 @@
     },
     {
       "id": "xref_dynamic_block_layouts",
-      "points": 7,
+      "points": 6,
       "status": "in_progress",
       "evidence_required": "Nested XREF, dynamic block and layout semantics"
     },
