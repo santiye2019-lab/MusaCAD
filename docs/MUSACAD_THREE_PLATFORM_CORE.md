@@ -153,6 +153,16 @@ Path: `core/native/`
   mirrored shear and fail-closed singular transforms. It is still a
   linear walk over scene instances; a separate scene-level BVH and
   real-DWG phone benchmarks are future work.
+- Shared **3D camera screen-to-WCS picking rays** are now computed by
+  `musacad_camera_ray.c`, a portable C11 view-projection 4x4 matrix
+  unprojection routine. It accepts top-left viewport pixel-edge coordinates,
+  both OpenGL-style -1..1 and Metal/D3D-style 0..1 clip depth, orthographic
+  and perspective cameras, and world drawing coordinates as doubles.
+  Its unit tests check singular/NaN matrix safe rejection, far-from-origin
+  WCS coordinates, screen-corner ray direction, near/far perspective rays,
+  and direct consumption by the multi-BLOCK 3D BVH scene selector.
+  No Android gesture integration, iOS viewport implementation or true
+  real-DWG multi-device parity has been claimed.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
