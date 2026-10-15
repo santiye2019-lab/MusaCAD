@@ -21,6 +21,8 @@ int main(void) {
     assert(musa_core_nurbs_preview_points(knots,3,6,2)==13);
     assert(musa_core_nurbs_evaluate(quarter,3,knots,6,2,.5,&x,&y));
     assert(near(x,sqrt(0.5),1e-12) && near(y,sqrt(0.5),1e-12));
+    assert(musa_core_nurbs_evaluate_validated(quarter,3,knots,2,.5,&x,&y));
+    assert(near(x,sqrt(0.5),1e-12) && near(y,sqrt(0.5),1e-12));
     assert(musa_core_nurbs_evaluate(quarter,3,knots,6,2,0,&x,&y));
     assert(near(x,1,1e-12) && near(y,0,1e-12));
     assert(musa_core_nurbs_evaluate(quarter,3,knots,6,2,1,&x,&y));
