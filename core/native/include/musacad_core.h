@@ -30,6 +30,15 @@ int musa_core_nurbs_validate(const MusaCoreNurbsControl *controls,size_t count,
 int musa_core_nurbs_evaluate(const MusaCoreNurbsControl *controls,size_t count,
                             const double *knots,size_t knot_count,int degree,double parameter,
                             double *out_x,double *out_y);
+/* High-throughput evaluation for an array ALREADY validated using
+ * musa_core_nurbs_validate(). The source buffer MUST stay immutable
+ * during the subsequent calls. This avoids quadratic revalidation cost in
+ * DWG first-paint loops; untrusted callers should use the checked method.
+ */
+int musa_core_nurbs_evaluate_validated(
+                            const MusaCoreNurbsControl *controls,size_t count,
+                            const double *knots,int degree,double parameter,
+                            double *out_x,double *out_y);
 int musa_core_nurbs_preview_points(const double *knots,size_t control_count,
                                   size_t knot_count,
                                   int degree);
