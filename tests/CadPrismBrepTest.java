@@ -17,21 +17,30 @@ public class CadPrismBrepTest {
         double[] square={0,0,2,0,2,2,0,2};
         CadPrismBrep.Solid s=CadPrismBrep.extrude(square,1,3);
         eq(s.volume,12);
+        eq(s.perimeter,8);eq(s.surfaceArea,32);
+        eq(s.centroidX,1);eq(s.centroidY,1);eq(s.centroidZ,2.5);
         if(!s.isWatertight()||s.ringVertices!=4||s.xyz.length!=24||
                 s.triangles.length!=36)throw new AssertionError("Square prism manifold");
         CadPrismBrep.Solid negative=CadPrismBrep.extrude(square,4,-3);
         eq(negative.volume,12);
+        eq(negative.centroidX,1);eq(negative.centroidY,1);eq(negative.centroidZ,2.5);
+        eq(negative.surfaceArea,32);
         if(!negative.isWatertight())throw new AssertionError("Negative extrusion manifold");
         CadPrismBrep.Solid cw=CadPrismBrep.extrude(new double[]{0,2,2,2,2,0,0,0},1,3);
         eq(cw.volume,12);
+        eq(cw.centroidX,1);eq(cw.centroidY,1);eq(cw.centroidZ,2.5);
         if(!cw.isWatertight())throw new AssertionError("Reverse ring manifold");
         CadPrismBrep.Solid translated=CadPrismBrep.extrude(
                 new double[]{100000,100000,100002,100000,100002,100002,100000,100002},
                 100000,3);
         eq(translated.volume,12);
+        eq(translated.centroidX,100001);eq(translated.centroidY,100001);
+        eq(translated.centroidZ,100001.5);eq(translated.surfaceArea,32);
         double[] concave={0,0,3,0,3,1,1,1,1,3,0,3};
         CadPrismBrep.Solid l=CadPrismBrep.extrude(concave,0,2);
         eq(l.volume,10);
+        eq(l.perimeter,12);eq(l.surfaceArea,34);
+        eq(l.centroidX,1.1);eq(l.centroidY,1.1);eq(l.centroidZ,1);
         if(!l.isWatertight()||l.triangles.length!=60)
             throw new AssertionError("Concave polygon extrusion failed");
         fail(()->CadPrismBrep.extrude(new double[]{0,0,2,2,0,2,2,0},0,2));
