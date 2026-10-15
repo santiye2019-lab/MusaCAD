@@ -24,17 +24,34 @@ public final class Dxf3dSafeSaveTest {
             openedSource.requireUnchanged(source);
             float[] before=mesh.xyz.clone();
             mesh.xyz[2]=9f;
-            File staged=Dxf3dSafeSave.stage(source,mesh,before,cache,openedSource);
+            Dxf3dSafeSave.VerifiedStage staged=Dxf3dSafeSave.stage(source,mesh,before,cache,openedSource);
             try{
                 yes(Arrays.equals(originalBytes,Files.readAllBytes(source.toPath())),
                     "export must not mutate source");
-                Dxf3dMesh reopen=Dxf3dMesh.read(staged);
+                Dxf3dMesh reopen=Dxf3dMesh.read(staged.file());
                 yes(reopen.xyz[2]==9f,"edited 3D Z must survive export roundtrip");
                 ByteArrayOutputStream destination=new ByteArrayOutputStream();
-                long copied=Dxf3dSafeSave.publish(staged,destination);
-                yes(copied==staged.length()&&
-                    Arrays.equals(destination.toByteArray(),Files.readAllBytes(staged.toPath())),
+                long copied=Dxf3dSafeSave.publish(staged,()->destination);
+                yes(copied==staged.file().length()&&
+                    Arrays.equals(destination.toByteArray(),Files.readAllBytes(staged.file().toPath())),
                     "publish must copy the validated staged file");
+                // Even after correct save/reopen, a staged file may be
+                // swapped or modified before the Android SAF picker returns.
+                // Verify the immutable stage hash BEFORE opener.open() can
+                // truncate an existing destination.
+                byte[] altered=Files.readAllBytes(staged.file().toPath());
+                altered[altered.length-10]^=0x01;
+                Files.write(staged.file().toPath(),altered);
+                final boolean[] opened={false};
+                boolean tamperingRejected=false;
+                try{
+                    Dxf3dSafeSave.publish(staged,()->{
+                        opened[0]=true;
+                        return new ByteArrayOutputStream();
+                    });
+                }catch(IOException expected){tamperingRejected=true;}
+                yes(tamperingRejected&&!opened[0],
+                    "tampered stage must be rejected BEFORE destination open");
             }finally{staged.delete();}
 
             // Source geometry changed before staging: same-sized bytes and
