@@ -19,11 +19,21 @@ public final class Dxf3dSafeSaveIntegrationContractTest {
         String guardedStage=Files.readString(
             Path.of("app/src/main/java/com/musa/cad/Dxf3dSafeSave.java"),StandardCharsets.UTF_8);
         int shaBefore=guardedStage.indexOf("CadSaveSourceIntegrity.capture(source)");
+        int sessionCheck=guardedStage.indexOf("openedSource.requireUnchanged(source)");
         int edit=guardedStage.indexOf("Dxf3dEditor.write(source,output,edited,original)");
-        int afterVerify=guardedStage.indexOf("baseline.requireUnchanged(source)");
+        int afterVerify=guardedStage.indexOf("baseline.requireUnchanged(source)",edit);
+        int sessionAfter=guardedStage.indexOf("openedSource.requireUnchanged(source)",edit);
         int stageReady=guardedStage.indexOf("ready=true;");
-        if(shaBefore<0||edit<shaBefore||afterVerify<edit||stageReady<afterVerify)
-            throw new AssertionError("SHA-256 snapshot must enclose 3D edit and stage acceptance");
+        if(sessionCheck<0||shaBefore<sessionCheck||edit<shaBefore||
+            afterVerify<edit||sessionAfter<afterVerify||stageReady<sessionAfter)
+            throw new AssertionError("Opening-session and staged SHA-256 must enclose 3D save/reopen");
+        int openedHash=source.indexOf("CadSaveSourceIntegrity.capture(sourceFile)");
+        int openedMesh=source.indexOf("Dxf3dMesh.read(sourceFile)",openedHash);
+        int openedVerified=source.indexOf("openedIntegrity.requireUnchanged(sourceFile)",openedMesh);
+        int openedAssigned=source.indexOf("openedSourceIntegrity=openedIntegrity;",openedVerified);
+        if(openedHash<0||openedMesh<openedHash||openedVerified<openedMesh||
+            openedAssigned<openedVerified||!source.contains("getCacheDir(),openedSourceIntegrity)"))
+            throw new AssertionError("3D Activity must hash original bytes across load and guarded export");
         System.out.println("3D SAF export contract: stage before open/truncate and cleanup");
     }
 }
