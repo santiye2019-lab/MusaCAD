@@ -13,6 +13,7 @@ extern "C" {
 #define MUSA_CORE_ABI_VERSION 1u
 #define MUSA_CORE_NURBS_MAX_DEGREE 16
 #define MUSA_CORE_NURBS_MAX_CONTROL 4096
+#define MUSA_CORE_NURBS_SAMPLES_PER_KNOT_SPAN 12
 typedef struct MusaCoreNurbsControl {
     double x, y, w;
 } MusaCoreNurbsControl;
@@ -27,9 +28,10 @@ double musa_core_effective_weight(double stored_weight,int has_explicit_weights)
 int musa_core_nurbs_validate(const MusaCoreNurbsControl *controls,size_t count,
                             const double *knots,size_t knot_count,int degree);
 int musa_core_nurbs_evaluate(const MusaCoreNurbsControl *controls,size_t count,
-                            const double *knots,int degree,double parameter,
+                            const double *knots,size_t knot_count,int degree,double parameter,
                             double *out_x,double *out_y);
 int musa_core_nurbs_preview_points(const double *knots,size_t control_count,
+                                  size_t knot_count,
                                   int degree);
 #ifdef __cplusplus
 }
