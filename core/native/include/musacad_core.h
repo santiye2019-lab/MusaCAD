@@ -121,6 +121,36 @@ int musa_core_mesh_ray_pick_f32(const float *xyz,size_t point_count,
                                const double direction[3],
                                double max_distance,
                                MusaCoreMeshRayHit *out);
+/*
+ * Reusable read-only 3D triangle BVH for large CAD drawing mesh selection.
+ * Copies vertex and face data at construction; caller may release input
+ * immediately. Subsequent picks are thread-safe when the BVH is immutable.
+ * This does not construct/edit ACIS B-Rep or apply scene-layer visibility.
+ *
+ * Build returns 1 and writes a new owned handle, or 0 on malformed input,
+ * resource limit or allocation failure without modifying *out.
+ * Query returns 1 for a real closest face, 0 for no hit, -1 for invalid
+ * ray input. Outputs are never modified on a miss/failure.
+ */
+typedef struct MusaCoreMeshBVH MusaCoreMeshBVH;
+int musa_core_mesh_bvh_build_f32(const float *xyz,size_t point_count,
+                                const int *triangles,size_t face_count,
+                                MusaCoreMeshBVH **out);
+typedef struct MusaCoreMeshBVHStats {
+    size_t tested_faces;
+    size_t visited_nodes;
+    size_t rejected_nodes;
+} MusaCoreMeshBVHStats;
+int musa_core_mesh_bvh_pick_stats(const MusaCoreMeshBVH *tree,
+                                 const double ray_origin[3],
+                                 const double ray_direction[3],
+                                 double max_distance,MusaCoreMeshRayHit *out,
+                                 MusaCoreMeshBVHStats *stats);
+int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *tree,
+                           const double ray_origin[3],
+                           const double ray_direction[3],
+                           double max_distance,MusaCoreMeshRayHit *out);
+void musa_core_mesh_bvh_destroy(MusaCoreMeshBVH *tree);
 #ifdef __cplusplus
 }
 #endif
