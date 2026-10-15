@@ -32,6 +32,7 @@ public final class Dxf3dMeshTest {
             if(edited.xyz[2]!=7||edited.xyz[14]!=8||edited.xyz[11]!=5)throw new AssertionError("saved coordinates");
         } finally {Files.deleteIfExists(file.toPath());}
         testLineAndPolyline();
+        test3dFaceInvisibleEdgesAndSafeRoundtrip();
         testPolygonMesh();
         testInsertedBlockLine();
         testAxialZBlockHeightAndNestedScaling();
@@ -45,6 +46,75 @@ public final class Dxf3dMeshTest {
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
         testMissing3dTagDoesNotWritePartialFile();
+    }
+
+    private static void test3dFaceInvisibleEdgesAndSafeRoundtrip() throws Exception {
+        File file=File.createTempFile("mesh3d-face-visibility-", ".dxf");
+        File saved=File.createTempFile("mesh3d-face-saved-", ".dxf");
+        try {
+            // Four corners are triangulated for shading, but only the CAD
+            // face outline is displayed. Bits 1 and 4 hide edge 1-2 and 3-4.
+            String quad="0\nSECTION\n2\nENTITIES\n"+
+                "0\n3DFACE\n70\n5\n"+
+                "10\n0\n20\n0\n30\n0\n"+
+                "11\n4\n21\n0\n31\n0\n"+
+                "12\n4\n22\n3\n32\n0\n"+
+                "13\n0\n23\n3\n33\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),quad,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.triangles.length!=6||mesh.edges.length!=4)
+                throw new AssertionError("quad must keep two shaded faces and two visible border edges");
+            if(mesh.edges[0]!=1||mesh.edges[1]!=2||
+               mesh.edges[2]!=3||mesh.edges[3]!=0)
+                throw new AssertionError("3DFACE group-70 invisible-edge mask incorrectly decoded");
+            float[] opened=mesh.xyz.clone();
+            mesh.xyz[8]=7f;
+            ByteArrayOutputStream written=new ByteArrayOutputStream();
+            Dxf3dEditor.write(file,written,mesh,opened);
+            String exported=written.toString(StandardCharsets.UTF_8);
+            if(!exported.contains("70\n5\n"))
+                throw new AssertionError("save must preserve 3DFACE hidden-edge mask");
+            Files.write(saved.toPath(),written.toByteArray());
+            Dxf3dMesh reopened=Dxf3dMesh.read(saved);
+            if(reopened.xyz[8]!=7f||reopened.triangles.length!=6||
+               !java.util.Arrays.equals(mesh.edges,reopened.edges))
+                throw new AssertionError("3DFACE saved XY/Z and visible outline must round-trip");
+
+            // No fourth corner means 4=3; bit 8 hides the 3->1 edge.
+            String triangle="0\nSECTION\n2\nENTITIES\n"+
+                "0\n3DFACE\n70\n8\n"+
+                "10\n0\n20\n0\n30\n0\n"+
+                "11\n2\n21\n0\n31\n0\n"+
+                "12\n0\n22\n2\n32\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),triangle,StandardCharsets.UTF_8);
+            Dxf3dMesh tri=Dxf3dMesh.read(file);
+            if(tri.triangles.length!=3||tri.edges.length!=4||
+               tri.edges[0]!=0||tri.edges[1]!=1||
+               tri.edges[2]!=1||tri.edges[3]!=2)
+                throw new AssertionError("triangular 3DFACE edge 4->1 must honor visibility flag");
+
+            // Even with all four visible outline edges, the artificial
+            // triangulation diagonal must never appear as a wireframe edge.
+            Files.writeString(file.toPath(),quad.replace("70\n5\n","70\n0\n"),StandardCharsets.UTF_8);
+            Dxf3dMesh outline=Dxf3dMesh.read(file);
+            if(outline.triangles.length!=6||outline.edges.length!=8)
+                throw new AssertionError("visible quad must have 4 perimeter edges, not 5");
+            for(int i=0;i+1<outline.edges.length;i+=2)
+                if((outline.edges[i]==0&&outline.edges[i+1]==2)||
+                   (outline.edges[i]==2&&outline.edges[i+1]==0))
+                    throw new AssertionError("wireframe exposed synthetic diagonal");
+
+            Files.writeString(file.toPath(),quad.replace("70\n5\n","70\n16\n"),StandardCharsets.UTF_8);
+            try {
+                Dxf3dMesh.read(file);
+                throw new AssertionError("invalid 3DFACE edge mask should fail closed");
+            } catch(java.io.IOException expected) {}
+        } finally {
+            Files.deleteIfExists(file.toPath());
+            Files.deleteIfExists(saved.toPath());
+        }
     }
 
     private static void testLineAndPolyline() throws Exception {
