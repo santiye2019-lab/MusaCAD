@@ -4,9 +4,10 @@ import java.nio.file.Path;
 
 /**
  * Production APKs require affirmative FINAL acceptance.
- * A 24-hour, developer-only pilot APK is NOT a production release:
- * it requires separate, explicit signed TEST APK consent (default false).
- * Neither source pushes nor PR tests can issue a signed pilot automatically.
+ * A 24-hour, developer-only pilot APK is NOT a production release.
+ * Under the user's latest hold policy even pilot APK requires BOTH explicit
+ * test consent AND the later final APK approval (both default false).
+ * Neither source pushes nor PR tests can issue an APK automatically.
  */
 public final class ApkReleaseApprovalContractTest {
     private static String read(String file)throws Exception{
@@ -44,6 +45,10 @@ public final class ApkReleaseApprovalContractTest {
             "AI pilot signed APK must be opt-in, never a default");
         require(pilot.contains("if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true"),
             "AI pilot must require manual deploy and explicit test APK consent");
+        require(pilot.contains("final_apk_approved:"),
+            "No Qwen pilot APK before user's final explicit authorization");
+        require(pilot.contains("if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true && inputs.final_apk_approved == true"),
+            "Even an approved test pilot must wait for final APK authorization");
         require(!pilot.contains("inputs.release_approved == true"),
             "Pilot testing must not assert that final engineering acceptance passed");
         require(pilot.contains("name: MusaCAD-Qwen-24h-PILOT-signed") &&
