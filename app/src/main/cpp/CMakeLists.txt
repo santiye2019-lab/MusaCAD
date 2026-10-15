@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(musacad_native C)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Reusable core is the SAME C implementation on Android and desktop/iOS.
+add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../../../core/native" "${CMAKE_CURRENT_BINARY_DIR}/musacad-core")
 set(LIBREDWG_LIBONLY ON CACHE BOOL "" FORCE)
 # Normal Android and host converter stay read-only. DWG writing is compiled only
 # by explicitly opting in to the isolated host proof; never affect production.
@@ -33,7 +35,7 @@ else()
   target_compile_definitions(musacad_dwg_convert PRIVATE MUSA_HOST=1)
 endif()
 target_include_directories(${MUSA_TARGET} PRIVATE "${LIBREDWG_SOURCE}/include" "${LIBREDWG_SOURCE}/src" "${CMAKE_CURRENT_BINARY_DIR}/libredwg/src")
-target_link_libraries(${MUSA_TARGET} PRIVATE redwg m)
+target_link_libraries(${MUSA_TARGET} PRIVATE redwg m musacad_core)
 
 # Host-only proof: the existing DWG reader and Android application are unchanged.
 if(NOT ANDROID AND MUSACAD_HOST_DWG_WRITE_PILOT)
