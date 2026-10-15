@@ -27,9 +27,15 @@ def _numeric(value):
         result = Decimal(value)
     except InvalidOperation:
         raise ValueError("invalid private polyface number") from None
-    if not result.is_finite() or abs(result) > _COORD_LIMIT:
+    # Decimal.__abs__ and normalize() can round or raise decimal.Overflow
+    # under the default context for large exponents / high-precision input.
+    # Use context-free magnitude after a cheap exponent check and keep the
+    # exact source decimal so subtle geometric drift cannot be hidden.
+    if not result.is_finite() or result.adjusted() > 12:
         raise ValueError("nonfinite or unbounded polyface position")
-    return result.normalize() if result else Decimal(0)
+    if result.copy_abs() > _COORD_LIMIT:
+        raise ValueError("polyface position outside audit coordinate bound")
+    return result
 
 
 def _integer(value):
