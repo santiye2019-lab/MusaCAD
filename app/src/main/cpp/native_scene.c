@@ -3,6 +3,7 @@
 #include "native_color.h"
 #include "scene_coord_safety.h"
 #include "musacad_core.h"
+#include "musacad_affine.h"
 #include "native_fit_spline.h"
 #include <math.h>
 #include <stdlib.h>
@@ -27,19 +28,16 @@
 #define MUSA_SCENE_MAX_FLOATS (9u*1024u*1024u)
 #define MUSA_MAX_BLOCK_DEPTH 24
 
-typedef struct { double a,b,c,d,tx,ty; } Affine2;
+typedef MusaCoreAffine2 Affine2;
 typedef MusaNativeSceneColor SceneColor;
 
-static Affine2 identity2(void){Affine2 m={1,0,0,1,0,0};return m;}
+/* Keep existing DWG dispatch call sites, but never duplicate matrix math. */
+static Affine2 identity2(void){return musa_core_affine_identity();}
 static Affine2 multiply2(Affine2 p,Affine2 q){
-    Affine2 r;
-    r.a=p.a*q.a+p.c*q.b;r.b=p.b*q.a+p.d*q.b;
-    r.c=p.a*q.c+p.c*q.d;r.d=p.b*q.c+p.d*q.d;
-    r.tx=p.a*q.tx+p.c*q.ty+p.tx;r.ty=p.b*q.tx+p.d*q.ty+p.ty;
-    return r;
+    return musa_core_affine_multiply(p,q);
 }
 static void map2(Affine2 m,double x,double y,double *ox,double *oy){
-    *ox=m.a*x+m.c*y+m.tx;*oy=m.b*x+m.d*y+m.ty;
+    musa_core_affine_map(m,x,y,ox,oy);
 }
 static int finite2(double x,double y){return isfinite(x)&&isfinite(y);}
 

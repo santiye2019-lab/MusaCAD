@@ -31,6 +31,13 @@ jobs:
         run: cmake --build build/shared-core --config Debug --parallel 2
       - name: Run common C ABI rational NURBS regression
         run: ctest --test-dir build/shared-core -C Debug --output-on-failure
+      - name: Cross-platform DWG INSERT and MINSERT affine transform geometry
+        run: cmake -S core/native/affine -B build/shared-affine -DCMAKE_BUILD_TYPE=Debug
+      - name: Compile portable CAD affine operations
+        run: cmake --build build/shared-affine --config Debug --parallel 2
+      - name: Verify nested transform and reverse hit-test parity
+        run: ctest --test-dir build/shared-affine -C Debug --output-on-failure
+
 
       - name: Check pre-existing legacy NURBS code uses identical canonical source (Linux)
         if: runner.os == 'Linux'
