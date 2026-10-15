@@ -63,6 +63,20 @@ jobs:
           mkdir -p /tmp/musacad-poly-offset-tests
           javac -encoding UTF-8 -d /tmp/musacad-poly-offset-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadPolylineOffsetTest.java
           java -cp /tmp/musacad-poly-offset-tests CadPolylineOffsetTest
+      - name: Fast 3D open-surface area-weighted XYZ centroid
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-surface-centroid-tests
+          javac -encoding UTF-8 -d /tmp/musacad-surface-centroid-tests app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/Cad3dSurfaceMetricsTest.java
+          java -cp /tmp/musacad-surface-centroid-tests Cad3dSurfaceMetricsTest
+      - name: Polygonal EXTRUDE shell, volumes and DXF reopen parity
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-extrude-tests
+          javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepTest.java
+          java -cp /tmp/musacad-extrude-tests CadPrismBrepTest
+          javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepRoundtripTest.java
+          java -cp /tmp/musacad-extrude-tests CadPrismBrepRoundtripTest
       - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
         run: |
           set -euo pipefail
