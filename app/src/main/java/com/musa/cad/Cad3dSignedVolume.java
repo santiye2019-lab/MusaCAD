@@ -19,9 +19,14 @@ public final class Cad3dSignedVolume {
         public final boolean available;
         public final double signedVolume;
         public final int triangleCount;
-        private Result(boolean available,double signedVolume,int triangleCount){
+        // Geometry centroid of the signed closed triangle shell, in WCS drawing units.
+        // NaN when the shell is open, unverified or has zero net signed volume.
+        public final double centroidX,centroidY,centroidZ;
+        private Result(boolean available,double signedVolume,int triangleCount,
+                       double centroidX,double centroidY,double centroidZ){
             this.available=available;this.signedVolume=signedVolume;
             this.triangleCount=triangleCount;
+            this.centroidX=centroidX;this.centroidY=centroidY;this.centroidZ=centroidZ;
         }
         public double magnitude(){return available?Math.abs(signedVolume):0d;}
     }
@@ -34,7 +39,7 @@ public final class Cad3dSignedVolume {
         final int faces=triangles.length/3;
         if(!topology.checked||!topology.closedOrientedByIndex||
            topology.triangles!=faces||faces==0)
-            return new Result(false,0d,faces);
+            return new Result(false,0d,faces,Double.NaN,Double.NaN,Double.NaN);
         int vertices=xyz.length/3;
         int reference=triangles[0];
         if(reference<0||reference>=vertices)
@@ -48,6 +53,7 @@ public final class Cad3dSignedVolume {
         // coordinates may be millions of drawing units from (0,0,0).
         // Cross products about global zero lose accuracy catastrophically.
         double sum=0d,correction=0d;
+        double mx=0d,my=0d,mz=0d,centroidCorrectionX=0d,centroidCorrectionY=0d,centroidCorrectionZ=0d;
         for(int i=0;i<triangles.length;i+=3){
             int ia=triangles[i],ib=triangles[i+1],ic=triangles[i+2];
             if(ia<0||ib<0||ic<0||ia>=vertices||ib>=vertices||ic>=vertices)
@@ -71,12 +77,30 @@ public final class Cad3dSignedVolume {
             if(Math.abs(sum)>=Math.abs(tetra))correction+=(sum-next)+tetra;
             else correction+=(tetra-next)+sum;
             sum=next;
+            // First moments of each signed tetrahedron, translated about
+            // the opening vertex to retain precision at large CAD coordinates.
+            double tx=tetra*(ax+bx+cx)/4d;
+            double ty=tetra*(ay+by+cy)/4d;
+            double tz=tetra*(az+bz+cz)/4d;
+            if(!Double.isFinite(tx)||!Double.isFinite(ty)||!Double.isFinite(tz))
+                throw new IllegalArgumentException("CAD centroid moment overflow");
+            double nx=mx+tx,ny=my+ty,nz=mz+tz;
+            centroidCorrectionX+=(Math.abs(mx)>=Math.abs(tx))?(mx-nx)+tx:(tx-nx)+mx;
+            centroidCorrectionY+=(Math.abs(my)>=Math.abs(ty))?(my-ny)+ty:(ty-ny)+my;
+            centroidCorrectionZ+=(Math.abs(mz)>=Math.abs(tz))?(mz-nz)+tz:(tz-nz)+mz;
+            mx=nx;my=ny;mz=nz;
         }
         double signed=sum+correction;
         if(!Double.isFinite(signed))
             throw new IllegalArgumentException("CAD signed volume overflow");
         // Indexed shell with 0 algebraic volume cannot be certified as an
         // enclosing mesh (e.g. offsetting/orientation cancellations).
-        return new Result(signed!=0d,signed,faces);
+        if(signed==0d)return new Result(false,0d,faces,Double.NaN,Double.NaN,Double.NaN);
+        double centerX=ox+(mx+centroidCorrectionX)/signed;
+        double centerY=oy+(my+centroidCorrectionY)/signed;
+        double centerZ=oz+(mz+centroidCorrectionZ)/signed;
+        if(!Double.isFinite(centerX)||!Double.isFinite(centerY)||!Double.isFinite(centerZ))
+            throw new IllegalArgumentException("CAD shell centroid overflow");
+        return new Result(true,signed,faces,centerX,centerY,centerZ);
     }
 }

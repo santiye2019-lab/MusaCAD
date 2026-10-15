@@ -194,6 +194,11 @@ public final class Mesh3dActivity extends Activity {
                         "%.3f",openingSignedVolume.signedVolume))
                 .append(" çizim birimi³ (yalnız ağ hesabı; kesin metraj, ")
                 .append("öz-kesişimsiz B-Rep veya geçerli ACIS katısı garantisi değildir)");
+            text.append("\nAçılıştaki üçgen ağın yaklaşık hacim merkezi (XYZ): ")
+                .append(String.format(java.util.Locale.getDefault(),"(%.3f, %.3f, %.3f)",
+                        openingSignedVolume.centroidX,openingSignedVolume.centroidY,
+                        openingSignedVolume.centroidZ))
+                .append(" çizim birimi (yalnız yönlü üçgen ağı; ACIS MASSPROP doğrulaması değildir)");
             if(mesh.acisSolids>0||mesh.unsupportedSolids>0||mesh.solidProxy||mesh.skippedBlockReferences>0)
                 text.append(" • Eksik blok/ACIS geometrisi nedeniyle kısmi");
         }
