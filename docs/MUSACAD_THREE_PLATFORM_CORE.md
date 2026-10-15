@@ -35,6 +35,13 @@ Path: `core/native/`
   the existing Android OCS transform and safe line fallback for invalid
   arc geometry; shared unit tests cover both branches, translated coordinates,
   degenerate/NaN/overflow inputs, and source-safe failure.
+- Native DWG ARC/CIRCLE/ELLIPSE and curved LWPOLYLINE scene preview now
+  reuse `core/native/include/musacad_curve_bounds.h` for analytical
+  positive/negative arc and transformed ellipse world-space extents.
+  The prior full-ellipse bounds remain a conservative overflow fallback;
+  geometry and first-paint color rendering are unchanged. Host C tests and
+  iPhoneOS object-only compilation cover this shared math. This is not yet
+  CAD viewport clipping or an editable 3D B-Rep kernel.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
