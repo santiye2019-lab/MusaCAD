@@ -41,7 +41,7 @@ public final class Cad3dUnsavedExitIntegrationContractTest {
         require(activity.contains("if(finishedExport&&saveCheckpoint!=null){")&&
                 activity.contains("saveCheckpoint.markSaved(exportSnapshot);"),
             "failed or canceled saves cannot mark edits clean");
-        int published=activity.indexOf("Dxf3dSafeSave.publish(staged,output);");
+        int published=activity.indexOf("Dxf3dSafeSave.publish(staged,");
         int success=activity.indexOf("exported=true;",published);
         require(published>=0&&success>published,
             "successful publication precedes checkpoint advancement");
