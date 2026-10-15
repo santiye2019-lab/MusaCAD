@@ -23,6 +23,19 @@ public final class DxfBlocks {
         static Transform insert(double bx,double by,double sx,double sy,double degrees,double x,double y){double r=Math.toRadians(degrees),co=Math.cos(r),si=Math.sin(r);double a=co*sx,b=si*sx,c=-si*sy,d=co*sy;return new Transform(a,b,c,d,x-a*bx-c*by,y-b*bx-d*by);}
     }
 
+    /** Vertical affine transform for axial-Z INSERTs; 2D preview remains unchanged. */
+    public static final class HeightTransform {
+        public final double scale,offset;
+        public HeightTransform(){this(1d,0d);}
+        private HeightTransform(double scale,double offset){this.scale=scale;this.offset=offset;}
+        public double point(double localZ){return scale*localZ+offset;}
+        public boolean isIdentity(){return scale==1d&&offset==0d;}
+        public boolean isFinite(){return Double.isFinite(scale)&&Double.isFinite(offset);}
+        HeightTransform thenInsert(double baseZ,double scaleZ,double insertZ){
+            return new HeightTransform(scale*scaleZ,point(insertZ-scaleZ*baseZ));
+        }
+    }
+
     public static final class Record {
         public final String type;public final int from,to,sourceFrom,sourceStart,sourceTo;final List<String>tags;
         Record(String type,List<String>tags,int from,int to){this(type,tags,from,to,from,Math.max(0,from-2),to);}
@@ -38,8 +51,8 @@ public final class DxfBlocks {
     }
 
     public static final class Placement {
-        public final Record record;public final Transform transform;public final String layer,layout;public final int color;public final String lineType;public final double lineTypeScale;public final int lineWeight;public final double blockScale;public final boolean directRoot;public final String[] visibilityLayerKeys;
-        Placement(Record record,Transform transform,String layer,String layout,int color,String lineType,double lineTypeScale,int lineWeight,boolean directRoot,String[] visibilityLayerKeys){this.record=record;this.transform=transform;this.layer=layer;this.layout=normalizeLayout(layout);this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=lineTypeScale;this.lineWeight=lineWeight;this.blockScale=transform.scale();this.directRoot=directRoot;this.visibilityLayerKeys=visibilityLayerKeys==null?new String[0]:visibilityLayerKeys.clone();}
+        public final Record record;public final Transform transform;public final HeightTransform height;public final String layer,layout;public final int color;public final String lineType;public final double lineTypeScale;public final int lineWeight;public final double blockScale;public final boolean directRoot;public final String[] visibilityLayerKeys;
+        Placement(Record record,Transform transform,HeightTransform height,String layer,String layout,int color,String lineType,double lineTypeScale,int lineWeight,boolean directRoot,String[] visibilityLayerKeys){this.record=record;this.transform=transform;this.height=height;this.layer=layer;this.layout=normalizeLayout(layout);this.color=color;this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=lineTypeScale;this.lineWeight=lineWeight;this.blockScale=transform.scale();this.directRoot=directRoot;this.visibilityLayerKeys=visibilityLayerKeys==null?new String[0]:visibilityLayerKeys.clone();}
     }
 
     /** Root INSERT metadata kept separately from expanded block geometry for quantity takeoff. */
@@ -85,7 +98,7 @@ public final class DxfBlocks {
             else if(section.equals("ENTITIES"))roots.add(record);
         }
         if(!layerColorLookup.containsKey("0")){int color=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);layerColorLookup.put("0",color);layerLineTypeLookup.put("0",DxfLineStyle.CONTINUOUS);layerLineWeightLookup.put("0",defaultWeight);result.layerColors.put("0",color);result.layerLineTypes.put("0",DxfLineStyle.CONTINUOUS);result.layerLineWeights.put("0",defaultWeight);}
-        int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);for(Record root:roots)expand(root,new Transform(),"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,defaultWeight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,defaultWeight,new HashSet<>(),result);if(result.layoutNames.isEmpty())result.layoutNames.add(MODEL_LAYOUT);return result;
+        int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);for(Record root:roots)expand(root,new Transform(),new HeightTransform(),"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,defaultWeight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,defaultWeight,new HashSet<>(),result);if(result.layoutNames.isEmpty())result.layoutNames.add(MODEL_LAYOUT);return result;
     }
 
 
@@ -137,13 +150,13 @@ public final class DxfBlocks {
         result.sink=sink;sink.begin(result);result.visits=0;
         int defaultBlockColor=DxfColor.aciArgb(DxfColor.DEFAULT_ACI);
         try(DxfStream input=new DxfStream(file,charset)){
-            section="";Record r;Transform identity=new Transform();Set<String>stack=new HashSet<>();
+            section="";Record r;Transform identity=new Transform();HeightTransform height=new HeightTransform();Set<String>stack=new HashSet<>();
             while((r=input.next())!=null){
                 FileTransfer.checkCancelled();
                 if("SECTION".equals(r.type)){section=r.text(2,"");continue;}
                 if("ENDSEC".equals(r.type)){section="";continue;}
                 if("EOF".equals(r.type))break;
-                if("ENTITIES".equals(section))expand(r,identity,"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,result.defaultLineweight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,result.defaultLineweight,stack,result);
+                if("ENTITIES".equals(section))expand(r,identity,height,"0",MODEL_LAYOUT,defaultBlockColor,DxfLineStyle.CONTINUOUS,result.defaultLineweight,1d,new String[0],true,blocks,layerColorLookup,layerLineTypeLookup,layerLineWeightLookup,result.defaultLineweight,stack,result);
             }
         }finally{
             try{sink.finish();}finally{result.sink=null;}
@@ -172,25 +185,25 @@ public final class DxfBlocks {
     private static void emit(Result result,Placement placement)throws IOException{
         result.layoutNames.add(placement.layout);if(result.sink!=null)result.sink.accept(placement);else result.placements.add(placement);
     }
-    private static void expandMembers(Block block,Transform transform,String layer,String layout,int color,String lineType,int lineWeight,double lineScale,String[] visibilityGates,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
-        if(block.file==null){for(Record member:block.members)expand(member,transform,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
+    private static void expandMembers(Block block,Transform transform,HeightTransform height,String layer,String layout,int color,String lineType,int lineWeight,double lineScale,String[] visibilityGates,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
+        if(block.file==null){for(Record member:block.members)expand(member,transform,height,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);return;}
         try(DxfStream input=new DxfStream(block.file,block.charset)){
             input.seek(block.offset,block.offsetLine);Record member;boolean ended=false;
             while((member=input.next())!=null){
                 if("ENDBLK".equals(member.type)){ended=true;break;}
                 if("ENDSEC".equals(member.type)||"EOF".equals(member.type)||"BLOCK".equals(member.type))break;
-                expand(member,transform,layer,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+                expand(member,transform,height,layout,color,lineType,lineWeight,lineScale,visibilityGates,false,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
             if(!ended)throw new IOException("DXF blok sonu bulunamadı");
         }
     }
 
-    private static void expand(Record r,Transform parent,String parentLayer,String parentLayout,int parentBlockColor,String parentBlockLineType,int parentBlockLineWeight,double parentLineTypeScale,String[] parentVisibilityGates,boolean directRoot,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
+    private static void expand(Record r,Transform parent,HeightTransform parentHeight,String parentLayer,String parentLayout,int parentBlockColor,String parentBlockLineType,int parentBlockLineWeight,double parentLineTypeScale,String[] parentVisibilityGates,boolean directRoot,Map<String,Block>blocks,Map<String,Integer>layerColors,Map<String,String>layerLineTypes,Map<String,Integer>layerLineWeights,int defaultLineweight,Set<String>stack,Result result)throws IOException{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("Yükleme iptal edildi");if(++result.visits>2000000)throw new IOException("DXF blokları açıldığında nesne sınırı aşıldı");if(r.type.equals("SEQEND"))return;
         String layer=r.text(8,"0");if(layer.equals("0"))layer=parentLayer;String[] visibilityGates=DxfLayerState.addGate(parentVisibilityGates,layer);String layout=entityLayout(r,parentLayout);int color=entityColor(r,layer,parentBlockColor,layerColors);String lineType=entityLineType(r,layer,parentBlockLineType,layerLineTypes);int lineWeight=entityLineweight(r,layer,parentBlockLineWeight,layerLineWeights,defaultLineweight);double ownScale=r.number(48,1d);if(!Double.isFinite(ownScale)||ownScale<=0d)ownScale=1d;double effectiveLineTypeScale=parentLineTypeScale*ownScale;
         if(r.type.equals("DIMENSION")){
             String name=key(r.text(2,""));Block block=blocks.get(name);boolean defaultExtrusion=r.number(210,0)==0&&r.number(220,0)==0&&r.number(230,1)==1;
-            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
+            if(block!=null&&!stack.contains(name)&&stack.size()<32&&defaultExtrusion){Transform transform=parent.thenLocal(Transform.translate(r.number(12,0),r.number(22,0)));stack.add(name);expandMembers(block,transform,parentHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);stack.remove(name);return;}
         }
         if(r.type.equals("ACAD_TABLE")){
             String name=key(r.text(2,""));Block block=blocks.get(name);
@@ -207,11 +220,11 @@ public final class DxfBlocks {
                 ?Transform.insert(bx,by,-1,1,-degrees,-ix,iy)
                 :Transform.insert(bx,by,1,1,degrees,ix,iy);
             stack.add(name);
-            try{expandMembers(block,parent.thenLocal(local),layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
+            try{expandMembers(block,parent.thenLocal(local),parentHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);}
             finally{stack.remove(name);}
             return;
         }
-        if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
+        if(!r.type.equals("INSERT")){emit(result,new Placement(r,parent,parentHeight,layer,layout,color,lineType,effectiveLineTypeScale,lineWeight,directRoot,visibilityGates));return;}
         String name=key(r.text(2,""));Block block=blocks.get(name);if(block==null||stack.contains(name)||stack.size()>=32){result.skipped++;return;}
         double nx=r.number(210,0),ny=r.number(220,0),nz=r.number(230,1);
         boolean positiveZ=Math.abs(nx)<1e-8&&Math.abs(ny)<1e-8&&nz>.999999;
@@ -229,6 +242,10 @@ public final class DxfBlocks {
         if(!Double.isFinite(angle)||!Double.isFinite(co)||!Double.isFinite(si)){
             result.skipped++;return;
         }
+        double baseZ=block.header.number(30,0),insertZ=r.number(30,0),scaleZ=r.number(43,1);
+        double axisSign=negativeZ?-1d:1d;
+        HeightTransform childHeight=parentHeight.thenInsert(baseZ,axisSign*scaleZ,axisSign*insertZ);
+        if(!childHeight.isFinite()){result.skipped++;return;}
         int[] edgeRows={0,rows-1},edgeColumns={0,columns-1};
         for(int checkRow:edgeRows)for(int checkColumn:edgeColumns){
             double dx=checkColumn*columnSpacing,dy=checkRow*rowSpacing;
@@ -261,7 +278,7 @@ public final class DxfBlocks {
                     ?Transform.insert(bx,by,-sx,sy,-degrees,-arrayX,arrayY)
                     :Transform.insert(bx,by,sx,sy,degrees,arrayX,arrayY);
                 Transform transform=parent.thenLocal(local);
-                expandMembers(block,transform,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
+                expandMembers(block,transform,childHeight,layer,layout,color,lineType,lineWeight,effectiveLineTypeScale,visibilityGates,blocks,layerColors,layerLineTypes,layerLineWeights,defaultLineweight,stack,result);
             }
         }finally{stack.remove(name);}
     }
