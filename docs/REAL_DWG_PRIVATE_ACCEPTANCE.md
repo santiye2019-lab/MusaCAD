@@ -54,9 +54,23 @@ ordinary numeric group-code map. POLYLINE checks header flags, elevation,
 widths, mesh settings and normal. VERTEX checks XYZ, widths, signed bulge,
 tangent, flags and signed polyface indices (negative indices encode hidden
 edges). A missing or changed vertex record must fail the subset comparison.
-**This is per-record parity only:** the sequence of VERTEX children under a
-POLYLINE parent, the terminating SEQEND and complete polyface topology are
-NOT yet independently verified. Do not present this as full mesh validation.
+**The per-handle numeric audit alone is not chain proof.** For an
+independently supplied original-DWG reader manifest, an **additional optional**
+`polyline_chain_records` array verifies the POLYLINE parent record, *ordered*
+VERTEX child handles, and closing SEQEND handle. Example:
+```json
+"polyline_chain_records": [
+  {"handle":"AA","space":"model","vertices":["AB","AC"],"seqend":"AD"}
+]
+```
+Place this inside the same private source-SHA-256-bound JSON manifest as the
+existing `records`. Source handles must come from a genuinely independent
+DWG reader, **not** from MusaCAD's converted DXF. A missing SEQEND,
+reversed child order, unknown owner or reused vertex fails the source-bound
+check. Report output contains count-only results; never publish raw handle
+lists or original drawings. **This verifies record ownership/ordering only:**
+polyface surface topology, face winding, full geometric adjacency, and
+modern DWG binary write/reopen are still NOT independently established.
 ELLIPSE references instead use the ordinary numeric group mapping, e.g.
 `{"10":"1","20":"2","11":"4","21":"0","40":"0.5","41":"0","42":"1.5707963267948966"}`.
 Missing start/end parameters are deliberately rejected rather than guessed;
