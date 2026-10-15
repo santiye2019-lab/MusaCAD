@@ -1,0 +1,53 @@
+name: MusaCAD shared native core portability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'core/native/**'
+      - 'app/src/main/cpp/native_nurbs.h'
+      - 'app/src/main/cpp/native_scene.c'
+      - 'app/src/main/cpp/CMakeLists.txt'
+      - '.github/workflows/cad-crossplatform-core.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-c-core:
+    name: C ABI geometry • ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure portable core (no Android SDK, no LibreDWG)
+        run: cmake -S core/native -B build/shared-core -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Compile portable C geometry
+        run: cmake --build build/shared-core --config Debug --parallel 2
+      - name: Run common C ABI rational NURBS regression
+        run: ctest --test-dir build/shared-core -C Debug --output-on-failure
+
+      - name: Check pre-existing legacy NURBS code uses identical canonical source (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp tests/native_nurbs_test.c -lm -o /tmp/musacad-legacy-nurbs-check
+          /tmp/musacad-legacy-nurbs-check
+
+      - name: Compile shared core for iOS arm64 device SDK (object only, no app signing)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
+            -c core/native/src/musacad_core.c \
+            -o "$RUNNER_TEMP/musacad-core-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-core-iphoneos-arm64.o"
+          echo "Only the shared C source compiled for iOS. No iOS app or actual device was tested."
