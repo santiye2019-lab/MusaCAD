@@ -15,6 +15,11 @@ on:
         description: "I approve creating a signed 24h TEST APK only (not final acceptance); installing may replace MusaCAD"
         type: boolean
         default: false
+      final_apk_approved:
+        description: "FINAL APK authorization after all MusaCAD development is finished (leave false during development)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -187,9 +192,10 @@ jobs:
 
   pilot-apk:
     needs: deploy
-    # Explicit pilot-only approval is the signed test APK checkbox. This
-    # workflow never publishes to Play, and no final field acceptance is claimed.
-    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true
+    # Signed pilot APK additionally requires FINAL APK authorization; pilot
+    # consent alone never produces an APK during active development.
+    # No public release or automatic push / PR triggered APK packaging.
+    if: inputs.operation == 'deploy' && inputs.build_pilot_apk == true && inputs.final_apk_approved == true
     runs-on: ubuntu-latest
     env:
       MUSACAD_PRODUCTION_RELEASE: "true"
