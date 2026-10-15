@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.List;
 
@@ -24,11 +25,15 @@ public final class Dxf3dMesh {
     public final int acisSolids,unsupportedSolids,skippedBlockReferences;
     public final boolean flatPlan,solidProxy;
 
-    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,int skippedBlockReferences,boolean solidProxy){
+    private Dxf3dMesh(float[] xyz,int[] triangles,int[] explicitEdges,BitSet outlineOnlyTriangles,int[] sourceLines,int[] coordinateSlots,int acisSolids,int unsupportedSolids,int skippedBlockReferences,boolean solidProxy){
         this.xyz=xyz;this.triangles=triangles;this.sourceLines=sourceLines;this.coordinateSlots=coordinateSlots;this.acisSolids=acisSolids;this.unsupportedSolids=unsupportedSolids;this.skippedBlockReferences=skippedBlockReferences;this.solidProxy=solidProxy;
         HashSet<Long> seen=new HashSet<>();IntBuffer lines=new IntBuffer();
         for(int i=0;i+1<explicitEdges.length;i+=2)edge(seen,lines,explicitEdges[i],explicitEdges[i+1]);
         for(int i=0;i+2<triangles.length;i+=3){
+            // DXF 3DFACE/TRACE/SOLID have an outline independent of the
+            // triangulation used for shaded drawing and area measurements.
+            // Never draw a synthetic quad diagonal or a hidden 3DFACE edge.
+            if(outlineOnlyTriangles.get(i/3))continue;
             edge(seen,lines,triangles[i],triangles[i+1]);
             edge(seen,lines,triangles[i+1],triangles[i+2]);
             edge(seen,lines,triangles[i+2],triangles[i]);
@@ -64,7 +69,7 @@ public final class Dxf3dMesh {
                 :"Bu çizimde desteklenen 3B veya çizgisel geometri bulunamadı");
         return new Dxf3dMesh(
             collector.points.toArray(),collector.triangles.toArray(),collector.explicitEdges.toArray(),
-            collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),expansion.skipped,collector.solidProxy
+            collector.outlineOnlyTriangles,collector.sourceLines.toArray(),collector.coordinateSlots.toArray(),collector.solids,Math.max(0,collector.solids-collector.resolvedSolids),expansion.skipped,collector.solidProxy
         );
     }
 
@@ -72,6 +77,7 @@ public final class Dxf3dMesh {
         final FloatBuffer points=new FloatBuffer();
         final IntBuffer triangles=new IntBuffer(),explicitEdges=new IntBuffer(),sourceLines=new IntBuffer(),coordinateSlots=new IntBuffer();
         final ArrayList<Face> faces=new ArrayList<>();
+        final BitSet outlineOnlyTriangles=new BitSet();
         boolean polyface,polygonMesh,polylinePath,polylineClosed,meshClosedM,meshClosedN,solidProxy;
         int base,vertexCount,firstPathVertex=-1,previousPathVertex=-1,meshM,meshN,solids,resolvedSolids;
 
@@ -123,12 +129,31 @@ public final class Dxf3dMesh {
                 addPoint(points,p,11,21,31);addSource(p,1);
                 appendEdge(explicitEdges,start,start+1);
             }else if("3DFACE".equals(r.type)||"TRACE".equals(r.type)||"SOLID".equals(r.type)){
-                int start=points.n/3;
+                boolean face3d="3DFACE".equals(r.type);
+                double rawMask=face3d?r.number(70,0):0;
+                if(!Double.isFinite(rawMask)||rawMask<0||rawMask>15||rawMask!=(int)rawMask)
+                    throw new IOException("3DFACE görünmez kenar bayrağı geçersiz");
+                int hidden=(int)rawMask;
+                int start=points.n/3,firstTriangle=triangles.n/3;
                 for(int k=0;k<3;k++){addPoint(points,p,10+k,20+k,30+k);addSource(p,k);}
-                if(r.has(13)&&r.has(23)){
+                boolean quad=r.has(13)&&r.has(23);
+                if(quad){
                     addPoint(points,p,13,23,33);addSource(p,3);
-                    appendTriangle(triangles,start,start+1,start+2);appendTriangle(triangles,start,start+2,start+3);
-                }else appendTriangle(triangles,start,start+1,start+2);
+                    appendTriangle(triangles,start,start+1,start+2);
+                    appendTriangle(triangles,start,start+2,start+3);
+                }else{
+                    appendTriangle(triangles,start,start+1,start+2);
+                }
+                outlineOnlyTriangles.set(firstTriangle,triangles.n/3);
+                // In the DXF spec, group-70 bits 1,2,4,8 hide edges
+                // 1-2,2-3,3-4,4-1 respectively. When vertex 4 is omitted,
+                // it is equal to vertex 3, so the last edge is 3-1.
+                if((hidden&1)==0)appendEdge(explicitEdges,start,start+1);
+                if((hidden&2)==0)appendEdge(explicitEdges,start+1,start+2);
+                if(quad){
+                    if((hidden&4)==0)appendEdge(explicitEdges,start+2,start+3);
+                    if((hidden&8)==0)appendEdge(explicitEdges,start+3,start);
+                }else if((hidden&8)==0)appendEdge(explicitEdges,start+2,start);
             }else if("3DSOLID".equals(r.type)||"BODY".equals(r.type)||"REGION".equals(r.type)){
                 solids++;
                 ArrayList<String> chunks=new ArrayList<>();
