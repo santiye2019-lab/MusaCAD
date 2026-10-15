@@ -532,6 +532,127 @@ class DwgEntityIdentityAuditTest(unittest.TestCase):
             self.assertNotIn("PRIVATE_SPLINE", str(good))
             self.assertNotIn("0.7", str(good))
 
+    def test_independent_ellipse_wcs_axis_ratio_and_radian_parameter_parity(self):
+        audit = DwgEntityIdentityAudit(geometry_enabled=True)
+        # The major axis is WCS relative to center; a tilted ellipse's
+        # axis can be along Z with normal along Y, not an OCS ARC angle.
+        inclined = [
+            (5, "AA"), (8, "PRIVATE_ELBOW"), (10, "10"), (20, "20"), (30, "30"),
+            (11, "0"), (21, "0"), (31, "4"), (40, "0.5"),
+            (41, "0"), (42, "1.57079632679489661923132169"),
+            (210, "0"), (220, "1"), (230, "0"),
+        ]
+        flat = [
+            (5, "BB"), (8, "PRIVATE_CEILING"), (10, "5"), (20, "3"),
+            (11, "3"), (21, "0"), (40, "1"),
+            (41, "0"), (42, "6.283185307179586"),
+        ]
+        audit.observe("ENTITIES", "ELLIPSE", inclined)
+        audit.observe("BLOCKS", "ELLIPSE", flat)
+        refs = [
+            {"handle":"AA", "type":"ELLIPSE", "groups":{
+                "10":"10.0","20":"20","30":"3e1",
+                "11":"0","21":"0","31":"4.00","40":"0.5000",
+                "41":"0","42":"1.57079632679489661923132169",
+                "210":"0","220":"1","230":"0"}},
+            {"handle":"BB", "type":"ELLIPSE", "groups":{
+                "10":"5","20":"3","11":"3","21":"0","40":"1",
+                "41":"0","42":"6.283185307179586"}},
+        ]
+        result = audit.compare_independent_geometry(refs)
+        self.assertEqual(result["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(result["independent_geometry_checked"],2)
+        self.assertNotIn("PRIVATE",str(result))
+        self.assertNotIn("1.57079632679489661923132169",str(result))
+        # Preserve sub-float differences: same shape counts, changed WCS
+        # center/axis, ratio, angular parameter, and extrusion orientation.
+        for key, new in (
+                ("10","10.0000000000000000000001"),
+                ("31","4.00000000000000001"),
+                ("40","0.500000000000000001"),
+                ("42","1.57079632679489661923132170"),
+                ("210","0.25"),
+        ):
+            with self.subTest(group=key):
+                drift = [dict(r,groups=dict(r["groups"])) for r in refs]
+                drift[0]["groups"][key] = new
+                report = audit.compare_independent_geometry(drift)
+                self.assertEqual(report["independent_geometry_parameter_mismatches"],1)
+                self.assertEqual(report["independent_geometry_result"],
+                                 "primitive_subset_mismatch")
+        for bad_groups in (
+                {"10":"0","20":"0","11":"3","21":"0","40":"0.5","41":"0"},
+                {"10":"0","20":"0","11":"0","21":"0","40":"0.5",
+                 "41":"0","42":"3"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"0",
+                 "41":"0","42":"3"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"1.5",
+                 "41":"0","42":"3"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"0.5",
+                 "41":"0","42":"3","210":"0","220":"0","230":"0"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"0.5",
+                 "41":"0","42":"3","210":"1","220":"0","230":"0"},
+                {"10":"NaN","20":"0","11":"3","21":"0","40":"0.5",
+                 "41":"0","42":"3"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"0.5",
+                 "41":"0","42":"3","0011":"5"},
+                {"10":"0","20":"0","11":"3","21":"0","40":"0.5",
+                 "41":"0","42":"1e999999999"},
+        ):
+            with self.subTest(invalid=bad_groups), self.assertRaises(ValueError):
+                audit.compare_independent_geometry([
+                    {"handle":"AA","type":"ELLIPSE","groups":bad_groups},refs[1]])
+        bad_source = DwgEntityIdentityAudit(geometry_enabled=True)
+        bad_source.observe("ENTITIES","ELLIPSE",
+                           inclined[:8]+[(40,"0")]+inclined[9:])
+        result = bad_source.compare_independent_geometry([refs[0]])
+        self.assertEqual(result["independent_geometry_invalid_decoded"],1)
+        self.assertEqual(result["independent_geometry_result"],
+                         "primitive_subset_mismatch")
+
+    def test_independent_ellipse_pipeline_catches_tilted_axis_drift(self):
+        fields = [
+            (5,"AA"),(8,"PRIVATE_ELLIPSE"),(10,"1"),(20,"2"),(30,"3"),
+            (11,"0"),(21,"0"),(31,"4"),(40,"0.5"),
+            (41,"0"),(42,"1.5707963267948966"),
+            (210,"0"),(220,"1"),(230,"0"),
+        ]
+        dxf = (record("SECTION", (2,"ENTITIES")) +
+               record("ELLIPSE", *fields) + record("ENDSEC") + record("EOF"))
+        base = [{"handle":"AA","type":"ELLIPSE","groups":{
+            str(code):value for code,value in fields if code not in (5,8)}}]
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            original=root/"read-only.dwg"
+            original.write_bytes(b"AC1032 synthetic-only drawing")
+            converter=root/"mock"
+            converter.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+            converter.chmod(0o700)
+
+            def converted(*args,**kwargs):
+                Path(args[0][2]).write_text(dxf,encoding="utf-8")
+                kwargs["stderr"].write(
+                    b"MusaCAD native scene: status=0 primitives=1 floats=9\n")
+                return Mock(returncode=0)
+
+            with patch("private_dwg_read_audit.subprocess.run",side_effect=converted):
+                with tempfile.TemporaryDirectory(dir=root) as temp:
+                    good=convert_one(original,converter,Path(temp),5,128,
+                                     independent_geometry=base)
+                changed=[dict(base[0],groups=dict(base[0]["groups"]))]
+                changed[0]["groups"]["31"]="4.0000000000000001"
+                with tempfile.TemporaryDirectory(dir=root) as temp:
+                    bad=convert_one(original,converter,Path(temp),5,128,
+                                    independent_geometry=changed)
+        self.assertEqual(good["independent_geometry_result"],
+                         "primitive_subset_parity_only")
+        self.assertEqual(good["status"],"decoded_dxf_inventory")
+        self.assertEqual(bad["independent_geometry_parameter_mismatches"],1)
+        self.assertEqual(bad["status"],"decoded_dxf_inventory_geometry_mismatch")
+        self.assertNotIn("PRIVATE_ELLIPSE",str(good))
+        self.assertNotIn("4.0000000000000001",str(bad))
+
     def test_independent_3dface_xyz_and_edge_visibility_parity(self):
         audit = DwgEntityIdentityAudit(geometry_enabled=True)
         # The converted triangular face omits corner four. It is exactly
