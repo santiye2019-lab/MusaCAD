@@ -67,6 +67,14 @@
       "commit": "77f1aa7d7992cd0ada97d843318f75f526d4ac5a",
       "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
       "verification": "Fast CAD regression run 38694083576 PASS, including Dxf3dMeshTest for nested axial-Z 3D transforms, negative-Z MINSERT and overflow safety. Android quality and modern DWG workflows still require independent confirmation."
+    },
+    {
+      "id": "tilted_ocs_3d_block_transform",
+      "points": 1,
+      "status": "implemented",
+      "commit": "99a0b2d89babe6ab8f7e1c4d0e0da78476b41507",
+      "source_path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "verification": "Targeted GitHub fast CAD run 38694881436 PASS: 3D arbitrary OCS INSERT, nested tilted MINSERT, invalid normal rejection and unchanged 2D block tests. Android full CI, private DWG cross-reader parity, physical-device and all 3D modeling acceptance remain separate."
     }
   ],
   "backlog": [
@@ -90,7 +98,7 @@
     },
     {
       "id": "xref_dynamic_block_layouts",
-      "points": 6,
+      "points": 5,
       "status": "in_progress",
       "evidence_required": "Nested XREF, dynamic block and layout semantics"
     },
