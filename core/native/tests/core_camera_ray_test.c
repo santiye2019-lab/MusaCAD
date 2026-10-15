@@ -48,6 +48,31 @@ int main(void){
     near(d[1],0,1e-12);
     near(d[2],-2./sqrt(5.),1e-12);
 
+    /* D3D/Metal/Vulkan 0..1 clip depth perspective projection:
+     * fovy 90, near 1, far 10, camera looking down -Z. The same screen
+     * click must unproject to the same WCS ray as OpenGL depth convention.
+     */
+    const double perspective_zero_one[16]={
+        1,0,0,0, 0,1,0,0,
+        0,0,-10./9.,-1.,
+        0,0,-10./9.,0
+    };
+    assert(musa_core_camera_screen_ray(perspective_zero_one,200,200,
+                                       100,100,1,o,d));
+    xyz(o,0,0,-1,1e-12);
+    xyz(d,0,0,-1,1e-12);
+    assert(musa_core_camera_screen_ray(perspective_zero_one,200,200,
+                                       150,100,1,o,d));
+    xyz(o,.5,0,-1,1e-12);
+    near(d[0],1./sqrt(5.),1e-12);
+    near(d[2],-2./sqrt(5.),1e-12);
+    /* Mouse/touch Y increases DOWN: top is positive WCS camera Y. */
+    assert(musa_core_camera_screen_ray(perspective_zero_one,200,200,
+                                       100,50,1,o,d));
+    xyz(o,0,.5,-1,1e-12);
+    near(d[1],1./sqrt(5.),1e-12);
+    near(d[2],-2./sqrt(5.),1e-12);
+
     /* Real WCS offset in matrix: reject float-style origin truncation. */
     const double translated[16]={
         1,0,0,0, 0,1,0,0, 0,0,1,0,
