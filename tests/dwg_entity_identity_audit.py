@@ -30,7 +30,15 @@ _CORE_GEOMETRY = {
     # Ordered repeated numeric group codes require a distinct source record
     # form: a reference list of [group-code, value] pairs, not a dict.
     "SPLINE": ((), {}),
+    "LWPOLYLINE": ((), {}),
 }
+_LWPOLYLINE_GROUPS = frozenset((
+    90, 70, 38, 39, 43, 210, 220, 230,
+    10, 20, 40, 41, 42, 91,
+))
+_LWPOLYLINE_HEADER_GROUPS = frozenset((90, 70, 38, 39, 43, 210, 220, 230))
+_LWPOLYLINE_VERTEX_GROUPS = frozenset((10, 20, 40, 41, 42, 91))
+_LWPOLYLINE_MAX_PAIRS = 25_000
 _SPLINE_GROUPS = frozenset((
     70, 71, 72, 73, 74, 40, 41,
     10, 20, 30, 11, 21, 31,
@@ -174,6 +182,74 @@ class DwgEntityIdentityAudit:
         return tuple(normalized)
 
     @staticmethod
+    def _lwpolyline_geometry(groups, reference=False):
+        """Audit the *ordered* LWPOLYLINE numeric geometry parameter stream.
+
+        10/20 XY vertices and their optional 40/41 widths, 42 signed bulges,
+        and 91 vertex IDs must remain attached to the same vertex. Reference
+        pairs come from an independent reader of the original DWG, not from
+        the converted DXF. Preserve precision, signs, repeated group order.
+        """
+        if reference:
+            if not isinstance(groups, list):
+                raise ValueError("ordered LWPOLYLINE reference pairs required")
+            pairs = []
+            for item in groups:
+                if (not isinstance(item, list) or len(item) != 2 or
+                    not isinstance(item[0], str) or not item[0].isdecimal() or
+                    str(int(item[0])) != item[0] or
+                    int(item[0]) not in _LWPOLYLINE_GROUPS):
+                    raise ValueError("invalid independent LWPOLYLINE group")
+                pairs.append((int(item[0]), item[1]))
+        else:
+            pairs = [(code, raw) for code, raw in groups
+                     if code in _LWPOLYLINE_GROUPS]
+        if not pairs or len(pairs) > _LWPOLYLINE_MAX_PAIRS:
+            raise ValueError("empty or oversized LWPOLYLINE fields")
+        normalized = []
+        scalars = {}
+        vertices = []
+        current = None
+        for code, raw in pairs:
+            if not isinstance(raw, str) or not 1 <= len(raw) <= 128:
+                raise ValueError("invalid LWPOLYLINE numeric field")
+            value = _normalized(code, raw)
+            if code in _LWPOLYLINE_HEADER_GROUPS:
+                if code in scalars:
+                    raise ValueError("duplicate LWPOLYLINE header field")
+                scalars[code] = value
+            elif code == 10:
+                if current is not None and 20 not in current:
+                    raise ValueError("LWPOLYLINE missing Y coordinate")
+                if len(vertices) >= 4096:
+                    raise ValueError("LWPOLYLINE vertex count exceeds audit cap")
+                current = {10: value}
+                vertices.append(current)
+            elif code in _LWPOLYLINE_VERTEX_GROUPS:
+                if current is None or code in current or (
+                        code != 20 and 20 not in current):
+                    raise ValueError("invalid LWPOLYLINE vertex field order")
+                current[code] = value
+                if code in (40, 41) and Decimal(value) < 0:
+                    raise ValueError("LWPOLYLINE negative vertex width")
+                if code == 91 and int(value) < 0:
+                    raise ValueError("LWPOLYLINE invalid vertex ID")
+            normalized.append((code, value))
+        if (90 not in scalars or current is None or 20 not in current or
+                int(scalars[90]) != len(vertices) or
+                not 1 <= len(vertices) <= 4096):
+            raise ValueError("LWPOLYLINE declared vertex count mismatch")
+        if 70 in scalars and int(scalars[70]) & ~129:
+            raise ValueError("unsupported LWPOLYLINE flags")
+        if (43 in scalars and Decimal(scalars[43]) < 0):
+            raise ValueError("LWPOLYLINE negative constant width")
+        normal = tuple(Decimal(scalars.get(code, default))
+                       for code, default in ((210, "0"), (220, "0"), (230, "1")))
+        if normal == (0, 0, 0):
+            raise ValueError("LWPOLYLINE invalid OCS normal")
+        return tuple(normalized)
+
+    @staticmethod
     def _primitive_geometry(kind, groups, reference=False):
         """Canonical exact numeric subset; never return values in diagnostics.
 
@@ -184,6 +260,8 @@ class DwgEntityIdentityAudit:
         """
         if kind == "SPLINE":
             return DwgEntityIdentityAudit._spline_geometry(groups, reference)
+        if kind == "LWPOLYLINE":
+            return DwgEntityIdentityAudit._lwpolyline_geometry(groups, reference)
         spec = _CORE_GEOMETRY.get(kind)
         if spec is None:
             raise ValueError("unsupported independent geometry type")
@@ -471,7 +549,8 @@ class DwgEntityIdentityAudit:
             "independent_geometry_scope": (
                 "LINE XYZ endpoints, POINT position/normal, CIRCLE/ARC center/"
                 "radius/angles/normal, 3DFACE XYZ corners/hidden edges, and "
-                "ordered SPLINE knot/control/fit/weight parameter groups only. "
+                "ordered SPLINE knot/control/fit/weight and LWPOLYLINE vertex/"
+                "signed-bulge/width/OCS parameter groups only. "
                 "Exact parameter strings after numeric normalization; no "
                 "evaluated curve or full DWG geometry, color, "
                 "XREF, block transforms, 3DSOLID, or rendering assurance."
