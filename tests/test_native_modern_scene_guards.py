@@ -51,9 +51,9 @@ class ModernSceneGuardTest(unittest.TestCase):
         # true NURBS sampling. Preserve abort-on-truncation without requiring
         # the old incorrect angular geometry to be reintroduced.
         self.assertIn("i<n&&!s->truncated;i++)", spline)
-        self.assertIn("j<=MUSA_NURBS_SAMPLES_PER_KNOT_SPAN&&!s->truncated", spline)
-        self.assertIn("musa_nurbs_eval(points,n,e->knots,degree,u,&x,&y)", spline)
-        self.assertIn("if(!musa_nurbs_eval", spline)
+        self.assertIn("j<=MUSA_CORE_NURBS_SAMPLES_PER_KNOT_SPAN&&!s->truncated", spline)
+        self.assertIn("musa_core_nurbs_evaluate(points,n,e->knots,(size_t)e->num_knots,degree,u,&x,&y)", spline)
+        self.assertIn("if(!musa_core_nurbs_evaluate", spline)
         self.assertIn("s->truncated=1;break;", spline)
         self.assertNotIn("emit_poly_point(s,parent,e->fit_pts", spline)
         self.assertNotIn("emit_poly_point(s,parent,e->ctrl_pts", spline)
