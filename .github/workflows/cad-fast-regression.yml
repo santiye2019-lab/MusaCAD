@@ -77,6 +77,12 @@ jobs:
           java -cp /tmp/musacad-extrude-tests CadPrismBrepTest
           javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepRoundtripTest.java
           java -cp /tmp/musacad-extrude-tests CadPrismBrepRoundtripTest
+      - name: Test bounded polygonal REVOLVE mesh and DXF reopen
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-revolve-tests
+          javac -encoding UTF-8 -d /tmp/musacad-revolve-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadRevolveShell.java tests/CadRevolveShellTest.java
+          java -cp /tmp/musacad-revolve-tests CadRevolveShellTest
       - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
         run: |
           set -euo pipefail
