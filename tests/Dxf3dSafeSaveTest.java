@@ -180,6 +180,44 @@ public final class Dxf3dSafeSaveTest {
                     Arrays.equals(curved.sourceLines,reopenedCurves.sourceLines),
                     "save/reopen must retain exact sampled curve geometry while editing independent LINE");
             }finally{curvesSaved.delete();}
+
+            // Editing an independent LINE must preserve the raw periodic
+            // degree-2 rational SPLINE knot, weight and periodic-flag records.
+            String periodic="0\nSECTION\n2\nENTITIES\n"+
+                "0\nSPLINE\n70\n6\n71\n2\n72\n8\n73\n5\n"+
+                "40\n0\n40\n1\n40\n2\n40\n3\n"+
+                "40\n4\n40\n5\n40\n6\n40\n7\n"+
+                "41\n1\n41\n0.5\n41\n1\n41\n1\n41\n0.5\n"+
+                "10\n0\n20\n0\n30\n4\n"+
+                "10\n2\n20\n0\n30\n4\n"+
+                "10\n1\n20\n2\n30\n4\n"+
+                "10\n0\n20\n0\n30\n4\n"+
+                "10\n2\n20\n0\n30\n4\n"+
+                "0\nLINE\n10\n0\n20\n1\n30\n2\n11\n2\n21\n1\n31\n3\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(source.toPath(),periodic,StandardCharsets.UTF_8);
+            CadSaveSourceIntegrity periodicSource=CadSaveSourceIntegrity.capture(source);
+            Dxf3dMesh periodicMesh=Dxf3dMesh.read(source);
+            yes(periodicMesh.approximateCurves==1&&periodicMesh.xyz.length==50*3,
+                "periodic rational SPLINE and independent LINE must read");
+            int editedVertex=48;
+            yes(periodicMesh.sourceLines[editedVertex]>=0,
+                "independent LINE must be editable after periodic curve");
+            float[] originalPeriodic=periodicMesh.xyz.clone();
+            periodicMesh.xyz[editedVertex*3+2]=9;
+            Dxf3dSafeSave.VerifiedStage periodicOutput=
+                Dxf3dSafeSave.stage(source,periodicMesh,originalPeriodic,cache,periodicSource);
+            try{
+                String savedPeriodic=Files.readString(periodicOutput.file().toPath(),StandardCharsets.UTF_8);
+                yes(savedPeriodic.contains("70\n6\n71\n2\n72\n8\n73\n5\n")&&
+                    savedPeriodic.contains("41\n0.5\n41\n1\n41\n1\n41\n0.5\n"),
+                    "export must preserve original periodic flags, knots and weights");
+                Dxf3dMesh reopenedPeriodic=Dxf3dMesh.read(periodicOutput.file());
+                yes(reopenedPeriodic.approximateCurves==1&&
+                    Arrays.equals(reopenedPeriodic.xyz,periodicMesh.xyz)&&
+                    Arrays.equals(reopenedPeriodic.edges,periodicMesh.edges),
+                    "periodic SPLINE/LINE geometry must survive staged DXF reopen");
+            }finally{periodicOutput.delete();}
         }finally{
             Files.deleteIfExists(source.toPath());
             File[] abandoned=cache.listFiles();
