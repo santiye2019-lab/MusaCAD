@@ -91,6 +91,14 @@
       "commit": "3ad1b77bc3e203fc857aad861cc642868d997191",
       "source_path": "tests/dwg_entity_identity_audit.py",
       "verification": "GitHub fast CAD run 38696236256 PASS: 3DFACE XYZ corners, optional fourth vertex, group-70 edge visibility, high-precision drift, malformed source, private converter integration. Full Android/modern DWG tests and independently supplied real project baseline remain pending."
+    },
+    {
+      "id": "three_d_stale_source_save_reopen_guard",
+      "points": 1,
+      "status": "implemented",
+      "commit": "6136041a3cf6dec5dcda7c6a874f78ede52b21de",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
+      "verification": "GitHub fast CAD run 38703445106 PASS: 3D DXF staged save verifies session's original source geometry, topology, object references and reopened result; same-size/same-mtime source mutation is rejected. This is only an input-integrity building block for future DWG Save As, not a modern binary DWG writer or full Android acceptance."
     }
   ],
   "backlog": [
@@ -102,7 +110,7 @@
     },
     {
       "id": "ac1032_real_writer_save_reopen",
-      "points": 18,
+      "points": 17,
       "status": "not_started",
       "evidence_required": "Modern real DWG Save As, independent roundtrip proof"
     },
