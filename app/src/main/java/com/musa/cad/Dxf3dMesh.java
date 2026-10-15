@@ -107,8 +107,16 @@ public final class Dxf3dMesh {
                     if((flags&64)!=0){
                         addPoint(points,p,10,20,30);addSource(p,0);vertexCount++;
                     }else if((flags&128)!=0){
-                        int[] indices=new int[4];for(int k=0;k<4;k++)indices[k]=Math.abs((int)r.number(71+k,0));
+                        if(faces.size()>=MAX_TRIANGLES/2)
+                            throw new IOException("3B polyface yüzey sayısı sınırı aşıldı");
+                        // Face indices are SIGNED in DXF: a negative vertex
+                        // index hides the edge STARTING at that vertex.
+                        // Never Math.abs() before interpreting wire visibility.
+                        int[] indices=new int[4];
+                        for(int k=0;k<4;k++)indices[k]=polyfaceFaceIndex(r,k);
                         faces.add(new Face(indices,base));
+                    }else{
+                        throw new IOException("3B polyface VERTEX sınıfı desteklenmiyor");
                     }
                 }else if(polygonMesh){
                     addPoint(points,p,10,20,30);addSource(p,0);vertexCount++;
@@ -188,7 +196,9 @@ public final class Dxf3dMesh {
 
         void finishGeometry()throws IOException{
             if(polyface){
-                for(Face face:faces)appendFace(triangles,face.index,face.base,vertexCount);
+                for(Face face:faces)
+                    appendFace(triangles,explicitEdges,outlineOnlyTriangles,
+                               face.index,face.base,vertexCount);
             }else if(polygonMesh){
                 appendPolygonMesh(triangles,base,vertexCount,meshM,meshN,meshClosedM,meshClosedN);
             }else if(polylinePath&&polylineClosed&&firstPathVertex>=0&&previousPathVertex>=0&&firstPathVertex!=previousPathVertex){
@@ -879,11 +889,50 @@ public final class Dxf3dMesh {
         if(a==b)return;long key=((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL);
         if(seen.add(key)){out.add(a);out.add(b);}
     }
-    private static void appendFace(IntBuffer out,int[] face,int base,int count)throws IOException{
-        int a=face[0],b=face[1],c=face[2],d=face[3];
-        if(a<1||b<1||c<1||a>count||b>count||c>count)return;
-        appendTriangle(out,base+a-1,base+b-1,base+c-1);
-        if(d>=1&&d<=count&&d!=a&&d!=b&&d!=c)appendTriangle(out,base+a-1,base+c-1,base+d-1);
+    private static int polyfaceFaceIndex(DxfBlocks.Record r,int position)throws IOException{
+        int code=71+position;
+        if(!r.has(code)){
+            if(position==3)return 0; // omitted 4th corner: triangle
+            throw new IOException("3B polyface yüzeyinin köşe indeksi eksik");
+        }
+        double raw=r.number(code,Double.NaN);
+        if(!Double.isFinite(raw)||raw!=Math.rint(raw)||
+           raw<-MAX_VERTICES||raw>MAX_VERTICES)
+            throw new IOException("3B polyface yüzey indeksi geçersiz");
+        int value=(int)raw;
+        if(position<3&&value==0)
+            throw new IOException("3B polyface ilk üç köşe indeksi sıfır olamaz");
+        return value;
+    }
+
+    private static void appendFace(IntBuffer triangles,IntBuffer visibleEdges,
+                                   BitSet outlineOnlyTriangles,int[] signed,
+                                   int base,int count)throws IOException{
+        int vertices=signed[3]==0?3:4;
+        int[] point=new int[vertices];
+        for(int i=0;i<vertices;i++){
+            int index=Math.abs(signed[i]);
+            if(index<1||index>count)
+                throw new IOException("3B polyface köşe indeksi tanımlı köşe sayısını aşıyor");
+            for(int j=0;j<i;j++)if(point[j]==index)
+                throw new IOException("3B polyface yinelenen yüzey köşesi");
+            point[i]=index;
+        }
+
+        // Shading still requires triangles, but they are never the visible
+        // wireframe edges of a CAD polyface (which could be hidden or quad).
+        int firstTriangle=triangles.n/3;
+        appendTriangle(triangles,base+point[0]-1,base+point[1]-1,base+point[2]-1);
+        if(vertices==4)
+            appendTriangle(triangles,base+point[0]-1,base+point[2]-1,base+point[3]-1);
+        outlineOnlyTriangles.set(firstTriangle,triangles.n/3);
+
+        // DXF sign belongs to the START vertex, including the last->first
+        // edge. The quad's artificial 1->3 triangulation never appears.
+        for(int i=0;i<vertices;i++)if(signed[i]>0){
+            int next=(i+1)%vertices;
+            appendEdge(visibleEdges,base+point[i]-1,base+point[next]-1);
+        }
     }
     private static void appendPolygonMesh(IntBuffer out,int base,int vertexCount,int m,int n,boolean closedM,boolean closedN)throws IOException{
         if(m<2||n<2||vertexCount<m*n)return;

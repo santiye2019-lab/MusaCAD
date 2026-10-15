@@ -51,6 +51,7 @@ public final class Dxf3dMeshTest {
         testTiltedCircularOcsAndNestedInsert();
         testInvalidCurvesFailClosed();
         test3dFaceInvisibleEdgesAndSafeRoundtrip();
+        testPolyfaceSignedInvisibleEdgesAndQuadWireframe();
         testPolygonMesh();
         testInsertedBlockLine();
         testAxialZBlockHeightAndNestedScaling();
@@ -64,6 +65,83 @@ public final class Dxf3dMeshTest {
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
         testMissing3dTagDoesNotWritePartialFile();
+    }
+
+    private static void testPolyfaceSignedInvisibleEdgesAndQuadWireframe() throws Exception {
+        File file=File.createTempFile("mesh3d-polyface-signed-", ".dxf");
+        File saved=File.createTempFile("mesh3d-polyface-saved-", ".dxf");
+        try {
+            String start="0\nSECTION\n2\nENTITIES\n"+
+                "0\nPOLYLINE\n70\n64\n"+
+                vertex(0,0,0)+vertex(4,0,0)+vertex(4,3,0)+vertex(0,3,0);
+            String end="0\nSEQEND\n0\nENDSEC\n0\nEOF\n";
+            // A signed -3 hides only edge 3->4. A quad has TWO shaded
+            // triangles but only three visible perimeter edges.
+            String face="0\nVERTEX\n70\n128\n71\n1\n72\n2\n73\n-3\n74\n4\n";
+            Files.writeString(file.toPath(),start+face+end,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(file);
+            if(mesh.xyz.length!=12||mesh.triangles.length!=6||mesh.edges.length!=6)
+                throw new AssertionError("polyface quad shading must not leak hidden or diagonal edges");
+            if(!java.util.Arrays.equals(mesh.edges,new int[]{0,1,1,2,3,0}))
+                throw new AssertionError("polyface negative vertex hides START->NEXT edge");
+
+            // Unrelated editable coordinate changes must preserve the face
+            // signed index in DXF and reproduce the same visible wireframe.
+            float[] source=mesh.xyz.clone();
+            mesh.xyz[11]=2f;
+            ByteArrayOutputStream output=new ByteArrayOutputStream();
+            Dxf3dEditor.write(file,output,mesh,source);
+            String exported=output.toString(StandardCharsets.UTF_8);
+            if(!exported.contains("73\n-3\n"))
+                throw new AssertionError("polyface hidden face edge sign must round-trip");
+            Files.write(saved.toPath(),output.toByteArray());
+            Dxf3dMesh again=Dxf3dMesh.read(saved);
+            if(again.xyz[11]!=2f||again.triangles.length!=6||
+               !java.util.Arrays.equals(again.edges,mesh.edges))
+                throw new AssertionError("saved polyface visible edges changed");
+
+            // Make all four source perimeter edges visible. The generated
+            // triangulation diagonal 1->3 still must NOT be shown.
+            Files.writeString(file.toPath(),
+                    start+face.replace("73\n-3\n","73\n3\n")+end,
+                    StandardCharsets.UTF_8);
+            mesh=Dxf3dMesh.read(file);
+            if(mesh.triangles.length!=6||mesh.edges.length!=8||
+               !java.util.Arrays.equals(mesh.edges,new int[]{0,1,1,2,2,3,3,0}))
+                throw new AssertionError("polyface quad must have four visible borders only");
+
+            // In triangular polyfaces the sign of the FIRST vertex hides
+            // edge 1->2, including last->first wrap semantics.
+            String triangle="0\nVERTEX\n70\n128\n71\n-1\n72\n2\n73\n3\n";
+            Files.writeString(file.toPath(),start+triangle+end,StandardCharsets.UTF_8);
+            mesh=Dxf3dMesh.read(file);
+            if(mesh.triangles.length!=3||
+               !java.util.Arrays.equals(mesh.edges,new int[]{1,2,2,0}))
+                throw new AssertionError("polyface signed first vertex edge not honored");
+
+            // Fail closed on invalid face indexing rather than invent a
+            // different surface or silently dropping invalid geometry.
+            String[] invalid={
+                face.replace("73\n-3\n","73\n-3.5\n"),
+                face.replace("73\n-3\n","73\n0\n"),
+                face.replace("74\n4\n","74\n9\n"),
+                face.replace("74\n4\n","74\n2\n"),
+                face.replace("73\n-3\n",""),
+                face.replace("73\n-3\n","73\nNaN\n")
+            };
+            for(int k=0;k<invalid.length;k++){
+                Files.writeString(file.toPath(),start+invalid[k]+end,
+                                  StandardCharsets.UTF_8);
+                boolean rejected=false;
+                try{Dxf3dMesh.read(file);}
+                catch(java.io.IOException expected){rejected=true;}
+                if(!rejected)throw new AssertionError(
+                        "malformed polyface index accepted: case "+k);
+            }
+        }finally{
+            Files.deleteIfExists(file.toPath());
+            Files.deleteIfExists(saved.toPath());
+        }
     }
 
     private static void test3dFaceInvisibleEdgesAndSafeRoundtrip() throws Exception {
