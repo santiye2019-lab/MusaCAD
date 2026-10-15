@@ -417,6 +417,10 @@ public final class Dxf3dMesh {
         if(!(end>begin)||!Double.isFinite(end-begin))
             throw new IOException("SPLINE geçerli parametre aralığı yok");
         boolean periodic=(flags&2)!=0,closed=(flags&3)!=0;
+        // The C1 seam check below is sufficient for quadratic periodic
+        // splines; cubic+ periodic forms require additional C2+ seam tests.
+        if(periodic&&degree>2)
+            throw new IOException("SPLINE periyodik derece 3+ henüz doğrulanmıyor");
         // A periodic flag is NOT sufficient to wrap arbitrary controls.
         // The supplied knot and control data must actually meet at the seam:
         // otherwise an auto-closing edge invents geometry absent from DXF.
@@ -435,17 +439,25 @@ public final class Dxf3dMesh {
                     throw new IOException("SPLINE periyodik parametre hassasiyeti yetersiz");
                 double[] after=evaluateSpline(controls,knots,weights,degree,begin+h);
                 double[] before=evaluateSpline(controls,knots,weights,degree,end-h);
-                double mismatch=0,maximum=1;
+                double mismatch=0;
                 for(int axis=0;axis<3;axis++){
                     double left=(after[axis]-a[axis])/h;
                     double right=(b[axis]-before[axis])/h;
                     mismatch=Math.max(mismatch,Math.abs(left-right));
                 }
-                for(SplineControl control:controls)
-                    maximum=Math.max(maximum,Math.max(Math.abs(control.x),
-                        Math.max(Math.abs(control.y),Math.abs(control.z))));
-                if(!Double.isFinite(mismatch)||
-                    mismatch>1e-3*maximum/(end-begin))
+                // Use geometry SIZE, never its absolute map coordinates:
+                // translating an invalid periodic spline by 1e9 must not
+                // accidentally make a kink acceptable.
+                double loX=Double.POSITIVE_INFINITY,loY=loX,loZ=loX;
+                double hiX=Double.NEGATIVE_INFINITY,hiY=hiX,hiZ=hiX;
+                for(SplineControl control:controls){
+                    loX=Math.min(loX,control.x);hiX=Math.max(hiX,control.x);
+                    loY=Math.min(loY,control.y);hiY=Math.max(hiY,control.y);
+                    loZ=Math.min(loZ,control.z);hiZ=Math.max(hiZ,control.z);
+                }
+                double extent=Math.max(1d,Math.hypot(Math.hypot(hiX-loX,hiY-loY),hiZ-loZ));
+                if(!Double.isFinite(mismatch)||!Double.isFinite(extent)||
+                    mismatch>1e-3*extent/(end-begin))
                     throw new IOException("SPLINE periyodik uç teğetleri eşleşmiyor");
             }
         }
