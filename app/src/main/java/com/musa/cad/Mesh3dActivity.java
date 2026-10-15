@@ -153,6 +153,11 @@ public final class Mesh3dActivity extends Activity {
         text.append(mesh.triangles.length/3).append(" üçgen  •  ")
             .append(mesh.edges.length/2).append(" kenar  •  ")
             .append(mesh.xyz.length/3).append(" köşe");
+        if(mesh.approximateCurves>0){
+            text.append("\n").append(mesh.approximateCurves)
+                .append(" daire/yay yaklaşık çizgi parçalarıyla gösterildi. ")
+                .append("Bu köşeler salt okunurdur; görünen yay uzunluğu kesin CAD ölçüsü veya metraj değildir.");
+        }
         if(mesh.skippedBlockReferences>0){
             text.append("\nUYARI: ")
                 .append(mesh.skippedBlockReferences)
