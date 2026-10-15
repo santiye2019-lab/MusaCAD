@@ -39,6 +39,7 @@ public final class Dxf3dMeshTest {
         testTiltedOcsBlockPlacement();
         testNestedTiltedMinsert();
         testInvalidTiltNormalDoesNotLeakGeometry();
+        testMissingAndExternalBlocksFlagIncomplete3d();
         testRejectedOverflowedHeightTransform();
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
@@ -168,6 +169,8 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh result=Dxf3dMesh.read(file);
             if(result.xyz.length!=6||result.edges.length!=2)
                 throw new AssertionError("overflowed INSERT must not emit invalid vertices");
+            if(result.skippedBlockReferences!=1)
+                throw new AssertionError("overflowed 3D block must be counted as incomplete");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
@@ -214,6 +217,8 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh result=Dxf3dMesh.read(file);
             if(result.xyz.length!=12||result.edges.length!=4)
                 throw new AssertionError("tilted nested MINSERT array count");
+            if(result.skippedBlockReferences!=0)
+                throw new AssertionError("valid nested 3D array must not be marked incomplete");
             double[] expected={-11,10,22, -13,11,22, -16,10,22, -18,11,22};
             for(int i=0;i<expected.length;i++)
                 assertNear(result.xyz[i],expected[i],"nested OCS coordinate "+i);
@@ -235,6 +240,32 @@ public final class Dxf3dMeshTest {
             Dxf3dMesh result=Dxf3dMesh.read(file);
             if(result.xyz.length!=6||result.edges.length!=2)
                 throw new AssertionError("invalid extrusion must not invent vertices");
+            if(result.skippedBlockReferences!=1)
+                throw new AssertionError("invalid OCS block must be disclosed as incomplete");
+        }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+
+    private static void testMissingAndExternalBlocksFlagIncomplete3d() throws Exception {
+        File file=File.createTempFile("mesh3d-partial-blocks-", ".dxf");
+        try{
+            String dxf="0\nSECTION\n2\nBLOCKS\n"+
+                "0\nBLOCK\n2\nEXTERNAL\n70\n4\n1\nprivate-path.dwg\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n0\n11\n1\n21\n0\n31\n0\n"+
+                "0\nENDBLK\n0\nENDSEC\n"+
+                "0\nSECTION\n2\nENTITIES\n"+
+                "0\nINSERT\n2\nUNKNOWN\n10\n0\n20\n0\n"+
+                "0\nINSERT\n2\nEXTERNAL\n10\n0\n20\n0\n"+
+                "0\nLINE\n10\n0\n20\n0\n30\n0\n11\n2\n21\n0\n31\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(file.toPath(),dxf,StandardCharsets.UTF_8);
+            Dxf3dMesh result=Dxf3dMesh.read(file);
+            if(result.xyz.length!=6||result.edges.length!=2)
+                throw new AssertionError("valid independent geometry must still open");
+            if(result.skippedBlockReferences!=2)
+                throw new AssertionError("missing XREF and unknown block must count as partial");
+            if(result.solidProxy)
+                throw new AssertionError("unresolved XREF must not fabricate a 3D solid");
         }finally{Files.deleteIfExists(file.toPath());}
     }
 
