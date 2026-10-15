@@ -350,8 +350,8 @@ public final class Dxf3dMesh {
             throws IOException{
         DxfBlocks.Record r=p.record;
         int degree=r.integer(71,0),flags=r.integer(70,0);
-        if(degree<1||degree>7||flags<0||((flags&2)!=0))
-            throw new IOException("SPLINE derece/bayrak desteklenmiyor (periyodik eğri dahil)");
+        if(degree<1||degree>7||flags<0)
+            throw new IOException("SPLINE derece/bayrak desteklenmiyor");
         ArrayList<Double> knots=new ArrayList<>(),weights=new ArrayList<>();
         ArrayList<SplineControl> controls=new ArrayList<>();
         List<String> tags=r.tags();
@@ -416,14 +416,38 @@ public final class Dxf3dMesh {
         double begin=knots.get(degree),end=knots.get(count);
         if(!(end>begin)||!Double.isFinite(end-begin))
             throw new IOException("SPLINE geçerli parametre aralığı yok");
-        boolean closed=(flags&1)!=0;
-        // Closed, nonperiodic splines must evaluate to the same geometric
-        // endpoint. Do not invent a closing segment across an open path.
+        boolean periodic=(flags&2)!=0,closed=(flags&3)!=0;
+        // A periodic flag is NOT sufficient to wrap arbitrary controls.
+        // The supplied knot and control data must actually meet at the seam:
+        // otherwise an auto-closing edge invents geometry absent from DXF.
         if(closed){
             double[] a=evaluateSpline(controls,knots,weights,degree,begin);
             double[] b=evaluateSpline(controls,knots,weights,degree,end);
-            if(Math.hypot(Math.hypot(a[0]-b[0],a[1]-b[1]),a[2]-b[2])>1e-6)
-                throw new IOException("SPLINE kapalı bayrağı uç noktaları eşleştirmiyor");
+            double gap=Math.hypot(Math.hypot(a[0]-b[0],a[1]-b[1]),a[2]-b[2]);
+            if(gap>1e-6)
+                throw new IOException("SPLINE kapalı/periyodik uç noktaları eşleşmiyor");
+            if(periodic&&degree>1){
+                // A true periodic degree-2+ B-spline also has a continuous
+                // tangent at the seam. Reject a false periodic flag or a
+                // nonmatching control/knot sequence instead of drawing a cusp.
+                double h=(end-begin)*1e-5;
+                if(!(h>0)||begin+h==begin||end-h==end)
+                    throw new IOException("SPLINE periyodik parametre hassasiyeti yetersiz");
+                double[] after=evaluateSpline(controls,knots,weights,degree,begin+h);
+                double[] before=evaluateSpline(controls,knots,weights,degree,end-h);
+                double mismatch=0,maximum=1;
+                for(int axis=0;axis<3;axis++){
+                    double left=(after[axis]-a[axis])/h;
+                    double right=(b[axis]-before[axis])/h;
+                    mismatch=Math.max(mismatch,Math.abs(left-right));
+                }
+                for(SplineControl control:controls)
+                    maximum=Math.max(maximum,Math.max(Math.abs(control.x),
+                        Math.max(Math.abs(control.y),Math.abs(control.z))));
+                if(!Double.isFinite(mismatch)||
+                    mismatch>1e-3*maximum/(end-begin))
+                    throw new IOException("SPLINE periyodik uç teğetleri eşleşmiyor");
+            }
         }
         // Uniform parameter sampling can jump over tightly clustered knots
         // and erase bends/corners. Visit EVERY distinct active knot exactly.
