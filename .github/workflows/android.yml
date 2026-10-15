@@ -86,6 +86,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java tests/CadEditTransformTest.java
           java -cp /tmp/musacad-tests CadEditTransformTest
+      - name: Test concentric ARC OFFSET with signed radii
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadArcOffsetTest.java
+          java -cp /tmp/musacad-tests CadArcOffsetTest
       - name: Test block and insert geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadBlock.java tests/CadBlockTest.java
