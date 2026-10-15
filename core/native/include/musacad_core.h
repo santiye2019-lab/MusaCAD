@@ -136,6 +136,16 @@ typedef struct MusaCoreMeshBVH MusaCoreMeshBVH;
 int musa_core_mesh_bvh_build_f32(const float *xyz,size_t point_count,
                                 const int *triangles,size_t face_count,
                                 MusaCoreMeshBVH **out);
+typedef struct MusaCoreMeshBVHStats {
+    size_t tested_faces;
+    size_t visited_nodes;
+    size_t rejected_nodes;
+} MusaCoreMeshBVHStats;
+int musa_core_mesh_bvh_pick_stats(const MusaCoreMeshBVH *tree,
+                                 const double ray_origin[3],
+                                 const double ray_direction[3],
+                                 double max_distance,MusaCoreMeshRayHit *out,
+                                 MusaCoreMeshBVHStats *stats);
 int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *tree,
                            const double ray_origin[3],
                            const double ray_direction[3],

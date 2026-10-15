@@ -136,16 +136,19 @@ invalid:
 static int cast_node(const MusaCoreMeshBVH *b,size_t node_index,
                      const double origin[3],const double d[3],
                      double max_distance,MusaCoreMeshRayHit *best,
-                     int *found) {
+                     int *found,MusaCoreMeshBVHStats *stats) {
     if(node_index>=b->nodes_used)return -1;
+    stats->visited_nodes++;
     const BVHNode *n=&b->nodes[node_index];
     double limit=*found?fmin(best->distance,max_distance):max_distance;
     int maybe=musa_core_bounds3_ray_maybe(n->box.mn,n->box.mx,
                                            origin,d,limit);
-    if(maybe<=0)return maybe==0?0:-1;
+    if(maybe==0){stats->rejected_nodes++;return 0;}
+    if(maybe<0)return -1;
     if(n->left==SIZE_MAX){
         for(size_t i=n->begin;i<n->begin+n->count;i++){
             size_t tri=b->order[i];
+            stats->tested_faces++;
             MusaCoreMeshRayHit hit={0};
             int rc=musa_core_mesh_ray_pick_f32(
                 b->xyz,b->points,b->faces+tri*3u,1,origin,d,
@@ -159,13 +162,14 @@ static int cast_node(const MusaCoreMeshBVH *b,size_t node_index,
         }
         return 0;
     }
-    if(cast_node(b,n->left,origin,d,max_distance,best,found)<0)return -1;
-    if(cast_node(b,n->right,origin,d,max_distance,best,found)<0)return -1;
+    if(cast_node(b,n->left,origin,d,max_distance,best,found,stats)<0)return -1;
+    if(cast_node(b,n->right,origin,d,max_distance,best,found,stats)<0)return -1;
     return 0;
 }
-int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *b,
-                           const double origin[3],const double direction[3],
-                           double max_distance,MusaCoreMeshRayHit *out) {
+int musa_core_mesh_bvh_pick_stats(const MusaCoreMeshBVH *b,
+                                 const double origin[3],const double direction[3],
+                                 double max_distance,MusaCoreMeshRayHit *out,
+                                 MusaCoreMeshBVHStats *stats) {
     if(!b||!out||!origin||!direction||
        !isfinite(max_distance)||max_distance<0.)return -1;
     for(int a=0;a<3;a++)
@@ -177,9 +181,20 @@ int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *b,
     double norm=hypot(hypot(d[0],d[1]),d[2]);
     if(!isfinite(norm)||norm==0.)return -1;
     for(int a=0;a<3;a++)d[a]/=norm;
-    if(b->triangles==0)return 0;
+    MusaCoreMeshBVHStats local={0};
+    if(b->triangles==0){
+        if(stats)*stats=local;
+        return 0;
+    }
     MusaCoreMeshRayHit best={0};int found=0;
-    if(cast_node(b,0,origin,d,max_distance,&best,&found)<0)return -1;
+    if(cast_node(b,0,origin,d,max_distance,&best,&found,&local)<0)return -1;
+    if(stats)*stats=local;
     if(!found)return 0;
     *out=best;return 1;
+}
+int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *tree,
+                           const double origin[3],const double direction[3],
+                           double max_distance,MusaCoreMeshRayHit *out) {
+    return musa_core_mesh_bvh_pick_stats(tree,origin,direction,
+                                         max_distance,out,NULL);
 }

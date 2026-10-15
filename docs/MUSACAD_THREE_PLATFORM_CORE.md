@@ -107,6 +107,12 @@ Path: `core/native/`
   This is a per-face shortcut: computational complexity remains O(faces);
   full BVH acceleration, phone performance acceptance and GPU-based picking
   are future work.
+- Deterministic BVH acceleration counters
+  (`musa_core_mesh_bvh_pick_stats`) now report visited nodes, rejected
+  nodes and exact triangle intersection counts without timing noise.
+  Shared tests check fewer than 96 exact triangle checks on dispersed
+  96-face CAD test geometry. This is evidence of algorithmic pruning,
+  not yet a measured FPS or real-file latency guarantee.
 - New `musacad_mesh_bvh.c` implements an **actual spatial BVH**
   (hierarchical per-face 3D AABB partitions) for repeated closest-face
   ray picks. Its index owns a validated copy of mesh vertices/faces,

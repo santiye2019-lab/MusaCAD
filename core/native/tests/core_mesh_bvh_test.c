@@ -57,7 +57,11 @@ int main(void){
         double start[]={i*10+.5,.5,8};
         MusaCoreMeshRayHit a={0},b={0};
         assert(musa_core_mesh_ray_pick_f32(mesh,288,ix,96,start,d,10,&a)==1);
-        assert(musa_core_mesh_bvh_pick(tree,start,d,10,&b)==1);
+        MusaCoreMeshBVHStats stats={0};
+        assert(musa_core_mesh_bvh_pick_stats(tree,start,d,10,&b,&stats)==1);
+        /* Unlike O(96) direct enumeration, BVH must test just nearby faces. */
+        assert(stats.tested_faces>0&&stats.tested_faces<96);
+        assert(stats.visited_nodes>0&&stats.rejected_nodes>0);
         assert(a.triangle_index==(size_t)i&&b.triangle_index==a.triangle_index);
         same(a.distance,b.distance);
     }
