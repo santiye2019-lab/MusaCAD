@@ -4,6 +4,7 @@
 #include "scene_coord_safety.h"
 #include "musacad_core.h"
 #include "musacad_bulge.h"
+#include "musacad_curve_bounds.h"
 #include "musacad_affine.h"
 #include "native_fit_spline.h"
 #include <math.h>
@@ -302,7 +303,18 @@ static int emit_curve(MusaNativeScene *s,SceneColor color,Affine2 m,double cx,do
     }
     if(fabs(sweep)<1e-12||!reserve_scene(s,8u+color_words(color)))return 0;
     push_code(s,4,color);pushf(s,(float)wcx);pushf(s,(float)wcy);pushf(s,(float)ux);pushf(s,(float)uy);pushf(s,(float)vx);pushf(s,(float)vy);pushf(s,(float)start);pushf(s,(float)sweep);
-    double rx=hypot(ux,vx),ry=hypot(uy,vy);add_bounds(s,wcx-rx,wcy-ry);add_bounds(s,wcx+rx,wcy+ry);s->primitives++;return 1;
+    MusaCoreCurveBounds bounds;
+    if(!musa_core_curve_bounds(wcx,wcy,ux,uy,vx,vy,start,sweep,&bounds)){
+        /* Keep existing conservative full-ellipse bounds only if safe. */
+        double rx=hypot(ux,vx),ry=hypot(uy,vy);
+        if(!isfinite(rx)||!isfinite(ry)||!musa_scene_xy_safe(wcx-rx,wcy-ry)||
+           !musa_scene_xy_safe(wcx+rx,wcy+ry)){s->truncated=1;return 0;}
+        add_bounds(s,wcx-rx,wcy-ry);add_bounds(s,wcx+rx,wcy+ry);
+    }else{
+        add_bounds(s,bounds.min_x,bounds.min_y);
+        add_bounds(s,bounds.max_x,bounds.max_y);
+    }
+    s->primitives++;return 1;
 }
 static void emit_arc_curve(MusaNativeScene *s,SceneColor color,Affine2 m,double cx,double cy,double ux,double uy,double vx,double vy,double start,double end,int full){
     double sweep=full?2.0*M_PI:end-start;while(sweep<=0)sweep+=2.0*M_PI;if(sweep>2.0*M_PI)sweep=2.0*M_PI;
