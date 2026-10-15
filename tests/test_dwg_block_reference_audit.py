@@ -91,6 +91,47 @@ class BlockReferenceAuditTest(unittest.TestCase):
         dup.observe("BLOCKS","BLOCK",[(2,"Local"),(70,"0")])
         self.assertEqual(dup.duplicate_blocks,1)
 
+    def test_minsert_grid_and_extrusion_fidelity(self):
+        # Existing INSERT records omit optional array/extrusion fields and
+        # retain canonical defaults, including normal=(0,0,1).
+        audit=self.make_audit()
+        self.assertEqual(audit.compare_independent(source_blocks(),source_inserts())[
+            "independent_block_reference_result"],"block_reference_metadata_parity_only")
+        for code,value in (("70","3"),("71","4"),("44","120"),
+                           ("45","-50"),("210","0.25"),("220","1"),("230","0")):
+            changed=source_inserts()
+            changed[0]["groups"][code]=value
+            self.assertEqual(audit.compare_independent(source_blocks(),changed)[
+                "independent_insert_transform_mismatches"],1,
+                "decoded INSERT must not pass with changed group "+code)
+        for bad in ({"70":"0"},{"71":"-1"},{"70":"65536"},
+                    {"70":"1.5"},{"71":"nan"},
+                    {"210":"0","220":"0","230":"0"},
+                    {"44":"Infinity"}):
+            changed=source_inserts()
+            changed[0]["groups"].update(bad)
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                audit.compare_independent(source_blocks(),changed)
+
+        # Valid non-default MINSERTs should also be able to pass.
+        grid=DwgBlockReferenceAudit()
+        grid.observe("BLOCKS","BLOCK",[(2,"Local"),(70,"0")])
+        grid.observe("ENTITIES","INSERT",[
+            (5,"A"),(2,"Local"),(8,"0"),(10,"10"),(20,"20"),
+            (70,"2"),(71,"3"),(44,"4.5"),(45,"-6"),(210,"0"),
+            (220,"1"),(230,"0")])
+        expected=[{"handle":"A","name":"Local","layer":"0","space":"model",
+                   "layout":None,
+                   "groups":{"10":"10","20":"20","70":"2","71":"3",
+                             "44":"4.5","45":"-6","210":"0",
+                             "220":"1","230":"0"}}]
+        self.assertEqual(grid.compare_independent(
+            [{"name":"Local","groups":{"70":"0"}}],expected)[
+                "independent_block_reference_result"],"block_reference_metadata_parity_only")
+        grid.observe("ENTITIES","INSERT",[
+            (5,"B"),(2,"Local"),(8,"0"),(10,"0"),(20,"0"),(70,"1"),(70,"2")])
+        self.assertEqual(grid.invalid_inserts,1)
+
     def test_private_dxf_wiring_and_explicit_status(self):
         dxf=(record("SECTION",(2,"BLOCKS"))+
              record("BLOCK",(2,"Local"),(70,"0"))+
