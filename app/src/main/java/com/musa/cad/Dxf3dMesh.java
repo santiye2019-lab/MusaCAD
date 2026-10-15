@@ -48,7 +48,7 @@ public final class Dxf3dMesh {
 
     public static Dxf3dMesh read(File file)throws IOException{
         Collector collector=new Collector();
-        DxfBlocks.expand(file,StandardCharsets.UTF_8,collector);
+        DxfBlocks.expand3d(file,StandardCharsets.UTF_8,collector);
         collector.finishGeometry();
         if(collector.polyface)throw new IOException("3B polyface nesnesinin sonu bulunamadı");
         if(collector.solids>0&&(collector.points.n==0||(collector.triangles.n==0&&collector.explicitEdges.n==0))){
@@ -161,7 +161,7 @@ public final class Dxf3dMesh {
         }
 
         private void addSource(DxfBlocks.Placement p,int slot){
-            boolean editable=p.directRoot&&p.transform.isIdentity()&&p.height.isIdentity();
+            boolean editable=p.directRoot&&p.spatial.isIdentity();
             sourceLines.add(editable?p.record.sourceStart:-1);
             coordinateSlots.add(slot);
         }
@@ -171,12 +171,12 @@ public final class Dxf3dMesh {
         int base=c.points.n/3;
         for(int i=0;i+2<mesh.xyz.length;i+=3){
             if(c.points.n/3>=MAX_VERTICES)throw new IOException("ACIS 3B köşe sayısı sınırı aşıldı");
-            double[] xy=p.transform.point(mesh.xyz[i],mesh.xyz[i+1]);
-            double z=p.height.point(mesh.xyz[i+2]);
-            if(!Double.isFinite(xy[0])||!Double.isFinite(xy[1])||!Double.isFinite(z)||
-                Math.abs(xy[0])>1e9||Math.abs(xy[1])>1e9||Math.abs(z)>1e9)
+            double[] xyz=p.spatial.point(mesh.xyz[i],mesh.xyz[i+1],mesh.xyz[i+2]);
+            double z=xyz[2];
+            if(!Double.isFinite(xyz[0])||!Double.isFinite(xyz[1])||!Double.isFinite(z)||
+                Math.abs(xyz[0])>1e9||Math.abs(xyz[1])>1e9||Math.abs(z)>1e9)
                 throw new IOException("ACIS 3B koordinat sınırı aşıldı");
-            c.points.add((float)xy[0]);c.points.add((float)xy[1]);c.points.add((float)z);
+            c.points.add((float)xyz[0]);c.points.add((float)xyz[1]);c.points.add((float)z);
             c.sourceLines.add(-1);c.coordinateSlots.add(-1);
         }
         for(int i=0;i+2<mesh.triangles.length;i+=3)
@@ -245,8 +245,8 @@ public final class Dxf3dMesh {
     private static void addPoint(FloatBuffer out,DxfBlocks.Placement p,int x,int y,int z)throws IOException{
         if(out.n/3>=MAX_VERTICES)throw new IOException("3B köşe sayısı sınırı aşıldı");
         DxfBlocks.Record r=p.record;
-        double[] xy=p.transform.point(r.number(x,0),r.number(y,0));
-        double c=p.height.point(r.number(z,0)),a=xy[0],b=xy[1];
+        double[] xyz=p.spatial.point(r.number(x,0),r.number(y,0),r.number(z,0));
+        double c=xyz[2],a=xyz[0],b=xyz[1];
         if(!Double.isFinite(a)||!Double.isFinite(b)||!Double.isFinite(c)||Math.abs(a)>1e9||Math.abs(b)>1e9||Math.abs(c)>1e9)throw new IOException("3B koordinat sınırı aşıldı");
         out.add((float)a);out.add((float)b);out.add((float)c);
     }
