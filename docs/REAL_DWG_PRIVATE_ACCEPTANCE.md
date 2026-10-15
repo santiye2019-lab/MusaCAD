@@ -68,9 +68,31 @@ existing `records`. Source handles must come from a genuinely independent
 DWG reader, **not** from MusaCAD's converted DXF. A missing SEQEND,
 reversed child order, unknown owner or reused vertex fails the source-bound
 check. Report output contains count-only results; never publish raw handle
-lists or original drawings. **This verifies record ownership/ordering only:**
-polyface surface topology, face winding, full geometric adjacency, and
-modern DWG binary write/reopen are still NOT independently established.
+lists or original drawings. **This verifies record ownership/ordering only.** To check a bounded
+**polyface surface-topology subset** as well, an independent source-DWG reader
+may additionally supply `polyface_records` under the same manifest:
+```json
+"polyface_records": [{
+  "handle": "A0", "space": "model",
+  "vertices": [
+    {"handle": "A1", "xyz": ["0", "0", "0"]},
+    {"handle": "A2", "xyz": ["1", "0", "0"]},
+    {"handle": "A3", "xyz": ["1", "1", "0"]}
+  ],
+  "faces": [{"handle": "A4", "indices": [1, -2, 3]}],
+  "seqend": "A5"
+}]
+```
+The optional polyface auditor validates **ordered** coordinate vertices,
+3-or-4-vertex faces, signed 1-based vertex indices (a negative index marks
+the following invisible face edge), face order/winding, parent and SEQEND
+identity. It reports only counts of matched/missing/changed meshes, shared
+and boundary edges, edge-incidence violations and inconsistent shared-edge
+orientation. Independent source data must come from a different original
+DWG reader, never MusaCAD's own DXF output. Simulated fixtures and passing
+CI test **do not prove real original-DWG parity**. This does NOT certify a
+watertight/valid engineering solid, native ACIS/B-Rep, exact rendered face
+visibility, modern binary DWG writing, or AutoCAD 2026 full equivalence.
 ELLIPSE references instead use the ordinary numeric group mapping, e.g.
 `{"10":"1","20":"2","11":"4","21":"0","40":"0.5","41":"0","42":"1.5707963267948966"}`.
 Missing start/end parameters are deliberately rejected rather than guessed;
