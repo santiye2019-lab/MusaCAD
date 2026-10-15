@@ -139,6 +139,22 @@
       "commit": "1be2d67a5f64fc32b57ebadb5f079772e76f248c",
       "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
       "verification": "GitHub fast CAD regression 38708384002 PASS: 3D LWPOLYLINE straight/closed, sparse signed bulge arcs, OCS elevation and rotated INSERT; invalid, duplicate and nonfinite values rejected. Tessellated points are read-only. Dxf3dSafeSaveTest verifies independent LINE Z edit preserves LWP bulge/elevation and reopens unchanged. This is 3D DXF-based display/roundtrip only: not native modern DWG editing, exact curve rendering or full Android/physical acceptance."
+    },
+    {
+      "id": "ellipse_wcs_3d_curve_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "e6b92a0f5ed9e5da54544b74056c96b928697483",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "Fast CAD regression run 38708933124 PASS: ELLIPSE full/partial parameter arcs, WCS major/minor axes, inclined plane normal and INSERT, malformed values and read-only samples. This is sampled 3D DXF display, not native DWG writer or exact ELLIPSE B-Rep."
+    },
+    {
+      "id": "rational_spline_deboor_3d_curve_preview",
+      "points": 1,
+      "status": "implemented",
+      "commit": "472da0a28173fe6d16c583caafdfb9b8f1f003ef",
+      "source_path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "verification": "Fast CAD regression run 38709519673 PASS: degree-1/2 nonperiodic knot-defined SPLINE, rational homogeneous de Boor, nested INSERT, closed loops, invalid knot/weights rejection; ELLIPSE+SPLINE controls retained on 3D DXF safe save/reopen with unrelated LINE edit. Fit-only/periodic spline is explicitly unsupported; triangulation approximates only, not exact length or full DWG parity. Android/full modern DWG/device acceptance pending."
     }
   ],
   "backlog": [
@@ -156,7 +172,7 @@
     },
     {
       "id": "advanced_2d_editing_roundtrip",
-      "points": 7,
+      "points": 5,
       "status": "in_progress",
       "evidence_required": "2D tool matrix, save/reopen tests"
     },
