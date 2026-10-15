@@ -32,6 +32,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Verify canonical CAD engine 18-item acceptance ledger
+        run: |
+          python3 -m unittest discover -s tests -p 'test_cad_18_item_ledger.py' -v
       - name: Test guarded production trial Worker deployment invariants
         run: |
           python3 -m unittest discover -s tests -p 'test_trial_worker_deploy_guard.py' -v
@@ -723,6 +726,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/AcisSatMesh.java tests/AcisSatMeshTest.java
           java -cp /tmp/musacad-tests AcisSatMeshTest
+      - name: Test watertight 3D planar B-Rep extrusion and DXF mesh writing
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepTest.java
+          java -cp /tmp/musacad-tests CadPrismBrepTest
       - name: Test DXF write full-precision coordinates and locale independence
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfNumber.java tests/DxfNumberTest.java
