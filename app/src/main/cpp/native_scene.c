@@ -3,6 +3,7 @@
 #include "native_color.h"
 #include "scene_coord_safety.h"
 #include "musacad_core.h"
+#include "musacad_bulge.h"
 #include "musacad_affine.h"
 #include "native_fit_spline.h"
 #include <math.h>
@@ -317,16 +318,14 @@ static void emit_ellipse_curve(MusaNativeScene *s,SceneColor color,Affine2 m,Dwg
     emit_curve(s,color,m,e->center.x,e->center.y,ux,uy,vx,vy,e->start_angle,sweep);
 }
 static void emit_hatch_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,BITCODE_BE extrusion,BITCODE_2RD a,BITCODE_2RD b,double bulge){
-    double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
-    if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
+    MusaCoreBulgeArc arc;
+    if(!musa_core_bulge_to_arc(a.x,a.y,b.x,b.y,bulge,&arc)){
         BITCODE_2DPOINT ia={a.x,a.y},ib={b.x,b.y},pa,pb;transform_OCS_2d(&pa,ia,extrusion);transform_OCS_2d(&pb,ib,extrusion);emit_line(s,color,parent,pa.x,pa.y,pb.x,pb.y);return;
     }
-    double theta=4.0*atan(bulge),h=chord*(1.0-bulge*bulge)/(4.0*bulge);
-    double nx=-dy/chord,ny=dx/chord,cx=(a.x+b.x)*0.5+nx*h,cy=(a.y+b.y)*0.5+ny*h;
-    double radius=chord*(1.0+bulge*bulge)/(4.0*fabs(bulge)),start=atan2(a.y-cy,a.x-cx);
-    BITCODE_2DPOINT ic={cx,cy},ix={cx+radius,cy},iy={cx,cy+radius},pc,px,py;
+    BITCODE_2DPOINT ic={arc.cx,arc.cy},ix={arc.cx+arc.radius,arc.cy},
+                    iy={arc.cx,arc.cy+arc.radius},pc,px,py;
     transform_OCS_2d(&pc,ic,extrusion);transform_OCS_2d(&px,ix,extrusion);transform_OCS_2d(&py,iy,extrusion);
-    emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
+    emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,arc.start,arc.sweep);
 }
 
 static double positive_sweep(double angle){
@@ -383,16 +382,14 @@ static void emit_leader_points(MusaNativeScene *s,SceneColor color,Affine2 paren
 
 
 static void emit_lw_segment(MusaNativeScene *s,SceneColor color,Affine2 parent,Dwg_Entity_LWPOLYLINE *e,dwg_point_2d a,dwg_point_2d b,double bulge){
-    double dx=b.x-a.x,dy=b.y-a.y,chord=hypot(dx,dy);
-    if(chord<1e-12||!isfinite(bulge)||fabs(bulge)<1e-12){
+    MusaCoreBulgeArc arc;
+    if(!musa_core_bulge_to_arc(a.x,a.y,b.x,b.y,bulge,&arc)){
         BITCODE_2DPOINT ia={a.x,a.y},ib={b.x,b.y},pa,pb;transform_OCS_2d(&pa,ia,e->extrusion);transform_OCS_2d(&pb,ib,e->extrusion);emit_line(s,color,parent,pa.x,pa.y,pb.x,pb.y);return;
     }
-    double theta=4.0*atan(bulge),h=chord*(1.0-bulge*bulge)/(4.0*bulge);
-    double nx=-dy/chord,ny=dx/chord,cx=(a.x+b.x)*0.5+nx*h,cy=(a.y+b.y)*0.5+ny*h;
-    double radius=chord*(1.0+bulge*bulge)/(4.0*fabs(bulge)),start=atan2(a.y-cy,a.x-cx);
-    BITCODE_2DPOINT ic={cx,cy},ix={cx+radius,cy},iy={cx,cy+radius},pc,px,py;
+    BITCODE_2DPOINT ic={arc.cx,arc.cy},ix={arc.cx+arc.radius,arc.cy},
+                    iy={arc.cx,arc.cy+arc.radius},pc,px,py;
     transform_OCS_2d(&pc,ic,e->extrusion);transform_OCS_2d(&px,ix,e->extrusion);transform_OCS_2d(&py,iy,e->extrusion);
-    emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,start,theta);
+    emit_curve(s,color,parent,pc.x,pc.y,px.x-pc.x,px.y-pc.y,py.x-pc.x,py.y-pc.y,arc.start,arc.sweep);
 }
 
 static void emit_object(Dwg_Object *obj,MusaNativeScene *s,Affine2 parent,int depth,SceneColor byBlock,SceneColor inheritedLayer);
