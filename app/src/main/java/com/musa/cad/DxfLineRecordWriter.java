@@ -18,6 +18,13 @@ public final class DxfLineRecordWriter {
     public static void write(BufferedWriter out,SourceReplacement source,
                              String layout,double x0,double y0,double x1,double y1)
             throws IOException{
+        write(out,source,layout,x0,y0,x1,y1,null);
+    }
+
+    /** Optional unique group-5 handle from DxfSourceHandlePlan. */
+    public static void write(BufferedWriter out,SourceReplacement source,
+                             String layout,double x0,double y0,double x1,double y1,
+                             String savedHandle)throws IOException{
         if(out==null||source==null||source.edit.type!=CadEdit.Type.LINE)
             throw new IOException("DXF LINE source replacement missing");
         // Validate everything BEFORE emitting the first group code.
@@ -33,8 +40,10 @@ public final class DxfLineRecordWriter {
             source.lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
         String lineScale=DxfNumber.format(source.lineTypeScale);
         int color=source.color&0x00FFFFFF;
+        String handle=savedHandle==null?null:DxfSourceHandlePlan.canonical(savedHandle);
 
         tag(out,0,"LINE");
+        if(handle!=null)tag(out,5,handle);
         tag(out,8,layer);
         if(!"Model".equalsIgnoreCase(targetLayout)){
             tag(out,67,"1");
