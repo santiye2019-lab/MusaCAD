@@ -20,6 +20,9 @@ public final class DxfWriter {
         if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
         Matrix contentToWorld=contentToWorldMatrix(drawing);
         Charset cs=charset(baseDxf);
+        // Verify atomic BREAK2 original source ranges before opening a
+        // destination stream; stale ranges must never erase adjacent entities.
+        DxfBreakSourceBoundaryGuard.verify(baseDxf,cs,replacements,removedSources);
         // Allocate BEFORE opening the target stream; original DXF group-5
         // values (including DIMSTYLE 105 and $HANDSEED) remain reserved.
         int sourceLines=0;
