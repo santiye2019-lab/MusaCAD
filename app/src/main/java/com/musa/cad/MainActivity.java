@@ -423,6 +423,11 @@ public class MainActivity extends AppCompatActivity {
                 if(cad.armBreakSelected())result.setText("BREAK • Çizgiyi böleceğiniz noktaya dokunun");
                 else result.setText("BREAK • Hedef nesne LINE olmalı");
                 break;
+            case BREAK2:
+                if(!ensureTransformSelection("BREAK2"))break;
+                if(cad.armBreakGapSelected())result.setText("BREAK2 • İlk ve ikinci boşluk sınırına sırayla dokunun");
+                else result.setText("BREAK2 • Hedef nesne LINE olmalı");
+                break;
             case PEDIT:
                 if(!ensureTransformSelection("PEDIT"))break;
                 if(cad.toggleSelectedPolylineClosed())result.setText("PEDIT • Polyline açık/kapalı durumu değiştirildi");
