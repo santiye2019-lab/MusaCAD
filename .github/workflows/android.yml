@@ -1011,6 +1011,8 @@ jobs:
           java -cp /tmp/musacad-tests Dxf3dSafeSaveTest
           java -cp /tmp/musacad-tests CadSaveSourceIntegrityTest
           java -cp /tmp/musacad-tests Dxf3dSafeSaveIntegrationContractTest
+      - name: P0 data-loss gate - Android Back only cancels project close
+        run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
       - name: Test cancellable file transfer
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/FileTransfer.java tests/FileTransferTest.java
@@ -1030,7 +1032,7 @@ jobs:
           grep -q 'new Intent(this,MainActivity.class)' app/src/main/java/com/musa/cad/SplashActivity.java
           grep -q 'putString(K_LICENSE_TOKEN' app/src/main/java/com/musa/cad/LicenseManager.java
           grep -q 'verifyStoredPaidToken' app/src/main/java/com/musa/cad/LicenseManager.java
-          grep -q 'İkinci kez geri tuşuna basarsanız proje' app/src/main/java/com/musa/cad/MainActivity.java
+          # P0 unsaved-project Back behavior is verified by the dedicated source-contract gate.
           grep -q 'lastAccessMs' app/src/main/java/com/musa/cad/RecentFileStore.java
           grep -q 'thumbnail' app/src/main/java/com/musa/cad/RecentFileStore.java
       - name: Test responsive entry and license screens
