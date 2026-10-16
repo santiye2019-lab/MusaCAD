@@ -21,6 +21,12 @@ async function handleAnalyze(request, env) {
 
   const session = await verifySession(request.headers.get("authorization"), env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
   if (!session.ok) return json({ status: "denied", message: session.message }, 401);
+  // This UUID is unrelated to account or device identity. Log no drawings,
+  // prompt, images, token, session payload or personally identifying fields.
+  const suppliedRequestId = request.headers.get("x-musacad-request-id") || "";
+  const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(suppliedRequestId)
+    ? suppliedRequestId : "untracked";
+  const requestStartedAt = Date.now();
 
   // Isolated 24-hour Qwen pilot. Never enable this flag on the production Worker.
   // Expiration is enforced for every request, independently of GitHub Actions.
@@ -67,6 +73,12 @@ async function handleAnalyze(request, env) {
     return json({ status: "denied", message: "Raw drawing upload is not accepted by this endpoint" }, 400);
   if (packageMode && !validCadPackage(cadPackage))
     return json({ status: "denied", message: "Unsupported CAD package payload" }, 400);
+
+  if (visualEvidence) console.info("MUSACAD_AI_VISUAL_ACCEPTED", JSON.stringify({
+    requestId, provider: aiProvider.name, imageCount: visualEvidence.images.length,
+    imageBase64Chars: visualEvidence.images.reduce((n, image) => n + image.base64.length, 0),
+    requestBytes: Number(request.headers.get("content-length") || 0)
+  }));
 
   const tools = [];
   if (allowWeb) tools.push({ type: "web_search" });
@@ -321,6 +333,10 @@ async function handleAnalyze(request, env) {
         ]);
       }
     } catch (_) {
+      if (visualEvidence) console.warn("MUSACAD_AI_VISUAL_FAILURE", JSON.stringify({
+        requestId, provider: aiProvider.name, stage: "upstream-connect",
+        elapsedMs: Date.now() - requestStartedAt, timedOut: controller.signal.aborted
+      }));
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI modeli bekleme süresini aştı. Raporun bu görüntü grubu analiz edilmedi; yerel proje incelemesi kullanılabilir." }, 504);
       return json({ status: "server_error", message:
@@ -332,6 +348,10 @@ async function handleAnalyze(request, env) {
     try {
       data = await Promise.race([upstream.json(), deadline]);
     } catch (_) {
+      if (visualEvidence) console.warn("MUSACAD_AI_VISUAL_FAILURE", JSON.stringify({
+        requestId, provider: aiProvider.name, stage: "upstream-json",
+        elapsedMs: Date.now() - requestStartedAt, timedOut: controller.signal.aborted
+      }));
       if (controller.signal.aborted)
         return json({ status: "timeout", message: "Gandalf görsel AI yanıtı bekleme süresini aştı. Görsel grup doğrulanmadı." }, 504);
       if (!upstream.ok) data = {}; // Some provider errors have empty or non-JSON bodies.
@@ -342,6 +362,10 @@ async function handleAnalyze(request, env) {
   } finally {
     clearTimeout(timeoutId);
   }
+  if (visualEvidence) console.info("MUSACAD_AI_VISUAL_UPSTREAM", JSON.stringify({
+    requestId, provider: aiProvider.name, upstreamStatus: upstream.status,
+    elapsedMs: Date.now() - requestStartedAt
+  }));
   if (!upstream.ok) {
     if (upstream.status === 429 && aiProvider.name === "gemini") {
       return json({
