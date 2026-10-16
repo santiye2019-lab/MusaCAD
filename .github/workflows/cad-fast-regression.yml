@@ -136,6 +136,10 @@ jobs:
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dSafeSaveTest.java
           java -cp /tmp/musacad-zinsert-tests Dxf3dMeshTest
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveTest
+          javac -encoding UTF-8 -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests \
+            app/src/main/java/com/musa/cad/Cad3dDxfHandleIndex.java \
+            tests/Cad3dDxfHandleIndexTest.java
+          java -cp /tmp/musacad-zinsert-tests Cad3dDxfHandleIndexTest
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/Dxf3dSafeSaveIntegrationContractTest.java
           java -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveIntegrationContractTest
       - name: AutoCAD 2026 indexed command router recognition smoke
