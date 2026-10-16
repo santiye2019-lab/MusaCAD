@@ -455,7 +455,7 @@ public class CadView extends View {
         // A single edited source LINE can yield two BREAK segments with the
         // same source ID; a Map<sourceId,edit> silently discards one of them.
         for(SourceReplacement e:sourceEdits.replacementRecords()){
-            if(vectorDrawing.isSourceVisible(e.sourceId))out.add(e.edit.copy());
+            if(vectorDrawing.isReplacementVisible(e))out.add(e.edit.copy());
         }
         return out;
     }
@@ -1346,7 +1346,9 @@ public class CadView extends View {
         // still serialized against the same original DXF source range.
         // Resolve the exact child hit BEFORE ordinary source selection.
         SourceEditSession.SplitPartHit child=sourceEdits.findSplitPart(x,y,tolerance);
-        if(child!=null&&vectorDrawing.isSourceVisible(child.sourceId)&&
+        if(child!=null&&
+                vectorDrawing.isReplacementVisible(
+                    sourceEdits.replacementRecordFor(child.sourceId,child.part))&&
                 sourceEdits.selectSplitPart(child.sourceId,child.part)){
             selectedPickX=x;selectedPickY=y;moveSelectedArmed=false;
             pairCommand=PairCommand.NONE;breakArmed=false;
@@ -1356,7 +1358,11 @@ public class CadView extends View {
             notifyValue();invalidate();return;
         }
         int replacementId=sourceEdits.findReplacement(x,y,tolerance);
-        if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.isSourceVisible(replacementId))source=candidate;}
+        if(replacementId>=0){
+            DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);
+            if(candidate!=null&&vectorDrawing.isReplacementVisible(
+                    sourceEdits.replacementRecordFor(replacementId,-1)))source=candidate;
+        }
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
         if(source==null){sourceEdits.clearSelection();selectedImageIndex=-1;moveSelectedArmed=false;notifyValue();invalidate();return;}
         sourceEdits.select(source.sourceId,source.range,source.prototype(),source.layer,source.color,source.lineType,source.lineTypeScale,source.lineWeight);
