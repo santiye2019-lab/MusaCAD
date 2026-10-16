@@ -1683,7 +1683,9 @@ public class CadView extends View {
             if(pairCommand==PairCommand.JOIN){listener.onMeasurement("JOIN • Birleştirilecek ikinci LINE/POLYLINE nesnesine dokunun");return;}
             if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+
                     (sourceEdits.selectedSplitPart()<0?"":" • Parça "+(sourceEdits.selectedSplitPart()+1)+"/2")+
-                    " • Taşı / Döndür / Kopya / Sil");return;}
+                    (sourceEdits.selectedSplitPart()<0?
+                        " • Taşı / Döndür / Kopya / Sil":
+                        " • Taşı / Döndür / Ölçekle / Aynala / Sil"));return;}
             listener.onMeasurement("Nesne seçin • Düzenlenebilir: "+vectorDrawing.editableSourceCount()+" • LINE / Çoklu / Daire / Yazı");return;
         }
         if(mode==Mode.FREEHAND)listener.onMeasurement("Eskiz • Parmağınız veya kaleminizle serbest çizim yapın");
