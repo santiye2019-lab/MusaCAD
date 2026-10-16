@@ -16,7 +16,7 @@ class ThreeDOnlyEntryTest(unittest.TestCase):
         section = s[start:end]
         self.assertIn("if(loaded.parsed==null||loaded.parsed.entityCount<=0)", section)
         self.assertIn("Dxf3dMesh.read(loaded.file)", section)
-        self.assertIn("geometry.triangles.length==0&&geometry.edges.length==0", section)
+        self.assertIn("Cad3dOnlyOpenGuard.requireRealGeometry(geometry)", section)
         self.assertIn("Mesh3dActivity.EXTRA_TRANSIENT_DXF,true", section)
         self.assertIn("threeD.putExtra(Mesh3dActivity.EXTRA_DXF,loaded.file.getAbsolutePath())", section)
         self.assertIn("startActivity(threeD)", section)
