@@ -163,6 +163,16 @@ Path: `core/native/`
   and direct consumption by the multi-BLOCK 3D BVH scene selector.
   No Android gesture integration, iOS viewport implementation or true
   real-DWG multi-device parity has been claimed.
+- The shared C11 `musacad_screen_frustum.c` now provides 3D
+  **screen-window and crossing candidate classification**. Homogeneous
+  clipping planes are derived from GL -1..1 or Metal/D3D 0..1 view-
+  projection and the user's viewport selection rectangle, then a WCS
+  axis-aligned bounding box is classified as outside / intersects /
+  entirely inside. Conservative plane slack preserves near-edge WCS
+  geometry and regressions cover perspective, orthographic, reversed
+  screen Y, large WCS offsets and singular input. This is broad phase,
+  not complete DWG polygon clipping, exact WINDOW/CROSSING selection,
+  hidden-line picking or AutoCAD 2026 equivalent UI.
 - The iPhoneOS arm64 object-only CI step also syntax-compiles affine and
   bulge unit sources; it does **not** run them on a phone or constitute
   Windows/iOS app delivery.
