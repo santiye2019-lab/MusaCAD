@@ -70,9 +70,8 @@ public final class Cad3dDxfHandleIndex {
                 }
                 if(raw==null)continue;
                 String handle=canonicalHandle(raw);
-                System.out.println("DXF fixture identity trace type="+r.type+" start="+r.sourceStart+" handle="+handle+" tags="+r.tags());
                 if(!seen.add(handle))
-                    throw new IOException("Farklı DXF nesneleri aynı tutamacı kullanıyor: "+handle+" type="+r.type+" at="+r.sourceStart);
+                    throw new IOException("Farklı DXF nesneleri aynı tutamacı kullanıyor");
                 if(seen.size()>MAX_INDEXED_HANDLES)
                     throw new IOException("DXF kimlik dizini kapasite sınırı");
                 if(supported(r.type)) {
