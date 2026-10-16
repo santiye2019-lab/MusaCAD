@@ -1399,6 +1399,7 @@ public class CadView extends View {
             if(command==PairCommand.TRIM){
                 if(t<=1e-4f||t>=.9999f||u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("TRIM • Kesişim hedef çizginin içinde ve sınır çizgisi üzerinde olmalı");return;}
                 float pickT=projectionParameter(selectedPickX,selectedPickY,target.xy[0],target.xy[1],target.xy[2],target.xy[3]);
+                if(!Float.isFinite(pickT)){if(listener!=null)listener.onMeasurement("TRIM • Seçilen çizgi geometrisi geçersiz");return;}
                 result=pickT<t?CadEdit.line(ix,iy,target.xy[2],target.xy[3]):CadEdit.line(target.xy[0],target.xy[1],ix,iy);
             }else{
                 if(u<-.0001f||u>1.0001f){if(listener!=null)listener.onMeasurement("EXTEND • Uzatma sınır çizgisinin üzerine ulaşmalı");return;}
@@ -1514,12 +1515,18 @@ public class CadView extends View {
     }
 
     private static float[] lineIntersection(float ax,float ay,float bx,float by,float cx,float cy,float dx,float dy){
-        float rX=bx-ax,rY=by-ay,sX=dx-cx,sY=dy-cy,den=rX*sY-rY*sX;if(Math.abs(den)<1e-7f)return null;
-        float qx=cx-ax,qy=cy-ay,t=(qx*sY-qy*sX)/den,u=(qx*rY-qy*rX)/den;
-        return new float[]{ax+t*rX,ay+t*rY,t,u};
+        // Use the same audited WCS geometry as Gandalf source edits rather
+        // than a separate float cross-product with an absolute tolerance.
+        double[] hit=MusaAiCadGeometry.intersectLines(
+            new double[]{ax,ay,bx,by},new double[]{cx,cy,dx,dy});
+        if(hit==null)return null;
+        for(double value:hit)if(!Double.isFinite(value)||
+                Math.abs(value)>Float.MAX_VALUE)return null;
+        return new float[]{(float)hit[0],(float)hit[1],(float)hit[2],(float)hit[3]};
     }
     private static float projectionParameter(float px,float py,float ax,float ay,float bx,float by){
-        float dx=bx-ax,dy=by-ay,len=dx*dx+dy*dy;if(len<1e-12f)return 0f;return ((px-ax)*dx+(py-ay)*dy)/len;
+        double t=MusaAiCadGeometry.projectOnLine(px,py,new double[]{ax,ay,bx,by});
+        return Double.isFinite(t)&&Math.abs(t)<=Float.MAX_VALUE?(float)t:Float.NaN;
     }
 
     private boolean fingerNavigationTouch(MotionEvent e){
