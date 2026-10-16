@@ -4,16 +4,38 @@ import java.util.*;
 
 /** Non-destructive source-entity mutation state used by CadView. */
 public final class SourceEditSession {
+    /** Independent in-session DXF style for an individual BREAK child.
+     * No separate native DWG handle is claimed here. */
+    private static final class ChildStyle {
+        String layer,lineType;int color,colorMode,lineWeight;double lineTypeScale;
+        ChildStyle(Entry e){
+            layer=e.layer;color=e.color;colorMode=e.colorMode;
+            lineType=e.lineType;lineTypeScale=e.lineTypeScale;
+            lineWeight=e.lineWeight;
+        }
+        ChildStyle copy(){
+            ChildStyle c=new ChildStyle();
+            c.layer=layer;c.color=color;c.colorMode=colorMode;
+            c.lineType=lineType;c.lineTypeScale=lineTypeScale;
+            c.lineWeight=lineWeight;return c;
+        }
+        private ChildStyle(){}
+    }
     private static final class Entry {
         final int id;final SourceRange range;final CadEdit original;String layer;int color,colorMode;String lineType;double lineTypeScale;int lineWeight;
-        CadEdit replacement,splitSecond;boolean deleted,splitFirstDeleted,splitSecondDeleted;
+        CadEdit replacement,splitSecond;
+        ChildStyle firstStyle,secondStyle;
+        boolean deleted,splitFirstDeleted,splitSecondDeleted;
         Entry(int id,SourceRange range,CadEdit original,String layer,int color,String lineType,double lineTypeScale,int lineWeight){
             this.id=id;this.range=range;this.original=original.copy();this.layer=layer==null?"0":layer;this.color=color;this.colorMode=SourceReplacement.COLOR_EXPLICIT;
             this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=Double.isFinite(lineTypeScale)&&lineTypeScale>0d?lineTypeScale:1d;
             this.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
         }
         CadEdit current(){return replacement==null?original:replacement;}
-        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.colorMode=colorMode;e.replacement=replacement==null?null:replacement.copy();e.splitSecond=splitSecond==null?null:splitSecond.copy();e.deleted=deleted;e.splitFirstDeleted=splitFirstDeleted;e.splitSecondDeleted=splitSecondDeleted;return e;}
+        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.colorMode=colorMode;e.replacement=replacement==null?null:replacement.copy();e.splitSecond=splitSecond==null?null:splitSecond.copy();
+            e.firstStyle=firstStyle==null?null:firstStyle.copy();
+            e.secondStyle=secondStyle==null?null:secondStyle.copy();
+            e.deleted=deleted;e.splitFirstDeleted=splitFirstDeleted;e.splitSecondDeleted=splitSecondDeleted;return e;}
     }
     private static final class Undo {
         final int[] ids;final Entry[] previous;final int selected;
@@ -117,13 +139,49 @@ public final class SourceEditSession {
     }
     public CadEdit currentFor(int id){Entry e=entries.get(id);return e==null||e.deleted||e.splitSecond!=null?null:e.current().copy();}
 
-    public String selectedLayer(){Entry e=entries.get(selected);return e==null||e.deleted?"0":e.layer;}
-    public int selectedColor(){Entry e=entries.get(selected);return e==null||e.deleted?0xFFFFFFFF:e.color;}
-    public String selectedLineType(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.CONTINUOUS:e.lineType;}
-    public double selectedLineTypeScale(){Entry e=entries.get(selected);return e==null||e.deleted?1d:e.lineTypeScale;}
-    public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;}
+    private ChildStyle selectedChildStyle(){
+        if(!hasSelection()||selectedPart<0)return null;
+        Entry e=entries.get(selected);
+        return selectedPart==0?e.firstStyle:e.secondStyle;
+    }
+    public String selectedLayer(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.layer:e==null||e.deleted?"0":e.layer;
+    }
+    public int selectedColor(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.color:e==null||e.deleted?0xFFFFFFFF:e.color;
+    }
+    public int selectedColorMode(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.colorMode:e==null||e.deleted?SourceReplacement.COLOR_EXPLICIT:e.colorMode;
+    }
+    public String selectedLineType(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.lineType:e==null||e.deleted?DxfLineStyle.CONTINUOUS:e.lineType;
+    }
+    public double selectedLineTypeScale(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.lineTypeScale:e==null||e.deleted?1d:e.lineTypeScale;
+    }
+    public int selectedLineWeight(){
+        ChildStyle c=selectedChildStyle();Entry e=entries.get(selected);
+        return c!=null?c.lineWeight:e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;
+    }
     public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
-        Entry e=entries.get(selected);if(!hasSelection()||selectedPart!=-1)return false;save(e);
+        Entry e=entries.get(selected);if(!hasSelection())return false;
+        if(selectedPart>=0){
+            ChildStyle c=selectedChildStyle();
+            if(c==null)return false;
+            save(e);
+            if(layer!=null&&!layer.trim().isEmpty())c.layer=layer.trim();
+            if(color!=null){c.color=color;c.colorMode=SourceReplacement.COLOR_EXPLICIT;}
+            if(lineType!=null&&!lineType.trim().isEmpty())c.lineType=DxfLineStyle.normalizeName(lineType);
+            if(lineTypeScale!=null&&Double.isFinite(lineTypeScale)&&lineTypeScale>0d)c.lineTypeScale=lineTypeScale;
+            if(lineWeight!=null)c.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
+            return true;
+        }
+        save(e);
         if(layer!=null&&!layer.trim().isEmpty())e.layer=layer.trim();
         if(color!=null){e.color=color;e.colorMode=SourceReplacement.COLOR_EXPLICIT;}
         if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
@@ -133,9 +191,16 @@ public final class SourceEditSession {
         return true;
     }
     public boolean updateSelectedColorMode(int mode){
-        Entry e=entries.get(selected);if(!hasSelection()||selectedPart!=-1)return false;
+        Entry e=entries.get(selected);if(!hasSelection())return false;
         if(mode!=SourceReplacement.COLOR_BYLAYER&&mode!=SourceReplacement.COLOR_BYBLOCK&&mode!=SourceReplacement.COLOR_EXPLICIT)return false;
-        save(e);e.colorMode=mode;if(e.replacement==null)e.replacement=e.current().copy();return true;
+        if(selectedPart>=0){
+            ChildStyle c=selectedChildStyle();
+            if(c==null)return false;
+            save(e);c.colorMode=mode;return true;
+        }
+        save(e);e.colorMode=mode;
+        if(e.replacement==null)e.replacement=e.current().copy();
+        return true;
     }
 
     public boolean moveSelectedTo(float x,float y){
@@ -183,6 +248,7 @@ public final class SourceEditSession {
         if(!finiteLine(first)||!finiteLine(second))return false;
         save(e);
         e.replacement=first.copy();e.splitSecond=second.copy();
+        e.firstStyle=new ChildStyle(e);e.secondStyle=new ChildStyle(e);
         selected=-1;selectedPart=-1; // reselect a specific child for later edits
         return true;
     }
@@ -260,10 +326,21 @@ public final class SourceEditSession {
     public List<SourceReplacement> replacementRecords(){
         ArrayList<SourceReplacement> out=new ArrayList<>();
         for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){
-            if(e.splitSecond==null||!e.splitFirstDeleted)
-                out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
-            if(e.splitSecond!=null&&!e.splitSecondDeleted)
-                out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.splitSecond));
+            if(e.splitSecond==null){
+                out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,
+                                              e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
+            }else{
+                if(!e.splitFirstDeleted){
+                    ChildStyle c=e.firstStyle;
+                    out.add(new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
+                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.replacement));
+                }
+                if(!e.splitSecondDeleted){
+                    ChildStyle c=e.secondStyle;
+                    out.add(new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
+                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond));
+                }
+            }
         }
         return out;
     }
