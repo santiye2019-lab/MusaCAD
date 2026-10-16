@@ -161,6 +161,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_real_dwg_model_identity.py' -v
           python3 tests/real_dwg_model_identity.py \
             --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+            --source-dxf /tmp/musa-writer-multi.dxf \
             /tmp/musa-writer-multi.dwg
 
       - name: R2000 complex polyline and 3DFACE roundtrip acceptance
@@ -195,6 +196,7 @@ jobs:
           python3 tests/real_dwg_model_identity.py \
             --converter /tmp/musa-writer-proof/musacad_dwg_convert \
             --min-matched 2 --min-3dface 1 \
+            --source-dxf /tmp/musa-advanced-r2000/face3d.dxf \
             /tmp/musa-advanced-r2000/face3d.dwg
           echo "R2000 advanced acceptance failures: $failures"
           test "$failures" -eq 0
@@ -244,6 +246,7 @@ jobs:
               python3 tests/real_dwg_model_identity.py \
                 --converter /tmp/musa-writer-proof/musacad_dwg_convert \
                 --min-matched 150 --min-3dface 80 \
+                --source-dxf "$input" \
                 "$output"
             fi
 
