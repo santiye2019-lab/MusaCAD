@@ -26,8 +26,11 @@ int main(void){
     assert(!musa_core_corner2_trim(a,b,0,0,0,0,2,0,&out));
     assert(!musa_core_corner2_trim(a,parallel,5,0,5,1,2,1,&out));
     assert(!musa_core_corner2_trim(a,b,5,0,0,5,NAN,1,&out));
-    const double *p=&previous.ax,*q=&out.ax;
-    for(int i=0;i<10;i++)eq(p[i],q[i]);
+    eq(previous.ax,out.ax);eq(previous.ay,out.ay);
+    eq(previous.atx,out.atx);eq(previous.aty,out.aty);
+    eq(previous.bx,out.bx);eq(previous.by,out.by);
+    eq(previous.btx,out.btx);eq(previous.bty,out.bty);
+    eq(previous.midx,out.midx);eq(previous.midy,out.midy);
     puts("2D corner finite-segment gates OK");
     return 0;
 }
