@@ -81,6 +81,18 @@ public class SourceEditSessionTest {
         if(reject.splitSelected(CadEdit.line(0,0,2,0),CadEdit.line(8,0,10,0)))
             throw new AssertionError("nested split without editable child IDs is unsafe");
 
+        // Source DXF ID zero is legal; its child ID must not collide with
+        // the -1 sentinel for 'nothing selected'.
+        SourceEditSession zero=new SourceEditSession();
+        zero.select(0,new SourceRange(0,0,5),CadEdit.line(0,0,10,0));
+        if(!zero.splitSelected(CadEdit.line(0,0,3,0),CadEdit.line(7,0,10,0)))
+            throw new AssertionError("source ID 0 split");
+        SourceEditSession.SplitPartHit zeroLeft=zero.findSplitPart(1,0,0.1f);
+        if(zeroLeft==null||zeroLeft.logicalId==-1||
+           !zero.selectSplitPart(zeroLeft.sourceId,zeroLeft.part)||
+           zero.selectedLogicalId()!=zeroLeft.logicalId)
+            throw new AssertionError("zero-based source must have a real child identity");
+
         // Independent stable logical IDs for two BREAK children, while
         // preserving the ONE parent source range for DXF undo/save.
         SourceEditSession children=new SourceEditSession();
