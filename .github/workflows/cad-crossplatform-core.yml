@@ -104,6 +104,16 @@ jobs:
           test -s "$RUNNER_TEMP/musacad-screen-frustum-iphoneos-arm64.o"
           xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
             -I core/native/include \
+            -c core/native/src/musacad_screen_scene.c \
+            -o "$RUNNER_TEMP/musacad-screen-scene-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-screen-scene-iphoneos-arm64.o"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
+            -c core/native/tests/core_screen_scene_test.c \
+            -o "$RUNNER_TEMP/musacad-screen-scene-test-iphoneos-arm64.o"
+          test -s "$RUNNER_TEMP/musacad-screen-scene-test-iphoneos-arm64.o"
+          xcrun --sdk iphoneos clang -std=c11 -arch arm64 -isysroot "$SDK" \
+            -I core/native/include \
             -c core/native/tests/core_bvh_scene_aabb_test.c \
             -o "$RUNNER_TEMP/musacad-bvh-scene-aabb-test-iphoneos-arm64.o"
           test -s "$RUNNER_TEMP/musacad-bvh-scene-aabb-test-iphoneos-arm64.o"
