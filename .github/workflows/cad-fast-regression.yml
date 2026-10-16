@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: P0 data-loss gate - Android Back only cancels project close
+        run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
