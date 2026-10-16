@@ -28,6 +28,8 @@ import java.util.Arrays;
 /** Reads the converted DWG/DXF mesh off the UI thread and opens a real 3D orbit view. */
 public final class Mesh3dActivity extends Activity {
     public static final String EXTRA_DXF="com.musa.cad.DXF_3D_PATH";
+    /** Only for private cache DXF files explicitly handed off by the 3D-only opening path. */
+    public static final String EXTRA_TRANSIENT_DXF="com.musa.cad.DXF_3D_TRANSIENT";
     public static final String EXTRA_MODE="com.musa.cad.DXF_3D_MODE";
     public static final String MODE_ISO="iso",MODE_ORBIT="orbit",MODE_FRONT="front",MODE_TOP="top",
         MODE_RIGHT="right",MODE_WIREFRAME="wireframe",MODE_SURFACE="surface",
@@ -644,6 +646,28 @@ public final class Mesh3dActivity extends Activity {
     }
     @Override protected void onDestroy(){
         closing=true;
+        // Retain the staged model through 3D recovery and save operations.
+        // Delete only once this activity truly finishes, never on rotation.
+        if(isFinishing()&&getIntent().getBooleanExtra(EXTRA_TRANSIENT_DXF,false)){
+            final String candidate=getIntent().getStringExtra(EXTRA_DXF);
+            if(candidate!=null){
+                try{
+                    File file=new File(candidate).getCanonicalFile();
+                    File cache=getCacheDir().getCanonicalFile();
+                    if(cache.equals(file.getParentFile())
+                        &&file.getName().startsWith("MusaCAD_acilan_")
+                        &&file.getName().endsWith(".dxf")){
+                        // A FIFO queue ensures any pending journal operation finishes before cleanup.
+                        RECOVERY_IO.execute(()->{
+                            if(file.isFile()&&!file.delete())
+                                android.util.Log.w("MusaCAD-3D","Temporary 3D DXF cleanup failed");
+                        });
+                    }
+                }catch(IOException e){
+                    android.util.Log.w("MusaCAD-3D","Temporary 3D DXF cleanup rejected",e);
+                }
+            }
+        }
         if(Build.VERSION.SDK_INT>=33&&systemBackCallback!=null){
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(systemBackCallback);
             systemBackCallback=null;

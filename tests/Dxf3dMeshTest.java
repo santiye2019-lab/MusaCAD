@@ -66,6 +66,7 @@ public final class Dxf3dMeshTest {
         testFlat2dPlanMetadata();
         testAcisSatSolidMesh();
         testAcisSolidBoundsProxy();
+        testOnly3dWithoutPlanEntity();
         testMissing3dTagDoesNotWritePartialFile();
     }
 
@@ -1271,6 +1272,29 @@ public final class Dxf3dMeshTest {
             if(!blocked)throw new AssertionError("missing source coordinate must block 3D save");
             if(target.size()!=0)throw new AssertionError("preflight failure wrote an incomplete 3D DXF file");
         }finally{Files.deleteIfExists(file.toPath());}
+    }
+
+    private static void testOnly3dWithoutPlanEntity() throws Exception {
+        File threeD=File.createTempFile("mesh3d-only-", ".dxf");
+        File empty=File.createTempFile("mesh3d-empty-", ".dxf");
+        try{
+            String geometry="0\nSECTION\n2\nENTITIES\n"
+                +"0\n3DFACE\n10\n0\n20\n0\n30\n4\n"
+                +"11\n3\n21\n0\n31\n4\n"
+                +"12\n0\n22\n4\n32\n4\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(threeD.toPath(),geometry,StandardCharsets.UTF_8);
+            Dxf3dMesh mesh=Dxf3dMesh.read(threeD);
+            if(mesh.triangles.length!=3||mesh.xyz.length!=9||mesh.solidProxy)
+                throw new AssertionError("valid 3DFACE-only DXF must remain real 3D geometry");
+            Files.writeString(empty.toPath(),"0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+            boolean rejected=false;
+            try{Dxf3dMesh.read(empty);}catch(java.io.IOException expected){rejected=true;}
+            if(!rejected)throw new AssertionError("genuinely empty DXF cannot be accepted as 3D");
+        }finally{
+            Files.deleteIfExists(threeD.toPath());
+            Files.deleteIfExists(empty.toPath());
+        }
     }
 
     private static String vertex(int x,int y,int z){return "0\nVERTEX\n70\n192\n10\n"+x+"\n20\n"+y+"\n30\n"+z+"\n";}
