@@ -70,6 +70,7 @@ public final class Cad3dDxfHandleIndex {
                 }
                 if(raw==null)continue;
                 String handle=canonicalHandle(raw);
+                System.out.println("DXF fixture identity trace type="+r.type+" start="+r.sourceStart+" handle="+handle);
                 if(!seen.add(handle))
                     throw new IOException("Farklı DXF nesneleri aynı tutamacı kullanıyor: "+handle+" type="+r.type+" at="+r.sourceStart);
                 if(seen.size()>MAX_INDEXED_HANDLES)
