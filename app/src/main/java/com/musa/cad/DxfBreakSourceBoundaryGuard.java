@@ -73,6 +73,27 @@ public final class DxfBreakSourceBoundaryGuard {
             if(splitSources.put(range.startLine,range)!=null)
                 throw new IOException("Two split groups target one original DXF LINE");
         }
+        // Also protect a BREAK2 source after BOTH children are erased:
+        // there are no replacement LINEs left to infer the original range.
+        Set<Integer> markedRemovals=new HashSet<>();
+        if(removals!=null)for(SourceRange deletion:removals){
+            if(deletion==null||!deletion.breakSource)continue;
+            if(!markedRemovals.add(deletion.startLine))
+                throw new IOException("BREAK original deleted more than once");
+            if(deletion.startLine+2!=deletion.sourceId)
+                throw new IOException("BREAK removal source ID is not a DXF record ID");
+            SourceRange previous=splitSources.putIfAbsent(deletion.startLine,deletion);
+            if(previous!=null&&(previous.sourceId!=deletion.sourceId||
+                 previous.startLine!=deletion.startLine||
+                 previous.endLineExclusive!=deletion.endLineExclusive))
+                throw new IOException("BREAK removal differs from replacement source");
+            for(SourceRange other:removals){
+                if(other==null||other==deletion)continue;
+                if(deletion.startLine<other.endLineExclusive&&
+                   other.startLine<deletion.endLineExclusive)
+                    throw new IOException("BREAK removal overlaps a neighboring deletion");
+            }
+        }
         if(splitSources.isEmpty())return;
         if(original==null||!original.isFile()||charset==null||
            original.length()>MAX_SOURCE_BYTES)
