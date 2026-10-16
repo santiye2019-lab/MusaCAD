@@ -44,8 +44,8 @@ public final class DxfBreakSourceBoundaryGuard {
         Map<Integer,SourceRange> splitSources=new HashMap<>();
         for(Map.Entry<Integer,List<SourceReplacement>> e:bySource.entrySet()){
             List<SourceReplacement> parts=e.getValue();
-            if(parts.size()==1)continue; // ordinary non-BREAK source edits
-            if(parts.size()!=2)throw new IOException("Ambiguous DXF split fragment count");
+            if(parts.size()==1&&!parts.get(0).breakChild)continue; // ordinary non-BREAK source edits
+            if(parts.size()>2)throw new IOException("Ambiguous DXF split fragment count");
             SourceRange range=parts.get(0).range;
             for(SourceReplacement part:parts){
                 if(part.edit.type!=CadEdit.Type.LINE||part.range==null||
