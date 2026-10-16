@@ -11,6 +11,7 @@ public final class NativeCadEngine implements AutoCloseable {
     private static native int exportDxfNative(long handle,String output);
     private static native long[] statsNative(long handle);
     private static native float[] sceneNative(long handle);
+    private static native long[] modelIdentityPageNative(long handle,long firstIndex,int maxEntries,long[] cursor) throws IOException;
     private static native float[] scenePageNative(long handle,long firstIndex,int maxWords,long[] cursor) throws IOException;
     private static native float[] sceneNestedPageNative(long handle,long firstTop,long firstLeaf,int maxWords,long[] cursor) throws IOException;
     private static native void closeNative(long handle);
@@ -27,6 +28,37 @@ public final class NativeCadEngine implements AutoCloseable {
         }
         public boolean coreOnly(){return entityCount>0&&unsupportedEntityCount==0;}
         public double coreCoverage(){return entityCount<=0?0d:Math.min(1d,Math.max(0d,coreEntityCount/(double)entityCount));}
+    }
+
+    /**
+     * Read-only original DWG *model-space top-level* entity IDs.
+     * Each packed pair is [exact 64-bit handle bits, known type 0..4].
+     * Expanded INSERT children and individual mesh triangles are NOT mapped.
+     * Must be reconciled with the same-source DXF before any identity claim.
+     */
+    public static final class ModelIdentityPage {
+        public final long[] packedHandleAndType;
+        public final long nextTopLevelIndex;
+        public final boolean hasMore;
+        private ModelIdentityPage(long[] values,long next,boolean more){
+            packedHandleAndType=values;
+            nextTopLevelIndex=next;hasMore=more;
+        }
+    }
+
+    /** Optional diagnostic, never called by rendering or touch handlers. */
+    public synchronized ModelIdentityPage modelIdentityPage(long first,int maxEntries)
+            throws IOException{
+        requireOpen();
+        if(first<0||maxEntries<1||maxEntries>1024)
+            throw new IOException("Geçersiz DWG kimlik sayfası sınırı");
+        long[] cursor=new long[2];
+        long[] raw=modelIdentityPageNative(handle,first,maxEntries,cursor);
+        if(raw==null||raw.length==0||(raw.length&1)!=0||
+            raw.length>2*maxEntries||cursor[0]!=first+raw.length/2L||
+            cursor[1]<0||cursor[1]>1)
+            throw new IOException("Eksik veya tutarsız DWG model kimlik sayfası");
+        return new ModelIdentityPage(raw,cursor[0],cursor[1]==1);
     }
 
     /** One bounded, self-contained native preview page. Cursor is in top-level DWG entities. */
