@@ -264,12 +264,11 @@ public final class MusaAiProjectPackage {
                 MusaAiDiscipline d=MusaAiDiscipline.classify(layer);
                 if(d!=MusaAiDiscipline.UNKNOWN)score.put(d,score.getOrDefault(d,0)+3);
             }
-            int sampled=0;
+            // Classify across the complete already-indexed drawing, not an arbitrary prefix.
             for(MusaAiDrawingIndex.Item item:index.items()){
                 if(item==null)continue;
                 MusaAiDiscipline d=MusaAiDiscipline.classify(item.layer+" "+item.text);
                 if(d!=MusaAiDiscipline.UNKNOWN)score.put(d,score.getOrDefault(d,0)+1);
-                if(++sampled>=12000)break;
             }
         }
         MusaAiDiscipline best=MusaAiDiscipline.UNKNOWN;int bestScore=0,second=0;
