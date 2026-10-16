@@ -43,6 +43,12 @@ public final class Dxf2dSavedLineReopenProofTest {
         Dxf2dStructureVerifier.verify(path.toFile());
         Dxf2dSavedLineReopenProof.verify(path.toFile(),StandardCharsets.UTF_8,expected);
     }
+    private static void verify(Path path,List<Dxf2dSavedLineReopenProof.Expected> expected,
+                               Set<String> retired)throws IOException{
+        Dxf2dStructureVerifier.verify(path.toFile());
+        Dxf2dSavedLineReopenProof.verify(path.toFile(),StandardCharsets.UTF_8,
+                                          expected,retired);
+    }
     private static String tag(int code,String value){
         return String.format(java.util.Locale.US,"%3d",code)+"\n"+value+"\n";
     }
@@ -63,6 +69,42 @@ public final class Dxf2dSavedLineReopenProofTest {
             String good=valid();
             Files.writeString(saved,good,StandardCharsets.UTF_8);
             verify(saved,expect());
+
+            // A BREAK source LINE group-5 handle must be retired in the output.
+            // Extract provenance from real input bytes, not an invented new ID.
+            Path oldSource=dir.resolve("break-original.dxf");
+            String original="0\nSECTION\n2\nENTITIES\n0\nLINE\n5\nA19\n"+
+                "8\nM-BORU\n10\n0\n20\n0\n11\n20\n21\n0\n"+
+                "0\nENDSEC\n0\nEOF\n";
+            Files.writeString(oldSource,original,StandardCharsets.UTF_8);
+            SourceRange originalRange=new SourceRange(6,4,18,true);
+            SourceReplacement breakChild=new SourceReplacement(
+                6,originalRange,"M-BORU",0xFF1234FE,
+                SourceReplacement.COLOR_EXPLICIT,"CENTER",2.25d,70,
+                CadEdit.line(0,0,7,0),true);
+            Set<String> retired=Dxf2dSavedLineReopenProof.retiredBreakSourceHandles(
+                oldSource.toFile(),StandardCharsets.UTF_8,
+                Collections.singletonList(breakChild));
+            check(retired.equals(Collections.singleton("A19")),
+                  "original BREAK LINE handle extraction");
+            verify(saved,expect(),retired);
+            StringWriter inserted=new StringWriter();
+            try(BufferedWriter w=new BufferedWriter(inserted)){
+                DxfLineRecordWriter.write(w,FIRST,"Model",0,0,20,0,"A19");
+            }
+            String ghost=good.replace("0\nENDSEC\n",
+                inserted.toString()+"0\nENDSEC\n");
+            Files.writeString(saved,ghost,StandardCharsets.UTF_8);
+            // The document remains structurally valid, but preserving the old
+            // source LINE in addition to both children must be rejected.
+            Dxf2dStructureVerifier.verify(saved.toFile());
+            try{
+                Dxf2dSavedLineReopenProof.verify(saved.toFile(),
+                    StandardCharsets.UTF_8,expect(),retired);
+                throw new AssertionError("retired source LINE accepted");
+            }catch(IOException expected){}
+            Files.writeString(saved,good,StandardCharsets.UTF_8);
+
             // A valid DXF document can still carry wrong source geometry,
             // wrong styles or missing children and MUST fail semantic readback.
             fails(saved,change(good,11,"7","6"),"first endpoint");
@@ -81,7 +123,9 @@ public final class Dxf2dSavedLineReopenProofTest {
             String secondMarker=tag(0,"LINE")+tag(5,"A21");
             int second=good.indexOf(secondMarker);
             if(second<0)throw new AssertionError("second LINE fixture not found");
-            String single=good.substring(0,second)+"0\\nENDSEC\\n0\\nEOF\\n";
+            String single=good.substring(0,second)+"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(saved,single,StandardCharsets.UTF_8);
+            Dxf2dStructureVerifier.verify(saved.toFile());
             fails(saved,single,"second LINE missing");
 
             // BYBLOCK saves ACI0 and no explicit group420.
