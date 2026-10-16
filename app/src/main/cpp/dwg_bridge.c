@@ -422,6 +422,73 @@ JNIEXPORT jint JNICALL Java_com_musa_cad_NativeCadEngine_exportDxfNative(JNIEnv 
     return result;
 }
 
+/*
+ * Read-only, bounded model-space ID transport for optional cross-checking
+ * against the DXF intermediate. This is NOT per-primitive scene provenance.
+ * Records are [unsigned DWG handle bits, known 3D type code] pairs:
+ * 0=other, 1=LINE, 2=3DFACE, 3=TRACE, 4=SOLID.
+ * Model order matches the native scene top-level cursor; INSERT children are
+ * intentionally absent until instance paths can be represented distinctly.
+ * No float conversion: 64-bit source handles must NEVER lose precision.
+ */
+JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_modelIdentityPageNative(
+    JNIEnv *env,jclass cls,jlong handle,jlong start,jint limit,jlongArray nextOut){
+    (void)cls;
+    MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
+    if(!session||start<0||limit<1||limit>1024||
+       !nextOut||(*env)->GetArrayLength(env,nextOut)<2){
+        throw_io(env,"DWG kimlik sayfası parametreleri geçersiz");
+        return NULL;
+    }
+    jlong *records=NULL;
+    size_t count=0,next=0,total=0;
+    int good=0;
+    pthread_mutex_lock(&engine_lock);
+    if(session_ensure_model_index(session) &&
+       (uint64_t)start<(uint64_t)session->model_count){
+        size_t begin=(size_t)start;
+        total=session->model_count;
+        count=total-begin;
+        if(count>(size_t)limit)count=(size_t)limit;
+        records=(jlong*)calloc(count*2u,sizeof(*records));
+        if(records){
+            for(size_t i=0;i<count;i++){
+                Dwg_Object *obj=session->model_entities[begin+i];
+                int type=0;
+                if(obj){
+                    switch(obj->fixedtype){
+                      case DWG_TYPE_LINE:type=1;break;
+                      case DWG_TYPE_3DFACE:type=2;break;
+                      case DWG_TYPE_TRACE:type=3;break;
+                      case DWG_TYPE_SOLID:type=4;break;
+                      default:break;
+                    }
+                    records[2u*i]=(jlong)(uint64_t)obj->handle.value;
+                }
+                records[2u*i+1]=(jlong)type;
+            }
+            next=begin+count;
+            good=1;
+        }
+    }
+    pthread_mutex_unlock(&engine_lock);
+    if(!good){
+        free(records);
+        throw_io(env,"DWG model kimlik dizini güvenli biçimde okunamadı");
+        return NULL;
+    }
+    jlongArray out=(*env)->NewLongArray(env,(jsize)(count*2u));
+    if(out){
+        (*env)->SetLongArrayRegion(env,out,0,(jsize)(count*2u),records);
+        if(!(*env)->ExceptionCheck(env)){
+            jlong cursor[2]={(jlong)next,(jlong)(next<total)};
+            (*env)->SetLongArrayRegion(env,nextOut,0,2,cursor);
+        }
+    }
+    free(records);
+    return out;
+}
+
 JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_statsNative(JNIEnv *env,jclass cls,jlong handle){
     (void)cls;
     MusaCadSession *session=(MusaCadSession*)(intptr_t)handle;
