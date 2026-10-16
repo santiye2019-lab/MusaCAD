@@ -26,6 +26,11 @@ public final class MusaAiCadGeometryTest {
         // are only 2e-8 and must NOT be mistaken for parallelism.
         double[] shortLine={0,0,0.0001,0};
         double[] shortBoundary={0.00005,-0.0001,0.00005,0.0001};
+        tight(MusaAiCadGeometry.intersectLines(shortLine,shortBoundary),
+              0.00005,0,0.5,0.5);
+        near(MusaAiCadGeometry.projectOnLine(0.00009,0,shortLine),0.9);
+        if(!Double.isNaN(MusaAiCadGeometry.projectOnLine(0,0,new double[]{0,0,0,0})))
+            throw new AssertionError("invalid projection must fail closed");
         tight(MusaAiCadGeometry.trimLine(shortLine,shortBoundary,0.00001,0),
               0.00005,0,0.0001,0);
         tight(MusaAiCadGeometry.trimLine(shortLine,shortBoundary,0.00009,0),
