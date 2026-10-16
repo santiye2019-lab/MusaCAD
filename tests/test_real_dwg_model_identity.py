@@ -5,7 +5,7 @@ from pathlib import Path
 
 from real_dwg_model_identity import (
     normalize, parse_native_export, parse_dxf, compare_records,
-    validate_expected_coverage, compare_three_way,
+    validate_expected_coverage, compare_three_way, compare_geometry,
 )
 
 
@@ -38,6 +38,52 @@ class RealDwgIdentityTest(unittest.TestCase):
             compare_three_way(original, wrong, wrong)
         with self.assertRaisesRegex(ValueError, "mismatch"):
             compare_three_way(original, original, wrong)
+
+
+    def test_three_way_geometry_catches_changed_line_endpoint(self):
+        """Handles/types stay equal but a real engineering coordinate moves."""
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "original.dxf"
+            p.write_text(simple_dxf(
+                "0\nLINE\n5\nA1\n10\n1.25\n20\n2.5\n30\n0\n"
+                "11\n3.75\n21\n4.5\n31\n5\n"), encoding="utf-8")
+            initial, source_geom = parse_dxf(p, with_geometry=True)
+            p.write_text(simple_dxf(
+                "0\nLINE\n5\nA1\n10\n1.25\n20\n2.5\n30\n0\n"
+                "11\n3.7501\n21\n4.5\n31\n5\n"), encoding="utf-8")
+            exported, changed_geom = parse_dxf(p, with_geometry=True)
+            self.assertEqual(initial, exported)
+            with self.assertRaisesRegex(ValueError, "coordinates differ"):
+                compare_geometry(source_geom, changed_geom)
+
+    def test_three_way_geometry_accepts_roundoff_and_triangle_default(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "face.dxf"
+            p.write_text(simple_dxf(
+                "0\n3DFACE\n5\nB2\n10\n0\n20\n0\n30\n0\n"
+                "11\n2\n21\n0\n31\n0\n12\n0\n22\n3\n32\n4\n"),
+                encoding="utf-8")
+            identities, source = parse_dxf(p, with_geometry=True)
+            self.assertEqual(identities, {"B2": "3DFACE"})
+            p.write_text(simple_dxf(
+                "0\n3DFACE\n5\nB2\n10\n0\n20\n0\n30\n0\n"
+                "11\n2\n21\n0\n31\n0\n12\n0\n22\n3\n32\n4\n"
+                "13\n0\n23\n3\n33\n4.0000000001\n"),
+                encoding="utf-8")
+            _, rounded = parse_dxf(p, with_geometry=True)
+            self.assertEqual(compare_geometry(source, rounded), 1)
+
+    def test_three_way_geometry_rejects_nonfinite_duplicate_or_missing_xy(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "malformed.dxf"
+            for rec in (
+                "0\nLINE\n5\nA1\n10\nNaN\n20\n1\n11\n2\n21\n3\n",
+                "0\nLINE\n5\nA1\n10\n0\n10\n1\n20\n1\n11\n2\n21\n3\n",
+                "0\n3DFACE\n5\nA1\n10\n0\n20\n0\n11\n2\n21\n0\n12\n1\n22\n1\n13\n1\n",
+            ):
+                p.write_text(simple_dxf(rec), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    parse_dxf(p, with_geometry=True)
 
     def test_fixture_coverage_requires_real_3d_faces(self):
         native = {"A": "LINE", "B": "3DFACE", "C": "3DFACE"}
