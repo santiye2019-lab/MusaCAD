@@ -4764,14 +4764,29 @@ public class MainActivity extends AppCompatActivity {
     private void saveEditedDxf(Uri uri){
         if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
-        task.future=loader.submit(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Kaydedilecek dosya açılamadı");DxfWriter.write(base,out,drawing,additions,replacements,removals,blocks,defaultLayer);FileTransfer.checkCancelled();
+        task.future=loader.submit(()->{
+            Dxf2dSafeSave.VerifiedStage savedStage=null;
+            try{
+                // Prepare, structurally re-open, and authenticate a private DXF
+                // BEFORE opening the SAF target. "wt" may truncate on open.
+                savedStage=Dxf2dSafeSave.stage(base,getCacheDir(),
+                    out->DxfWriter.write(base,out,drawing,additions,replacements,
+                                         removals,blocks,defaultLayer),
+                    Dxf2dStructureVerifier::verify);
+                FileTransfer.checkCancelled();
+                Dxf2dSafeSave.publish(savedStage,
+                    ()->getContentResolver().openOutputStream(uri,"wt"));
+                FileTransfer.checkCancelled();
                     CadImageOverlayStore.save(getApplicationContext(),destinationOverlayKey,rasterOverlays);
                     if(sourceOverlayKey!=null&&!sourceOverlayKey.equals(destinationOverlayKey))CadImageOverlayStore.save(getApplicationContext(),sourceOverlayKey,rasterOverlays);
                     FileTransfer.checkCancelled();runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();
                     if(currentProject!=null){currentProject.savedFingerprint=cad.editFingerprint();currentProject.baselineSet=true;currentProject.dirty=false;currentProject.viewState=cad.captureSessionState();clearRecovery(currentProject);}
                     Toast.makeText(this,rasterCount==0?"DXF kaydedildi • "+total+" düzenleme":"DXF kaydedildi • "+rasterCount+" görüntünün konumu MusaCAD proje verisine kaydedildi (DXF içine gömülmez)",Toast.LENGTH_LONG).show();
                     ProjectSession close=pendingCloseAfterSave;pendingCloseAfterSave=null;
-                    if(close!=null)closeProjectNow(close);});}catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}});
+                    if(close!=null)closeProjectNow(close);});}
+            catch(Exception e){runOnUiThread(()->{if(activeLoad!=task||isFinishing()||isDestroyed())return;activeLoad=null;task.dialog.dismiss();pendingCloseAfterSave=null;error(e);});}
+            finally{if(savedStage!=null)savedStage.delete();}
+        });
     }
 
     private void showShare(){
