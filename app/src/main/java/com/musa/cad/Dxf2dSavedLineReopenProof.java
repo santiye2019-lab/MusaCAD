@@ -103,7 +103,7 @@ public final class Dxf2dSavedLineReopenProof {
                 }
             }
         }
-        if(type!=null)checkRecord(type,groups,required,seen);
+        if(type!=null)checkRecord(type,groups,required,retired,seen);
         if(seen.size()!=required.size())
             throw new IOException("Saved DXF missing generated LINE handle(s)");
     }
