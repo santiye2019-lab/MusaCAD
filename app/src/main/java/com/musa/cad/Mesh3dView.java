@@ -194,6 +194,16 @@ public final class Mesh3dView extends View {
     public void setTopView(){yaw=0f;pitch=-(float)Math.PI/2f;zoom=1f;postInvalidateOnAnimation();}
     public void setRightView(){yaw=(float)Math.PI/2f;pitch=0f;zoom=1f;postInvalidateOnAnimation();}
     public void resetCamera(){setIsometricView();}
+    /**
+     * Read-only capture of the actual Canvas camera for the portable C11
+     * screen-to-scene selection engine. Must be called after View layout.
+     * This does NOT enable native pick or change the current touch gestures.
+     * Check matchesCanvasMesh on the model worker after edits before use.
+     */
+    public Cad3dLegacyCameraBridge.Snapshot sharedSelectionCamera(){
+        return Cad3dLegacyCameraBridge.capture(model.cx,model.cy,model.cz,
+            model.radius,yaw,pitch,zoom,getWidth(),getHeight());
+    }
     private int nearestVertex(float x,float y){int at=-1;float best=36f*getResources().getDisplayMetrics().density;best*=best;
         for(int i=0;i<screen.length;i+=2){float dx=screen[i]-x,dy=screen[i+1]-y,dist=dx*dx+dy*dy;if(dist<best){best=dist;at=i/2;}}
         return at;

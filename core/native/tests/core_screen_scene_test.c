@@ -155,6 +155,37 @@ int main(void) {
                                        100,100,0,2,&hit,&diag) == -1);
     assert(hit.object_id == 123);
 
+    /*
+     * Canvas legacy front-camera fixture, radius=1, yaw=pitch=0,
+     * zoom=1, viewport=200x200. This is the exact world-to-clip layout
+     * produced by Cad3dLegacyCameraBridge: X is screen-right, Z is
+     * screen-up, and increasing Y travels away from the viewer.
+     * C ray unprojection must hit the same central visible triangle.
+     */
+    const float front_xyz[] = {-.2f,0,-.2f, .2f,0,-.2f, 0,0,.2f};
+    MusaCoreMeshBVH *front_mesh = NULL;
+    assert(musa_core_mesh_bvh_build_f32(front_xyz, 3, faces, 1,
+                                         &front_mesh) && front_mesh);
+    const double canvas_front[16] = {
+        1./1.3,0,0,0,
+        0,0,.8,.4,
+        0,1./1.3,0,0,
+        0,0,0,1
+    };
+    MusaCoreBVHInstance front_scene[] = {
+        {front_mesh, central, 4242, 1}
+    };
+    assert(musa_core_screen_scene_pick(front_scene, 1, canvas_front,
+                                       200,200,100,100,0,10,&hit,&diag) == 1);
+    assert(hit.object_id == 4242 && hit.instance_index == 0);
+    near(hit.face.wcs_x, 0);
+    near(hit.face.wcs_y, 0);
+    near(hit.face.wcs_z, 0);
+    assert(musa_core_screen_scene_candidates(front_scene, 1, canvas_front,
+           200,200,70,70,130,130,0,0,picks,3,&n) == 1);
+    assert(n == 1 && picks[0] == 0);
+    musa_core_mesh_bvh_destroy(front_mesh);
+
     musa_core_mesh_bvh_destroy(mesh);
     puts("MusaCAD portable Android/desktop/iPhone screen-scene click and rectangle PASS");
     return 0;
