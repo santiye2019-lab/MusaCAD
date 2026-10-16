@@ -152,6 +152,25 @@ jobs:
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             tests/Dxf2dSafeSaveTest.java
           java -cp /tmp/musacad-2d-safe-stage Dxf2dSafeSaveTest
+      - name: DXF semantic readback of saved BREAK children
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-saved-semantic
+          javac -encoding UTF-8 -d /tmp/musacad-saved-semantic \
+            app/src/main/java/com/musa/cad/CadEdit.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/DxfNumber.java \
+            app/src/main/java/com/musa/cad/FileTransfer.java \
+            app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
+            app/src/main/java/com/musa/cad/SourceRange.java \
+            app/src/main/java/com/musa/cad/SourceReplacement.java \
+            app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
+            app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
+            app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
+            app/src/main/java/com/musa/cad/Dxf2dSavedLineReopenProof.java \
+            tests/Dxf2dSavedLineReopenProofTest.java
+          java -cp /tmp/musacad-saved-semantic Dxf2dSavedLineReopenProofTest
       - name: Fast 3D open-surface area-weighted XYZ centroid
         run: |
           set -euo pipefail

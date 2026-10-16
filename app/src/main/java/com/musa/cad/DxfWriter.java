@@ -101,6 +101,42 @@ public final class DxfWriter {
         }
     }
 
+    /**
+     * Reopen saved DXF and independently compare every generated source LINE
+     * (including separate BREAK2 children) against actual group-5 identities,
+     * transformed coordinates, layout, colors and linetypes.
+     * Call only AFTER Dxf2dStructureVerifier.verify(stage).
+     */
+    public static void verifySavedSourceLines(File baseDxf,File savedDxf,
+            DxfParser.Result drawing,List<SourceReplacement> replacements)
+            throws IOException{
+        if(replacements==null||replacements.isEmpty())return;
+        int count=0;
+        for(SourceReplacement r:replacements)
+            if(r!=null&&r.edit.type==CadEdit.Type.LINE)count++;
+        if(count==0)return;
+        Charset cs=charset(baseDxf);
+        DxfSourceHandlePlan plan=DxfSourceHandlePlan.prepare(baseDxf,cs,count);
+        Matrix toWorld=contentToWorldMatrix(drawing);
+        List<Dxf2dSavedLineReopenProof.Expected> expected=new ArrayList<>(count);
+        int index=0;
+        for(SourceReplacement r:replacements){
+            if(r==null||r.edit.type!=CadEdit.Type.LINE)continue;
+            CadEdit edit=r.edit;
+            PointF a=w(toWorld,edit.xy[0],edit.xy[1]);
+            PointF b=w(toWorld,edit.xy[2],edit.xy[3]);
+            DxfParser.SourceEntity source=drawing.sourceById(r.sourceId);
+            String layout=source==null?drawing.activeLayout:source.layout;
+            expected.add(new Dxf2dSavedLineReopenProof.Expected(
+                plan.handleAt(index++),layout,r,a.x,a.y,b.x,b.y));
+        }
+        // A successful readback must also prove that the original BREAK
+        // source handle was retired, not merely that the two children exist.
+        Set<String> retired=Dxf2dSavedLineReopenProof.retiredBreakSourceHandles(
+            baseDxf,cs,replacements);
+        Dxf2dSavedLineReopenProof.verify(savedDxf,cs,expected,retired);
+    }
+
     private static LinkedHashMap<String,String> collectTextStyles(List<CadEdit> additions,List<SourceReplacement> replacements,List<CadBlock.Definition> blocks){
         LinkedHashMap<String,String> out=new LinkedHashMap<>();
         collectTextStyles(out,additions);
