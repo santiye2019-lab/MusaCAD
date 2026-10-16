@@ -19,7 +19,9 @@ class IndependentAcceptance51Test(unittest.TestCase):
     def test_all_51_families_mapped_once_and_not_falsely_approved(self):
         summary = validate_ledger(self.matrix, self.ledger)
         self.assertEqual(summary["total"], 51)
-        self.assertEqual(summary["approved"], sum(\n            row["review"]["decision"] == "approved"\n            for row in self.ledger["cases"]))
+        self.assertEqual(summary["approved"], sum(
+            row["review"]["decision"] == "approved"
+            for row in self.ledger["cases"]))
         self.assertEqual(len(set(x["id"] for x in self.ledger["cases"])), 51)
         self.assertEqual(set(GATES), set(self.ledger["cases"][0]["gates"]))
 
