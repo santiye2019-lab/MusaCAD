@@ -452,8 +452,10 @@ public class CadView extends View {
     public List<CadEdit> getVisibleEdits(){
         ArrayList<CadEdit> out=new ArrayList<>();for(CadEdit e:edits)out.add(e.copy());
         if(vectorDrawing==null){out.addAll(sourceEdits.replacements());return out;}
-        for(Map.Entry<Integer,CadEdit> e:sourceEdits.replacementMap().entrySet()){
-            if(vectorDrawing.isSourceVisible(e.getKey()))out.add(e.getValue().copy());
+        // A single edited source LINE can yield two BREAK segments with the
+        // same source ID; a Map<sourceId,edit> silently discards one of them.
+        for(SourceReplacement e:sourceEdits.replacementRecords()){
+            if(vectorDrawing.isSourceVisible(e.sourceId))out.add(e.edit.copy());
         }
         return out;
     }
@@ -1391,23 +1393,22 @@ public class CadView extends View {
                 "BREAK • Bölme noktası geçersiz veya uç noktaya çok yakın");
             return;
         }
-        // Both remaining finite segments use the source CAD layer; color,
-        // linetype and one-action undo need a distinct source split transaction.
-        String layer=sourceEdits.selectedLayer();
+        // Commit both LINE halves as one source edit transaction. The same
+        // source style (layer, resolved color, linetype, scale, lineweight)
+        // will be used by display and DXF save for BOTH halves. A single
+        // source undo restores the unsplit original, without extra overlays.
         CadEdit first=CadEdit.line((float)parts[0],(float)parts[1],
-                                   (float)parts[2],(float)parts[3])
-                                   .withLayerOverride(layer);
+                                   (float)parts[2],(float)parts[3]);
         CadEdit second=CadEdit.line((float)parts[4],(float)parts[5],
-                                    (float)parts[6],(float)parts[7])
-                                    .withLayerOverride(layer);
-        if(!sourceEdits.deleteSelected()){
-            breakArmed=false;breakGapArmed=false;breakGapFirstPicked=false;
+                                    (float)parts[6],(float)parts[7]);
+        if(!sourceEdits.splitSelected(first,second)){
+            if(listener!=null)listener.onMeasurement("BREAK • Kaynak nesne bölünemedi");
             return;
         }
-        addRegularEdits(java.util.Arrays.asList(first,second));
+        redoEdits.clear();lastActionRegular=false;lastUndoWasRegular=false;
         boolean hadGap=breakGapArmed;
         breakArmed=false;breakGapArmed=false;breakGapFirstPicked=false;
-        lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         invalidate();
         if(listener!=null)listener.onMeasurement(hadGap?
             "BREAK2 • Seçilen aralık kaldırıldı, iki çizgi kaldı":
