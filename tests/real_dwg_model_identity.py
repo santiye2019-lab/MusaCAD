@@ -56,7 +56,7 @@ def parse_dxf(path):
         if kind == "SECTION":
             code2 = [v for c, v in groups if c == 2]
             if len(code2) != 1:
-                raise ValueError("DXF section header invalid")
+                raise ValueError("DXF section header invalid (group 2 count=%d, tag count=%d)" % (len(code2), len(groups)))
             section = code2[0].upper()
         elif kind == "ENDSEC":
             section = None
