@@ -72,6 +72,18 @@ jobs:
           mkdir -p /tmp/musacad-poly-offset-tests
           javac -encoding UTF-8 -d /tmp/musacad-poly-offset-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadPolylineOffsetTest.java
           java -cp /tmp/musacad-poly-offset-tests CadPolylineOffsetTest
+      - name: Fast BREAK child identity, per-part editing and style safety
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-break-children
+          javac -encoding UTF-8 -d /tmp/musacad-break-children \
+            app/src/main/java/com/musa/cad/CadEdit.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/SourceRange.java \
+            app/src/main/java/com/musa/cad/SourceReplacement.java \
+            app/src/main/java/com/musa/cad/SourceEditSession.java \
+            tests/SourceEditSessionTest.java
+          java -cp /tmp/musacad-break-children SourceEditSessionTest
       - name: Fast 3D open-surface area-weighted XYZ centroid
         run: |
           set -euo pipefail
