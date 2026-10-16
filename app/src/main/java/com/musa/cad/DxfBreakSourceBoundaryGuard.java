@@ -31,8 +31,15 @@ public final class DxfBreakSourceBoundaryGuard {
                               List<SourceReplacement> replacements,
                               List<SourceRange> removals)throws IOException{
         Map<Integer,List<SourceReplacement>> bySource=new HashMap<>();
+        Map<Integer,Integer> ownerForStart=new HashMap<>();
         if(replacements!=null)for(SourceReplacement item:replacements){
-            if(item!=null)bySource.computeIfAbsent(item.sourceId,k->new ArrayList<>()).add(item);
+            if(item==null)continue;
+            if(item.range==null||item.sourceId!=item.range.sourceId)
+                throw new IOException("Edited DXF entity has an inconsistent source ID");
+            Integer earlier=ownerForStart.putIfAbsent(item.range.startLine,item.sourceId);
+            if(earlier!=null&&earlier.intValue()!=item.sourceId)
+                throw new IOException("Two source IDs claim one original DXF record");
+            bySource.computeIfAbsent(item.sourceId,k->new ArrayList<>()).add(item);
         }
         Map<Integer,SourceRange> splitSources=new HashMap<>();
         for(Map.Entry<Integer,List<SourceReplacement>> e:bySource.entrySet()){
