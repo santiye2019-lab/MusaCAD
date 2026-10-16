@@ -79,14 +79,14 @@ public class MainActivity extends AppCompatActivity {
         MediaAttachment(String kind,String name,String mime,Uri uri){this.kind=kind;this.name=name;this.mime=mime;this.uri=uri.toString();}
     }
     private static final class Loaded {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,colorDiagnostics;boolean dxf,handedOff;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,colorDiagnostics;boolean dxf,handedOff,threeDOnly;
         List<CadImageOverlay> imageOverlays=Collections.emptyList();
         ProjectSession project;
         void dispose(){if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();if(workingDxf!=null&&workingDxf!=file)workingDxf.delete();if(file!=null)file.delete();}
     }
 
     private static final class ProjectSession {
-        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,loadDiagnostics,colorDiagnostics;boolean dxf;
+        Uri sourceUri;File file,workingDxf;Bitmap bitmap;DxfParser.Result parsed;NativeScene nativeScene;String name,loadDiagnostics,colorDiagnostics;boolean dxf,threeDOnly;
         CadView.SessionState viewState;CadView.ViewBookmark viewBookmark;long savedFingerprint;boolean baselineSet,dirty,preparingEditor;String prepareError;long lastAccessMs;LoadTask prepareTask;
         String recoveryId;long recoveryFingerprint=Long.MIN_VALUE;
         final Set<String> previousVisibleLayers=new HashSet<>();
@@ -4228,7 +4228,7 @@ public class MainActivity extends AppCompatActivity {
                         // Validate a usable 3D mesh before offering the 3D-only editor;
                         // a missing/unreadable ACIS payload must still fail honestly.
                         Dxf3dMesh geometry=Dxf3dMesh.read(loaded.file);
-                        if(geometry.xyz.length==0||
+                        if(geometry.solidProxy||geometry.xyz.length==0||
                            (geometry.triangles.length==0&&geometry.edges.length==0))
                             throw new IOException("Desteklenen 2B veya 3B DXF geometrisi bulunamadı");
                         if(loaded.bitmap!=null&&!loaded.bitmap.isRecycled())
@@ -4353,11 +4353,80 @@ public class MainActivity extends AppCompatActivity {
                             android.util.Log.i("MusaCAD-CadColor","native{"+nativeColors.safeSummary()+
                                 "} full{"+fullColors.safeSummary()+"} suspect="+suspect);
                         }
-                        if(parsed==null||parsed.entityCount<=0)
-                            throw new IOException("DWG içinde desteklenen 2B nesne bulunamadı");
-                        parsed.conversionWarnings=status;
-                        loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
+                        if(parsed==null||parsed.entityCount<=0){
+                            // This may be a 3D-only drawing, not a failed DWG read.
+                            // Accept only verified 3D geometry from the converted DXF,
+                            // never a synthetic extents-based proxy for missing ACIS.
+                            Dxf3dMesh threeD=Dxf3dMesh.read(converted);
+                            if(threeD.solidProxy||threeD.xyz.length==0||
+                               (threeD.triangles.length==0&&threeD.edges.length==0))
+                                throw new IOException("DWG 3B nesneleri gerçek geometri olarak okunamadı");
+                            loaded.threeDOnly=true;
+                            loaded.workingDxf=converted;
+                            loaded.parsed=null;
+                            loaded.bitmap=null;
+                            keep=true;
+                        }else{
+                            parsed.conversionWarnings=status;
+                            loaded.parsed=parsed;loaded.workingDxf=converted;loaded.bitmap=parsed.bitmap;keep=true;
+                        }
                     }finally{if(!keep)converted.delete();}
+                }
+
+                if(loaded.threeDOnly){
+                    // A real 3D DXF is ready even though the 2D vector model is empty.
+                    // Keep both private caches in the ProjectSession, so a 3D editor
+                    // reopen never depends on a temporary file cleaned too early.
+                    runOnUiThread(()->{
+                        if(isFinishing()||isDestroyed()){
+                            if(!loaded.handedOff)loaded.dispose();
+                            else if(loaded.workingDxf!=null)loaded.workingDxf.delete();
+                            return;
+                        }
+                        ProjectSession project=loaded.project;
+                        if(loaded.handedOff&&(project==null||!projects.contains(project))){
+                            if(loaded.workingDxf!=null)loaded.workingDxf.delete();
+                            return;
+                        }
+                        if(!loaded.handedOff){
+                            if(activeLoad!=task){loaded.dispose();return;}
+                            project=new ProjectSession();
+                            project.sourceUri=loaded.sourceUri;
+                            project.file=loaded.file;
+                            project.name=loaded.name;
+                            project.dxf=false;
+                            project.lastAccessMs=System.currentTimeMillis();
+                            project.persistedImages.addAll(loaded.imageOverlays);
+                            loaded.project=project;
+                            loaded.handedOff=true;
+                            projects.add(project);
+                            activeLoad=null;
+                            if(task.dialog!=null)task.dialog.dismiss();
+                            activateProject(project);
+                            project.savedFingerprint=cad.editFingerprint();
+                            project.baselineSet=true;
+                            project.dirty=false;
+                        }
+                        project.workingDxf=loaded.workingDxf;
+                        project.threeDOnly=true;
+                        project.preparingEditor=false;
+                        project.prepareTask=null;
+                        project.prepareError=null;
+                        if(currentProject==project){
+                            editingBaseDxf=project.workingDxf;
+                            activeDxf=null;
+                            updateEditorEnabled(false);
+                            updateLayerButtons(false);
+                            renderCurrentProjectStatus();
+                            open3d(Mesh3dActivity.MODE_ISO);
+                        }
+                        refreshProjectTabs();
+                        openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
+                        project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),0);
+                        android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
+                        scheduleRecentMetadataRecord(uri,loaded.name);
+                    });
+                    return;
                 }
 
                 if(loaded.handedOff&&loaded.project!=null){
@@ -4617,9 +4686,11 @@ public class MainActivity extends AppCompatActivity {
     private void renderCurrentProjectStatus(){
         if(currentProject==null){fileName.setText("Henüz proje açılmadı");result.setText("Hazır");return;}
         String editable=canEdit()?"  •  düzenlenebilir":"";
-        String mode=currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
+        String mode=currentProject.threeDOnly?"  •  DWG 3B-only":currentProject.dxf?"  •  DXF":activeDxf!=null?"  •  DWG":currentProject.nativeScene!=null?"  •  DWG Native":"  •  DWG önizleme";
         fileName.setText(currentDisplayName+mode+editable);
-        if(activeDxf!=null){
+        if(currentProject.threeDOnly){
+            result.setText("3B-only DWG • gerçek 3B geometri doğrulandı • 2B düzenleme kullanılamaz • 3B araçlarıyla açın");
+        }else if(activeDxf!=null){
             String fallback=activeDxf.fontFallbacks.isEmpty()?(activeDxf.externalShapeFallback?"  •  SHX shape fallback":""):"  •  eksik font "+activeDxf.fontFallbacks.size();
             String ole=activeDxf.oleObjectCount>0?"  •  OLE "+activeDxf.olePreviewCount+"/"+activeDxf.oleObjectCount+" önizleme":"";
             result.setText("Hazır  •  "+activeDxf.activeLayout+"  •  "+activeDxf.entityCount+" nesne  •  "+activeDxf.layerCount+" katman  •  "+activeDxf.editableSourceCount()+" seçilebilir"+(activeDxf.externalReferences.isEmpty()?"":"  •  ⚠ XREF "+activeDxf.externalReferences.size()+" harici bağlantı")+(canEdit()?"  •  düzenleme açık":"")+ole+fallback);
