@@ -39,12 +39,6 @@ public final class Cad3dDxfHandleIndexTest {
             String source=drawing(line("00a1",0)+face("B2")+line(null,4));
             Files.writeString(f.toPath(),source,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(f);
-            try(com.musa.cad.DxfStream stream=new com.musa.cad.DxfStream(f,StandardCharsets.UTF_8)) {
-                com.musa.cad.DxfBlocks.Record record;
-                while((record=stream.next())!=null)
-                    System.out.println("DXF handle fixture record: "+record.type+
-                        " source="+record.sourceStart+" handle="+record.text(5,"<none>"));
-            }
             Cad3dDxfHandleIndex index=Cad3dDxfHandleIndex.read(f);
             check(index.indexedRecordCount()==2);
             check(mesh.xyz.length/3==8);
