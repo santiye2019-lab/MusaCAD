@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: P0 data-loss gate - Back cancels project close
+        run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
       - name: Enforce single portable CAD engine and Windows iOS test contracts
         run: |
           python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
