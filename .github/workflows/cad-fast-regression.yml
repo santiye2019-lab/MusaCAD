@@ -84,6 +84,20 @@ jobs:
             app/src/main/java/com/musa/cad/SourceEditSession.java \
             tests/SourceEditSessionTest.java
           java -cp /tmp/musacad-break-children SourceEditSessionTest
+      - name: Fast BREAK DXF disk save and reopen styled LINE records
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-break-dxf-reopen
+          javac -encoding UTF-8 -d /tmp/musacad-break-dxf-reopen \
+            app/src/main/java/com/musa/cad/CadEdit.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/DxfNumber.java \
+            app/src/main/java/com/musa/cad/SourceRange.java \
+            app/src/main/java/com/musa/cad/SourceReplacement.java \
+            app/src/main/java/com/musa/cad/SourceEditSession.java \
+            app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
+            tests/DxfBreakLineSaveReopenTest.java
+          java -cp /tmp/musacad-break-dxf-reopen DxfBreakLineSaveReopenTest
       - name: Fast 3D open-surface area-weighted XYZ centroid
         run: |
           set -euo pipefail
