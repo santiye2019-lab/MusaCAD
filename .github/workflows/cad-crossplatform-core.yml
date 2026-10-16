@@ -66,16 +66,16 @@ jobs:
           from pathlib import Path
           import re
           cmake = Path("core/native/CMakeLists.txt").read_text(encoding="utf-8")
-          match = re.search(r"add_library\\(musacad_core STATIC\\s+(.*?)\\)", cmake, re.S)
+          match = re.search(r"add_library\(musacad_core STATIC\s+(.*?)\)", cmake, re.S)
           if not match:
               raise SystemExit("Missing canonical shared C target")
-          sources = re.findall(r"src/[A-Za-z0-9_]+\\.c", match.group(1))
+          sources = re.findall(r"src/[A-Za-z0-9_]+\.c", match.group(1))
           if not sources or len(sources) != len(set(sources)):
               raise SystemExit("Shared core must have a unique, nonempty source inventory")
           tracked = {str(path.relative_to(Path("core/native"))) for path in Path("core/native/src").glob("*.c")}
           if set(sources) != tracked:
               raise SystemExit(f"Unregistered shared C sources: {sorted(tracked - set(sources))}")
-          print("\\n".join("core/native/" + source for source in sources))
+          print("\n".join("core/native/" + source for source in sources))
           PY
           test -s "$RUNNER_TEMP/musacad-core-ios-sources.txt"
           compiled=0
