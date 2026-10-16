@@ -123,6 +123,7 @@ jobs:
             app/src/main/java/com/musa/cad/SourceRange.java \
             app/src/main/java/com/musa/cad/SourceReplacement.java \
             app/src/main/java/com/musa/cad/DxfBreakSourceBoundaryGuard.java \
+            app/src/main/java/com/musa/cad/SourceEditSession.java \
             tests/DxfBreakSourceBoundaryGuardTest.java
           java -cp /tmp/musacad-break-range-guard DxfBreakSourceBoundaryGuardTest
       - name: BREAK BYLAYER layer palette and relocated child visibility proof
