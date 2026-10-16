@@ -344,7 +344,54 @@ static int host_nested_page_probe(const char *input,const char *budget,int index
     return failure?1:0;
 }
 
+/*
+ * Host-only, read-only identity fixture transport. The output is private to
+ * the local CI machine: NEVER log handles, copy this file to artifacts or
+ * bundle the original DWG. Read-only model-space owners only; INSERT children
+ * need their instance paths and are not certified here.
+ */
+static int host_model_identity_probe(const char *input,const char *dest){
+    int error=0;
+    MusaCadSession *session=session_open(input,&error);
+    if(!session)return 1;
+    if(!session_ensure_model_index(session)){
+        session_close(session);
+        return 1;
+    }
+    int fd=open(dest,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if(fd<0){session_close(session);return 2;}
+    FILE *out=fdopen(fd,"wb");
+    if(!out){
+        close(fd);unlink(dest);session_close(session);return 2;
+    }
+    int failure=0;
+    for(size_t i=0;i<session->model_count;i++){
+        Dwg_Object *obj=session->model_entities[i];
+        if(!obj||!obj->handle.value){failure=1;break;}
+        const char *type="OTHER";
+        switch(obj->fixedtype){
+            case DWG_TYPE_LINE:type="LINE";break;
+            case DWG_TYPE__3DFACE:type="3DFACE";break;
+            case DWG_TYPE_TRACE:type="TRACE";break;
+            case DWG_TYPE_SOLID:type="SOLID";break;
+            default:break;
+        }
+        if(fprintf(out,"%016llX\t%s\n",
+                   (unsigned long long)(uint64_t)obj->handle.value,type)<0){
+            failure=1;break;
+        }
+    }
+    if(fclose(out)!=0)failure=1;
+    if(failure)unlink(dest);
+    else fprintf(stderr,"Native DWG model identity fixture: %zu roots (not a parity certification)\n",
+                 session->model_count);
+    session_close(session);
+    return failure?1:0;
+}
+
 int main(int argc,char **argv){
+    if(argc==4&&strcmp(argv[1],"--model-identity-probe")==0)
+        return host_model_identity_probe(argv[2],argv[3]);
     if(argc==4&&strcmp(argv[1],"--context-nested-paged-probe")==0)
         return host_nested_page_probe(argv[2],argv[3],1,1);
     if(argc==4&&strcmp(argv[1],"--indexed-nested-paged-probe")==0)
@@ -458,7 +505,7 @@ JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_modelIdentityPage
                 if(obj){
                     switch(obj->fixedtype){
                       case DWG_TYPE_LINE:type=1;break;
-                      case DWG_TYPE_3DFACE:type=2;break;
+                      case DWG_TYPE__3DFACE:type=2;break;
                       case DWG_TYPE_TRACE:type=3;break;
                       case DWG_TYPE_SOLID:type=4;break;
                       default:break;

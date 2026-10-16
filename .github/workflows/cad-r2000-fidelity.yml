@@ -15,6 +15,8 @@ on:
       - 'app/src/main/cpp/native_fit_spline.h'
       - 'app/src/main/cpp/native_scene.h'
       - 'app/src/main/cpp/dwg_bridge.c'
+      - 'tests/real_dwg_model_identity.py'
+      - 'tests/test_real_dwg_model_identity.py'
       - 'tests/r2000_generate_variants.py'
       - 'tests/r2000_generate_stress.py'
       - 'tests/private_dwg_read_audit.py'
@@ -149,6 +151,17 @@ jobs:
             exit 1
           fi
           test ! -e /tmp/musa-malformed-output.dwg
+
+      - name: Real binary DWG root identity survives intermediate DXF conversion
+        run: |
+          set -euo pipefail
+          # The upstream fixture was converted to an actual AC1015 binary DWG.
+          # Never disclose source handles in logs, attach private output or
+          # mistake this single-reader check for AutoCAD 2026 certification.
+          python3 -m unittest discover -s tests -p 'test_real_dwg_model_identity.py' -v
+          python3 tests/real_dwg_model_identity.py \
+            --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+            /tmp/musa-writer-multi.dwg
 
       - name: R2000 complex polyline and 3DFACE roundtrip acceptance
         run: |
