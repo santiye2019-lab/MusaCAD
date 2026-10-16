@@ -779,6 +779,7 @@ public class CadView extends View {
         if(e==null)return null;
         StringBuilder b=new StringBuilder();
         b.append("Tür: ").append(source==null?e.type.name():source.type);
+        if(sourceEdits.selectedSplitPart()>=0)b.append("\nParça kimliği: ").append(sourceEdits.selectedLogicalId());
         b.append("\nKatman: ").append(sourceEdits.selectedLayer());
         b.append("\nÇizgi tipi: ").append(sourceEdits.selectedLineType());
         b.append(String.format(Locale.getDefault(),"\nÇizgi tipi ölçeği: %.3f",sourceEdits.selectedLineTypeScale()));
@@ -1341,6 +1342,19 @@ public class CadView extends View {
         float tolerance=20f*getResources().getDisplayMetrics().density/Math.max(.001f,scale);
         for(int i=imageOverlays.size()-1;i>=0;i--)if(imageOverlays.get(i).hit(x,y,tolerance*.25f)){selectedImageIndex=i;sourceEdits.clearSelection();moveSelectedArmed=false;pairCommand=PairCommand.NONE;breakArmed=false;stretchArmed=false;stretchVertex=-1;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);notifyValue();invalidate();return;}
         selectedImageIndex=-1;DxfParser.SourceEntity source=null;
+        // Split fragments have separate logical handles although both are
+        // still serialized against the same original DXF source range.
+        // Resolve the exact child hit BEFORE ordinary source selection.
+        SourceEditSession.SplitPartHit child=sourceEdits.findSplitPart(x,y,tolerance);
+        if(child!=null&&vectorDrawing.isSourceVisible(child.sourceId)&&
+                sourceEdits.selectSplitPart(child.sourceId,child.part)){
+            selectedPickX=x;selectedPickY=y;moveSelectedArmed=false;
+            pairCommand=PairCommand.NONE;breakArmed=false;
+            breakGapArmed=false;breakGapFirstPicked=false;
+            stretchArmed=false;stretchVertex=-1;
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            notifyValue();invalidate();return;
+        }
         int replacementId=sourceEdits.findReplacement(x,y,tolerance);
         if(replacementId>=0){DxfParser.SourceEntity candidate=vectorDrawing.sourceById(replacementId);if(candidate!=null&&vectorDrawing.isSourceVisible(replacementId))source=candidate;}
         if(source==null)source=vectorDrawing.findEditableSource(x,y,tolerance,sourceEdits.hiddenSourceIds());
@@ -1667,7 +1681,9 @@ public class CadView extends View {
             if(pairCommand==PairCommand.CHAMFER){listener.onMeasurement(String.format(Locale.getDefault(),"CHAMFER • D=%.3f • İkinci çizgiye dokunun",pairValue));return;}
             if(pairCommand==PairCommand.MATCHPROP){listener.onMeasurement("MATCHPROP • Özelliklerin aktarılacağı hedef nesneye dokunun");return;}
             if(pairCommand==PairCommand.JOIN){listener.onMeasurement("JOIN • Birleştirilecek ikinci LINE/POLYLINE nesnesine dokunun");return;}
-            if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+" • Taşı / Döndür / Kopya / Sil");return;}
+            if(sourceEdits.hasSelection()){DxfParser.SourceEntity s=vectorDrawing.sourceById(sourceEdits.selectedId());listener.onMeasurement("Seçili: "+(s==null?"nesne":s.type)+
+                    (sourceEdits.selectedSplitPart()<0?"":" • Parça "+(sourceEdits.selectedSplitPart()+1)+"/2")+
+                    " • Taşı / Döndür / Kopya / Sil");return;}
             listener.onMeasurement("Nesne seçin • Düzenlenebilir: "+vectorDrawing.editableSourceCount()+" • LINE / Çoklu / Daire / Yazı");return;
         }
         if(mode==Mode.FREEHAND)listener.onMeasurement("Eskiz • Parmağınız veya kaleminizle serbest çizim yapın");
