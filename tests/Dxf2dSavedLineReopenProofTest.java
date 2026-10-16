@@ -23,7 +23,7 @@ public final class Dxf2dSavedLineReopenProofTest {
         120,new SourceRange(120,118,135),"E-PRIZ",0xFF22BB44,
         SourceReplacement.COLOR_BYLAYER,"HIDDEN",1.25d,18,
         CadEdit.line(13,0,20,0));
-    private static List<Dxf2dSavedLineReopenProof.Expected> expect()throws Exception{
+    private static List<Dxf2dSavedLineReopenProof.Expected> expect()throws IOException{
         return Arrays.asList(
             new Dxf2dSavedLineReopenProof.Expected("A20","Model",FIRST,0,0,7,0),
             new Dxf2dSavedLineReopenProof.Expected("A21","Layout1",SECOND,13,0,20,0)
@@ -99,8 +99,14 @@ public final class Dxf2dSavedLineReopenProofTest {
             verify(saved,Collections.singletonList(
                 new Dxf2dSavedLineReopenProof.Expected(
                     "AF0","Model",byblock,1,2,4,5)));
-            fails(saved,buffer.toString().replace("62\n0\n","62\n256\n"),
-                  "wrong BYBLOCK ACI");
+            Files.writeString(saved,buffer.toString().replace("62\n0\n","62\n256\n"),
+                              StandardCharsets.UTF_8);
+            try{
+                verify(saved,Collections.singletonList(
+                    new Dxf2dSavedLineReopenProof.Expected(
+                        "AF0","Model",byblock,1,2,4,5)));
+                throw new AssertionError("wrong BYBLOCK ACI accepted");
+            }catch(IOException expected){}
 
             // Real staged-save callback: reject semantic mutation before
             // provider/SAF opener can be invoked.
