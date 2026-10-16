@@ -141,10 +141,22 @@ def file_sha(path):
     return digest.digest()
 
 
-def verify(converter, original, minimum_entities=1, minimum_faces=0):
+def verify(converter, original, minimum_entities=1, minimum_faces=0,
+           source_dxf=None):
     if not converter.is_file() or not original.is_file():
         raise ValueError("native converter or DWG file missing")
     before = file_sha(original)
+    input_checksum = None
+    expected = None
+    if source_dxf is not None:
+        if not source_dxf.is_file():
+            raise ValueError("initial DXF source fixture missing")
+        input_checksum = file_sha(source_dxf)
+        try:
+            expected = parse_dxf(source_dxf)
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("initial DXF model index invalid: " + str(exc)) from None
+        validate_expected_coverage(expected, minimum_entities, minimum_faces)
     with tempfile.TemporaryDirectory(prefix="musa-real-dwg-id-") as tmp:
         temp = Path(tmp)
         model = temp / "model-identities.txt"
@@ -179,8 +191,17 @@ def verify(converter, original, minimum_entities=1, minimum_faces=0):
             raise ValueError("DXF model index invalid: " + str(exc)) from None
         count = compare_records(source, target)
         validate_expected_coverage(source, minimum_entities, minimum_faces)
+        if expected is not None:
+            if expected != source:
+                raise ValueError("initial DXF to binary DWG identity/type mismatch "
+                                 "(input=%d; native=%d)" % (len(expected), len(source)))
+            if expected != target:
+                raise ValueError("initial DXF to exported DXF identity/type mismatch "
+                                 "(input=%d; output=%d)" % (len(expected), len(target)))
     if file_sha(original) != before:
         raise ValueError("read-only DWG source changed")
+    if source_dxf is not None and file_sha(source_dxf) != input_checksum:
+        raise ValueError("read-only initial DXF source changed")
     return count
 
 
@@ -189,12 +210,16 @@ def main():
     parser.add_argument("--converter", required=True, type=Path)
     parser.add_argument("--min-matched", type=int, default=1)
     parser.add_argument("--min-3dface", type=int, default=0)
+    parser.add_argument("--source-dxf", type=Path,
+                        help="Optional unchanged initial DXF, for three-way proof")
     parser.add_argument("dwg", type=Path)
     args = parser.parse_args()
     try:
         count = verify(args.converter.resolve(), args.dwg.resolve(),
                        minimum_entities=args.min_matched,
-                       minimum_faces=args.min_3dface)
+                       minimum_faces=args.min_3dface,
+                       source_dxf=(args.source_dxf.resolve()
+                                   if args.source_dxf is not None else None))
     except (ValueError, OSError, subprocess.SubprocessError) as exc:
         # No IDs, source drawing names, geometry or raw records are disclosed.
         # Parser messages describe counts/categories only; never expose handles,
@@ -202,8 +227,9 @@ def main():
         reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
         print("FAIL: original DWG / converted DXF identity: " + reason)
         return 1
-    print("PASS: %d original DWG root entities retain handle+type in DXF "
-          "(NOT independent AutoCAD parity)" % count)
+    print("PASS: %d original DWG root entities retain handle+type in DXF%s "
+          "(NOT independent AutoCAD parity)" % (
+              count, " and initial source DXF" if args.source_dxf else ""))
     return 0
 
 
