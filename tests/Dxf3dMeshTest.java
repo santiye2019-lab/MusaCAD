@@ -1283,11 +1283,11 @@ public final class Dxf3dMeshTest {
                 +"11\n3\n21\n0\n31\n4\n"
                 +"12\n0\n22\n4\n32\n4\n"
                 +"0\nENDSEC\n0\nEOF\n";
-            Files.writeString(threeD,geometry,StandardCharsets.UTF_8);
+            Files.writeString(threeD.toPath(),geometry,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(threeD);
             if(mesh.triangles.length!=3||mesh.xyz.length!=9||mesh.solidProxy)
                 throw new AssertionError("valid 3DFACE-only DXF must remain real 3D geometry");
-            Files.writeString(empty,"0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+            Files.writeString(empty.toPath(),"0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
             boolean rejected=false;
             try{Dxf3dMesh.read(empty);}catch(java.io.IOException expected){rejected=true;}
             if(!rejected)throw new AssertionError("genuinely empty DXF cannot be accepted as 3D");
