@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -66,7 +67,13 @@ public final class Dxf2dSafeSave {
         try{
             try(FileOutputStream raw=new FileOutputStream(stage,false);
                 BufferedOutputStream out=new BufferedOutputStream(raw,128*1024)){
-                writer.write(out);
+                // DxfWriter intentionally closes its BufferedWriter. This
+                // shield lets that close flush data WITHOUT closing our
+                // underlying staging fd before the durability sync.
+                OutputStream shield=new FilterOutputStream(out){
+                    @Override public void close()throws IOException{flush();}
+                };
+                writer.write(shield);
                 out.flush();
                 raw.getFD().sync();
             }
