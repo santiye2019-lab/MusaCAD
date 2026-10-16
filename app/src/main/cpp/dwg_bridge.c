@@ -371,7 +371,7 @@ static int host_model_identity_probe(const char *input,const char *dest){
         const char *type="OTHER";
         switch(obj->fixedtype){
             case DWG_TYPE_LINE:type="LINE";break;
-            case DWG_TYPE_3DFACE:type="3DFACE";break;
+            case DWG_TYPE__3DFACE:type="3DFACE";break;
             case DWG_TYPE_TRACE:type="TRACE";break;
             case DWG_TYPE_SOLID:type="SOLID";break;
             default:break;
@@ -505,7 +505,7 @@ JNIEXPORT jlongArray JNICALL Java_com_musa_cad_NativeCadEngine_modelIdentityPage
                 if(obj){
                     switch(obj->fixedtype){
                       case DWG_TYPE_LINE:type=1;break;
-                      case DWG_TYPE_3DFACE:type=2;break;
+                      case DWG_TYPE__3DFACE:type=2;break;
                       case DWG_TYPE_TRACE:type=3;break;
                       case DWG_TYPE_SOLID:type=4;break;
                       default:break;
