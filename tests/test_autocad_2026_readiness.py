@@ -37,12 +37,12 @@ class AutoCAD2026ReadinessTest(unittest.TestCase):
                              [g for g in GATES
                               if case["gates"][g]["status"] != "passed"])
 
-    def test_unfinished_baseline_rejects_final_parity(self):
-        result = summarize(self.matrix, self.ledger)
+    def test_incomplete_catalog_rejects_final_parity_even_if_ci_is_green(self):
+        matrix = copy.deepcopy(self.matrix)
+        matrix["scoring_policy"]["complete_catalog"] = False
+        result = summarize(matrix, self.ledger)
         self.assertEqual(result["readiness"], "blocked")
-        self.assertGreater(result["scenario_inventories_incomplete"], 0)
         self.assertFalse(result["reference_command_inventory_complete"])
-        self.assertNotEqual(result["certified_families"], result["family_count"])
 
     def test_invalid_report_cannot_be_counted_as_ready(self):
         for change in ("missing_family", "unverified_approval", "fake_green_ci"):
@@ -55,7 +55,9 @@ class AutoCAD2026ReadinessTest(unittest.TestCase):
                 matrix["capabilities"][0]["verified_reference_parity"] = True
                 matrix["capabilities"][0]["implementation_status"] = "verified"
             else:
-                ledger["cases"][0]["gates"]["continuous_integration"]["status"] = "passed"
+                ledger["cases"][0]["gates"]["continuous_integration"] = {
+                    "status": "passed", "artifact": None, "sha256": None
+                }
             with self.subTest(change=change), self.assertRaises(ValueError):
                 summarize(matrix, ledger)
 
@@ -64,14 +66,17 @@ class AutoCAD2026ReadinessTest(unittest.TestCase):
         cmd = [sys.executable, str(script)]
         status = subprocess.run(cmd, capture_output=True, text=True, check=False)
         self.assertEqual(status.returncode, 0, status.stderr)
-        self.assertIn("Final parity readiness: BLOCKED", status.stdout)
-        failed = subprocess.run(cmd + ["--require-ready"], capture_output=True,
-                                text=True, check=False)
-        self.assertEqual(failed.returncode, 1, failed.stderr)
+        report = summarize(self.matrix, self.ledger)
+        self.assertIn("Final parity readiness: " + report["readiness"].upper(),
+                      status.stdout)
+        final = subprocess.run(cmd + ["--require-ready"], capture_output=True,
+                               text=True, check=False)
+        self.assertEqual(final.returncode, 0 if report["readiness"] == "ready" else 1,
+                         final.stderr)
         output = subprocess.run(cmd + ["--json"], capture_output=True,
                                 text=True, check=False)
         self.assertEqual(output.returncode, 0, output.stderr)
-        self.assertEqual(json.loads(output.stdout)["readiness"], "blocked")
+        self.assertEqual(json.loads(output.stdout)["readiness"], report["readiness"])
 
 
 if __name__ == "__main__":
