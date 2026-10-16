@@ -97,7 +97,8 @@ public class CadView extends View {
     private enum PairCommand { NONE, TRIM, EXTEND, FILLET, CHAMFER, MATCHPROP, JOIN }
     private PairCommand pairCommand=PairCommand.NONE;
     private float pairValue;
-    private boolean breakArmed,lastUndoWasRegular,stretchArmed;
+    private boolean breakArmed,breakGapArmed,breakGapFirstPicked,lastUndoWasRegular,stretchArmed;
+    private float breakGapFirstX,breakGapFirstY;
     private int stretchVertex=-1;
     private float selectedPickX,selectedPickY;
     private String pendingBlockName="";
@@ -747,7 +748,16 @@ public class CadView extends View {
     public boolean armBreakSelected(){
         CadEdit selected=sourceEdits.currentSelected();
         if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE)return false;
-        breakArmed=true;pairCommand=PairCommand.NONE;moveSelectedArmed=false;notifyValue();invalidate();return true;
+        breakArmed=true;breakGapArmed=false;breakGapFirstPicked=false;
+        pairCommand=PairCommand.NONE;moveSelectedArmed=false;notifyValue();invalidate();return true;
+    }
+    /** MusaCAD BREAK2 extension: remove an interval between two picked points. */
+    public boolean armBreakGapSelected(){
+        CadEdit selected=sourceEdits.currentSelected();
+        if(mode!=Mode.SELECT_ENTITY||selected==null||selected.type!=CadEdit.Type.LINE)return false;
+        breakArmed=true;breakGapArmed=true;breakGapFirstPicked=false;
+        pairCommand=PairCommand.NONE;moveSelectedArmed=false;
+        notifyValue();invalidate();return true;
     }
     public boolean toggleSelectedPolylineClosed(){
         if(mode!=Mode.SELECT_ENTITY||!sourceEdits.hasSelection())return false;
@@ -940,7 +950,8 @@ public class CadView extends View {
     public void clearMeasurement(){
         lastSnapped=false;freehandPoints.clear();
         if(selecting){cancelSelection();return;}
-        if(mode==Mode.SELECT_ENTITY){sourceEdits.clearSelection();selectedImageIndex=-1;moveSelectedArmed=false;stretchArmed=false;stretchVertex=-1;pairCommand=PairCommand.NONE;breakArmed=false;notifyValue();invalidate();return;}
+        if(mode==Mode.SELECT_ENTITY){sourceEdits.clearSelection();selectedImageIndex=-1;moveSelectedArmed=false;stretchArmed=false;stretchVertex=-1;pairCommand=PairCommand.NONE;breakArmed=false;breakGapArmed=false;
+            breakGapFirstPicked=false;notifyValue();invalidate();return;}
         points.clear();notifyValue();invalidate();
     }
 
@@ -1355,17 +1366,33 @@ public class CadView extends View {
 
     private void applyBreak(float x,float y){
         CadEdit target=sourceEdits.currentSelected();
-        if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){breakArmed=false;notifyValue();invalidate();return;}
-        double[] parts=MusaAiCadGeometry.breakLineAt(
-            new double[]{target.xy[0],target.xy[1],target.xy[2],target.xy[3]},x,y);
+        if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){
+            breakArmed=false;breakGapArmed=false;breakGapFirstPicked=false;
+            notifyValue();invalidate();return;
+        }
+        double[] line={target.xy[0],target.xy[1],target.xy[2],target.xy[3]};
+        if(breakGapArmed&&!breakGapFirstPicked){
+            // Reject out-of-segment picks before switching to the second tap.
+            double t=MusaAiCadGeometry.projectOnLine(x,y,line);
+            if(!Double.isFinite(t)||t<=0.001d||t>=0.999d){
+                if(listener!=null)listener.onMeasurement(
+                    "BREAK2 • İlk nokta çizginin iç bölümünde olmalı");
+                return;
+            }
+            breakGapFirstX=x;breakGapFirstY=y;breakGapFirstPicked=true;
+            notifyValue();invalidate();return;
+        }
+        double[] parts=breakGapArmed?
+            MusaAiCadGeometry.breakLineGapAt(line,breakGapFirstX,breakGapFirstY,x,y):
+            MusaAiCadGeometry.breakLineAt(line,x,y);
         if(parts==null){
-            if(listener!=null)listener.onMeasurement(
+            if(listener!=null)listener.onMeasurement(breakGapArmed?
+                "BREAK2 • İki farklı iç nokta seçin; aralık ve uçlar geçerli olmalı":
                 "BREAK • Bölme noktası geçersiz veya uç noktaya çok yakın");
             return;
         }
-        // Preserve at least the original CAD layer for both new segments.
-        // Full source color/linetype and compound undo still require a
-        // dedicated source multi-entity split transaction.
+        // Both remaining finite segments use the source CAD layer; color,
+        // linetype and one-action undo need a distinct source split transaction.
         String layer=sourceEdits.selectedLayer();
         CadEdit first=CadEdit.line((float)parts[0],(float)parts[1],
                                    (float)parts[2],(float)parts[3])
@@ -1373,10 +1400,18 @@ public class CadView extends View {
         CadEdit second=CadEdit.line((float)parts[4],(float)parts[5],
                                     (float)parts[6],(float)parts[7])
                                     .withLayerOverride(layer);
-        if(!sourceEdits.deleteSelected()){breakArmed=false;return;}
+        if(!sourceEdits.deleteSelected()){
+            breakArmed=false;breakGapArmed=false;breakGapFirstPicked=false;
+            return;
+        }
         addRegularEdits(java.util.Arrays.asList(first,second));
-        breakArmed=false;lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
-        if(listener!=null)listener.onMeasurement("BREAK • Çizgi iki parçaya bölündü");
+        boolean hadGap=breakGapArmed;
+        breakArmed=false;breakGapArmed=false;breakGapFirstPicked=false;
+        lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        invalidate();
+        if(listener!=null)listener.onMeasurement(hadGap?
+            "BREAK2 • Seçilen aralık kaldırıldı, iki çizgi kaldı":
+            "BREAK • Çizgi iki parçaya bölündü");
     }
 
     private void applyPairCommand(float x,float y){
@@ -1618,7 +1653,13 @@ public class CadView extends View {
             if(vectorDrawing==null){listener.onMeasurement("Kaynak nesne düzenleme yalnız vektörel DXF/DWG çizimlerinde kullanılabilir");return;}
             if(moveSelectedArmed){listener.onMeasurement("Taşı: seçili nesnenin yeni merkez noktasına dokunun");return;}
             if(stretchArmed){listener.onMeasurement(stretchVertex<0?"STRETCH • Taşınacak köşe/vertex noktasına dokunun":"STRETCH • Vertex için yeni konuma dokunun");return;}
-            if(breakArmed){listener.onMeasurement("BREAK • Çizgiyi böleceğiniz noktaya dokunun");return;}
+            if(breakArmed){
+                listener.onMeasurement(breakGapArmed?
+                    (breakGapFirstPicked?"BREAK2 • Aralığın ikinci ucuna dokunun":
+                                         "BREAK2 • Aralığın ilk ucuna dokunun"):
+                    "BREAK • Çizgiyi böleceğiniz noktaya dokunun");
+                return;
+            }
             if(pairCommand==PairCommand.TRIM){listener.onMeasurement("TRIM • Kesme sınırı olacak ikinci çizgiye dokunun");return;}
             if(pairCommand==PairCommand.EXTEND){listener.onMeasurement("EXTEND • Uzatma sınırı olacak ikinci çizgiye dokunun");return;}
             if(pairCommand==PairCommand.FILLET){listener.onMeasurement(String.format(Locale.getDefault(),"FILLET • R=%.3f • İkinci çizgiye dokunun",pairValue));return;}

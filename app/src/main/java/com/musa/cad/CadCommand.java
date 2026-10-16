@@ -10,7 +10,7 @@ import java.util.Locale;
 public final class CadCommand {
     public enum Action {
         NONE, LINE, POLYLINE, CIRCLE, ARC, ELLIPSE, POINT, XLINE, RECTANGLE, TEXT, SELECT,
-        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, PEDIT, LIST, MATCHPROP, JOIN, HATCH, STRETCH, BLOCK, INSERT, DIVIDE, REVCLOUD, MULTILEADER, DIMSTYLE, DIMLINEAR, DIMALIGNED, DIMANGULAR, DIMRADIUS, DIMDIAMETER, LAYER, PROPERTIES,
+        PAN, MOVE, COPY, ROTATE, ERASE, SCALE, MIRROR, OFFSET, ARRAY, EXPLODE, OSNAP, REGEN, TRIM, EXTEND, FILLET, CHAMFER, BREAK, BREAK2, PEDIT, LIST, MATCHPROP, JOIN, HATCH, STRETCH, BLOCK, INSERT, DIVIDE, REVCLOUD, MULTILEADER, DIMSTYLE, DIMLINEAR, DIMALIGNED, DIMANGULAR, DIMRADIUS, DIMDIAMETER, LAYER, PROPERTIES,
         DISTANCE, AREA, ANGLE, ID_POINT, ARC_LENGTH, ZOOM, ZOOM_EXTENTS, VIEW_3D, VIEW_2D, UNDO, REDO, SAVE, HELP, UNSUPPORTED
     }
 
@@ -46,6 +46,7 @@ public final class CadCommand {
         if(eq(s,"F","FILLET"))return Action.FILLET;
         if(eq(s,"CHA","CHAMFER"))return Action.CHAMFER;
         if(eq(s,"BR","BREAK"))return Action.BREAK;
+        if(eq(s,"BREAK2","B2"))return Action.BREAK2;
         if(eq(s,"PE","PEDIT"))return Action.PEDIT;
         if(eq(s,"LI","LIST"))return Action.LIST;
         if(eq(s,"MA","MATCHPROP"))return Action.MATCHPROP;
@@ -97,7 +98,7 @@ public final class CadCommand {
             case PAN:return "PAN";case MOVE:return "MOVE";case COPY:return "COPY";case ROTATE:return "ROTATE";
             case ERASE:return "ERASE";case SCALE:return "SCALE";case MIRROR:return "MIRROR";case OFFSET:return "OFFSET";
             case ARRAY:return "ARRAY";case EXPLODE:return "EXPLODE";case OSNAP:return "OSNAP";case REGEN:return "REGEN";
-            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case PEDIT:return "PEDIT";case LIST:return "LIST";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";case HATCH:return "HATCH";case STRETCH:return "STRETCH";case BLOCK:return "BLOCK";case INSERT:return "INSERT";case DIVIDE:return "DIVIDE";case REVCLOUD:return "REVCLOUD";case MULTILEADER:return "MLEADER";case DIMSTYLE:return "DIMSTYLE";case DIMLINEAR:return "DIMLINEAR";case DIMALIGNED:return "DIMALIGNED";case DIMANGULAR:return "DIMANGULAR";case DIMRADIUS:return "DIMRADIUS";case DIMDIAMETER:return "DIMDIAMETER";
+            case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case BREAK:return "BREAK";case BREAK2:return "BREAK2";case PEDIT:return "PEDIT";case LIST:return "LIST";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";case HATCH:return "HATCH";case STRETCH:return "STRETCH";case BLOCK:return "BLOCK";case INSERT:return "INSERT";case DIVIDE:return "DIVIDE";case REVCLOUD:return "REVCLOUD";case MULTILEADER:return "MLEADER";case DIMSTYLE:return "DIMSTYLE";case DIMLINEAR:return "DIMLINEAR";case DIMALIGNED:return "DIMALIGNED";case DIMANGULAR:return "DIMANGULAR";case DIMRADIUS:return "DIMRADIUS";case DIMDIAMETER:return "DIMDIAMETER";
             case LAYER:return "LAYER";case PROPERTIES:return "PROPERTIES";
             case DISTANCE:return "DIST";case AREA:return "AREA";case ANGLE:return "ANGLE";case ID_POINT:return "ID";case ARC_LENGTH:return "ARCLEN";case ZOOM:return "ZOOM";case VIEW_3D:return "3D";case VIEW_2D:return "2D";
             case ZOOM_EXTENTS:return "ZOOM EXTENTS";case UNDO:return "UNDO";case SAVE:return "QSAVE";

@@ -12,7 +12,7 @@ public final class CadCommandTest {
         expect("RO",CadCommand.Action.ROTATE);expect("E",CadCommand.Action.ERASE);expect("SC",CadCommand.Action.SCALE);expect("MI",CadCommand.Action.MIRROR);
         expect("O",CadCommand.Action.OFFSET);expect("AR",CadCommand.Action.ARRAY);expect("X",CadCommand.Action.EXPLODE);expect("OS",CadCommand.Action.OSNAP);
         expect("TR",CadCommand.Action.TRIM);expect("EX",CadCommand.Action.EXTEND);expect("F",CadCommand.Action.FILLET);expect("CHA",CadCommand.Action.CHAMFER);
-        expect("BR",CadCommand.Action.BREAK);expect("PE",CadCommand.Action.PEDIT);expect("LI",CadCommand.Action.LIST);expect("MA",CadCommand.Action.MATCHPROP);
+        expect("BR",CadCommand.Action.BREAK);expect("BREAK2",CadCommand.Action.BREAK2);expect("B2",CadCommand.Action.BREAK2);expect("PE",CadCommand.Action.PEDIT);expect("LI",CadCommand.Action.LIST);expect("MA",CadCommand.Action.MATCHPROP);
         expect("J",CadCommand.Action.JOIN);expect("H",CadCommand.Action.HATCH);expect("S",CadCommand.Action.STRETCH);expect("B",CadCommand.Action.BLOCK);
         expect("I",CadCommand.Action.INSERT);expect("D",CadCommand.Action.DIMSTYLE);expect("DLI",CadCommand.Action.DIMLINEAR);expect("DAL",CadCommand.Action.DIMALIGNED);
         expect("LA",CadCommand.Action.LAYER);expect("PR",CadCommand.Action.PROPERTIES);expect("DI",CadCommand.Action.DISTANCE);expect("AA",CadCommand.Action.AREA);

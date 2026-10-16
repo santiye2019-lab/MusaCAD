@@ -117,6 +117,35 @@ public final class MusaAiCadGeometryTest {
                                          Double.POSITIVE_INFINITY,0)!=null)
             throw new AssertionError("invalid BREAK pick must fail closed");
 
+        // BREAK2 removes the middle interval, regardless of picking order.
+        tight(MusaAiCadGeometry.breakLineGapAt(
+              new double[]{0,0,10,0},3,2,7,-1),
+              0,0,3,0,7,0,10,0);
+        tight(MusaAiCadGeometry.breakLineGapAt(
+              new double[]{0,0,10,0},7,-1,3,2),
+              0,0,3,0,7,0,10,0);
+        tight(MusaAiCadGeometry.breakLineGapAt(
+              new double[]{10,0,0,0},7,-1,3,2),
+              10,0,7,0,3,0,0,0);
+        tight(MusaAiCadGeometry.breakLineGapAt(
+              new double[]{0,0,0.0001,0},0.00003,0,0.00007,0),
+              0,0,0.00003,0,0.00007,0,0.0001,0);
+        double[] gapLine={0,0,10,0};
+        if(MusaAiCadGeometry.breakLineGapAt(gapLine,5,0,5,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(gapLine,-1,0,5,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(gapLine,5,0,11,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(gapLine,0.0001,0,4,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(gapLine,5,0,5.0001,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(gapLine,Double.NaN,0,7,0)!=null||
+           MusaAiCadGeometry.breakLineGapAt(new double[]{0,0,0,0},1,0,2,0)!=null)
+            throw new AssertionError("BREAK2 invalid segment must fail closed");
+        if(gapLine[0]!=0||gapLine[2]!=10)
+            throw new AssertionError("BREAK2 must not mutate source geometry");
+        if(MusaAiCadGeometry.breakLineGapAt(
+              new double[]{1e9,1e9,1e9+0.0001,1e9},
+              1e9+0.00003,1e9,1e9+0.00007,1e9)!=null)
+            throw new AssertionError("BREAK2 must reject unrepresentable float gap");
+
         System.out.println("MusaAiCadGeometryTest OK");
     }
 }

@@ -84,6 +84,38 @@ public final class MusaAiCadGeometry {
         return new double[]{target[0],target[1],x,y,x,y,target[2],target[3]};
     }
 
+    /**
+     * Two-point BREAK for a finite source LINE, removing the segment
+     * strictly between two projected user picks. Output order follows the
+     * original LINE vertex order, independent of tap order:
+     * [start, splitA, splitB, end].
+     * Rejected input must not mutate source drawing or the caller's arrays.
+     */
+    public static double[] breakLineGapAt(double[] target,
+                                          double ax,double ay,
+                                          double bx,double by){
+        if(!line(target)||!finite(ax,ay,bx,by))return null;
+        double dx=target[2]-target[0],dy=target[3]-target[1];
+        double length=Math.hypot(dx,dy);
+        if(!(length>1e-12)||!Double.isFinite(length))return null;
+        double t1=projection(ax,ay,target),t2=projection(bx,by,target);
+        if(!Double.isFinite(t1)||!Double.isFinite(t2))return null;
+        double lo=Math.min(t1,t2),hi=Math.max(t1,t2);
+        // Require two nonzero, distinct remaining LINEs plus a real gap.
+        if(lo<=0.001d||hi>=0.999d||hi-lo<=0.001d)return null;
+        double x1=target[0]+dx*lo,y1=target[1]+dy*lo;
+        double x2=target[0]+dx*hi,y2=target[1]+dy*hi;
+        if(!finite(x1,y1,x2,y2))return null;
+        float fx1=(float)x1,fy1=(float)y1,fx2=(float)x2,fy2=(float)y2;
+        if(!Float.isFinite(fx1)||!Float.isFinite(fy1)||
+                !Float.isFinite(fx2)||!Float.isFinite(fy2))return null;
+        if((fx1==(float)target[0]&&fy1==(float)target[1])||
+           (fx2==(float)target[2]&&fy2==(float)target[3])||
+           (fx1==fx2&&fy1==fy2))return null;
+        return new double[]{target[0],target[1],x1,y1,
+                            x2,y2,target[2],target[3]};
+    }
+
     public static boolean validPolyline(double[] xy,boolean closed){
         if(!path(xy))return false;
         int points=xy.length/2;
