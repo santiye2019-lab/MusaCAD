@@ -137,22 +137,34 @@ def verify(converter, original):
         temp = Path(tmp)
         model = temp / "model-identities.txt"
         converted = temp / "converted.dxf"
-        subprocess.run(
-            [str(converter), "--model-identity-probe", str(original), str(model)],
-            check=True, timeout=90, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        try:
+            subprocess.run(
+                [str(converter), "--model-identity-probe", str(original), str(model)],
+                check=True, timeout=90, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except subprocess.SubprocessError:
+            raise ValueError("native DWG root identity probe failed") from None
         if not model.is_file():
             raise ValueError("native model identities missing")
-        source = parse_native_export(model)
-        subprocess.run(
-            [str(converter), str(original), str(converted)],
-            check=True, timeout=90, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        try:
+            source = parse_native_export(model)
+        except ValueError as exc:
+            raise ValueError("native DWG index validation: " + str(exc)) from None
+        try:
+            subprocess.run(
+                [str(converter), str(original), str(converted)],
+                check=True, timeout=90, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except subprocess.SubprocessError:
+            raise ValueError("DWG to DXF conversion failed") from None
         if not converted.is_file():
             raise ValueError("converted DXF missing")
-        target = parse_dxf(converted)
+        try:
+            target = parse_dxf(converted)
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("DXF model index invalid: " + str(exc)) from None
         count = compare_records(source, target)
     if file_sha(original) != before:
         raise ValueError("read-only DWG source changed")
@@ -168,7 +180,10 @@ def main():
         count = verify(args.converter.resolve(), args.dwg.resolve())
     except (ValueError, OSError, subprocess.SubprocessError) as exc:
         # No IDs, source drawing names, geometry or raw records are disclosed.
-        print("FAIL: original DWG / converted DXF model identity consistency")
+        # Parser messages describe counts/categories only; never expose handles,
+        # coordinates, filenames or original engineering drawing payloads.
+        reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+        print("FAIL: original DWG / converted DXF identity: " + reason)
         return 1
     print("PASS: %d original DWG root entities retain handle+type in DXF "
           "(NOT independent AutoCAD parity)" % count)
