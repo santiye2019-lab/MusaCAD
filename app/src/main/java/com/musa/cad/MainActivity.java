@@ -2681,6 +2681,7 @@ public class MainActivity extends AppCompatActivity {
             tool("Fileto",R.drawable.ic_circle,this::runFilletCommand),
             tool("Oluk / Pah",R.drawable.ic_line,this::runChamferCommand),
             tool("Kır",R.drawable.ic_line,()->{if(ensureTransformSelection("KIR / BREAK")){if(cad.armBreakSelected())result.setText("Kır • Bölme noktasına dokunun");else result.setText("Kır • Hedef nesne çizgi olmalı");}}),
+            tool("Aralıklı Kır",R.drawable.ic_line,()->{if(ensureTransformSelection("BREAK2")){if(cad.armBreakGapSelected())result.setText("BREAK2 • Boşluk başlangıcı ve bitişine dokunun");else result.setText("BREAK2 • Hedef nesne LINE olmalı");}}),
             tool("Stretch",R.drawable.ic_move,()->{if(ensureTransformSelection("STRETCH")){if(cad.armStretchSelected())result.setText("Stretch • Köşe/vertex seçin");}}),
             tool("Array",R.drawable.ic_copy,this::runArrayCommand),
             tool("Patlat",R.drawable.ic_more,()->{if(ensureTransformSelection("EXPLODE")){if(cad.explodeSelectedEntity())result.setText("Patlat • Nesne parçalara ayrıldı");else result.setText("Patlat • Bu nesne desteklenmiyor");}}),
@@ -3882,6 +3883,7 @@ public class MainActivity extends AppCompatActivity {
             "F / FILLET • İki çizgi arasına teğet yay\n"+
             "CHA / CHAMFER • İki çizgi arasında düz pah\n"+
             "BR / BREAK • Seçili çizgiyi dokunulan noktadan böl\n"+
+            "B2 / BREAK2 • Seçili çizgide iki nokta arasını kaldır\n"+
             "PE / PEDIT • Polyline açık/kapalı durumunu değiştir\n"+
             "LI / LIST • Seçili nesnenin bilgilerini göster\n"+
             "MA / MATCHPROP • Seçili nesnenin özelliklerini hedefe aktar\n"+
