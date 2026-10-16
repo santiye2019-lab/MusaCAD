@@ -30,6 +30,8 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_one_cad_engine_mandate.py' -v
           python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
+          python3 -m unittest discover -s tests -p 'test_core_migration_diff.py' -v
+          python3 tests/check_core_migration_diff.py
       - name: Compile and test shared CAD core without Android or LibreDWG
         run: |
           set -euo pipefail
