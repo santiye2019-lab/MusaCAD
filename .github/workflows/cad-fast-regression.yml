@@ -140,6 +140,10 @@ jobs:
             app/src/main/java/com/musa/cad/Cad3dDxfHandleIndex.java \
             tests/Cad3dDxfHandleIndexTest.java
           java -cp /tmp/musacad-zinsert-tests Cad3dDxfHandleIndexTest
+          javac -encoding UTF-8 -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests \
+            app/src/main/java/com/musa/cad/Cad3dDwgHandleCrosscheck.java \
+            tests/Cad3dDwgHandleCrosscheckTest.java
+          java -cp /tmp/musacad-zinsert-tests Cad3dDwgHandleCrosscheckTest
           javac -encoding UTF-8 -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/DxfStreamEofTest.java
           java -cp /tmp/musacad-zinsert-tests DxfStreamEofTest
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests tests/Dxf3dSafeSaveIntegrationContractTest.java
