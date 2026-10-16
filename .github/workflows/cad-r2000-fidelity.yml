@@ -159,8 +159,8 @@ jobs:
           # Never disclose source handles in logs, attach private output or
           # mistake this single-reader check for AutoCAD 2026 certification.
           python3 -m unittest discover -s tests -p 'test_real_dwg_model_identity.py' -v
-          python3 tests/real_dwg_model_identity.py \\
-            --converter /tmp/musa-writer-proof/musacad_dwg_convert \\
+          python3 tests/real_dwg_model_identity.py \
+            --converter /tmp/musa-writer-proof/musacad_dwg_convert \
             /tmp/musa-writer-multi.dwg
 
       - name: R2000 complex polyline and 3DFACE roundtrip acceptance
