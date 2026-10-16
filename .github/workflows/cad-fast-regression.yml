@@ -140,6 +140,18 @@ jobs:
             app/src/main/java/com/musa/cad/DxfReplacementLayerStyle.java \
             tests/DxfReplacementLayerStyleTest.java
           java -cp /tmp/musacad-break-bylayer DxfReplacementLayerStyleTest
+      - name: 2D DXF stage before SAF with structural and SHA-256 verification
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-2d-safe-stage
+          javac -encoding UTF-8 -d /tmp/musacad-2d-safe-stage \
+            app/src/main/java/com/musa/cad/FileTransfer.java \
+            app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
+            app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
+            app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
+            tests/Dxf2dSafeSaveTest.java
+          java -cp /tmp/musacad-2d-safe-stage Dxf2dSafeSaveTest
       - name: Fast 3D open-surface area-weighted XYZ centroid
         run: |
           set -euo pipefail
