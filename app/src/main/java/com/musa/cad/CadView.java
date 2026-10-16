@@ -1459,26 +1459,6 @@ public class CadView extends View {
         switch(command){case TRIM:return "TRIM";case EXTEND:return "EXTEND";case FILLET:return "FILLET";case CHAMFER:return "CHAMFER";case MATCHPROP:return "MATCHPROP";case JOIN:return "JOIN";default:return "KOMUT";}
     }
 
-    private static float[] rayFromIntersection(CadEdit line,float ix,float iy,float pickX,float pickY){
-        if(line==null||line.xy.length<4)return null;
-        float t=projectionParameter(pickX,pickY,line.xy[0],line.xy[1],line.xy[2],line.xy[3]);
-        float px=line.xy[0]+(line.xy[2]-line.xy[0])*t,py=line.xy[1]+(line.xy[3]-line.xy[1])*t;
-        float vx=px-ix,vy=py-iy,len=(float)Math.hypot(vx,vy);
-        if(len<1e-5f){
-            float d1=(float)Math.hypot(line.xy[0]-pickX,line.xy[1]-pickY),d2=(float)Math.hypot(line.xy[2]-pickX,line.xy[3]-pickY);
-            float ex=d1<=d2?line.xy[0]:line.xy[2],ey=d1<=d2?line.xy[1]:line.xy[3];vx=ex-ix;vy=ey-iy;len=(float)Math.hypot(vx,vy);
-        }
-        if(len<1e-6f)return null;return new float[]{vx/len,vy/len};
-    }
-
-    private static CadEdit keptLineToPoint(CadEdit line,float ix,float iy,float[] dir,float tx,float ty){
-        if(line==null||line.xy.length<4||dir==null)return null;
-        float a=(line.xy[0]-ix)*dir[0]+(line.xy[1]-iy)*dir[1],b=(line.xy[2]-ix)*dir[0]+(line.xy[3]-iy)*dir[1];
-        float ex=a>=b?line.xy[0]:line.xy[2],ey=a>=b?line.xy[1]:line.xy[3];
-        if(Math.hypot(ex-tx,ey-ty)<1e-6)return null;
-        return CadEdit.line(ex,ey,tx,ty);
-    }
-
     private DxfParser.SourceEntity findEditableSourceAt(float x,float y){
         if(vectorDrawing==null)return null;float tolerance=20f*getResources().getDisplayMetrics().density/Math.max(.001f,scale),best=tolerance;DxfParser.SourceEntity found=null;int selectedId=sourceEdits.selectedId();
         int replacementId=sourceEdits.findReplacement(x,y,tolerance);if(replacementId>=0&&replacementId!=selectedId){DxfParser.SourceEntity replacement=vectorDrawing.sourceById(replacementId);if(replacement!=null&&vectorDrawing.isSourceVisible(replacementId))return replacement;}
