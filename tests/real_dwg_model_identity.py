@@ -9,6 +9,7 @@ AutoCAD 2026 reference, block instance ancestry or modern DWG writing.
 import argparse
 from collections import Counter
 import hashlib
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -44,12 +45,71 @@ def parse_native_export(path):
     return {key: val for key, val in records.items() if val in SUPPORTED}
 
 
-def parse_dxf(path):
+
+def primitive_geometry(kind, groups):
+    """Strict WCS vertex audit for direct LINE/3DFACE only.
+
+    This deliberately does NOT certify layer/color, invisible edges, OCS,
+    blocks, ACIS, or the binary DWG's independently decoded coordinates.
+    """
+    indexes = (0, 1) if kind == "LINE" else (0, 1, 2, 3)
+    wanted = {base + offset for base in (10, 20, 30)
+              for offset in indexes}
+    values = {}
+    for code, raw in groups:
+        if code not in wanted:
+            continue
+        if code in values:
+            raise ValueError("repeated DXF primitive coordinate group")
+        try:
+            number = float(raw)
+        except ValueError:
+            raise ValueError("invalid DXF primitive coordinate") from None
+        if not math.isfinite(number):
+            raise ValueError("nonfinite DXF primitive coordinate")
+        values[code] = number
+
+    def point(i):
+        if 10 + i not in values or 20 + i not in values:
+            raise ValueError("missing required DXF primitive XY coordinate")
+        return (values[10 + i], values[20 + i], values.get(30 + i, 0.0))
+
+    if kind == "LINE":
+        return (point(0), point(1))
+    first_three = (point(0), point(1), point(2))
+    fourth_x, fourth_y = 13 in values, 23 in values
+    if fourth_x != fourth_y:
+        raise ValueError("partial DXF 3DFACE fourth vertex")
+    # A triangular 3DFACE may omit the fourth point (same as third).
+    return first_three + ((point(3) if fourth_x else first_three[2]),)
+
+
+def compare_geometry(initial, exported):
+    """Conservatively reject silent coordinate edits despite identical IDs.
+
+    Tolerance covers floating-point ASCII/DWG/ASCII roundoff, not engineering
+    drawing edits. No identifiers, measurements or private file paths in logs.
+    """
+    if not initial or initial.keys() != exported.keys():
+        raise ValueError("three-way LINE/3DFACE geometry coverage mismatch")
+    for key, shape in initial.items():
+        other = exported[key]
+        if len(shape) != len(other) or any(
+            not math.isclose(a, b, rel_tol=1e-13, abs_tol=1e-9)
+            for point_a, point_b in zip(shape, other)
+            for a, b in zip(point_a, point_b)
+        ):
+            raise ValueError("three-way LINE/3DFACE coordinates differ")
+    return len(initial)
+
+
+def parse_dxf(path, with_geometry=False):
     section = None
     kind = None
     groups = []
     seen = set()
     entities = {}
+    geometry = {}
 
     def complete():
         nonlocal section, kind
@@ -75,6 +135,8 @@ def parse_dxf(path):
                 raise ValueError("duplicate DXF direct model handle")
             seen.add(key)
             entities[key] = kind
+            if with_geometry and kind in ("LINE", "3DFACE"):
+                geometry[key] = primitive_geometry(kind, groups)
 
     # Large user DXFs are not needed here; the public-fixture CI inputs are
     # strictly bounded, and no bytes are logged or committed.
@@ -104,7 +166,7 @@ def parse_dxf(path):
                     raise ValueError("oversized DXF entity")
         if kind is not None:
             complete()
-    return entities
+    return (entities, geometry) if with_geometry else entities
 
 
 def compare_records(native, dxf):
@@ -160,12 +222,13 @@ def verify(converter, original, minimum_entities=1, minimum_faces=0,
     before = file_sha(original)
     input_checksum = None
     expected = None
+    original_geometry = None
     if source_dxf is not None:
         if not source_dxf.is_file():
             raise ValueError("initial DXF source fixture missing")
         input_checksum = file_sha(source_dxf)
         try:
-            expected = parse_dxf(source_dxf)
+            expected, original_geometry = parse_dxf(source_dxf, with_geometry=True)
         except (ValueError, UnicodeError) as exc:
             raise ValueError("initial DXF model index invalid: " + str(exc)) from None
         validate_expected_coverage(expected, minimum_entities, minimum_faces)
@@ -198,13 +261,21 @@ def verify(converter, original, minimum_entities=1, minimum_faces=0,
         if not converted.is_file():
             raise ValueError("converted DXF missing")
         try:
-            target = parse_dxf(converted)
+            if expected is None:
+                target = parse_dxf(converted)
+                converted_geometry = None
+            else:
+                target, converted_geometry = parse_dxf(converted, with_geometry=True)
         except (ValueError, UnicodeError) as exc:
             raise ValueError("DXF model index invalid: " + str(exc)) from None
         count = compare_records(source, target)
         validate_expected_coverage(source, minimum_entities, minimum_faces)
         if expected is not None:
             count = compare_three_way(expected, source, target)
+            # Identity/type parity is not sufficient if a LINE endpoint or
+            # 3DFACE corner silently moves during the binary roundtrip.
+            if original_geometry:
+                compare_geometry(original_geometry, converted_geometry)
     if file_sha(original) != before:
         raise ValueError("read-only DWG source changed")
     if source_dxf is not None and file_sha(source_dxf) != input_checksum:
