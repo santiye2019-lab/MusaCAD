@@ -126,6 +126,14 @@ public final class DxfParser {
             }
             oleObjectCount=oleCount;olePreviewCount=olePreview;oleMissingPreviewCount=oleCount-olePreview;oleTypes=Collections.unmodifiableSet(types);
         }
+        /** Bounded color-only diagnostic for the active layout; no text or geometry leaves device. */
+        public CadColorProfile colorProfile(){
+            CadColorProfile profile=new CadColorProfile();
+            int stride=Math.max(1,(visibleDocument.size()+CadColorProfile.MAX_SAMPLES-1)/CadColorProfile.MAX_SAMPLES);
+            for(int i=0;i<visibleDocument.size();i+=stride)
+                profile.add(visibleDocument.get(i).color);
+            return profile;
+        }
         public Result withVisibleLayers(Set<String>selected)throws IOException{Set<String>visible=canonicalVisible(layerNames,selected);Result r=renderLayout(document,layerNames,visible,layoutNames,activeLayout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,replacementLayerStyle,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;r.externalReferences=externalReferences;return r;}
         public Result withLayout(String selected)throws IOException{String layout=findLayout(layoutNames,selected);Result r=renderLayout(document,layerNames,visibleLayers,layoutNames,layout,skippedCount,millimetersPerUnit,drawingUnitName,globalLineTypeScale,lineTypes,replacementLayerStyle,bitmap!=null,modelExtents,blockInsertions);r.conversionWarnings=conversionWarnings;r.externalReferences=externalReferences;return r;}
         private SourceEntity sourceEntity(LayerEntity layer){if(layer==null||layer.sourceRange==null||layer.sourceEditWorld==null)return null;CadEdit content=mapEditToContent(layer.sourceEditWorld,view);return new SourceEntity(layer.sourceId,layer.sourceRange,layer.sourceType,layer.layer,layer.layout,layer.color,layer.lineType,layer.lineTypeScale,layer.lineWeight,content);}
