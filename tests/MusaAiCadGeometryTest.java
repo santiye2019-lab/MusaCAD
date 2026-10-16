@@ -62,6 +62,41 @@ public final class MusaAiCadGeometryTest {
         if(!MusaAiCadGeometry.validPolyline(new double[]{0,0,1,0,1,1},true))throw new AssertionError("closed polyline");
         if(MusaAiCadGeometry.validPolyline(new double[]{0,0,1,0},true))throw new AssertionError("closed needs 3 points");
 
+        // Corner rays are selected by user picks, not by LINE storage order.
+        double[] horizontal={0,0,10,0},vertical={0,0,0,10};
+        double[] chamfer=MusaAiCadGeometry.cornerLines(
+            horizontal,vertical,5,0,0,5,2,false);
+        tight(chamfer,10,0,2,0,0,10,0,2,1,1);
+        double k=2-2/Math.sqrt(2);
+        tight(MusaAiCadGeometry.cornerLines(horizontal,vertical,5,0,0,5,2,true),
+              10,0,2,0,0,10,0,2,k,k);
+        tight(MusaAiCadGeometry.cornerLines(
+              new double[]{10,0,0,0},new double[]{0,10,0,0},
+              5,0,0,5,2,false),10,0,2,0,0,10,0,2,1,1);
+        tight(MusaAiCadGeometry.cornerLines(
+              new double[]{-10,0,10,0},new double[]{0,-10,0,10},
+              5,0,0,-5,2,false),10,0,2,0,0,-10,0,-2,1,-1);
+
+        // An excessive FILLET radius or CHAMFER distance must NOT extend
+        // past a source endpoint or create a zero-length kept section.
+        for(boolean fillet:new boolean[]{false,true}){
+            for(double large:new double[]{10,12}){
+                if(MusaAiCadGeometry.cornerLines(horizontal,vertical,5,0,0,5,large,fillet)!=null)
+                    throw new AssertionError("oversize corner should fail closed");
+            }
+            if(MusaAiCadGeometry.cornerLines(
+                    new double[]{2,0,10,0},vertical,5,0,0,5,2,fillet)!=null)
+                throw new AssertionError("external theoretical corner is unsupported");
+            if(MusaAiCadGeometry.cornerLines(horizontal,vertical,0,0,0,0,2,fillet)!=null)
+                throw new AssertionError("ambiguous picks on intersection must not alter geometry");
+            if(MusaAiCadGeometry.cornerLines(horizontal,
+                    new double[]{0,1,10,1},5,0,4,1,2,fillet)!=null)
+                throw new AssertionError("parallel corner must fail");
+            if(MusaAiCadGeometry.cornerLines(horizontal,vertical,5,0,0,5,
+                    Double.POSITIVE_INFINITY,fillet)!=null)
+                throw new AssertionError("nonfinite corner radius/distance must fail");
+        }
+
         System.out.println("MusaAiCadGeometryTest OK");
     }
 }
