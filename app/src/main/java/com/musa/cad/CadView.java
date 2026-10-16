@@ -1414,39 +1414,37 @@ public class CadView extends View {
             return;
         }
 
-        float[] d1=rayFromIntersection(target,ix,iy,selectedPickX,selectedPickY);
-        float[] d2=rayFromIntersection(edge,ix,iy,x,y);
-        if(d1==null||d2==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgi yönleri belirlenemedi");return;}
-        float dot=Math.max(-1f,Math.min(1f,d1[0]*d2[0]+d1[1]*d2[1]));
-        float theta=(float)Math.acos(dot);
-        if(theta<Math.toRadians(1d)||theta>Math.toRadians(179d)){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Uygun bir köşe açısı seçin");return;}
-
-        float distance=pairValue;
-        CadEdit connector;
-        float tangentDistance=distance;
-        if(command==PairCommand.FILLET){
-            tangentDistance=(float)(distance/Math.tan(theta/2d));
-            if(!Float.isFinite(tangentDistance)||tangentDistance<=0f){if(listener!=null)listener.onMeasurement("FILLET • Yarıçap bu açı için uygulanamadı");return;}
+        // The old corner branch allowed a tangent point beyond the picked
+        // source segment, silently manufacturing a new outline. Compute both
+        // kept segments and the connector BEFORE any source edit transaction.
+        double[] corner=MusaAiCadGeometry.cornerLines(
+            new double[]{target.xy[0],target.xy[1],target.xy[2],target.xy[3]},
+            new double[]{edge.xy[0],edge.xy[1],edge.xy[2],edge.xy[3]},
+            selectedPickX,selectedPickY,x,y,pairValue,
+            command==PairCommand.FILLET);
+        if(corner==null){
+            if(listener!=null)listener.onMeasurement(
+                pairCommandName(command)+" • Köşe, seçilen çizgi sınırları içinde oluşturulamıyor");
+            return;
         }
-        float p1x=ix+d1[0]*tangentDistance,p1y=iy+d1[1]*tangentDistance;
-        float p2x=ix+d2[0]*tangentDistance,p2y=iy+d2[1]*tangentDistance;
-        CadEdit first=keptLineToPoint(target,ix,iy,d1,p1x,p1y);
-        CadEdit second=keptLineToPoint(edge,ix,iy,d2,p2x,p2y);
-        if(first==null||second==null){if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Çizgiler düzenlenemedi");return;}
-
-        if(command==PairCommand.CHAMFER){
-            connector=CadEdit.line(p1x,p1y,p2x,p2y);
-        }else{
-            float bx=d1[0]+d2[0],by=d1[1]+d2[1],bl=(float)Math.hypot(bx,by);
-            if(bl<1e-6f){if(listener!=null)listener.onMeasurement("FILLET • Açıortay oluşturulamadı");return;}
-            bx/=bl;by/=bl;
-            float centerDistance=(float)(distance/Math.sin(theta/2d));
-            float cx=ix+bx*centerDistance,cy=iy+by*centerDistance;
-            float vx=ix-cx,vy=iy-cy,vl=(float)Math.hypot(vx,vy);
-            if(vl<1e-6f){if(listener!=null)listener.onMeasurement("FILLET • Yay merkezi oluşturulamadı");return;}
-            float mx=cx+vx/vl*distance,my=cy+vy/vl*distance;
-            connector=CadEdit.arc(p1x,p1y,mx,my,p2x,p2y);
-            if(connector==null){if(listener!=null)listener.onMeasurement("FILLET • Yay geometrisi oluşturulamadı");return;}
+        for(double coordinate:corner)
+            if(!Double.isFinite(coordinate)||Math.abs(coordinate)>1e9d){
+                if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Geometri sınırı aşıldı");
+                return;
+            }
+        CadEdit first=CadEdit.line((float)corner[0],(float)corner[1],
+                                  (float)corner[2],(float)corner[3]);
+        CadEdit second=CadEdit.line((float)corner[4],(float)corner[5],
+                                   (float)corner[6],(float)corner[7]);
+        CadEdit connector=command==PairCommand.CHAMFER?
+            CadEdit.line((float)corner[2],(float)corner[3],
+                         (float)corner[6],(float)corner[7]):
+            CadEdit.arc((float)corner[2],(float)corner[3],
+                        (float)corner[8],(float)corner[9],
+                        (float)corner[6],(float)corner[7]);
+        if(connector==null){
+            if(listener!=null)listener.onMeasurement(pairCommandName(command)+" • Köşe yayı geçersiz");
+            return;
         }
 
         boolean replaced=sourceEdits.replaceSelectedAndOther(
