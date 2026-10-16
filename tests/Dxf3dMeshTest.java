@@ -1278,16 +1278,16 @@ public final class Dxf3dMeshTest {
         File threeD=File.createTempFile("mesh3d-only-", ".dxf");
         File empty=File.createTempFile("mesh3d-empty-", ".dxf");
         try{
-            String geometry="0\\nSECTION\\n2\\nENTITIES\\n"
-                +"0\\n3DFACE\\n10\\n0\\n20\\n0\\n30\\n4\\n"
-                +"11\\n3\\n21\\n0\\n31\\n4\\n"
-                +"12\\n0\\n22\\n4\\n32\\n4\\n"
-                +"0\\nENDSEC\\n0\\nEOF\\n";
-            Files.writeString(threeD,geometry.replace("\\n","\\n"),StandardCharsets.UTF_8);
+            String geometry="0\nSECTION\n2\nENTITIES\n"
+                +"0\n3DFACE\n10\n0\n20\n0\n30\n4\n"
+                +"11\n3\n21\n0\n31\n4\n"
+                +"12\n0\n22\n4\n32\n4\n"
+                +"0\nENDSEC\n0\nEOF\n";
+            Files.writeString(threeD,geometry,StandardCharsets.UTF_8);
             Dxf3dMesh mesh=Dxf3dMesh.read(threeD);
             if(mesh.triangles.length!=3||mesh.xyz.length!=9||mesh.solidProxy)
                 throw new AssertionError("valid 3DFACE-only DXF must remain real 3D geometry");
-            Files.writeString(empty,"0\\nSECTION\\n2\\nENTITIES\\n0\\nENDSEC\\n0\\nEOF\\n".replace("\\n","\\n"),StandardCharsets.UTF_8);
+            Files.writeString(empty,"0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
             boolean rejected=false;
             try{Dxf3dMesh.read(empty);}catch(java.io.IOException expected){rejected=true;}
             if(!rejected)throw new AssertionError("genuinely empty DXF cannot be accepted as 3D");
