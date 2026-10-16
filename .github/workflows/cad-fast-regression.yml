@@ -59,6 +59,9 @@ jobs:
             tests/CadOpenTraceTest.java
           java -cp /tmp/musacad-color-load CadColorProfileTest
           java -cp /tmp/musacad-color-load CadOpenTraceTest
+      - name: Guard validated 3D-only DXF entry and private transient cleanup
+        run: |
+          python3 -m unittest discover -s tests -p 'test_3d_only_dxf_opening_contract.py' -v
       - name: Test XREF attach overlay and honest unresolved-reference inventory
         run: |
           set -euo pipefail
