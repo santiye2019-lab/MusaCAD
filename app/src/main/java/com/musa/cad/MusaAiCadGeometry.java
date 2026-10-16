@@ -64,21 +64,45 @@ public final class MusaAiCadGeometry {
         return closed?points>=3:points>=2;
     }
 
+    /** Shared tested intersection for ordinary on-screen and AI source edits. */
+    public static double[] intersectLines(double[] target,double[] boundary){
+        return line(target)&&line(boundary)?intersection(target,boundary):null;
+    }
+
+    /** Relative picked-point fraction on a WCS segment; NaN for invalid lines. */
+    public static double projectOnLine(double px,double py,double[] target){
+        if(!line(target)||!finite(px,py))return Double.NaN;
+        return projection(px,py,target);
+    }
+
     private static double[] intersection(double[] a,double[] b){
+        // Match musacad_line2.h's WCS supporting-line kernel. Comparing the
+        // unnormalized cross product to a fixed 1e-7 incorrectly rejects
+        // small (e.g. 0.1 mm) perpendicular source DWG lines.
         double x1=a[0],y1=a[1],x2=a[2],y2=a[3],x3=b[0],y3=b[1],x4=b[2],y4=b[3];
         double rx=x2-x1,ry=y2-y1,sx=x4-x3,sy=y4-y3;
-        double den=cross(rx,ry,sx,sy);
-        if(Math.abs(den)<EPS)return null;
+        double lengthA=Math.hypot(rx,ry),lengthB=Math.hypot(sx,sy);
+        if(!(lengthA>1e-12)||!(lengthB>1e-12)||
+                !Double.isFinite(lengthA)||!Double.isFinite(lengthB))return null;
+        double ux=rx/lengthA,uy=ry/lengthA,vx=sx/lengthB,vy=sy/lengthB;
+        double den=cross(ux,uy,vx,vy);
+        if(!Double.isFinite(den)||Math.abs(den)<=1e-12)return null;
         double qx=x3-x1,qy=y3-y1;
-        double t=cross(qx,qy,sx,sy)/den;
-        double u=cross(qx,qy,rx,ry)/den;
-        return new double[]{x1+t*rx,y1+t*ry,t,u};
+        double da=cross(qx,qy,vx,vy)/den;
+        double db=cross(qx,qy,ux,uy)/den;
+        double ix=x1+da*ux,iy=y1+da*uy,t=da/lengthA,u=db/lengthB;
+        // Reject impossible out-of-budget intersections instead of passing
+        // infinity or falsely clipping to a source endpoint.
+        return finite(ix,iy,t,u)?new double[]{ix,iy,t,u}:null;
     }
 
     private static double projection(double x,double y,double[] line){
-        double dx=line[2]-line[0],dy=line[3]-line[1],d=dx*dx+dy*dy;
-        if(d<EPS)return 0d;
-        return ((x-line[0])*dx+(y-line[1])*dy)/d;
+        // A fixed absolute length-squared EPS makes every segment shorter
+        // than sqrt(1e-7) project to zero, reversing short-line TRIM picks.
+        double dx=line[2]-line[0],dy=line[3]-line[1];
+        double len=Math.hypot(dx,dy);
+        if(!(len>1e-12)||!Double.isFinite(len))return Double.NaN;
+        return ((x-line[0])*(dx/len)+(y-line[1])*(dy/len))/len;
     }
 
     private static double cross(double ax,double ay,double bx,double by){return ax*by-ay*bx;}
