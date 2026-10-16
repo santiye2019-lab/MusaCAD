@@ -69,7 +69,7 @@ public final class SourceEditSession {
         public final long logicalId;
         SplitPartHit(int sourceId,int part){
             this.sourceId=sourceId;this.part=part;
-            this.logicalId=-(((long)sourceId)*2L+part+1L);
+            this.logicalId=-(((long)sourceId)*2L+part+2L);
         }
     }
     public SplitPartHit findSplitPart(float x,float y,float tolerance){
@@ -98,7 +98,7 @@ public final class SourceEditSession {
     public long selectedLogicalId(){
         if(!hasSelection())return -1L;
         return selectedPart<0?(long)selected:
-               -(((long)selected)*2L+selectedPart+1L);
+               -(((long)selected)*2L+selectedPart+2L);
     }
     public int selectedSplitPart(){return hasSelection()?selectedPart:-1;}
 
