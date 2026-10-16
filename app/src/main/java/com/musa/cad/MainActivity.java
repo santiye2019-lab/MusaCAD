@@ -4223,8 +4223,35 @@ public class MainActivity extends AppCompatActivity {
                     openTrace.mark(CadOpenTrace.Phase.FINAL_DXF_PARSE);
                     loaded.workingDxf=loaded.file;
                     loaded.bitmap=loaded.parsed==null?null:loaded.parsed.bitmap;
-                    if(loaded.parsed==null||loaded.parsed.entityCount<=0)
-                        throw new IOException("Desteklenen DXF geometrisi bulunamadı");
+                    if(loaded.parsed==null||loaded.parsed.entityCount<=0){
+                        // No 2D drawable entity is not equivalent to an empty CAD file.
+                        // Validate a usable 3D mesh before offering the 3D-only editor;
+                        // a missing/unreadable ACIS payload must still fail honestly.
+                        Dxf3dMesh geometry=Dxf3dMesh.read(loaded.file);
+                        if(geometry.xyz.length==0||
+                           (geometry.triangles.length==0&&geometry.edges.length==0))
+                            throw new IOException("Desteklenen 2B veya 3B DXF geometrisi bulunamadı");
+                        if(loaded.bitmap!=null&&!loaded.bitmap.isRecycled())
+                            loaded.bitmap.recycle();
+                        loaded.bitmap=null;
+                        runOnUiThread(()->{
+                            if(activeLoad!=task||isFinishing()||isDestroyed()){
+                                loaded.dispose();
+                                return;
+                            }
+                            activeLoad=null;
+                            if(task.dialog!=null)task.dialog.dismiss();
+                            Intent threeD=new Intent(this,Mesh3dActivity.class);
+                            threeD.putExtra(Mesh3dActivity.EXTRA_DXF,loaded.file.getAbsolutePath());
+                            threeD.putExtra(Mesh3dActivity.EXTRA_MODE,Mesh3dActivity.MODE_ISO);
+                            threeD.putExtra(Mesh3dActivity.EXTRA_TRANSIENT_DXF,true);
+                            startActivity(threeD);
+                            // Mesh3dActivity owns this private cache DXF until it finishes.
+                            // Never dispose or mutate the original SAF source document.
+                        });
+                        RecentFileStore.record(getApplicationContext(),uri,loaded.name,null);
+                        return;
+                    }
                     Bitmap recentPreview=loaded.bitmap;
                     runOnUiThread(()->{
                         if(activeLoad!=task||isFinishing()||isDestroyed()){loaded.dispose();return;}activeLoad=null;task.dialog.dismiss();
