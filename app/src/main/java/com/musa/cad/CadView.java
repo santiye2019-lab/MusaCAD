@@ -1356,12 +1356,26 @@ public class CadView extends View {
     private void applyBreak(float x,float y){
         CadEdit target=sourceEdits.currentSelected();
         if(target==null||target.type!=CadEdit.Type.LINE||target.xy.length<4){breakArmed=false;notifyValue();invalidate();return;}
-        float t=projectionParameter(x,y,target.xy[0],target.xy[1],target.xy[2],target.xy[3]);
-        if(t<=.001f||t>=.999f){if(listener!=null)listener.onMeasurement("BREAK • Çizginin uçlarından uzakta bir nokta seçin");return;}
-        float px=target.xy[0]+(target.xy[2]-target.xy[0])*t,py=target.xy[1]+(target.xy[3]-target.xy[1])*t;
-        CadEdit first=CadEdit.line(target.xy[0],target.xy[1],px,py),second=CadEdit.line(px,py,target.xy[2],target.xy[3]);
+        double[] parts=MusaAiCadGeometry.breakLineAt(
+            new double[]{target.xy[0],target.xy[1],target.xy[2],target.xy[3]},x,y);
+        if(parts==null){
+            if(listener!=null)listener.onMeasurement(
+                "BREAK • Bölme noktası geçersiz veya uç noktaya çok yakın");
+            return;
+        }
+        // Preserve at least the original CAD layer for both new segments.
+        // Full source color/linetype and compound undo still require a
+        // dedicated source multi-entity split transaction.
+        String layer=sourceEdits.selectedLayer();
+        CadEdit first=CadEdit.line((float)parts[0],(float)parts[1],
+                                   (float)parts[2],(float)parts[3])
+                                   .withLayerOverride(layer);
+        CadEdit second=CadEdit.line((float)parts[4],(float)parts[5],
+                                    (float)parts[6],(float)parts[7])
+                                    .withLayerOverride(layer);
         if(!sourceEdits.deleteSelected()){breakArmed=false;return;}
-        addRegularEdit(first);addRegularEdit(second);breakArmed=false;lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
+        addRegularEdits(java.util.Arrays.asList(first,second));
+        breakArmed=false;lastActionRegular=true;performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);invalidate();
         if(listener!=null)listener.onMeasurement("BREAK • Çizgi iki parçaya bölündü");
     }
 

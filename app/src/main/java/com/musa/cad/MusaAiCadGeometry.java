@@ -58,6 +58,32 @@ public final class MusaAiCadGeometry {
         return result;
     }
 
+    /**
+     * Returns two finite WCS LINE segments after a single-point BREAK:
+     * [start.x,start.y,split.x,split.y,split.x,split.y,end.x,end.y].
+     * The picked point is projected onto the line's supporting segment.
+     * Rejects near-endpoint splits and float-collapsed endpoints before a
+     * source edit can be committed. Does not model a two-point BREAK gap.
+     */
+    public static double[] breakLineAt(double[] target,double pickX,double pickY){
+        if(!line(target)||!finite(pickX,pickY))return null;
+        double dx=target[2]-target[0],dy=target[3]-target[1];
+        double length=Math.hypot(dx,dy);
+        if(!(length>1e-12)||!Double.isFinite(length))return null;
+        double t=projection(pickX,pickY,target);
+        if(!Double.isFinite(t)||t<=0.001d||t>=0.999d)return null;
+        double x=target[0]+dx*t,y=target[1]+dy*t;
+        if(!finite(x,y)||Math.hypot(x-target[0],y-target[1])<=1e-12||
+                Math.hypot(x-target[2],y-target[3])<=1e-12)return null;
+        // CadView edits currently serialize 2D source coordinates as floats;
+        // reject cases where either half would collapse after this conversion.
+        float fx=(float)x,fy=(float)y;
+        if(!Float.isFinite(fx)||!Float.isFinite(fy)||
+                (fx==(float)target[0]&&fy==(float)target[1])||
+                (fx==(float)target[2]&&fy==(float)target[3]))return null;
+        return new double[]{target[0],target[1],x,y,x,y,target[2],target[3]};
+    }
+
     public static boolean validPolyline(double[] xy,boolean closed){
         if(!path(xy))return false;
         int points=xy.length/2;

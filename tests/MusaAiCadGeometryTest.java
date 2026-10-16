@@ -97,6 +97,26 @@ public final class MusaAiCadGeometryTest {
                 throw new AssertionError("nonfinite corner radius/distance must fail");
         }
 
+        tight(MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},5,3),
+              0,0,5,0,5,0,10,0);
+        tight(MusaAiCadGeometry.breakLineAt(new double[]{10,0,0,0},5,3),
+              10,0,5,0,5,0,0,0);
+        tight(MusaAiCadGeometry.breakLineAt(new double[]{0,0,0.0001,0},0.00005,0),
+              0,0,0.00005,0,0.00005,0,0.0001,0);
+        if(MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},0,0)!=null||
+           MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},10,0)!=null||
+           MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},11,0)!=null)
+            throw new AssertionError("BREAK at or outside endpoint is invalid");
+        if(MusaAiCadGeometry.breakLineAt(new double[]{0,0,0,0},0,0)!=null)
+            throw new AssertionError("zero-length source line is not breakable");
+        if(MusaAiCadGeometry.breakLineAt(
+              new double[]{1e9,1e9,1e9+0.0001,1e9},1e9+0.00005,1e9)!=null)
+            throw new AssertionError("BREAK must reject float-collapsed source endpoints");
+        if(MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},Double.NaN,0)!=null||
+           MusaAiCadGeometry.breakLineAt(new double[]{0,0,10,0},
+                                         Double.POSITIVE_INFINITY,0)!=null)
+            throw new AssertionError("invalid BREAK pick must fail closed");
+
         System.out.println("MusaAiCadGeometryTest OK");
     }
 }
