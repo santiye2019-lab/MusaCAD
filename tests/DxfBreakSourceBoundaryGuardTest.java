@@ -127,6 +127,25 @@ public final class DxfBreakSourceBoundaryGuardTest {
             verify(f.file,Collections.singletonList(sole),
                    Collections.singletonList(f.range));
 
+            // BOTH children deleted: no replacement lines remain, but the
+            // original BREAK source must still be validated before removal.
+            if(!session.selectSplitPart(f.range.sourceId,0)||
+               !session.deleteSelected()||
+               !session.replacementRecords().isEmpty()||
+               session.removals().size()!=1||
+               !session.removals().get(0).breakSource)
+                throw new AssertionError("both-deleted BREAK lost original provenance");
+            verify(f.file,session.replacementRecords(),session.removals());
+            SourceRange badLastRemoval=new SourceRange(f.range.sourceId,
+                  f.range.startLine,f.range.endLineExclusive+2,true);
+            rejected(f.file,session.replacementRecords(),
+                     Collections.singletonList(badLastRemoval),
+                     "both-deleted BREAK must not erase a neighboring CIRCLE");
+            rejected(f.file,session.replacementRecords(),
+                     Arrays.asList(session.removals().get(0),
+                                   session.removals().get(0)),
+                     "both-deleted BREAK must reject duplicate removals");
+
             // Ordinary single-source edits are intentionally not gated.
             verify(f.file,Collections.singletonList(fragments(f.range).get(0)),
                   Collections.singletonList(f.range));
