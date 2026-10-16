@@ -28,6 +28,25 @@ int main(void){
     assert(!musa_core_break2_point(offset,1e9+0.00005,1e9,&result));
     assert(!musa_core_break2_point(line,2e12,1,&result));
     assert(result.first[2]==saved.first[2]&&result.second[0]==saved.second[0]);
-    puts("2D BREAK source segment geometry OK");
+    assert(musa_core_break2_gap(line,3,2,7,-1,&result));
+    near(result.first[2],3,1e-12);near(result.second[0],7,1e-12);
+    assert(musa_core_break2_gap(line,7,-1,3,2,&result));
+    near(result.first[2],3,1e-12);near(result.second[0],7,1e-12);
+    assert(musa_core_break2_gap(rev,7,-1,3,2,&result));
+    near(result.first[2],7,1e-12);near(result.second[0],3,1e-12);
+    assert(musa_core_break2_gap(tiny,0.00003,0,0.00007,0,&result));
+    near(result.first[2],0.00003,1e-12);
+    saved=result;
+    assert(!musa_core_break2_gap(line,5,0,5,0,&result));
+    assert(!musa_core_break2_gap(line,-1,0,5,0,&result));
+    assert(!musa_core_break2_gap(line,5,0,11,0,&result));
+    assert(!musa_core_break2_gap(line,0.0001,0,5,0,&result));
+    assert(!musa_core_break2_gap(line,5,0,5.0001,0,&result));
+    assert(!musa_core_break2_gap(line,NAN,0,7,0,&result));
+    assert(!musa_core_break2_gap(flat,1,0,2,0,&result));
+    assert(!musa_core_break2_gap(offset,1e9+0.00003,1e9,
+                                 1e9+0.00007,1e9,&result));
+    assert(result.first[2]==saved.first[2]&&result.second[0]==saved.second[0]);
+    puts("2D BREAK source segment geometry and BREAK2 gap OK");
     return 0;
 }
