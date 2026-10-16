@@ -4725,8 +4725,8 @@ public class MainActivity extends AppCompatActivity {
         final boolean dirty=isProjectDirty(project);
         String name=project.name==null||project.name.trim().isEmpty()?"Bu proje":project.name;
         String message=dirty
-            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydetmek, kaydetmeden kapatmak veya işlemi iptal etmek için seçim yapın.\n\nİkinci kez geri tuşuna basarsanız proje kaydedilmeden kapanır; MusaCAD açık kalır."
-            : name+" kapatılsın mı?\n\nİkinci kez geri tuşuna basarsanız proje kapanır; MusaCAD açık kalır.";
+            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydet, kaydetmeden kapat veya iptal seçeneklerinden birini seçin. Telefonun Geri tuşu işlemi iptal eder."
+            : name+" kapatılsın mı?\n\nTelefonun Geri tuşu kapatma işlemini iptal eder.";
 
         AlertDialog.Builder builder=new AlertDialog.Builder(this)
             .setTitle(dirty?"Projeyi kapat • Kaydedilmemiş değişiklikler":"Projeyi kapat")
@@ -4746,16 +4746,12 @@ public class MainActivity extends AppCompatActivity {
         projectCloseTarget=project;
         projectCloseDialog=builder.create();
         projectCloseDialog.setCanceledOnTouchOutside(false);
+        // Back cancels the modal; it must NEVER discard an unsaved CAD project.
+        // The separate explicit KAYDET/KAYDETMEDEN KAPAT buttons own disposal.
         projectCloseDialog.setOnKeyListener((dialog,keyCode,event)->{
-            if(keyCode==KeyEvent.KEYCODE_BACK&&event.getAction()==KeyEvent.ACTION_UP){
-                ProjectSession target=projectCloseTarget;
-                dialog.dismiss();
-                projectCloseDialog=null;
-                projectCloseTarget=null;
-                if(target!=null&&projects.contains(target))closeProjectNow(target);
-                return true;
-            }
-            return keyCode==KeyEvent.KEYCODE_BACK;
+            if(keyCode!=KeyEvent.KEYCODE_BACK)return false;
+            if(event.getAction()==KeyEvent.ACTION_UP)dialog.dismiss();
+            return true;
         });
         projectCloseDialog.setOnDismissListener(d->{
             if(projectCloseDialog==d){
