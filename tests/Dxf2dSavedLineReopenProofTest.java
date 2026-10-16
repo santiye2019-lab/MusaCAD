@@ -43,6 +43,14 @@ public final class Dxf2dSavedLineReopenProofTest {
         Dxf2dStructureVerifier.verify(path.toFile());
         Dxf2dSavedLineReopenProof.verify(path.toFile(),StandardCharsets.UTF_8,expected);
     }
+    private static String tag(int code,String value){
+        return String.format(java.util.Locale.US,"%3d",code)+"\n"+value+"\n";
+    }
+    private static String change(String document,int code,String from,String to){
+        String old=tag(code,from);
+        if(!document.contains(old))throw new AssertionError("missing DXF test group "+code+"="+from);
+        return document.replace(old,tag(code,to));
+    }
     private static void fails(Path path,String altered,String label)throws Exception{
         Files.writeString(path,altered,StandardCharsets.UTF_8);
         try{verify(path,expect());throw new AssertionError("accepted "+label);}
@@ -57,31 +65,23 @@ public final class Dxf2dSavedLineReopenProofTest {
             verify(saved,expect());
             // A valid DXF document can still carry wrong source geometry,
             // wrong styles or missing children and MUST fail semantic readback.
-            fails(saved,good.replace("11\n7\n","11\n6\n"),"first endpoint");
-            fails(saved,good.replace("10\n13\n","10\n12\n"),"second endpoint");
-            fails(saved,good.replace("8\nM-BORU\n","8\nM-SOGUTMA\n"),
-                  "first layer");
-            fails(saved,good.replace("8\nE-PRIZ\n","8\nE-ZAYIF\n"),
-                  "second independent layer");
-            fails(saved,good.replace("6\nCENTER\n","6\nDASHED\n"),
-                  "first line pattern");
-            fails(saved,good.replace("48\n2.25\n","48\n1.25\n"),
-                  "first line scale");
-            fails(saved,good.replace("370\n70\n","370\n35\n"),
-                  "first lineweight");
-            fails(saved,good.replace("420\n1193214\n","420\n1193215\n"),
-                  "explicit TrueColor");
-            fails(saved,good.replace("8\nE-PRIZ\n",
-                                    "8\nE-PRIZ\n420\n11\n"),
-                  "BYLAYER becomes explicit");
-            fails(saved,good.replace("410\nLayout1\n",
-                                    "410\nLayout2\n"),
-                  "child layout");
-            fails(saved,good.replace("5\nA21\n","5\nA22\n"),
-                  "child handle changed");
-            // Syntactically valid DXF with second child omitted.
-            String single=good.substring(0,good.indexOf("0\nLINE\n5\nA21\n"))+
-                          "0\nENDSEC\n0\nEOF\n";
+            fails(saved,change(good,11,"7","6"),"first endpoint");
+            fails(saved,change(good,10,"13","12"),"second endpoint");
+            fails(saved,change(good,8,"M-BORU","M-SOGUTMA"),"first layer");
+            fails(saved,change(good,8,"E-PRIZ","E-ZAYIF"),"second independent layer");
+            fails(saved,change(good,6,"CENTER","DASHED"),"first line pattern");
+            fails(saved,change(good,48,"2.25","1.25"),"first line scale");
+            fails(saved,change(good,370,"70","35"),"first lineweight");
+            fails(saved,change(good,420,"1193214","1193215"),"explicit TrueColor");
+            fails(saved,good.replace(tag(8,"E-PRIZ"),
+                    tag(8,"E-PRIZ")+tag(420,"11")),"BYLAYER becomes explicit");
+            fails(saved,change(good,410,"Layout1","Layout2"),"child layout");
+            fails(saved,change(good,5,"A21","A22"),"child handle changed");
+            // A syntactically valid DXF missing only the second BREAK child.
+            String secondMarker=tag(0,"LINE")+tag(5,"A21");
+            int second=good.indexOf(secondMarker);
+            if(second<0)throw new AssertionError("second LINE fixture not found");
+            String single=good.substring(0,second)+"0\\nENDSEC\\n0\\nEOF\\n";
             fails(saved,single,"second LINE missing");
 
             // BYBLOCK saves ACI0 and no explicit group420.
@@ -99,7 +99,7 @@ public final class Dxf2dSavedLineReopenProofTest {
             verify(saved,Collections.singletonList(
                 new Dxf2dSavedLineReopenProof.Expected(
                     "AF0","Model",byblock,1,2,4,5)));
-            Files.writeString(saved,buffer.toString().replace("62\n0\n","62\n256\n"),
+            Files.writeString(saved,change(buffer.toString(),62,"0","256"),
                               StandardCharsets.UTF_8);
             try{
                 verify(saved,Collections.singletonList(
