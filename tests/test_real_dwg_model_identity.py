@@ -5,7 +5,7 @@ from pathlib import Path
 
 from real_dwg_model_identity import (
     normalize, parse_native_export, parse_dxf, compare_records,
-    validate_expected_coverage,
+    validate_expected_coverage, compare_three_way,
 )
 
 
@@ -20,6 +20,24 @@ class RealDwgIdentityTest(unittest.TestCase):
         target = {"A": "LINE", "C": "LINE"}
         with self.assertRaisesRegex(ValueError, "mismatch"):
             compare_records(native, target)
+
+    def test_three_way_rejects_synchronized_loss_of_original_entity(self):
+        initial = {"A1": "LINE", "B2": "3DFACE"}
+        # Reader and DXF re-export agree but BOTH dropped source face.
+        native = {"A1": "LINE"}
+        exported = {"A1": "LINE"}
+        self.assertEqual(compare_records(native, exported), 1)
+        with self.assertRaisesRegex(ValueError, "initial DXF to binary"):
+            compare_three_way(initial, native, exported)
+        self.assertEqual(compare_three_way(initial, dict(initial), dict(initial)), 2)
+
+    def test_three_way_rejects_changed_handle_with_equal_counts(self):
+        original = {"A1": "LINE", "B2": "3DFACE"}
+        wrong = {"A1": "LINE", "C2": "3DFACE"}
+        with self.assertRaisesRegex(ValueError, "initial DXF"):
+            compare_three_way(original, wrong, wrong)
+        with self.assertRaisesRegex(ValueError, "mismatch"):
+            compare_three_way(original, original, wrong)
 
     def test_fixture_coverage_requires_real_3d_faces(self):
         native = {"A": "LINE", "B": "3DFACE", "C": "3DFACE"}
