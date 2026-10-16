@@ -6,14 +6,14 @@ import java.util.*;
 public final class SourceEditSession {
     private static final class Entry {
         final int id;final SourceRange range;final CadEdit original;String layer;int color,colorMode;String lineType;double lineTypeScale;int lineWeight;
-        CadEdit replacement;boolean deleted;
+        CadEdit replacement,splitSecond;boolean deleted;
         Entry(int id,SourceRange range,CadEdit original,String layer,int color,String lineType,double lineTypeScale,int lineWeight){
             this.id=id;this.range=range;this.original=original.copy();this.layer=layer==null?"0":layer;this.color=color;this.colorMode=SourceReplacement.COLOR_EXPLICIT;
             this.lineType=DxfLineStyle.normalizeName(lineType);this.lineTypeScale=Double.isFinite(lineTypeScale)&&lineTypeScale>0d?lineTypeScale:1d;
             this.lineWeight=DxfLineStyle.normalizeWeight(lineWeight,DxfLineStyle.DEFAULT_LINEWEIGHT);
         }
         CadEdit current(){return replacement==null?original:replacement;}
-        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.colorMode=colorMode;e.replacement=replacement==null?null:replacement.copy();e.deleted=deleted;return e;}
+        Entry copy(){Entry e=new Entry(id,range,original,layer,color,lineType,lineTypeScale,lineWeight);e.colorMode=colorMode;e.replacement=replacement==null?null:replacement.copy();e.splitSecond=splitSecond==null?null:splitSecond.copy();e.deleted=deleted;return e;}
     }
     private static final class Undo {
         final int[] ids;final Entry[] previous;final int selected;
@@ -86,17 +86,42 @@ public final class SourceEditSession {
         save(e);e.colorMode=mode;if(e.replacement==null)e.replacement=e.current().copy();return true;
     }
 
-    public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
-    public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
-    public boolean scaleSelected(float factor){Entry e=entries.get(selected);if(e==null||e.deleted||!Float.isFinite(factor)||factor<=0f)return false;save(e);CadEdit c=e.current();e.replacement=c.scaled(factor,c.centerX(),c.centerY());return true;}
-    public boolean mirrorSelected(boolean verticalAxis){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);CadEdit c=e.current();e.replacement=c.mirrored(verticalAxis,c.centerX(),c.centerY());return true;}
-    public boolean replaceSelected(CadEdit replacement){Entry e=entries.get(selected);if(e==null||e.deleted||replacement==null)return false;save(e);e.replacement=replacement.copy();return true;}
+    public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
+    public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
+    public boolean scaleSelected(float factor){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null||!Float.isFinite(factor)||factor<=0f)return false;save(e);CadEdit c=e.current();e.replacement=c.scaled(factor,c.centerX(),c.centerY());return true;}
+    public boolean mirrorSelected(boolean verticalAxis){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.mirrored(verticalAxis,c.centerX(),c.centerY());return true;}
+    public boolean replaceSelected(CadEdit replacement){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null||replacement==null)return false;save(e);e.replacement=replacement.copy();return true;}
+    /**
+     * Atomic one-source-to-two-LINE replacement. Both halves retain the
+     * SAME source layer/color/linetype/scale/lineweight, are DXF-serialized
+     * as two separate entities, and share ONE undo/redo record.
+     *
+     * Until individual source IDs for resulting segments are introduced,
+     * split outputs are view/save-only and cannot be selected individually.
+     */
+    public boolean splitSelected(CadEdit first,CadEdit second){
+        Entry e=entries.get(selected);
+        if(e==null||e.deleted||e.splitSecond!=null||first==null||second==null||
+                e.current().type!=CadEdit.Type.LINE||first.type!=CadEdit.Type.LINE||
+                second.type!=CadEdit.Type.LINE)return false;
+        if(!finiteLine(first)||!finiteLine(second))return false;
+        save(e);
+        e.replacement=first.copy();e.splitSecond=second.copy();
+        selected=-1; // never edit only the first part by selecting the second
+        return true;
+    }
+    private static boolean finiteLine(CadEdit line){
+        if(line==null||line.xy.length!=4)return false;
+        for(float x:line.xy)if(!Float.isFinite(x))return false;
+        return Math.hypot((double)line.xy[2]-line.xy[0],
+                          (double)line.xy[3]-line.xy[1])>1e-8;
+    }
     public boolean replaceSelectedAndOther(int otherId,SourceRange otherRange,CadEdit otherPrototype,String otherLayer,int otherColor,String otherLineType,double otherLineTypeScale,int otherLineWeight,CadEdit selectedReplacement,CadEdit otherReplacement){
         Entry first=entries.get(selected);
-        if(first==null||first.deleted||otherId<0||otherId==selected||otherRange==null||otherPrototype==null||selectedReplacement==null||otherReplacement==null)return false;
+        if(first==null||first.deleted||first.splitSecond!=null||otherId<0||otherId==selected||otherRange==null||otherPrototype==null||selectedReplacement==null||otherReplacement==null)return false;
         Entry previousOther=entries.get(otherId);
         Entry other=previousOther==null?new Entry(otherId,otherRange,otherPrototype,otherLayer,otherColor,otherLineType,otherLineTypeScale,otherLineWeight):previousOther;
-        if(other.deleted)return false;
+        if(other.deleted||other.splitSecond!=null)return false;
         record(new Undo(first.id,first.copy(),otherId,previousOther==null?null:previousOther.copy(),selected));
         if(previousOther==null)entries.put(otherId,other);
         first.replacement=selectedReplacement.copy();
@@ -105,10 +130,10 @@ public final class SourceEditSession {
     }
     public boolean replaceSelectedAndDeleteOther(int otherId,SourceRange otherRange,CadEdit otherPrototype,String otherLayer,int otherColor,String otherLineType,double otherLineTypeScale,int otherLineWeight,CadEdit selectedReplacement){
         Entry first=entries.get(selected);
-        if(first==null||first.deleted||otherId<0||otherId==selected||otherRange==null||otherPrototype==null||selectedReplacement==null)return false;
+        if(first==null||first.deleted||first.splitSecond!=null||otherId<0||otherId==selected||otherRange==null||otherPrototype==null||selectedReplacement==null)return false;
         Entry previousOther=entries.get(otherId);
         Entry other=previousOther==null?new Entry(otherId,otherRange,otherPrototype,otherLayer,otherColor,otherLineType,otherLineTypeScale,otherLineWeight):previousOther;
-        if(other.deleted)return false;
+        if(other.deleted||other.splitSecond!=null)return false;
         record(new Undo(first.id,first.copy(),otherId,previousOther==null?null:previousOther.copy(),selected));
         if(previousOther==null)entries.put(otherId,other);
         first.replacement=selectedReplacement.copy();
@@ -127,20 +152,23 @@ public final class SourceEditSession {
         target.replacement=target.current().copy();
         return true;
     }
-    public CadEdit offsetSelected(float distance){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().offset(distance);}
-    public CadEdit copySelected(float dx,float dy){Entry e=entries.get(selected);return e==null||e.deleted?null:e.current().translated(dx,dy);}
+    public CadEdit offsetSelected(float distance){Entry e=entries.get(selected);return e==null||e.deleted||e.splitSecond!=null?null:e.current().offset(distance);}
+    public CadEdit copySelected(float dx,float dy){Entry e=entries.get(selected);return e==null||e.deleted||e.splitSecond!=null?null:e.current().translated(dx,dy);}
     public boolean deleteSelected(){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);e.deleted=true;e.replacement=null;selected=-1;return true;}
 
     public boolean undo(){Undo u=undo.pollFirst();if(u==null)return false;redo.addFirst(snapshot(u.ids,selected));restore(u);return true;}
     public boolean redo(){Undo r=redo.pollFirst();if(r==null)return false;undo.addFirst(snapshot(r.ids,selected));trim(undo);restore(r);return true;}
 
     public Set<Integer> hiddenSourceIds(){LinkedHashSet<Integer> ids=new LinkedHashSet<>();for(Entry e:entries.values())if(e.deleted||e.replacement!=null)ids.add(e.id);return ids;}
-    public List<CadEdit> replacements(){ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.add(e.replacement.copy());return out;}
+    public List<CadEdit> replacements(){ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){out.add(e.replacement.copy());if(e.splitSecond!=null)out.add(e.splitSecond.copy());}return out;}
     public Map<Integer,CadEdit> replacementMap(){LinkedHashMap<Integer,CadEdit> out=new LinkedHashMap<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.put(e.id,e.replacement.copy());return out;}
 
     public List<SourceReplacement> replacementRecords(){
         ArrayList<SourceReplacement> out=new ArrayList<>();
-        for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
+        for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){
+            out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
+            if(e.splitSecond!=null)out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.splitSecond));
+        }
         return out;
     }
 
@@ -148,7 +176,7 @@ public final class SourceEditSession {
     public int modifiedCount(){int n=0;for(Entry e:entries.values())if(e.deleted||e.replacement!=null)n++;return n;}
 
     /** Finds a currently replaced source entity so it remains selectable after its original is hidden. */
-    public int findReplacement(float x,float y,float tolerance){float best=Math.max(0,tolerance);int found=-1;for(Entry e:entries.values()){if(e.deleted||e.replacement==null)continue;float d=e.replacement.hitDistance(x,y);if(d<=best){best=d;found=e.id;}}return found;}
+    public int findReplacement(float x,float y,float tolerance){float best=Math.max(0,tolerance);int found=-1;for(Entry e:entries.values()){if(e.deleted||e.replacement==null||e.splitSecond!=null)continue;float d=e.replacement.hitDistance(x,y);if(d<=best){best=d;found=e.id;}}return found;}
 
     public SourceRange rangeFor(int id){Entry e=entries.get(id);return e==null?null:e.range;}
     public CadEdit prototypeFor(int id){Entry e=entries.get(id);return e==null?null:e.original.copy();}
