@@ -368,7 +368,17 @@ public final class SourceEditSession {
         return out;
     }
 
-    public List<SourceRange> removals(){ArrayList<SourceRange> out=new ArrayList<>();for(Entry e:entries.values())if(e.deleted||e.replacement!=null)out.add(e.range);return out;}
+    public List<SourceRange> removals(){
+        ArrayList<SourceRange> out=new ArrayList<>();
+        for(Entry e:entries.values())if(e.deleted||e.replacement!=null){
+            // A deleted last child leaves no replacement record, so carry
+            // the original BREAK source provenance on the removal itself.
+            out.add(e.splitSecond==null?e.range:
+                    new SourceRange(e.range.sourceId,e.range.startLine,
+                                    e.range.endLineExclusive,true));
+        }
+        return out;
+    }
     public int modifiedCount(){int n=0;for(Entry e:entries.values())if(e.deleted||e.replacement!=null)n++;return n;}
 
     /** Finds a currently replaced source entity so it remains selectable after its original is hidden. */
