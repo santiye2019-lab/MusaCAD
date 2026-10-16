@@ -30,6 +30,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Enforce single portable CAD engine and Windows iOS test contracts
+        run: |
+          python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
