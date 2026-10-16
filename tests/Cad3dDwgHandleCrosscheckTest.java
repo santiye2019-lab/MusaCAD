@@ -71,6 +71,19 @@ public final class Cad3dDwgHandleCrosscheckTest {
             catch(IOException good){}
         }finally {Files.deleteIfExists(file.toPath());}
 
+        // 64-bit unsigned DXF handle must survive signed JNI jlong transport.
+        File high=File.createTempFile("musacad-unsigned-handle-", ".dxf");
+        try{
+            Files.writeString(high.toPath(),"0\nSECTION\n2\nENTITIES\n"+
+                "0\nLINE\n5\nF000000000000001\n10\n0\n20\n0\n"+
+                "11\n1\n21\n1\n0\nENDSEC\n0\nEOF\n",StandardCharsets.UTF_8);
+            Dxf3dMesh highMesh=Dxf3dMesh.read(high);
+            Cad3dDxfHandleIndex highIndex=Cad3dDxfHandleIndex.read(high);
+            Cad3dDwgHandleCrosscheck.Builder highBuilder=new Cad3dDwgHandleCrosscheck.Builder();
+            highBuilder.addPage(0,new long[]{0xF000000000000001L,1},1,false);
+            expect(highBuilder.finish().matchesDirectModel(highIndex.forVertex(highMesh,0)));
+        }finally{Files.deleteIfExists(high.toPath());}
+
         reject(new long[]{},0,0,false);
         reject(new long[]{0xA1},0,1,false);
         reject(new long[]{0,1},0,1,false);
