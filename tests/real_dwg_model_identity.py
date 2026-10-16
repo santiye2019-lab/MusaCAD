@@ -54,10 +54,11 @@ def parse_dxf(path):
     def complete():
         nonlocal section, kind
         if kind == "SECTION":
-            code2 = [v for c, v in groups if c == 2]
-            if len(code2) != 1:
-                raise ValueError("DXF section header invalid (group 2 count=%d, tag count=%d)" % (len(code2), len(groups)))
-            section = code2[0].upper()
+            # DXF HEADER values can themselves contain many code-2 tags.
+            # Only the INITIAL (2, section-name) pair declares SECTION.
+            if not groups or groups[0][0] != 2 or not groups[0][1]:
+                raise ValueError("DXF section header missing initial group-2 name")
+            section = groups[0][1].upper()
         elif kind == "ENDSEC":
             section = None
         elif section == "ENTITIES" and kind in SUPPORTED:
