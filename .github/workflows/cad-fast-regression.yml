@@ -78,6 +78,15 @@ jobs:
           mkdir -p /tmp/musacad-surface-centroid-tests
           javac -encoding UTF-8 -d /tmp/musacad-surface-centroid-tests app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java tests/Cad3dSurfaceMetricsTest.java
           java -cp /tmp/musacad-surface-centroid-tests Cad3dSurfaceMetricsTest
+      - name: Android Canvas 3D camera to shared C matrix projection regression
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-camera-projection-jvm
+          javac -encoding UTF-8 -d /tmp/musacad-camera-projection-jvm \
+            app/src/main/java/com/musa/cad/Cad3dLegacyCameraBridge.java \
+            tests/Cad3dLegacyCameraBridgeTest.java
+          java -cp /tmp/musacad-camera-projection-jvm Cad3dLegacyCameraBridgeTest
+          echo 'Projection-only test; native picking, real DWG ID, and device acceptance remain pending.'
       - name: Optional Android 3D native mesh mass adapter preserves Java fallback
         run: |
           set -euo pipefail
