@@ -86,9 +86,12 @@ public final class MusaAiCadGeometry {
     }
 
     private static double projection(double x,double y,double[] line){
-        double dx=line[2]-line[0],dy=line[3]-line[1],d=dx*dx+dy*dy;
-        if(d<EPS)return 0d;
-        return ((x-line[0])*dx+(y-line[1])*dy)/d;
+        // A fixed absolute length-squared EPS makes every segment shorter
+        // than sqrt(1e-7) project to zero, reversing short-line TRIM picks.
+        double dx=line[2]-line[0],dy=line[3]-line[1];
+        double len=Math.hypot(dx,dy);
+        if(!(len>1e-12)||!Double.isFinite(len))return Double.NaN;
+        return ((x-line[0])*(dx/len)+(y-line[1])*(dy/len))/len;
     }
 
     private static double cross(double ax,double ay,double bx,double by){return ax*by-ay*bx;}
