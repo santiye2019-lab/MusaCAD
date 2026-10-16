@@ -161,6 +161,8 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
           python3 -m unittest discover -s tests -p 'test_autocad_2026_parity_gate.py' -v
           python3 -m unittest discover -s tests -p 'test_autocad_2026_51_acceptance.py' -v
+          python3 -m unittest discover -s tests -p 'test_autocad_2026_readiness.py' -v
+          python3 tests/autocad_2026_readiness.py
           python3 tests/autocad_2026_51_acceptance.py
           python3 -m unittest discover -s tests -p 'test_final_apk_hold_gate.py' -v
           python3 tests/autocad_2026_parity_gate.py
