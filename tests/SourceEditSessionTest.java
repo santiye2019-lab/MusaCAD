@@ -125,6 +125,8 @@ public class SourceEditSessionTest {
         if(children.updateSelectedStyle("YANLIS",null,null,null,null)||
            children.updateSelectedColorMode(SourceReplacement.COLOR_BYBLOCK))
             throw new AssertionError("shared source style must not silently change a single child");
+        if(children.copySelected(3,0)!=null||children.offsetSelected(1)!=null)
+            throw new AssertionError("fragment copy/offset must wait for exact source styling");
         if(!children.undo()||children.replacementRecords().size()!=2)
             throw new AssertionError("undo child move");
         near(children.replacementRecords().get(0).edit.xy[1],0,"undo left move");
