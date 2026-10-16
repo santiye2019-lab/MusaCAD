@@ -122,6 +122,18 @@ def compare_records(native, dxf):
     return len(native)
 
 
+def compare_three_way(initial, native, exported):
+    """Do not accept synchronized reader/converter loss of original entities."""
+    compare_records(native, exported)
+    if initial != native:
+        raise ValueError("initial DXF to binary DWG identity/type mismatch "
+                         "(input=%d; native=%d)" % (len(initial), len(native)))
+    if initial != exported:
+        raise ValueError("initial DXF to exported DXF identity/type mismatch "
+                         "(input=%d; output=%d)" % (len(initial), len(exported)))
+    return len(initial)
+
+
 def validate_expected_coverage(native, minimum_entities, minimum_faces):
     """Make test fixtures fail if both reader and converter omit 3D faces."""
     if minimum_entities < 1 or minimum_faces < 0:
@@ -192,12 +204,7 @@ def verify(converter, original, minimum_entities=1, minimum_faces=0,
         count = compare_records(source, target)
         validate_expected_coverage(source, minimum_entities, minimum_faces)
         if expected is not None:
-            if expected != source:
-                raise ValueError("initial DXF to binary DWG identity/type mismatch "
-                                 "(input=%d; native=%d)" % (len(expected), len(source)))
-            if expected != target:
-                raise ValueError("initial DXF to exported DXF identity/type mismatch "
-                                 "(input=%d; output=%d)" % (len(expected), len(target)))
+            count = compare_three_way(expected, source, target)
     if file_sha(original) != before:
         raise ValueError("read-only DWG source changed")
     if source_dxf is not None and file_sha(source_dxf) != input_checksum:
