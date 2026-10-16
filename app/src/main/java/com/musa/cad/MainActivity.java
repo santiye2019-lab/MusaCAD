@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
     private GridLayout toolPanelGrid;
     private HorizontalScrollView categoryScroll;
     private final ArrayList<ProjectSession> projects=new ArrayList<>();
-    private ProjectSession currentProject,pendingCloseAfterSave;
+    private ProjectSession currentProject,pendingCloseAfterSave,pendingDxfSaveProject;
     private AlertDialog projectCloseDialog;
     private ProjectSession projectCloseTarget;
     private CadEdit crossProjectClipboard;
@@ -4141,7 +4141,7 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
-        if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
+        if(r==SAVE_DXF&&(c!=RESULT_OK||data==null||data.getData()==null)){pendingCloseAfterSave=null;pendingDxfSaveProject=null;return;}
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
             pendingYfk2025Reply=null;
@@ -4718,15 +4718,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestCloseProject(ProjectSession project){
-        if(project==null)return;
-        if(project!=currentProject)activateProject(project);
+        if(project==null||!projects.contains(project))return;
+        // Do not switch tabs or prepare a save while another modal or CAD task is active.
         if(projectCloseDialog!=null&&projectCloseDialog.isShowing())return;
+        if(activeLoad!=null){
+            Toast.makeText(this,"Devam eden CAD işlemi bitince projeyi kapatın",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(project!=currentProject){
+            activateProject(project);
+            // Saving another tab's in-memory edits would risk closing the wrong project.
+            if(currentProject!=project){
+                Toast.makeText(this,"Proje etkinleştirilemedi; kapatma iptal edildi",Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
 
         final boolean dirty=isProjectDirty(project);
         String name=project.name==null||project.name.trim().isEmpty()?"Bu proje":project.name;
         String message=dirty
-            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydetmek, kaydetmeden kapatmak veya işlemi iptal etmek için seçim yapın.\n\nİkinci kez geri tuşuna basarsanız proje kaydedilmeden kapanır; MusaCAD açık kalır."
-            : name+" kapatılsın mı?\n\nİkinci kez geri tuşuna basarsanız proje kapanır; MusaCAD açık kalır.";
+            ? name+" içinde kaydedilmemiş değişiklikler var.\n\nKaydet ve kapat, kaydetmeden kapat veya iptal seçeneklerinden birini seçin. Telefonun Geri tuşu yalnızca bu uyarıyı kapatır."
+            : name+" kapatılsın mı?\n\nTelefonun Geri tuşu kapatma işlemini iptal eder.";
 
         AlertDialog.Builder builder=new AlertDialog.Builder(this)
             .setTitle(dirty?"Projeyi kapat • Kaydedilmemiş değişiklikler":"Projeyi kapat")
@@ -4735,6 +4747,12 @@ public class MainActivity extends AppCompatActivity {
 
         if(dirty){
             builder.setPositiveButton("KAYDET VE KAPAT",(d,w)->{
+                // A save-close must be bound to the same active, editable project.
+                if(project!=currentProject||activeLoad!=null||!canEdit()){
+                    pendingCloseAfterSave=null;
+                    Toast.makeText(this,"Proje artık kayda hazır değil; kapatma iptal edildi",Toast.LENGTH_LONG).show();
+                    return;
+                }
                 pendingCloseAfterSave=project;
                 requestEditedDxfSave();
             });
@@ -4746,16 +4764,12 @@ public class MainActivity extends AppCompatActivity {
         projectCloseTarget=project;
         projectCloseDialog=builder.create();
         projectCloseDialog.setCanceledOnTouchOutside(false);
+        // Back means CANCEL, never a hidden "close without saving".
+        // Only the explicitly named save/discard/close buttons may dispose a project.
         projectCloseDialog.setOnKeyListener((dialog,keyCode,event)->{
-            if(keyCode==KeyEvent.KEYCODE_BACK&&event.getAction()==KeyEvent.ACTION_UP){
-                ProjectSession target=projectCloseTarget;
-                dialog.dismiss();
-                projectCloseDialog=null;
-                projectCloseTarget=null;
-                if(target!=null&&projects.contains(target))closeProjectNow(target);
-                return true;
-            }
-            return keyCode==KeyEvent.KEYCODE_BACK;
+            if(keyCode!=KeyEvent.KEYCODE_BACK)return false;
+            if(event.getAction()==KeyEvent.ACTION_UP)dialog.dismiss();
+            return true;
         });
         projectCloseDialog.setOnDismissListener(d->{
             if(projectCloseDialog==d){
@@ -4885,11 +4899,32 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestEditedDxfSave(){
         if(activeLoad!=null){Toast.makeText(this,"Devam eden işlem bitmeden kaydedilemez",Toast.LENGTH_SHORT).show();return;}if(!canEdit()){Toast.makeText(this,"Bu çizim DXF olarak düzenlenebilir durumda değil",Toast.LENGTH_SHORT).show();return;}
-        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");startActivityForResult(intent,SAVE_DXF);
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");String base=currentDisplayName==null?"cizim":currentDisplayName.replaceFirst("(?i)\\.(dwg|dxf)$","");intent.putExtra(Intent.EXTRA_TITLE,base+"_duzenlendi.dxf");
+        pendingDxfSaveProject=currentProject;
+        try{startActivityForResult(intent,SAVE_DXF);}
+        catch(Exception failure){pendingCloseAfterSave=null;pendingDxfSaveProject=null;error(failure);}
     }
 
     private void saveEditedDxf(Uri uri){
-        if(!canEdit()||activeLoad!=null)return;final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
+        final ProjectSession selectedProject=pendingDxfSaveProject;
+        pendingDxfSaveProject=null;
+        if(selectedProject==null||selectedProject!=currentProject||!projects.contains(selectedProject)){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Dosya seçimi sırasında aktif CAD projesi değişti; kayıt engellendi",Toast.LENGTH_LONG).show();
+            return;
+        }
+        // Never publish a different project's edits after returning from Android's document picker.
+        if(pendingCloseAfterSave!=null&&currentProject!=pendingCloseAfterSave){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Etkin proje değişti; yanlış çizimin kaydı engellendi",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(currentProject!=null&&currentProject.sourceUri!=null&&currentProject.sourceUri.equals(uri)){
+            pendingCloseAfterSave=null;
+            Toast.makeText(this,"Orijinal CAD kaynağının üzerine yazılamaz; yeni kopya seçin",Toast.LENGTH_LONG).show();
+            return;
+        }
+        if(!canEdit()||activeLoad!=null){pendingCloseAfterSave=null;return;}final File base=editingBaseDxf;final DxfParser.Result drawing=activeDxf;final List<CadEdit> additions=cad.getAddedEdits();final List<SourceReplacement> replacements=cad.getSourceReplacements();final List<SourceRange> removals=cad.getSourceRemovals();final List<CadBlock.Definition> blocks=cad.getUserBlocks();final List<CadImageOverlay> rasterOverlays=cad.getImageOverlays();final String defaultLayer=currentProject==null?"0":currentProject.defaultLayer;final String sourceOverlayKey=currentProject==null||currentProject.sourceUri==null?null:currentProject.sourceUri.toString();final String destinationOverlayKey=uri.toString();final int rasterCount=rasterOverlays.size();final int total=additions.size()+removals.size()+blocks.size();
         LoadTask task=new LoadTask();activeLoad=task;LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);int pad=dp(20);box.setPadding(pad,pad,pad,pad);box.addView(new ProgressBar(this));task.progress=new TextView(this);task.progress.setText("DXF hazırlanıyor…");box.addView(task.progress);task.dialog=new AlertDialog.Builder(this).setTitle("Düzenlenmiş DXF kaydediliyor").setView(box).setNegativeButton("İPTAL",(d,w)->cancelLoad()).create();task.dialog.setOnCancelListener(d->cancelLoad());task.dialog.setCanceledOnTouchOutside(false);task.dialog.show();
         task.future=loader.submit(()->{
             Dxf2dSafeSave.VerifiedStage savedStage=null;
