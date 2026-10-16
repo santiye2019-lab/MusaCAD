@@ -28,6 +28,21 @@ struct MusaCoreMeshBVH {
     BVHNode *nodes;
     size_t nodes_used,nodes_capacity;
 };
+int musa_core_mesh_bvh_bounds(const MusaCoreMeshBVH *tree,
+                             double out_minimum[3],double out_maximum[3]) {
+    if(!tree||!out_minimum||!out_maximum)return -1;
+    if(tree->triangles==0)return 0;
+    if(!tree->nodes||tree->nodes_used==0)return -1;
+    const BVHBox *root=&tree->nodes[0].box;
+    for(int k=0;k<3;k++) {
+        if(!isfinite(root->mn[k])||!isfinite(root->mx[k])||
+           root->mn[k]>root->mx[k])return -1;
+    }
+    for(int k=0;k<3;k++){
+        out_minimum[k]=root->mn[k];out_maximum[k]=root->mx[k];
+    }
+    return 1;
+}
 void musa_core_mesh_bvh_destroy(MusaCoreMeshBVH *tree) {
     if(!tree)return;
     free(tree->xyz);free(tree->faces);free(tree->tri_boxes);

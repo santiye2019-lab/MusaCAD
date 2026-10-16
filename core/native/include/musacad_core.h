@@ -150,6 +150,13 @@ int musa_core_mesh_bvh_pick(const MusaCoreMeshBVH *tree,
                            const double ray_origin[3],
                            const double ray_direction[3],
                            double max_distance,MusaCoreMeshRayHit *out);
+/*
+ * Object-local BVH root AABB. Returns 1 for a nonempty indexed mesh,
+ * 0 for an empty BVH and -1 for null pointers. Outputs are unchanged
+ * on empty/invalid. Immutable BVH supports concurrent read queries.
+ */
+int musa_core_mesh_bvh_bounds(const MusaCoreMeshBVH *tree,
+                             double out_minimum[3],double out_maximum[3]);
 void musa_core_mesh_bvh_destroy(MusaCoreMeshBVH *tree);
 #ifdef __cplusplus
 }
