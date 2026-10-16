@@ -190,6 +190,12 @@ jobs:
             fi
             cmp "$input" "${input}.original"
           done
+          # Independently exercise actual binary non-coplanar 3DFACE handle
+          # and type preservation, not merely successful write/reopen.
+          python3 tests/real_dwg_model_identity.py \
+            --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+            --min-matched 2 --min-3dface 1 \
+            /tmp/musa-advanced-r2000/face3d.dwg
           echo "R2000 advanced acceptance failures: $failures"
           test "$failures" -eq 0
 
@@ -230,6 +236,17 @@ jobs:
             test -n "$peak"
             test "$peak" -le 900000
             echo "PASS R2000 STRESS: ${kind} peak_rss_kib=$peak"
+            # This mixed, original binary DWG has 512 additional entities,
+            # including 3DFACE as well as LINE/CIRCLE/ARC/POINT/LWPOLYLINE.
+            # The strict identity gate compares retained root LINE/3DFACE
+            # handles and types, not the original DXF line/face counts.
+            if [ "$kind" = mixed-512 ]; then
+              python3 tests/real_dwg_model_identity.py \
+                --converter /tmp/musa-writer-proof/musacad_dwg_convert \
+                --min-matched 150 --min-3dface 80 \
+                "$output"
+            fi
+
           done
 
       - name: Real DWG reader regression on publicly distributable LibreDWG fixtures

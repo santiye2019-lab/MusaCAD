@@ -5,6 +5,7 @@ from pathlib import Path
 
 from real_dwg_model_identity import (
     normalize, parse_native_export, parse_dxf, compare_records,
+    validate_expected_coverage,
 )
 
 
@@ -19,6 +20,16 @@ class RealDwgIdentityTest(unittest.TestCase):
         target = {"A": "LINE", "C": "LINE"}
         with self.assertRaisesRegex(ValueError, "mismatch"):
             compare_records(native, target)
+
+    def test_fixture_coverage_requires_real_3d_faces(self):
+        native = {"A": "LINE", "B": "3DFACE", "C": "3DFACE"}
+        self.assertEqual(validate_expected_coverage(native, 3, 2), 3)
+        with self.assertRaisesRegex(ValueError, "coverage too small"):
+            validate_expected_coverage(native, 4, 2)
+        with self.assertRaisesRegex(ValueError, "required 3DFACE"):
+            validate_expected_coverage(native, 3, 3)
+        with self.assertRaises(ValueError):
+            validate_expected_coverage(native, 0, 0)
 
     def test_wrong_type_is_a_failure_and_no_empty_pass(self):
         with self.assertRaises(ValueError):

@@ -122,6 +122,17 @@ def compare_records(native, dxf):
     return len(native)
 
 
+def validate_expected_coverage(native, minimum_entities, minimum_faces):
+    """Make test fixtures fail if both reader and converter omit 3D faces."""
+    if minimum_entities < 1 or minimum_faces < 0:
+        raise ValueError("invalid test fixture acceptance minimum")
+    if len(native) < minimum_entities:
+        raise ValueError("real binary DWG identity fixture coverage too small")
+    if sum(kind == "3DFACE" for kind in native.values()) < minimum_faces:
+        raise ValueError("real binary DWG fixture lost required 3DFACE")
+    return len(native)
+
+
 def file_sha(path):
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -130,7 +141,7 @@ def file_sha(path):
     return digest.digest()
 
 
-def verify(converter, original):
+def verify(converter, original, minimum_entities=1, minimum_faces=0):
     if not converter.is_file() or not original.is_file():
         raise ValueError("native converter or DWG file missing")
     before = file_sha(original)
@@ -167,6 +178,7 @@ def verify(converter, original):
         except (ValueError, UnicodeError) as exc:
             raise ValueError("DXF model index invalid: " + str(exc)) from None
         count = compare_records(source, target)
+        validate_expected_coverage(source, minimum_entities, minimum_faces)
     if file_sha(original) != before:
         raise ValueError("read-only DWG source changed")
     return count
@@ -175,10 +187,14 @@ def verify(converter, original):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--converter", required=True, type=Path)
+    parser.add_argument("--min-matched", type=int, default=1)
+    parser.add_argument("--min-3dface", type=int, default=0)
     parser.add_argument("dwg", type=Path)
     args = parser.parse_args()
     try:
-        count = verify(args.converter.resolve(), args.dwg.resolve())
+        count = verify(args.converter.resolve(), args.dwg.resolve(),
+                       minimum_entities=args.min_matched,
+                       minimum_faces=args.min_3dface)
     except (ValueError, OSError, subprocess.SubprocessError) as exc:
         # No IDs, source drawing names, geometry or raw records are disclosed.
         # Parser messages describe counts/categories only; never expose handles,
