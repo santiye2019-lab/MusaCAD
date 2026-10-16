@@ -75,6 +75,70 @@ public final class MusaAiCadGeometry {
         return projection(px,py,target);
     }
 
+    /**
+     * Conservative finite-segment 2D corner. Used for source LINE FILLET
+     * (fillet=true, value=radius) and CHAMFER (value=symmetric distance).
+     * Points are in source drawing coordinates, not screen pixels.
+     *
+     * Return [farA.xy, tangentA.xy, farB.xy, tangentB.xy, arcMid.xy].
+     * For chamfer the last point is just the connector midpoint.
+     * Only the picked sides of intersecting finite LINEs are supported:
+     * external intersection extensions, arc/polyline corners, asymmetric
+     * chamfers, tangent-only/no-trim options await separate acceptance.
+     * Fail closed before the caller starts an edit transaction.
+     */
+    public static double[] cornerLines(double[] first,double[] second,
+                                       double pickAx,double pickAy,
+                                       double pickBx,double pickBy,
+                                       double value,boolean fillet){
+        if(!line(first)||!line(second)||
+                !finite(pickAx,pickAy,pickBx,pickBy,value)||
+                !(value>1e-12))return null;
+        double[] hit=intersection(first,second);
+        if(hit==null)return null;
+        double ix=hit[0],iy=hit[1],ta=hit[2],tb=hit[3];
+        // This first implementation trims two existing finite segments;
+        // extending to reach a far-away theoretical corner is not supported.
+        if(ta<0d||ta>1d||tb<0d||tb>1d)return null;
+        double pa=projection(pickAx,pickAy,first);
+        double pb=projection(pickBx,pickBy,second);
+        if(!Double.isFinite(pa)||!Double.isFinite(pb)||
+                Math.abs(pa-ta)<=1e-10||Math.abs(pb-tb)<=1e-10)return null;
+        int ea=pa<ta?0:2,eb=pb<tb?0:2;
+        double ax=first[ea],ay=first[ea+1];
+        double bx=second[eb],by=second[eb+1];
+        double la=Math.hypot(ax-ix,ay-iy),lb=Math.hypot(bx-ix,by-iy);
+        if(!(la>1e-12)||!(lb>1e-12)||!Double.isFinite(la)||!Double.isFinite(lb))
+            return null;
+        double uax=(ax-ix)/la,uay=(ay-iy)/la;
+        double ubx=(bx-ix)/lb,uby=(by-iy)/lb;
+        double cosine=Math.max(-1d,Math.min(1d,uax*ubx+uay*uby));
+        double theta=Math.acos(cosine);
+        if(!(theta>Math.toRadians(1d))||!(theta<Math.toRadians(179d)))return null;
+        double distance=fillet?value/Math.tan(theta/2d):value;
+        if(!(distance>1e-12)||!Double.isFinite(distance))return null;
+        // Never silently extend a source LINE or collapse a kept section.
+        double remainA=la-distance,remainB=lb-distance;
+        if(!(remainA>Math.max(1e-12,la*1e-10))||
+                !(remainB>Math.max(1e-12,lb*1e-10)))return null;
+        double tax=ix+uax*distance,tay=iy+uay*distance;
+        double tbx=ix+ubx*distance,tby=iy+uby*distance;
+        double mx=(tax+tbx)*0.5,my=(tay+tby)*0.5;
+        if(fillet){
+            double bdx=uax+ubx,bdy=uay+uby,bl=Math.hypot(bdx,bdy);
+            double sin=Math.sin(theta/2d);
+            if(!(bl>1e-12)||!(sin>1e-12))return null;
+            double centerDistance=value/sin;
+            double cx=ix+bdx/bl*centerDistance,cy=iy+bdy/bl*centerDistance;
+            double back=Math.hypot(ix-cx,iy-cy);
+            if(!(back>1e-12)||!Double.isFinite(back))return null;
+            mx=cx+(ix-cx)/back*value;
+            my=cy+(iy-cy)/back*value;
+        }
+        double[] result={ax,ay,tax,tay,bx,by,tbx,tby,mx,my};
+        return finite(result)?result:null;
+    }
+
     private static double[] intersection(double[] a,double[] b){
         // Match musacad_line2.h's WCS supporting-line kernel. Comparing the
         // unnormalized cross product to a fixed 1e-7 incorrectly rejects
