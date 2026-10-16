@@ -30,9 +30,20 @@ public final class Cad3dDwgHandleCrosscheck {
         if(candidate==null)return false;
         int expected=typeOf(candidate.entityType);
         if(expected==TYPE_OTHER)return false;
-        long key;
-        try {key=Long.parseUnsignedLong(candidate.dxfHandle,16);}
-        catch(NumberFormatException e){return false;}
+        // Parse all 64 handle bits without requiring Android API 26's
+        // Long.parseUnsignedLong; every nibble is bounded and lossless.
+        String hex=candidate.dxfHandle;
+        if(hex==null||hex.isEmpty()||hex.length()>16)return false;
+        long key=0;
+        for(int i=0;i<hex.length();i++){
+            char c=hex.charAt(i);
+            int digit=c>='0'&&c<='9'?c-'0'
+                :c>='A'&&c<='F'?c-'A'+10
+                :c>='a'&&c<='f'?c-'a'+10:-1;
+            if(digit<0)return false;
+            key=(key<<4)|(long)digit;
+        }
+        if(key==0)return false;
         Integer nativeType=directModels.get(key);
         return nativeType!=null&&nativeType==expected;
     }
