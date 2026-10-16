@@ -113,6 +113,18 @@ jobs:
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
             tests/DxfSourceHandlePlanTest.java
           java -cp /tmp/musacad-dxf-handles DxfSourceHandlePlanTest
+      - name: BREAK2 exact original DXF source range deletion safety
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-break-range-guard
+          javac -encoding UTF-8 -d /tmp/musacad-break-range-guard \
+            app/src/main/java/com/musa/cad/CadEdit.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/SourceRange.java \
+            app/src/main/java/com/musa/cad/SourceReplacement.java \
+            app/src/main/java/com/musa/cad/DxfBreakSourceBoundaryGuard.java \
+            tests/DxfBreakSourceBoundaryGuardTest.java
+          java -cp /tmp/musacad-break-range-guard DxfBreakSourceBoundaryGuardTest
       - name: BREAK BYLAYER layer palette and relocated child visibility proof
         run: |
           set -euo pipefail
