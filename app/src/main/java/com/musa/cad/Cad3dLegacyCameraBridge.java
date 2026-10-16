@@ -50,7 +50,7 @@ public final class Cad3dLegacyCameraBridge {
 
         /** Scan outside the drawing/gesture thread after geometry edits. */
         public boolean matchesCanvasMesh(float[] xyz) {
-            if(xyz==null||xyz.length%3!=0)return false;
+            if(xyz==null||xyz.length==0||xyz.length%3!=0)return false;
             for(int i=0;i<xyz.length;i+=3)
                 if(!matchesCanvasAt(xyz[i],xyz[i+1],xyz[i+2]))return false;
             return true;
