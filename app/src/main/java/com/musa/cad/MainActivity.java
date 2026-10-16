@@ -4772,7 +4772,14 @@ public class MainActivity extends AppCompatActivity {
                 savedStage=Dxf2dSafeSave.stage(base,getCacheDir(),
                     out->DxfWriter.write(base,out,drawing,additions,replacements,
                                          removals,blocks,defaultLayer),
-                    Dxf2dStructureVerifier::verify);
+                    stagedDxf->{
+                        Dxf2dStructureVerifier.verify(stagedDxf);
+                        // Independently read the staged source LINE records:
+                        // two BREAK children must reopen at their exact
+                        // coordinates with separate style and DXF handles.
+                        DxfWriter.verifySavedSourceLines(base,stagedDxf,drawing,
+                                                         replacements);
+                    });
                 FileTransfer.checkCancelled();
                 Dxf2dSafeSave.publish(savedStage,
                     ()->getContentResolver().openOutputStream(uri,"wt"));
