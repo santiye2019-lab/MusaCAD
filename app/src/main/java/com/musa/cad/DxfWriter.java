@@ -130,7 +130,11 @@ public final class DxfWriter {
             expected.add(new Dxf2dSavedLineReopenProof.Expected(
                 plan.handleAt(index++),layout,r,a.x,a.y,b.x,b.y));
         }
-        Dxf2dSavedLineReopenProof.verify(savedDxf,cs,expected);
+        // A successful readback must also prove that the original BREAK
+        // source handle was retired, not merely that the two children exist.
+        Set<String> retired=Dxf2dSavedLineReopenProof.retiredBreakSourceHandles(
+            baseDxf,cs,replacements);
+        Dxf2dSavedLineReopenProof.verify(savedDxf,cs,expected,retired);
     }
 
     private static LinkedHashMap<String,String> collectTextStyles(List<CadEdit> additions,List<SourceReplacement> replacements,List<CadBlock.Definition> blocks){
