@@ -30,6 +30,57 @@ public class SourceEditSessionTest {
         if(!s.hasSelection()||s.replacements().size()!=1)throw new AssertionError("undo restore");
         SourceReplacement restored=s.replacementRecords().get(0);
         if(!"YENI_KATMAN".equals(restored.layer)||!"CENTER".equals(restored.lineType)||restored.lineWeight!=35||restored.color!=0xFFFF0000)throw new AssertionError("undo delete preserves edited style");
+        // BREAK and BREAK2 must be ONE source transaction, not two overlay
+        // edits with three separate undo steps. Both halves serialize with
+        // exactly the same styling inherited from the selected source LINE.
+        SourceEditSession split=new SourceEditSession();
+        SourceRange sr=new SourceRange(99,100,115);
+        split.select(99,sr,CadEdit.line(0,0,20,0),
+                "M-ATIKSU",0xFF21BA56,"DASHED",0.75d,35);
+        if(split.splitSelected(CadEdit.line(0,0,7,0),CadEdit.line(13,0,20,0))!=true)
+            throw new AssertionError("2D source split must commit");
+        if(split.hasSelection())throw new AssertionError("split must not ambiguously select one child");
+        if(split.modifiedCount()!=1||split.removals().size()!=1||
+           split.replacements().size()!=2||split.replacementRecords().size()!=2)
+            throw new AssertionError("two output LINEs, exactly one original DXF removal");
+        java.util.List<SourceReplacement> fragments=split.replacementRecords();
+        for(int k=0;k<2;k++){
+            SourceReplacement fragment=fragments.get(k);
+            if(fragment.sourceId!=99||fragment.range!=sr||
+               !"M-ATIKSU".equals(fragment.layer)||
+               fragment.color!=0xFF21BA56||!"DASHED".equals(fragment.lineType)||
+               fragment.lineWeight!=35||Math.abs(fragment.lineTypeScale-.75)>1e-9)
+                throw new AssertionError("split lost source DXF style on part "+k);
+        }
+        near(fragments.get(0).edit.xy[2],7,"source first half");
+        near(fragments.get(1).edit.xy[0],13,"source second half");
+        if(split.findReplacement(15,0,2)>=0)
+            throw new AssertionError("unaddressed child selection must fail closed");
+        SourceEditSession frozen=split.snapshotCopy();
+        if(!split.undo()||split.modifiedCount()!=0||split.replacements().size()!=0||
+           split.removals().size()!=0||!split.hasSelection())
+            throw new AssertionError("one undo must restore source LINE and style");
+        if(split.undo())throw new AssertionError("source split must be just one undo");
+        if(!split.redo()||split.modifiedCount()!=1||split.replacements().size()!=2)
+            throw new AssertionError("one redo must restore both split segments");
+        if(frozen.replacementRecords().size()!=2||
+           frozen.replacementRecords().get(1).edit.xy[0]!=13)
+            throw new AssertionError("tab snapshot must preserve complete split");
+        SourceEditSession fromSnapshot=new SourceEditSession();
+        fromSnapshot.copyFrom(frozen);
+        if(!fromSnapshot.undo()||fromSnapshot.modifiedCount()!=0)
+            throw new AssertionError("restored drawing session must undo entire split");
+        SourceEditSession reject=new SourceEditSession();
+        reject.select(9,new SourceRange(9,0,4),CadEdit.line(0,0,10,0),
+                      "ELEKTRIK",0xFFABCDEF);
+        if(reject.splitSelected(CadEdit.line(0,0,0,0),CadEdit.line(5,0,10,0))||
+           reject.modifiedCount()!=0||reject.replacements().size()!=0)
+            throw new AssertionError("degenerate split must not mutate source state");
+        if(!reject.splitSelected(CadEdit.line(0,0,3,0),CadEdit.line(7,0,10,0)))
+            throw new AssertionError("valid second split");
+        if(reject.splitSelected(CadEdit.line(0,0,2,0),CadEdit.line(8,0,10,0)))
+            throw new AssertionError("nested split without editable child IDs is unsafe");
+
         System.out.println("Source entity edit session/style cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
