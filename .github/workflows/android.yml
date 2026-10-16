@@ -82,6 +82,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java tests/CadEditStylusTest.java
           java -cp /tmp/musacad-tests CadEditStylusTest
+      - name: Test fast conservative CAD source selection parity
+        run: |
+          javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadPickBounds.java tests/CadPickBoundsTest.java
+          java -cp /tmp/musacad-tests CadPickBoundsTest
       - name: Test source entity edit transforms
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/SourceRange.java tests/CadEditTransformTest.java

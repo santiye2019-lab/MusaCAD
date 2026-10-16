@@ -135,7 +135,15 @@ public final class DxfParser {
         public boolean isSourceVisible(int id){LayerEntity layer=sourceLayerById.get(id);return layer!=null&&activeLayout.equals(layer.layout)&&layer.isVisible(visibleLayerKeys);}
         public SourceEntity findEditableSource(float x,float y,float tolerance,Set<Integer>hiddenIds){
             PointF world=drawingPointFromContent(x,y);float best=(float)drawingDistanceFromContent(Math.max(0f,tolerance));LayerEntity found=null;Set<Integer>hidden=hiddenIds==null?Collections.emptySet():hiddenIds;
-            for(LayerEntity layer:editableSourceLayers){if(!activeLayout.equals(layer.layout)||hidden.contains(layer.sourceId)||!layer.isVisible(visibleLayerKeys))continue;float distance=layer.sourceEditWorld.hitDistance(world.x,world.y),allowed="TEXT".equals(layer.sourceType)?best*1.75f:best;if(distance<=allowed&&(found==null||distance<best)){best=distance;found=layer;}}
+            for(LayerEntity layer:editableSourceLayers){
+                if(!activeLayout.equals(layer.layout)||hidden.contains(layer.sourceId)||!layer.isVisible(visibleLayerKeys))continue;
+                float allowed="TEXT".equals(layer.sourceType)?best*1.75f:best;
+                // Cheap conservative bounds first. Keep the original exact
+                // hit-distance and nearest-object ordering unchanged.
+                if(!CadPickBounds.mightHit(layer.sourceEditWorld,world.x,world.y,allowed))continue;
+                float distance=layer.sourceEditWorld.hitDistance(world.x,world.y);
+                if(distance<=allowed&&(found==null||distance<best)){best=distance;found=layer;}
+            }
             return sourceEntity(found);
         }
         public void drawVector(Canvas canvas,Matrix imageMatrix){drawVector(canvas,imageMatrix,Collections.emptySet());}
