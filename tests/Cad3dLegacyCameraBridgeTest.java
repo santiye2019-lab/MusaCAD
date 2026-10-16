@@ -58,6 +58,7 @@ public final class Cad3dLegacyCameraBridgeTest {
         check(!s.matchesCanvasAt(0,-17,0)); // clamps near model limit
         check(!s.matchesCanvasMesh(new float[]{0,0,0,0,-17,0}));
         check(!s.matchesCanvasMesh(new float[]{0,0}));
+        check(!s.matchesCanvasMesh(new float[0]));
         check(!s.matchesCanvasAt(Double.NaN,0,0));
         rejects(()->Cad3dLegacyCameraBridge.capture(0,0,0,0,0,0,1,100,100));
         rejects(()->Cad3dLegacyCameraBridge.capture(0,0,0,1,0,0,1,0,100));
