@@ -70,16 +70,16 @@ class RealDwgIdentityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / "header_fixture.dxf"
             p.write_text(
-                "0\\nSECTION\\n2\\nHEADER\\n9\\n$CUSTOM\\n2\\nextra-value\\n"
-                "9\\n$SECOND\\n2\\nextra-value-2\\n0\\nENDSEC\\n"
-                "0\\nSECTION\\n2\\nENTITIES\\n"
-                "0\\nLINE\\n5\\nA1\\n10\\n0\\n20\\n0\\n"
-                "11\\n2\\n21\\n1\\n0\\nENDSEC\\n0\\nEOF\\n",
+                "0\nSECTION\n2\nHEADER\n9\n$CUSTOM\n2\nextra-value\n"
+                "9\n$SECOND\n2\nextra-value-2\n0\nENDSEC\n"
+                "0\nSECTION\n2\nENTITIES\n"
+                "0\nLINE\n5\nA1\n10\n0\n20\n0\n"
+                "11\n2\n21\n1\n0\nENDSEC\n0\nEOF\n",
                 encoding="utf-8"
             )
             self.assertEqual(parse_dxf(p), {"A1": "LINE"})
-            p.write_text("0\\nSECTION\\n9\\n$BAD\\n2\\nHEADER\\n"
-                         "0\\nENDSEC\\n0\\nEOF\\n", encoding="utf-8")
+            p.write_text("0\nSECTION\n9\n$BAD\n2\nHEADER\n"
+                         "0\nENDSEC\n0\nEOF\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 parse_dxf(p)
 
