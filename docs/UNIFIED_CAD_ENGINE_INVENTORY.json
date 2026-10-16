@@ -1,0 +1,663 @@
+{
+  "schema_version": 1,
+  "owner_decision_date": "2026-10-17",
+  "purpose": "Conservative file-level baseline to prevent new untracked Java-only CAD engine features; not functional acceptance",
+  "shared_engine_target": "one portable C/C++ core, one C ABI, Android/Windows/iOS",
+  "all_cad_engine_functions_shared": false,
+  "all_platform_apps_complete": false,
+  "certified_autocad_2026_families": 0,
+  "certified_family_denominator": 51,
+  "candidate_detection_prefixes": [
+    "Cad",
+    "Dxf",
+    "Native",
+    "Acis",
+    "Mesh3d",
+    "Dwg",
+    "MusaAiCad",
+    "Source",
+    "Snap",
+    "Selection",
+    "Recovery"
+  ],
+  "java_candidate_count": 106,
+  "remaining_migration_policy": "All CAD semantics in any Java or platform-specific code are migration debt until independently proven in shared core. Adapter candidates require manual audit too.",
+  "java_modules": [
+    {
+      "path": "app/src/main/java/com/musa/cad/AcisSatMesh.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dDwgHandleCrosscheck.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dDxfHandleIndex.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dEditHistory.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dFaceLighting.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dLegacyCameraBridge.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dMeshTopology.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dNativeDwgIdentityAudit.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dNativeMeshMass.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dNativeMeshSurface.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dOnlyOpenGuard.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dRecoveryJournal.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dSaveCheckpoint.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dSignedVolume.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadBlock.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadBlockLibrary.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadColorProfile.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadCommand.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadDimension.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadDocumentSupport.java",
+      "classification": "platform_adapter_candidate",
+      "family": "document_print_adapter",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadDwgFormat.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadEdit.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadFontManager.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadFontPolicy.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadFrameTimeStats.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadGizmoMath.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadImageOverlay.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadImageOverlayStore.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadNavigationPolicy.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadOpenTrace.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadPickBounds.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadPrint.java",
+      "classification": "platform_adapter_candidate",
+      "family": "document_print_adapter",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadPrintMath.java",
+      "classification": "needs_core_audit",
+      "family": "document_print_adapter",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadPrismBrep.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadRenderPalette.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadRevolveShell.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java",
+      "classification": "platform_adapter_candidate",
+      "family": "document_print_adapter",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadUcsFrame.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadUcsProfiles.java",
+      "classification": "needs_core_audit",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadView.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/CadXrefSummary.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DwgPreview.java",
+      "classification": "platform_adapter_candidate",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf2dSafeSave.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf2dSavedLineReopenProof.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf3dEditor.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf3dMesh.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Dxf3dSafeSave.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfAttributeVisibility.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfBreakSourceBoundaryGuard.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfBulge.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfColor.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfComplexLineAndroid.java",
+      "classification": "platform_adapter_candidate",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfComplexLineText.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfHatch.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfLayerEditor.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfLayerState.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfLineRecordWriter.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfLineStyle.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfLineTypeParser.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfMLeader.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfMLine.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfMText.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfNumber.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfOleFrame.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfOleTextExtractor.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfParser.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfRay.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfReplacementLayerStyle.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfSpline.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfStream.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfText.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfTextAlign.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfTextOcs.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfTextStyle.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfViewport.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfWipeout.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfWriter.java",
+      "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Mesh3dActivity.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/Mesh3dView.java",
+      "classification": "platform_adapter_candidate",
+      "family": "three_dimensional_engine",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/MusaAiCadGeometry.java",
+      "classification": "needs_core_audit",
+      "family": "ai_cad_evidence",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/MusaAiCadJson.java",
+      "classification": "platform_adapter_candidate",
+      "family": "ai_cad_evidence",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/MusaAiCadPackageJson.java",
+      "classification": "platform_adapter_candidate",
+      "family": "ai_cad_evidence",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeCadEngine.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeDwg.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativePageCatalog.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativePageSpatialIndex.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativePageTransformGuard.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativePagedPreviewLoader.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativePagedScenePreview.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeScene.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeSceneFingerprint.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeSceneRecordBounds.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeViewportPageCache.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeViewportReloadGate.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeVisibleReloadBudget.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/RecoveryStore.java",
+      "classification": "platform_adapter_candidate",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/SelectionBounds.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/SnapPoints.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/SourceEditSession.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/SourceRange.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/SourceReplacement.java",
+      "classification": "needs_core_audit",
+      "family": "two_dimensional_and_cad_object_semantics",
+      "migrated_verified": false
+    }
+  ]
+}
