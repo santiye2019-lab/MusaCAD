@@ -54,6 +54,12 @@ jobs:
           mkdir -p /tmp/musacad-block-tests
           javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -cp /tmp/musacad-block-tests DxfBlocksTest
+      - name: Test conservative 2D CAD source selection prefilter
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-pick-bounds
+          javac -encoding UTF-8 -d /tmp/musacad-pick-bounds app/src/main/java/com/musa/cad/CadEdit.java app/src/main/java/com/musa/cad/CadPickBounds.java tests/CadPickBoundsTest.java
+          java -cp /tmp/musacad-pick-bounds CadPickBoundsTest
       - name: Preserve CAD source discipline layer through 2D transforms
         run: |
           set -euo pipefail
