@@ -46,13 +46,27 @@ public final class Dxf2dSavedLineReopenProof {
 
     public static void verify(File stage,Charset charset,List<Expected> expected)
             throws IOException{
-        if(expected==null||expected.isEmpty())return;
+        verify(stage,charset,expected,Collections.emptySet());
+    }
+
+    /** Retired source handles must not survive as ENTITIES after a BREAK edit. */
+    public static void verify(File stage,Charset charset,List<Expected> expected,
+                              Set<String> retiredHandles)throws IOException{
+        if((expected==null||expected.isEmpty())&&
+           (retiredHandles==null||retiredHandles.isEmpty()))return;
         if(stage==null||!stage.isFile()||charset==null||stage.length()>512L*1024*1024)
             throw new IOException("Saved LINE readback file unavailable");
         Map<String,Expected> required=new HashMap<>();
-        for(Expected e:expected){
+        if(expected!=null)for(Expected e:expected){
             if(e==null||required.putIfAbsent(e.handle,e)!=null)
                 throw new IOException("Duplicate expected DXF LINE handle");
+        }
+        Set<String> retired=new HashSet<>();
+        if(retiredHandles!=null)for(String oldHandle:retiredHandles){
+            String h=DxfSourceHandlePlan.canonical(oldHandle);
+            if(required.containsKey(h))
+                throw new IOException("Retired source handle reused by BREAK child");
+            retired.add(h);
         }
         Set<String> seen=new HashSet<>();
         boolean pending=false,inEntities=false;
@@ -74,7 +88,7 @@ public final class Dxf2dSavedLineReopenProof {
                 }
                 String data=value.trim();
                 if(code==0){
-                    if(type!=null){checkRecord(type,groups,required,seen);groups.clear();type=null;}
+                    if(type!=null){checkRecord(type,groups,required,retired,seen);groups.clear();type=null;}
                     if("SECTION".equals(data)){pending=true;inEntities=false;}
                     else if("ENDSEC".equals(data))inEntities=false;
                     else if(inEntities)type=data;
@@ -94,13 +108,72 @@ public final class Dxf2dSavedLineReopenProof {
             throw new IOException("Saved DXF missing generated LINE handle(s)");
     }
 
+    /**
+     * Extract only handles of original BREAK source LINE records from the
+     * verified source ranges; source LINEs without group-5 have no retired
+     * handle to compare. Never infer a DWG binary object identity here.
+     */
+    public static Set<String> retiredBreakSourceHandles(File original,Charset charset,
+            List<SourceReplacement> replacements)throws IOException{
+        Map<Integer,SourceRange> ranges=new HashMap<>();
+        if(replacements!=null)for(SourceReplacement item:replacements){
+            if(item==null||!item.breakChild)continue;
+            SourceRange r=item.range;
+            if(r==null||item.sourceId!=r.sourceId||r.startLine+2!=r.sourceId)
+                throw new IOException("Invalid original BREAK source range");
+            SourceRange previous=ranges.putIfAbsent(r.startLine,r);
+            if(previous!=null&&(previous.sourceId!=r.sourceId||
+                previous.endLineExclusive!=r.endLineExclusive))
+                throw new IOException("Conflicting original BREAK source ranges");
+        }
+        if(ranges.isEmpty())return Collections.emptySet();
+        if(original==null||!original.isFile()||charset==null||
+           original.length()>512L*1024*1024)
+            throw new IOException("Original BREAK source DXF unavailable");
+        Set<String> retired=new HashSet<>();
+        boolean pending=false,inEntities=false;
+        SourceRange active=null;
+        int lineIndex=0,pairs=0;
+        try(BufferedReader reader=new BufferedReader(
+                new InputStreamReader(new FileInputStream(original),charset),128*1024)){
+            while(true){
+                String raw=reader.readLine();
+                if(raw==null)break;
+                String value=reader.readLine();
+                if(value==null)throw new IOException("Truncated BREAK source DXF");
+                if(++pairs>32_000_000)throw new IOException("BREAK source size limit");
+                int code;
+                try{code=Integer.parseInt(raw.trim());}
+                catch(NumberFormatException error){
+                    throw new IOException("Invalid BREAK source group code",error);
+                }
+                String data=value.trim();
+                if(code==0){
+                    active=null;
+                    if("SECTION".equals(data)){pending=true;inEntities=false;}
+                    else if("ENDSEC".equals(data)){pending=false;inEntities=false;}
+                    else if(inEntities&&"LINE".equals(data))active=ranges.get(lineIndex);
+                }else if(pending&&code==2){
+                    inEntities="ENTITIES".equalsIgnoreCase(data);pending=false;
+                }else if(active!=null&&code==5&&active.containsLine(lineIndex)){
+                    if(!retired.add(DxfSourceHandlePlan.canonical(data)))
+                        throw new IOException("Duplicate original BREAK LINE handle");
+                }
+                lineIndex+=2;
+            }
+        }
+        return retired;
+    }
+
     private static void checkRecord(String type,Map<Integer,String> fields,
-                                    Map<String,Expected> required,Set<String> seen)
-            throws IOException{
+                                    Map<String,Expected> required,Set<String> retired,
+                                    Set<String> seen)throws IOException{
         String raw=fields.get(5);
         if(raw==null)return;
         // Unknown handles belong to existing entities and must remain untouched.
         String handle=DxfSourceHandlePlan.canonical(raw);
+        if(retired.contains(handle))
+            throw new IOException("Retired original BREAK LINE remains in saved DXF");
         Expected e=required.get(handle);
         if(e==null)return;
         if(!"LINE".equals(type)||!seen.add(handle))
