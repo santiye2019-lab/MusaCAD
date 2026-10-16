@@ -323,6 +323,29 @@ public final class SourceEditSession {
     public List<CadEdit> replacements(){ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){if(e.splitSecond==null||!e.splitFirstDeleted)out.add(e.replacement.copy());if(e.splitSecond!=null&&!e.splitSecondDeleted)out.add(e.splitSecond.copy());}return out;}
     public Map<Integer,CadEdit> replacementMap(){LinkedHashMap<Integer,CadEdit> out=new LinkedHashMap<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.put(e.id,(e.splitSecond!=null&&e.splitFirstDeleted?e.splitSecond:e.replacement).copy());return out;}
 
+    /** Fetch a specific current child style without conflating two fragments
+     * with their shared original DXF source ID. -1 = unsplit replacement. */
+    public SourceReplacement replacementRecordFor(int sourceId,int part){
+        Entry e=entries.get(sourceId);
+        if(e==null||e.deleted||e.replacement==null)return null;
+        if(e.splitSecond==null){
+            if(part!=-1)return null;
+            return new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,
+                                         e.lineType,e.lineTypeScale,e.lineWeight,e.replacement);
+        }
+        if(part==0&&!e.splitFirstDeleted){
+            ChildStyle c=e.firstStyle;
+            return new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
+                                         c.lineType,c.lineTypeScale,c.lineWeight,e.replacement);
+        }
+        if(part==1&&!e.splitSecondDeleted){
+            ChildStyle c=e.secondStyle;
+            return new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
+                                         c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond);
+        }
+        return null;
+    }
+
     public List<SourceReplacement> replacementRecords(){
         ArrayList<SourceReplacement> out=new ArrayList<>();
         for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){
