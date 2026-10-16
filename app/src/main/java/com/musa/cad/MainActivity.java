@@ -4228,9 +4228,7 @@ public class MainActivity extends AppCompatActivity {
                         // Validate a usable 3D mesh before offering the 3D-only editor;
                         // a missing/unreadable ACIS payload must still fail honestly.
                         Dxf3dMesh geometry=Dxf3dMesh.read(loaded.file);
-                        if(geometry.solidProxy||geometry.xyz.length==0||
-                           (geometry.triangles.length==0&&geometry.edges.length==0))
-                            throw new IOException("Desteklenen 2B veya 3B DXF geometrisi bulunamadı");
+                        Cad3dOnlyOpenGuard.requireRealGeometry(geometry);
                         if(loaded.bitmap!=null&&!loaded.bitmap.isRecycled())
                             loaded.bitmap.recycle();
                         loaded.bitmap=null;
@@ -4358,9 +4356,7 @@ public class MainActivity extends AppCompatActivity {
                             // Accept only verified 3D geometry from the converted DXF,
                             // never a synthetic extents-based proxy for missing ACIS.
                             Dxf3dMesh threeD=Dxf3dMesh.read(converted);
-                            if(threeD.solidProxy||threeD.xyz.length==0||
-                               (threeD.triangles.length==0&&threeD.edges.length==0))
-                                throw new IOException("DWG 3B nesneleri gerçek geometri olarak okunamadı");
+                            Cad3dOnlyOpenGuard.requireRealGeometry(threeD);
                             loaded.threeDOnly=true;
                             loaded.workingDxf=converted;
                             loaded.parsed=null;
