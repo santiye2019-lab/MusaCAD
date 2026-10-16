@@ -229,9 +229,13 @@ public final class SourceEditSession {
         return true;
     }
     public CadEdit offsetSelected(float distance){
+        // Copies are regular overlay edits and cannot yet retain every source
+        // color/linetype attribute of an independently split child.
+        if(selectedPart>=0)return null;
         CadEdit c=currentSelected();return c==null?null:c.offset(distance);
     }
     public CadEdit copySelected(float dx,float dy){
+        if(selectedPart>=0)return null;
         CadEdit c=currentSelected();return c==null?null:c.translated(dx,dy);
     }
     public boolean deleteSelected(){
