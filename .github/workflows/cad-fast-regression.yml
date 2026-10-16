@@ -96,8 +96,23 @@ jobs:
             app/src/main/java/com/musa/cad/SourceReplacement.java \
             app/src/main/java/com/musa/cad/SourceEditSession.java \
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
+            app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
             tests/DxfBreakLineSaveReopenTest.java
           java -cp /tmp/musacad-break-dxf-reopen DxfBreakLineSaveReopenTest
+      - name: Fast DXF saved handles and HANDSEED collision proof
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-dxf-handles
+          javac -encoding UTF-8 -d /tmp/musacad-dxf-handles \
+            app/src/main/java/com/musa/cad/CadEdit.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/DxfNumber.java \
+            app/src/main/java/com/musa/cad/SourceRange.java \
+            app/src/main/java/com/musa/cad/SourceReplacement.java \
+            app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
+            app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
+            tests/DxfSourceHandlePlanTest.java
+          java -cp /tmp/musacad-dxf-handles DxfSourceHandlePlanTest
       - name: BREAK BYLAYER layer palette and relocated child visibility proof
         run: |
           set -euo pipefail
