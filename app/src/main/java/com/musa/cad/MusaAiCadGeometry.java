@@ -64,6 +64,17 @@ public final class MusaAiCadGeometry {
         return closed?points>=3:points>=2;
     }
 
+    /** Shared tested intersection for ordinary on-screen and AI source edits. */
+    public static double[] intersectLines(double[] target,double[] boundary){
+        return line(target)&&line(boundary)?intersection(target,boundary):null;
+    }
+
+    /** Relative picked-point fraction on a WCS segment; NaN for invalid lines. */
+    public static double projectOnLine(double px,double py,double[] target){
+        if(!line(target)||!finite(px,py))return Double.NaN;
+        return projection(px,py,target);
+    }
+
     private static double[] intersection(double[] a,double[] b){
         // Match musacad_line2.h's WCS supporting-line kernel. Comparing the
         // unnormalized cross product to a fixed 1e-7 incorrectly rejects
