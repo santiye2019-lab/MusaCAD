@@ -81,6 +81,84 @@ public class SourceEditSessionTest {
         if(reject.splitSelected(CadEdit.line(0,0,2,0),CadEdit.line(8,0,10,0)))
             throw new AssertionError("nested split without editable child IDs is unsafe");
 
+        // Source DXF ID zero is legal; its child ID must not collide with
+        // the -1 sentinel for 'nothing selected'.
+        SourceEditSession zero=new SourceEditSession();
+        zero.select(0,new SourceRange(0,0,5),CadEdit.line(0,0,10,0));
+        if(!zero.splitSelected(CadEdit.line(0,0,3,0),CadEdit.line(7,0,10,0)))
+            throw new AssertionError("source ID 0 split");
+        SourceEditSession.SplitPartHit zeroLeft=zero.findSplitPart(1,0,0.1f);
+        if(zeroLeft==null||zeroLeft.logicalId==-1||
+           !zero.selectSplitPart(zeroLeft.sourceId,zeroLeft.part)||
+           zero.selectedLogicalId()!=zeroLeft.logicalId)
+            throw new AssertionError("zero-based source must have a real child identity");
+
+        // Independent stable logical IDs for two BREAK children, while
+        // preserving the ONE parent source range for DXF undo/save.
+        SourceEditSession children=new SourceEditSession();
+        SourceRange childRange=new SourceRange(123,300,315);
+        children.select(123,childRange,CadEdit.line(0,0,20,0),
+                        "TESISAT",0xFF27C0B2,"DASHED",0.5d,25);
+        if(!children.splitSelected(CadEdit.line(0,0,7,0),
+                                   CadEdit.line(13,0,20,0)))
+            throw new AssertionError("logical child split");
+        SourceEditSession.SplitPartHit left=children.findSplitPart(3,0,1);
+        SourceEditSession.SplitPartHit right=children.findSplitPart(17,0,1);
+        if(left==null||right==null||left.sourceId!=123||right.sourceId!=123||
+           left.part!=0||right.part!=1||left.logicalId==right.logicalId||
+           left.logicalId>=0||right.logicalId>=0)
+            throw new AssertionError("child IDs must be distinct and stable");
+        if(!children.selectSplitPart(left.sourceId,left.part)||
+           children.selectedLogicalId()!=left.logicalId||children.selectedSplitPart()!=0)
+            throw new AssertionError("select left fragment by hit");
+        if(!children.moveSelectedTo(3,4))
+            throw new AssertionError("move selected left child");
+        java.util.List<SourceReplacement> splitMoves=children.replacementRecords();
+        if(splitMoves.size()!=2)throw new AssertionError("move must retain sibling");
+        near(splitMoves.get(0).edit.xy[1],4,"left child independently moved");
+        near(splitMoves.get(1).edit.xy[1],0,"right child unchanged");
+        for(SourceReplacement piece:splitMoves)
+            if(!"TESISAT".equals(piece.layer)||piece.color!=0xFF27C0B2||
+               !"DASHED".equals(piece.lineType)||piece.lineWeight!=25||
+               Math.abs(piece.lineTypeScale-0.5d)>1e-9)
+                throw new AssertionError("independently edited child lost source style");
+        if(children.updateSelectedStyle("YANLIS",null,null,null,null)||
+           children.updateSelectedColorMode(SourceReplacement.COLOR_BYBLOCK))
+            throw new AssertionError("shared source style must not silently change a single child");
+        if(children.copySelected(3,0)!=null||children.offsetSelected(1)!=null)
+            throw new AssertionError("fragment copy/offset must wait for exact source styling");
+        if(!children.undo()||children.replacementRecords().size()!=2)
+            throw new AssertionError("undo child move");
+        near(children.replacementRecords().get(0).edit.xy[1],0,"undo left move");
+        if(!children.redo())throw new AssertionError("redo child move");
+        near(children.replacementRecords().get(0).edit.xy[1],4,"redo left move");
+        if(!children.selectSplitPart(right.sourceId,right.part))
+            throw new AssertionError("select independent right child");
+        if(children.selectedLogicalId()!=right.logicalId)
+            throw new AssertionError("stable right logical ID after edits");
+        if(!children.deleteSelected()||children.replacementRecords().size()!=1||
+           children.removals().size()!=1||children.modifiedCount()!=1)
+            throw new AssertionError("delete only right child, preserve parent removal");
+        near(children.replacementRecords().get(0).edit.xy[1],4,"left child survives right delete");
+        if(children.findSplitPart(17,0,1)!=null)
+            throw new AssertionError("deleted right child cannot be selected");
+        if(!children.undo()||children.replacementRecords().size()!=2)
+            throw new AssertionError("undo must restore only deleted child");
+        if(!children.selectSplitPart(left.sourceId,left.part)||!children.deleteSelected()||
+           !children.selectSplitPart(right.sourceId,right.part)||!children.deleteSelected())
+            throw new AssertionError("both children can be deleted independently");
+        if(children.replacementRecords().size()!=0||
+           children.removals().size()!=1||
+           !children.hiddenSourceIds().contains(123))
+            throw new AssertionError("when both children deleted parent DXF must remain removed");
+        if(!children.undo()||children.replacementRecords().size()!=1||
+           !children.redo()||children.replacementRecords().size()!=0)
+            throw new AssertionError("deletion undo/redo must not restore unwanted sibling");
+        SourceEditSession snapChildren=children.snapshotCopy();
+        if(snapChildren.replacementRecords().size()!=0||
+           snapChildren.removals().size()!=1)
+            throw new AssertionError("split child delete state must persist across tabs");
+
         System.out.println("Source entity edit session/style cases passed");
     }
     private static void near(float actual,float expected,String name){if(Math.abs(actual-expected)>.01f)throw new AssertionError(name+": "+actual+" != "+expected);}
