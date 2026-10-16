@@ -71,7 +71,7 @@ public final class Cad3dDxfHandleIndex {
                 if(raw==null)continue;
                 String handle=canonicalHandle(raw);
                 if(!seen.add(handle))
-                    throw new IOException("Farklı DXF nesneleri aynı tutamacı kullanıyor");
+                    throw new IOException("Farklı DXF nesneleri aynı tutamacı kullanıyor: "+handle+" type="+r.type+" at="+r.sourceStart);
                 if(seen.size()>MAX_INDEXED_HANDLES)
                     throw new IOException("DXF kimlik dizini kapasite sınırı");
                 if(supported(r.type)) {
