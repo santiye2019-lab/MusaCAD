@@ -42,6 +42,10 @@ public final class DxfStream implements Closeable {
     }
 
     private String line()throws IOException{
+        // RandomAccessFile returns -1 permanently after EOF. Without this
+        // guard, position=0 and available=-1 would let the next call read
+        // the stale start of the byte buffer as a second phantom DXF pass.
+        if(available<0)return null;
         ByteArrayOutputStream bytes=new ByteArrayOutputStream(48);
         boolean any=false;
         while(true){
