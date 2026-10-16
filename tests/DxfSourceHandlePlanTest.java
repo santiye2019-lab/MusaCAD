@@ -62,7 +62,7 @@ public final class DxfSourceHandlePlanTest {
                     header="HEADER".equals(value);
                     inEntities="ENTITIES".equals(value);
                     pendingSection=false;
-                }else if(group==0&&"ENDSEC"){
+                }else if(group==0&&"ENDSEC".equals(value)){
                     if(inEntities){
                         DxfLineRecordWriter.write(writer,left,"Model",0,0,7,0,
                                                   plan.handleAt(0));
@@ -104,7 +104,7 @@ public final class DxfSourceHandlePlanTest {
         return out;
     }
     private static void rejected(Path fixture)throws Exception{
-        try{DxfSourceHandlePlan.prepare(fixture,StandardCharsets.UTF_8,2);
+        try{DxfSourceHandlePlan.prepare(fixture.toFile(),StandardCharsets.UTF_8,2);
             throw new AssertionError("bad source handle accepted");
         }catch(IOException expected){}
     }
