@@ -20,9 +20,17 @@ public final class DxfWriter {
         if(baseDxf==null||drawing==null)throw new IOException("Kaydedilecek DXF çalışma kopyası yok");
         Matrix contentToWorld=contentToWorldMatrix(drawing);
         Charset cs=charset(baseDxf);
+        // Allocate BEFORE opening the target stream; original DXF group-5
+        // values (including DIMSTYLE 105 and $HANDSEED) remain reserved.
+        int sourceLines=0;
+        if(replacements!=null)for(SourceReplacement entry:replacements)
+            if(entry!=null&&entry.edit.type==CadEdit.Type.LINE)sourceLines++;
+        DxfSourceHandlePlan savedHandles=sourceLines>0?
+            DxfSourceHandlePlan.prepare(baseDxf,cs,sourceLines):null;
         boolean inserted=false,blocksInserted=blocks==null||blocks.isEmpty();
         String section="";
         boolean sectionPending=false,tablePending=false,inStyleTable=false,stylePending=false,styleTableSeen=false;
+        boolean nextGroupIsHandseed=false;
         int lineIndex=0;
         List<SourceRange> removals=removedSources==null?Collections.emptyList():removedSources;
         LinkedHashMap<String,String> requiredStyles=collectTextStyles(additions,replacements,blocks);
@@ -35,6 +43,18 @@ public final class DxfWriter {
                 String valueLine=in.readLine();if(valueLine==null)throw new IOException("Eksik DXF etiketi");
                 int code;try{code=Integer.parseInt(codeLine.trim());}catch(Exception e){throw new IOException("Geçersiz DXF etiketi",e);}
                 String value=valueLine.trim();
+                if(savedHandles!=null&&"HEADER".equals(section)){
+                    if(code==9)nextGroupIsHandseed="$HANDSEED".equalsIgnoreCase(value);
+                    else if(nextGroupIsHandseed){
+                        if(code==5){
+                            // Advance the file's future handle allocator beyond
+                            // every newly materialized source LINE.
+                            valueLine=savedHandles.nextSeed();
+                            value=valueLine;
+                        }
+                        nextGroupIsHandseed=false;
+                    }
+                }
 
                 if("TABLES".equals(section)){
                     if(code==0&&"TABLE".equals(value)){tablePending=true;stylePending=false;}
@@ -60,7 +80,7 @@ public final class DxfWriter {
                 if(code==0&&"ENDSEC".equals(value)&&"ENTITIES".equals(section)&&!inserted){
                     String layer=defaultLayer==null||defaultLayer.trim().isEmpty()?"0":defaultLayer.trim();
                     writeEdits(out,contentToWorld,additions,layer,null,null,null,null,drawing.activeLayout);
-                    writeReplacements(out,contentToWorld,replacements,drawing);inserted=true;
+                    writeReplacements(out,contentToWorld,replacements,drawing,savedHandles);inserted=true;
                 }
 
                 boolean removed=isRemoved(lineIndex,removals);
@@ -119,8 +139,9 @@ public final class DxfWriter {
     }
 
     private static boolean isRemoved(int lineIndex,List<SourceRange> removals){for(SourceRange range:removals)if(range!=null&&range.containsLine(lineIndex))return true;return false;}
-    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements,DxfParser.Result drawing)throws IOException{
+    private static void writeReplacements(BufferedWriter out,Matrix contentToWorld,List<SourceReplacement> replacements,DxfParser.Result drawing,DxfSourceHandlePlan savedHandles)throws IOException{
         if(replacements==null)return;
+        int handleIndex=0;
         for(SourceReplacement replacement:replacements){
             if(replacement==null)continue;
             DxfParser.SourceEntity source=drawing.sourceById(replacement.sourceId);
@@ -131,7 +152,10 @@ public final class DxfWriter {
                 CadEdit edit=replacement.edit;
                 PointF a=w(contentToWorld,edit.xy[0],edit.xy[1]);
                 PointF b=w(contentToWorld,edit.xy[2],edit.xy[3]);
-                DxfLineRecordWriter.write(out,replacement,layout,a.x,a.y,b.x,b.y);
+                if(savedHandles==null||handleIndex>=savedHandles.count())
+                    throw new IOException("Missing planned DXF LINE identity");
+                DxfLineRecordWriter.write(out,replacement,layout,a.x,a.y,b.x,b.y,
+                                          savedHandles.handleAt(handleIndex++));
             }else{
                 Integer color=replacement.colorMode==SourceReplacement.COLOR_BYLAYER?
                     null:replacement.colorMode==SourceReplacement.COLOR_BYBLOCK?
