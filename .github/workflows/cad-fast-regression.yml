@@ -48,6 +48,17 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_native_preview_type_audit.py' -v
           python3 -m unittest discover -s tests -p 'test_native_modern_scene_guards.py' -v
           python3 -m unittest discover -s tests -p 'test_native_point_payload_guard.py' -v
+      - name: Test private CAD first-paint color anomaly and opening-stage timings
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-color-load
+          javac -encoding UTF-8 -d /tmp/musacad-color-load \
+            app/src/main/java/com/musa/cad/CadColorProfile.java \
+            app/src/main/java/com/musa/cad/CadOpenTrace.java \
+            tests/CadColorProfileTest.java \
+            tests/CadOpenTraceTest.java
+          java -cp /tmp/musacad-color-load CadColorProfileTest
+          java -cp /tmp/musacad-color-load CadOpenTraceTest
       - name: Test XREF attach overlay and honest unresolved-reference inventory
         run: |
           set -euo pipefail
