@@ -122,9 +122,8 @@ public class SourceEditSessionTest {
                !"DASHED".equals(piece.lineType)||piece.lineWeight!=25||
                Math.abs(piece.lineTypeScale-0.5d)>1e-9)
                 throw new AssertionError("independently edited child lost source style");
-        if(children.updateSelectedStyle("YANLIS",null,null,null,null)||
-           children.updateSelectedColorMode(SourceReplacement.COLOR_BYBLOCK))
-            throw new AssertionError("shared source style must not silently change a single child");
+        // Per-child style mutations are covered by an isolated undo/redo
+        // regression below, so this move-only case remains deterministic.
         if(children.copySelected(3,0)!=null||children.offsetSelected(1)!=null)
             throw new AssertionError("fragment copy/offset must wait for exact source styling");
         if(!children.undo()||children.replacementRecords().size()!=2)
@@ -158,6 +157,90 @@ public class SourceEditSessionTest {
         if(snapChildren.replacementRecords().size()!=0||
            snapChildren.removals().size()!=1)
             throw new AssertionError("split child delete state must persist across tabs");
+
+        // A BREAK2 child gets its own independently editable CAD style.
+        // It must keep one source DXF removal record while producing two
+        // differently styled LINE replacement records for DXF serialization.
+        SourceEditSession styledChildren=new SourceEditSession();
+        SourceRange range=new SourceRange(440,500,510);
+        styledChildren.select(440,range,CadEdit.line(0,0,20,0),
+                              "M-BORU",0xFF22BB44,"DASHED",0.5d,35);
+        if(!styledChildren.splitSelected(CadEdit.line(0,0,7,0),
+                                         CadEdit.line(13,0,20,0)))
+            throw new AssertionError("initial BREAK2 source must split");
+        SourceEditSession.SplitPartHit firstHit=styledChildren.findSplitPart(3,0,1);
+        SourceEditSession.SplitPartHit secondHit=styledChildren.findSplitPart(16,0,1);
+        if(firstHit==null||secondHit==null||firstHit.logicalId==secondHit.logicalId)
+            throw new AssertionError("split child source identities");
+        if(!styledChildren.selectSplitPart(440,0)||
+           !styledChildren.updateSelectedStyle(
+               "M-SOGUTMA",0xFF1234FE,"CENTER",2.25d,70))
+            throw new AssertionError("update only first child style");
+        if(!"M-SOGUTMA".equals(styledChildren.selectedLayer())||
+           styledChildren.selectedColor()!=0xFF1234FE||
+           !"CENTER".equals(styledChildren.selectedLineType())||
+           Math.abs(styledChildren.selectedLineTypeScale()-2.25d)>1e-9||
+           styledChildren.selectedLineWeight()!=70)
+            throw new AssertionError("selected child shows incorrect style");
+        java.util.List<SourceReplacement> childStyles=styledChildren.replacementRecords();
+        if(childStyles.size()!=2||childStyles.get(0).sourceId!=440||
+           childStyles.get(1).sourceId!=440||styledChildren.removals().size()!=1)
+            throw new AssertionError("split style changes must retain source removal");
+        SourceReplacement leftStyle=childStyles.get(0),rightStyle=childStyles.get(1);
+        if(!"M-SOGUTMA".equals(leftStyle.layer)||leftStyle.color!=0xFF1234FE||
+           !"CENTER".equals(leftStyle.lineType)||leftStyle.lineWeight!=70||
+           Math.abs(leftStyle.lineTypeScale-2.25d)>1e-9)
+            throw new AssertionError("left child DXF style mismatch");
+        if(!"M-BORU".equals(rightStyle.layer)||rightStyle.color!=0xFF22BB44||
+           !"DASHED".equals(rightStyle.lineType)||rightStyle.lineWeight!=35||
+           Math.abs(rightStyle.lineTypeScale-0.5d)>1e-9)
+            throw new AssertionError("right sibling style accidentally changed");
+        if(!styledChildren.undo()||styledChildren.replacementRecords().size()!=2||
+           !"M-BORU".equals(styledChildren.replacementRecords().get(0).layer))
+            throw new AssertionError("undo left-child style must restore inherited style");
+        if(!styledChildren.redo()||
+           !"M-SOGUTMA".equals(styledChildren.replacementRecords().get(0).layer))
+            throw new AssertionError("redo child style must restore independent style");
+        if(!styledChildren.selectSplitPart(440,1)||
+           !styledChildren.updateSelectedStyle("E-PRIZ",null,"HIDDEN",1.25d,18)||
+           !styledChildren.updateSelectedColorMode(SourceReplacement.COLOR_BYLAYER))
+            throw new AssertionError("second child independent style and BYLAYER");
+        childStyles=styledChildren.replacementRecords();
+        if(childStyles.get(0).colorMode!=SourceReplacement.COLOR_EXPLICIT||
+           childStyles.get(1).colorMode!=SourceReplacement.COLOR_BYLAYER||
+           !"M-SOGUTMA".equals(childStyles.get(0).layer)||
+           !"E-PRIZ".equals(childStyles.get(1).layer)||
+           childStyles.get(1).lineWeight!=18)
+            throw new AssertionError("BYLAYER change must affect second child only");
+        SourceEditSession persistedStyles=styledChildren.snapshotCopy();
+        if(!styledChildren.undo()||
+           styledChildren.replacementRecords().get(1).colorMode!=
+               SourceReplacement.COLOR_EXPLICIT)
+            throw new AssertionError("undo second child color mode");
+        if(!styledChildren.undo()||
+           !"M-BORU".equals(styledChildren.replacementRecords().get(1).layer))
+            throw new AssertionError("undo second child layer only");
+        if(!styledChildren.redo()||!styledChildren.redo()||
+           styledChildren.replacementRecords().get(1).colorMode!=
+               SourceReplacement.COLOR_BYLAYER)
+            throw new AssertionError("redo independent style and color mode");
+        SourceEditSession restoredStyles=new SourceEditSession();
+        restoredStyles.copyFrom(persistedStyles);
+        if(restoredStyles.replacementRecords().size()!=2||
+           !"M-SOGUTMA".equals(restoredStyles.replacementRecords().get(0).layer)||
+           !"E-PRIZ".equals(restoredStyles.replacementRecords().get(1).layer))
+            throw new AssertionError("tab snapshot must retain independent child metadata");
+        if(!restoredStyles.selectSplitPart(440,0)||!restoredStyles.deleteSelected()||
+           restoredStyles.replacementRecords().size()!=1||
+           !"E-PRIZ".equals(restoredStyles.replacementRecords().get(0).layer))
+            throw new AssertionError("delete styled child must retain other style");
+        if(!restoredStyles.undo()||restoredStyles.replacementRecords().size()!=2||
+           !"M-SOGUTMA".equals(restoredStyles.replacementRecords().get(0).layer))
+            throw new AssertionError("undo styled child deletion restores original style");
+        // A bad child selector must not create an undo record or alter outputs.
+        if(restoredStyles.selectSplitPart(440,3)||
+           restoredStyles.replacementRecords().size()!=2)
+            throw new AssertionError("out-of-range logical child is invalid");
 
         System.out.println("Source entity edit session/style cases passed");
     }
