@@ -123,7 +123,7 @@ public final class SourceEditSession {
     public double selectedLineTypeScale(){Entry e=entries.get(selected);return e==null||e.deleted?1d:e.lineTypeScale;}
     public int selectedLineWeight(){Entry e=entries.get(selected);return e==null||e.deleted?DxfLineStyle.DEFAULT_LINEWEIGHT:e.lineWeight;}
     public boolean updateSelectedStyle(String layer,Integer color,String lineType,Double lineTypeScale,Integer lineWeight){
-        Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);
+        Entry e=entries.get(selected);if(!hasSelection()||selectedPart!=-1)return false;save(e);
         if(layer!=null&&!layer.trim().isEmpty())e.layer=layer.trim();
         if(color!=null){e.color=color;e.colorMode=SourceReplacement.COLOR_EXPLICIT;}
         if(lineType!=null&&!lineType.trim().isEmpty())e.lineType=DxfLineStyle.normalizeName(lineType);
@@ -133,16 +133,40 @@ public final class SourceEditSession {
         return true;
     }
     public boolean updateSelectedColorMode(int mode){
-        Entry e=entries.get(selected);if(e==null||e.deleted)return false;
+        Entry e=entries.get(selected);if(!hasSelection()||selectedPart!=-1)return false;
         if(mode!=SourceReplacement.COLOR_BYLAYER&&mode!=SourceReplacement.COLOR_BYBLOCK&&mode!=SourceReplacement.COLOR_EXPLICIT)return false;
         save(e);e.colorMode=mode;if(e.replacement==null)e.replacement=e.current().copy();return true;
     }
 
-    public boolean moveSelectedTo(float x,float y){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.translated(x-c.centerX(),y-c.centerY());return true;}
-    public boolean rotateSelected(float degrees){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.rotated(degrees,c.centerX(),c.centerY());return true;}
-    public boolean scaleSelected(float factor){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null||!Float.isFinite(factor)||factor<=0f)return false;save(e);CadEdit c=e.current();e.replacement=c.scaled(factor,c.centerX(),c.centerY());return true;}
-    public boolean mirrorSelected(boolean verticalAxis){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null)return false;save(e);CadEdit c=e.current();e.replacement=c.mirrored(verticalAxis,c.centerX(),c.centerY());return true;}
-    public boolean replaceSelected(CadEdit replacement){Entry e=entries.get(selected);if(e==null||e.deleted||e.splitSecond!=null||replacement==null)return false;save(e);e.replacement=replacement.copy();return true;}
+    public boolean moveSelectedTo(float x,float y){
+        if(!Float.isFinite(x)||!Float.isFinite(y))return false;
+        CadEdit c=currentSelected();return c!=null&&
+            replaceSelected(c.translated(x-c.centerX(),y-c.centerY()));
+    }
+    public boolean rotateSelected(float degrees){
+        CadEdit c=currentSelected();return c!=null&&Float.isFinite(degrees)&&
+            replaceSelected(c.rotated(degrees,c.centerX(),c.centerY()));
+    }
+    public boolean scaleSelected(float factor){
+        CadEdit c=currentSelected();return c!=null&&Float.isFinite(factor)&&factor>0f&&
+            replaceSelected(c.scaled(factor,c.centerX(),c.centerY()));
+    }
+    public boolean mirrorSelected(boolean verticalAxis){
+        CadEdit c=currentSelected();return c!=null&&
+            replaceSelected(c.mirrored(verticalAxis,c.centerX(),c.centerY()));
+    }
+    public boolean replaceSelected(CadEdit replacement){
+        Entry e=entries.get(selected);
+        if(!hasSelection()||replacement==null)return false;
+        if(e.splitSecond!=null){
+            if(!finiteLine(replacement))return false;
+            save(e);
+            if(selectedPart==0)e.replacement=replacement.copy();
+            else e.splitSecond=replacement.copy();
+            return true;
+        }
+        save(e);e.replacement=replacement.copy();return true;
+    }
     /**
      * Atomic one-source-to-two-LINE replacement. Both halves retain the
      * SAME source layer/color/linetype/scale/lineweight, are DXF-serialized
@@ -194,32 +218,48 @@ public final class SourceEditSession {
     }
     public boolean matchSelectedPropertiesToOther(int otherId,SourceRange otherRange,CadEdit otherPrototype,String otherLayer,int otherColor,String otherLineType,double otherLineTypeScale,int otherLineWeight){
         Entry source=entries.get(selected);
-        if(source==null||source.deleted||otherId<0||otherId==selected||otherRange==null||otherPrototype==null)return false;
+        if(source==null||source.deleted||source.splitSecond!=null||otherId<0||otherId==selected||otherRange==null||otherPrototype==null)return false;
         Entry previousOther=entries.get(otherId);
         Entry target=previousOther==null?new Entry(otherId,otherRange,otherPrototype,otherLayer,otherColor,otherLineType,otherLineTypeScale,otherLineWeight):previousOther;
-        if(target.deleted)return false;
+        if(target.deleted||target.splitSecond!=null)return false;
         record(new Undo(otherId,previousOther==null?null:previousOther.copy(),selected));
         if(previousOther==null)entries.put(otherId,target);
         target.layer=source.layer;target.color=source.color;target.lineType=source.lineType;target.lineTypeScale=source.lineTypeScale;target.lineWeight=source.lineWeight;
         target.replacement=target.current().copy();
         return true;
     }
-    public CadEdit offsetSelected(float distance){Entry e=entries.get(selected);return e==null||e.deleted||e.splitSecond!=null?null:e.current().offset(distance);}
-    public CadEdit copySelected(float dx,float dy){Entry e=entries.get(selected);return e==null||e.deleted||e.splitSecond!=null?null:e.current().translated(dx,dy);}
-    public boolean deleteSelected(){Entry e=entries.get(selected);if(e==null||e.deleted)return false;save(e);e.deleted=true;e.replacement=null;selected=-1;return true;}
+    public CadEdit offsetSelected(float distance){
+        CadEdit c=currentSelected();return c==null?null:c.offset(distance);
+    }
+    public CadEdit copySelected(float dx,float dy){
+        CadEdit c=currentSelected();return c==null?null:c.translated(dx,dy);
+    }
+    public boolean deleteSelected(){
+        Entry e=entries.get(selected);
+        if(!hasSelection())return false;
+        save(e);
+        if(e.splitSecond!=null){
+            if(selectedPart==0)e.splitFirstDeleted=true;
+            else e.splitSecondDeleted=true;
+        }else{e.deleted=true;e.replacement=null;}
+        selected=-1;selectedPart=-1;
+        return true;
+    }
 
     public boolean undo(){Undo u=undo.pollFirst();if(u==null)return false;redo.addFirst(snapshot(u.ids,selected));restore(u);selectedPart=-1;return true;}
     public boolean redo(){Undo r=redo.pollFirst();if(r==null)return false;undo.addFirst(snapshot(r.ids,selected));trim(undo);restore(r);selectedPart=-1;return true;}
 
     public Set<Integer> hiddenSourceIds(){LinkedHashSet<Integer> ids=new LinkedHashSet<>();for(Entry e:entries.values())if(e.deleted||e.replacement!=null)ids.add(e.id);return ids;}
-    public List<CadEdit> replacements(){ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){out.add(e.replacement.copy());if(e.splitSecond!=null)out.add(e.splitSecond.copy());}return out;}
-    public Map<Integer,CadEdit> replacementMap(){LinkedHashMap<Integer,CadEdit> out=new LinkedHashMap<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.put(e.id,e.replacement.copy());return out;}
+    public List<CadEdit> replacements(){ArrayList<CadEdit> out=new ArrayList<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){if(e.splitSecond==null||!e.splitFirstDeleted)out.add(e.replacement.copy());if(e.splitSecond!=null&&!e.splitSecondDeleted)out.add(e.splitSecond.copy());}return out;}
+    public Map<Integer,CadEdit> replacementMap(){LinkedHashMap<Integer,CadEdit> out=new LinkedHashMap<>();for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null)out.put(e.id,(e.splitSecond!=null&&e.splitFirstDeleted?e.splitSecond:e.replacement).copy());return out;}
 
     public List<SourceReplacement> replacementRecords(){
         ArrayList<SourceReplacement> out=new ArrayList<>();
         for(Entry e:entries.values())if(!e.deleted&&e.replacement!=null){
-            out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
-            if(e.splitSecond!=null)out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.splitSecond));
+            if(e.splitSecond==null||!e.splitFirstDeleted)
+                out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.replacement));
+            if(e.splitSecond!=null&&!e.splitSecondDeleted)
+                out.add(new SourceReplacement(e.id,e.range,e.layer,e.color,e.colorMode,e.lineType,e.lineTypeScale,e.lineWeight,e.splitSecond));
         }
         return out;
     }
