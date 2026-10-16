@@ -41,7 +41,7 @@ public final class Cad3dDxfHandleIndexTest {
             Dxf3dMesh mesh=Dxf3dMesh.read(f);
             Cad3dDxfHandleIndex index=Cad3dDxfHandleIndex.read(f);
             check(index.indexedRecordCount()==2);
-            check(mesh.xyz.length/3==10);
+            check(mesh.xyz.length/3==8);
             check(mesh.triangles.length/3==2);
             Cad3dDxfHandleIndex.Candidate line=index.forVertex(mesh,0);
             check(line!=null&&"A1".equals(line.dxfHandle)&&
@@ -55,7 +55,7 @@ public final class Cad3dDxfHandleIndexTest {
             // Unsigned record positions and triangle indices are NOT handles.
             check(index.forVertex(mesh,6)==null);
             check(index.forVertex(mesh,-1)==null);
-            check(index.forVertex(mesh,10)==null);
+            check(index.forVertex(mesh,8)==null);
             check(index.forTriangle(mesh,2)==null);
             check(index.forEdge(mesh,-1)==null);
             index.requireUnchanged(f);
