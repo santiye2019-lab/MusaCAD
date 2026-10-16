@@ -72,7 +72,9 @@ static inline int musa_core_corner2_trim(
         result.midx=cx+(hit.x-cx)/back*value;
         result.midy=cy+(hit.y-cy)/back*value;
     }
-    const double *v=&result.ax;
+    const double v[]={result.ax,result.ay,result.atx,result.aty,
+                      result.bx,result.by,result.btx,result.bty,
+                      result.midx,result.midy};
     for(int i=0;i<10;i++)
         if(!isfinite(v[i])||fabs(v[i])>1e12)return 0;
     *out=result;
