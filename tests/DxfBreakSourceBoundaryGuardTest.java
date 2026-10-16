@@ -105,6 +105,28 @@ public final class DxfBreakSourceBoundaryGuardTest {
             triple.add(fragments(f.range).get(0));
             rejected(f.file,triple,Collections.singletonList(f.range),
                      "three pieces unsupported without source provenance");
+            // A surviving BREAK child MUST still be marked as such and
+            // range-verified after its sibling was erased.
+            SourceEditSession session=new SourceEditSession();
+            session.select(f.range.sourceId,f.range,CadEdit.line(0,0,20,0),
+                           "M-BORU",0xFF00FF00);
+            if(!session.splitSelected(CadEdit.line(0,0,7,0),
+                                      CadEdit.line(13,0,20,0))||
+               !session.selectSplitPart(f.range.sourceId,1)||
+               !session.deleteSelected()||
+               session.replacementRecords().size()!=1||
+               !session.replacementRecords().get(0).breakChild)
+                throw new AssertionError("surviving child loses BREAK provenance");
+            verify(f.file,session.replacementRecords(),session.removals());
+            rejected(f.file,session.replacementRecords(),
+                     Collections.singletonList(spills),
+                     "surviving child would delete neighboring CIRCLE");
+            SourceReplacement sole=session.replacementRecords().get(0).copy();
+            if(!sole.breakChild)
+                throw new AssertionError("copy must retain child origin marker");
+            verify(f.file,Collections.singletonList(sole),
+                   Collections.singletonList(f.range));
+
             // Ordinary single-source edits are intentionally not gated.
             verify(f.file,Collections.singletonList(fragments(f.range).get(0)),
                   Collections.singletonList(f.range));
