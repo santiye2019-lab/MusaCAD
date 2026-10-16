@@ -336,12 +336,12 @@ public final class SourceEditSession {
         if(part==0&&!e.splitFirstDeleted){
             ChildStyle c=e.firstStyle;
             return new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
-                                         c.lineType,c.lineTypeScale,c.lineWeight,e.replacement);
+                                         c.lineType,c.lineTypeScale,c.lineWeight,e.replacement,true);
         }
         if(part==1&&!e.splitSecondDeleted){
             ChildStyle c=e.secondStyle;
             return new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
-                                         c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond);
+                                         c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond,true);
         }
         return null;
     }
@@ -356,12 +356,12 @@ public final class SourceEditSession {
                 if(!e.splitFirstDeleted){
                     ChildStyle c=e.firstStyle;
                     out.add(new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
-                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.replacement));
+                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.replacement,true));
                 }
                 if(!e.splitSecondDeleted){
                     ChildStyle c=e.secondStyle;
                     out.add(new SourceReplacement(e.id,e.range,c.layer,c.color,c.colorMode,
-                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond));
+                                                  c.lineType,c.lineTypeScale,c.lineWeight,e.splitSecond,true));
                 }
             }
         }
