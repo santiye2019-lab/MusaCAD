@@ -75,6 +75,10 @@ public final class Dxf2dSafeSaveTest {
                 "11\nNaN\n21\n0\n"));
             verifyRejectedStage(source,cache,valid().replace("11\n20\n21\n0\n",
                 "21\n0\n"));
+            verifyRejectedStage(source,cache,valid().replace("11\n20\n21\n0\n",
+                "11\n1e999\n21\n0\n"));
+            verifyRejectedStage(source,cache,valid().replace("11\n20\n21\n0\n",
+                "11\n0x1p2\n21\n0\n"));
             // The SAME portable C state machine must reject structural traps
             // before SAF destination is opened, even if file bytes are valid.
             verifyRejectedStage(source,cache,valid().replace(
