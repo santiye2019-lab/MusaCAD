@@ -51,9 +51,8 @@ public final class Dxf2dStructureVerifier {
                 String group=line(reader);
                 if(group==null)break;
                 String value=line(reader);
-                if(value==null)throw new IOException("Eksik DXF grup çifti");
-                if(++pairs>MAX_PAIRS)throw new IOException("DXF grup sayısı fazla");
-                int code=DxfGroupCode.parse(group);
+                int code=DxfGroupCode.parsePair(group,value,pairs,MAX_PAIRS);
+                pairs++;
                 String item=value.trim();
                 if(seenEnd)throw new IOException("DXF EOF sonrasında veri bulunuyor");
                 if(sectionPending){
