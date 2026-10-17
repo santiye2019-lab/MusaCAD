@@ -481,25 +481,11 @@ jobs:
             tests/CadOpenTraceTest.java
           java -cp /tmp/musacad-color-load CadColorProfileTest
           java -cp /tmp/musacad-color-load CadOpenTraceTest
-      - name: Verified 3D-only mesh fallback for both DXF and converted DWG
+      - name: Verified 3D-only mesh fallback via shared C ABI (never Java-only)
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_3d_only_dwg_opening_contract.py' -v
-          mkdir -p /tmp/musacad-3d-only
-          javac -encoding UTF-8 -d /tmp/musacad-3d-only \
-            app/src/main/java/com/musa/cad/FileTransfer.java \
-            app/src/main/java/com/musa/cad/DxfColor.java \
-            app/src/main/java/com/musa/cad/DxfLineStyle.java \
-            app/src/main/java/com/musa/cad/DxfLineTypeParser.java \
-            app/src/main/java/com/musa/cad/DxfTextStyle.java \
-            app/src/main/java/com/musa/cad/DxfStream.java \
-            app/src/main/java/com/musa/cad/DxfLayerState.java \
-            app/src/main/java/com/musa/cad/DxfBlocks.java \
-            app/src/main/java/com/musa/cad/AcisSatMesh.java \
-            app/src/main/java/com/musa/cad/Dxf3dMesh.java \
-            app/src/main/java/com/musa/cad/Cad3dOnlyOpenGuard.java \
-            tests/Cad3dOnlyOpenGuardTest.java
-          java -cp /tmp/musacad-3d-only Cad3dOnlyOpenGuardTest
+          bash tests/run_3d_admission_host.sh
       - name: Guard validated 3D-only DXF entry and private transient cleanup
         run: |
           python3 -m unittest discover -s tests -p 'test_3d_only_dxf_opening_contract.py' -v
