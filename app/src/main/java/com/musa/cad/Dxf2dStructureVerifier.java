@@ -53,10 +53,7 @@ public final class Dxf2dStructureVerifier {
                 String value=line(reader);
                 if(value==null)throw new IOException("Eksik DXF grup çifti");
                 if(++pairs>MAX_PAIRS)throw new IOException("DXF grup sayısı fazla");
-                int code;
-                try{code=Integer.parseInt(group.trim());}
-                catch(NumberFormatException e){throw new IOException("DXF grup kodu hatalı",e);}
-                if(code<0||code>1071)throw new IOException("DXF grup kodu sınır dışı");
+                int code=DxfGroupCode.parse(group);
                 String item=value.trim();
                 if(seenEnd)throw new IOException("DXF EOF sonrasında veri bulunuyor");
                 if(sectionPending){
