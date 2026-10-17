@@ -18,6 +18,8 @@ int musa_core_source_sha256_update(MusaSourceSha256 *state,
 int musa_core_source_sha256_finish(MusaSourceSha256 *state,
                                   unsigned char out_digest[32]);
 void musa_core_source_sha256_destroy(MusaSourceSha256 *state);
+/* Constant-time digest equality, no separate Java CAD integrity decision. */
+int musa_core_source_sha256_equal(const unsigned char *a,const unsigned char *b,size_t length);
 #ifdef __cplusplus
 }
 #endif
