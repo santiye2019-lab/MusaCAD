@@ -69,9 +69,11 @@ public final class Dxf2dSafeSaveTest {
             // before the document provider gets any access.
             verifyRejectedStage(source,cache,valid().replace("0\nEOF\n",""));
             // Same 64-bit handle with different ASCII case/leading zero must
-            // be rejected, even across HEADER, ENTITIES and DIMSTYLE 105.
+            // be rejected, including ENTITIES and DIMSTYLE 105.
             verifyRejectedStage(source,cache,valid().replace(
-                "0\nLINE\n5\nA1\n","0\nLINE\n5\n000a2\n"));
+                "0\nENDSEC\n0\nEOF\n",
+                "0\nLINE\n5\n000a1\n10\n0\n20\n0\n11\n1\n21\n1\n"+
+                "0\nENDSEC\n0\nEOF\n"));
             verifyRejectedStage(source,cache,valid().replace(
                 "0\nSECTION\n2\nENTITIES\n",
                 "0\nSECTION\n2\nTABLES\n0\nDIMSTYLE\n105\na1\n0\nENDSEC\n"+
