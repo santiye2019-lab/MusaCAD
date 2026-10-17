@@ -53,8 +53,9 @@ public final class DxfSourceHandlePlan {
         if(source.length()>512L*1024L*1024L)
             throw new IOException("DXF handle source exceeds bounded input");
         requireCore();
+        // All group-5/105 values, including HEADER $HANDSEED, are reserved
+        // unconditionally. The previous Java section flags were unused.
         String maximum="FF";
-        boolean header=false,sectionPending=false,expectSeed=false;
         int pairs=0;
         try(BufferedReader in=new BufferedReader(
                 new InputStreamReader(new FileInputStream(source),charset),128*1024)){
@@ -65,10 +66,6 @@ public final class DxfSourceHandlePlan {
                 int code=DxfGroupCode.parsePair(codeLine,valueLine,pairs,MAX_GROUP_PAIRS);
                 pairs++;
                 String value=valueLine.trim();
-                if(code==0&&"SECTION".equals(value)){sectionPending=true;header=false;continue;}
-                if(sectionPending&&code==2){header="HEADER".equalsIgnoreCase(value);sectionPending=false;continue;}
-                if(code==0&&"ENDSEC".equals(value)){header=false;expectSeed=false;}
-                if(header&&code==9)expectSeed="$HANDSEED".equalsIgnoreCase(value);
                 if(code==5||code==105){
                     try {
                         maximum=maximumNative(maximum,value);
@@ -76,7 +73,6 @@ public final class DxfSourceHandlePlan {
                         throw new IOException("Ortak CAD çekirdeğinde DXF kimlik işlevi yok",unavailable);
                     }
                     if(maximum==null)throw new IOException("Invalid DXF handle hexadecimal value");
-                    if(expectSeed&&code==5)expectSeed=false;
                 }
             }
         }
