@@ -68,6 +68,20 @@ public final class Dxf2dSafeSaveTest {
             // Missing EOF and duplicate handles must be rejected on stage,
             // before the document provider gets any access.
             verifyRejectedStage(source,cache,valid().replace("0\nEOF\n",""));
+            // Same 64-bit handle with different ASCII case/leading zero must
+            // be rejected, including ENTITIES and DIMSTYLE 105.
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nENDSEC\n0\nEOF\n",
+                "0\nLINE\n5\n000a1\n10\n0\n20\n0\n11\n1\n21\n1\n"+
+                "0\nENDSEC\n0\nEOF\n"));
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nSECTION\n2\nENTITIES\n",
+                "0\nSECTION\n2\nTABLES\n0\nDIMSTYLE\n105\na1\n0\nENDSEC\n"+
+                "0\nSECTION\n2\nENTITIES\n"));
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nLINE\n5\nA1\n","0\nLINE\n5\n0\n"));
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nLINE\n5\nA1\n","0\nLINE\n5\nFFFFFFFFFFFFFFFFF\n"));
             verifyRejectedStage(source,cache,valid().replace("0\nENDSEC\n0\nEOF\n",
                 "0\nLINE\n5\nA1\n10\n1\n20\n2\n11\n3\n21\n4\n"+
                 "0\nENDSEC\n0\nEOF\n"));
