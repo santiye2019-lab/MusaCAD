@@ -7,7 +7,7 @@ extern "C" {
 #endif
 /*
  * Bounded, portable source-identity set for staged DXF save verification.
- * All 5/105 IDs in HEADER/TABLES/BLOCKS/ENTITIES/OBJECTS are interpreted
+ * Entity 5/105 IDs in TABLES/BLOCKS/ENTITIES/OBJECTS are interpreted
  * numerically, so 000a == A == a. Zero and non-hex IDs are forbidden.
  * This API is not a full DXF/DWG document parser or a DWG handle resolver.
  */
