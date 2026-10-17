@@ -7,7 +7,8 @@ mkdir -p /tmp/musacad-dxf-handle-host
 cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -I"${JAVA_HOME}/include" -I"${JAVA_HOME}/include/linux" \
   -Icore/native/include \
-  core/native/src/musacad_dxf_handle.c app/src/main/cpp/dxf_handle_jni.c \
+  core/native/src/musacad_dxf_handle.c core/native/src/musacad_dxf_handle_set.c \
+  app/src/main/cpp/dxf_handle_jni.c app/src/main/cpp/dxf_saved_handles_jni.c \
   core/native/src/musacad_dxf_group.c core/native/src/musacad_dxf_pair.c app/src/main/cpp/dxf_group_jni.c \
   core/native/src/musacad_source_sha256.c app/src/main/cpp/source_sha256_jni.c \
   core/native/src/musacad_dxf_section.c app/src/main/cpp/dxf_section_jni.c \
