@@ -870,6 +870,19 @@ jobs:
                  "no production AC1032 writer until independently validated"
           PY
 
+      - name: P0 one portable C SHA-256 source integrity and byte-exact save guard
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-source-sha
+          javac -encoding UTF-8 -d /tmp/musacad-source-sha \
+            app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
+            tests/CadSaveSourceIntegrityTest.java \
+            tests/CadSourceSha256NativeParityTest.java \
+            tests/CadSourceSha256MissingCoreTest.java
+          java -cp /tmp/musacad-source-sha CadSourceSha256MissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSourceSha256NativeParityTest
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSaveSourceIntegrityTest
       - name: P0 shared C group-code parser and missing-core fail-closed regression
         run: |
           set -euo pipefail

@@ -13,6 +13,7 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -Icore/native/include \
   core/native/src/musacad_dwg_signature.c \
   app/src/main/cpp/dwg_signature_jni.c \
+  core/native/src/musacad_source_sha256.c app/src/main/cpp/source_sha256_jni.c \
   -o /tmp/musacad-dwg-signature/libmusacad_dwg.so
 java -Djava.library.path=/tmp/musacad-dwg-signature \
   -cp /tmp/musacad-dwg-signature CadDwgFormatTest
