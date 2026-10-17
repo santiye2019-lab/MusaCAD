@@ -64,10 +64,7 @@ public final class DxfSourceHandlePlan {
                 String valueLine=in.readLine();
                 if(valueLine==null)throw new IOException("Truncated DXF group pair");
                 if(++pairs>MAX_GROUP_PAIRS)throw new IOException("Excessive DXF group pairs");
-                int code;
-                try{code=Integer.parseInt(codeLine.trim());}
-                catch(NumberFormatException ex){throw new IOException("Invalid DXF group code",ex);}
-                if(code<0||code>1071)throw new IOException("Invalid DXF group code range");
+                int code=DxfGroupCode.parse(codeLine);
                 String value=valueLine.trim();
                 if(code==0&&"SECTION".equals(value)){sectionPending=true;header=false;continue;}
                 if(sectionPending&&code==2){header="HEADER".equalsIgnoreCase(value);sectionPending=false;continue;}
