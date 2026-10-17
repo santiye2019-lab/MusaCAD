@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -39,8 +38,7 @@ public final class Dxf2dStructureVerifier {
     public static void verify(File dxf)throws IOException{
         if(dxf==null||!dxf.isFile()||dxf.length()==0||dxf.length()>MAX_BYTES)
             throw new IOException("Geçersiz 2B DXF geçici dosyası");
-        String section=null;
-        boolean sectionPending=false,seenEntities=false,seenEnd=false;
+        DxfSectionGuard sections=new DxfSectionGuard();
         boolean entityIsLine=false;
         int lineFlags=0,pairs=0;
         Set<String> seenHandles=new HashSet<>();
@@ -51,44 +49,21 @@ public final class Dxf2dStructureVerifier {
                 String group=line(reader);
                 if(group==null)break;
                 String value=line(reader);
-                int code=DxfGroupCode.parsePair(group,value,pairs,MAX_PAIRS);
+                // Portable C simultaneously validates pair framing and
+                // SECTION/ENDSEC/EOF transitions: one JNI call per pair.
+                int packet=sections.consume(group,value,pairs,MAX_PAIRS);
                 pairs++;
+                int code=DxfSectionGuard.code(packet);
                 String item=value.trim();
-                if(seenEnd)throw new IOException("DXF EOF sonrasında veri bulunuyor");
-                if(sectionPending){
-                    if(code!=2||item.isEmpty())
-                        throw new IOException("DXF SECTION adı eksik");
-                    section=item.toUpperCase(Locale.ROOT);
-                    if("ENTITIES".equals(section)){
-                        if(seenEntities)throw new IOException("Çift DXF ENTITIES bölümü");
-                        seenEntities=true;
-                    }
-                    sectionPending=false;
-                    continue;
+                if(DxfSectionGuard.event(packet,DxfSectionGuard.RECORD_BOUNDARY)
+                        &&entityIsLine){
+                    requireLine(lineFlags);
+                    entityIsLine=false;lineFlags=0;
                 }
-                if(code==0){
-                    if(entityIsLine){
-                        requireLine(lineFlags);
-                        entityIsLine=false;lineFlags=0;
-                    }
-                    if("SECTION".equals(item)){
-                        if(section!=null)throw new IOException("İç içe DXF SECTION");
-                        sectionPending=true;
-                    }else if("ENDSEC".equals(item)){
-                        if(section==null)throw new IOException("DXF ENDSEC eşleşmiyor");
-                        section=null;
-                    }else if("EOF".equals(item)){
-                        if(section!=null||!seenEntities)
-                            throw new IOException("DXF EOF veya ENTITIES eksik");
-                        seenEnd=true;
-                    }else{
-                        if(section==null)throw new IOException("DXF nesnesi SECTION dışında");
-                        if("ENTITIES".equals(section)&&"LINE".equals(item)){
-                            entityIsLine=true;lineFlags=0;
-                        }
-                    }
-                }else{
-                    if(section==null)throw new IOException("DXF değer SECTION dışında");
+                if(DxfSectionGuard.event(packet,DxfSectionGuard.LINE_STARTED)){
+                    entityIsLine=true;lineFlags=0;
+                }
+                if(code!=0){
                     if(entityIsLine){
                         int bit=code==10?1:code==20?2:code==11?4:code==21?8:0;
                         if(bit!=0){
@@ -101,8 +76,7 @@ public final class Dxf2dStructureVerifier {
                         }
                     }
                     if((code==5||code==105)&&
-                       ("ENTITIES".equals(section)||"BLOCKS".equals(section)||
-                        "TABLES".equals(section)||"OBJECTS".equals(section))){
+                       DxfSectionGuard.event(packet,DxfSectionGuard.HANDLE_AREA)){
                         String handle=DxfSourceHandlePlan.canonical(item);
                         if(!seenHandles.add(handle))throw new IOException("DXF nesne tutamacı yinelendi");
                         if(seenHandles.size()>MAX_HANDLES)throw new IOException("DXF kimlik sınırı aşıldı");
@@ -110,8 +84,7 @@ public final class Dxf2dStructureVerifier {
                 }
             }
         }
-        if(sectionPending||section!=null||!seenEntities||!seenEnd)
-            throw new IOException("DXF kaydı tamamlanmamış");
+        sections.requireFinished();
     }
 
     private static void requireLine(int flags)throws IOException{
