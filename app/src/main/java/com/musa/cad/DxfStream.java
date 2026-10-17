@@ -12,11 +12,12 @@ public final class DxfStream implements Closeable {
     public static final long MAX_BYTES=512L*1024L*1024L;
     private static final int MAX_LINE_BYTES=1024*1024;
     private static final int MAX_RECORD_TAG_STRINGS=2_000_000;
+    private static final int MAX_PAIRS=32_000_000;
 
     private final RandomAccessFile file;
     private final Charset charset;
     private final byte[] buffer=new byte[64*1024];
-    private int position,available,lineIndex;
+    private int position,available,lineIndex,pairsRead;
     private long offset;
 
     private String pendingType;
@@ -37,7 +38,7 @@ public final class DxfStream implements Closeable {
     public void seek(long byteOffset,int sourceLine)throws IOException{
         if(byteOffset<0||byteOffset>file.length())throw new IOException("Geçersiz DXF konumu");
         file.seek(byteOffset);offset=byteOffset;lineIndex=Math.max(0,sourceLine);
-        position=available=0;pendingType=null;pendingStartOffset=0;pendingStartLine=0;
+        position=available=0;pairsRead=0;pendingType=null;pendingStartOffset=0;pendingStartLine=0;
         nextRecordOffset=byteOffset;nextRecordLine=lineIndex;
     }
 
@@ -85,8 +86,8 @@ public final class DxfStream implements Closeable {
                 return new DxfBlocks.Record(type,tags,0,tags.size(),recordStartLine+2,recordStartLine,lineIndex);
             }
             String value=line();
-            if(value==null)throw new IOException("Eksik DXF etiket çifti");
-            int code=DxfGroupCode.parse(codeLine);
+            int code=DxfGroupCode.parsePair(codeLine,value,pairsRead,MAX_PAIRS);
+            pairsRead++;
 
             if(code==0){
                 String nextType=value.trim();
