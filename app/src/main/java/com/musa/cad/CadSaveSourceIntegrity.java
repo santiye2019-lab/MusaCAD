@@ -82,7 +82,13 @@ public final class CadSaveSourceIntegrity {
     /** Fail closed: original file and staged bytes must be unchanged. */
     public void requireUnchanged(File file)throws IOException{
         CadSaveSourceIntegrity current=capture(file);
-        if(length!=current.length||!MessageDigest.isEqual(digest,current.digest))
+        final boolean equal;
+        try {
+            equal=equalDigestNative(digest,current.digest);
+        }catch(LinkageError unavailable){
+            throw new IOException("Ortak CAD çekirdeğinde SHA-256 karşılaştırması yok",unavailable);
+        }
+        if(length!=current.length||!equal)
             throw new IOException("Kaynak CAD dosyası kayıt sırasında değişti");
     }
 }
