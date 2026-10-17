@@ -113,6 +113,12 @@ int musa_core_source_sha256_finish(MusaSourceSha256 *s,
     s->finished=1;
     return 1;
 }
+int musa_core_source_sha256_equal(const unsigned char *a,const unsigned char *b,size_t len){
+    if(!a||!b||len!=32)return 0;
+    unsigned char delta=0;
+    for(size_t i=0;i<32;i++)delta|=(unsigned char)(a[i]^b[i]);
+    return delta==0;
+}
 void musa_core_source_sha256_destroy(MusaSourceSha256 *s){
     if(s){memset(s,0,sizeof(*s));free(s);}
 }
