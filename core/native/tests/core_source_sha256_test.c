@@ -38,6 +38,12 @@ int main(void){
         assert(digits[got[i]>>4]==expected[2*i]);
         assert(digits[got[i]&15]==expected[2*i+1]);
     }
+    assert(musa_core_source_sha256_equal(got,got,32));
+    unsigned char altered[32];
+    memcpy(altered,got,32);
+    altered[31]^=1u;
+    assert(!musa_core_source_sha256_equal(got,altered,32));
+    assert(!musa_core_source_sha256_equal(got,altered,31));
     musa_core_source_sha256_destroy(s);
     assert(!musa_core_source_sha256_update(NULL,buf,10));
     puts("PASS: FIPS SHA-256 empty/abc/million-a cross-platform source digest");
