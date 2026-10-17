@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* One Android JNI transport invocation replaces Java group and section logic.
- * In/out four-int Java state is safe, owned and never a dangling C pointer.
+/* One Android JNI invocation validates group, section and LINE semantics.
+ * Owned five-int Java state contains 4 section ints + 1 LINE flags int;
+ * never exposes a dangling pointer or a second platform algorithm.
  */
 #include <jni.h>
 #include "musacad_dxf_pair.h"
@@ -12,7 +13,7 @@ Java_com_musa_cad_DxfSectionGuard_consumeNative(
     jint pair_count,jint max_pairs) {
     (void)clazz;
     if(!fields||!group||pair_count<0||max_pairs<=0||
-       (*env)->GetArrayLength(env,fields)!=4)
+       (*env)->GetArrayLength(env,fields)!=5)
         return MUSA_DXF_SECTION_BAD_ARGUMENT;
     const jsize grouplen=(*env)->GetStringUTFLength(env,group);
     if(grouplen<1||grouplen>1048576)
@@ -30,8 +31,8 @@ Java_com_musa_cad_DxfSectionGuard_consumeNative(
     if(vlen<0||vlen>4194304)return MUSA_DXF_SECTION_BAD_ARGUMENT;
     const char *v=(*env)->GetStringUTFChars(env,value,NULL);
     if(!v)return MUSA_DXF_SECTION_BAD_ARGUMENT;
-    jint raw[4];
-    (*env)->GetIntArrayRegion(env,fields,0,4,raw);
+    jint raw[5];
+    (*env)->GetIntArrayRegion(env,fields,0,5,raw);
     if((*env)->ExceptionCheck(env)){
         (*env)->ReleaseStringUTFChars(env,value,v);
         return MUSA_DXF_SECTION_BAD_ARGUMENT;
@@ -39,12 +40,18 @@ Java_com_musa_cad_DxfSectionGuard_consumeNative(
     MusaDxfSectionState state={raw[0],raw[1],raw[2],raw[3]};
     int flags=0;
     const int status=musa_core_dxf_section_step(&state,code,v,(size_t)vlen,&flags);
+    int new_line_flags=raw[4];
+    const int line_status=status==MUSA_DXF_SECTION_OK
+        ?musa_core_dxf_line_step(raw[4],code,v,(size_t)vlen,
+                                flags,&new_line_flags)
+        :status;
     (*env)->ReleaseStringUTFChars(env,value,v);
     if(status!=MUSA_DXF_SECTION_OK)return status;
+    if(line_status!=MUSA_DXF_SECTION_OK)return line_status;
 
-    const jint updated[4]={state.current_kind,state.awaiting_name,
-                           state.seen_entities,state.seen_eof};
-    (*env)->SetIntArrayRegion(env,fields,0,4,updated);
+    const jint updated[5]={state.current_kind,state.awaiting_name,
+                           state.seen_entities,state.seen_eof,new_line_flags};
+    (*env)->SetIntArrayRegion(env,fields,0,5,updated);
     if((*env)->ExceptionCheck(env))return MUSA_DXF_SECTION_BAD_ARGUMENT;
     return ((jint)flags<<11)|code;
 }
@@ -53,11 +60,13 @@ JNIEXPORT jint JNICALL
 Java_com_musa_cad_DxfSectionGuard_finishNative(
     JNIEnv *env,jclass clazz,jintArray fields){
     (void)clazz;
-    if(!fields||(*env)->GetArrayLength(env,fields)!=4)
+    if(!fields||(*env)->GetArrayLength(env,fields)!=5)
         return MUSA_DXF_SECTION_BAD_ARGUMENT;
-    jint raw[4];
-    (*env)->GetIntArrayRegion(env,fields,0,4,raw);
+    jint raw[5];
+    (*env)->GetIntArrayRegion(env,fields,0,5,raw);
     if((*env)->ExceptionCheck(env))return MUSA_DXF_SECTION_BAD_ARGUMENT;
     const MusaDxfSectionState state={raw[0],raw[1],raw[2],raw[3]};
-    return musa_core_dxf_section_finish(&state);
+    const int status=musa_core_dxf_section_finish(&state);
+    if(status!=MUSA_DXF_SECTION_OK)return status;
+    return raw[4]==0?MUSA_DXF_SECTION_OK:MUSA_DXF_LINE_COORDINATES_MISSING;
 }
