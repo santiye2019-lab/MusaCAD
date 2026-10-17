@@ -31,6 +31,7 @@ public final class CadSaveSourceIntegrity {
     private static native boolean updateDigestNative(long context,byte[] bytes,int length);
     private static native byte[] finishDigestNative(long context);
     private static native void destroyDigestNative(long context);
+    private static native boolean equalDigestNative(byte[] left,byte[] right);
 
     private CadSaveSourceIntegrity(long length,byte[] digest){
         this.length=length;this.digest=digest.clone();
