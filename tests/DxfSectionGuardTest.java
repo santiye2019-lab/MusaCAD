@@ -36,6 +36,8 @@ public final class DxfSectionGuardTest {
         if(DxfSectionGuard.code(packed)!=5||
            !DxfSectionGuard.event(packed,DxfSectionGuard.HANDLE_AREA))
             throw new AssertionError("Identity section event missing");
+        for(String[] xy:new String[][]{{"10","0"},{"20","0"},
+            {"11","20"},{"21","5"}})feed(g,p++,xy[0],xy[1]);
         feed(g,p++,"0","ENDSEC");
         feed(g,p++,"0","SECTION");
         bad(g,p,"2","ENTITIES","Çift");
@@ -53,6 +55,21 @@ public final class DxfSectionGuardTest {
         }catch(IOException expected){
             if(!expected.getMessage().contains("tamamlanmamış"))throw expected;
         }
-        System.out.println("PASS: shared C section state through real JNI");
+        DxfSectionGuard invalid=new DxfSectionGuard();
+        feed(invalid,0,"0","SECTION");
+        feed(invalid,1,"2","ENTITIES");
+        feed(invalid,2,"0","LINE");
+        feed(invalid,3,"10","1.25");
+        feed(invalid,4,"20","-2e3");
+        bad(invalid,5,"11","NaN","sayısal");
+        bad(invalid,5,"11","1e999","sayısal");
+        bad(invalid,5,"11","0x1p3","sayısal");
+        feed(invalid,5,"11","3");
+        bad(invalid,6,"0","ENDSEC","koordinatları eksik");
+        feed(invalid,6,"21","4");
+        feed(invalid,7,"0","ENDSEC");
+        feed(invalid,8,"0","EOF");
+        invalid.requireFinished();
+        System.out.println("PASS: shared C section + LINE coordinate state through real JNI");
     }
 }
