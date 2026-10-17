@@ -8,5 +8,5 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -I"${JAVA_HOME}/include" -I"${JAVA_HOME}/include/linux" \
   -Icore/native/include \
   core/native/src/musacad_dxf_handle.c app/src/main/cpp/dxf_handle_jni.c \
-  core/native/src/musacad_dxf_group.c app/src/main/cpp/dxf_group_jni.c \
+  core/native/src/musacad_dxf_group.c core/native/src/musacad_dxf_pair.c app/src/main/cpp/dxf_group_jni.c \
   -o /tmp/musacad-dxf-handle-host/libmusacad_dwg.so
