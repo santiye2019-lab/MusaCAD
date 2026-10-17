@@ -10,6 +10,7 @@ javac -encoding UTF-8 -d /tmp/musacad-3d-only \
   app/src/main/java/com/musa/cad/DxfLineStyle.java \
   app/src/main/java/com/musa/cad/DxfLineTypeParser.java \
   app/src/main/java/com/musa/cad/DxfTextStyle.java \
+  app/src/main/java/com/musa/cad/DxfGroupCode.java \
   app/src/main/java/com/musa/cad/DxfStream.java \
   app/src/main/java/com/musa/cad/DxfLayerState.java \
   app/src/main/java/com/musa/cad/DxfBlocks.java \
@@ -24,7 +25,9 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -I"${JAVA_HOME}/include" -I"${JAVA_HOME}/include/linux" \
   -Icore/native/include \
   core/native/src/musacad_3d_admission.c \
+  core/native/src/musacad_dxf_group.c \
   app/src/main/cpp/open3d_guard_jni.c \
+  app/src/main/cpp/dxf_group_jni.c \
   -o /tmp/musacad-3d-only/libmusacad_dwg.so
 java -Djava.library.path=/tmp/musacad-3d-only \
   -cp /tmp/musacad-3d-only Cad3dOnlyOpenGuardTest
