@@ -6,27 +6,38 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Reads the six-byte ACxxxx DWG file signature, NOT AutoCAD's app version.
+ * Android adapter for the ONE portable DWG header classifier in
+ * core/native/src/musacad_dwg_signature.c. The display labels stay in Java,
+ * but Java NEVER decides whether any DWG signature is supported.
  *
- * AutoCAD 2026 uses AC1032 (2018-family DWG). A modern-format header is
- * only a format identifier, NOT proof of a working AC1032 writer, valid file,
- * lossless object mapping or ACIS feature parity.
- *
- * This sniffer never modifies a source DWG and does not trigger a converter.
+ * AC1032 is a DWG file-family signature, not an AutoCAD 2026 feature claim.
+ * This read-only check never edits source CAD bytes.
  */
 public final class CadDwgFormat {
     private CadDwgFormat(){}
+    private static final boolean sharedCoreLoaded;
+    static {
+        boolean ready=false;
+        try {
+            System.loadLibrary("musacad_dwg");
+            ready=true;
+        } catch (LinkageError | SecurityException unavailable) {
+            // No fallback classifier: the shared engine is authoritative.
+        }
+        sharedCoreLoaded=ready;
+    }
+
+    private static native int identifyNative(byte[] firstSixBytes);
 
     public static final class Info {
         public final String signature,formatFamily;
         public final boolean supportedSignature,modern2018Family;
-        Info(String signature,String family,boolean supported){
+        Info(String signature,String family,boolean supported,boolean modern){
             this.signature=signature;
             formatFamily=family;
             supportedSignature=supported;
-            modern2018Family="AC1032".equals(signature);
+            modern2018Family=modern;
         }
-        /** User-facing diagnosis, NOT an offer of native DWG Save As. */
         public String label(){
             return supportedSignature?
                     formatFamily+" DWG ("+signature+")":
@@ -53,23 +64,30 @@ public final class CadDwgFormat {
     public static Info identify(byte[] header){
         if(header==null||header.length<6)
             throw new IllegalArgumentException("eksik DWG imzası");
-        for(int i=0;i<6;i++){
-            int c=header[i]&0xff;
-            if(c<0x20||c>0x7e)
-                return new Info("", "",false);
+        if(!sharedCoreLoaded)
+            throw new IllegalStateException("Ortak CAD çekirdeği olmadan DWG biçimi belirlenemez");
+        final int version;
+        try {
+            version=identifyNative(header);
+        } catch(LinkageError unavailable) {
+            throw new IllegalStateException("Ortak CAD çekirdeğinde DWG imza tanıyıcısı bulunamadı",unavailable);
         }
-        String magic=new String(header,0,6,StandardCharsets.US_ASCII);
-        switch(magic){
-            case "AC1009": return new Info(magic,"R12",true);
-            case "AC1012": return new Info(magic,"R13",true);
-            case "AC1014": return new Info(magic,"R14",true);
-            case "AC1015": return new Info(magic,"2000",true);
-            case "AC1018": return new Info(magic,"2004",true);
-            case "AC1021": return new Info(magic,"2007",true);
-            case "AC1024": return new Info(magic,"2010",true);
-            case "AC1027": return new Info(magic,"2013",true);
-            case "AC1032": return new Info(magic,"2018–2026",true);
-            default: return new Info(magic,"",false);
+        // Negative return = non-printable/binary header, no printable signature.
+        if(version<0)return new Info("","",false,false);
+        String signature=new String(header,0,6,StandardCharsets.US_ASCII);
+        final String family;
+        switch(version){
+            case 1:family="R12";break;
+            case 2:family="R13";break;
+            case 3:family="R14";break;
+            case 4:family="2000";break;
+            case 5:family="2004";break;
+            case 6:family="2007";break;
+            case 7:family="2010";break;
+            case 8:family="2013";break;
+            case 9:family="2018–2026";break;
+            default:return new Info(signature,"",false,false);
         }
+        return new Info(signature,family,true,version==9);
     }
 }
