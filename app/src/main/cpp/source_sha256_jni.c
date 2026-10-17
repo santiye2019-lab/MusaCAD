@@ -40,6 +40,19 @@ Java_com_musa_cad_CadSaveSourceIntegrity_finishDigestNative(
     for(size_t i=0;i<32;i++)wipe[i]=0;
     return result;
 }
+JNIEXPORT jboolean JNICALL
+Java_com_musa_cad_CadSaveSourceIntegrity_equalDigestNative(
+    JNIEnv *env,jclass type,jbyteArray left,jbyteArray right){
+    (void)type;
+    if(!left||!right||(*env)->GetArrayLength(env,left)!=32||
+       (*env)->GetArrayLength(env,right)!=32)return JNI_FALSE;
+    unsigned char a[32],b[32];
+    (*env)->GetByteArrayRegion(env,left,0,32,(jbyte *)a);
+    if((*env)->ExceptionCheck(env))return JNI_FALSE;
+    (*env)->GetByteArrayRegion(env,right,0,32,(jbyte *)b);
+    if((*env)->ExceptionCheck(env))return JNI_FALSE;
+    return musa_core_source_sha256_equal(a,b,32)?JNI_TRUE:JNI_FALSE;
+}
 JNIEXPORT void JNICALL
 Java_com_musa_cad_CadSaveSourceIntegrity_destroyDigestNative(
     JNIEnv *env,jclass type,jlong handle){
