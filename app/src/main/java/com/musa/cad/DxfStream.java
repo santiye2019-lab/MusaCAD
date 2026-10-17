@@ -86,10 +86,7 @@ public final class DxfStream implements Closeable {
             }
             String value=line();
             if(value==null)throw new IOException("Eksik DXF etiket çifti");
-            int code;
-            try{code=Integer.parseInt(codeLine.trim());}
-            catch(NumberFormatException e){throw new IOException("Geçersiz DXF etiketi",e);}
-            if(code<0||code>1071)throw new IOException("Geçersiz DXF etiket kodu");
+            int code=DxfGroupCode.parse(codeLine);
 
             if(code==0){
                 String nextType=value.trim();
