@@ -138,7 +138,8 @@ jobs:
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
             app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
             tests/DxfBreakLineSaveReopenTest.java
-          java -cp /tmp/musacad-break-dxf-reopen DxfBreakLineSaveReopenTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-break-dxf-reopen DxfBreakLineSaveReopenTest
       - name: Fast DXF saved handles and HANDSEED collision proof
         run: |
           set -euo pipefail
@@ -151,8 +152,11 @@ jobs:
             app/src/main/java/com/musa/cad/SourceReplacement.java \
             app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
-            tests/DxfSourceHandlePlanTest.java
-          java -cp /tmp/musacad-dxf-handles DxfSourceHandlePlanTest
+            tests/DxfSourceHandlePlanTest.java \
+            tests/DxfSourceHandleMissingCoreTest.java
+          java -cp /tmp/musacad-dxf-handles DxfSourceHandleMissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-dxf-handles DxfSourceHandlePlanTest
       - name: BREAK2 exact original DXF source range deletion safety
         run: |
           set -euo pipefail
@@ -191,7 +195,8 @@ jobs:
             app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             tests/Dxf2dSafeSaveTest.java
-          java -cp /tmp/musacad-2d-safe-stage Dxf2dSafeSaveTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-2d-safe-stage Dxf2dSafeSaveTest
       - name: DXF semantic readback of saved BREAK children
         run: |
           set -euo pipefail
@@ -210,7 +215,8 @@ jobs:
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             app/src/main/java/com/musa/cad/Dxf2dSavedLineReopenProof.java \
             tests/Dxf2dSavedLineReopenProofTest.java
-          java -cp /tmp/musacad-saved-semantic Dxf2dSavedLineReopenProofTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-saved-semantic Dxf2dSavedLineReopenProofTest
       - name: Fast 3D open-surface area-weighted XYZ centroid
         run: |
           set -euo pipefail
