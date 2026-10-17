@@ -46,6 +46,41 @@ int main(void){
     feed(&incomplete,0,"SECTION");
     assert(musa_core_dxf_section_finish(&incomplete)==MUSA_DXF_SECTION_INCOMPLETE);
     assert(musa_core_dxf_section_step(NULL,0,"X",1,&f)==MUSA_DXF_SECTION_BAD_ARGUMENT);
+
+    /* The same canonical state machine must reject malformed LINE geometry
+     * without mutating committed data, and require all four XY values.
+     */
+    int line=0, next=99;
+    assert(musa_core_dxf_line_step(line,0,"LINE",4,
+        MUSA_DXF_SECTION_RECORD_BOUNDARY|MUSA_DXF_SECTION_LINE_STARTED,&next)==0);
+    assert(next==16);line=next;
+    assert(musa_core_dxf_line_step(line,10,"1.25",4,0,&next)==0);
+    assert(next==17);line=next;
+    next=99;
+    assert(musa_core_dxf_line_step(line,11,"NaN",3,0,&next)==
+           MUSA_DXF_LINE_INVALID_NUMBER);
+    assert(next==99);
+    assert(musa_core_dxf_line_step(line,11,"1e999",5,0,&next)==
+           MUSA_DXF_LINE_INVALID_NUMBER);
+    assert(next==99);
+    assert(musa_core_dxf_line_step(line,11,"0x1p2",5,0,&next)==
+           MUSA_DXF_LINE_INVALID_NUMBER);
+    assert(next==99);
+    assert(musa_core_dxf_line_step(line,20,"-2.0e+3",7,0,&next)==0);
+    assert(next==19);line=next;
+    assert(musa_core_dxf_line_step(line,11,"0.01",4,0,&next)==0);
+    assert(next==23);line=next;
+    next=99;
+    assert(musa_core_dxf_line_step(line,0,"ENDSEC",6,
+        MUSA_DXF_SECTION_RECORD_BOUNDARY,&next)==
+        MUSA_DXF_LINE_COORDINATES_MISSING);
+    assert(next==99);
+    assert(musa_core_dxf_line_step(line,21,"-1",2,0,&next)==0);
+    assert(next==31);line=next;
+    assert(musa_core_dxf_line_step(line,0,"ENDSEC",6,
+        MUSA_DXF_SECTION_RECORD_BOUNDARY,&next)==0);
+    assert(next==0);
+    puts("PASS: portable DXF LINE coordinates, missing data, overflow, atomic state");
     puts("PASS: cross-platform source-safe DXF SECTION/ENDSEC/EOF finite state machine");
     return 0;
 }
