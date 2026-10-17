@@ -21,7 +21,7 @@ int main(void){
     fail("");fail(" ");fail("+");fail("-1");
     fail("1072");fail("99999999999999999999999999999");
     fail("1e2");fail("0x10");fail("1 0");
-    fail("١٠");fail("９"); /* Non-ASCII numeric code bytes must fail. */
+    fail("\xD9\xA1\xD9\xA0");fail("\xEF\xBC\x99"); /* UTF-8 digits rejected */
     int unchanged=88;
     assert(!musa_core_dxf_group_parse(NULL,0,&unchanged));
     assert(!musa_core_dxf_group_parse("0",1,NULL));
