@@ -26,6 +26,7 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -Icore/native/include \
   core/native/src/musacad_3d_admission.c \
   core/native/src/musacad_dxf_group.c \
+  core/native/src/musacad_dxf_pair.c \
   app/src/main/cpp/open3d_guard_jni.c \
   app/src/main/cpp/dxf_group_jni.c \
   -o /tmp/musacad-3d-only/libmusacad_dwg.so
