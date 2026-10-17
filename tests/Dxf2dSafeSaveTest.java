@@ -75,6 +75,18 @@ public final class Dxf2dSafeSaveTest {
                 "11\nNaN\n21\n0\n"));
             verifyRejectedStage(source,cache,valid().replace("11\n20\n21\n0\n",
                 "21\n0\n"));
+            // The SAME portable C state machine must reject structural traps
+            // before SAF destination is opened, even if file bytes are valid.
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nSECTION\n2\nENTITIES\n",
+                "0\nSECTION\n2\nENTITIES\n0\nSECTION\n2\nBLOCKS\n"));
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nSECTION\n2\nENTITIES\n",
+                "0\nSECTION\n0\nLINE\n"));
+            verifyRejectedStage(source,cache,valid().replace(
+                "0\nENDSEC\n0\nEOF\n",
+                "0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n"));
+            verifyRejectedStage(source,cache,valid()+"0\nLINE\n");
             require(cache.listFiles().length==0,
                     "all invalid temporary outputs must be deleted");
 
