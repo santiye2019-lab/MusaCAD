@@ -49,6 +49,17 @@ jobs:
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSourceSha256NativeParityTest
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSaveSourceIntegrityTest
+      - name: P0 one native DXF section grammar, truncation and no-core acceptance
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-native-sections
+          javac -encoding UTF-8 -d /tmp/musacad-native-sections \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java \
+            tests/DxfSectionGuardTest.java \
+            tests/DxfSectionGuardMissingCoreTest.java
+          java -cp /tmp/musacad-native-sections DxfSectionGuardMissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-native-sections DxfSectionGuardTest
       - name: P0 shared C group-code parser and missing-core fail-closed regression
         run: |
           set -euo pipefail
@@ -222,7 +233,7 @@ jobs:
             app/src/main/java/com/musa/cad/FileTransfer.java \
             app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
             app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
-            app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             tests/Dxf2dSafeSaveTest.java
           bash tests/build_dxf_handle_jni_host.sh
@@ -241,7 +252,7 @@ jobs:
             app/src/main/java/com/musa/cad/SourceReplacement.java \
             app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
-            app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             app/src/main/java/com/musa/cad/Dxf2dSavedLineReopenProof.java \
             tests/Dxf2dSavedLineReopenProofTest.java
