@@ -4,7 +4,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.MessageDigest;
 
 /**
  * Read-only CAD file source fingerprint for safe two-phase DXF/DWG exports.
