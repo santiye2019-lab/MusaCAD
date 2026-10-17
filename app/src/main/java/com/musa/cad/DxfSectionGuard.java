@@ -4,17 +4,17 @@ import java.io.IOException;
 
 /**
  * Strict staged-DXF SECTION/ENDSEC/EOF validation lives ONLY in portable C.
- * Platform code retains file I/O and handle/LINE fixture readback.
+ * Platform code retains file I/O and duplicate-handle readback.
  *
  * The native call combines existing group-code pair validation with section
- * state transitions, avoiding two JNI round trips for every DXF group pair.
+ * and LINE validation, avoiding separate JNI round trips per coordinate.
  */
 public final class DxfSectionGuard {
     public static final int RECORD_BOUNDARY=1;
     public static final int LINE_STARTED=2;
     public static final int HANDLE_AREA=4;
     private static final int CODE_MASK=2047;
-    private final int[] state=new int[4];
+    private final int[] state=new int[5]; // four section ints + native LINE coordinate state
 
     private static final boolean sharedCoreLoaded;
     static {
@@ -77,6 +77,8 @@ public final class DxfSectionGuard {
             case -15:return "DXF EOF veya ENTITIES eksik";
             case -16:return "DXF nesnesi SECTION dışında";
             case -17:return "DXF kaydı tamamlanmamış";
+            case -19:return "Kaydedilmiş LINE koordinatları eksik";
+            case -20:return "DXF LINE sayısal koordinatı geçersiz";
             default:return "DXF bölüm kaydı geçersiz veya çekirdek hatası";
         }
     }

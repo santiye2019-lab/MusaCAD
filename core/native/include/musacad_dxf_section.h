@@ -34,13 +34,22 @@ enum MusaDxfSectionResult {
     MUSA_DXF_SECTION_EOF_MISMATCH=-15,
     MUSA_DXF_SECTION_OUTSIDE=-16,
     MUSA_DXF_SECTION_INCOMPLETE=-17,
-    MUSA_DXF_SECTION_BAD_ARGUMENT=-18
+    MUSA_DXF_SECTION_BAD_ARGUMENT=-18,
+    MUSA_DXF_LINE_COORDINATES_MISSING=-19,
+    MUSA_DXF_LINE_INVALID_NUMBER=-20
 };
 
 /* Success modifies state and writes *flags. All errors leave both untouched. */
 int musa_core_dxf_section_step(MusaDxfSectionState *state,int code,
                                const char *value,size_t value_len,int *flags);
 int musa_core_dxf_section_finish(const MusaDxfSectionState *state);
+/* A saved DXF LINE must have finite decimal XY coordinates 10/20/11/21.
+ * One portable state: bit 4 = active LINE, bits 0..3 = valid coords.
+ * SECTION record-boundary events finish the previous LINE before starting
+ * another. On error *next_flags is never changed; caller commits atomically.
+ */
+int musa_core_dxf_line_step(int old_flags,int code,const char *value,
+                            size_t value_len,int section_events,int *next_flags);
 #ifdef __cplusplus
 }
 #endif

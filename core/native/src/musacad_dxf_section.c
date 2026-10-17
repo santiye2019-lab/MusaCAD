@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dxf_section.h"
 #include <string.h>
+#include <stdlib.h>
+#include <math.h>
 
 static void strip_ascii(const char **bytes,size_t *n){
     while(*n && (unsigned char)**bytes<=0x20u){++(*bytes);--(*n);}
@@ -77,4 +79,67 @@ int musa_core_dxf_section_finish(const MusaDxfSectionState *state){
     return (!state->awaiting_name && !state->current_kind &&
             state->seen_entities && state->seen_eof)
         ?MUSA_DXF_SECTION_OK:MUSA_DXF_SECTION_INCOMPLETE;
+}
+
+/* DXF numbers use invariant ASCII decimal syntax, independent of Android.
+ * Reject NaN/Infinity, hexadecimal floating syntax, unsupported suffixes and
+ * overflow. strtod runs only after strict ASCII lexical validation.
+ */
+static int line_decimal_finite(const char *raw,size_t length){
+    size_t first=0,last=length;
+    while(first<last && (unsigned char)raw[first]<=0x20u)++first;
+    while(last>first && (unsigned char)raw[last-1]<=0x20u)--last;
+    if(first==last)return 0;
+    size_t pos=first;
+    if(raw[pos]=='+'||raw[pos]=='-')++pos;
+    size_t digits=0;
+    while(pos<last && raw[pos]>='0' && raw[pos]<='9'){++pos;++digits;}
+    if(pos<last && raw[pos]=='.'){
+        ++pos;
+        while(pos<last && raw[pos]>='0' && raw[pos]<='9'){++pos;++digits;}
+    }
+    if(!digits)return 0;
+    if(pos<last && (raw[pos]=='e'||raw[pos]=='E')){
+        ++pos;
+        if(pos<last && (raw[pos]=='+'||raw[pos]=='-'))++pos;
+        size_t exponent_digits=0;
+        while(pos<last && raw[pos]>='0' && raw[pos]<='9'){
+            ++pos;++exponent_digits;
+        }
+        if(!exponent_digits)return 0;
+    }
+    if(pos!=last)return 0;
+    char *end=NULL;
+    double number=strtod(raw+first,&end);
+    return end==raw+last && isfinite(number);
+}
+int musa_core_dxf_line_step(int old_flags,int code,const char *value,
+                            size_t value_len,int section_events,int *next_flags){
+    if(!value||!next_flags||old_flags<0||(old_flags & ~31)!=0||
+       code<0||code>1071||
+       (section_events & ~(MUSA_DXF_SECTION_RECORD_BOUNDARY|
+                           MUSA_DXF_SECTION_LINE_STARTED|
+                           MUSA_DXF_SECTION_HANDLE_AREA))!=0)
+        return MUSA_DXF_SECTION_BAD_ARGUMENT;
+    int candidate=old_flags;
+    if(section_events&MUSA_DXF_SECTION_RECORD_BOUNDARY){
+        if((candidate&16) && (candidate&15)!=15)
+            return MUSA_DXF_LINE_COORDINATES_MISSING;
+        candidate=0;
+    }
+    if(section_events&MUSA_DXF_SECTION_LINE_STARTED){
+        if(code!=0 || !(section_events&MUSA_DXF_SECTION_RECORD_BOUNDARY))
+            return MUSA_DXF_SECTION_BAD_ARGUMENT;
+        candidate=16;
+    }
+    if((candidate&16) && code!=0){
+        const int bit=code==10?1:code==20?2:code==11?4:code==21?8:0;
+        if(bit){
+            if(!line_decimal_finite(value,value_len))
+                return MUSA_DXF_LINE_INVALID_NUMBER;
+            candidate|=bit;
+        }
+    }
+    *next_flags=candidate;
+    return MUSA_DXF_SECTION_OK;
 }
