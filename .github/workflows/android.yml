@@ -877,10 +877,14 @@ jobs:
           javac -encoding UTF-8 -d /tmp/musacad-dxf-group-jni \
             app/src/main/java/com/musa/cad/DxfGroupCode.java \
             tests/DxfGroupCodeTest.java \
-            tests/DxfGroupCodeMissingCoreTest.java
+            tests/DxfGroupCodeMissingCoreTest.java \
+            tests/DxfGroupPairTest.java \
+            tests/DxfGroupPairMissingCoreTest.java
           java -cp /tmp/musacad-dxf-group-jni DxfGroupCodeMissingCoreTest
+          java -cp /tmp/musacad-dxf-group-jni DxfGroupPairMissingCoreTest
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-dxf-group-jni DxfGroupCodeTest
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-dxf-group-jni DxfGroupPairTest
       - name: Identify genuine DWG version without confusing AutoCAD 2026
         run: |
           bash tests/run_dwg_signature_host.sh
