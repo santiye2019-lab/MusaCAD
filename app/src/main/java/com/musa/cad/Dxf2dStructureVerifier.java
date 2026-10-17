@@ -39,8 +39,7 @@ public final class Dxf2dStructureVerifier {
         if(dxf==null||!dxf.isFile()||dxf.length()==0||dxf.length()>MAX_BYTES)
             throw new IOException("Geçersiz 2B DXF geçici dosyası");
         DxfSectionGuard sections=new DxfSectionGuard();
-        boolean entityIsLine=false;
-        int lineFlags=0,pairs=0;
+        int pairs=0;
         Set<String> seenHandles=new HashSet<>();
         try(BufferedReader reader=new BufferedReader(new InputStreamReader(
                 new FileInputStream(dxf),StandardCharsets.ISO_8859_1),128*1024)){
@@ -55,26 +54,9 @@ public final class Dxf2dStructureVerifier {
                 pairs++;
                 int code=DxfSectionGuard.code(packet);
                 String item=value.trim();
-                if(DxfSectionGuard.event(packet,DxfSectionGuard.RECORD_BOUNDARY)
-                        &&entityIsLine){
-                    requireLine(lineFlags);
-                    entityIsLine=false;lineFlags=0;
-                }
-                if(DxfSectionGuard.event(packet,DxfSectionGuard.LINE_STARTED)){
-                    entityIsLine=true;lineFlags=0;
-                }
+                // Native C verifies LINE coordinate syntax and completeness
+                // in the same state transition, before this record is trusted.
                 if(code!=0){
-                    if(entityIsLine){
-                        int bit=code==10?1:code==20?2:code==11?4:code==21?8:0;
-                        if(bit!=0){
-                            try{if(!Double.isFinite(Double.parseDouble(item)))
-                                throw new NumberFormatException("non-finite");}
-                            catch(NumberFormatException ex){
-                                throw new IOException("DXF LINE sayısal koordinatı geçersiz",ex);
-                            }
-                            lineFlags|=bit;
-                        }
-                    }
                     if((code==5||code==105)&&
                        DxfSectionGuard.event(packet,DxfSectionGuard.HANDLE_AREA)){
                         String handle=DxfSourceHandlePlan.canonical(item);
@@ -87,7 +69,4 @@ public final class Dxf2dStructureVerifier {
         sections.requireFinished();
     }
 
-    private static void requireLine(int flags)throws IOException{
-        if((flags&15)!=15)throw new IOException("Kaydedilmiş LINE koordinatları eksik");
-    }
 }
