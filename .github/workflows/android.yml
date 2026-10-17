@@ -883,6 +883,16 @@ jobs:
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSourceSha256NativeParityTest
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-source-sha CadSaveSourceIntegrityTest
+      - name: P0 native DXF SECTION grammar including malformed/truncated/no-core proofs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-native-sections
+          javac -encoding UTF-8 -d /tmp/musacad-native-sections \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java \
+            tests/DxfSectionGuardTest.java tests/DxfSectionGuardMissingCoreTest.java
+          java -cp /tmp/musacad-native-sections DxfSectionGuardMissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-native-sections DxfSectionGuardTest
       - name: P0 shared C group-code parser and missing-core fail-closed regression
         run: |
           set -euo pipefail
