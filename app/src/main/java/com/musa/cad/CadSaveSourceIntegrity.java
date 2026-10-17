@@ -73,8 +73,7 @@ public final class CadSaveSourceIntegrity {
             if(state!=0){
                 try{destroyDigestNative(state);}
                 catch(LinkageError unavailable){
-                    // Native ABI was unloaded/corrupted; cannot recover. The
-                    // enclosing capture never treats missing core as success.
+                    throw new IOException("Ortak CAD çekirdeği SHA-256 kaynağını kapatamadı",unavailable);
                 }
             }
         }
