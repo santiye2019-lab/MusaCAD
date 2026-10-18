@@ -12,11 +12,13 @@ extern "C" {
  * ODA R13-R15 DWG file-header layout, not copied from another CAD engine.
  * This safely extracts original on-disk offsets and validates the sentinel,
  * record identities, interval boundaries and the R2000 CRC16 checksum.
+ * Six locator records are valid. Optional record IDs 3..5 may have zero
+ * length (no section). ID 5 is retained as opaque metadata only.
  * No entity/object decoder, editable drawing or DWG save is certified.
  * Do NOT pass these unverified regions to an editable CAD object database.
  * Modern AC1018..AC1032 have different file organizations and are refused.
  */
-#define MUSA_DWG_AC1015_MAX_LOCATORS 5u
+#define MUSA_DWG_AC1015_MAX_LOCATORS 6u
 typedef struct MusaDwgAc1015Locators {
     uint16_t codepage;
     uint16_t stored_header_crc;

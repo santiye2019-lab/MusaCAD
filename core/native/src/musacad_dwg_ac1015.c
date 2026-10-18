@@ -43,7 +43,8 @@ int musa_dwg_ac1015_read_locators(const uint8_t *bytes,size_t n,
      * The CRC polynomial is independently implemented in MusaCAD Core. */
     uint16_t calculated_crc=0u;
     const uint16_t xor_mask=count==3u?0xa598u:
-                            count==4u?0x8101u:0x3cc4u;
+                            count==4u?0x8101u:
+                            count==5u?0x3cc4u:0x8461u;
     if(!musa_core_crc16_arc(0u,bytes,table_end,&calculated_crc)||
        (uint16_t)(calculated_crc^xor_mask)!=(uint16_t)stored_crc)
         return 0;
@@ -55,24 +56,32 @@ int musa_dwg_ac1015_read_locators(const uint8_t *bytes,size_t n,
     result.header_end=(uint32_t)header_end;
     result.crc_verified=1;
     uint32_t seen=0u;
+    /* Only non-empty regions are eligible for bounds/overlap admission.
+     * Optional raw locator records with length=0 have no borrowed span.
+     * Keep the original metadata (including reserved ID 5) untouched. */
+    MusaDwgRegion nonempty[MUSA_DWG_AC1015_MAX_LOCATORS]={0};
+    size_t nonempty_count=0u;
     for(size_t i=0u;i<(size_t)count;i++){
         const size_t pos=0x19u+i*9u;
         uint64_t id=0u,offset=0u,length=0u;
         if(!read_at(&bits,pos,8u,&id)||
            !read_at(&bits,pos+1u,32u,&offset)||
            !read_at(&bits,pos+5u,32u,&length)||
-           id>4u||(seen&(1u<<(unsigned)id))!=0u||
-           offset<header_end)return 0;
+           id>5u||(seen&(1u<<(unsigned)id))!=0u||
+           (id<3u&&length==0u)||
+           (length>0u&&offset<header_end))return 0;
         seen|=1u<<(unsigned)id;
         result.regions[i].section_kind=(uint32_t)id;
         result.regions[i].offset=offset;
         result.regions[i].length=length;
+        if(length>0u)nonempty[nonempty_count++]=result.regions[i];
     }
-    /* Required records: DWG header variables, class and object map.
-     * Unknown sixth record layout is intentionally refused. */
+    /* IDs 0 HEADER, 1 CLASSES and 2 OBJECT MAP are mandatory/non-empty.
+     * IDs 3..5 may be empty; a present ID 5 stays opaque and is never
+     * interpreted as decoded DWG objects. All actual intervals are checked. */
     if((seen&7u)!=7u||
-       !musa_dwg_regions_validate((uint64_t)n,result.regions,
-                                  (size_t)count))return 0;
+       !musa_dwg_regions_validate((uint64_t)n,nonempty,
+                                  nonempty_count))return 0;
     *out=result;
     return 1;
 }

@@ -6,8 +6,10 @@ R2000 section-locator records from offset `0x15` (count) and `0x19`
 (record list). Every 9-byte entry holds record kind, little-endian offset and
 length. It also captures the codepage and image seeker as **unverified**
 metadata, verifies the 16-byte legacy file-header sentinel, and rejects
-duplicate/unknown records, missing mandatory sections, overlapping intervals,
-truncated headers and out-of-file ranges.
+duplicate/unknown records, missing mandatory sections, overlapping nonempty
+intervals, truncated headers and out-of-file ranges. The documented
+3/4/5/6-locator variants are supported, including absent zero-length
+optional sections (IDs 3..5); record 5 remains opaque metadata.
 
 **Reference**: Open Design Alliance, *Open Design Specification for .dwg
 files*, chapter 3.2 (R13-R15 / R2000 file header), especially section-locator
@@ -25,10 +27,10 @@ the documented R2000 header CRC is now verified using the section-count
 XOR mask. Section contents and their own integrity are not decoded. No B-Rep, handles, objects, 3D, drawing edit, modern AC1032 layout
 or DWG saving is supported by this specific parser. Its output must NOT
 admit an editable document or claim full DWG compatibility. AC1018+ is
-explicitly refused. Section record number 5 is undocumented and refused.
+explicitly refused. Optional record ID 5 is preserved but **not decoded**.
 
-Next stages: verify real-file fixtures independently; validate per-section
-content sentinels/checksums; bounded section content decoding;
+Next stages: expand public real-file corpus and independent reference testing;
+validate remaining section checksums and bounded section content decoding;
 then implement modern AC1032 separate section map/compression protocols.
 MusaCAD's MC1032 `.mcad` is a different, custom format.
 
@@ -97,3 +99,49 @@ CRC-16 detects accidental corruption but provides **no authenticity**.
 the file remains read-only. Real DWG fixture corpus and independent
 third-party decoder equivalence, object/class decoding, complete section
 validation, modern AC1032 decoding and native DWG writing remain open.
+
+## P0: Real pinned R2000 binary fixture acceptance gate
+
+`core/native/tests/core_ac1015_real_fixture_probe.c` is an original,
+read-only host test that calls the same portable C functions as MusaCAD.
+The Modern DWG CI workflow checks out the publicly distributable
+LibreDWG test-data repository at an **exact pinned source commit**,
+then runs the **MusaCAD-owned reader only** on the original
+`test/test-data/2000/TS1.dwg`. The expected on-disk signature is
+`AC1015`. We require the file-level CRC/locators and both HEADER and
+CLASSES envelope/data CRCs to pass. The original file SHA-256 before and
+after execution must match exactly.
+
+A newer sample (`test/test-data/example_2013.dwg`) is also required to
+be rejected by this AC1015-only parser. CI must **fail** on any
+rejection of the R2000 file or mistaken acceptance of the modern file:
+no soft-pass, warning downgrade, or skipped real acceptance. The
+first-party probe does not load or call any LibreDWG library.
+
+This genuine **file-format section-level** evidence remains distinct
+from entity/class/object decoding, editable scene reconstruction,
+object-preserving DWG save, AutoCAD 2026 equivalence and physical
+Android/Windows/iOS application testing. Never assert any of those
+broader claims based only on this gate.
+
+## Genuine six-locator acceptance result and honest limits
+
+The pinned real `TS1.dwg` case has **six** locator records rather than
+the prior synthetic fixtures' three to five. The source specification
+defines a sixth-header XOR mask `0x8461`; the original document also
+allows optional section records with no content. The pinned real file
+contains a zero-length optional record (ID 3).
+
+MusaCAD now validates all *non-empty* byte intervals for overlap and
+out-of-file bounds, requires the three mandatory non-empty sections,
+and preserves the original six-record metadata without borrowing bytes
+from empty sections. Record 5 is accepted as opaque metadata but **not
+decoded**. The pinned real-file CI gate independently checks the
+six-record layout, empty optional record, safe refusal of its byte span,
+HEADER and CLASSES CRC checks, original byte preservation, and explicit
+modern-DWG rejection.
+
+This is **one real reference file** proving only legacy header/section
+read correctness within the tested scope. It does not establish
+class/entity decoding, object maps, genuine modern DWG editing/writing,
+complete DWG interoperability, or AutoCAD 2026 functional parity.
