@@ -19,6 +19,17 @@ import java.util.Map;
 public final class Cad3dMeshTopology {
     public static final int MAX_AUDITED_TRIANGLES = 50000;
     private Cad3dMeshTopology(){}
+    /* One common C engine on actual Android. Java code below remains only
+     * a JVM regression oracle during audited cross-platform migration. */
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native int[] inspectNative(float[] xyz,int[] triangles);
 
     public static final class Result {
         public final boolean checked,closedOrientedByIndex;
@@ -85,6 +96,13 @@ public final class Cad3dMeshTopology {
            triangles.length%3!=0)
             throw new IllegalArgumentException("invalid triangle mesh arrays");
         int count=triangles.length/3;
+        if(ANDROID_RUNTIME){
+            int[] data=inspectNative(xyz,triangles);
+            if(data==null||data.length!=8)
+                throw new IllegalArgumentException("invalid native mesh topology input");
+            return new Result(data[0]!=0,data[1]!=0,
+                    data[2],data[3],data[4],data[5],data[6],data[7]);
+        }
         if(count>MAX_AUDITED_TRIANGLES)
             return new Result(false,false,count,0,0,0,0,0);
         int vertexCount=xyz.length/3;
