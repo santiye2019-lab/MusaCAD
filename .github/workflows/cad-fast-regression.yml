@@ -86,12 +86,21 @@ jobs:
           set -euo pipefail
           cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
             core/native/src/musacad_dwg_ac1015_object.c \
+            core/native/src/musacad_dwg_ac1015_values.c \
             core/native/src/musacad_dwg_signature.c \
             core/native/src/musacad_crc16.c \
             core/native/src/musacad_bits.c \
             core/native/tests/core_dwg_ac1015_object_test.c \
             -o /tmp/musacad-ac1015-object
           /tmp/musacad-ac1015-object
+      - name: P0 original R2000 coordinate codecs BS BL RD BD DD BT BE and fail-closed stream
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/src/musacad_dwg_ac1015_values.c \
+            core/native/tests/core_dwg_ac1015_values_test.c \
+            -o /tmp/musacad-ac1015-values
+          /tmp/musacad-ac1015-values
       - name: P0 first-party DWG candidate section spans, bounds and overlap rejections
         run: |
           set -euo pipefail
