@@ -12,6 +12,17 @@ package com.musa.cad;
  */
 public final class Cad3dSurfaceMetrics {
     private Cad3dSurfaceMetrics(){}
+    /* Native geometry is mandatory on Android; Java below is a JVM-only
+     * differential reference, NOT an Android backup CAD engine. */
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native double[] measureNative(float[] xyz,int[] triangles);
 
     public static final class Result {
         public final double area;
@@ -31,6 +42,20 @@ public final class Cad3dSurfaceMetrics {
         if(xyz==null||triangles==null||xyz.length%3!=0||
            triangles.length%3!=0)
             throw new IllegalArgumentException("invalid CAD triangle arrays");
+        if(ANDROID_RUNTIME){
+            double[] data=measureNative(xyz,triangles);
+            if(data==null||data.length!=6||
+               !Double.isFinite(data[0])||data[0]<0||
+               data[4]!=triangles.length/3||data[5]<0||
+               data[5]>data[4]||data[5]!=Math.rint(data[5])||
+               (data[0]==0d?!(Double.isNaN(data[1])&&Double.isNaN(data[2])&&
+                   Double.isNaN(data[3])):
+                   !(Double.isFinite(data[1])&&Double.isFinite(data[2])&&
+                   Double.isFinite(data[3]))))
+                throw new IllegalArgumentException("invalid native CAD surface data");
+            return new Result(data[0],(int)data[4],(int)data[5],
+                    data[1],data[2],data[3]);
+        }
         final int vertices=xyz.length/3;
         // Translate moment calculations near the mesh, so large CAD WCS
         // coordinates do not dominate much smaller model dimensions.

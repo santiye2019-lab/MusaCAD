@@ -16,6 +16,16 @@ static int compensated_add(double value,double *sum,double *correction){
     *sum=next;
     return isfinite(*correction);
 }
+int musa_core_mesh_surface_result_valid(const MusaCoreMeshSurface *r,
+                                        size_t expected_faces){
+    if(!r||r->triangle_count!=expected_faces||
+       r->degenerate_count>r->triangle_count||
+       !isfinite(r->area)||r->area<0.)return 0;
+    if(r->area==0.)return isnan(r->centroid_x)&&isnan(r->centroid_y)&&
+                          isnan(r->centroid_z);
+    return isfinite(r->centroid_x)&&isfinite(r->centroid_y)&&
+           isfinite(r->centroid_z);
+}
 int musa_core_mesh_surface_f32(const float *xyz,size_t point_count,
                               const int *triangles,size_t face_count,
                               MusaCoreMeshSurface *out){
@@ -75,5 +85,6 @@ int musa_core_mesh_surface_f32(const float *xyz,size_t point_count,
         if(!isfinite(result.centroid_x)||!isfinite(result.centroid_y)||
            !isfinite(result.centroid_z))return 0;
     }
+    if(!musa_core_mesh_surface_result_valid(&result,face_count))return 0;
     *out=result;return 1;
 }

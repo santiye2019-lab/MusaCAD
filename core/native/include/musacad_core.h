@@ -77,6 +77,11 @@ typedef struct MusaCoreMeshSurface {
 int musa_core_mesh_surface_f32(const float *xyz,size_t point_count,
                               const int *triangles,size_t face_count,
                               MusaCoreMeshSurface *out);
+/* Portable result-integrity contract. Zero-area mesh has unavailable NaN
+ * centroids; positive-area mesh has finite WCS centroids. This is NOT
+ * geometry/B-Rep validity certification. Never silently publish invalid data. */
+int musa_core_mesh_surface_result_valid(const MusaCoreMeshSurface *result,
+                                        size_t expected_faces);
 /*
  * Independently audit indexed 3D triangle connectivity before signed-mass
  * calculations. Untrusted meshes are NEVER certified solely by edge count.
