@@ -3,6 +3,7 @@
  * No DWG parser, no external CAD SDK, no platform-specific headers.
  */
 #include "musacad_mc1032_v2.h"
+#include "musacad_handle_index.h"
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
@@ -14,6 +15,7 @@ struct MusaMC2Scene {
     uint64_t next_handle;
     MusaMC2Layer layers[MUSA_MC2_MAX_LAYERS];
     MusaMC2Entity *entities;
+    MusaHandleIndex *handles;
 };
 static const unsigned char magic[6]={'M','C','1','0','3','2'};
 static int ieee64(void) {
@@ -47,6 +49,8 @@ MusaMC2Scene *musa_mc2_scene_create(uint32_t maximum){
     if(!s)return NULL;
     s->entities=(MusaMC2Entity *)calloc(maximum,sizeof(*s->entities));
     if(!s->entities){free(s);return NULL;}
+    s->handles=musa_handle_index_create(maximum);
+    if(!s->handles){free(s->entities);free(s);return NULL;}
     s->maximum=maximum;s->next_handle=1;
     s->layer_count=1;
     strcpy(s->layers[0].name,"0");
@@ -60,6 +64,7 @@ void musa_mc2_scene_destroy(MusaMC2Scene *s){
         memset(s->entities,0,(size_t)s->maximum*sizeof(*s->entities));
         free(s->entities);
     }
+    musa_handle_index_destroy(s->handles);
     memset(s,0,sizeof(*s));free(s);
 }
 uint32_t musa_mc2_scene_entity_count(const MusaMC2Scene *s){return s?s->count:0;}
@@ -85,9 +90,9 @@ int musa_mc2_scene_get_layer(const MusaMC2Scene *s,uint32_t id,MusaMC2Layer *out
 }
 static uint32_t locate(const MusaMC2Scene *s,uint64_t handle){
     if(!s||!handle)return UINT32_MAX;
-    for(uint32_t i=0;i<s->count;i++)
-        if(s->entities[i].handle==handle)return i;
-    return UINT32_MAX;
+    uint32_t slot=UINT32_MAX;
+    return musa_handle_index_get(s->handles,handle,&slot)==1
+       ?slot:UINT32_MAX;
 }
 int musa_mc2_scene_add_entity(MusaMC2Scene *s,const MusaMC2Entity *in,
                               uint64_t *actual_handle){
@@ -96,6 +101,8 @@ int musa_mc2_scene_add_entity(MusaMC2Scene *s,const MusaMC2Entity *in,
     uint64_t id=in->handle?in->handle:s->next_handle;
     if(id==0u||id==UINT64_MAX)return MUSA_MC2_LIMIT;
     if(locate(s,id)!=UINT32_MAX)return MUSA_MC2_INVALID;
+    const int indexed=musa_handle_index_put(s->handles,id,s->count);
+    if(indexed!=1)return indexed==-2?MUSA_MC2_LIMIT:MUSA_MC2_INVALID;
     MusaMC2Entity e=*in;e.handle=id;
     s->entities[s->count++]=e;
     if(id>=s->next_handle)s->next_handle=id+1u;
@@ -134,11 +141,15 @@ int musa_mc2_scene_delete(MusaMC2Scene *s,uint64_t id){
     if(!s||!id)return MUSA_MC2_INVALID;
     uint32_t i=locate(s,id);
     if(i==UINT32_MAX)return MUSA_MC2_NOT_FOUND;
+    if(musa_handle_index_remove(s->handles,id)!=1)
+        return MUSA_MC2_CORRUPT;
     if(i+1u<s->count)
         memmove(s->entities+i,s->entities+i+1u,
                 (size_t)(s->count-i-1u)*sizeof(*s->entities));
     --s->count;
     memset(s->entities+s->count,0,sizeof(*s->entities));
+    for(uint32_t k=i;k<s->count;k++)
+        (void)musa_handle_index_set(s->handles,s->entities[k].handle,k);
     return MUSA_MC2_OK;
 }
 static void u32put(unsigned char *p,uint32_t v){
