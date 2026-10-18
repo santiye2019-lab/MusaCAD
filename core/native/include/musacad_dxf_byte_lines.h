@@ -19,6 +19,17 @@ enum MusaDxfByteLineResult {
     MUSA_DXF_BYTE_BAD_ARGUMENT=-2,
     MUSA_DXF_BYTE_NO_MEMORY=-3
 };
+/* Existing staged-save scanner keeps historical drop-all-CR behavior.
+ * Seekable DxfStream needs CR preserved inside payload, with ONLY a final
+ * CR immediately preceding LF/EOF removed as in its existing Java reader.
+ * Both modes use precisely the same portable C buffering and length policy.
+ */
+enum MusaDxfCrMode {
+    MUSA_DXF_CR_DROP_ALL=0,
+    MUSA_DXF_CR_TRAILING_ONLY=1
+};
+MusaDxfByteLines *musa_core_dxf_byte_lines_create_mode(
+    size_t max_line_bytes,int cr_mode);
 MusaDxfByteLines *musa_core_dxf_byte_lines_create(size_t max_line_bytes);
 int musa_core_dxf_byte_lines_step(MusaDxfByteLines *reader,
     const unsigned char *chunk,size_t chunk_len,size_t *consumed,
