@@ -8,6 +8,7 @@
 #include "musacad_dwg_ac1015.h"
 #include "musacad_dwg_ac1015_frame.h"
 #include "musacad_dwg_ac1015_handles.h"
+#include "musacad_dwg_ac1015_object.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,6 +119,39 @@ int main(int argc,char **argv){
         fputs("FAIL: real R2000 object map CRC/index acceptance\n",stderr);
         return 1;
     }
+    if(object_count>100000u){
+        free(file);
+        fputs("FAIL: too many public real DWG records for bounded test\n",stderr);
+        return 1;
+    }
+    MusaDwgAc1015HandleEntry *entries=(MusaDwgAc1015HandleEntry*)
+         calloc(object_count,sizeof(MusaDwgAc1015HandleEntry));
+    if(!entries){
+        free(file);return 1;
+    }
+    size_t confirmed_count=0u;
+    if(!musa_dwg_ac1015_handles_index(file,n,entries,
+                                       object_count,&confirmed_count)||
+       confirmed_count!=object_count){
+        free(entries);free(file);
+        fputs("FAIL: real DWG handle index mismatch\n",stderr);
+        return 1;
+    }
+    size_t complete=0u;
+    for(size_t i=0u;i<object_count;i++){
+        MusaDwgAc1015ObjectRecord rec={0};
+        if(!musa_dwg_ac1015_read_object_record(file,n,&entries[i],&rec)||
+           rec.record_crc_verified!=1||rec.geometry_decoded!=0||
+           rec.indexed_handle!=entries[i].handle){
+            fputs("FAIL: indexed real R2000 object record CRC/type boundary\n",stderr);
+            free(entries);free(file);
+            return 1;
+        }
+        complete++;
+    }
+    free(entries);
+    printf("PASS: real R2000 independently checked %zu object records (CRC + type header only)\n",
+           complete);
     printf("PASS: real R2000 HEADER/CLASSES CRC + object handle map (%zu indexed objects)\n",
            object_count);
     free(file);
