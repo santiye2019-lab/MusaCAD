@@ -28,6 +28,7 @@ jobs:
       - name: Enforce owner's all-platform one-CAD-engine rule and migration inventory
         run: |
           set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_firstparty_no_cad_sdk.py' -v
           python3 -m unittest discover -s tests -p 'test_one_cad_engine_mandate.py' -v
           python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
           python3 -m unittest discover -s tests -p 'test_core_migration_diff.py' -v
