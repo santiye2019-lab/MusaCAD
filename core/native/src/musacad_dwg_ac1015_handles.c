@@ -42,7 +42,7 @@ static int read_modular_signed(const uint8_t *p,size_t end,size_t *at,
         mag|=bits<<shift;
         if(final){
             const int negative=(b&0x40u)!=0;
-            if(i>0u && bits==0u)return 0;
+            if(i>0u && mag<(UINT64_C(1)<<((i-1u)*7u+6u)))return 0;
             if((negative&&mag>UINT64_C(0x8000000000000000))||
                (!negative&&mag>(uint64_t)INT64_MAX)||
                (negative&&mag==0u))return 0;
