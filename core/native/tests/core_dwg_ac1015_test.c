@@ -65,6 +65,48 @@ int main(void){
             assert(loc.regions[i].offset>=end);
             assert(loc.regions[i].length>0u);
         }
+        /* All three to five documented section IDs have a safe borrowed
+         * view of their ORIGINAL bytes. The view never owns the buffer. */
+        for(unsigned id=0u;id<records;id++){
+            const uint8_t *start=NULL;
+            size_t len=0u;
+            assert(musa_dwg_ac1015_readonly_section(
+                fixture,sizeof(fixture),id,&start,&len));
+            assert(start==fixture+(size_t)loc.regions[id].offset);
+            assert(len==(size_t)loc.regions[id].length);
+        }
+        /* Unknown/missing IDs, missing outputs, wrong DWG versions and
+         * truncated input must never clobber caller-owned output. */
+        const uint8_t *safe=fixture+4u;
+        size_t length=12345u;
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),records,&safe,&length));
+        assert(safe==fixture+4u&&length==12345u);
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),5u,&safe,&length));
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,end-1u,0u,&safe,&length));
+        assert(!musa_dwg_ac1015_readonly_section(
+            NULL,sizeof(fixture),0u,&safe,&length));
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),0u,NULL,&length));
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),0u,&safe,NULL));
+        assert(safe==fixture+4u&&length==12345u);
+        /* Any changed header byte breaks the genuine header CRC. Do not
+         * return spans validated against the previous header contents. */
+        fixture[0x13u]^=1u;
+        assert(!musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),0u,&safe,&length));
+        assert(safe==fixture+4u&&length==12345u);
+        fixture[0x13u]^=1u;
+        /* Payload bytes have NO integrity proof yet: reads can succeed but
+         * must never be advertised as a decoded/verified DWG section. */
+        fixture[128u]^=0x80u;
+        assert(musa_dwg_ac1015_readonly_section(
+            fixture,sizeof(fixture),0u,&safe,&length));
+        assert(safe==fixture+128u&&length==52u);
+        fixture[128u]^=0x80u;
         assert(memcmp(original,fixture,sizeof(fixture))==0);
         fail_unchanged(fixture,end-1u,&loc);
         fail_unchanged(fixture,0x18u,&loc);

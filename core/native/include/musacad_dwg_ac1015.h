@@ -33,6 +33,21 @@ typedef struct MusaDwgAc1015Locators {
  */
 int musa_dwg_ac1015_read_locators(const uint8_t *bytes,size_t byte_count,
                                   MusaDwgAc1015Locators *out);
+/* Obtain a bounded, read-only ORIGINAL file section by documented R2000
+ * locator ID 0..4. Revalidate the complete file header, its CRC16 and
+ * every section extent on EVERY call: never trust saved/stale locators.
+ * The returned span is borrowed from 'bytes', valid only as long as the
+ * original allocation and file bytes remain unchanged.
+ *
+ * IMPORTANT: This checks header integrity ONLY. The section payload has
+ * NOT been checksum-verified or decoded and MUST NOT be admitted as a CAD
+ * document. Missing/unknown sections and invalid arguments fail closed,
+ * leaving *out_start and *out_length unchanged.
+ */
+int musa_dwg_ac1015_readonly_section(const uint8_t *bytes,size_t byte_count,
+                                      uint32_t section_kind,
+                                      const uint8_t **out_start,
+                                      size_t *out_length);
 #ifdef __cplusplus
 }
 #endif
