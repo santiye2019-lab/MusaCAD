@@ -153,6 +153,10 @@ jobs:
       - name: Enforce single portable CAD engine and Windows iOS test contracts
         run: |
           python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
+      - name: P1 3D UCS portable core, native JNI and JVM parity
+        run: |
+          set -euo pipefail
+          bash tests/run_ucs_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
