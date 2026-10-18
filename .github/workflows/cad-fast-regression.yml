@@ -122,6 +122,7 @@ jobs:
           set -euo pipefail
           cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
             core/native/src/musacad_dwg_ac1015_common.c \
+            core/native/src/musacad_dwg_ac1015_handle_refs.c \
             core/native/src/musacad_dwg_ac1015_line.c \
             core/native/src/musacad_dwg_ac1015_object.c \
             core/native/src/musacad_dwg_ac1015_values.c \
@@ -130,6 +131,18 @@ jobs:
             core/native/tests/core_dwg_ac1015_common_test.c \
             -o /tmp/musacad-ac1015-common
           /tmp/musacad-ac1015-common
+      - name: P0 original R2000 typed and relative H handles, zero padding and source integrity
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/src/musacad_dwg_ac1015_handle_refs.c \
+            core/native/src/musacad_dwg_ac1015_values.c \
+            core/native/src/musacad_dwg_ac1015_object.c \
+            core/native/src/musacad_dwg_signature.c \
+            core/native/src/musacad_crc16.c \
+            core/native/tests/core_dwg_ac1015_handle_refs_test.c \
+            -o /tmp/musacad-ac1015-hrefs
+          /tmp/musacad-ac1015-hrefs
       - name: P0 first-party DWG candidate section spans, bounds and overlap rejections
         run: |
           set -euo pipefail
