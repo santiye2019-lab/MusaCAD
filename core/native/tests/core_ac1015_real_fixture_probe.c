@@ -7,6 +7,7 @@
  */
 #include "musacad_dwg_ac1015.h"
 #include "musacad_dwg_ac1015_frame.h"
+#include "musacad_dwg_ac1015_handles.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -110,7 +111,15 @@ int main(int argc,char **argv){
             return 1;
         }
     }
-    puts("PASS: real R2000 header locator, HEADER and CLASSES structural/data CRC gates");
+    size_t object_count=0u;
+    if(!musa_dwg_ac1015_handles_index(file,n,NULL,0u,&object_count)||
+       object_count==0u){
+        free(file);
+        fputs("FAIL: real R2000 object map CRC/index acceptance\n",stderr);
+        return 1;
+    }
+    printf("PASS: real R2000 HEADER/CLASSES CRC + object handle map (%zu indexed objects)\n",
+           object_count);
     free(file);
     return 0;
 }

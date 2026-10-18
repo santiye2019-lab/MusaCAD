@@ -145,3 +145,27 @@ This is **one real reference file** proving only legacy header/section
 read correctness within the tested scope. It does not establish
 class/entity decoding, object maps, genuine modern DWG editing/writing,
 complete DWG interoperability, or AutoCAD 2026 functional parity.
+
+## P0: Native R2000 handle map index (object addresses, not decoded objects)
+
+The **first-party portable C11** `musa_dwg_ac1015_handles_index` scans
+AC1015 locator ID 2 (AcDb:Handles / OBJECT MAP) using the file-header
+checks already accepted above. Each bounded map page has a big-endian
+length (max 2032 bytes), alternating unsigned modular-char handle
+deltas and signed modular-char absolute-file-location deltas, a
+big-endian CRC-16 seeded with `0xC0C1`, and a required terminal
+empty page. Handles must increase; every computed object address must
+lie inside the **original** file. No partially filled caller index is
+returned on a structurally invalid page, CRC failure, invalid delta,
+missing terminal, or insufficient caller capacity.
+
+The generic API supports an allocation-free count-only pass and
+caller-owned entry storage. Public real `TS1.dwg` must pass the
+new native-only index test on pinned original bytes. No LibreDWG
+runtime or code enters the native engine; the external public fixture
+is only reference data.
+
+**LIMITS:** object map entries are original file locations and stable
+handle IDs, not decoded entity types, curves, layers, layouts, solids,
+or geometry. Further object-header/record checks and a multi-file
+reference corpus are mandatory before claiming full DWG read/write.
