@@ -144,7 +144,6 @@ int main(int argc,char **argv){
         if(!musa_dwg_ac1015_read_object_record(file,n,&entries[i],&rec)||
            rec.record_crc_verified!=1||rec.geometry_decoded!=0||
            rec.indexed_handle!=entries[i].handle){
-            free(entries);free(file);
             /* Temporary public-fixture scalar-only diagnosis; never output
              * original handles, coordinates, filenames or source bytes. */
             const size_t off=(size_t)entries[i].file_offset;
@@ -169,6 +168,7 @@ int main(int argc,char **argv){
                 }else fprintf(stderr,"P0 public fixture scalar diagnosis: ordinal=%zu bad MS length/bounds\n",i);
             }
             fputs("FAIL: indexed real R2000 object record CRC/type boundary\n",stderr);
+            free(entries);free(file);
             return 1;
         }
         complete++;
