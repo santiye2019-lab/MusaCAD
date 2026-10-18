@@ -1,11 +1,7 @@
 package com.musa.cad;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Fast bounded structural disk readback for staged 2D DXF documents.
@@ -14,24 +10,10 @@ import java.nio.charset.StandardCharsets;
  */
 public final class Dxf2dStructureVerifier {
     private static final long MAX_BYTES=512L*1024*1024;
-    private static final int MAX_LINE_LENGTH=1024*1024;
     private static final int MAX_PAIRS=32_000_000;
     private static final int MAX_HANDLES=1_500_000;
 
     private Dxf2dStructureVerifier(){}
-
-    private static String line(BufferedReader reader)throws IOException{
-        StringBuilder value=new StringBuilder(48);
-        int c;
-        while((c=reader.read())!=-1){
-            if(c=='\n')break;
-            if(c=='\r')continue;
-            if(value.length()>=MAX_LINE_LENGTH)
-                throw new IOException("DXF grup satırı fazla uzun");
-            value.append((char)c);
-        }
-        return c==-1&&value.length()==0?null:value.toString();
-    }
 
     public static void verify(File dxf)throws IOException{
         if(dxf==null||!dxf.isFile()||dxf.length()==0||dxf.length()>MAX_BYTES)
@@ -39,13 +21,12 @@ public final class Dxf2dStructureVerifier {
         DxfSectionGuard sections=new DxfSectionGuard();
         int pairs=0;
         try(DxfSavedHandleSet seenHandles=new DxfSavedHandleSet(MAX_HANDLES);
-            BufferedReader reader=new BufferedReader(new InputStreamReader(
-                new FileInputStream(dxf),StandardCharsets.ISO_8859_1),128*1024)){
+            DxfPortableLines reader=new DxfPortableLines(dxf)){
             while(true){
                 FileTransfer.checkCancelled();
-                String group=line(reader);
+                String group=reader.line();
                 if(group==null)break;
-                String value=line(reader);
+                String value=reader.line();
                 // Portable C simultaneously validates pair framing and
                 // SECTION/ENDSEC/EOF transitions: one JNI call per pair.
                 int packet=sections.consume(group,value,pairs,MAX_PAIRS);
