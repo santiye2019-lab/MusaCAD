@@ -21,6 +21,7 @@ class SharedCorePortabilityContract(unittest.TestCase):
         self.assertIn("target_compile_features(musacad_core PUBLIC c_std_11)", core)
         self.assertIn('add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../../../core/native"', adapter)
         android_target = adapter.split("if(ANDROID)", 1)[1].split("return()", 1)[0]
+        android_target = "\n".join(line.split("#", 1)[0] for line in android_target.splitlines())
         self.assertIn("target_link_libraries(musacad_dwg PRIVATE m musacad_core)", android_target)
         self.assertIn("firstparty_dwg_unavailable_jni.c", android_target)
         self.assertNotIn("redwg", android_target.lower())
