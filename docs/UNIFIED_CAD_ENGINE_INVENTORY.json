@@ -20,7 +20,7 @@
     "Selection",
     "Recovery"
   ],
-  "java_candidate_count": 109,
+  "java_candidate_count": 110,
   "remaining_migration_policy": "All CAD semantics in any Java or platform-specific code are migration debt until independently proven in shared core. Adapter candidates require manual audit too.",
   "java_modules": [
     {
@@ -458,6 +458,12 @@
     {
       "path": "app/src/main/java/com/musa/cad/DxfReplacementLayerStyle.java",
       "classification": "needs_core_audit",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/DxfPortableLines.java",
+      "classification": "platform_adapter_candidate",
       "family": "file_io_and_dxf_dwg_semantics",
       "migrated_verified": false
     },

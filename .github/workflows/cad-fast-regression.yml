@@ -70,6 +70,17 @@ jobs:
           java -cp /tmp/musacad-dxf-saved-handles DxfSavedHandleSetMissingCoreTest
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-dxf-saved-handles DxfSavedHandleSetTest
+      - name: P0 portable C DXF byte streaming and no-native fail-closed
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-native-byte-lines
+          javac -encoding UTF-8 -d /tmp/musacad-native-byte-lines \
+            app/src/main/java/com/musa/cad/FileTransfer.java \
+            app/src/main/java/com/musa/cad/DxfPortableLines.java \
+            tests/DxfPortableLinesTest.java tests/DxfPortableLinesMissingCoreTest.java
+          java -cp /tmp/musacad-native-byte-lines DxfPortableLinesMissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-native-byte-lines DxfPortableLinesTest
       - name: P0 shared C group-code parser and missing-core fail-closed regression
         run: |
           set -euo pipefail
@@ -243,7 +254,7 @@ jobs:
             app/src/main/java/com/musa/cad/FileTransfer.java \
             app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java \
             app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
-            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/DxfSavedHandleSet.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/DxfSavedHandleSet.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             tests/Dxf2dSafeSaveTest.java
           bash tests/build_dxf_handle_jni_host.sh
@@ -262,7 +273,7 @@ jobs:
             app/src/main/java/com/musa/cad/SourceReplacement.java \
             app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfSourceHandlePlan.java \
             app/src/main/java/com/musa/cad/DxfLineRecordWriter.java \
-            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/DxfSavedHandleSet.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
+            app/src/main/java/com/musa/cad/DxfSectionGuard.java app/src/main/java/com/musa/cad/DxfSavedHandleSet.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/Dxf2dStructureVerifier.java \
             app/src/main/java/com/musa/cad/Dxf2dSafeSave.java \
             app/src/main/java/com/musa/cad/Dxf2dSavedLineReopenProof.java \
             tests/Dxf2dSavedLineReopenProofTest.java
