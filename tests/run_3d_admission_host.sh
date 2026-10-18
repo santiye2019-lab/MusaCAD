@@ -11,6 +11,7 @@ javac -encoding UTF-8 -d /tmp/musacad-3d-only \
   app/src/main/java/com/musa/cad/DxfLineTypeParser.java \
   app/src/main/java/com/musa/cad/DxfTextStyle.java \
   app/src/main/java/com/musa/cad/DxfGroupCode.java \
+  app/src/main/java/com/musa/cad/DxfPortableLines.java \
   app/src/main/java/com/musa/cad/DxfStream.java \
   app/src/main/java/com/musa/cad/DxfLayerState.java \
   app/src/main/java/com/musa/cad/DxfBlocks.java \
@@ -27,6 +28,8 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   core/native/src/musacad_3d_admission.c \
   core/native/src/musacad_dxf_group.c \
   core/native/src/musacad_dxf_pair.c \
+  core/native/src/musacad_dxf_byte_lines.c \
+  app/src/main/cpp/dxf_byte_lines_jni.c \
   app/src/main/cpp/open3d_guard_jni.c \
   app/src/main/cpp/dxf_group_jni.c \
   -o /tmp/musacad-3d-only/libmusacad_dwg.so

@@ -43,6 +43,24 @@ int main(void){
     assert(r);
     assert(musa_core_dxf_byte_lines_finish(r,&line,&length)==MUSA_DXF_BYTE_EOF);
     musa_core_dxf_byte_lines_destroy(r);
-    puts("PASS: portable bounded DXF byte line framing CRLF LF split EOF and cap");
+    /* Record streams preserve inner CR and remove only one trailing CR.
+     * Staged-save mode above deliberately keeps legacy drop-all-CR behavior.
+     */
+    assert(musa_core_dxf_byte_lines_create_mode(8,2)==NULL);
+    assert(musa_core_dxf_byte_lines_create_mode(8,-1)==NULL);
+    r=musa_core_dxf_byte_lines_create_mode(8,MUSA_DXF_CR_TRAILING_ONLY);
+    assert(r);
+    assert(feed(r,(const unsigned char *)"A\rB\r",4,&used,"",0)==MUSA_DXF_BYTE_MORE);
+    assert(feed(r,(const unsigned char *)"\n",1,&used,"A\rB",3)==MUSA_DXF_BYTE_LINE);
+    assert(feed(r,(const unsigned char *)"x\r\r",3,&used,"",0)==MUSA_DXF_BYTE_MORE);
+    assert(musa_core_dxf_byte_lines_finish(r,&line,&length)==MUSA_DXF_BYTE_LINE);
+    assert(length==3&&!memcmp(line,"x\r\r",3));
+    musa_core_dxf_byte_lines_destroy(r);
+    r=musa_core_dxf_byte_lines_create_mode(4,MUSA_DXF_CR_TRAILING_ONLY);
+    assert(r);
+    assert(feed(r,(const unsigned char *)"a\rb\n",4,&used,"a\rb",3)==MUSA_DXF_BYTE_LINE);
+    assert(feed(r,(const unsigned char *)"12345",5,&used,"",0)==MUSA_DXF_BYTE_TOO_LONG);
+    musa_core_dxf_byte_lines_destroy(r);
+        puts("PASS: portable bounded DXF byte line framing CRLF LF split EOF and cap");
     return 0;
 }
