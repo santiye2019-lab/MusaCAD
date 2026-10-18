@@ -51,10 +51,12 @@ public final class DxfStreamNativeSeekTest {
                 reader.seek(0,0);
                 require("SECTION".equals(reader.next().type),"restart from byte zero");
             }
-            DxfBlocks.Result expanded=DxfBlocks.expand(source.toFile(),
-                StandardCharsets.ISO_8859_1,null);
-            require(expanded.placements.size()==1,"single LINE preserved");
-            require("A\rB".equals(expanded.placements.get(0).layer),
+            final int[] placements={0};
+            final String[] savedLayer={null};
+            DxfBlocks.expand(source.toFile(),StandardCharsets.ISO_8859_1,
+                placement->{placements[0]++;savedLayer[0]=placement.layer;});
+            require(placements[0]==1,"single LINE preserved");
+            require("A\rB".equals(savedLayer[0]),
                 "interior CR must remain intact on seekable stream");
 
             // The native per-line cap is enforced in all source streaming paths.
