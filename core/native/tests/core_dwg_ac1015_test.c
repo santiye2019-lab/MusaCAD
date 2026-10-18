@@ -36,6 +36,10 @@ static size_t build(uint8_t *x,size_t n,unsigned count){
 }
 static void fail_unchanged(const uint8_t *bytes,size_t n,
                            MusaDwgAc1015Locators *out){
+    if(!out){
+        assert(!musa_dwg_ac1015_read_locators(bytes,n,NULL));
+        return;
+    }
     MusaDwgAc1015Locators original=*out;
     assert(!musa_dwg_ac1015_read_locators(bytes,n,out));
     assert(memcmp(out,&original,sizeof(original))==0);
