@@ -134,7 +134,6 @@ int main(void){
     x[148u]^=1u;
     /* Each tamper leaves the header CRC valid but the DATA CRC invalid.
      * The old envelope-only API still accepts such data by design. */
-    rejected_crc(x,sizeof(x),0u);
     x[148u]^=1u;
     rejected_crc(x,sizeof(x),0u);
     x[148u]^=1u;
