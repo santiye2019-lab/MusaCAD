@@ -2,7 +2,6 @@
 #include "musacad_dwg_ac1015_object.h"
 #include "musacad_dwg_signature.h"
 #include "musacad_crc16.h"
-#include "musacad_bits.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -28,22 +27,46 @@ static int read_ms(const uint8_t *src,size_t available,
     if(value<7u)return 0; /* 2-bit type+raw 32-bit pre-handle length. */
     *nbytes=n;*length=(size_t)value;return 1;
 }
+/* DWG raw bit codes consume MOST-SIGNIFICANT bit first inside a byte.
+ * This is intentionally separate from MusaBits's internal LSB-first
+ * semantics used elsewhere in the CAD engine. Integer values in DWG
+ * raw fields themselves have little-endian BYTE order. */
+static int read_dwg_bits(const uint8_t *p,size_t n,size_t *bitpos,
+                         unsigned width,uint64_t *out){
+    if(!p||!bitpos||!out||width==0u||width>32u||
+       n>SIZE_MAX/8u||*bitpos>n*8u||width>n*8u-*bitpos)return 0;
+    uint64_t v=0u;
+    for(unsigned i=0u;i<width;i++){
+        const size_t pos=*bitpos+(size_t)i;
+        v=(v<<1)|((uint64_t)((p[pos/8u]>>(7u-(pos&7u)))&1u));
+    }
+    *bitpos+=(size_t)width;*out=v;return 1;
+}
+static int read_dwg_raw_le(const uint8_t *p,size_t n,size_t *pos,
+                           unsigned bytes,uint64_t *out){
+    uint64_t value=0u;
+    for(unsigned i=0;i<bytes;i++){
+        uint64_t byte=0u;
+        if(!read_dwg_bits(p,n,pos,8u,&byte))return 0;
+        value|=byte<<(8u*i);
+    }
+    *out=value;return 1;
+}
 static int read_type_and_endbit(const uint8_t *data,size_t n,
                                 uint16_t *type,uint32_t *endbit){
-    MusaBits bits={0};
-    uint64_t code=0,type_value=0,raw_endbit=0;
-    if(!musa_bits_reader(&bits,data,n)||
-       !musa_bits_read(&bits,2u,&code))return 0;
+    size_t pos=0u;
+    uint64_t code=0u,type_value=0u,raw_endbit=0u;
+    if(!read_dwg_bits(data,n,&pos,2u,&code))return 0;
     if(code==0u){
-        if(!musa_bits_read(&bits,16u,&type_value))return 0;
+        if(!read_dwg_raw_le(data,n,&pos,2u,&type_value))return 0;
     }else if(code==1u){
-        if(!musa_bits_read(&bits,8u,&type_value))return 0;
+        if(!read_dwg_bits(data,n,&pos,8u,&type_value))return 0;
     }else if(code==2u){
         type_value=0u;
     }else{
         type_value=256u;
     }
-    if(!musa_bits_read(&bits,32u,&raw_endbit)||
+    if(!read_dwg_raw_le(data,n,&pos,4u,&raw_endbit)||
        raw_endbit>(uint64_t)n*8u)return 0;
     *type=(uint16_t)type_value;
     *endbit=(uint32_t)raw_endbit;
