@@ -30,7 +30,10 @@ static size_t build(uint8_t *x,size_t n,unsigned count){
         put_le(x+k+5u,lengths[i]);
     }
     size_t crc_pos=0x19u+(size_t)count*9u;
-    x[crc_pos]=0xb1u; x[crc_pos+1u]=0x23u;
+    /* Independently calculated R2000 header golden checksums for fixtures. */
+    static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u};
+    const uint16_t crc=golden[count-3u];
+    x[crc_pos]=(uint8_t)crc;x[crc_pos+1u]=(uint8_t)(crc>>8);
     memcpy(x+crc_pos+2u,sentinel,16u);
     return crc_pos+18u;
 }
@@ -52,9 +55,11 @@ int main(void){
         MusaDwgAc1015Locators loc={0};
         assert(musa_dwg_ac1015_read_locators(fixture,sizeof(fixture),&loc));
         assert(loc.region_count==records&&loc.header_end==end);
-        assert(loc.codepage==1252u&&loc.stored_header_crc==0x23b1u);
+        static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u};
+        assert(loc.codepage==1252u);
+        assert(loc.stored_header_crc==golden[records-3u]);
         assert(loc.image_seeker_unverified==256u);
-        assert(loc.crc_verified==0); /* MUST NOT claim CRC acceptance */
+        assert(loc.crc_verified==1); /* Actual header checksum verified */
         for(unsigned i=0;i<records;i++){
             assert(loc.regions[i].section_kind==i);
             assert(loc.regions[i].offset>=end);
@@ -101,10 +106,16 @@ int main(void){
         put_le(fixture+0x19u+1u,0xfffffff0u);
         fail_unchanged(fixture,sizeof(fixture),&loc);
         put_le(fixture+0x19u+1u,128u);
-        /* Even if CRC bytes are arbitrary this is only structural reading. */
+        /* Unlike the earlier structural-only reader, a forged CRC fails. */
         fixture[end-18u]^=0xffu;
+        fail_unchanged(fixture,sizeof(fixture),&loc);
+        fixture[end-18u]^=0xffu;
+        /* Changing an otherwise valid source byte must also be detected. */
+        fixture[0x13u]^=0x01u;
+        fail_unchanged(fixture,sizeof(fixture),&loc);
+        fixture[0x13u]^=0x01u;
         assert(musa_dwg_ac1015_read_locators(fixture,sizeof(fixture),&loc));
-        assert(loc.crc_verified==0);
+        assert(loc.crc_verified==1);
     }
     MusaDwgAc1015Locators loc={0};
     fail_unchanged(NULL,512u,&loc);

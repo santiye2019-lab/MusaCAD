@@ -20,14 +20,14 @@ Windows, iOS share the exact C implementation. CTests and CI include synthetic
 byte fixtures, overflows, corrupt sentinel, unknown/duplicate classes,
 truncations and byte-preservation assertions.
 
-**CRITICAL LIMITATIONS**: extracted offsets are structurally checked but
-stored header CRC is **not yet validated**, and section contents are not
-decoded. No B-Rep, handles, objects, 3D, drawing edit, modern AC1032 layout
+**CRITICAL LIMITATIONS**: extracted offsets are structurally checked and
+the documented R2000 header CRC is now verified using the section-count
+XOR mask. Section contents and their own integrity are not decoded. No B-Rep, handles, objects, 3D, drawing edit, modern AC1032 layout
 or DWG saving is supported by this specific parser. Its output must NOT
 admit an editable document or claim full DWG compatibility. AC1018+ is
 explicitly refused. Section record number 5 is undocumented and refused.
 
-Next stages: verify real-file fixtures independently; implement the legacy
-header checksum and content sentinels; bounded section content decoding;
+Next stages: verify real-file fixtures independently; validate per-section
+content sentinels/checksums; bounded section content decoding;
 then implement modern AC1032 separate section map/compression protocols.
 MusaCAD's MC1032 `.mcad` is a different, custom format.

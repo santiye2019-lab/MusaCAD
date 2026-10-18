@@ -2,6 +2,7 @@
 #include "musacad_dwg_ac1015.h"
 #include "musacad_dwg_signature.h"
 #include "musacad_bits.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -37,13 +38,22 @@ int musa_dwg_ac1015_read_locators(const uint8_t *bytes,size_t n,
        !read_at(&bits,0x0du,32u,&image)||
        !read_at(&bits,0x13u,16u,&codepage)||
        !read_at(&bits,table_end,16u,&stored_crc))return 0;
+    /* The R13-R15 header checksum is computed from BOF through the final
+     * locator record with initial 0 and a count-dependent XOR constant.
+     * The CRC polynomial is independently implemented in MusaCAD Core. */
+    uint16_t calculated_crc=0u;
+    const uint16_t xor_mask=count==3u?0xa598u:
+                            count==4u?0x8101u:0x3cc4u;
+    if(!musa_core_crc16_arc(0u,bytes,table_end,&calculated_crc)||
+       (uint16_t)(calculated_crc^xor_mask)!=(uint16_t)stored_crc)
+        return 0;
     MusaDwgAc1015Locators result={0};
     result.codepage=(uint16_t)codepage;
     result.stored_header_crc=(uint16_t)stored_crc;
     result.image_seeker_unverified=(uint32_t)image;
     result.region_count=(uint32_t)count;
     result.header_end=(uint32_t)header_end;
-    result.crc_verified=0;
+    result.crc_verified=1;
     uint32_t seen=0u;
     for(size_t i=0u;i<(size_t)count;i++){
         const size_t pos=0x19u+i*9u;
