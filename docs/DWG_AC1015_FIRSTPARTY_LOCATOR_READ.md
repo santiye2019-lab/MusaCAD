@@ -190,3 +190,31 @@ not yet decode actual LINE/CIRCLE/ARC fields, layer, color, object
 handle-reference stream, geometry, B-Rep solids, XREF or user editing.
 A valid CRC does not authenticate an adversarial file. AutoCAD 2026
 equivalence remains independently unapproved.
+
+## P0: shared AC1015 compressed coordinate field reader
+
+`musacad_dwg_ac1015_values.c` is the first-party read-only **field**
+decoder for R2000 binary objects (not a scene builder). It uses bounded
+MSB-first bit access and little-endian raw-byte reconstruction for BS, BL,
+RL, RD, BD, DD, BT and BE. All public reads are transactional: a malformed,
+truncated, non-finite or disallowed field preserves both cursor and output.
+A caller-provided exclusive bit limit prevents consuming the handle stream.
+
+The already-CRC-verified object envelope now parses its raw BS type and RL
+pre-handle bit limit through the same portable source. A CI acceptance probe
+must continue checking every indexed record in the pinned real TS1.dwg;
+new synthetic tests check all compressed-number modes, unaligned bit fields,
+DD 4/6/8-byte deltas, default extrusion, and failed reads. The shared CMake
+library is built on Android NDK, Windows, macOS and Linux; there is no
+independent Java interpreter of these DWG fields.
+
+**Not implemented here:** extraction of entity-common metadata/EED/graphic
+streams, the authoritative start position of type-specific data, complete
+LINE/CIRCLE/ARC entity payloads, handle reference graph, layer assignments,
+or original edited DWG writing. `geometry_decoded` remains 0. Numeric
+field decoding with synthetic coordinate streams is not equivalent to
+real-DWG coordinate acceptance or AutoCAD 2026 feature parity.
+
+Reference format: Open Design Alliance, *Open Design Specification for .dwg
+files*, compressed data definitions and R2000 entity prescriptions,
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf .
