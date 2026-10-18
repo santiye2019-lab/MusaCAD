@@ -20,7 +20,7 @@
       "id": "no_libredwg_runtime",
       "name": "Calisan ortak cekirdekte dis DWG kutuphanesi baginin yasaklanmasi",
       "status": "accepted",
-      "evidence": ".github/workflows/cad-single-core.yml"
+      "evidence": ".github/workflows/android.yml"
     },
     {
       "id": "dwg_signature",
