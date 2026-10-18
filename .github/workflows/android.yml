@@ -58,6 +58,17 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_android_firstparty_runtime.py' -v
+      - name: MC1032 rev2 native layers 3D JNI and old-core refusal
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-mc1032-v2-java
+          javac -encoding UTF-8 -d /tmp/musacad-mc1032-v2-java \
+            app/src/main/java/com/musa/cad/Mc1032V2Native.java \
+            tests/Mc1032V2NativeTest.java tests/Mc1032V2MissingCoreTest.java
+          java -cp /tmp/musacad-mc1032-v2-java Mc1032V2MissingCoreTest
+          bash tests/build_mc1032_v2_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-mc1032-v2-host \
+            -cp /tmp/musacad-mc1032-v2-java Mc1032V2NativeTest
       - name: MC1032 first-party binary JNI read/write, corruption and missing-core proof
         run: |
           set -euo pipefail
