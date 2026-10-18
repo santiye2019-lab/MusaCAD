@@ -19,6 +19,9 @@ int main(void){
     near(r.centroid_y,.25,1e-12);
     near(r.centroid_z,.25,1e-12);
     assert(r.triangle_count==4);
+    assert(musa_core_mesh_mass_verified_f32(tetra,4,outward,4,&r));
+    near(r.signed_volume,1./6.,1e-12);
+    near(r.centroid_x,.25,1e-12);
     assert(musa_core_mesh_mass_f32(tetra,4,inward,4,1,&r));
     near(r.signed_volume,-1./6.,1e-12);
     near(r.centroid_x,.25,1e-12);
@@ -48,6 +51,14 @@ int main(void){
     r.signed_volume=12345.;r.centroid_x=6789.;r.triangle_count=5;
     assert(!musa_core_mesh_mass_f32(tetra,4,outward,4,0,&r));
     assert(!musa_core_mesh_mass_f32(tetra,4,open,1,1,&r));
+    assert(!musa_core_mesh_mass_verified_f32(tetra,4,open,1,&r));
+    assert(!musa_core_mesh_mass_verified_f32(tetra,4,bad,4,&r));
+    assert(!musa_core_mesh_mass_verified_f32(nanmesh,4,outward,4,&r));
+    int duplicate[]={0,2,1,0,1,3,0,3,2,0,2,1};
+    assert(!musa_core_mesh_mass_verified_f32(tetra,4,duplicate,4,&r));
+    assert(!musa_core_mesh_mass_verified_f32(tetra,4,outward,50001u,&r));
+    assert(!musa_core_mesh_mass_verified_f32(NULL,4,outward,4,&r));
+    assert(!musa_core_mesh_mass_verified_f32(tetra,4,outward,4,NULL));
     assert(!musa_core_mesh_mass_f32(tetra,4,bad,4,1,&r));
     assert(!musa_core_mesh_mass_f32(nanmesh,4,outward,4,1,&r));
     assert(!musa_core_mesh_mass_f32(tetra,4,outward,4000001u,1,&r));

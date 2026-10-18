@@ -14,6 +14,17 @@ package com.musa.cad;
  */
 public final class Cad3dSignedVolume {
     private Cad3dSignedVolume(){}
+    /* Android requires one portable native CAD engine. Java equations below
+     * remain only as a non-Android JVM differential test reference. */
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native double[] measureNative(float[] xyz,int[] triangles);
 
     public static final class Result {
         public final boolean available;
@@ -40,6 +51,17 @@ public final class Cad3dSignedVolume {
         if(!topology.checked||!topology.closedOrientedByIndex||
            topology.triangles!=faces||faces==0)
             return new Result(false,0d,faces,Double.NaN,Double.NaN,Double.NaN);
+        if(ANDROID_RUNTIME){
+            /* C revalidates current vertices and faces; no stale approval. */
+            double[] result=measureNative(xyz,triangles);
+            if(result==null)
+                return new Result(false,0d,faces,Double.NaN,Double.NaN,Double.NaN);
+            if(result.length!=4||!Double.isFinite(result[0])||result[0]==0d||
+               !Double.isFinite(result[1])||!Double.isFinite(result[2])||
+               !Double.isFinite(result[3]))
+                throw new IllegalArgumentException("invalid native CAD volume result");
+            return new Result(true,result[0],faces,result[1],result[2],result[3]);
+        }
         int vertices=xyz.length/3;
         int reference=triangles[0];
         if(reference<0||reference>=vertices)

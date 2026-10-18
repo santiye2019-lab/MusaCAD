@@ -117,7 +117,13 @@
       "path": "app/src/main/java/com/musa/cad/Cad3dSignedVolume.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_mesh_mass.c",
+      "android_adapter": "app/src/main/cpp/mesh_mass_jni.c",
+      "native_host_test": "tests/run_mesh_mass_native_host.sh",
+      "remaining_work": "Java non-Android differential oracle retained; Windows/iOS native application and real-device verification pending; not an ACIS/B-Rep solid or billable quantity certification."
     },
     {
       "path": "app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java",

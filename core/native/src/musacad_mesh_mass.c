@@ -65,3 +65,17 @@ int musa_core_mesh_mass_f32(const float *xyz,size_t point_count,
     *out=result;
     return 1;
 }
+
+/* All topology admission and mass semantics live in this portable core. */
+int musa_core_mesh_mass_verified_f32(const float *xyz,size_t point_count,
+                                     const int *triangles,size_t face_count,
+                                     MusaCoreMeshMass *out){
+    if(!xyz||!triangles||!out||!point_count||!face_count||
+       point_count>1000000u||face_count>50000u||
+       point_count>SIZE_MAX/3u||face_count>SIZE_MAX/3u)return 0;
+    MusaCoreMeshTopology r={0};
+    if(!musa_core_mesh_topology_f32(xyz,point_count,triangles,face_count,&r)||
+       !r.checked||!r.closed_oriented_by_index||r.triangles!=face_count)
+        return 0;
+    return musa_core_mesh_mass_f32(xyz,point_count,triangles,face_count,1,out);
+}
