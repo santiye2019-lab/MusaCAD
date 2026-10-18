@@ -51,7 +51,13 @@
       "path": "app/src/main/java/com/musa/cad/Cad3dFaceLighting.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_face_light.c",
+      "android_adapter": "app/src/main/cpp/face_light_jni.c",
+      "native_host_test": "tests/run_face_light_native_host.sh",
+      "remaining_work": "Remove host Java geometry oracle after final device parity, validate Android/iOS/Windows rendered frame fidelity; this is not solids/B-Rep certification."
     },
     {
       "path": "app/src/main/java/com/musa/cad/Cad3dLegacyCameraBridge.java",
