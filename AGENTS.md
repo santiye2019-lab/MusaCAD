@@ -2,6 +2,24 @@
 
 > Owner directive confirmed 2026-10-17. These rules are binding for every subsequent CAD development and PR in this repository. See [docs/UNIFIED_CAD_ENGINE_POLICY.md](docs/UNIFIED_CAD_ENGINE_POLICY.md), [issue #295](https://github.com/santiye2019-lab/MusaCAD/issues/295), and [docs/UNIFIED_CAD_ENGINE_INVENTORY.json](docs/UNIFIED_CAD_ENGINE_INVENTORY.json).
 
+## Verified sequential development — owner instruction 18 October 2026
+
+- Within an active development session, after each independently verified P0
+  engine increment: repair all failing native/Android/CAD tests, confirm all
+  five latest-commit required workflows green, merge to main only with an
+  expected-head-SHA lease, then move directly to the next independently
+  verifiable engine increment rather than asking for routine reapproval.
+- Never hide a failed test, suppress a regression check, silently drop
+  unsupported geometry, leave a half-written source file, or claim that a
+  partially implemented feature is complete. Keep mobile, Windows and iOS
+  geometry semantics in the same portable MusaCAD-owned C/C++ core.
+- No APK, production release, Cloudflare deployment or user-facing update
+  of a phone installation until explicit owner approval. Do not claim
+  development continues while the conversation is inactive; only actual
+  executed GitHub commits/tests/merges count as completed progress.
+- Certified AutoCAD 2026 functional equivalence remains separately tracked
+  from completed implementation work, with no unverified percent increases.
+
 ## MC1032 native file-format naming — binding owner decision (18 October 2026)
 
 - MusaCAD's **OWN** native binary document format and on-disk signature is
