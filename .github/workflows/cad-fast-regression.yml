@@ -36,6 +36,13 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_dwg_libredwg_reference_matrix.py' -v
+      - name: P0 first-party DWG candidate section spans, bounds and overlap rejections
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/src/musacad_dwg_regions.c core/native/tests/core_dwg_regions_test.c \
+            -o /tmp/musacad-dwg-regions-fast
+          /tmp/musacad-dwg-regions-fast
       - name: P0 native DWG signature identification across C and JVM
         run: |
           set -euo pipefail
