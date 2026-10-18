@@ -77,7 +77,7 @@ class FunctionalReferenceMatrixTest(unittest.TestCase):
         s=self.m["reference_policy"]
         for requirement in ("host-only","no LibreDWG code","first-party engine"):
             self.assertIn(requirement,s)
-        self.assertIn("zero LibreDWG",POLICY.read_text(encoding="utf-8"))
+        self.assertIn("must contain no LibreDWG",POLICY.read_text(encoding="utf-8"))
         self.assertEqual(self.m["platform_core"],"core/native/")
         self.assertIn("iPhoneOS arm64",self.m["platform_targets"])
         self.assertIn("Windows",self.m["platform_targets"])
