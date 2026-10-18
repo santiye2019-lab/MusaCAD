@@ -218,3 +218,38 @@ real-DWG coordinate acceptance or AutoCAD 2026 feature parity.
 Reference format: Open Design Alliance, *Open Design Specification for .dwg
 files*, compressed data definitions and R2000 entity prescriptions,
 https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf .
+
+## P0: first-party R2000 LINE, CIRCLE and ARC field grammar
+
+The common portable C11 core now contains strict original field-layout
+parsers for AC1015 type 19 (LINE), type 18 (CIRCLE), and type 17 (ARC).
+LINE fields: zero-Z flag; X RD/DD; Y RD/DD; optional Z RD/DD;
+thickness BT and extrusion BE. CIRCLE: center 3BD, radius BD, BT/BE.
+ARC: same CIRCLE fields, followed by start/end angles BD (radians).
+Both ARC/CIRCLE reject non-positive radius; all three reject a zero
+extrusion normal and a premature or overflowing pre-handle boundary.
+
+The reader accepts only a CRC-verified object record and a **caller
+supplied, independently validated first field bit**. Every exact
+pre-handle bit must be consumed; any trailing mismatched bit, malformed
+number or truncated record fails without partial output or source
+changes. The fast CI uses synthetic bit-accurate real object envelopes
+with CRC and source-record roundtrip; CMake registers the same regression
+against Android-compatible portable static core. The full real pinned
+`TS1.dwg` fixture still proves **record/CRC boundaries only**, not
+full LINE/CIRCLE/ARC coordinate parity.
+
+**Critical limitation:** reading the object's actual handle/EED,
+optional graphic image and common entity metadata (color, layer
+links, linetype scale and flags) to locate the authoritative first
+entity-specific bit is **not yet implemented**. Current synthetic tests
+provide an intentionally pre-validated offset. These parsers must
+not be wired into rendering or used to declare any genuine native
+DWG object semantically decoded until that trust boundary and
+cross-reader real-file coordinate equality have passed.
+`geometry_decoded` intentionally remains 0. Neither mobile APK nor
+production service is changed. AutoCAD 2026 parity is unapproved.
+
+Reference: Open Design Alliance Open Design Specification for .dwg files,
+R2000 entity chapters LINE, CIRCLE and ARC,
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf .
