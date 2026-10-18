@@ -261,7 +261,14 @@
       "path": "app/src/main/java/com/musa/cad/CadUcsFrame.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_ucs.c",
+      "android_adapter": "app/src/main/cpp/ucs_jni.c",
+      "cross_platform_test": "core/native/tests/core_ucs_test.c",
+      "native_host_test": "tests/CadUcsNativeHostTest.java",
+      "remaining_work": "Remove non-Android Java differential formulas after full platform/native acceptance, preserve UCS profile storage/UI, demonstrate device iOS and Windows app integration."
     },
     {
       "path": "app/src/main/java/com/musa/cad/CadUcsProfiles.java",
@@ -683,5 +690,6 @@
       "family": "two_dimensional_and_cad_object_semantics",
       "migrated_verified": false
     }
-  ]
+  ],
+  "last_incremental_audit": "2026-10-18"
 }
