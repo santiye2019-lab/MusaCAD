@@ -47,3 +47,30 @@ payload are not detected by the file-header CRC. The returned pointer is
 borrowed and invalidated if its owning allocation goes away. Neither
 section contents nor object maps/handles/geometry are authenticated, decoded
 or made editable. The CI regression explicitly tests this limitation.
+
+## P0: R2000 framed HEADER and CLASSES reading
+
+`core/native/src/musacad_dwg_ac1015_frame.c` adds one original,
+platform-independent, read-only C11 routine for legacy R2000/AC1015
+**locator 0 (HEADER variables)** and **locator 1 (CLASSES)**. It
+requires the previously checked original file-header CRC/section table,
+then checks the documented 16-byte beginning sentinel, matching
+complement ending sentinel, 4-byte little-endian payload length and exact
+section extent. Borrowed payload is exposed only if all checks pass;
+invalid length, changed sentinel, missing or unsupported section, newer
+DWG version and malformed header fail without changing caller output.
+Portable CTest and GitHub fast regression cover synthetic positive and
+negative cases.
+
+**Hard boundary:** the stored payload CRC is *reported but not validated*.
+Corruption **inside** the payload can still pass framing checks, as the
+negative-control test explicitly demonstrates. Neither HEADER variables
+nor CLASSES records are decoded. This provides safe framing, **not**
+full content integrity, general-purpose DWG opening/writing, real-file
+conformance, or AutoCAD 2026 equivalence.
+
+Format fields and sentinels are independently transcribed from
+[Open Design Specification for DWG files](https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf),
+R13-R15 section locators, AcDb:Header and AcDb:Classes descriptions.
+Production on-file fixtures and verified payload CRC are separate next
+acceptance gates.
