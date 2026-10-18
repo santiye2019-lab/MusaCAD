@@ -62,6 +62,14 @@ int musa_document_get_index(const MusaDocument *document,size_t index,
 int musa_document_translate(MusaDocument *document,uint64_t handle,
                              double dx,double dy);
 int musa_document_delete(MusaDocument *document,uint64_t handle);
+/* Import-only entry point for a separate first-party file decoder.
+ * Allows original, unordered nonzero file handles. Rejects duplicates and
+ * later imports after any public edit/add/delete; never recycles deleted IDs.
+ * handle=0 requests a new private monotonic handle.
+ */
+int musa_document_load_entity(MusaDocument *document,
+                              const MusaDocumentEntity *source,
+                              uint64_t *actual_handle);
 
 #ifdef __cplusplus
 }
