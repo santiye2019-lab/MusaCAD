@@ -10,10 +10,11 @@ static void io_error(JNIEnv *env,const char *message){
     if(cls){(*env)->ThrowNew(env,cls,message);(*env)->DeleteLocalRef(env,cls);}
 }
 JNIEXPORT jlong JNICALL
-Java_com_musa_cad_DxfPortableLines_openNative(JNIEnv *env,jclass cls,jint maximum){
+Java_com_musa_cad_DxfPortableLines_openNative(JNIEnv *env,jclass cls,jint maximum,jint mode){
     (void)env;(void)cls;
     if(maximum<1||maximum>1048576)return (jlong)0;
-    return (jlong)(intptr_t)musa_core_dxf_byte_lines_create((size_t)maximum);
+    return (jlong)(intptr_t)musa_core_dxf_byte_lines_create_mode(
+        (size_t)maximum,(int)mode);
 }
 static jbyteArray make_line(JNIEnv *env,const unsigned char *bytes,size_t length){
     if(length>1048576u)return NULL;
