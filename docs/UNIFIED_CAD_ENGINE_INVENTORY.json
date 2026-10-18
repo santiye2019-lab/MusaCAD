@@ -69,7 +69,13 @@
       "path": "app/src/main/java/com/musa/cad/Cad3dMeshTopology.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_mesh_topology.c",
+      "android_adapter": "app/src/main/cpp/mesh_topology_jni.c",
+      "native_host_test": "tests/run_mesh_topology_native_host.sh",
+      "remaining_work": "Remove host JVM topological calculations after iOS/Windows app and device acceptance. This is indexed edge auditing, not ACIS solids or self-intersection certification."
     },
     {
       "path": "app/src/main/java/com/musa/cad/Cad3dNativeDwgIdentityAudit.java",

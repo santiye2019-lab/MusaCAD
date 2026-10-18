@@ -165,6 +165,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_face_light_native_host.sh
+      - name: P2 indexed 3D topology native C / Android JNI and JVM oracle
+        run: |
+          set -euo pipefail
+          bash tests/run_mesh_topology_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
