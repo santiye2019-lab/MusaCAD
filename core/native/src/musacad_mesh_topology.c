@@ -39,15 +39,16 @@ int musa_core_mesh_topology_f32(const float *xyz,size_t point_count,
                                const int *triangles,size_t face_count,
                                MusaCoreMeshTopology *out){
     if(!out||point_count>MUSA_TOPO_MAX_VERTICES||
-       point_count>SIZE_MAX/3u||face_count>SIZE_MAX/3u||
-       (face_count&&(!triangles||!xyz)))return 0;
+       point_count>SIZE_MAX/3u||face_count>SIZE_MAX/3u)return 0;
     MusaCoreMeshTopology result={0};
     result.triangles=face_count;
     if(face_count>MUSA_TOPO_MAX_TRIANGLES){
-        /* The Java method likewise reports NOT CHECKED, never a solid. */
+        /* No entity memory is touched for unsupported oversized audits.
+         * NULL arrays are safe here: result is explicitly UNCHECKED. */
         *out=result;
         return 1;
     }
+    if(face_count&&(!triangles||!xyz))return 0;
     result.checked=1;
     if(face_count==0){*out=result;return 1;}
     TopoEdge *edges=(TopoEdge*)malloc(face_count*3u*sizeof(*edges));

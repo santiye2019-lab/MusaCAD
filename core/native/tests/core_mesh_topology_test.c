@@ -57,6 +57,10 @@ int main(void){
 
     assert(musa_core_mesh_topology_f32(tetra,4,outward,50001u,&r));
     assert(!r.checked&&!r.closed_oriented_by_index&&r.triangles==50001u);
+    /* Oversized files must not force allocation/read of huge face payloads.
+     * The shared C core itself returns unchecked without dereferencing. */
+    assert(musa_core_mesh_topology_f32(NULL,4,NULL,50001u,&r));
+    assert(!r.checked&&!r.closed_oriented_by_index&&r.triangles==50001u);
     assert(musa_core_mesh_topology_f32(NULL,0,NULL,0,&r));
     assert(r.checked&&!r.closed_oriented_by_index&&r.triangles==0);
 
