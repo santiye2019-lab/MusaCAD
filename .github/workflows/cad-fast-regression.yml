@@ -81,6 +81,25 @@ jobs:
           java -cp /tmp/musacad-native-byte-lines DxfPortableLinesMissingCoreTest
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-native-byte-lines DxfPortableLinesTest
+      - name: P0 seekable DXF source record reader uses one portable C framer
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-stream-seek-native
+          javac -encoding UTF-8 -d /tmp/musacad-stream-seek-native \
+            app/src/main/java/com/musa/cad/FileTransfer.java \
+            app/src/main/java/com/musa/cad/DxfColor.java \
+            app/src/main/java/com/musa/cad/DxfLineStyle.java \
+            app/src/main/java/com/musa/cad/DxfLineTypeParser.java \
+            app/src/main/java/com/musa/cad/DxfTextStyle.java \
+            app/src/main/java/com/musa/cad/DxfGroupCode.java \
+            app/src/main/java/com/musa/cad/DxfPortableLines.java \
+            app/src/main/java/com/musa/cad/DxfStream.java \
+            app/src/main/java/com/musa/cad/DxfLayerState.java \
+            app/src/main/java/com/musa/cad/DxfBlocks.java \
+            tests/DxfStreamNativeSeekTest.java tests/DxfStreamMissingCoreTest.java
+          java -cp /tmp/musacad-stream-seek-native DxfStreamMissingCoreTest
+          bash tests/build_dxf_handle_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-stream-seek-native DxfStreamNativeSeekTest
       - name: P0 shared C group-code parser and missing-core fail-closed regression
         run: |
           set -euo pipefail
@@ -141,14 +160,14 @@ jobs:
           bash tests/build_dxf_handle_jni_host.sh
           set -euo pipefail
           mkdir -p /tmp/musacad-xref-inventory
-          javac -encoding UTF-8 -d /tmp/musacad-xref-inventory app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/CadXrefSummary.java tests/DxfXrefInventoryTest.java
+          javac -encoding UTF-8 -d /tmp/musacad-xref-inventory app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/CadXrefSummary.java tests/DxfXrefInventoryTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-xref-inventory DxfXrefInventoryTest
       - name: Fast DXF INSERT/MINSERT geometry and material-count safety
         run: |
           bash tests/build_dxf_handle_jni_host.sh
           set -euo pipefail
           mkdir -p /tmp/musacad-block-tests
-          javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
+          javac -d /tmp/musacad-block-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java tests/DxfBlocksTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-block-tests DxfBlocksTest
       - name: Test conservative 2D CAD source selection prefilter
         run: |
@@ -327,14 +346,14 @@ jobs:
           mkdir -p /tmp/musacad-extrude-tests
           javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-extrude-tests CadPrismBrepTest
-          javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepRoundtripTest.java
+          javac -encoding UTF-8 -d /tmp/musacad-extrude-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadPrismBrepRoundtripTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-extrude-tests CadPrismBrepRoundtripTest
       - name: Test bounded polygonal REVOLVE mesh and DXF reopen
         run: |
           bash tests/build_dxf_handle_jni_host.sh
           set -euo pipefail
           mkdir -p /tmp/musacad-revolve-tests
-          javac -encoding UTF-8 -d /tmp/musacad-revolve-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadRevolveShell.java tests/CadRevolveShellTest.java tests/CadRevolveSectorTest.java
+          javac -encoding UTF-8 -d /tmp/musacad-revolve-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadRevolveShell.java tests/CadRevolveShellTest.java tests/CadRevolveSectorTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-revolve-tests CadRevolveShellTest
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-revolve-tests CadRevolveSectorTest
       - name: Test bounded oblique polygonal SWEEP and DXF reopen
@@ -342,14 +361,14 @@ jobs:
           bash tests/build_dxf_handle_jni_host.sh
           set -euo pipefail
           mkdir -p /tmp/musacad-oblique-sweep-tests
-          javac -encoding UTF-8 -d /tmp/musacad-oblique-sweep-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadObliqueSweepTest.java
+          javac -encoding UTF-8 -d /tmp/musacad-oblique-sweep-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Cad3dMeshTopology.java app/src/main/java/com/musa/cad/Cad3dSignedVolume.java app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java app/src/main/java/com/musa/cad/CadPrismBrep.java tests/CadObliqueSweepTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-oblique-sweep-tests CadObliqueSweepTest
       - name: Fast 3D INSERT/MINSERT Z-scale and nested elevation regression
         run: |
           bash tests/build_dxf_handle_jni_host.sh
           set -euo pipefail
           mkdir -p /tmp/musacad-zinsert-tests
-          javac -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java tests/Dxf3dMeshTest.java
+          javac -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/FileTransfer.java app/src/main/java/com/musa/cad/DxfColor.java app/src/main/java/com/musa/cad/DxfLineStyle.java app/src/main/java/com/musa/cad/DxfLineTypeParser.java app/src/main/java/com/musa/cad/DxfTextStyle.java app/src/main/java/com/musa/cad/DxfGroupCode.java app/src/main/java/com/musa/cad/DxfPortableLines.java app/src/main/java/com/musa/cad/DxfStream.java app/src/main/java/com/musa/cad/DxfLayerState.java app/src/main/java/com/musa/cad/DxfBlocks.java app/src/main/java/com/musa/cad/AcisSatMesh.java app/src/main/java/com/musa/cad/Dxf3dMesh.java app/src/main/java/com/musa/cad/Dxf3dEditor.java tests/Dxf3dMeshTest.java
           javac -cp /tmp/musacad-zinsert-tests -d /tmp/musacad-zinsert-tests app/src/main/java/com/musa/cad/CadSaveSourceIntegrity.java app/src/main/java/com/musa/cad/Dxf3dSafeSave.java tests/Dxf3dSafeSaveTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-zinsert-tests Dxf3dMeshTest
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-zinsert-tests Dxf3dSafeSaveTest
