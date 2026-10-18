@@ -181,6 +181,11 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_pick_bounds_native_host.sh
+      - name: P0 first-party binary bit cursor bounds, rollback and canonical varints
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include             core/native/src/musacad_bits.c core/native/tests/core_bits_test.c             -o /tmp/musacad-core-bits-fast
+          /tmp/musacad-core-bits-fast
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
