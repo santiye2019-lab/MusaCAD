@@ -270,7 +270,10 @@ int musa_mc2_decode(const unsigned char *data,size_t n,MusaMC2Scene **out){
     if(u32get(data+40)!=crc(data,40)||
        u32get(data+36)!=crc(data+MUSA_MC2_HEADER_SIZE,
                            n-MUSA_MC2_HEADER_SIZE))return MUSA_MC2_CORRUPT;
-    MusaMC2Scene *s=musa_mc2_scene_create(count?count:1u);
+    /* The on-disk record count is current occupancy, not a scene capacity.
+     * Opened documents must remain editable up to the bounded v2 limit.
+     * Fixed-capacity allocation also keeps handle-index slot coverage valid. */
+    MusaMC2Scene *s=musa_mc2_scene_create(MUSA_MC2_MAX_ENTITIES);
     if(!s)return MUSA_MC2_NO_MEMORY;
     int status=MUSA_MC2_OK;
     for(uint32_t i=0;i<layers;i++){

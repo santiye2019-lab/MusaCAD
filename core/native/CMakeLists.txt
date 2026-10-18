@@ -23,6 +23,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_mc1032_migrate_test tests/core_mc1032_migrate_test.c)
         target_link_libraries(musacad_core_mc1032_migrate_test PRIVATE musacad_core)
         add_test(NAME musacad_core_mc1032_v1_v2_lossless_upgrade COMMAND musacad_core_mc1032_migrate_test)
+        # Independently reopen tiny/empty v2 files, then edit to full capacity.
+        add_executable(musacad_core_mc1032_reopen_capacity_test tests/core_mc1032_reopen_capacity_test.c)
+        target_link_libraries(musacad_core_mc1032_reopen_capacity_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_mc1032_reopen_remains_editable COMMAND musacad_core_mc1032_reopen_capacity_test)
         # MC1032 revision 2 layered 3D scene, own platform-stable binary format.
         add_executable(musacad_core_mc1032_v2_test tests/core_mc1032_v2_test.c)
         target_link_libraries(musacad_core_mc1032_v2_test PRIVATE musacad_core)
