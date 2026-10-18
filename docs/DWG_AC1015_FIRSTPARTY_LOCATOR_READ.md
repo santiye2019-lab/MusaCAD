@@ -1,0 +1,33 @@
+# Independent R2000 / AC1015 real binary section-locator reader
+
+Portable C11 implementation: `core/native/src/musacad_dwg_ac1015.c`.
+This is the first DWG **format-specific** read: it extracts real documented
+R2000 section-locator records from offset `0x15` (count) and `0x19`
+(record list). Every 9-byte entry holds record kind, little-endian offset and
+length. It also captures the codepage and image seeker as **unverified**
+metadata, verifies the 16-byte legacy file-header sentinel, and rejects
+duplicate/unknown records, missing mandatory sections, overlapping intervals,
+truncated headers and out-of-file ranges.
+
+**Reference**: Open Design Alliance, *Open Design Specification for .dwg
+files*, chapter 3.2 (R13-R15 / R2000 file header), especially section-locator
+records and post-header sentinel:
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+This is an independently written **first-party** decoder of the publicly
+described layout, NOT translated LibreDWG/ODA source code. All Android,
+Windows, iOS share the exact C implementation. CTests and CI include synthetic
+byte fixtures, overflows, corrupt sentinel, unknown/duplicate classes,
+truncations and byte-preservation assertions.
+
+**CRITICAL LIMITATIONS**: extracted offsets are structurally checked but
+stored header CRC is **not yet validated**, and section contents are not
+decoded. No B-Rep, handles, objects, 3D, drawing edit, modern AC1032 layout
+or DWG saving is supported by this specific parser. Its output must NOT
+admit an editable document or claim full DWG compatibility. AC1018+ is
+explicitly refused. Section record number 5 is undocumented and refused.
+
+Next stages: verify real-file fixtures independently; implement the legacy
+header checksum and content sentinels; bounded section content decoding;
+then implement modern AC1032 separate section map/compression protocols.
+MusaCAD's MC1032 `.mcad` is a different, custom format.
