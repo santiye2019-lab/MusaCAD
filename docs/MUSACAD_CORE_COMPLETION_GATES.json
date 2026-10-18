@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "name": "MusaCAD unified CAD core gate-coverage index",
+  "scope": "Versioned functional acceptance gate coverage, not work-hours, feature quality, AutoCAD 2026 equivalence, or certified release readiness",
+  "method": "Fixed 25 equal, binary gates; ONLY 'accepted' items count; a candidate counts only after required CI and source review. 4% per accepted gate. Do not credit synthetic field tests as real drawing acceptance.",
+  "total_gates": 25,
+  "accepted_gates": 9,
+  "completion_index_percent": 36,
+  "autoCAD_2026_parity_percent": null,
+  "certified_51_families": 0,
+  "run_policy": "On each change: keep a separate CI pass ratio; update accepted only with exact source and successful tests. Never alter denominator silently.",
+  "gates": [
+    {
+      "id": "portable_c_abi",
+      "name": "Android NDK/Windows/macOS/Linux ortak C ABI ve derleme kaniti",
+      "status": "accepted",
+      "evidence": "core/native/CMakeLists.txt"
+    },
+    {
+      "id": "no_libredwg_runtime",
+      "name": "Calisan ortak cekirdekte dis DWG kutuphanesi baginin yasaklanmasi",
+      "status": "accepted",
+      "evidence": ".github/workflows/cad-single-core.yml"
+    },
+    {
+      "id": "dwg_signature",
+      "name": "DWG surum imzasi sinifi ve red kontrolleri",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_signature.c"
+    },
+    {
+      "id": "r2000_section_locators",
+      "name": "R2000 dosya bolum konumlari ve yapisal sinirlar",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_ac1015.c"
+    },
+    {
+      "id": "r2000_section_crc",
+      "name": "R2000 HEADER/CLASSES CRC cercevesi",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_ac1015_frame.c"
+    },
+    {
+      "id": "r2000_handle_map",
+      "name": "R2000 handle haritasi CRC ve isaretci indeksleri",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_ac1015_handles.c"
+    },
+    {
+      "id": "r2000_object_envelope",
+      "name": "R2000 nesne tipi uzunlugu ve CRC dogrulamasi",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_ac1015_object.c"
+    },
+    {
+      "id": "r2000_numeric_fields",
+      "name": "R2000 sikistirilmis sayi alanlari ve sinir kontrolleri",
+      "status": "accepted",
+      "evidence": "core/native/src/musacad_dwg_ac1015_values.c"
+    },
+    {
+      "id": "primitive_field_grammar",
+      "name": "LINE/CIRCLE/ARC alan yerlesimi sentetik dogrulama",
+      "status": "accepted",
+      "evidence": "core/native/tests/core_dwg_ac1015_line_test.c"
+    },
+    {
+      "id": "common_prefix_subset",
+      "name": "R2000 ortak nesne basligi destekli alt-kumesinin senkron dogrulamasi",
+      "status": "candidate",
+      "evidence": "core/native/tests/core_dwg_ac1015_common_test.c"
+    },
+    {
+      "id": "common_eed_graphics",
+      "name": "Tam EED/preview ve butun ortak nesne basligi varyantlari",
+      "status": "pending"
+    },
+    {
+      "id": "object_handle_graph",
+      "name": "Owner/reactor/layer/linetype tam referans grafigi",
+      "status": "pending"
+    },
+    {
+      "id": "real_legacy_geometry",
+      "name": "Bagimsiz gercek R2000 DWG koordinat eslestirmesi",
+      "status": "pending"
+    },
+    {
+      "id": "modern_dwg_objects",
+      "name": "Bagimsiz modern AC1032 varlik ve semantik kapsami",
+      "status": "pending"
+    },
+    {
+      "id": "modern_dwg_writer",
+      "name": "Ozgun modern DWG yazici ve katman/nesne semantigi",
+      "status": "pending"
+    },
+    {
+      "id": "independent_dwg_roundtrip",
+      "name": "Uctan uca DWG kaydet-ac bagimsiz esdegerlik",
+      "status": "pending"
+    },
+    {
+      "id": "dxf_read_semantics",
+      "name": "Tam DXF formatlari ve kaynak DWG karsilastirmasi",
+      "status": "pending"
+    },
+    {
+      "id": "dxf_write_semantics",
+      "name": "Tam DXF yazma-kaydet-yeniden acma semantik kanit",
+      "status": "pending"
+    },
+    {
+      "id": "advanced_2d_editing",
+      "name": "2B duzenleme komut ailesi tam kabul",
+      "status": "pending"
+    },
+    {
+      "id": "exact_3d_surface",
+      "name": "Kesin 3B egri/yuzey topoloji islemleri",
+      "status": "pending"
+    },
+    {
+      "id": "brep_acis_solids",
+      "name": "B-Rep ACIS katilar ve bool islemleri",
+      "status": "pending"
+    },
+    {
+      "id": "large_dwg_runtime",
+      "name": "Buyuk DWG akicilik, renk dogrulugu, hata toleransi",
+      "status": "pending"
+    },
+    {
+      "id": "android_engine_integration",
+      "name": "Gercek Android cihazda tum yeni motor islevleri",
+      "status": "pending"
+    },
+    {
+      "id": "windows_engine_integration",
+      "name": "Gercek Windows urun testleri ve uzun sureli kararlilik",
+      "status": "pending"
+    },
+    {
+      "id": "ios_engine_integration",
+      "name": "Gercek iPhone/iPad cihaz testleri ve kararlilik",
+      "status": "pending"
+    }
+  ]
+}
