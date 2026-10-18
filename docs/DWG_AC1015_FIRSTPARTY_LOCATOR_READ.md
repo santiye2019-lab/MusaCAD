@@ -279,3 +279,38 @@ styles, independent real-file geometry values or modern binary DWG
 writing. `geometry_decoded` must remain zero and the existing
 Android renderer must not consume these fields as complete drawing
 semantics until the real reference corpus passes.
+
+## P0: R2000 first-party typed and relative handle field codec
+
+`musacad_dwg_ac1015_handle_refs.c` now provides a portable, bounded,
+transactional R2000 `H` value reader: 4-bit code, 4-bit byte count,
+then big-endian handle/offset bytes (different byte order from RL/RD).
+The recognized strict subset is primary absolute (0), typed absolute
+soft/hard ownership and pointer references (2–5), and relative +1, -1,
++offset, -offset (6,8,A,C). All unsupported encodings, noncanonical
+leading zero bytes, null target, malformed count, arithmetic underflow/
+overflow and truncated streams are rejected without modifying the
+caller cursor/output.
+
+The same codec now validates each primitive object's self-handle
+against the already CRC-verified object-map handle in the previous
+common-prefix reader, instead of maintaining a second partial H codec.
+A conservative `read_exact_handle_tail` API only parses the number of
+handle fields already known **from an independently established entity
+layout**, and rejects unexpected trailing data and nonzero tail padding;
+its two-pass approach preserves all caller result slots on validation
+failure. It deliberately does not assign handle roles.
+
+A complete R2000 object graph is **not** yet implemented: the caller
+must still determine the actual reference count and whether each handle
+is owner/reactor/layer/linetype/plotstyle. References have not been
+cross-checked against the referenced object's type or real original DWG
+semantic golden records. Synthetic tests demonstrate handle bit layout,
+arithmetic and immutable original CRC-backed record bytes, **not**
+complete real-world entity graph parity. EED and embedded graphic payload
+support remain separate. `geometry_decoded` stays zero for genuine
+DWG object record readers. APK/release behavior is unchanged.
+
+Specification: Open Design Alliance, *Open Design Specification for .dwg
+files*, section "HANDLE REFERENCES" (code/count/relative handles),
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf.
