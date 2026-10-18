@@ -32,6 +32,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: P0 data-loss gate - Back cancels project close
         run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
+      - name: P0 LibreDWG independent functional oracle matrix and no-false-equivalence proof
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_dwg_libredwg_reference_matrix.py' -v
       - name: P0 native DWG signature identification across C and JVM
         run: |
           set -euo pipefail
