@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(musacad_core LANGUAGES C)
 # Pure-C portable static library: Android NDK, Windows (MSVC), Apple clang.
 # The embedded Android DWG integration links exactly this target.
-add_library(musacad_core STATIC src/musacad_core.c src/musacad_mesh_mass.c src/musacad_mesh_surface.c src/musacad_mesh_topology.c src/musacad_mesh_ray_pick.c src/musacad_mesh_bvh.c src/musacad_mesh_bvh_wcs.c src/musacad_mesh_bvh_scene.c src/musacad_camera_ray.c src/musacad_screen_frustum.c src/musacad_screen_scene.c src/musacad_3d_admission.c src/musacad_dwg_signature.c src/musacad_document.c src/musacad_handle_index.c src/musacad_mc1032.c src/musacad_mc1032_v2.c src/musacad_mc1032_migrate.c src/musacad_dxf_document.c src/musacad_dxf_writer.c src/musacad_dxf_handle.c src/musacad_dxf_handle_set.c src/musacad_dxf_group.c src/musacad_dxf_pair.c src/musacad_dxf_byte_lines.c src/musacad_source_sha256.c src/musacad_dxf_section.c)
+add_library(musacad_core STATIC src/musacad_core.c src/musacad_ucs.c src/musacad_mesh_mass.c src/musacad_mesh_surface.c src/musacad_mesh_topology.c src/musacad_mesh_ray_pick.c src/musacad_mesh_bvh.c src/musacad_mesh_bvh_wcs.c src/musacad_mesh_bvh_scene.c src/musacad_camera_ray.c src/musacad_screen_frustum.c src/musacad_screen_scene.c src/musacad_3d_admission.c src/musacad_dwg_signature.c src/musacad_document.c src/musacad_handle_index.c src/musacad_mc1032.c src/musacad_mc1032_v2.c src/musacad_mc1032_migrate.c src/musacad_dxf_document.c src/musacad_dxf_writer.c src/musacad_dxf_handle.c src/musacad_dxf_handle_set.c src/musacad_dxf_group.c src/musacad_dxf_pair.c src/musacad_dxf_byte_lines.c src/musacad_source_sha256.c src/musacad_dxf_section.c)
 set_target_properties(musacad_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(musacad_core PUBLIC c_std_11)
 target_include_directories(musacad_core PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
@@ -19,6 +19,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_handle_index_test tests/core_handle_index_test.c)
         target_link_libraries(musacad_core_handle_index_test PRIVATE musacad_core)
         add_test(NAME musacad_core_indexed_3d_handles_stress COMMAND musacad_core_handle_index_test)
+        # Independent WCS↔UCS axes, construction, roundtrip and safe-failure proof.
+        add_executable(musacad_core_ucs_test tests/core_ucs_test.c)
+        target_link_libraries(musacad_core_ucs_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_3d_ucs_frame_native COMMAND musacad_core_ucs_test)
         # No-loss explicit migration between independent MC1032 revisions.
         add_executable(musacad_core_mc1032_migrate_test tests/core_mc1032_migrate_test.c)
         target_link_libraries(musacad_core_mc1032_migrate_test PRIVATE musacad_core)
