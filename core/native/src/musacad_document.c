@@ -11,6 +11,7 @@ struct MusaDocument {
     MusaDocumentEntity *entities;
     size_t count,capacity,maximum;
     uint64_t next_handle;
+    int import_open;
 };
 
 unsigned int musa_document_abi_version(void){return MUSA_DOCUMENT_ABI_VERSION;}
@@ -21,6 +22,7 @@ MusaDocument *musa_document_create(size_t max_entities){
     if(!doc)return NULL;
     doc->maximum=max_entities;
     doc->next_handle=1u;
+    doc->import_open=1;
     return doc;
 }
 void musa_document_destroy(MusaDocument *doc){
@@ -64,6 +66,7 @@ static int insert(MusaDocument *doc,MusaDocumentEntity item,
     doc->entities[doc->count]=item;
     ++doc->count;
     ++doc->next_handle;
+    doc->import_open=0;
     *out_handle=item.handle;
     return MUSA_DOCUMENT_OK;
 }
@@ -138,6 +141,7 @@ int musa_document_translate(MusaDocument *doc,uint64_t handle,
        !valid_point(candidate.x2,candidate.y2))
         return MUSA_DOCUMENT_OVERFLOW;
     doc->entities[at]=candidate;
+    doc->import_open=0;
     return MUSA_DOCUMENT_OK;
 }
 int musa_document_delete(MusaDocument *doc,uint64_t handle){
@@ -149,5 +153,61 @@ int musa_document_delete(MusaDocument *doc,uint64_t handle){
                 (doc->count-at-1u)*sizeof(*doc->entities));
     --doc->count;
     memset(doc->entities+doc->count,0,sizeof(*doc->entities));
+    doc->import_open=0;
+    return MUSA_DOCUMENT_OK;
+}
+
+/* A temporary decode can import original handles in arbitrary order.
+ * Once a document is edited, this loading-only API locks permanently.
+ */
+int musa_document_load_entity(MusaDocument *doc,
+                              const MusaDocumentEntity *source,
+                              uint64_t *actual_handle){
+    if(!doc||!source||!actual_handle||!doc->import_open)
+        return MUSA_DOCUMENT_INVALID;
+    if(!valid_point(source->x1,source->y1)||
+       !valid_point(source->x2,source->y2)||
+       !isfinite(source->radius)||!isfinite(source->start_deg)||
+       !isfinite(source->end_deg))
+        return MUSA_DOCUMENT_INVALID;
+    switch(source->kind){
+      case MUSA_DOCUMENT_LINE:
+        if(source->radius!=0||source->start_deg!=0||source->end_deg!=0)
+            return MUSA_DOCUMENT_INVALID;
+        break;
+      case MUSA_DOCUMENT_POINT:
+        if(source->x2!=0||source->y2!=0||source->radius!=0||
+           source->start_deg!=0||source->end_deg!=0)
+            return MUSA_DOCUMENT_INVALID;
+        break;
+      case MUSA_DOCUMENT_CIRCLE:
+        if(source->x2!=0||source->y2!=0||!valid_radius(source->radius)||
+           source->start_deg!=0||source->end_deg!=0)
+            return MUSA_DOCUMENT_INVALID;
+        break;
+      case MUSA_DOCUMENT_ARC:
+        if(source->x2!=0||source->y2!=0||!valid_radius(source->radius))
+            return MUSA_DOCUMENT_INVALID;
+        break;
+      default:return MUSA_DOCUMENT_INVALID;
+    }
+    uint64_t handle=source->handle;
+    if(handle==UINT64_MAX)return MUSA_DOCUMENT_OVERFLOW;
+    if(handle!=0u){
+        /* No handle is accepted twice, even for out-of-order source IDs. */
+        for(size_t i=0;i<doc->count;i++)
+            if(doc->entities[i].handle==handle)
+                return MUSA_DOCUMENT_INVALID;
+    }else{
+        handle=doc->next_handle;
+        if(handle==0u||handle==UINT64_MAX)return MUSA_DOCUMENT_OVERFLOW;
+    }
+    const int status=ensure_slot(doc);
+    if(status!=MUSA_DOCUMENT_OK)return status;
+    MusaDocumentEntity entity=*source;
+    entity.handle=handle;
+    doc->entities[doc->count++]=entity;
+    if(handle>=doc->next_handle)doc->next_handle=handle+1u;
+    *actual_handle=handle;
     return MUSA_DOCUMENT_OK;
 }
