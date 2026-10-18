@@ -5,16 +5,43 @@ import java.util.Arrays;
 /** Immutable right-handed user coordinate system for safe WCS <-> UCS conversions. */
 public final class CadUcsFrame {
     private static final double EPS=1e-10,MAX_COORD=1e9;
-    private final double[] origin,xAxis,yAxis,zAxis;
-
+    private final double[] origin,xAxis,yAxis,zAxis,nativeFrame;
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native double[] createNative(double[] rawNine);
+    private static native double[] toWorldNative(double[] packed,double x,double y,double z);
+    private static native double[] toLocalNative(double[] packed,double x,double y,double z);
+    private static native double[] moveNative(double[] packed,int axis,double distance);
+    /* Pure Java retained only as a non-Android reference oracle until platform
+     * acceptance. Android must use one common C engine, never Java fallback. */
     private CadUcsFrame(double[] origin,double[] xAxis,double[] yAxis,double[] zAxis){
+        this(origin,xAxis,yAxis,zAxis,null);
+    }
+    private CadUcsFrame(double[] origin,double[] xAxis,double[] yAxis,double[] zAxis,
+                        double[] nativeFrame){
         this.origin=origin;this.xAxis=xAxis;this.yAxis=yAxis;this.zAxis=zAxis;
+        this.nativeFrame=nativeFrame;
     }
     public static CadUcsFrame world(){return of(0,0,0,1,0,0,0,1,0);}
     public static CadUcsFrame front(){return of(0,0,0,1,0,0,0,0,1);}
     public static CadUcsFrame right(){return of(0,0,0,0,1,0,0,0,1);}
     public static CadUcsFrame of(double ox,double oy,double oz,double xx,double xy,double xz,
                                  double yx,double yy,double yz){
+        if(ANDROID_RUNTIME){
+            double[] payload=createNative(new double[]{ox,oy,oz,xx,xy,xz,yx,yy,yz});
+            if(payload==null||payload.length!=12)
+                throw new IllegalArgumentException("Native UCS definition missing");
+            return new CadUcsFrame(Arrays.copyOfRange(payload,0,3),
+                    Arrays.copyOfRange(payload,3,6),
+                    Arrays.copyOfRange(payload,6,9),
+                    Arrays.copyOfRange(payload,9,12),payload);
+        }
         double[] origin=vec(ox,oy,oz);
         for(double v:origin)if(Math.abs(v)>MAX_COORD)throw new IllegalArgumentException("UCS origin exceeds CAD bounds");
         double[] x=unit(vec(xx,xy,xz));
@@ -53,6 +80,7 @@ public final class CadUcsFrame {
         return input;
     }
     public double[] toWorld(double x,double y,double z){
+        if(ANDROID_RUNTIME)return toWorldNative(nativeFrame,x,y,z);
         vec(x,y,z);
         return new double[]{
             origin[0]+x*xAxis[0]+y*yAxis[0]+z*zAxis[0],
@@ -60,11 +88,13 @@ public final class CadUcsFrame {
             origin[2]+x*xAxis[2]+y*yAxis[2]+z*zAxis[2]};
     }
     public double[] toLocal(double x,double y,double z){
+        if(ANDROID_RUNTIME)return toLocalNative(nativeFrame,x,y,z);
         double[] d=vec(x-origin[0],y-origin[1],z-origin[2]);
         return new double[]{dot(d,xAxis),dot(d,yAxis),dot(d,zAxis)};
     }
     /** Displacement only: the UCS origin must not shift the geometry during an axis step. */
     public double[] move(int axis,double distance){
+        if(ANDROID_RUNTIME)return moveNative(nativeFrame,axis,distance);
         if(axis<0||axis>2||!Double.isFinite(distance))
             throw new IllegalArgumentException("Invalid UCS axis step");
         double[] direction=axis==0?xAxis:axis==1?yAxis:zAxis;

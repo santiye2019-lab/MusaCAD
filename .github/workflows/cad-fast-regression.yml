@@ -157,6 +157,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_gizmo_native_host.sh
+      - name: P1 3D UCS portable core, native JNI and JVM parity
+        run: |
+          set -euo pipefail
+          bash tests/run_ucs_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
