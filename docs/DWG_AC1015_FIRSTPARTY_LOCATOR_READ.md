@@ -253,3 +253,29 @@ production service is changed. AutoCAD 2026 parity is unapproved.
 Reference: Open Design Alliance Open Design Specification for .dwg files,
 R2000 entity chapters LINE, CIRCLE and ARC,
 https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf .
+
+## P0: strict R2000 entity common prefix (safe subset)
+
+`musa_dwg_ac1015_read_simple_common` is a first-party, read-only C11
+decoder of R2000 object type/bit boundary, self-handle H, zero EED,
+absent preview graphics, nolinks, ACI color, positive linetype scale,
+linetype/plotstyle flags, invisibility and lineweight. It requires a
+CRC-passed indexed AC1015 object and compares the encoded self-handle
+against its object-map identity before producing a common-data
+`geometric_start_bit`. It refuses EED payloads and preview graphics
+rather than interpreting them as coordinates. Malformed/truncated
+prefixes do not alter the caller's output; source bytes remain untouched.
+
+The synthetic full-record fixture exercises this common-data boundary
+through an existing LINE geometry field decoder, preserving original
+CRC and the handle stream; fast CI and cross-platform CMake tests
+compile the same portable code. **The real TS1.dwg regression still
+only checks indexed record headers/CRC and must not be reported as
+verified common metadata, layer references or real geometry.**
+
+The core does not yet resolve actual owner/reactor/layer handle
+references or object reachability, EED/preview forms, all entity
+styles, independent real-file geometry values or modern binary DWG
+writing. `geometry_decoded` must remain zero and the existing
+Android renderer must not consume these fields as complete drawing
+semantics until the real reference corpus passes.

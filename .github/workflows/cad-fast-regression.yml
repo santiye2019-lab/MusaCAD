@@ -9,6 +9,7 @@ on:
       - 'core/native/**'
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
+      - 'docs/MUSACAD_CORE_COMPLETION_GATES.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
       - 'docs/AUTOCAD_2026_ACCEPTANCE_51.json'
       - 'docs/autocad2026_evidence/**'
@@ -30,6 +31,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Check fixed 25-gate shared CAD core completion percentage
+        run: python3 -m unittest discover -s tests -p 'test_core_completion_gates.py' -v
       - name: P0 data-loss gate - Back cancels project close
         run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
       - name: P0 LibreDWG independent functional oracle matrix and no-false-equivalence proof
@@ -114,6 +117,19 @@ jobs:
             core/native/tests/core_dwg_ac1015_line_test.c \
             -o /tmp/musacad-ac1015-primitives
           /tmp/musacad-ac1015-primitives
+      - name: P0 R2000 strict common self handle, no EED/graphics, color and LINE admission
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/src/musacad_dwg_ac1015_common.c \
+            core/native/src/musacad_dwg_ac1015_line.c \
+            core/native/src/musacad_dwg_ac1015_object.c \
+            core/native/src/musacad_dwg_ac1015_values.c \
+            core/native/src/musacad_dwg_signature.c \
+            core/native/src/musacad_crc16.c \
+            core/native/tests/core_dwg_ac1015_common_test.c \
+            -o /tmp/musacad-ac1015-common
+          /tmp/musacad-ac1015-common
       - name: P0 first-party DWG candidate section spans, bounds and overlap rejections
         run: |
           set -euo pipefail
