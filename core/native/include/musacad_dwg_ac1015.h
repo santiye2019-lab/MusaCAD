@@ -11,8 +11,8 @@ extern "C" {
  * First-party R2000/AC1015 section-locator READER, per publicly documented
  * ODA R13-R15 DWG file-header layout, not copied from another CAD engine.
  * This safely extracts original on-disk offsets and validates the sentinel,
- * record identities and interval boundaries. The recorded CRC is returned
- * for diagnostics but NOT checked; no object decode / DWG save is certified.
+ * record identities, interval boundaries and the R2000 CRC16 checksum.
+ * No entity/object decoder, editable drawing or DWG save is certified.
  * Do NOT pass these unverified regions to an editable CAD object database.
  * Modern AC1018..AC1032 have different file organizations and are refused.
  */
@@ -23,7 +23,7 @@ typedef struct MusaDwgAc1015Locators {
     uint32_t image_seeker_unverified;
     uint32_t region_count;
     uint32_t header_end;
-    int crc_verified; /* Always 0 until independent CRC validation exists. */
+    int crc_verified; /* 1 only after first-party R2000 CRC check. */
     MusaDwgRegion regions[MUSA_DWG_AC1015_MAX_LOCATORS];
 } MusaDwgAc1015Locators;
 
