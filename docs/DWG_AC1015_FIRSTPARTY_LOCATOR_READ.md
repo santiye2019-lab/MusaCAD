@@ -169,3 +169,24 @@ is only reference data.
 handle IDs, not decoded entity types, curves, layers, layouts, solids,
 or geometry. Further object-header/record checks and a multi-file
 reference corpus are mandatory before claiming full DWG read/write.
+
+## P0: First-party original object record CRC and type header
+
+`musa_dwg_ac1015_read_object_record` accepts a bounded source address
+and handle obtained from the previously checked R2000 object map. The
+portable C11 reader validates the 2/4-byte unsigned DWG modular-short
+record length, bit-short object type, bit-positioned raw 32-bit
+pre-handle size and seeded `0xC0C1` CRC-16 over size bytes plus record
+payload. It preserves output on error. The borrowed data is read-only.
+
+The pinned public real `TS1.dwg` regression requires **all 336
+indexed object records** to pass independently, not only the synthetic
+fixture. It rejects truncated records, incorrect CRC, noncanonical
+length, impossible bit boundaries, unsupported modern DWG and altered
+source bytes. The external reference fixture is never modified.
+
+**Scope:** type code and source boundaries are metadata only. They do
+not yet decode actual LINE/CIRCLE/ARC fields, layer, color, object
+handle-reference stream, geometry, B-Rep solids, XREF or user editing.
+A valid CRC does not authenticate an adversarial file. AutoCAD 2026
+equivalence remains independently unapproved.
