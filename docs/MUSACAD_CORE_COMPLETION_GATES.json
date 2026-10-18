@@ -4,8 +4,8 @@
   "scope": "Versioned functional acceptance gate coverage, not work-hours, feature quality, AutoCAD 2026 equivalence, or certified release readiness",
   "method": "Fixed 25 equal, binary gates; ONLY 'accepted' items count; a candidate counts only after required CI and source review. 4% per accepted gate. Do not credit synthetic field tests as real drawing acceptance.",
   "total_gates": 25,
-  "accepted_gates": 9,
-  "completion_index_percent": 36,
+  "accepted_gates": 10,
+  "completion_index_percent": 40,
   "autoCAD_2026_parity_percent": null,
   "certified_51_families": 0,
   "run_policy": "On each change: keep a separate CI pass ratio; update accepted only with exact source and successful tests. Never alter denominator silently.",
@@ -67,8 +67,9 @@
     {
       "id": "common_prefix_subset",
       "name": "R2000 ortak nesne basligi destekli alt-kumesinin senkron dogrulamasi",
-      "status": "candidate",
-      "evidence": "core/native/tests/core_dwg_ac1015_common_test.c"
+      "status": "accepted",
+      "evidence": "core/native/tests/core_dwg_ac1015_common_test.c",
+      "acceptance": "PR #391, head 66d803d0afd37b9d83aa4ed5a72763184939ab8b, all five required workflow runs completed with success; synthetic common prefix plus LINE, portable host and Android quality tests; real DWG geometry semantic parity unverified."
     },
     {
       "id": "common_eed_graphics",
