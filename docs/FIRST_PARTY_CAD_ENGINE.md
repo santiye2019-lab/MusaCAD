@@ -4,6 +4,24 @@ Status: IN PROGRESS; **not** an AutoCAD 2026 or AC1032 compatibility certificati
 Decision: 2026-10-18. The user requires an independently implemented CAD core;
 third-party CAD engines must NOT be part of the final product.
 
+## Immediate Android runtime transition
+
+The Android `musacad_dwg` shared library is being switched to a first-party
+C11 core / JNI adapter with **no redwg link**, `dwg_bridge.c`, or LibreDWG
+decoder. Existing DXF and native mesh / NURBS / 3D admission interfaces remain.
+Until a real first-party AC1032 binary reader is accepted, DWG opening
+**fails with an explicit IOException rather than silently calling LibreDWG**.
+This temporarily removes the legacy application's DWG-open capability:
+it is a deliberate feature availability regression, NOT independent DWG
+support or improved AutoCAD parity. The original DWG bytes stay untouched.
+Android end-user distribution is blocked until real first-party DWG reopen
+and source-preservation acceptance is completed and the owner approves APK.
+
+Host-only legacy tools and reference tests still contain a pinned LibreDWG
+implementation; these must be removed in a separate verified replacement
+without disabling important independently evidenced regression coverage.
+They are not linked into Android.
+
 ## Existing bridge we must replace (not claim as ours)
 
 - `app/src/main/cpp/dwg_bridge.c` calls `dwg_read_file` from LibreDWG.
