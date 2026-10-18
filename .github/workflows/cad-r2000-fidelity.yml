@@ -80,40 +80,6 @@ jobs:
             core/native/src/musacad_bits.c \
             core/native/tests/core_ac1015_real_fixture_probe.c \
             -o /tmp/musacad-ac1015-real-fixture
-          # Public fixture metadata only; never print entity IDs or geometry.
-          python3 - <<'PY'
-          from pathlib import Path
-          import struct
-          b=Path("third_party/libredwg/test/test-data/2000/TS1.dwg").read_bytes()
-          count=struct.unpack_from("<I",b,0x15)[0]
-          end=0x19+9*count
-          print("R2000 public fixture diagnostic:", "bytes",len(b),
-                "locator_count",count,"table_end",end)
-          if 3<=count<=64 and end+18<=len(b):
-              rec=[(b[0x19+i*9],
-                     *struct.unpack_from("<II",b,0x19+i*9+1))
-                   for i in range(count)]
-              crc=0
-              for c in b[:end]:
-                  crc^=c
-                  for _ in range(8):
-                      crc=(crc>>1) ^ (0xA001 if crc&1 else 0)
-              mask={3:0xA598,4:0x8101,5:0x3CC4}.get(count)
-              stored=struct.unpack_from("<H",b,end)[0]
-              print("R2000 public fixture locator IDs:",
-                    [int(r[0]) for r in rec])
-              print("R2000 public fixture section lengths:",
-                    [int(r[2]) for r in rec])
-              print("R2000 public fixture ranges_in_bounds:",
-                    [off>=end+18 and sz>0 and off+sz<=len(b)
-                     for _,off,sz in rec])
-              print("R2000 public fixture header CRC candidate:",
-                    "valid" if mask is not None and (crc^mask)==stored
-                    else "mismatch-or-unsupported-count")
-              print("R2000 public fixture file sentinel:",
-                    b[end+2:end+18]==bytes.fromhex(
-                        "95a04e2899821ae55e41e05f9d3a4d00"))
-          PY
           before="$(sha256sum "$fixture" | cut -d ' ' -f1)"
           /tmp/musacad-ac1015-real-fixture accept-r2000 "$fixture"
           after="$(sha256sum "$fixture" | cut -d ' ' -f1)"
