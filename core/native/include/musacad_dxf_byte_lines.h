@@ -21,7 +21,7 @@ enum MusaDxfByteLineResult {
 };
 /* Existing staged-save scanner keeps historical drop-all-CR behavior.
  * Seekable DxfStream needs CR preserved inside payload, with ONLY a final
- * CR immediately preceding LF/EOF removed as in its existing Java reader.
+ * CR immediately preceding LF removed; unterminated EOF preserves CR.
  * Both modes use precisely the same portable C buffering and length policy.
  */
 enum MusaDxfCrMode {
