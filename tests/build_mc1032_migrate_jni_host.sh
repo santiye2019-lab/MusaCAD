@@ -8,6 +8,7 @@ cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -Icore/native/include \
   core/native/src/musacad_document.c \
   core/native/src/musacad_mc1032.c \
+  core/native/src/musacad_handle_index.c \
   core/native/src/musacad_mc1032_v2.c \
   core/native/src/musacad_mc1032_migrate.c \
   app/src/main/cpp/mc1032_jni.c \
