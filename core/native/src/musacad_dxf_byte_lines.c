@@ -74,7 +74,12 @@ int musa_core_dxf_byte_lines_finish(MusaDxfByteLines *reader,
     reader->finished=1;
     *line=NULL;*line_len=0;
     if(reader->length==0)return MUSA_DXF_BYTE_EOF;
-    *line=reader->bytes;*line_len=emitted_length(reader);
+    /* Original seekable DxfStream stripped CR only before LF.
+     * Its unterminated final EOF line retained trailing CR bytes.
+     */
+    *line=reader->bytes;
+    *line_len=reader->cr_mode==MUSA_DXF_CR_TRAILING_ONLY
+        ?reader->length:emitted_length(reader);
     reader->length=0;
     return MUSA_DXF_BYTE_LINE;
 }
