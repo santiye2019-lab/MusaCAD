@@ -74,3 +74,26 @@ Format fields and sentinels are independently transcribed from
 R13-R15 section locators, AcDb:Header and AcDb:Classes descriptions.
 Production on-file fixtures and verified payload CRC are separate next
 acceptance gates.
+
+## P0: Verified HEADER / CLASSES data CRC (strict optional API)
+
+`musa_dwg_ac1015_parse_crc_verified_frame` extends, without changing,
+the existing envelope-only API. After validating the original R2000
+file header, section table and both sentinels, the strict function checks
+the **stored section CRC-16** using initial seed `0xC0C1`, applied
+to the 4-byte little-endian section length followed by the entire payload.
+Any mismatch fails closed and leaves the caller's output unchanged.
+Its returned `payload_crc_verified=1` distinguishes a checked span from
+the older `parse_frame` function's always-unverified CRC.
+
+The seed and covered bytes are specified in the ODA *Open Design
+Specification for .dwg files*, section 9 (AcDb:Header) and section 10
+(AcDb:Classes). Tests use fixed independent golden CRC vectors,
+deliberately corrupted section payloads, a corrupted stored CRC, invalid
+arguments and an intentionally re-signed payload to demonstrate that
+CRC-16 detects accidental corruption but provides **no authenticity**.
+
+**Acceptance scope:** synthetic R2000 envelopes and portable host tests;
+the file remains read-only. Real DWG fixture corpus and independent
+third-party decoder equivalence, object/class decoding, complete section
+validation, modern AC1032 decoding and native DWG writing remain open.
