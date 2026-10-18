@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1015_frame.h"
 #include "musacad_dwg_ac1015.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <string.h>
 /* Independently transcribed published R13-R15 DWG beginning sentinels.
@@ -44,6 +45,29 @@ int musa_dwg_ac1015_parse_frame(const uint8_t *file,size_t file_bytes,
     parsed.section_kind=section_kind;
     parsed.envelope_verified=1;
     parsed.payload_crc_verified=0;
+    *out=parsed;
+    return 1;
+}
+
+/* The R13-R15 AcDb:Header and AcDb:Classes section CRC covers the
+ * four-byte little-endian length and all following section data,
+ * starting immediately after the 16-byte beginning sentinel.
+ * Per the documented DWG format the initial CRC-16/ARC value is 0xC0C1.
+ * The already-parsed envelope guarantees length+4 fits the original span.
+ */
+int musa_dwg_ac1015_parse_crc_verified_frame(const uint8_t *file,
+                                               size_t file_bytes,
+                                               uint32_t section_kind,
+                                               MusaDwgAc1015Frame *out){
+    if(!out)return 0;
+    MusaDwgAc1015Frame parsed={0};
+    if(!musa_dwg_ac1015_parse_frame(file,file_bytes,section_kind,&parsed)||
+       parsed.payload_bytes>SIZE_MAX-4u)return 0;
+    uint16_t computed=0u;
+    if(!musa_core_crc16_arc(0xc0c1u,parsed.payload-4u,
+                            parsed.payload_bytes+4u,&computed)||
+       computed!=parsed.stored_payload_crc_unverified)return 0;
+    parsed.payload_crc_verified=1;
     *out=parsed;
     return 1;
 }

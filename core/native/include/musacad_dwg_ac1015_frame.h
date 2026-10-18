@@ -25,6 +25,18 @@ typedef struct MusaDwgAc1015Frame {
  */
 int musa_dwg_ac1015_parse_frame(const uint8_t *file,size_t file_bytes,
                                 uint32_t section_kind,MusaDwgAc1015Frame *out);
+/* Strict CRC-validated view for original R2000 HEADER and CLASSES.
+ * Requires all structural checks from parse_frame() plus the documented
+ * seeded (0xC0C1) CRC-16 on 4-byte section length followed by payload.
+ * On mismatch, leave *out untouched. Never copy or modify source bytes.
+ * CRC verifies accidental corruption only: NOT cryptographic authenticity,
+ * parsing of class/header variables, or correctness of real-world DWGs.
+ * The caller owns file and must keep it unchanged while borrowing payload.
+ */
+int musa_dwg_ac1015_parse_crc_verified_frame(const uint8_t *file,
+                                               size_t file_bytes,
+                                               uint32_t section_kind,
+                                               MusaDwgAc1015Frame *out);
 #ifdef __cplusplus
 }
 #endif
