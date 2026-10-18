@@ -2,6 +2,7 @@
 #include "musacad_face_light.h"
 #include <assert.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 static void near(double got,double wanted){
     assert(isfinite(got)&&fabs(got-wanted)<1e-12);
