@@ -31,3 +31,19 @@ Next stages: verify real-file fixtures independently; validate per-section
 content sentinels/checksums; bounded section content decoding;
 then implement modern AC1032 separate section map/compression protocols.
 MusaCAD's MC1032 `.mcad` is a different, custom format.
+
+## P0 read-only section view (all three platforms)
+
+`musa_dwg_ac1015_readonly_section` returns a borrowed, bounded original
+byte span for a documented AC1015 section kind (0..4), if and only if the
+header CRC, sentinel, complete section table and interval checks **all**
+succeed on this invocation. It refuses absent/unknown section kinds,
+truncated/mutated header, stale validation and null outputs without changing
+caller outputs or modifying the input. The C11 function is part of the single
+Android/Windows/iOS common native core; no LibreDWG runtime dependency.
+
+**Do not confuse safe access with decoded DWG**: changes to a section's
+payload are not detected by the file-header CRC. The returned pointer is
+borrowed and invalidated if its owning allocation goes away. Neither
+section contents nor object maps/handles/geometry are authenticated, decoded
+or made editable. The CI regression explicitly tests this limitation.
