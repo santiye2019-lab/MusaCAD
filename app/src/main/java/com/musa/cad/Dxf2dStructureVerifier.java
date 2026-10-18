@@ -6,8 +6,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Fast bounded structural disk readback for staged 2D DXF documents.
@@ -40,8 +38,8 @@ public final class Dxf2dStructureVerifier {
             throw new IOException("Geçersiz 2B DXF geçici dosyası");
         DxfSectionGuard sections=new DxfSectionGuard();
         int pairs=0;
-        Set<String> seenHandles=new HashSet<>();
-        try(BufferedReader reader=new BufferedReader(new InputStreamReader(
+        try(DxfSavedHandleSet seenHandles=new DxfSavedHandleSet(MAX_HANDLES);
+            BufferedReader reader=new BufferedReader(new InputStreamReader(
                 new FileInputStream(dxf),StandardCharsets.ISO_8859_1),128*1024)){
             while(true){
                 FileTransfer.checkCancelled();
@@ -53,15 +51,14 @@ public final class Dxf2dStructureVerifier {
                 int packet=sections.consume(group,value,pairs,MAX_PAIRS);
                 pairs++;
                 int code=DxfSectionGuard.code(packet);
-                String item=value.trim();
                 // Native C verifies LINE coordinate syntax and completeness
                 // in the same state transition, before this record is trusted.
                 if(code!=0){
                     if((code==5||code==105)&&
                        DxfSectionGuard.event(packet,DxfSectionGuard.HANDLE_AREA)){
-                        String handle=DxfSourceHandlePlan.canonical(item);
-                        if(!seenHandles.add(handle))throw new IOException("DXF nesne tutamacı yinelendi");
-                        if(seenHandles.size()>MAX_HANDLES)throw new IOException("DXF kimlik sınırı aşıldı");
+                        // One shared C set owns 5/105 hex parsing, normalization,
+                        // collision checks and the bounded number of handles.
+                        seenHandles.reserve(value);
                     }
                 }
             }
