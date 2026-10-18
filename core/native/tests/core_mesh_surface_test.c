@@ -15,6 +15,18 @@ int main(void){
     close_to(r.centroid_y,4./3.,1e-12);
     close_to(r.centroid_z,0.,1e-12);
     assert(r.triangle_count==1&&r.degenerate_count==0);
+    assert(musa_core_mesh_surface_result_valid(&r,1));
+    /* Shared C result ABI checks protect all platform adapters from
+     * fabricated area/centroid/face-count state, including zero-area data. */
+    MusaCoreMeshSurface corrupt_result=r;
+    corrupt_result.triangle_count=2;
+    assert(!musa_core_mesh_surface_result_valid(&corrupt_result,1));
+    corrupt_result=r;corrupt_result.degenerate_count=2;
+    assert(!musa_core_mesh_surface_result_valid(&corrupt_result,1));
+    corrupt_result=r;corrupt_result.area=-1.;
+    assert(!musa_core_mesh_surface_result_valid(&corrupt_result,1));
+    corrupt_result=r;corrupt_result.centroid_y=NAN;
+    assert(!musa_core_mesh_surface_result_valid(&corrupt_result,1));
     const float cube[]={0,0,0,1,0,0,1,1,0,0,1,0,
                         0,0,1,1,0,1,1,1,1,0,1,1};
     const int faces[]={0,1,2,0,2,3,4,6,5,4,7,6,
@@ -35,6 +47,10 @@ int main(void){
     const int deg[]={0,0,2};
     assert(musa_core_mesh_surface_f32(triangle,3,deg,1,&r));
     assert(r.area==0.&&r.degenerate_count==1&&isnan(r.centroid_x));
+    assert(musa_core_mesh_surface_result_valid(&r,1));
+    corrupt_result=r;corrupt_result.centroid_x=0.;
+    assert(!musa_core_mesh_surface_result_valid(&corrupt_result,1));
+    assert(!musa_core_mesh_surface_result_valid(NULL,0));
     assert(musa_core_mesh_surface_f32(NULL,0,NULL,0,&r));
     assert(r.area==0.&&r.triangle_count==0&&isnan(r.centroid_z));
     /* Matching Java behavior: float deltas must first widen to double. */

@@ -37,7 +37,8 @@ static jdoubleArray surface_measure(JNIEnv *env,jfloatArray points,
                                      &result);
     if(indices)(*env)->ReleaseIntArrayElements(env,triangles,indices,JNI_ABORT);
     if(xyz)(*env)->ReleaseFloatArrayElements(env,points,xyz,JNI_ABORT);
-    if(!ok)return NULL;
+    if(!ok||!musa_core_mesh_surface_result_valid(&result,(size_t)(f/3)))
+        return NULL;
     jdouble values[6]={result.area,result.centroid_x,result.centroid_y,
                        result.centroid_z,(double)result.triangle_count,
                        (double)result.degenerate_count};
