@@ -81,9 +81,6 @@ int main(void){
     file[307u]^=1u;
     fails_unchanged(file,sizeof(file),4u);
     file[307u]^=1u;
-    file[320u]=0u; /* page terminator must have size 2 */
-    fails_unchanged(file,sizeof(file),4u);
-    file[320u]=0u; /* original is also 0 */
     file[321u]=3u;fails_unchanged(file,sizeof(file),4u);file[321u]=2u;
     /* Valid CRC with a zero handle delta still fails structurally. */
     file[306u]=0u;crc_map_page(file+304u,8u);
