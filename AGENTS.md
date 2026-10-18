@@ -2,6 +2,15 @@
 
 > Owner directive confirmed 2026-10-17. These rules are binding for every subsequent CAD development and PR in this repository. See [docs/UNIFIED_CAD_ENGINE_POLICY.md](docs/UNIFIED_CAD_ENGINE_POLICY.md), [issue #295](https://github.com/santiye2019-lab/MusaCAD/issues/295), and [docs/UNIFIED_CAD_ENGINE_INVENTORY.json](docs/UNIFIED_CAD_ENGINE_INVENTORY.json).
 
+## Fully independent first-party MusaCAD engine — mandatory owner decision, 18 October 2026
+
+- The **released CAD engine must contain no LibreDWG, ODA, third-party DWG/DXF parsing/serialization/geometry kernel or runtime fallback**. MusaCAD must own the DWG binary reader, DWG binary writer, DXF reader/writer, object model, geometry, 2D/3D modeling and editing, commands, and undo/redo in common C/C++ source.
+- Existing `app/src/main/cpp/` LibreDWG bridge is **legacy migration debt**, not the MusaCAD engine and not acceptable as a permanent dependency. Do not add new calls to it, move it into `core/native/`, or label its output as MusaCAD-native decode. Preserve the existing user-facing DWG opening behavior until the first-party replacement is independently accepted; removing it prematurely would regress files and violate source-safety.
+- Build first-party `core/native/` with **no external CAD decoder/encoder libraries**, on Linux, Windows, macOS and iOS cross-compile. Tests must fail if independent core source starts including/linking third-party CAD code.
+- **Cutover condition:** verify genuine binary AC1015–AC1032 decode AND encode with original-object IDs, geometry, colors, layers, blocks, dynamic content, XREF, annotations, layouts and 3D/ACIS semantics or explicit loss rejection; independently reopen and compare. Only then remove the legacy LibreDWG runtime/build path. Unsupported objects must fail closed, never disappear silently.
+- Do not confuse a six-byte AC1032 header recognition, synthetic DXF, a geometry preview, or a compiled stub with a native DWG reader/writer or AutoCAD 2026 equivalence. Treat all missing functions as tracked work, not as complete.
+- No APK or deployment until the owner's explicit final approval.
+
 ## Exactly ONE CAD engine, for every supported platform
 
 - **ALL CAD engine functionality must ultimately live in a single portable, common C/C++ engine** exposed through a stable, versioned C ABI. It MUST compile for Android, Windows and iOS. One CAD object/data model, one set of geometry computations, one DWG/DXF read-edit-save implementation, one 2D/3D computation model, one undo/redo command semantics implementation.
