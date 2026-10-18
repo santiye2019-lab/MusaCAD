@@ -14,24 +14,27 @@ static void put_le(uint8_t *x,uint32_t value){
     x[2]=(uint8_t)(value>>16);x[3]=(uint8_t)(value>>24);
 }
 static size_t build(uint8_t *x,size_t n,unsigned count){
-    assert(n>=512u&&count>=3u&&count<=5u);
+    assert(n>=512u&&count>=3u&&count<=6u);
     memset(x,0,n);
     memcpy(x,"AC1015",6);
     x[12]=1u;
     put_le(x+0x0du,256u); /* preview seeker is diagnostic, unverified */
     x[0x13u]=0xe4u; x[0x14u]=0x04u;
     put_le(x+0x15u,count);
-    const uint32_t starts[]={128u,224u,304u,384u,448u};
-    const uint32_t lengths[]={52u,38u,64u,32u,52u};
+    const uint32_t starts[]={128u,224u,304u,384u,448u,500u};
+    const uint32_t lengths[]={52u,38u,64u,32u,52u,12u};
     for(unsigned i=0u;i<count;i++){
         size_t k=0x19u+(size_t)i*9u;
         x[k]=(uint8_t)i;
-        put_le(x+k+1u,starts[i]);
-        put_le(x+k+5u,lengths[i]);
+        /* Six-entry public-file variant: optional fourth record empty. */
+        const uint32_t start=(count==6u&&i==3u)?0u:starts[i];
+        const uint32_t length=(count==6u&&i==3u)?0u:lengths[i];
+        put_le(x+k+1u,start);
+        put_le(x+k+5u,length);
     }
     size_t crc_pos=0x19u+(size_t)count*9u;
     /* Independently calculated R2000 header golden checksums for fixtures. */
-    static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u};
+    static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u,0x8f52u};
     const uint16_t crc=golden[count-3u];
     x[crc_pos]=(uint8_t)crc;x[crc_pos+1u]=(uint8_t)(crc>>8);
     memcpy(x+crc_pos+2u,sentinel,16u);
@@ -49,31 +52,42 @@ static void fail_unchanged(const uint8_t *bytes,size_t n,
 }
 int main(void){
     uint8_t fixture[512],original[512];
-    for(unsigned records=3;records<=5;records++){
+    for(unsigned records=3;records<=6;records++){
         size_t end=build(fixture,sizeof(fixture),records);
         memcpy(original,fixture,sizeof(fixture));
         MusaDwgAc1015Locators loc={0};
         assert(musa_dwg_ac1015_read_locators(fixture,sizeof(fixture),&loc));
         assert(loc.region_count==records&&loc.header_end==end);
-        static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u};
+        static const uint16_t golden[]={0xe82fu,0x9e95u,0x3b17u,0x8f52u};
         assert(loc.codepage==1252u);
         assert(loc.stored_header_crc==golden[records-3u]);
         assert(loc.image_seeker_unverified==256u);
         assert(loc.crc_verified==1); /* Actual header checksum verified */
         for(unsigned i=0;i<records;i++){
             assert(loc.regions[i].section_kind==i);
-            assert(loc.regions[i].offset>=end);
-            assert(loc.regions[i].length>0u);
+            if(records==6u&&i==3u){
+                assert(loc.regions[i].offset==0u);
+                assert(loc.regions[i].length==0u);
+            } else {
+                assert(loc.regions[i].offset>=end);
+                assert(loc.regions[i].length>0u);
+            }
         }
-        /* All three to five documented section IDs have a safe borrowed
+        /* Only nonempty documented section IDs have a safe borrowed
          * view of their ORIGINAL bytes. The view never owns the buffer. */
         for(unsigned id=0u;id<records;id++){
             const uint8_t *start=NULL;
             size_t len=0u;
-            assert(musa_dwg_ac1015_readonly_section(
-                fixture,sizeof(fixture),id,&start,&len));
-            assert(start==fixture+(size_t)loc.regions[id].offset);
-            assert(len==(size_t)loc.regions[id].length);
+            if(id>=5u||(records==6u&&id==3u)){
+                assert(!musa_dwg_ac1015_readonly_section(
+                    fixture,sizeof(fixture),id,&start,&len));
+                assert(start==NULL&&len==0u);
+            } else {
+                assert(musa_dwg_ac1015_readonly_section(
+                    fixture,sizeof(fixture),id,&start,&len));
+                assert(start==fixture+(size_t)loc.regions[id].offset);
+                assert(len==(size_t)loc.regions[id].length);
+            }
         }
         /* Unknown/missing IDs, missing outputs, wrong DWG versions and
          * truncated input must never clobber caller-owned output. */
@@ -121,7 +135,8 @@ int main(void){
         fixture[end-1u]^=0x01u; /* damaged 16-byte sentinel */
         fail_unchanged(fixture,sizeof(fixture),&loc);
         fixture[end-1u]^=0x01u;
-        fixture[0x15u]=6u; /* undocumented sixth locator: fail closed */
+        fixture[0x15u]=(uint8_t)(records==6u?7u:6u);
+        /* Modified locator count without a matching signed header fails. */
         fail_unchanged(fixture,sizeof(fixture),&loc);
         fixture[0x15u]=(uint8_t)records;
         fixture[0x19u+9u]=0u; /* duplicate 0, required class missing */
@@ -130,7 +145,7 @@ int main(void){
         fixture[0x19u+9u*2u]=4u; /* missing mandatory object-map 2 */
         fail_unchanged(fixture,sizeof(fixture),&loc);
         fixture[0x19u+9u*2u]=2u;
-        fixture[0x19u]=5u; /* unknown record id */
+        fixture[0x19u]=6u; /* unknown record id */
         fail_unchanged(fixture,sizeof(fixture),&loc);
         fixture[0x19u]=0u;
         put_le(fixture+0x19u+1u,0u); /* section overlaps file header */
