@@ -17,8 +17,10 @@ public final class DxfStream implements Closeable {
     private final RandomAccessFile file;
     private final Charset charset;
     private final byte[] buffer=new byte[64*1024];
-    private int position,available,lineIndex,pairsRead;
+    private final int[] position=new int[1];
+    private int available,lineIndex,pairsRead;
     private long offset;
+    private long nativeLines;
 
     private String pendingType;
     private long pendingStartOffset;
@@ -33,41 +35,62 @@ public final class DxfStream implements Closeable {
         if(source.length()>MAX_BYTES)throw new IOException("DXF dosyası 512 MB sınırını aşıyor");
         this.file=new RandomAccessFile(source,"r");
         this.charset=charset;
+        try{
+            nativeLines=DxfPortableLines.openRecordFramer(MAX_LINE_BYTES);
+        }catch(IOException failed){
+            file.close();
+            throw failed;
+        }
     }
 
     public void seek(long byteOffset,int sourceLine)throws IOException{
         if(byteOffset<0||byteOffset>file.length())throw new IOException("Geçersiz DXF konumu");
-        file.seek(byteOffset);offset=byteOffset;lineIndex=Math.max(0,sourceLine);
-        position=available=0;pairsRead=0;pendingType=null;pendingStartOffset=0;pendingStartLine=0;
+        // Reset the same portable scanner on every random-access seek.
+        // Acquire the replacement before destroying the original cursor.
+        final long replacement=DxfPortableLines.openRecordFramer(MAX_LINE_BYTES);
+        try{file.seek(byteOffset);}
+        catch(IOException failed){
+            DxfPortableLines.closeRecordFramer(replacement);
+            throw failed;
+        }
+        final long previous=nativeLines;
+        nativeLines=replacement;
+        DxfPortableLines.closeRecordFramer(previous);
+        offset=byteOffset;lineIndex=Math.max(0,sourceLine);
+        position[0]=0;available=0;pairsRead=0;
+        pendingType=null;pendingStartOffset=0;pendingStartLine=0;
         nextRecordOffset=byteOffset;nextRecordLine=lineIndex;
     }
 
     private String line()throws IOException{
-        // RandomAccessFile returns -1 permanently after EOF. Without this
-        // guard, position=0 and available=-1 would let the next call read
-        // the stale start of the byte buffer as a second phantom DXF pass.
+        // C owns ALL LF/CR framing, split-buffer state and bounded line size.
+        // Java keeps only platform file I/O, cancellation and text decoding.
         if(available<0)return null;
-        ByteArrayOutputStream bytes=new ByteArrayOutputStream(48);
-        boolean any=false;
         while(true){
-            if(position==available){
-                FileTransfer.checkCancelled();
-                available=file.read(buffer);position=0;
-                if(available<0){
-                    if(!any)return null;
+            if(position[0]<available){
+                int before=position[0];
+                byte[] bytes=DxfPortableLines.feedRecordFramer(
+                    nativeLines,buffer,position,available);
+                if(position[0]<before||position[0]>available)
+                    throw new IOException("Ortak DXF okuyucu konumu geçersiz");
+                offset+=position[0]-before;
+                if(bytes!=null){
                     lineIndex++;
-                    return new String(bytes.toByteArray(),charset);
+                    return new String(bytes,charset);
                 }
+                if(position[0]!=available)
+                    throw new IOException("Ortak DXF okuyucu ilerleyemedi");
             }
-            int b=buffer[position++]&255;offset++;any=true;
-            if(b==10){
-                byte[] value=bytes.toByteArray();int length=value.length;
-                if(length>0&&value[length-1]==13)length--;
+            FileTransfer.checkCancelled();
+            available=file.read(buffer);
+            position[0]=0;
+            if(available<0){
+                // Finish ONCE; without this guard EOF could replay old bytes.
+                byte[] finalLine=DxfPortableLines.finishRecordFramer(nativeLines);
+                if(finalLine==null)return null;
                 lineIndex++;
-                return new String(value,0,length,charset);
+                return new String(finalLine,charset);
             }
-            if(bytes.size()>=MAX_LINE_BYTES)throw new IOException("DXF satırı çok uzun");
-            bytes.write(b);
         }
     }
 
@@ -107,5 +130,10 @@ public final class DxfStream implements Closeable {
         }
     }
 
-    public void close()throws IOException{file.close();}
+    public void close()throws IOException{
+        final long old=nativeLines;
+        nativeLines=0L;
+        try{file.close();}
+        finally{DxfPortableLines.closeRecordFramer(old);}
+    }
 }
