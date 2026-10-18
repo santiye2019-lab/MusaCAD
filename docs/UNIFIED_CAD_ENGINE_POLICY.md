@@ -2,6 +2,16 @@
 
 **Binding owner decision, 17 October 2026** • Issue [#295](https://github.com/santiye2019-lab/MusaCAD/issues/295) • Executable instructions: [../AGENTS.md](../AGENTS.md)
 
+## Additional binding decision — fully first-party engine (18 October 2026)
+
+The final MusaCAD CAD runtime MUST contain **zero LibreDWG / ODA / third-party CAD-engine dependencies**. Building the CAD object model while continuing to rely on an external DWG reader does NOT satisfy the target. MusaCAD must implement its own AC1015–AC1032 binary decoding, native binary writing, DXF read/write, source-preserving CAD object database, edit transactions, geometry and advanced 3D semantics.
+
+**Honest current limitation:** `app/src/main/cpp/dwg_bridge.c` still calls the legacy LibreDWG `dwg_read_file`. `app/src/main/cpp/CMakeLists.txt` links `redwg`. It must not be mistaken for our independent reader, nor ripped out until equivalent first-party decode is tested, to avoid breaking working Android DWG opening.
+
+**Development isolation:** First-party code lives under `core/native/`, never references a third-party CAD parser, and is independently built by CMake/CTest on Linux, Windows and macOS, plus iOS ARM64 object compilation. No further LibreDWG integration or new fallback code is allowed. AC1032 header detection and independent geometric document operations are preliminary components, NOT binary DWG codec completion.
+
+**Removal gate:** identical reference DWG inputs → MusaCAD-owned decode → object identities, layer/state/color, layouts, blocks/dynamic-blocks, XREF, annotation, polyline/spline and 3D ACIS/B-Rep loss audit → edit and MusaCAD-owned AC1032 binary encode → independent reopen → source-integrity and cross-platform tests. Unknown semantics must reject destructive saves. After this gate passes, delete all `libredwg` binary, linkage, vendored-source build requirements and bridge calls from the shipping/runtime target. No dependency-reduction percentage is a CAD-equivalence percentage.
+
 ## Target, without exceptions for engine semantics
 
 Exactly one CAD engine, with versioned and memory-safe portable C ABI. All CAD-specific computation, DWG/DXF record interpretation, source identity, units, layer/layout/block/XREF object semantics, editing and command transactions, 2D/3D geometry, selection, OCS/UCS, parametric model state, mesh/B-Rep/topology, geometric measurements, dimensioning/hatch rules, serialization, undo/redo and input validation are performed by this common engine.
