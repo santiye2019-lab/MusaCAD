@@ -60,6 +60,33 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: third_party/libredwg
+      - name: P0 genuine AC1015 original-byte header and section CRC acceptance
+        run: |
+          set -euo pipefail
+          # Public upstream reference data is pinned at checkout above.
+          # Never downgrade a failed real-file acceptance to a warning.
+          fixture=third_party/libredwg/test/test-data/2000/TS1.dwg
+          modern=third_party/libredwg/test/test-data/example_2013.dwg
+          test -s "$fixture"
+          test -s "$modern"
+          test "$(head -c 6 "$fixture")" = "AC1015"
+          test "$(head -c 6 "$modern")" != "AC1015"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/src/musacad_dwg_ac1015_frame.c \
+            core/native/src/musacad_dwg_ac1015.c \
+            core/native/src/musacad_dwg_regions.c \
+            core/native/src/musacad_dwg_signature.c \
+            core/native/src/musacad_crc16.c \
+            core/native/src/musacad_bits.c \
+            core/native/tests/core_ac1015_real_fixture_probe.c \
+            -o /tmp/musacad-ac1015-real-fixture
+          before="$(sha256sum "$fixture" | cut -d ' ' -f1)"
+          /tmp/musacad-ac1015-real-fixture accept-r2000 "$fixture"
+          after="$(sha256sum "$fixture" | cut -d ' ' -f1)"
+          test "$before" = "$after"
+          /tmp/musacad-ac1015-real-fixture reject-modern "$modern"
+          echo "PASS real-file P0: original fixture unchanged; no LibreDWG runtime in the first-party probe"
+
       - name: Reject silent CAD geometry color or block loss in future AC1032 output
         run: |
           python3 -m unittest discover -s tests -p 'test_dwg_dxf_semantic_parity.py' -v
