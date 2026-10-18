@@ -97,3 +97,27 @@ CRC-16 detects accidental corruption but provides **no authenticity**.
 the file remains read-only. Real DWG fixture corpus and independent
 third-party decoder equivalence, object/class decoding, complete section
 validation, modern AC1032 decoding and native DWG writing remain open.
+
+## P0: Real pinned R2000 binary fixture acceptance gate
+
+`core/native/tests/core_ac1015_real_fixture_probe.c` is an original,
+read-only host test that calls the same portable C functions as MusaCAD.
+The Modern DWG CI workflow checks out the publicly distributable
+LibreDWG test-data repository at an **exact pinned source commit**,
+then runs the **MusaCAD-owned reader only** on the original
+`test/test-data/2000/TS1.dwg`. The expected on-disk signature is
+`AC1015`. We require the file-level CRC/locators and both HEADER and
+CLASSES envelope/data CRCs to pass. The original file SHA-256 before and
+after execution must match exactly.
+
+A newer sample (`test/test-data/example_2013.dwg`) is also required to
+be rejected by this AC1015-only parser. CI must **fail** on any
+rejection of the R2000 file or mistaken acceptance of the modern file:
+no soft-pass, warning downgrade, or skipped real acceptance. The
+first-party probe does not load or call any LibreDWG library.
+
+This genuine **file-format section-level** evidence remains distinct
+from entity/class/object decoding, editable scene reconstruction,
+object-preserving DWG save, AutoCAD 2026 equivalence and physical
+Android/Windows/iOS application testing. Never assert any of those
+broader claims based only on this gate.
