@@ -70,6 +70,23 @@ int main(void){
     for(size_t i=0;i<size;i++)assert(bytes[i]==0xa5); /* atomic failure */
     assert(musa_mc1032_encode(source,bytes,size,&written)==MUSA_MC1032_OK);
     assert(written==size&&memcmp(bytes,"MC1032",6)==0);
+    /* Real standard-C file IO on Linux/Windows/macOS; byte codec is identical.
+     * This is a test file, never the user's original drawing.
+     */
+    FILE *on_disk=tmpfile();
+    assert(on_disk);
+    assert(fwrite(bytes,1u,size,on_disk)==size);
+    assert(fflush(on_disk)==0);
+    assert(fseek(on_disk,0,SEEK_SET)==0);
+    unsigned char *from_disk=(unsigned char *)malloc(size);
+    assert(from_disk);
+    assert(fread(from_disk,1u,size,on_disk)==size);
+    assert(fclose(on_disk)==0);
+    MusaDocument *file_reopened=NULL;
+    assert(musa_mc1032_decode(from_disk,size,&file_reopened)==MUSA_MC1032_OK);
+    assert(file_reopened && musa_document_count(file_reopened)==4);
+    musa_document_destroy(file_reopened);
+    free(from_disk);
     assert(musa_mc1032_decode(bytes,size,&round)==MUSA_MC1032_OK);
     assert(round && musa_document_count(round)==4);
     for(size_t i=0;i<4;i++){
