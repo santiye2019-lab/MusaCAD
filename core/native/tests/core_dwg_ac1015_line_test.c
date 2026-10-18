@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1015_line.h"
+#include "musacad_dwg_ac1015_curve.h"
 #include "musacad_dwg_ac1015_object.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
@@ -99,6 +100,80 @@ static void assert_reject(const MusaDwgAc1015ObjectRecord *r,size_t first){
     TEST(!musa_dwg_ac1015_decode_line_fields(r,first,&out));
     TEST(memcmp(&prior,&out,sizeof(out))==0);
 }
+/* Spec-declared ARC=17 and CIRCLE=18 follow a shared 3BD/BD/BT/BE
+ * field layout; ARC adds two BD angles. No common metadata is inferred. */
+static void curve_fixture(uint16_t type,int bad_radius,int bad_normal,
+                          uint8_t file[FILE_SIZE],size_t *first){
+    Writer w={0};
+    TEST(type==17u||type==18u);
+    put_u(&w,1u,2u);put_raw(&w,type,1u);
+    const size_t rl_at=w.bit;put_raw(&w,0u,4u);
+    put_u(&w,0x53u,7u); *first=w.bit;
+    put_bd(&w,12.125);put_bd(&w,-99.0);put_bd(&w,3.75);
+    put_bd(&w,bad_radius?0.0:15.5);
+    put_u(&w,1u,1u); /* default thickness=0 */
+    if(bad_normal){
+        put_u(&w,0u,1u); /* explicit zero extrusion is forbidden */
+        put_bd(&w,0.0);put_bd(&w,0.0);put_bd(&w,0.0);
+    }else put_u(&w,1u,1u); /* default WCS normal */
+    if(type==17u){put_bd(&w,-0.25);put_bd(&w,2.125);}
+    const size_t end=w.bit;
+    TEST(end<=UINT32_MAX);
+    rewrite_rl(&w,rl_at,(uint32_t)end);
+    put_u(&w,0xa5u,8u); /* unrelated handles cannot be consumed */
+    const size_t bytes=(w.bit+7u)/8u;
+    TEST(bytes<0x8000u&&bytes+DATA_START+2u<FILE_SIZE);
+    memset(file,0,FILE_SIZE);memcpy(file,"AC1015",6u);
+    file[128]=(uint8_t)bytes;file[129]=(uint8_t)(bytes>>8u);
+    memcpy(file+DATA_START,w.bytes,bytes);
+    uint16_t crc=0u;
+    TEST(musa_core_crc16_arc(0xc0c1u,file+128,bytes+2u,&crc));
+    file[DATA_START+bytes]=(uint8_t)crc;
+    file[DATA_START+bytes+1u]=(uint8_t)(crc>>8u);
+}
+static void curve_reject(const MusaDwgAc1015ObjectRecord *r,size_t first){
+    MusaDwgAc1015CurveFields fields={0};
+    fields.radius=88.0;fields.center[1]=-123.0;fields.indexed_handle=99u;
+    const MusaDwgAc1015CurveFields old=fields;
+    TEST(!musa_dwg_ac1015_decode_curve_fields(r,first,&fields));
+    TEST(memcmp(&old,&fields,sizeof(fields))==0);
+}
+static void curve_cases(void){
+    uint8_t file[FILE_SIZE],oldbytes[FILE_SIZE];size_t first=0u;
+    const MusaDwgAc1015HandleEntry index={0x3au,128u};
+    for(uint16_t type=17u;type<=18u;type++){
+        curve_fixture(type,0,0,file,&first);
+        memcpy(oldbytes,file,sizeof(file));
+        MusaDwgAc1015ObjectRecord r={0};
+        TEST(musa_dwg_ac1015_read_object_record(file,FILE_SIZE,&index,&r));
+        TEST(r.type_code==type&&r.record_crc_verified==1&&r.geometry_decoded==0);
+        MusaDwgAc1015CurveFields fields={0};
+        TEST(musa_dwg_ac1015_decode_curve_fields(&r,first,&fields));
+        TEST(fields.type_code==type&&fields.indexed_handle==index.handle);
+        TEST(fields.center[0]==12.125&&fields.center[1]==-99.0&&fields.center[2]==3.75);
+        TEST(fields.radius==15.5&&fields.thickness==0.0);
+        TEST(fields.extrusion[0]==0.0&&fields.extrusion[1]==0.0&&fields.extrusion[2]==1.0);
+        if(type==17u)TEST(fields.start_angle==-0.25&&fields.end_angle==2.125);
+        else TEST(fields.start_angle==0.0&&fields.end_angle==0.0);
+        TEST(fields.first_field_bit==first&&fields.end_field_bit==r.pre_handle_bits);
+        TEST(fields.field_layout_decoded==1&&r.geometry_decoded==0);
+        TEST(memcmp(oldbytes,file,sizeof(file))==0);
+        MusaDwgAc1015ObjectRecord broken=r;
+        broken.pre_handle_bits-=1u;curve_reject(&broken,first);
+        broken=r;broken.pre_handle_bits+=1u;curve_reject(&broken,first);
+        broken=r;broken.type_code=19u;curve_reject(&broken,first);
+        broken=r;broken.record_crc_verified=0;curve_reject(&broken,first);
+        broken=r;broken.data_bytes=1u;curve_reject(&broken,first);
+        curve_reject(&r,first+1u);
+        curve_reject(&r,r.pre_handle_bits+1u);
+        curve_fixture(type,1,0,file,&first);
+        TEST(musa_dwg_ac1015_read_object_record(file,FILE_SIZE,&index,&r));
+        curve_reject(&r,first); /* zero radius */
+        curve_fixture(type,0,1,file,&first);
+        TEST(musa_dwg_ac1015_read_object_record(file,FILE_SIZE,&index,&r));
+        curve_reject(&r,first); /* zero extrusion */
+    }
+}
 int main(void){
     uint8_t file[FILE_SIZE],untouched[FILE_SIZE];
     size_t offset=0u;
@@ -135,6 +210,7 @@ int main(void){
     TEST(line.end_field_bit==r.pre_handle_bits);
     make_fixture(1,1,file,&offset);r=read_record(file);
     assert_reject(&r,offset); /* invalid zero extrusion */
-    puts("PASS first-party R2000 LINE RD/DD XYZ, default-Z, BT/BE, CRC and fail-closed field boundary");
+    curve_cases();
+    puts("PASS first-party R2000 LINE, CIRCLE and ARC fields, CRC, exact bit limits and rollback");
     return 0;
 }
