@@ -75,6 +75,7 @@ jobs:
             core/native/src/musacad_dwg_ac1015_frame.c \
             core/native/src/musacad_dwg_ac1015_handles.c \
             core/native/src/musacad_dwg_ac1015_object.c \
+            core/native/src/musacad_dwg_ac1015_values.c \
             core/native/src/musacad_dwg_ac1015.c \
             core/native/src/musacad_dwg_regions.c \
             core/native/src/musacad_dwg_signature.c \
