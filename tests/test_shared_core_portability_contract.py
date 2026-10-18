@@ -63,6 +63,28 @@ class SharedCorePortabilityContract(unittest.TestCase):
         self.assertNotIn("assembleDirectDebug", workflow)
         self.assertNotIn("release_approved: true", workflow)
 
+    def test_both_android_ndk_abis_and_iphoneos_archive_are_required(self):
+        workflow = CROSS.read_text(encoding="utf-8")
+        for required in [
+            "android.toolchain.cmake",
+            "arm64-v8a x86_64",
+            "-DANDROID_ABI=",
+            "-DANDROID_PLATFORM=android-24",
+            "-DBUILD_TESTING=OFF",
+            "libmusacad_core.a",
+            "musa_bits_read",
+            "musa_core_mesh_mass_verified_f32",
+            "iphoneos ar -rcs",
+            "iphoneos nm -g",
+            "NO APK",
+        ]:
+            with self.subTest(check=required):
+                self.assertIn(required, workflow)
+        self.assertIn("if: runner.os == 'Linux'", workflow)
+        self.assertIn("if: runner.os == 'macOS'", workflow)
+        self.assertNotIn("assembleDirectDebug", workflow)
+        self.assertNotIn("release_approved: true", workflow)
+
     def test_shared_core_sources_are_explicitly_declared(self):
         cmake = CMAKE.read_text(encoding="utf-8")
         match = re.search(r"add_library\(musacad_core STATIC\s+(.*?)\)", cmake, re.S)
