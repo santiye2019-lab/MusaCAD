@@ -76,3 +76,21 @@ int musa_dwg_ac1015_read_locators(const uint8_t *bytes,size_t n,
     *out=result;
     return 1;
 }
+
+/* Safe first-party borrow: never allow callers to use a stale validated
+ * locator from an earlier version of the buffer. No payload verification. */
+int musa_dwg_ac1015_readonly_section(const uint8_t *bytes,size_t n,
+                                      uint32_t section_kind,
+                                      const uint8_t **out_start,
+                                      size_t *out_length){
+    if(!bytes||!out_start||!out_length||section_kind>4u)return 0;
+    MusaDwgAc1015Locators current={0};
+    if(!musa_dwg_ac1015_read_locators(bytes,n,&current)||
+       current.crc_verified!=1)return 0;
+    for(size_t i=0u;i<(size_t)current.region_count;i++){
+        if(current.regions[i].section_kind==section_kind)
+            return musa_dwg_region_readonly_span(bytes,n,&current.regions[i],
+                                                   out_start,out_length);
+    }
+    return 0;
+}
