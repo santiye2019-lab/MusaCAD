@@ -7,12 +7,36 @@ package com.musa.cad;
  */
 public final class CadPickBounds {
     private CadPickBounds(){}
+    /* Source selection CAD math is shared by all platforms. Host JVM Java
+     * below remains an independent oracle until device acceptance. */
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native boolean mightHitNative(float[] xy,int shape,
+                                                 float x,float y,float tolerance);
 
     public static boolean mightHit(CadEdit edit,float x,float y,float tolerance){
         if(edit==null||!Float.isFinite(x)||!Float.isFinite(y)
             ||!Float.isFinite(tolerance)||tolerance<0f)return true;
         float[] xy=edit.xy;
         if(xy==null||xy.length<2)return true;
+        if(ANDROID_RUNTIME){
+            /* Unbounded XLINE / tilted ELLIPSE are always candidates. */
+            int shape;
+            switch(edit.type){
+                case XLINE:
+                case ELLIPSE: shape=3;break;
+                case CIRCLE: shape=1;break;
+                case ARC: shape=2;break;
+                default: shape=0;break;
+            }
+            return mightHitNative(xy,shape,x,y,tolerance);
+        }
         float minX=Float.POSITIVE_INFINITY,minY=Float.POSITIVE_INFINITY;
         float maxX=Float.NEGATIVE_INFINITY,maxY=Float.NEGATIVE_INFINITY;
 

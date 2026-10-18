@@ -177,6 +177,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_mesh_mass_native_host.sh
+      - name: P2 shared conservative 2D picking bounds via portable C and real JNI
+        run: |
+          set -euo pipefail
+          bash tests/run_pick_bounds_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
