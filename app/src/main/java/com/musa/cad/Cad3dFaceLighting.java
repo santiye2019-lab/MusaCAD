@@ -9,6 +9,15 @@ package com.musa.cad;
  */
 public final class Cad3dFaceLighting {
     private Cad3dFaceLighting(){}
+    private static final boolean ANDROID_RUNTIME=isAndroidRuntime();
+    private static boolean isAndroidRuntime(){
+        String vm=System.getProperty("java.vm.name","");
+        return "Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm);
+    }
+    static {
+        if(ANDROID_RUNTIME)System.loadLibrary("musacad_dwg");
+    }
+    private static native double brightnessNative(float[] xyz,int a,int b,int c);
 
     /**
      * Returns 0..1 diffuse brightness from a face's unoriented normal;
@@ -21,6 +30,9 @@ public final class Cad3dFaceLighting {
         if(xyz==null||xyz.length%3!=0||a<0||b<0||c<0||
            a>=xyz.length/3||b>=xyz.length/3||c>=xyz.length/3)
             return -1;
+        /* Android uses the single portable CAD C engine; Java calculation
+         * below is a host-only differential oracle, not an Android fallback. */
+        if(ANDROID_RUNTIME)return brightnessNative(xyz,a,b,c);
         int i=a*3,j=b*3,k=c*3;
         for(int axis=0;axis<3;axis++){
             if(!Float.isFinite(xyz[i+axis])||

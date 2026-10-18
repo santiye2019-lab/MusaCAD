@@ -161,6 +161,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_ucs_native_host.sh
+      - name: P2 shared 3D face brightness via actual JNI and C native regressions
+        run: |
+          set -euo pipefail
+          bash tests/run_face_light_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail
