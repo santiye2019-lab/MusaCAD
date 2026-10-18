@@ -173,6 +173,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_mesh_surface_native_host.sh
+      - name: P2 native signed mesh volume with independent topology admission and JNI parity
+        run: |
+          set -euo pipefail
+          bash tests/run_mesh_mass_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail

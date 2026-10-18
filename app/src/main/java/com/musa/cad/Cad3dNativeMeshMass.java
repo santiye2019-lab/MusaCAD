@@ -68,6 +68,10 @@ public final class Cad3dNativeMeshMass {
     public static Comparison compare(float[] xyz,int[] faces,
                                      Cad3dMeshTopology.Result topology){
         Cad3dSignedVolume.Result original=Cad3dSignedVolume.measure(xyz,faces,topology);
+        String vm=System.getProperty("java.vm.name","");
+        if("Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm))
+            return new Comparison(original,null,false,false,
+                    "native_authoritative_no_independent_oracle");
         if(!original.available)
             return new Comparison(original,null,false,false,"mesh_not_accepted");
         if(xyz.length/3>1000000||faces.length/3>Cad3dMeshTopology.MAX_AUDITED_TRIANGLES)

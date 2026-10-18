@@ -61,6 +61,12 @@ int musa_core_mesh_mass_f32(const float *xyz,size_t point_count,
                             const int *triangles,size_t face_count,
                             int topology_prevalidated,
                             MusaCoreMeshMass *out);
+/* Safe public API always independently verifies the exact mesh connectivity,
+ * winding, duplicate and degenerate faces before the mass integration.
+ * Never treats an adapter's prior topology decision as binding. */
+int musa_core_mesh_mass_verified_f32(const float *xyz,size_t point_count,
+                                     const int *triangles,size_t face_count,
+                                     MusaCoreMeshMass *out);
 /*
  * Triangle-mesh SURFACE metrics (not signed enclosed volume).
  * Reads float XYZ vertices + indexed triangles; returns total area and
