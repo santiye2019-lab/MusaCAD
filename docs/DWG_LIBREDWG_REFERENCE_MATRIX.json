@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "title": "LibreDWG observable functional reference for independent MusaCAD DWG interoperability",
+  "reference_policy": "Use publicly documented format observations and independently generated source fixtures. LibreDWG remains host-only; do not include, port, translate or link its CAD implementation into the released first-party engine. Copying GPLv3+ source would invoke license obligations; this matrix deliberately contains no LibreDWG code.",
+  "sources": [
+    "https://www.gnu.org/software/libredwg/manual/html_node/Overview.html",
+    "https://www.gnu.org/software/libredwg/manual/html_node/Encoding.html",
+    "https://github.com/LibreDWG/libredwg/blob/master/README"
+  ],
+  "platform_core": "core/native/",
+  "platform_targets": [
+    "Android arm64-v8a",
+    "Android x86_64",
+    "Windows",
+    "iPhoneOS arm64"
+  ],
+  "roundtrip_acceptance": "Same real binary DWG -> independently decode -> compare object identity, geometry, layers, block/attributes, XREF, layouts, annotations, unknown classes and 3D geometry -> edit -> native encode -> independent reopen, audit and source-loss rejection. Unknown semantics block destructive saves.",
+  "autocad_2026_certified_families": 0,
+  "autocad_2026_family_denominator": 51,
+  "version_matrix": [
+    {
+      "magic": "AC1009",
+      "release": "R12",
+      "native_signature_enum": "MUSA_DWG_R12",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "legacy",
+      "libredwg_writer_notes": "Older legacy format support; not independently certified here.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1012",
+      "release": "R13",
+      "native_signature_enum": "MUSA_DWG_R13",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "legacy",
+      "libredwg_writer_notes": "Older legacy format support; not independently certified here.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1014",
+      "release": "R14",
+      "native_signature_enum": "MUSA_DWG_R14",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "legacy",
+      "libredwg_writer_notes": "Older legacy format support; not independently certified here.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1015",
+      "release": "R2000",
+      "native_signature_enum": "MUSA_DWG_2000",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "recommended",
+      "libredwg_writer_notes": "Reference's recommended output target; does not certify MusaCAD output.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1018",
+      "release": "R2004",
+      "native_signature_enum": "MUSA_DWG_2004",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "experimental",
+      "libredwg_writer_notes": "Known incomplete or incompatible writing; must not be treated as a passing oracle.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1021",
+      "release": "R2007",
+      "native_signature_enum": "MUSA_DWG_2007",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "unsupported",
+      "libredwg_writer_notes": "LibreDWG R2007 writer is not implemented as documented.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1024",
+      "release": "R2010",
+      "native_signature_enum": "MUSA_DWG_2010",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "experimental",
+      "libredwg_writer_notes": "Known incomplete or incompatible writing; must not be treated as a passing oracle.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1027",
+      "release": "R2013",
+      "native_signature_enum": "MUSA_DWG_2013",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "experimental",
+      "libredwg_writer_notes": "Known incomplete or incompatible writing; must not be treated as a passing oracle.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    },
+    {
+      "magic": "AC1032",
+      "release": "R2018_to_2026",
+      "native_signature_enum": "MUSA_DWG_2018_2026",
+      "libredwg_read_reference": "documented_broad_support_with_known_gaps",
+      "libredwg_write_reference": "experimental",
+      "libredwg_writer_notes": "Known incomplete or incompatible writing; must not be treated as a passing oracle.",
+      "musacad_signature_identification": "implemented_tested",
+      "musacad_real_binary_decode": "not_implemented",
+      "musacad_real_binary_encode": "not_implemented",
+      "fixture_evidence": "not_collected",
+      "roundtrip_evidence": "not_run",
+      "independent_acceptance": false
+    }
+  ],
+  "implementation_stages": [
+    {
+      "id": "signature_identification",
+      "state": "implemented_tested",
+      "code": "core/native/src/musacad_dwg_signature.c",
+      "evidence": "core/native/tests/core_dwg_signature_test.c",
+      "boundary": "Identifies six-byte header only; no DWG entities"
+    },
+    {
+      "id": "bounded_binary_bit_io",
+      "state": "generic_infrastructure_tested",
+      "code": "core/native/src/musacad_bits.c",
+      "evidence": "core/native/tests/core_bits_test.c",
+      "boundary": "Generic bitstream, NOT AutoCAD proprietary bit codes"
+    },
+    {
+      "id": "dwg_section_page_map",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_section_checksums_and_compression",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_header_variables_and_classes",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_handles_and_object_database",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_entity_layer_layout_and_block_semantics",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_xref_proxy_dynamic_content",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_brep_acis_solid_semantics",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "dwg_native_binary_writer_and_rollback",
+      "state": "not_implemented",
+      "code": null,
+      "evidence": null
+    },
+    {
+      "id": "independent_dwg_reopen_and_full_loss_audit",
+      "state": "not_run",
+      "code": null,
+      "evidence": null
+    }
+  ]
+}
