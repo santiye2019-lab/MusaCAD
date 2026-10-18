@@ -25,11 +25,40 @@ public final class DxfPortableLines implements Closeable {
         }
         coreLoaded=available;
     }
-    private static native long openNative(int maxLineBytes);
+    private static native long openNative(int maxLineBytes,int crMode);
     private static native byte[] nextNative(long context,byte[] chunk,
                                            int[] offset,int limit)throws IOException;
     private static native byte[] finishNative(long context)throws IOException;
     private static native void closeNative(long context);
+
+    /* Same JNI transport for staged-save and seekable DxfStream adapters.
+     * Mode 0: staged-save legacy drop-all-CR. Mode 1: trailing-only CR.
+     * Fail closed if portable C is unavailable; never parse bytes in Java.
+     */
+    static long openRecordFramer(int maxLineBytes)throws IOException{
+        if(!coreLoaded)throw new IOException("Ortak CAD çekirdeği olmadan DXF satırı okunamaz");
+        final long handle;
+        try{handle=openNative(maxLineBytes,1);}
+        catch(LinkageError missing){
+            throw new IOException("Ortak CAD çekirdeği DXF satır JNI bağlantısı yok",missing);
+        }
+        if(handle==0L)throw new IOException("Ortak DXF satır okuyucusu oluşturulamadı");
+        return handle;
+    }
+    static byte[] feedRecordFramer(long handle,byte[] bytes,int[] offset,int limit)
+            throws IOException{
+        try{return nextNative(handle,bytes,offset,limit);}
+        catch(LinkageError missing){
+            throw new IOException("Ortak DXF satır JNI bağlantısı yok",missing);
+        }
+    }
+    static byte[] finishRecordFramer(long handle)throws IOException{
+        try{return finishNative(handle);}
+        catch(LinkageError missing){
+            throw new IOException("Ortak DXF satır JNI bağlantısı yok",missing);
+        }
+    }
+    static void closeRecordFramer(long handle){if(handle!=0L)closeNative(handle);}
 
     private final FileInputStream input;
     private final byte[] chunk=new byte[CHUNK_BYTES];
@@ -43,7 +72,7 @@ public final class DxfPortableLines implements Closeable {
         if(!coreLoaded)throw new IOException("Ortak CAD çekirdeği olmadan DXF satırı okunamaz");
         final long nativeHandle;
         try {
-            nativeHandle=openNative(MAX_LINE_BYTES);
+            nativeHandle=openNative(MAX_LINE_BYTES,0);
         }catch(LinkageError unavailable){
             throw new IOException("Ortak CAD çekirdeği DXF satır işlemi yok",unavailable);
         }
