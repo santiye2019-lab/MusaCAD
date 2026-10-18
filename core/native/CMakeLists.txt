@@ -15,6 +15,10 @@ endif()
 if(PROJECT_IS_TOP_LEVEL)
     include(CTest)
     if(BUILD_TESTING)
+        # One shared source library exports the same CAD ABI on all hosts.
+        add_executable(musacad_core_portable_abi_smoke tests/core_portable_abi_smoke.c)
+        target_link_libraries(musacad_core_portable_abi_smoke PRIVATE musacad_core)
+        add_test(NAME musacad_core_one_engine_abi_smoke COMMAND musacad_core_portable_abi_smoke)
         # First-party bounded binary-bit cursor for future independent DWG codec.
         add_executable(musacad_core_bits_test tests/core_bits_test.c)
         target_link_libraries(musacad_core_bits_test PRIVATE musacad_core)

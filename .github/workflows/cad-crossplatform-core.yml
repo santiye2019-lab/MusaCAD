@@ -39,6 +39,11 @@ jobs:
         if: runner.os == 'Linux'
         run: python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v
 
+      - name: Cross-compile the same native CAD core for Android arm64 and x86_64 (no APK)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash tests/run_native_crossbuild.sh android
+
       - name: Cross-platform DWG INSERT and MINSERT affine transform geometry
         run: cmake -S core/native/affine -B build/shared-affine -DCMAKE_BUILD_TYPE=Debug
       - name: Compile portable CAD affine operations
@@ -89,4 +94,5 @@ jobs:
           done < "$RUNNER_TEMP/musacad-core-ios-sources.txt"
           test "$compiled" -gt 0
           echo "Compiled all $compiled common CAD core C units for iPhoneOS ARM64."
+          bash tests/run_native_crossbuild.sh ios-archive
           echo "This is object compilation only, NOT simulator, signed app or physical iPhone acceptance."
