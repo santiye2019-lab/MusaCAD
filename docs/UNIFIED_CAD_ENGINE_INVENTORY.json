@@ -244,7 +244,13 @@
       "path": "app/src/main/java/com/musa/cad/CadPickBounds.java",
       "classification": "needs_core_audit",
       "family": "two_dimensional_and_cad_object_semantics",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_pick_bounds.c",
+      "android_adapter": "app/src/main/cpp/pick_bounds_jni.c",
+      "native_host_test": "tests/run_pick_bounds_native_host.sh",
+      "remaining_work": "Java host-only oracle retained; Android device pick performance, Windows and iOS app integration still require acceptance."
     },
     {
       "path": "app/src/main/java/com/musa/cad/CadPrint.java",
