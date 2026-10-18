@@ -75,6 +75,26 @@ int main(int argc,char **argv){
         fputs("FAIL: real R2000 header acceptance flags\n",stderr);
         return 1;
     }
+    /* This pinned real fixture specifically exercises the six-record R2000
+     * layout with an absent/zero-length optional section 3. A refactor that
+     * silently strips or borrows it must fail the real-file gate. */
+    if(loc.region_count!=6u ||
+       loc.regions[3].section_kind!=3u ||
+       loc.regions[3].length!=0u ||
+       loc.regions[5].section_kind!=5u){
+        free(file);
+        fputs("FAIL: genuine six-locator and empty optional section semantics\n",stderr);
+        return 1;
+    }
+    const uint8_t *optional_span=file+2u;
+    size_t optional_length=777u;
+    if(musa_dwg_ac1015_readonly_section(file,n,3u,
+                                        &optional_span,&optional_length)||
+       optional_span!=file+2u || optional_length!=777u){
+        free(file);
+        fputs("FAIL: absent optional section must never be borrowed\n",stderr);
+        return 1;
+    }
     for(uint32_t section=0u;section<2u;section++){
         MusaDwgAc1015Frame frame={0};
         if(!musa_dwg_ac1015_parse_crc_verified_frame(
