@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1015_object.h"
-#include "musacad_bits.h"
 #include "musacad_crc16.h"
 #include <assert.h>
 #include <stdint.h>
@@ -8,6 +7,15 @@
 #include <string.h>
 
 static MusaDwgAc1015HandleEntry entry={12u,128u};
+/* Independently encode DWG MSB-first bits; RL bytes are LE. */
+static void put_bit(uint8_t *p,size_t bit,unsigned value){
+    if(value)p[bit/8u]|=(uint8_t)(1u<<(7u-(bit&7u)));
+}
+static size_t put_bits(uint8_t *p,size_t bit,uint32_t value,unsigned width){
+    for(unsigned k=0u;k<width;k++)
+        put_bit(p,bit++, (value>>(width-1u-k))&1u);
+    return bit;
+}
 static void put_record(uint8_t *file,size_t capacity,uint32_t length,int extended){
     memset(file,0,capacity);
     memcpy(file,"AC1015",6u);
@@ -19,11 +27,13 @@ static void put_record(uint8_t *file,size_t capacity,uint32_t length,int extende
         p[2]=(uint8_t)(length>>15);
         p[3]=(uint8_t)(length>>23);
     }
-    MusaBits bits={0};
-    assert(musa_bits_writer(&bits,p+size_bytes,(size_t)length));
-    assert(musa_bits_write(&bits,2u,1u)); /* BS 01: byte follows */
-    assert(musa_bits_write(&bits,8u,1u)); /* DWG entity type 1 (TEXT is irrelevant here) */
-    assert(musa_bits_write(&bits,32u,42u)); /* PRE-handles in bits */
+    size_t bit=0u;
+    bit=put_bits(p+size_bytes,bit,1u,2u); /* code 01, 8-bit BS */
+    bit=put_bits(p+size_bytes,bit,1u,8u); /* type raw byte */
+    /* Pre-handle field RL=42, little-endian in successive raw bytes. */
+    bit=put_bits(p+size_bytes,bit,42u,8u);
+    for(unsigned k=0u;k<3u;k++)bit=put_bits(p+size_bytes,bit,0u,8u);
+    assert(bit==42u);
     uint16_t crc=0;
     assert(musa_core_crc16_arc(0xc0c1u,p,size_bytes+length,&crc));
     p[size_bytes+length]=(uint8_t)crc;
