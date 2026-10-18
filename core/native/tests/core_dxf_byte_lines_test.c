@@ -54,7 +54,7 @@ int main(void){
     assert(feed(r,(const unsigned char *)"\n",1,&used,"A\rB",3)==MUSA_DXF_BYTE_LINE);
     assert(feed(r,(const unsigned char *)"x\r\r",3,&used,"",0)==MUSA_DXF_BYTE_MORE);
     assert(musa_core_dxf_byte_lines_finish(r,&line,&length)==MUSA_DXF_BYTE_LINE);
-    assert(length==2&&!memcmp(line,"x\r",2));
+    assert(length==3&&!memcmp(line,"x\r\r",3));
     musa_core_dxf_byte_lines_destroy(r);
     r=musa_core_dxf_byte_lines_create_mode(4,MUSA_DXF_CR_TRAILING_ONLY);
     assert(r);
