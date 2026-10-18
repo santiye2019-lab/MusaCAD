@@ -8,7 +8,8 @@ mkdir -p /tmp/musacad-gizmo-jni /tmp/musacad-gizmo-java
 cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
   -I"$JHOME/include" -I"$JHOME/include/linux" \
   -Icore/native/include \
-  core/native/src/musacad_gizmo.c app/src/main/cpp/gizmo_jni.c \
+  core/native/src/musacad_gizmo.c core/native/src/musacad_ucs.c \
+  app/src/main/cpp/gizmo_jni.c app/src/main/cpp/ucs_jni.c \
   -lm -o /tmp/musacad-gizmo-jni/libmusacad_dwg.so
 javac -encoding UTF-8 -d /tmp/musacad-gizmo-java \
   app/src/main/java/com/musa/cad/CadUcsFrame.java \
