@@ -25,7 +25,12 @@ static void frame(uint8_t *p,const uint8_t *begin,uint32_t n){
     memcpy(p,begin,16u);
     le32(p+16u,n);
     for(uint32_t i=0;i<n;i++)p[20u+i]=(uint8_t)((i*7u+13u)&255u);
-    p[20u+n]=0x5au;p[21u+n]=0xa5u; /* intentionally NOT verified */
+    /* Independent fixed golden CRCs: seed 0xC0C1 over LE32(n)+data.
+     * Recomputed outside the implementation, not a self-verifying test. */
+    assert(n==20u||n==8u);
+    const uint16_t golden=n==20u?0xedf4u:0x9912u;
+    p[20u+n]=(uint8_t)golden;
+    p[21u+n]=(uint8_t)(golden>>8);
     for(size_t i=0u;i<16u;i++)p[22u+n+i]=(uint8_t)(begin[i]^0xffu);
 }
 static void repair_crc(uint8_t *file){
@@ -54,6 +59,18 @@ static void fixture(uint8_t *file){
     frame(file+128u,header_begin,20u);
     frame(file+224u,class_begin,8u);
 }
+static void rejected_crc(const uint8_t *bytes,size_t n,uint32_t kind){
+    MusaDwgAc1015Frame out={0};
+    out.payload=bytes?bytes+4u:NULL;
+    out.payload_bytes=777u;
+    out.stored_payload_crc_unverified=0x1255u;
+    out.section_kind=98u;
+    out.envelope_verified=17;
+    out.payload_crc_verified=33;
+    const MusaDwgAc1015Frame initial=out;
+    assert(!musa_dwg_ac1015_parse_crc_verified_frame(bytes,n,kind,&out));
+    assert(memcmp(&out,&initial,sizeof(out))==0);
+}
 static void rejected(const uint8_t *bytes,size_t n,uint32_t kind){
     MusaDwgAc1015Frame out={0};
     out.payload=bytes?bytes+4u:NULL;
@@ -76,7 +93,14 @@ int main(void){
         assert(out.payload_crc_verified==0);
         assert(out.payload==(k==0u?x+148u:x+244u));
         assert(out.payload_bytes==(k==0u?20u:8u));
-        assert(out.stored_payload_crc_unverified==0xa55au);
+        const uint16_t golden=k==0u?0xedf4u:0x9912u;
+        assert(out.stored_payload_crc_unverified==golden);
+        MusaDwgAc1015Frame verified={0};
+        assert(musa_dwg_ac1015_parse_crc_verified_frame(
+            x,sizeof(x),k,&verified));
+        assert(verified.envelope_verified==1&&verified.payload_crc_verified==1);
+        assert(verified.payload==out.payload&&verified.payload_bytes==out.payload_bytes);
+        assert(verified.stored_payload_crc_unverified==golden);
     }
     assert(memcmp(before,x,sizeof(x))==0);
     rejected(x,sizeof(x),2u);rejected(x,sizeof(x),UINT32_MAX);
@@ -100,14 +124,49 @@ int main(void){
     le32(x+0x19u+5u,37u);repair_crc(x);
     rejected(x,sizeof(x),0u);
     le32(x+0x19u+5u,58u);repair_crc(x);
-    /* A modified PAYLOAD is still accepted as an envelope: no false
-     * assertion that data CRC, objects or drawing have been checked. */
+    /* Backward-compatible envelope API does not assert CRC correctness;
+     * strict API refuses the same damaged original bytes. */
     x[148u]^=1u;
     MusaDwgAc1015Frame out={0};
     assert(musa_dwg_ac1015_parse_frame(x,sizeof(x),0u,&out));
     assert(out.payload_crc_verified==0&&out.envelope_verified==1);
+    rejected_crc(x,sizeof(x),0u);
     x[148u]^=1u;
+    /* Each tamper leaves the header CRC valid but the DATA CRC invalid.
+     * The old envelope-only API still accepts such data by design. */
+    rejected_crc(x,sizeof(x),0u);
+    x[148u]^=1u;
+    rejected_crc(x,sizeof(x),0u);
+    x[148u]^=1u;
+    x[244u]^=1u;
+    rejected_crc(x,sizeof(x),1u);
+    x[244u]^=1u;
+    x[168u]^=0x40u; /* HEADER stored section CRC */
+    rejected_crc(x,sizeof(x),0u);
+    x[168u]^=0x40u;
+    x[252u]^=0x40u; /* CLASSES stored section CRC */
+    rejected_crc(x,sizeof(x),1u);
+    x[252u]^=0x40u;
+    rejected_crc(x,sizeof(x),2u);
+    rejected_crc(x,310u,0u);
+    rejected_crc(NULL,sizeof(x),0u);
+    assert(!musa_dwg_ac1015_parse_crc_verified_frame(
+        x,sizeof(x),0u,NULL));
+    /* CRC is not a signature: an attacker can rewrite payload AND CRC.
+     * Never call this cryptographic authentication or decoded DWG data. */
+    x[148u]^=1u;
+    uint16_t rewritten=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,x+144u,24u,&rewritten));
+    x[168u]=(uint8_t)rewritten;
+    x[169u]=(uint8_t)(rewritten>>8);
+    MusaDwgAc1015Frame forged={0};
+    assert(musa_dwg_ac1015_parse_crc_verified_frame(
+        x,sizeof(x),0u,&forged));
+    assert(forged.payload_crc_verified==1);
+    x[148u]^=1u;
+    x[168u]=0xf4u;
+    x[169u]=0xedu;
     assert(memcmp(before,x,sizeof(x))==0);
-    puts("PASS: portable AC1015 framed HEADER/CLASSES, length, both sentinels, corruptions and honest CRC limits");
+    puts("PASS: AC1015 HEADER/CLASSES seeded CRC-16, tamper rejection, unmodified outputs and no-authentication boundary");
     return 0;
 }
