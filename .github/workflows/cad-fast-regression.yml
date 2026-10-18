@@ -169,6 +169,10 @@ jobs:
         run: |
           set -euo pipefail
           bash tests/run_mesh_topology_native_host.sh
+      - name: P2 authoritative native 3D surface area and centroid JNI parity
+        run: |
+          set -euo pipefail
+          bash tests/run_mesh_surface_native_host.sh
       - name: Shared C ABI 1 core, independent of Android/LibreDWG
         run: |
           set -euo pipefail

@@ -71,6 +71,12 @@ public final class Cad3dNativeMeshSurface {
      */
     public static Comparison compare(float[] xyz,int[] triangles) {
         Cad3dSurfaceMetrics.Result reference=Cad3dSurfaceMetrics.measure(xyz,triangles);
+        /* Once production Android uses the same C implementation directly,
+         * a native-vs-native self-compare would be a false parity claim. */
+        String vm=System.getProperty("java.vm.name","");
+        if("Dalvik".equalsIgnoreCase(vm)||"ART".equalsIgnoreCase(vm))
+            return new Comparison(reference,null,false,false,
+                    "native_authoritative_no_independent_oracle");
         if(xyz.length==0||triangles.length==0)
             return new Comparison(reference,null,false,false,"empty_mesh_java_only");
         if(xyz.length/3>1000000||triangles.length/3>50000)

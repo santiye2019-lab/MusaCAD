@@ -123,7 +123,13 @@
       "path": "app/src/main/java/com/musa/cad/Cad3dSurfaceMetrics.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_mesh_surface.c",
+      "android_adapter": "app/src/main/cpp/mesh_surface_jni.c",
+      "native_host_test": "tests/run_mesh_surface_native_host.sh",
+      "remaining_work": "Java JVM differential reference remains, Windows/iOS application and real device verification pending. Not an ACIS/B-Rep or engineering metraj certification."
     },
     {
       "path": "app/src/main/java/com/musa/cad/CadBlock.java",
