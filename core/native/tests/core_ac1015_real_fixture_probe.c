@@ -9,6 +9,7 @@
 #include "musacad_dwg_ac1015_frame.h"
 #include "musacad_dwg_ac1015_handles.h"
 #include "musacad_dwg_ac1015_object.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -144,6 +145,29 @@ int main(int argc,char **argv){
            rec.record_crc_verified!=1||rec.geometry_decoded!=0||
            rec.indexed_handle!=entries[i].handle){
             free(entries);free(file);
+            /* Temporary public-fixture scalar-only diagnosis; never output
+             * original handles, coordinates, filenames or source bytes. */
+            const size_t off=(size_t)entries[i].file_offset;
+            if(off+4u<n){
+                const uint16_t lo=(uint16_t)file[off]|
+                                  ((uint16_t)file[off+1u]<<8);
+                const size_t sz=(size_t)(lo&0x7fffu)|
+                         ((lo&0x8000u)&&off+4u<n?
+                         ((size_t)((uint16_t)file[off+2u]|
+                         ((uint16_t)file[off+3u]<<8))<<15):0u);
+                const size_t skip=(lo&0x8000u)?4u:2u;
+                if(sz<n-off && skip+sz+2u<=n-off){
+                    uint16_t computed=0;
+                    musa_core_crc16_arc(0xc0c1u,file+off,skip+sz,&computed);
+                    const uint16_t crc_le=(uint16_t)file[off+skip+sz]|
+                        ((uint16_t)file[off+skip+sz+1u]<<8);
+                    const uint16_t crc_be=(uint16_t)((uint16_t)file[off+skip+sz]<<8)|
+                        (uint16_t)file[off+skip+sz+1u];
+                    fprintf(stderr,"P0 public fixture scalar diagnosis: ordinal=%zu size=%zu encoded=%zu CRC_LE=%s CRC_BE=%s\n",
+                        i,sz,skip,computed==crc_le?"pass":"fail",
+                        computed==crc_be?"pass":"fail");
+                }else fprintf(stderr,"P0 public fixture scalar diagnosis: ordinal=%zu bad MS length/bounds\n",i);
+            }
             fputs("FAIL: indexed real R2000 object record CRC/type boundary\n",stderr);
             return 1;
         }
