@@ -83,8 +83,16 @@ int main(void){
              MUSA_DXF_DOCUMENT_MALFORMED);
     rejected("0\nSECTION\n2\nENTITIES\n0\nPOINT\n10\n0\n20\n0\n0\nENDSEC\n0\nEOF\n0\nEOF",
              MUSA_DXF_DOCUMENT_MALFORMED);
-    rejected("0\nSECTION\n2\nENTITIES\n0\nPOINT\n10\n0\n20\n0\n0\nENDSEC\n0\nEOF",MUSA_DXF_DOCUMENT_LIMIT);
-    /* Previous fixture contains one point; max limit cannot be zero. */
+    /* Limit is independent of malformed input and does not publish a model. */
+    assert(read_string(nolayer,0,&doc)==MUSA_DXF_DOCUMENT_LIMIT && doc==NULL);
+    char two[512];
+    snprintf(two,sizeof(two),
+      "0\nSECTION\n2\nENTITIES\n"
+      "0\nPOINT\n10\n0\n20\n0\n"
+      "0\nPOINT\n10\n1\n20\n1\n"
+      "0\nENDSEC\n0\nEOF\n");
+    assert(read_string(two,1,&doc)==MUSA_DXF_DOCUMENT_LIMIT && doc==NULL);
+    /* A malformed final pair never publishes an incomplete document. */
     size_t big_size=6000;
     unsigned char *big=(unsigned char *)malloc(big_size);
     assert(big);
