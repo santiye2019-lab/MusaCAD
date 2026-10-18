@@ -70,6 +70,19 @@ jobs:
           java -cp /tmp/musacad-dxf-saved-handles DxfSavedHandleSetMissingCoreTest
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-dxf-saved-handles DxfSavedHandleSetTest
+      - name: MC1032 own-engine v1-v2 lossless migration JNI and no-core proof
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/musacad-mc1032-migrate-java
+          javac -encoding UTF-8 -d /tmp/musacad-mc1032-migrate-java \
+            app/src/main/java/com/musa/cad/Mc1032Native.java \
+            app/src/main/java/com/musa/cad/Mc1032V2Native.java \
+            app/src/main/java/com/musa/cad/Mc1032Migration.java \
+            tests/Mc1032MigrationTest.java tests/Mc1032MigrationMissingCoreTest.java
+          java -cp /tmp/musacad-mc1032-migrate-java Mc1032MigrationMissingCoreTest
+          bash tests/build_mc1032_migrate_jni_host.sh
+          java -Djava.library.path=/tmp/musacad-mc1032-migrate \
+            -cp /tmp/musacad-mc1032-migrate-java Mc1032MigrationTest
       - name: MC1032 rev2 native layers 3D JNI and old-core refusal
         run: |
           set -euo pipefail
