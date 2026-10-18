@@ -34,7 +34,7 @@ int main(void){
     assert(isnan(musa_core_gizmo_drag_distance(100,0,0.05,0,10)));
     assert(isnan(musa_core_gizmo_drag_distance(100,0,1,0,0)));
     assert(isnan(musa_core_gizmo_drag_distance(NAN,0,1,0,10)));
-    assert(isnan(musa_core_gizmo_drag_distance(DBL_MAX,DBL_MAX,1,0,10)));
+    assert(isnan(musa_core_gizmo_drag_distance(DBL_MAX,DBL_MAX,1,1,10)));
     /* Invalid values never partially corrupt the caller's output. */
     double sentinel[2]={42,43};
     assert(!musa_core_gizmo_axis_direction(x,NAN,0,sentinel));
