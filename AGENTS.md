@@ -2,6 +2,25 @@
 
 > Owner directive confirmed 2026-10-17. These rules are binding for every subsequent CAD development and PR in this repository. See [docs/UNIFIED_CAD_ENGINE_POLICY.md](docs/UNIFIED_CAD_ENGINE_POLICY.md), [issue #295](https://github.com/santiye2019-lab/MusaCAD/issues/295), and [docs/UNIFIED_CAD_ENGINE_INVENTORY.json](docs/UNIFIED_CAD_ENGINE_INVENTORY.json).
 
+## MC1032 native file-format naming — binding owner decision (18 October 2026)
+
+- MusaCAD's **OWN** native binary document format and on-disk signature is
+  **MC1032**, with extension `.mcad`. Define and maintain its own format
+  specification in [docs/MC1032_BINARY_FORMAT.md](docs/MC1032_BINARY_FORMAT.md).
+- **Do not rename an Autodesk `AC1032` DWG header to `MC1032`.** That is a
+  different external file format; merely changing its magic bytes would be
+  incompatible and misleading. AutoCAD/DWG interoperability needs a genuinely
+  first-party DWG decoder and encoder, separate from MC1032.
+- All MC1032 read, write, object validation, source handle semantics,
+  checksums and edit semantics belong to the single portable C/C++ CAD core.
+  Android JNI, Windows and iOS expose that same ABI; platform-specific file
+  dialogs, native storage and UIs are thin adapters only.
+- New MC1032 capabilities must be cross-platform, round-trip tested, and
+  reject unsupported entities rather than silently losing layers, solids or
+  metadata. Existing v1 LINE/CIRCLE/ARC/POINT is a tested subset, NOT
+  the end-state engine or AutoCAD 2026 parity.
+- Never create an APK or release without explicit owner approval.
+
 ## Fully independent first-party MusaCAD engine — mandatory owner decision, 18 October 2026
 
 - The **released CAD engine must contain no LibreDWG, ODA, third-party DWG/DXF parsing/serialization/geometry kernel or runtime fallback**. MusaCAD must own the DWG binary reader, DWG binary writer, DXF reader/writer, object model, geometry, 2D/3D modeling and editing, commands, and undo/redo in common C/C++ source.
