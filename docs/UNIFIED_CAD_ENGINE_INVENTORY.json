@@ -183,7 +183,14 @@
       "path": "app/src/main/java/com/musa/cad/CadGizmoMath.java",
       "classification": "needs_core_audit",
       "family": "three_dimensional_engine",
-      "migrated_verified": false
+      "migrated_verified": false,
+      "audit_date": "2026-10-18",
+      "audit_status": "partial_core_migration",
+      "portable_core": "core/native/src/musacad_gizmo.c",
+      "android_adapter": "app/src/main/cpp/gizmo_jni.c",
+      "cross_platform_test": "core/native/tests/core_gizmo_test.c",
+      "native_host_test": "tests/CadGizmoNativeHostTest.java",
+      "remaining_work": "Remove host-only duplicate Java math after pure-C differential/physical-device acceptance; CadUcsFrame.move remains Java UCS geometry; verify actual Android device, Windows app and iOS app."
     },
     {
       "path": "app/src/main/java/com/musa/cad/CadImageOverlay.java",
@@ -683,5 +690,7 @@
       "family": "two_dimensional_and_cad_object_semantics",
       "migrated_verified": false
     }
-  ]
+  ],
+  "last_incremental_audit": "2026-10-18",
+  "audit_method": "Conservative tracked owner: presence of C functions does NOT prove the full Java module, Android JNI, Windows/iOS adapters or AutoCAD 2026 family equivalence."
 }

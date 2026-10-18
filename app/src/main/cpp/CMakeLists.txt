@@ -12,7 +12,7 @@ if(ANDROID)
   add_library(musacad_dwg SHARED
     firstparty_dwg_unavailable_jni.c
     mesh_mass_jni.c mesh_surface_jni.c open3d_guard_jni.c
-    dwg_signature_jni.c mc1032_jni.c mc1032_v2_jni.c mc1032_migrate_jni.c dxf_handle_jni.c dxf_saved_handles_jni.c
+    dwg_signature_jni.c gizmo_jni.c mc1032_jni.c mc1032_v2_jni.c mc1032_migrate_jni.c dxf_handle_jni.c dxf_saved_handles_jni.c
     dxf_group_jni.c source_sha256_jni.c
     dxf_section_jni.c dxf_byte_lines_jni.c)
   target_link_options(musacad_dwg PRIVATE "-Wl,-z,max-page-size=16384")
