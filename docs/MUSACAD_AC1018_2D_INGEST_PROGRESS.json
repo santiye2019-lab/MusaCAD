@@ -163,5 +163,9 @@
       "status": "pending"
     }
   ],
+  "granular_evidence_index": {
+    "path": "docs/MUSACAD_AC1018_2D_READ_DETAIL.json",
+    "interpretation": "Separate evidence-coverage estimate with subchecks for 5 pending milestones. Original 11/16 binary acceptance remains unchanged. It is not completion, AutoCAD parity or measured work-hours."
+  },
   "update_policy": "After a PR is merged and its latest-head native/Android CI passes, update the specific milestone and add its exact file/test evidence; report BOTH this scoped workstream progress and unchanged fixed 25-gate acceptance separately; never label workstream progress as full engine completion."
 }
