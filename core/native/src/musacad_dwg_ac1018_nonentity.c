@@ -76,11 +76,12 @@ int musa_dwg_ac1018_nonentity_identity_record(
  * codepage converter rather than mangling an engineering layer name.
  * All writes are deferred until *every* accepted prefix field is valid.
  * The remaining CMC and H tails are intentionally NOT claimed decoded. */
-int musa_dwg_ac1018_layer_prefix_record(
+static int read_layer_prefix_bits(
     const uint8_t *objects,size_t object_bytes,size_t object_offset,
-    uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out){
-    if(!objects||!out||object_offset>=object_bytes||
-       overlap(objects,object_bytes,out,sizeof(*out)))return 0;
+    uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out,
+    MusaDwgAc1015Bits *after_flags,size_t *pre_handles){
+    if(!objects||!out||!after_flags||!pre_handles||
+       object_offset>=object_bytes)return 0;
     MusaDwgAc1018NonEntityIdentity identity={0};
     if(!musa_dwg_ac1018_nonentity_identity_record(
            objects,object_bytes,object_offset,indexed_handle,&identity)||
@@ -134,5 +135,72 @@ int musa_dwg_ac1018_layer_prefix_record(
     checked.record_crc_verified=identity.record_crc_verified;
     checked.embedded_self_verified=identity.embedded_self_verified;
     *out=checked;
+    *after_flags=b;
+    *pre_handles=(size_t)endbit;
+    return 1;
+}
+/* Layer-name prefix remains an independently useful conservative API.
+ * Both prefix and extended-CMC callers use the same verified bit cursor. */
+int musa_dwg_ac1018_layer_prefix_record(
+    const uint8_t *objects,size_t object_bytes,size_t object_offset,
+    uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out){
+    if(!out||!objects||overlap(objects,object_bytes,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018LayerPrefix checked={0};
+    MusaDwgAc1015Bits bits={0};size_t end=0u;
+    if(!read_layer_prefix_bits(objects,object_bytes,object_offset,
+              indexed_handle,&checked,&bits,&end))return 0;
+    *out=checked;
+    return 1;
+}
+/* TV is a pre-2007 byte-counted codepage string. We deliberately accept
+ * only 7-bit printable ASCII until the drawing's codepage can be proven. */
+static int read_ascii_tv(MusaDwgAc1015Bits *bits,size_t end,
+                         char dest[256]){
+    if(!bits||!dest||bits->bit_pos>end)return 0;
+    MusaDwgAc1015Bits tmp=*bits;
+    uint16_t count=0u;
+    if(!musa_dwg_ac1015_bits_read_bs(&tmp,&count)||
+       !count||count>255u||tmp.bit_pos>end||
+       (size_t)count>(end-tmp.bit_pos)/8u)return 0;
+    for(size_t i=0u;i<count;i++){
+        uint32_t ch=0u;
+        if(!musa_dwg_ac1015_bits_read_u(&tmp,8u,&ch)||
+           ch<0x20u||ch>0x7eu)return 0;
+        dest[i]=(char)ch;
+    }
+    *bits=tmp;
+    return 1;
+}
+/* R2004 LAYER CMC is a BS color index, BL raw RGB, RC flags, then
+ * optional TV color/book names. This validates the complete supported
+ * pre-handle data range; H pointers after it remain UNCLASSIFIED.
+ * The raw 32-bit RGB value is NOT normalized to a rendered color. */
+int musa_dwg_ac1018_layer_color_record(
+    const uint8_t *objects,size_t object_bytes,size_t object_offset,
+    uint64_t indexed_handle,MusaDwgAc1018LayerColor *out){
+    if(!objects||!out||
+       overlap(objects,object_bytes,out,sizeof(*out)))return 0;
+    MusaDwgAc1018LayerColor staged={0};
+    MusaDwgAc1015Bits bits={0};size_t end=0u;
+    if(!read_layer_prefix_bits(objects,object_bytes,object_offset,
+             indexed_handle,&staged.prefix,&bits,&end))return 0;
+    uint16_t index=0u;
+    uint32_t rgb=0u,flags=0u;
+    if(!musa_dwg_ac1015_bits_read_bs(&bits,&index)||
+       !musa_dwg_ac1015_bits_read_bl(&bits,&rgb)||
+       !musa_dwg_ac1015_bits_read_u(&bits,8u,&flags)||
+       flags>3u||bits.bit_pos>end)return 0;
+    if((flags&1u) && !read_ascii_tv(
+                &bits,end,staged.color_name))return 0;
+    if((flags&2u) && !read_ascii_tv(
+                &bits,end,staged.book_name))return 0;
+    if(bits.bit_pos!=end)return 0;
+    staged.raw_cmc_index=index;
+    staged.raw_cmc_rgb=rgb;
+    staged.has_color_name=(uint8_t)((flags&1u)!=0u);
+    staged.has_book_name=(uint8_t)((flags&2u)!=0u);
+    staged.cmc_data_bits_verified=1u;
+    *out=staged;
     return 1;
 }
