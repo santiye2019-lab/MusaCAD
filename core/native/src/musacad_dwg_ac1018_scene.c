@@ -3,6 +3,7 @@
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_handles.h"
 #include "musacad_dwg_ac1018_reactor_links.h"
+#include "musacad_dwg_ac1018_reactor_links_internal.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_crc16.h"
 #include <stddef.h>
@@ -196,9 +197,9 @@ int musa_dwg_ac1018_scene_read_lwpolyline(
 }
 
 /* An indexed H target's presence is NOT proof of its DWG CLASSES role.
- * Existing strict common-handle-tail scanner supplies the only acceptance
- * path for R2004 link membership (zero or positive reactors).
- * Temporary map materialization is explicit; no unsafe struct aliasing. */
+ * The validated scene's original CRC-backed R2004 index is immutable.
+ * Reuse it directly: no allocation, no O(N) conversion/verification on
+ * each H role query; individual roles use binary-search membership. */
 int musa_dwg_ac1018_scene_audit_links(
     const MusaDwgAc1018Scene *s,uint64_t handle,
     uint64_t *reactor_targets,size_t capacity,
@@ -219,22 +220,14 @@ int musa_dwg_ac1018_scene_audit_links(
         return 0;
     size_t offset=0u;
     if(!get_offset(s,handle,&offset))return 0;
-    MusaDwgAc1015HandleEntry *converted=
-        (MusaDwgAc1015HandleEntry*)malloc(
-             s->index_count*sizeof(*converted));
-    if(!converted)return 0;
-    for(size_t i=0u;i<s->index_count;i++){
-        converted[i].handle=s->index[i].handle;
-        converted[i].file_offset=s->index[i].object_offset;
-    }
     MusaDwgAc1018ReactorAudit checked={0};
     uint64_t found[64]={0};
-    int ok=musa_dwg_ac1018_read_zero_reactor_links(
+    int ok=musa_dwg_ac1018_read_links_verified_scene_index(
            s->objects,s->object_bytes,offset,handle,
-           converted,s->index_count,&checked);
-    if(!ok)ok=musa_dwg_ac1018_read_reactor_links(
+           s->index,s->index_count,found,64u,&checked,1);
+    if(!ok)ok=musa_dwg_ac1018_read_links_verified_scene_index(
            s->objects,s->object_bytes,offset,handle,
-           converted,s->index_count,found,64u,&checked);
+           s->index,s->index_count,found,64u,&checked,0);
     if(ok){
         if(checked.reactor_count>capacity||
            (checked.reactor_count&&!reactor_targets))ok=0;
@@ -245,7 +238,6 @@ int musa_dwg_ac1018_scene_audit_links(
             *out=checked;
         }
     }
-    free(converted);
     return ok;
 }
 
