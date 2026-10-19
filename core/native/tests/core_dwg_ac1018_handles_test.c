@@ -47,6 +47,29 @@ int main(void){
     memcpy(prev,out,sizeof(prev));const size_t saved=count;
     assert(!musa_dwg_ac1018_handles_index(buf,size,40u,out,5u,&count));
     assert(!memcmp(prev,out,sizeof(prev))&&count==saved);
+    /* Bad caller buffers must never damage original DWG bytes or leak a
+     * partially written index, even if all handle-map CRCs were valid. */
+    MusaDwgAc1018HandleEntry source_alias[6]={{0}};
+    memcpy(source_alias,buf,size);
+    assert(!musa_dwg_ac1018_handles_index(
+        (const uint8_t*)source_alias,size,40u,source_alias,6u,&count));
+    assert(!memcmp(source_alias,buf,size)&&count==saved);
+    size_t count_alias[8]={0};
+    memcpy(count_alias,buf,size);
+    assert(!musa_dwg_ac1018_handles_index(
+        (const uint8_t*)count_alias,size,40u,NULL,0u,count_alias));
+    assert(!memcmp(count_alias,buf,size)&&count==saved);
+    union {
+        MusaDwgAc1018HandleEntry entries[6];
+        size_t count;
+    } output_alias;
+    memcpy(output_alias.entries,prev,sizeof(prev));
+    assert(!musa_dwg_ac1018_handles_index(
+        buf,size,40u,output_alias.entries,6u,&output_alias.count));
+    assert(!memcmp(output_alias.entries,prev,sizeof(prev))&&count==saved);
+    assert(!musa_dwg_ac1018_handles_index(
+        buf,size,40u,out,SIZE_MAX/sizeof(out[0])+1u,&count));
+    assert(!memcmp(prev,out,sizeof(prev))&&count==saved);
     assert(!musa_dwg_ac1018_handles_index(buf,size-4u,40u,out,6u,&count));
     assert(!musa_dwg_ac1018_handles_index(buf,size,32u,out,6u,&count));
     assert(!musa_dwg_ac1018_handles_index(buf,size,0u,out,6u,&count));

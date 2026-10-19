@@ -23,7 +23,9 @@ typedef struct MusaDwgAc1018HandleEntry {
  * Pass entries=NULL, capacity=0 to obtain validated count only.
  * With entries, capacity must hold every entry. Atomic on any error:
  * no partial entries or count are exposed; caller keeps buffers immutable
- * during both validation passes. No platform-specific or CAD SDK dependency.
+ * during both validation passes. Source bytes, output entries and out_count
+ * must not overlap; aliased buffers or overflowing capacity are rejected
+ * without writes. No platform-specific or CAD SDK dependency.
  */
 int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
     size_t handle_bytes, size_t object_section_bytes,
