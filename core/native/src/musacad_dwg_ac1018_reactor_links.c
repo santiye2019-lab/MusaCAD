@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_reactor_links.h"
+#include "musacad_dwg_ac1018_reactor_links_internal.h"
 #include "musacad_dwg_ac1018_eed.h"
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include "musacad_dwg_ac1015_values.h"
@@ -23,47 +24,68 @@ static int read_ms(const uint8_t *p,size_t n,size_t *len_bytes,size_t *value){
                              ((size_t)hi<<15u);
     return *value>=8u;
 }
-static int validate_map(const MusaDwgAc1015HandleEntry *map,
-    size_t count,size_t object_bytes,uint64_t self,size_t off){
-    if(!map||!count||!object_bytes||!self)return 0;
-    size_t lo=0u,hi=count;
-    for(size_t i=0u;i<count;i++){
-        if(!map[i].handle||(i&&map[i-1u].handle>=map[i].handle)||
-           map[i].file_offset>=(uint64_t)object_bytes)return 0;
-    }
-    while(lo<hi){
-        const size_t mid=lo+(hi-lo)/2u;
-        if(map[mid].handle<self)lo=mid+1u;else hi=mid;
-    }
-    return lo<count&&map[lo].handle==self&&
-           map[lo].file_offset==(uint64_t)off;
+/* Two safe, explicitly tagged layouts. The original AC1015 public
+ * decoder still validates the entire caller-supplied map. Only the
+ * scene-owned AC1018 map (fully CRC-checked on scene_open) may bypass
+ * repeated full-index scans and use binary search for each H target. */
+typedef struct LinkIndex {
+    const MusaDwgAc1015HandleEntry *legacy;
+    const MusaDwgAc1018HandleEntry *scene;
+    size_t count;
+    int prevalidated_scene;
+} LinkIndex;
+static uint64_t h_at(const LinkIndex *idx,size_t n){
+    return idx->prevalidated_scene?
+        idx->scene[n].handle:idx->legacy[n].handle;
 }
-static int member(const MusaDwgAc1015HandleEntry *map,size_t n,
-    uint64_t target){
-    size_t lo=0u,hi=n;
+static uint64_t off_at(const LinkIndex *idx,size_t n){
+    return idx->prevalidated_scene?
+        idx->scene[n].object_offset:idx->legacy[n].file_offset;
+}
+static int member(const LinkIndex *idx,uint64_t target){
+    size_t lo=0u,hi=idx->count;
     if(!target)return 0;
     while(lo<hi){
         const size_t mid=lo+(hi-lo)/2u;
-        if(map[mid].handle<target)lo=mid+1u;else hi=mid;
+        if(h_at(idx,mid)<target)lo=mid+1u;else hi=mid;
     }
-    return lo<n&&map[lo].handle==target;
+    return lo<idx->count&&h_at(idx,lo)==target;
+}
+static int validate_map(const LinkIndex *idx,
+    size_t object_bytes,uint64_t self,size_t off){
+    if(!idx||!idx->count||!object_bytes||!self||
+       (idx->prevalidated_scene?!idx->scene:!idx->legacy))return 0;
+    /* Fail-closed public input: never trust a forged AC1015 map. */
+    if(!idx->prevalidated_scene){
+        for(size_t i=0u;i<idx->count;i++){
+            if(!h_at(idx,i)||
+               (i&&h_at(idx,i-1u)>=h_at(idx,i))||
+               off_at(idx,i)>=(uint64_t)object_bytes)return 0;
+        }
+    }
+    size_t lo=0u,hi=idx->count;
+    while(lo<hi){
+        const size_t mid=lo+(hi-lo)/2u;
+        if(h_at(idx,mid)<self)lo=mid+1u;else hi=mid;
+    }
+    return lo<idx->count&&h_at(idx,lo)==self&&
+           off_at(idx,lo)==(uint64_t)off;
 }
 static int check_ref(MusaDwgAc1015Bits *bits,uint64_t self,
-    uint8_t expected_code,const MusaDwgAc1015HandleEntry *map,
-    size_t count,uint64_t *target){
+    uint8_t expected_code,const LinkIndex *idx,uint64_t *target){
     MusaDwgAc1015HandleRef ref={0};
     if(!musa_dwg_ac1015_read_handle_ref(bits,self,&ref)||
-       ref.code!=expected_code||!member(map,count,ref.target))return 0;
+       ref.code!=expected_code||!member(idx,ref.target))return 0;
     *target=ref.target;
     return 1;
 }
 static int read_links_impl(
     const uint8_t *objects,size_t object_bytes,size_t offset,
-    uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
+    uint64_t self,const LinkIndex *idx,
     uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out,
     int expect_zero){
     if(!objects||!out||!reactors||!self||offset>=object_bytes||
-       !validate_map(map,map_count,object_bytes,self,offset))return 0;
+       !validate_map(idx,object_bytes,self,offset))return 0;
     const uint8_t *record=objects+offset;
     const size_t remaining=object_bytes-offset;
     size_t size_bytes=0u,data_bytes=0u;
@@ -105,14 +127,14 @@ static int read_links_impl(
     MusaDwgAc1018ReactorAudit result={0};
     result.handle=self;result.entity_mode=(uint8_t)mode;
     result.eed_raw_bytes_skipped=eed_bytes;result.reactor_count=reactor_count;
-    if(mode==0u&&!check_ref(&tail,self,12u,map,map_count,
+    if(mode==0u&&!check_ref(&tail,self,12u,idx,
                            &result.owner_handle))return 0;
     for(uint32_t i=0u;i<reactor_count;i++){
-        if(!check_ref(&tail,self,4u,map,map_count,&found[i]))return 0;
+        if(!check_ref(&tail,self,4u,idx,&found[i]))return 0;
     }
-    if(!xdict_missing&&!check_ref(&tail,self,3u,map,map_count,
+    if(!xdict_missing&&!check_ref(&tail,self,3u,idx,
                                  &result.xdictionary_handle))return 0;
-    if(!check_ref(&tail,self,5u,map,map_count,&result.layer_handle))return 0;
+    if(!check_ref(&tail,self,5u,idx,&result.layer_handle))return 0;
     /* R2004 often uses nonzero terminal padding bits; these are CRC-backed,
      * but their semantics aren't inferred. Reject any extra full byte. */
     if(tail.bit_pos>tail.bit_end||tail.bit_end-tail.bit_pos>7u)return 0;
@@ -128,8 +150,9 @@ int musa_dwg_ac1018_read_reactor_links(
     const uint8_t *objects,size_t object_bytes,size_t offset,
     uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
     uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out){
+    const LinkIndex idx={map,NULL,map_count,0};
     return read_links_impl(objects,object_bytes,offset,self,
-                           map,map_count,reactors,capacity,out,0);
+                           &idx,reactors,capacity,out,0);
 }
 /* Zero-reactor case still verifies H owner/layer/XDictionary references
  * and full sorted index membership. Never invent empty-reference success
@@ -139,6 +162,20 @@ int musa_dwg_ac1018_read_zero_reactor_links(
     uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
     MusaDwgAc1018ReactorAudit *out){
     uint64_t unused[1]={0};
+    const LinkIndex idx={map,NULL,map_count,0};
     return read_links_impl(objects,object_bytes,offset,self,
-                           map,map_count,unused,1u,out,1);
+                           &idx,unused,1u,out,1);
+}
+
+/* PRIVATE scene-only hook. Caller must supply the intact handle map
+ * returned from musa_dwg_ac1018_handles_index and owned by the cached
+ * validated scene; NOT for arbitrary maps or unverified input. */
+int musa_dwg_ac1018_read_links_verified_scene_index(
+    const uint8_t *objects,size_t object_bytes,size_t offset,
+    uint64_t self,const MusaDwgAc1018HandleEntry *entries,size_t count,
+    uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out,
+    int expect_zero){
+    const LinkIndex idx={NULL,entries,count,1};
+    return read_links_impl(objects,object_bytes,offset,self,
+                           &idx,reactors,capacity,out,expect_zero?1:0);
 }
