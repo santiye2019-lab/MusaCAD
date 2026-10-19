@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_lwpolyline.h"
+#include "musacad_ocs.h"
 #include "musacad_dwg_ac1018_eed.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_crc16.h"
@@ -138,4 +139,15 @@ int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *section,
     }
     free(vertices);
     return good;
+}
+
+/* Single shared OCS-to-WCS path: no Android-specific coordinate math. */
+int musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
+    const MusaDwgAc1018LWPolyline *poly,
+    const MusaDwgAc1018LWVertex *vertex, double out_xyz[3]) {
+    if (!poly || !vertex || !out_xyz) return 0;
+    MusaCoreOcsBasis basis={0};
+    const double xy[2]={vertex->x,vertex->y};
+    return musa_core_ocs_basis(poly->extrusion,&basis) &&
+           musa_core_ocs_to_world(&basis,xy,poly->elevation,out_xyz);
 }

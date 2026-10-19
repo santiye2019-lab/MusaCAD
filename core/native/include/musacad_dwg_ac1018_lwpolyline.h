@@ -44,6 +44,12 @@ int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *object_section,
     size_t section_bytes, size_t object_offset, uint64_t indexed_handle,
     MusaDwgAc1018LWVertex *out_vertices, size_t capacity,
     MusaDwgAc1018LWPolyline *out);
+/* OCS vertex + elevation -> world XYZ. DWG arbitrary-axis normal comes from
+ * the decoded extrusion. Does not transform bulge or solve entity ownership.
+ * Output remains untouched on failure. */
+int musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
+    const MusaDwgAc1018LWPolyline *poly,
+    const MusaDwgAc1018LWVertex *vertex, double out_xyz[3]);
 #ifdef __cplusplus
 }
 #endif
