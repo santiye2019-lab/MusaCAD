@@ -23,6 +23,17 @@ static int overlaps(const void *a,size_t a_bytes,
     return a_bytes&&b_bytes&&
            ((x<=y&&y-x<a_bytes)||(y<x&&x-y<b_bytes));
 }
+/* Reject caller outputs overlapping the opaque scene header or its cached
+ * verified object/index data. Every exposed read remains read-only even if
+ * the caller passes a pointer into previously returned session memory. */
+static int scene_output_overlaps(const MusaDwgAc1018Scene *s,
+                                 const void *dst,size_t bytes){
+    if(!s||!s->objects||!s->index||
+       s->index_count>SIZE_MAX/sizeof(*s->index))return 1;
+    return overlaps(s,sizeof(*s),dst,bytes)||
+           overlaps(s->objects,s->object_bytes,dst,bytes)||
+           overlaps(s->index,s->index_count*sizeof(*s->index),dst,bytes);
+}
 void musa_dwg_ac1018_scene_close(MusaDwgAc1018Scene *s){
     if(!s)return;
     free(s->index);
@@ -87,8 +98,8 @@ size_t musa_dwg_ac1018_scene_handle_count(const MusaDwgAc1018Scene *s){
 int musa_dwg_ac1018_scene_probe_record_at(
     const MusaDwgAc1018Scene *s,size_t ordinal,
     MusaDwgAc1018RecordProbe *out){
-    if(!s||!out||!s->objects||!s->index||
-       ordinal>=s->index_count)return 0;
+    if(!s||!out||ordinal>=s->index_count||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
     const MusaDwgAc1018HandleEntry *entry=&s->index[ordinal];
     if(!entry->handle||entry->object_offset>=s->object_bytes)return 0;
     const size_t offset=(size_t)entry->object_offset;
@@ -136,10 +147,8 @@ int musa_dwg_ac1018_scene_probe_record_at(
 int musa_dwg_ac1018_scene_probe_record_handle(
     const MusaDwgAc1018Scene *s,uint64_t handle,
     MusaDwgAc1018RecordProbe *out){
-    if(!s||!s->objects||!s->index||!out||!handle||
-       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
-       overlaps(s->index,s->index_count*sizeof(*s->index),
-                out,sizeof(*out)))return 0;
+    if(!s||!out||!handle||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
     size_t lo=0u,hi=s->index_count;
     while(lo<hi){
         const size_t mid=lo+(hi-lo)/2u;
@@ -181,7 +190,7 @@ int musa_dwg_ac1018_scene_probe_nonentity_identity(
 }
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
-    if(!out)return 0;
+    if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
     size_t at=0u;
     if(!get_offset(s,handle,&at))return 0;
     return musa_dwg_ac1018_read_line_record(s->objects,
@@ -189,7 +198,7 @@ int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
 }
 int musa_dwg_ac1018_scene_read_curve(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Curve *out){
-    if(!out)return 0;
+    if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
     size_t at=0u;
     if(!get_offset(s,handle,&at))return 0;
     return musa_dwg_ac1018_read_curve_record(s->objects,
@@ -201,7 +210,9 @@ int musa_dwg_ac1018_scene_read_lwpolyline(
       MusaDwgAc1018LWPolyline *out){
     if(!vertices||!out||!capacity||capacity>100000u||
        capacity>SIZE_MAX/sizeof(*vertices)||
-       overlaps(vertices,capacity*sizeof(*vertices),out,sizeof(*out)))
+       overlaps(vertices,capacity*sizeof(*vertices),out,sizeof(*out))||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       scene_output_overlaps(s,vertices,capacity*sizeof(*vertices)))
        return 0;
     size_t at=0u;
     if(!get_offset(s,handle,&at))return 0;
@@ -221,13 +232,9 @@ int musa_dwg_ac1018_scene_audit_links(
        (capacity&&!reactor_targets)||
        s->index_count>SIZE_MAX/sizeof(MusaDwgAc1015HandleEntry))
        return 0;
-    if(overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
-       overlaps(s->index,s->index_count*sizeof(*s->index),
-                out,sizeof(*out))||
-       (capacity&&(overlaps(s->objects,s->object_bytes,
-                           reactor_targets,capacity*sizeof(*reactor_targets))||
-                   overlaps(s->index,s->index_count*sizeof(*s->index),
-                            reactor_targets,capacity*sizeof(*reactor_targets))||
+    if(scene_output_overlaps(s,out,sizeof(*out))||
+       (capacity&&(scene_output_overlaps(
+                         s,reactor_targets,capacity*sizeof(*reactor_targets))||
                    overlaps(out,sizeof(*out),reactor_targets,
                             capacity*sizeof(*reactor_targets)))))
         return 0;
@@ -264,15 +271,11 @@ int musa_dwg_ac1018_scene_audit_link_record_envelopes(
     MusaDwgAc1018LinkedRecordAudit *out){
     if(!s||!out||!handle||capacity>64u||
        (capacity&&!reactor_records)||
-       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
-       overlaps(s->index,s->index_count*sizeof(*s->index),
-                out,sizeof(*out))||
+       scene_output_overlaps(s,out,sizeof(*out))||
        (capacity&&(overlaps(out,sizeof(*out),reactor_records,
                             capacity*sizeof(*reactor_records))||
-                   overlaps(s->objects,s->object_bytes,reactor_records,
-                            capacity*sizeof(*reactor_records))||
-                   overlaps(s->index,s->index_count*sizeof(*s->index),
-                            reactor_records,capacity*sizeof(*reactor_records)))))
+                   scene_output_overlaps(s,reactor_records,
+                            capacity*sizeof(*reactor_records)))))
         return 0;
     MusaDwgAc1018LinkedRecordAudit staged={0};
     MusaDwgAc1018RecordProbe inspected[64]={{0}};

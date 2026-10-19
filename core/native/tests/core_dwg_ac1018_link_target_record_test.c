@@ -278,6 +278,13 @@ int main(void){
     assert(!memcmp(&record,&saved,sizeof(record)));
     const MusaDwgAc1018LinkedRecordAudit old=audit;
     assert(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
+                   scene,0x120u,NULL,0u,
+                   (MusaDwgAc1018LinkedRecordAudit*)(void*)scene));
+    assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
+    assert(musa_dwg_ac1018_scene_audit_link_record_envelopes(
+                   scene,0x120u,NULL,0u,&audit));
+    assert(!memcmp(&audit,&old,sizeof(audit)));
+    assert(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
                    scene,0x34u,NULL,0u,&audit));
     assert(!memcmp(&audit,&old,sizeof(audit)));
     file[288u]^=1u; /* source copied in scene */
@@ -317,6 +324,12 @@ int main(void){
            reactors[0].record_crc_verified);
     MusaDwgAc1018LinkedRecordAudit kept=audit;
     MusaDwgAc1018RecordProbe kept_reactor=reactors[0];
+    assert(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
+                  scene,0x120u,
+                  (MusaDwgAc1018RecordProbe*)(void*)scene,1u,&audit));
+    assert(musa_dwg_ac1018_scene_handle_count(scene)==4u);
+    assert(!memcmp(&audit,&kept,sizeof(audit))&&
+           !memcmp(&reactors[0],&kept_reactor,sizeof(kept_reactor)));
     assert(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
                   scene,0x120u,NULL,0u,&audit));
     assert(!musa_dwg_ac1018_scene_audit_link_record_envelopes(

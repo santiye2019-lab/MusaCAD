@@ -15,7 +15,9 @@ extern "C" {
  * CRC-validates the complete bounded handle index, then supports many
  * O(log N) handle lookups without repeatedly decompressing the source.
  * On failure *out remains unchanged, source bytes are never changed.
- * The returned session is opaque and owns its decoded buffers.
+ * All read/probe output pointers must be disjoint from the opaque session,
+ * its cached object bytes and its immutable handle index; otherwise the
+ * call fails without writes. The session owns its decoded buffers.
  * No lossless scene, layer/owner semantics, or native DWG writer claim.
  */
 typedef struct MusaDwgAc1018Scene MusaDwgAc1018Scene;
@@ -79,8 +81,8 @@ int musa_dwg_ac1018_scene_read_lwpolyline(
  * Targets are numeric H references only: LAYER table and owner target
  * CLASSES are NOT yet decoded or semantically proven.
  *
- * The map adapter is temporary and O(index_count) per audit call. Geometry
- * reads remain O(log N); bulk link audit optimization comes separately.
+ * The cached native handle index is reused without O(N) copies;
+ * verified target membership lookups use binary search.
  */
 int musa_dwg_ac1018_scene_audit_links(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
