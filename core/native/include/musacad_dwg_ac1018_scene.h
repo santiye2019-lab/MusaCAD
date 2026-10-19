@@ -112,6 +112,22 @@ int musa_dwg_ac1018_scene_audit_link_record_envelopes(
 int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018LinkedRecordAudit *out);
+/* Validates the SUPPORTED fixed R2004 link TARGETS together:
+ * entity H-reference membership, CRC/framing, numeric BS declared type
+ * and absolute embedded self-H equal to each indexed target handle.
+ * A positive result is still NOT a full AcDb layer/block class decode.
+ * Reactors are checked for membership/CRC but cannot be classified yet.
+ * All outputs are transactional and scene-owned buffers are immutable. */
+typedef struct MusaDwgAc1018FixedLinkIdentities {
+    MusaDwgAc1018LinkedRecordAudit roles;
+    MusaDwgAc1018NonEntityIdentity layer;
+    MusaDwgAc1018NonEntityIdentity owner;
+    MusaDwgAc1018NonEntityIdentity xdictionary;
+    uint8_t verified_fixed_identity_links;
+} MusaDwgAc1018FixedLinkIdentities;
+int musa_dwg_ac1018_scene_audit_fixed_link_identities(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
+    MusaDwgAc1018FixedLinkIdentities *out);
 #ifdef __cplusplus
 }
 #endif
