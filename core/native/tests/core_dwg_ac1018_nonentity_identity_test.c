@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 
-typedef struct Writer {uint8_t data[32];size_t bits;} Writer;
+typedef struct Writer {uint8_t data[64];size_t bits;} Writer;
 static void setbit(Writer *w,size_t at,uint32_t bit){
     assert(at<sizeof(w->data)*8u);
     const uint8_t mask=(uint8_t)(1u<<(7u-at%8u));
@@ -81,7 +81,8 @@ static size_t make_layer_prefix(uint8_t out[64],
     if(cmc_case==0){
         put(&w,2u,2u); /* incomplete CMC: prefix-only fixture */
     }else{
-        put(&w,2u,2u); /* R2004 CMC BS color index=0 */
+        if(cmc_case==5){put(&w,2u,1u);byte(&w,1u);}
+        else put(&w,2u,2u); /* R2004 CMC BS index=0 */
         put(&w,2u,0u); /* BL raw RGB: 32 bits follow */
         byte(&w,0x33u);byte(&w,0x22u);
         byte(&w,0x11u);byte(&w,0u); /* raw RGB 0x00112233 */
@@ -191,6 +192,7 @@ int main(void){
     assert(musa_dwg_ac1018_layer_color_record(
                record,n,0u,0x33u,&color));
     assert(color.cmc_data_bits_verified&&
+           color.raw_cmc_index==0u&&
            color.raw_cmc_rgb==UINT32_C(0x00112233)&&
            !strcmp(color.prefix.name,"MEK-SU")&&
            color.prefix.raw_layer_flags==13u&&
@@ -218,6 +220,12 @@ int main(void){
     assert(!musa_dwg_ac1018_layer_color_record(
                   record,n,0u,0x33u,&color)); /* unsupported codepage */
     assert(!memcmp(&color,&names,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,5);
+    assert(musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color));
+    assert(color.raw_cmc_index==1u&&
+           color.raw_cmc_rgb==UINT32_C(0x00112233));
+    color=names;
     n=make_layer_prefix(record,51u,0x33u,0,0);
     assert(!musa_dwg_ac1018_layer_color_record(
                   record,n,0u,0x33u,&color)); /* incomplete CMC */
