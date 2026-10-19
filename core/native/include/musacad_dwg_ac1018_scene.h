@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1018_line.h"
 #include "musacad_dwg_ac1018_curve.h"
 #include "musacad_dwg_ac1018_lwpolyline.h"
+#include "musacad_dwg_ac1018_nonentity.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +46,13 @@ int musa_dwg_ac1018_scene_probe_record_at(
 int musa_dwg_ac1018_scene_probe_record_handle(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018RecordProbe *out);
+/* Look up a fixed non-entity target in the cached protected R2004 scene
+ * and independently verify its embedded self-H against the CRC-backed
+ * scene index. Does not infer a validated AcDb semantic role; no changes
+ * on failure, no extra decompression, no hidden full-map copy. */
+int musa_dwg_ac1018_scene_probe_nonentity_identity(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018NonEntityIdentity *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
