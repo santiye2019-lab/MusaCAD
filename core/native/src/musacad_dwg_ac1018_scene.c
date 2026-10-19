@@ -331,3 +331,34 @@ int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
     *out=staged;
     return 1;
 }
+
+/* Only the supported fixed H roles: strict numeric BS type claims
+ * plus independently checked embedded self-H on each indexed target.
+ * Does not overclaim CLASSES or target-specific AcDb fields. */
+int musa_dwg_ac1018_scene_audit_fixed_link_identities(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018FixedLinkIdentities *out){
+    if(!s||!out||!handle||!s->objects||!s->index||
+       overlaps(s,sizeof(*s),out,sizeof(*out))||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out)))return 0;
+    MusaDwgAc1018FixedLinkIdentities checked={0};
+    if(!musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+               s,handle,&checked.roles)||
+       !musa_dwg_ac1018_scene_probe_nonentity_identity(
+               s,checked.roles.link_roles.layer_handle,&checked.layer)||
+       checked.layer.declared_type!=51u)return 0;
+    if(checked.roles.link_roles.owner_handle&&
+       (!musa_dwg_ac1018_scene_probe_nonentity_identity(
+             s,checked.roles.link_roles.owner_handle,&checked.owner)||
+        checked.owner.declared_type!=49u))return 0;
+    if(checked.roles.link_roles.xdictionary_handle&&
+       (!musa_dwg_ac1018_scene_probe_nonentity_identity(
+             s,checked.roles.link_roles.xdictionary_handle,
+             &checked.xdictionary)||
+        checked.xdictionary.declared_type!=42u))return 0;
+    checked.verified_fixed_identity_links=1u;
+    *out=checked;
+    return 1;
+}
