@@ -201,6 +201,11 @@ int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
     MusaDwgAc1018SectionKind kind,uint8_t *output,size_t capacity,
     size_t *out_bytes){
     if(!file||!output||!out_bytes)return 0;
+    /* Fail closed if output aliases any portion of the original DWG.
+     * No successful operation may alter source document bytes. */
+    const uintptr_t start=(uintptr_t)file,dest=(uintptr_t)output;
+    if((dest>=start && dest-start<file_bytes) ||
+       (start>=dest && start-dest<capacity))return 0;
     MusaDwgAc1018SectionDescriptor info={0};
     size_t count=0u;
     if(!musa_dwg_ac1018_section_pages(file,file_bytes,kind,NULL,0u,
