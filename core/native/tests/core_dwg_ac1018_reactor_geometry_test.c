@@ -20,10 +20,6 @@ static const uint8_t lw_record[] = {
     0x00,0x00,0x04,0x10,0x0c,0x10,0x54,0x17,0x55,0x13,0x30,0xc7,
     0x5c,
 };
-static MusaDwgAc1015HandleEntry make_map_entry(uint64_t handle,uint64_t pos){
-    MusaDwgAc1015HandleEntry e={0};
-    e.handle=handle;e.file_offset=pos;return e;
-}
 static void test_line(void){
     MusaDwgAc1015HandleEntry map[4]={
         {0x33u,1u},{0x75u,2u},{0x11bu,3u},{0x120u,0u}
