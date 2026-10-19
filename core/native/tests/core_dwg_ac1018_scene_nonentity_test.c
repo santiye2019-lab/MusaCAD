@@ -23,7 +23,7 @@ static void byte(Writer *w,uint8_t b){put(w,8u,b);}
  * BL reactors=0, B missing XDict. Everything is real bit framing;
  * no opaque target shortcut and no third-party DWG libraries. */
 static size_t make(uint8_t out[64],uint16_t type,
-                   uint64_t self,int reactor_overflow){
+                   uint64_t self,int reactor_overflow,int named_layer){
     Writer w={0};
     assert(type<256u&&self&&self<=UINT32_MAX);
     put(&w,2u,1u);byte(&w,(uint8_t)type); /* BS byte */
@@ -39,6 +39,16 @@ static size_t make(uint8_t out[64],uint16_t type,
     if(reactor_overflow){put(&w,2u,1u);byte(&w,65u);}
     else put(&w,2u,2u); /* BL reactor zero */
     put(&w,1u,1u); /* missing extension dictionary */
+    if(named_layer){
+        assert(type==51u);
+        put(&w,2u,1u);byte(&w,4u); /* TV length BS */
+        for(unsigned i=0;i<4u;i++)byte(&w,(uint8_t)"MEK0"[i]);
+        put(&w,1u,1u); /* ever-referenced */
+        put(&w,2u,2u); /* xrefindex+1 = 0 */
+        put(&w,1u,0u); /* Xdep */
+        put(&w,2u,1u);byte(&w,9u); /* flags */
+        put(&w,2u,2u); /* CMC remains opaque */
+    }
     const size_t endbit=w.bits;
     for(unsigned i=0;i<4;i++)
         for(unsigned b=0;b<8u;b++)
@@ -121,7 +131,8 @@ static void section(uint8_t *p,uint64_t n,uint32_t section_id,
  * A wrong embedded self H intentionally leaves outer page and object
  * CRC16 valid, testing that a matching map entry is not sufficient. */
 static void construct(uint8_t file[1120],int wrong_layer_self,
-                      int wrong_other_self,uint16_t other_type){
+                      int wrong_other_self,uint16_t other_type,
+                      int named_layer){
     memset(file,0u,1120u);memcpy(file,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -134,9 +145,10 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
     uint8_t objs[128]={0},h[13]={0};
-    const size_t first=make(objs,51u,wrong_layer_self?0x34u:0x33u,0);
+    const size_t first=make(objs,51u,wrong_layer_self?0x34u:0x33u,
+                            0,named_layer);
     const size_t second=make(objs+first,other_type,
-                             wrong_other_self?0x11cu:0x11bu,0);
+                             wrong_other_self?0x11cu:0x11bu,0,0);
     const size_t total=first+second;
     assert(total<=sizeof(objs)&&first<128u);
     h[1]=7u;
@@ -172,7 +184,7 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
 }
 int main(void){
     uint8_t file[1120]={0};
-    construct(file,0,0,49u);
+    construct(file,0,0,49u,0);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==2u);
@@ -211,7 +223,7 @@ int main(void){
     assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
                  scene,0x33u,&layer));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
-    construct(file,1,0,49u);
+    construct(file,1,0,49u,0);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     /* Both the outer page and MS record CRC remain correct. */
     MusaDwgAc1018RecordProbe record={0};
@@ -230,7 +242,7 @@ int main(void){
                  scene,0x11bu,&owner)); /* correct unaffected target */
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* Same fail-closed policy for the indexed BLOCK_HEADER self identity. */
-    construct(file,0,1,49u);
+    construct(file,0,1,49u,0);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_probe_record_handle(
                   scene,0x11bu,&record)&&record.record_crc_verified&&
@@ -240,7 +252,7 @@ int main(void){
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* A CRC-backed DICTIONARY (type 42) is still opaque but its
      * embedded indexed identity must agree for non-strict inventory. */
-    construct(file,0,0,42u);
+    construct(file,0,0,42u,0);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
     assert(inventory.other_declared_records==2u&&
@@ -249,10 +261,30 @@ int main(void){
                   scene,0x11bu,&owner)&&owner.declared_type==42u);
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     const MusaDwgAc1018SceneInventory dictionary_inventory=inventory;
-    construct(file,0,1,42u);
+    construct(file,0,1,42u,0);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
     assert(!memcmp(&inventory,&dictionary_inventory,sizeof(inventory)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,49u,1); /* bit-coded named layer in raw DWG */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    MusaDwgAc1018LayerPrefix layer_prefix={0};
+    assert(musa_dwg_ac1018_scene_read_layer_prefix(
+                  scene,0x33u,&layer_prefix));
+    assert(!strcmp(layer_prefix.name,"MEK0")&&
+           layer_prefix.name_bytes==4u&&
+           layer_prefix.raw_layer_flags==9u&&
+           layer_prefix.indexed_handle==0x33u&&
+           layer_prefix.record_crc_verified&&
+           layer_prefix.embedded_self_verified);
+    MusaDwgAc1018LayerPrefix unchanged=layer_prefix;
+    assert(!musa_dwg_ac1018_scene_read_layer_prefix(
+                  scene,0x11bu,&layer_prefix)); /* BLOCK_HEADER != LAYER */
+    assert(!musa_dwg_ac1018_scene_read_layer_prefix(
+                  scene,0x34u,&layer_prefix)); /* nonexistent handle */
+    assert(!musa_dwg_ac1018_scene_read_layer_prefix(
+                  scene,0x33u,(MusaDwgAc1018LayerPrefix*)(void*)scene));
+    assert(!memcmp(&unchanged,&layer_prefix,sizeof(unchanged)));
     musa_dwg_ac1018_scene_close(scene);
     return 0;
 }
