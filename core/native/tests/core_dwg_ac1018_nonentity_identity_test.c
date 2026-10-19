@@ -55,6 +55,46 @@ static size_t make(uint8_t out[64],uint16_t type,
     out[body+3u]=(uint8_t)(crc>>8u);
     return body+4u;
 }
+
+/* Real R2004 MS+CRC framing, BS/RL/H/EED common prefix, then
+ * TV name, reference bit, BS xref index, xdep and raw flags.
+ * The color BS stub is kept unclassified by the prefix decoder. */
+static size_t make_layer_prefix(uint8_t out[64],
+                                unsigned type,uint32_t indexed,
+                                int non_ascii){
+    Writer w={0};
+    const char name[]="MEK-SU";
+    put(&w,2u,1u);byte(&w,(uint8_t)type);
+    const size_t rl_at=w.bits;
+    for(int i=0;i<4;i++)byte(&w,0u);
+    byte(&w,1u);byte(&w,(uint8_t)indexed); /* absolute self-H */
+    put(&w,2u,2u); /* EED zero */
+    put(&w,2u,2u); /* reactor BL zero */
+    put(&w,1u,1u); /* XDictionary missing */
+    put(&w,2u,1u);byte(&w,6u); /* TV BS byte count */
+    for(size_t i=0;i<6u;i++)
+        byte(&w,non_ascii&&i==0u?0xe9u:(uint8_t)name[i]);
+    put(&w,1u,1u); /* ever-referenced */
+    put(&w,2u,2u); /* xrefindex+1 = 0 */
+    put(&w,1u,0u); /* Xdep */
+    put(&w,2u,1u);byte(&w,13u); /* raw flags BS */
+    put(&w,2u,2u); /* reserved CMC color BS prefix not decoded */
+    const size_t endbit=w.bits;
+    for(unsigned i=0u;i<4u;i++)
+        for(unsigned j=0u;j<8u;j++)
+            setbit(&w,rl_at+(size_t)i*8u+j,
+                   ((uint32_t)endbit>>(8u*i+7u-j))&1u);
+    const size_t body=(w.bits+7u)/8u;
+    assert(body<sizeof(w.data)&&body+4u<64u);
+    memset(out,0u,64u);
+    out[0]=(uint8_t)body;out[1]=(uint8_t)(body>>8u);
+    memcpy(out+2u,w.data,body);
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,out,body+2u,&crc));
+    out[body+2u]=(uint8_t)crc;
+    out[body+3u]=(uint8_t)(crc>>8u);
+    return body+4u;
+}
 int main(void){
     uint8_t record[64]={0};
     MusaDwgAc1018NonEntityIdentity out={0};
@@ -93,5 +133,39 @@ int main(void){
     n=make(record,51u,0x33u,1);
     assert(!musa_dwg_ac1018_nonentity_identity_record(
                     record,n,0u,0x33u,&out)); /* BL reactor cap */
+
+    MusaDwgAc1018LayerPrefix layer={0};
+    n=make_layer_prefix(record,51u,0x33u,0);
+    assert(musa_dwg_ac1018_layer_prefix_record(
+                   record,n,0u,0x33u,&layer));
+    assert(layer.indexed_handle==0x33u&&
+           layer.name_bytes==6u&&!strcmp(layer.name,"MEK-SU")&&
+           layer.ever_referenced==1u&&
+           layer.xref_index_plus_one==0u&&
+           layer.xref_dependent==0u&&
+           layer.raw_layer_flags==13u&&
+           layer.record_crc_verified&&layer.embedded_self_verified);
+    const MusaDwgAc1018LayerPrefix good=layer;
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x34u,&layer)); /* embedded H mismatch */
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n-1u,0u,0x33u,&layer)); /* truncated CRC */
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x33u,
+                  (MusaDwgAc1018LayerPrefix*)(void*)record)); /* alias */
+    assert(!memcmp(&good,&layer,sizeof(good)));
+    n=make_layer_prefix(record,49u,0x33u,0);
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x33u,&layer)); /* not LAYER */
+    assert(!memcmp(&good,&layer,sizeof(good)));
+    n=make_layer_prefix(record,51u,0x33u,1);
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x33u,&layer)); /* unsupported codepage */
+    assert(!memcmp(&good,&layer,sizeof(good)));
+    n=make_layer_prefix(record,51u,0x33u,0);
+    record[n-1u]^=0x01u;
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x33u,&layer)); /* CRC corruption */
+    assert(!memcmp(&good,&layer,sizeof(good)));
     return 0;
 }

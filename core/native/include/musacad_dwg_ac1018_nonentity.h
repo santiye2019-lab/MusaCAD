@@ -34,6 +34,28 @@ typedef struct MusaDwgAc1018NonEntityIdentity {
 int musa_dwg_ac1018_nonentity_identity_record(
     const uint8_t *objects,size_t object_bytes,size_t object_offset,
     uint64_t indexed_handle,MusaDwgAc1018NonEntityIdentity *out);
+
+/* First-party bounded R2004/AC1018 LAYER (numerical type 51) DATA PREFIX:
+ * ASCII-only TV name, referenced bit, xref index+1, xref-dependent bit and
+ * raw BS flags. Does NOT parse CMC color, table-control/linetype/plotstyle H,
+ * complete AcDb class/ownership graph, or mixed-codepage text. Unsupported
+ * encoding/record layout FAILS CLOSED; no metadata is silently guessed.
+ * Source bytes and caller's output remain unchanged on any error.
+ */
+typedef struct MusaDwgAc1018LayerPrefix {
+    uint64_t indexed_handle;
+    char name[256]; /* NUL-terminated conservative ASCII-only subset */
+    uint16_t name_bytes;
+    uint16_t xref_index_plus_one;
+    uint16_t raw_layer_flags;
+    uint8_t ever_referenced;
+    uint8_t xref_dependent;
+    uint8_t record_crc_verified;
+    uint8_t embedded_self_verified;
+} MusaDwgAc1018LayerPrefix;
+int musa_dwg_ac1018_layer_prefix_record(
+    const uint8_t *objects,size_t object_bytes,size_t object_offset,
+    uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out);
 #ifdef __cplusplus
 }
 #endif
