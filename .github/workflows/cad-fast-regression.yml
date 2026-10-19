@@ -10,6 +10,7 @@ on:
       - 'app/src/main/java/**'
       - 'docs/CAD_2026_PROGRESS.json'
       - 'docs/MUSACAD_CORE_COMPLETION_GATES.json'
+      - 'docs/MUSACAD_AC1018_2D_INGEST_PROGRESS.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
       - 'docs/AUTOCAD_2026_ACCEPTANCE_51.json'
       - 'docs/autocad2026_evidence/**'
@@ -33,6 +34,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check fixed 25-gate shared CAD core completion percentage
         run: python3 -m unittest discover -s tests -p 'test_core_completion_gates.py' -v
+      - name: Verify AC1018 2D ingest milestone coverage and native evidence
+        run: python3 -m unittest discover -s tests -p 'test_ac1018_2d_ingest_progress.py' -v
       - name: P0 data-loss gate - Back cancels project close
         run: python3 -m unittest discover -s tests -p 'test_p0_unsaved_project_back_cancel.py' -v
       - name: P0 LibreDWG independent functional oracle matrix and no-false-equivalence proof
