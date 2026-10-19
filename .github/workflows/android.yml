@@ -500,6 +500,7 @@ jobs:
       - name: Validate incremental CAD development progress and zero-failure policy
         run: |
           python3 -m unittest discover -s tests -p 'test_cad_progress_gate.py' -v
+          python3 -m unittest discover -s tests -p 'test_ac1018_read_progress_gate.py' -v
           python3 tests/cad_progress_gate.py
       - name: Test Google Play yearly renewal policy
         run: |
