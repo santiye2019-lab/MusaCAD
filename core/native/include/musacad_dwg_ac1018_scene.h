@@ -130,6 +130,30 @@ typedef struct MusaDwgAc1018FixedLinkIdentities {
 int musa_dwg_ac1018_scene_audit_fixed_link_identities(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018FixedLinkIdentities *out);
+/* Independently audit EVERY indexed R2004 record: bounded MS-frame,
+ * CRC16 and supported 2D geometry self-H checks. Numerical declared types
+ * alone are NEVER counted as decoded geometry. Unknown records are counted,
+ * not dropped. Known-but-unsupported geometry is counted separately.
+ * No block, layer, layout, AcDb-class, renderer or writer parity claim.
+ * strict_supported_only=1 refuses incomplete subsets atomically; it does
+ * not imply complete DWG drawing or AutoCAD 2026 equivalence.
+ * Scratch polyline vertices (max 100000) are reused. On any failure
+ * caller outputs and source scene stay unchanged.
+ */
+typedef struct MusaDwgAc1018SceneInventory {
+    size_t indexed_record_count;
+    size_t decoded_lines;
+    size_t decoded_arcs;
+    size_t decoded_circles;
+    size_t decoded_lwpolylines;
+    size_t undecodable_supported_records;
+    size_t other_declared_records;
+    uint8_t all_indexed_record_crcs_verified;
+    uint8_t only_supported_primitives_decoded;
+} MusaDwgAc1018SceneInventory;
+int musa_dwg_ac1018_scene_inventory(
+    const MusaDwgAc1018Scene *scene,int strict_supported_only,
+    MusaDwgAc1018SceneInventory *out);
 #ifdef __cplusplus
 }
 #endif
