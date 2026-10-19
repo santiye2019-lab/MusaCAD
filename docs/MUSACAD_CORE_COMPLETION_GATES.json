@@ -79,7 +79,9 @@
     {
       "id": "object_handle_graph",
       "name": "Owner/reactor/layer/linetype tam referans grafigi",
-      "status": "pending"
+      "status": "candidate",
+      "evidence": "core/native/tests/core_dwg_ac1015_handle_refs_test.c",
+      "note": "Partial reference field decoder only. This candidate does NOT qualify for a full object graph gate (requires typed owner/layer graph and independent real DWG semantic parity)."
     },
     {
       "id": "real_legacy_geometry",

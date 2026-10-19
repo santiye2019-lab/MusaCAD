@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1015_common.h"
 #include "musacad_dwg_ac1015_values.h"
+#include "musacad_dwg_ac1015_handle_refs.h"
 #include <stddef.h>
 #include <stdint.h>
 /* R2000 common ENTITY prefix, documented Open Design Specification:
@@ -20,22 +21,17 @@ int musa_dwg_ac1015_read_simple_common(
     if(!musa_dwg_ac1015_bits_init(&c,r->data,r->data_bytes,
                                   0u,(size_t)r->pre_handle_bits))return 0;
     uint16_t kind=0u,eed=0u,aci=0u,invisible=0u;
-    uint32_t endbit=0u,code=0u,count=0u,part=0u,graphic=0u;
+    uint32_t endbit=0u,graphic=0u;
     uint32_t nolinks=0u,ltf=0u,plot=0u,weight=0u;
-    uint64_t self=0u;
+    MusaDwgAc1015HandleRef self={0};
     double scale=0.0;
     if(!musa_dwg_ac1015_bits_read_bs(&c,&kind)||
        !musa_dwg_ac1015_bits_read_rl(&c,&endbit)||
        kind!=r->type_code||endbit!=r->pre_handle_bits||
-       !musa_dwg_ac1015_bits_read_u(&c,4u,&code)||
-       !musa_dwg_ac1015_bits_read_u(&c,4u,&count)||
-       code!=0u||count==0u||count>8u)return 0;
-    for(uint32_t i=0u;i<count;i++){
-        if(!musa_dwg_ac1015_bits_read_u(&c,8u,&part))return 0;
-        self=(self<<8u)|(uint64_t)part;
-    }
+       !musa_dwg_ac1015_read_handle_ref(&c,r->indexed_handle,&self)||
+       self.code!=0u)return 0;
     /* H self-handle must equal validated object-map index handle. */
-    if(self!=r->indexed_handle||
+    if(self.target!=r->indexed_handle||
        !musa_dwg_ac1015_bits_read_bs(&c,&eed)||
        eed!=0u|| /* EED payload requires an independent parser. */
        !musa_dwg_ac1015_bits_read_u(&c,1u,&graphic)||
