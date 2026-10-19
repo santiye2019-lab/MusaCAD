@@ -386,6 +386,26 @@ int musa_dwg_ac1018_scene_audit_fixed_link_identities(
     return 1;
 }
 
+/* Verified entity-to-layer metadata join. No resolved render color and
+ * no unproven block/AcDb relationship acceptance. */
+int musa_dwg_ac1018_scene_read_entity_layer_color(
+    const MusaDwgAc1018Scene *s,uint64_t entity_handle,
+    MusaDwgAc1018EntityLayerColor *out){
+    if(!s||!out||!entity_handle||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018EntityLayerColor checked={0};
+    if(!musa_dwg_ac1018_scene_audit_fixed_link_identities(
+              s,entity_handle,&checked.fixed_links)||
+       !musa_dwg_ac1018_scene_read_layer_color(
+              s,checked.fixed_links.roles.link_roles.layer_handle,
+              &checked.layer_color)||
+       checked.layer_color.prefix.indexed_handle!=
+             checked.fixed_links.roles.link_roles.layer_handle||
+       !checked.layer_color.cmc_data_bits_verified)return 0;
+    checked.verified_layer_color_link=1u;
+    *out=checked;
+    return 1;
+}
 /* Deterministic original binary DWG inventory: no selective skipping,
  * no full-scene materialization, no O(index_count) side copy. Indexed
  * record types are untrusted until their separate CRC and primitive
