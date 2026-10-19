@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_ocs.h"
+#include "musacad_dwg_ac1018_lwpolyline.h"
 #include <assert.h>
 #include <float.h>
 #include <math.h>
@@ -31,6 +32,20 @@ int main(void) {
     const double other[3]={0,0.02,1.0};
     assert(musa_core_ocs_basis(other,&basis));
     assert(basis.x[0]<-0.999 && near(basis.x[1],0.0));
+    /* The actual R2004 LWPOLYLINE adapter must agree with its core basis. */
+    MusaDwgAc1018LWPolyline poly={0};
+    poly.extrusion[1]=1.0;
+    poly.elevation=4.0;
+    MusaDwgAc1018LWVertex vertex={0};
+    vertex.x=2.0; vertex.y=3.0;
+    double lw_wcs[3]={0};
+    assert(musa_dwg_ac1018_lwpolyline_vertex_to_wcs(&poly,&vertex,lw_wcs));
+    for(int i=0;i<3;++i) assert(near(lw_wcs[i],side_xyz[i]));
+    double preserved[3]={6,7,8};
+    vertex.x=NAN;
+    assert(!musa_dwg_ac1018_lwpolyline_vertex_to_wcs(&poly,&vertex,preserved));
+    assert(preserved[0]==6 && preserved[1]==7 && preserved[2]==8);
+    vertex.x=2.0;
     const double zero[3]={0,0,0},bad[3]={NAN,1,0};
     MusaCoreOcsBasis unchanged=basis;
     assert(!musa_core_ocs_basis(zero,&basis));
