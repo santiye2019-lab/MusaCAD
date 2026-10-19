@@ -29,7 +29,7 @@ static size_t make(uint8_t out[64],uint16_t type,
     put(&w,2u,1u);byte(&w,(uint8_t)type); /* BS byte */
     const size_t rl_at=w.bits;
     for(int i=0;i<4;i++)byte(&w,0u); /* RL patched after header */
-    uint8_t h[4]={0};unsigned len=0u;
+    unsigned len=0u;
     for(uint64_t v=self;v;v>>=8u)len++;
     assert(len>=1u&&len<=4u);
     byte(&w,(uint8_t)len); /* absolute code 0 + H count */
