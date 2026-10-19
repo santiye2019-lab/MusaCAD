@@ -191,7 +191,7 @@ static size_t hmap(uint8_t *h,int reactor){
 /* corrupt_target: 1 layer, 2 owner, 3 reactor (reactor case only).
  * Outer physical DWG page checksum is regenerated; the inner object
  * CRC is intentionally left wrong. */
-static void build_targets(uint8_t file[1120],int reactor,int corrupt_target){
+static void build_targets(uint8_t file[1120],int reactor,int corrupt_target,int typed_variant){
     memset(file,0u,1120u);memcpy(file,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -205,9 +205,11 @@ static void build_targets(uint8_t file[1120],int reactor,int corrupt_target){
     }
     uint8_t objects[256]={0};
     size_t count=0u;
-    count+=opaque_target(objects+count,50u); /* declared layer type */
+    count+=opaque_target(objects+count,
+              (typed_variant==1||typed_variant==2)?51u:50u); /* layer BS */
     if(reactor)count+=opaque_target(objects+count,70u);
-    count+=opaque_target(objects+count,60u); /* declared owner type */
+    count+=opaque_target(objects+count,
+              (typed_variant==1||typed_variant==3)?49u:60u); /* owner BS */
     count+=reactor?make(objects+count,0u,1u,0):
                    make_zero(objects+count,0u,1u);
     assert(count<sizeof(objects));
@@ -241,7 +243,7 @@ static void build_targets(uint8_t file[1120],int reactor,int corrupt_target){
     sys_header(file+1056u,UINT32_C(0x41630e3b),32u,35u);
 }
 int main(void){
-    uint8_t file[1120];build_targets(file,0,0);
+    uint8_t file[1120];build_targets(file,0,0,0);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
@@ -258,6 +260,14 @@ int main(void){
            audit.layer_record.declared_type==50u&&
            audit.layer_record.record_crc_verified&&
            audit.xdictionary_record.handle==0u);
+    /* A CRC-correct target with the wrong fixed BS role code is not
+     * admitted merely because its handle is indexed. */
+    MusaDwgAc1018LinkedRecordAudit type_result={0};
+    type_result.layer_record.declared_type=777u;
+    const MusaDwgAc1018LinkedRecordAudit before_type=type_result;
+    assert(!musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+                scene,0x120u,&type_result));
+    assert(!memcmp(&type_result,&before_type,sizeof(type_result)));
     MusaDwgAc1018RecordProbe record={0};
     assert(musa_dwg_ac1018_scene_probe_record_handle(scene,0x33u,&record));
     assert(record.handle==0x33u&&record.declared_type==50u&&
@@ -274,7 +284,26 @@ int main(void){
     assert(musa_dwg_ac1018_scene_audit_link_record_envelopes(
                    scene,0x120u,NULL,0u,&audit));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
-    build_targets(file,1,0);
+    /* Individually vary layer and owner declared BS type, while the
+     * synthetic target payload remains opaque (NOT full class proof). */
+    for(int variant=1;variant<=3;variant++){
+        build_targets(file,0,0,variant);
+        assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+        MusaDwgAc1018LinkedRecordAudit typed={0};
+        typed.layer_record.declared_type=777u;
+        const MusaDwgAc1018LinkedRecordAudit untouched=typed;
+        const int admitted=musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+                               scene,0x120u,&typed);
+        assert(admitted==(variant==1));
+        if(admitted){
+            assert(typed.layer_record.declared_type==51u&&
+                   typed.owner_record.declared_type==49u&&
+                   typed.layer_record.record_crc_verified&&
+                   typed.owner_record.record_crc_verified);
+        }else assert(!memcmp(&typed,&untouched,sizeof(typed)));
+        musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    }
+    build_targets(file,1,0,0);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==4u);
     MusaDwgAc1018RecordProbe reactors[2]={{0}};
@@ -299,7 +328,7 @@ int main(void){
            !memcmp(&reactors[0],&kept_reactor,sizeof(kept_reactor)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     for(int damage=1;damage<=3;damage++){
-        build_targets(file,1,damage);
+        build_targets(file,1,damage,0);
         assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
         MusaDwgAc1018ReactorAudit links={0};
         uint64_t members[1]={0};
