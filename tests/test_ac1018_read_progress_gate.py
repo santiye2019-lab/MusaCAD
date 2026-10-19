@@ -114,7 +114,7 @@ class Ac1018ReadProgressGateTest(unittest.TestCase):
 
     def test_missing_test_file_or_undeclared_gate_rejected(self):
         inflated = copy.deepcopy(self.detail)
-        inflated["groups"][0]["steps"][0]["evidence"][1] = "missing/fake.c"
+        inflated["groups"][0]["steps"][0]["evidence"][1] = "core/native/tests/missing_fake.c"
         with self.assertRaisesRegex(ValueError, "evidence path"):
             assess_detail(self.macro, inflated)
         inflated = copy.deepcopy(self.detail)
