@@ -167,7 +167,8 @@ static void setbit(Writer *w,size_t bit,uint32_t value){
     if(value)w->bytes[bit/8u]|=mask;
     else w->bytes[bit/8u]&=(uint8_t)~mask;
 }
-static size_t target(uint8_t out[128],uint16_t type,uint32_t self){
+static size_t target(uint8_t out[128],uint16_t type,uint32_t self,
+                     int named_layer){
     Writer w={0};
     assert(type<256u&&self<=65535u&&self);
     put(&w,2u,1u);octet(&w,(uint8_t)type);
@@ -180,6 +181,20 @@ static size_t target(uint8_t out[128],uint16_t type,uint32_t self){
     put(&w,2u,2u); /* BS no EED */
     put(&w,2u,2u); /* BL zero reactors */
     put(&w,1u,1u); /* B xdictionary absent */
+    if(named_layer&&type==51u){
+        put(&w,2u,1u);octet(&w,4u); /* BS length of ASCII name */
+        const char *name="MEK0";
+        for(int i=0;i<4;i++)octet(&w,(uint8_t)name[i]);
+        put(&w,1u,1u); /* ever-referenced */
+        put(&w,2u,2u); /* BS xref-index+1 = zero */
+        put(&w,1u,0u); /* xdep false */
+        put(&w,2u,1u);octet(&w,9u); /* raw layer flags */
+        put(&w,2u,1u);octet(&w,1u); /* BS CMC index = 1 */
+        put(&w,2u,0u); /* BL raw color = 0x00123456 */
+        octet(&w,0x56u);octet(&w,0x34u);
+        octet(&w,0x12u);octet(&w,0u);
+        octet(&w,0u); /* RC optional color names absent */
+    }
     const size_t endbit=w.bits;
     for(unsigned i=0u;i<4u;i++)
         for(unsigned j=0u;j<8u;j++)
@@ -210,7 +225,8 @@ static size_t make_index(uint8_t h[16],size_t first,size_t second){
     assert(at==15u);
     return at;
 }
-static void construct(uint8_t file[1120],int wrong,unsigned entity_type){
+static void construct(uint8_t file[1120],int wrong,
+                      unsigned entity_type,int named_layer){
     memset(file,0u,1120u);memcpy(file,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -224,9 +240,9 @@ static void construct(uint8_t file[1120],int wrong,unsigned entity_type){
     }
     uint8_t objects[128]={0};
     const size_t layer=target(objects,wrong==3?50u:51u,
-                             wrong==1?0x34u:0x33u);
+                             wrong==1?0x34u:0x33u,named_layer);
     const size_t owner=target(objects+layer,49u,
-                             wrong==2?0x11cu:0x11bu);
+                             wrong==2?0x11cu:0x11bu,0);
     const size_t line=make_zero(objects+layer+owner,0u,1u,entity_type);
     const size_t total=layer+owner+line;
     assert(layer<128u&&owner<128u&&total<128u);
@@ -254,7 +270,7 @@ static void construct(uint8_t file[1120],int wrong,unsigned entity_type){
     sys_header(file+1056u,UINT32_C(0x41630e3b),32u,35u);
 }
 int main(void){
-    uint8_t file[1120];construct(file,0,19u);
+    uint8_t file[1120];construct(file,0,19u,0);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
@@ -281,7 +297,7 @@ int main(void){
     assert(!memcmp(&audit,&good,sizeof(audit)));
     musa_dwg_ac1018_scene_close(scene);
     for(int invalid=1;invalid<=3;invalid++){
-        construct(file,invalid,19u);
+        construct(file,invalid,19u,0);
         assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
         /* Both H indexing and the target's MS CRC are individually valid. */
         MusaDwgAc1018RecordProbe target_record={0};
@@ -301,7 +317,7 @@ int main(void){
      * ARC/CIRCLE geometry acceptance is implied by link acceptance. */
     const unsigned kinds[]={17u,18u,77u};
     for(size_t k=0;k<sizeof(kinds)/sizeof(kinds[0]);k++){
-        construct(file,0,kinds[k]);
+        construct(file,0,kinds[k],0);
         assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
         MusaDwgAc1018RecordProbe entity={0};
         assert(musa_dwg_ac1018_scene_probe_record_handle(
@@ -326,7 +342,7 @@ int main(void){
         /* Even CRC-correct ARC/CIRCLE/LWPOLYLINE references must
          * reject fixed role targets whose embedded H is forged. */
         for(int invalid=1;invalid<=3;invalid++){
-            construct(file,invalid,kinds[k]);
+            construct(file,invalid,kinds[k],0);
             assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
             linked=good;
             assert(!musa_dwg_ac1018_scene_audit_fixed_link_identities(
@@ -334,6 +350,50 @@ int main(void){
             assert(!memcmp(&linked,&good,sizeof(good)));
             musa_dwg_ac1018_scene_close(scene);scene=NULL;
         }
+    }
+    /* Real binary-original AC1018 fixture: an entity H-link points to
+     * a named and CRC-backed LAYER whose CMC RGB/index is independently
+     * parsed. No geometry read or display parity is claimed here. */
+    const unsigned join_entities[]={17u,18u,19u,77u};
+    MusaDwgAc1018EntityLayerColor colored={0};
+    for(size_t i=0u;i<sizeof(join_entities)/sizeof(join_entities[0]);i++){
+        construct(file,0,join_entities[i],1);
+        assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+        assert(musa_dwg_ac1018_scene_read_entity_layer_color(
+                         scene,0x120u,&colored));
+        assert(colored.verified_layer_color_link&&
+               colored.fixed_links.verified_fixed_identity_links&&
+               colored.fixed_links.roles.link_roles.layer_handle==0x33u&&
+               colored.fixed_links.roles.link_roles.owner_handle==0x11bu&&
+               colored.layer_color.prefix.indexed_handle==0x33u&&
+               !strcmp(colored.layer_color.prefix.name,"MEK0")&&
+               colored.layer_color.raw_cmc_index==1u&&
+               colored.layer_color.raw_cmc_rgb==UINT32_C(0x00123456)&&
+               colored.layer_color.cmc_data_bits_verified);
+        const MusaDwgAc1018EntityLayerColor prior=colored;
+        assert(!musa_dwg_ac1018_scene_read_entity_layer_color(
+                       scene,0x121u,&colored)); /* missing H */
+        assert(!musa_dwg_ac1018_scene_read_entity_layer_color(
+                       scene,0x120u,
+                       (MusaDwgAc1018EntityLayerColor*)(void*)scene));
+        assert(!memcmp(&colored,&prior,sizeof(colored)));
+        musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    }
+    /* CRC-valid-but-not-named target cannot become a color. */
+    construct(file,0,19u,0);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    const MusaDwgAc1018EntityLayerColor prior=colored;
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_color(
+                   scene,0x120u,&colored));
+    assert(!memcmp(&colored,&prior,sizeof(colored)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    for(int invalid=1;invalid<=3;invalid++){
+        construct(file,invalid,19u,1);
+        assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+        assert(!musa_dwg_ac1018_scene_read_entity_layer_color(
+                        scene,0x120u,&colored));
+        assert(!memcmp(&colored,&prior,sizeof(colored)));
+        musa_dwg_ac1018_scene_close(scene);scene=NULL;
     }
     return 0;
 }
