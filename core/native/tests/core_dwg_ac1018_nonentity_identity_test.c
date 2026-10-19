@@ -1,0 +1,97 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include "musacad_dwg_ac1018_nonentity.h"
+#include "musacad_crc16.h"
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+
+typedef struct Writer {uint8_t data[32];size_t bits;} Writer;
+static void setbit(Writer *w,size_t at,uint32_t bit){
+    assert(at<sizeof(w->data)*8u);
+    const uint8_t mask=(uint8_t)(1u<<(7u-at%8u));
+    if(bit)w->data[at/8u]|=mask;
+    else w->data[at/8u]&=(uint8_t)~mask;
+}
+static void put(Writer *w,unsigned n,uint32_t v){
+    assert(n<=32u&&w->bits+n<=sizeof(w->data)*8u);
+    for(unsigned i=0u;i<n;i++)
+        setbit(w,w->bits++,(v>>(n-1u-i))&1u);
+}
+static void byte(Writer *w,uint8_t b){put(w,8u,b);}
+/* Synthetic R2004 nonentity: BS, RL endbit, absolute H, BS EED=0,
+ * BL reactors=0, B missing XDict. Everything is real bit framing;
+ * no opaque target shortcut and no third-party DWG libraries. */
+static size_t make(uint8_t out[64],uint16_t type,
+                   uint64_t self,int reactor_overflow){
+    Writer w={0};
+    assert(type<256u&&self&&self<=UINT32_MAX);
+    put(&w,2u,1u);byte(&w,(uint8_t)type); /* BS byte */
+    const size_t rl_at=w.bits;
+    for(int i=0;i<4;i++)byte(&w,0u); /* RL patched after header */
+    uint8_t h[4]={0};unsigned len=0u;
+    for(uint64_t v=self;v;v>>=8u)len++;
+    assert(len>=1u&&len<=4u);
+    byte(&w,(uint8_t)len); /* absolute code 0 + H count */
+    for(unsigned i=0;i<len;i++)
+        byte(&w,(uint8_t)(self>>(8u*(len-1u-i))));
+    put(&w,2u,2u); /* BS EED zero */
+    if(reactor_overflow){put(&w,2u,1u);byte(&w,65u);}
+    else put(&w,2u,2u); /* BL reactor zero */
+    put(&w,1u,1u); /* missing extension dictionary */
+    const size_t endbit=w.bits;
+    for(unsigned i=0;i<4;i++)
+        for(unsigned b=0;b<8u;b++)
+            setbit(&w,rl_at+(size_t)i*8u+b,
+                   ((uint32_t)endbit>>(8u*i+7u-b))&1u);
+    const size_t body=(w.bits+7u)/8u;
+    assert(body<sizeof(w.data)&&body<UINT16_MAX);
+    memset(out,0u,64u);
+    out[0]=(uint8_t)body;out[1]=(uint8_t)(body>>8u);
+    memcpy(out+2u,w.data,body);
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,out,body+2u,&crc));
+    out[body+2u]=(uint8_t)crc;
+    out[body+3u]=(uint8_t)(crc>>8u);
+    return body+4u;
+}
+int main(void){
+    uint8_t record[64]={0};
+    MusaDwgAc1018NonEntityIdentity out={0};
+    const uint16_t kinds[]={51u,49u,42u};
+    const uint64_t handles[]={0x33u,0x11bu,0x44u};
+    for(size_t i=0;i<3u;i++){
+        const size_t n=make(record,kinds[i],handles[i],0);
+        assert(musa_dwg_ac1018_nonentity_identity_record(
+                       record,n,0u,handles[i],&out));
+        assert(out.declared_type==kinds[i]&&out.indexed_handle==handles[i]&&
+               out.record_bytes==n&&out.record_crc_verified&&
+               out.embedded_self_verified&&out.reactor_count==0u&&
+               out.xdictionary_missing&&out.eed_skipped_bytes==0u);
+        const MusaDwgAc1018NonEntityIdentity old=out;
+        /* Correct record checksum but an incorrect index-to-self binding. */
+        assert(!musa_dwg_ac1018_nonentity_identity_record(
+                       record,n,0u,handles[i]+1u,&out));
+        assert(!memcmp(&old,&out,sizeof(old)));
+        /* Correct object, expected type alone cannot rewrite actual type. */
+        assert(!musa_dwg_ac1018_nonentity_identity_record(
+                       record,n,n,handles[i],&out));
+        assert(!musa_dwg_ac1018_nonentity_identity_record(
+                       record,n-1u,0u,handles[i],&out));
+        assert(!musa_dwg_ac1018_nonentity_identity_record(
+                       record,n,0u,handles[i],
+                       (MusaDwgAc1018NonEntityIdentity*)(void*)record));
+        assert(!memcmp(&old,&out,sizeof(old)));
+        record[n-1u]^=0x01u;
+        assert(!musa_dwg_ac1018_nonentity_identity_record(
+                       record,n,0u,handles[i],&out));
+        assert(!memcmp(&old,&out,sizeof(old)));
+    }
+    size_t n=make(record,50u,0x33u,0);
+    assert(!musa_dwg_ac1018_nonentity_identity_record(
+                    record,n,0u,0x33u,&out)); /* LAYER_CONTROL not LAYER */
+    n=make(record,51u,0x33u,1);
+    assert(!musa_dwg_ac1018_nonentity_identity_record(
+                    record,n,0u,0x33u,&out)); /* BL reactor cap */
+    return 0;
+}
