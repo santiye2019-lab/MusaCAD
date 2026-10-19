@@ -8,7 +8,8 @@
 extern "C" {
 #endif
 /* First-party read-only AC1018/R2004 common entity-link audit for
- * LINE (19) and LWPOLYLINE (77) records with reactor references.
+ * ARC (17), CIRCLE (18), LINE (19), and LWPOLYLINE (77)
+ * records with reactor references in the common-header subset.
  *
  * Inputs: independently decompressed AcDbObjects section, strictly ordered
  * CRC-backed AcDb:Handles index (entries use section-relative offsets).
@@ -43,7 +44,8 @@ int musa_dwg_ac1018_read_reactor_links(
     const MusaDwgAc1015HandleEntry *index, size_t index_count,
     uint64_t *reactor_targets, size_t reactor_capacity,
     MusaDwgAc1018ReactorAudit *out);
-/* Same strict CRC/self-handle/member audit for LINE/LWPOLYLINE records
+/* Same strict CRC/self-handle/member audit for ARC/CIRCLE/LINE/
+ * LWPOLYLINE records
  * whose encoded BL reactor count is exactly ZERO. This is a separate entry
  * point so the original positive-reactor API retains its fail-closed scope.
  * Owner (C H), optional XDictionary (3 H) and layer (5 H) references are

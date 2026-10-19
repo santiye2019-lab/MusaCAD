@@ -106,7 +106,9 @@ static int read_links_impl(
     uint32_t reactor_count=0u,xdict_missing=0u,eed_bytes=0u;
     MusaDwgAc1015HandleRef embedded_self={0};
     if(!musa_dwg_ac1015_bits_read_bs(&c,&typ)||
-       (typ!=19u&&typ!=77u)||
+       /* Supported common R2004 prefix/tail roles, NOT curve geometry.
+        * ARC/CIRCLE use the same checked entity H-link grammar as LINE. */
+       (typ!=17u&&typ!=18u&&typ!=19u&&typ!=77u)||
        !musa_dwg_ac1015_bits_read_rl(&c,&before_handles)||
        (size_t)before_handles>data_bytes*8u||
        !musa_dwg_ac1015_read_handle_ref(&c,self,&embedded_self)||
