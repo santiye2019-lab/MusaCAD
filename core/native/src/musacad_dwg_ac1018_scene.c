@@ -2,6 +2,8 @@
 #include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_handles.h"
+#include "musacad_dwg_ac1015_values.h"
+#include "musacad_crc16.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -76,6 +78,57 @@ done:
 size_t musa_dwg_ac1018_scene_handle_count(const MusaDwgAc1018Scene *s){
     return s?s->index_count:0u;
 }
+
+/* Record probe intentionally does not infer class, owner, layer or geometry.
+ * A handle-index entry is not proof the referenced record self-ID matches:
+ * dedicated geometry readers still validate their own self handles. */
+int musa_dwg_ac1018_scene_probe_record_at(
+    const MusaDwgAc1018Scene *s,size_t ordinal,
+    MusaDwgAc1018RecordProbe *out){
+    if(!s||!out||!s->objects||!s->index||
+       ordinal>=s->index_count)return 0;
+    const MusaDwgAc1018HandleEntry *entry=&s->index[ordinal];
+    if(!entry->handle||entry->object_offset>=s->object_bytes)return 0;
+    const size_t offset=(size_t)entry->object_offset;
+    const size_t n=s->object_bytes-offset;
+    const uint8_t *p=s->objects+offset;
+    if(n<4u)return 0;
+    const uint16_t first=(uint16_t)p[0]|((uint16_t)p[1]<<8u);
+    size_t head=2u,payload=0u;
+    if((first&UINT16_C(0x8000))==0u){
+        payload=first;
+    }else{
+        if(n<6u)return 0;
+        const uint16_t second=(uint16_t)p[2]|((uint16_t)p[3]<<8u);
+        if(!second||(second&UINT16_C(0x8000)))return 0;
+        payload=(size_t)(first&UINT16_C(0x7fff))|
+                ((size_t)second<<15u);
+        head=4u;
+    }
+    if(payload<8u||n-head<2u||payload>n-head-2u||
+       payload>SIZE_MAX/8u)return 0;
+    uint16_t computed=0u;
+    if(!musa_core_crc16_arc(0xc0c1u,p,head+payload,&computed))
+        return 0;
+    const size_t crc_at=head+payload;
+    const uint16_t stored=(uint16_t)p[crc_at]|
+                          ((uint16_t)p[crc_at+1u]<<8u);
+    if(stored!=computed)return 0;
+    MusaDwgAc1015Bits bits={0};
+    uint16_t declared=0u;
+    if(!musa_dwg_ac1015_bits_init(&bits,p+head,payload,0u,
+                                 payload*8u)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&declared))return 0;
+    MusaDwgAc1018RecordProbe checked={0};
+    checked.handle=entry->handle;
+    checked.object_offset=entry->object_offset;
+    checked.record_bytes=head+payload+2u;
+    checked.declared_type=declared;
+    checked.record_crc_verified=1u;
+    *out=checked;
+    return 1;
+}
+
 /* Stable, sorted 64-bit self handles from CRC-checked page deltas. */
 static int get_offset(const MusaDwgAc1018Scene *s,uint64_t handle,
                       size_t *offset){
