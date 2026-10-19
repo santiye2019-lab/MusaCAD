@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "musacad_dwg_ac1018_line.h"
+#include "musacad_dwg_ac1018_curve.h"
 #include "musacad_dwg_ac1018_lwpolyline.h"
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,13 @@ int musa_dwg_ac1018_scene_probe_record_at(
     MusaDwgAc1018RecordProbe *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
+/* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
+ * from an already opened, verified and cached original R2004 DWG.
+ * Uses the same first-party primitive C11 decoder; does not verify
+ * graphical ownership/linetype graph or promise commercial CAD parity.
+ * Rejects absent/wrong-type/unsupported entity records atomically. */
+int musa_dwg_ac1018_scene_read_curve(const MusaDwgAc1018Scene *scene,
+      uint64_t handle,MusaDwgAc1018Curve *out);
 /* Reads 1..100000 OCS vertices and metadata, never partial output.
  * Caller can convert OCS vertex + elevation/extrusion to WCS using the
  * existing musa_dwg_ac1018_lwpolyline_vertex_to_wcs().
