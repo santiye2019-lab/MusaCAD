@@ -94,6 +94,16 @@ int musa_dwg_ac1018_scene_audit_link_record_envelopes(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018RecordProbe *reactor_records,size_t reactor_capacity,
     MusaDwgAc1018LinkedRecordAudit *out);
+/* Reject CRC-correct but incorrectly declared fixed object-role targets:
+ * layer must claim 51 (LAYER), graphical owner when present 49
+ * (BLOCK_HEADER), and XDictionary when present 42 (DICTIONARY).
+ * This is a numerical declared-BS filter only: it does NOT prove an
+ * AcDb class, embedded self-handle, or complete ownership semantics.
+ * Reactor targets are CRC-probed but their classes are not restricted.
+ * Entire audit is transactional. No progress milestone is satisfied. */
+int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
+    MusaDwgAc1018LinkedRecordAudit *out);
 #ifdef __cplusplus
 }
 #endif
