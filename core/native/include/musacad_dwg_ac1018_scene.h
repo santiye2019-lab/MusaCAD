@@ -39,6 +39,12 @@ typedef struct MusaDwgAc1018RecordProbe {
 int musa_dwg_ac1018_scene_probe_record_at(
     const MusaDwgAc1018Scene *scene,size_t index_ordinal,
     MusaDwgAc1018RecordProbe *out);
+/* O(log N) handle lookup followed by CRC16/frame/type probe of the
+ * referenced object. A CRC-backed declared type is NOT a verified AcDb
+ * class, embedded self-handle or validated geometry. Atomic on failure. */
+int musa_dwg_ac1018_scene_probe_record_handle(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018RecordProbe *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
@@ -72,6 +78,22 @@ int musa_dwg_ac1018_scene_audit_links(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     uint64_t *reactor_targets,size_t reactor_capacity,
     MusaDwgAc1018ReactorAudit *out);
+/* Strengthen an already supported LINE/LWPOLYLINE H-link audit:
+ * require EVERY referenced owner, layer, XDictionary and reactor target
+ * to also have a valid individual MS-framed CRC16 object record. Return
+ * each record's untrusted DECLARED BS type, never infer target class role.
+ * Caller outputs remain byte-identical on any missing/invalid target.
+ * This is not yet the full layer/owner semantic class graph gate. */
+typedef struct MusaDwgAc1018LinkedRecordAudit {
+    MusaDwgAc1018ReactorAudit link_roles;
+    MusaDwgAc1018RecordProbe owner_record;  /* zero if mode 2/no owner */
+    MusaDwgAc1018RecordProbe layer_record;
+    MusaDwgAc1018RecordProbe xdictionary_record; /* zero if absent */
+} MusaDwgAc1018LinkedRecordAudit;
+int musa_dwg_ac1018_scene_audit_link_record_envelopes(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
+    MusaDwgAc1018RecordProbe *reactor_records,size_t reactor_capacity,
+    MusaDwgAc1018LinkedRecordAudit *out);
 #ifdef __cplusplus
 }
 #endif
