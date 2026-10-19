@@ -92,9 +92,9 @@ static void H(Writer *w,uint8_t code,uint8_t len,uint32_t val){
     }
 }
 static size_t make(uint8_t output[128],unsigned mode,
-                   unsigned xdict_missing,int nonzero_pad){
+                   unsigned xdict_missing,int nonzero_pad,unsigned entity_type){
     Writer w={0};
-    put(&w,2u,1u);octet(&w,19u); /* BS LINE type */
+    put(&w,2u,1u);octet(&w,(uint8_t)entity_type); /* BS entity claim */
     /* RL pre-handle bit count = 88 */
     const unsigned endbit=nonzero_pad ? 91u : 88u;
     octet(&w,(uint8_t)endbit);octet(&w,0);octet(&w,0);octet(&w,0);
@@ -125,9 +125,9 @@ static size_t make(uint8_t output[128],unsigned mode,
  * Same fixed header and H role grammar, but BL reactor count is exactly 0.
  * This fixture does not assert geometric LINE coordinates. */
 static size_t make_zero(uint8_t output[128],unsigned mode,
-                        unsigned xdict_missing){
+                        unsigned xdict_missing,unsigned entity_type){
     Writer w={0};
-    put(&w,2u,1u);octet(&w,19u);
+    put(&w,2u,1u);octet(&w,(uint8_t)entity_type);
     const unsigned endbit=80u;
     octet(&w,(uint8_t)endbit);
     octet(&w,0u);octet(&w,0u);octet(&w,0u);
@@ -177,7 +177,7 @@ static void make_index(uint8_t h[17],int with_reactor,size_t *out_n){
     assert(pos==(with_reactor?17u:15u));
     *out_n=pos;
 }
-static void build(uint8_t f[1120],int with_reactor){
+static void build(uint8_t f[1120],int with_reactor,unsigned entity_type){
     memset(f,0u,1120u);memcpy(f,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -192,8 +192,8 @@ static void build(uint8_t f[1120],int with_reactor){
     uint8_t objects[256]={0};
     const size_t prefix=with_reactor?3u:2u;
     const size_t rlen=with_reactor?
-           make(objects+prefix,0u,1u,0):
-           make_zero(objects+prefix,0u,1u);
+           make(objects+prefix,0u,1u,0,entity_type):
+           make_zero(objects+prefix,0u,1u,entity_type);
     assert(prefix+rlen<sizeof(objects));
     uint8_t handles[17]={0};size_t handle_bytes=0u;
     make_index(handles,with_reactor,&handle_bytes);
@@ -225,7 +225,7 @@ static void build(uint8_t f[1120],int with_reactor){
     sys_header(f+1056u,UINT32_C(0x41630e3b),32u,35u);
 }
 int main(void){
-    uint8_t file[1120];build(file,0);
+    uint8_t file[1120];build(file,0,19u);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
@@ -270,7 +270,7 @@ int main(void){
     assert(invalid==scene);
     musa_dwg_ac1018_scene_close(scene);
     scene=NULL;
-    build(file,1);
+    build(file,1,19u);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==4u);
     uint64_t reactors[2]={999u,888u};
@@ -295,6 +295,45 @@ int main(void){
                                                 reactors,0u,&checked));
     assert(!memcmp(&checked,&saved,sizeof(saved))&&
            reactors[0]==original_reactor);
-    musa_dwg_ac1018_scene_close(scene);
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Independently synthesize positive- and zero-reactor ARC/CIRCLE
+     * common H tails. Numerical type 16 must still fail closed.
+     * None of the fixture payloads contains accepted curve geometry. */
+    const unsigned claims[]={17u,18u,77u,16u};
+    for(size_t k=0;k<sizeof(claims)/sizeof(claims[0]);k++){
+        for(int with_reactor=0;with_reactor<=1;with_reactor++){
+            build(file,with_reactor,claims[k]);
+            assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+            MusaDwgAc1018RecordProbe probe={0};
+            assert(musa_dwg_ac1018_scene_probe_record_handle(
+                       scene,0x120u,&probe));
+            assert(probe.record_crc_verified&&
+                   probe.declared_type==claims[k]);
+            MusaDwgAc1018ReactorAudit audit={0};
+            uint64_t targets[2]={999u,888u};
+            if(claims[k]==16u){
+                assert(!musa_dwg_ac1018_scene_audit_links(
+                             scene,0x120u,targets,2u,&audit));
+                assert(!audit.handle&&targets[0]==999u&&targets[1]==888u);
+            }else{
+                assert(musa_dwg_ac1018_scene_audit_links(
+                             scene,0x120u,targets,2u,&audit));
+                assert(audit.handle==0x120u&&audit.owner_handle==0x11bu&&
+                       audit.layer_handle==0x33u&&
+                       audit.reactor_count==(unsigned)with_reactor&&
+                       audit.record_crc_verified&&audit.handle_membership_verified&&
+                       !audit.geometry_decoded);
+                if(with_reactor)
+                    assert(targets[0]==0x75u&&targets[1]==888u);
+                else assert(targets[0]==999u&&targets[1]==888u);
+                if(claims[k]==17u||claims[k]==18u){
+                    MusaDwgAc1018Curve curve={0};
+                    assert(!musa_dwg_ac1018_scene_read_curve(
+                                 scene,0x120u,&curve));
+                }
+            }
+            musa_dwg_ac1018_scene_close(scene);scene=NULL;
+        }
+    }
     return 0;
 }
