@@ -57,10 +57,11 @@ static int check_ref(MusaDwgAc1015Bits *bits,uint64_t self,
     *target=ref.target;
     return 1;
 }
-int musa_dwg_ac1018_read_reactor_links(
+static int read_links_impl(
     const uint8_t *objects,size_t object_bytes,size_t offset,
     uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
-    uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out){
+    uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out,
+    int expect_zero){
     if(!objects||!out||!reactors||!self||offset>=object_bytes||
        !validate_map(map,map_count,object_bytes,self,offset))return 0;
     const uint8_t *record=objects+offset;
@@ -92,7 +93,8 @@ int musa_dwg_ac1018_read_reactor_links(
        !musa_dwg_ac1015_bits_read_u(&c,1u,&graphics)||graphics!=0u||
        !musa_dwg_ac1015_bits_read_u(&c,2u,&mode)||(mode!=0u&&mode!=2u)||
        !musa_dwg_ac1015_bits_read_bl(&c,&reactor_count)||
-       reactor_count==0u||reactor_count>64u||reactor_count>capacity||
+       ((expect_zero&&reactor_count!=0u)||(!expect_zero&&reactor_count==0u))||
+       reactor_count>64u||reactor_count>capacity||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&xdict_missing)||
        c.bit_pos>(size_t)before_handles)return 0;
     MusaDwgAc1015Bits tail={0};
@@ -119,4 +121,24 @@ int musa_dwg_ac1018_read_reactor_links(
     memcpy(reactors,found,(size_t)reactor_count*sizeof(found[0]));
     *out=result;
     return 1;
+}
+
+/* Legacy positive-reactor API remains strict and unchanged externally. */
+int musa_dwg_ac1018_read_reactor_links(
+    const uint8_t *objects,size_t object_bytes,size_t offset,
+    uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
+    uint64_t *reactors,size_t capacity,MusaDwgAc1018ReactorAudit *out){
+    return read_links_impl(objects,object_bytes,offset,self,
+                           map,map_count,reactors,capacity,out,0);
+}
+/* Zero-reactor case still verifies H owner/layer/XDictionary references
+ * and full sorted index membership. Never invent empty-reference success
+ * if the on-disk BL reactor count was actually nonzero. */
+int musa_dwg_ac1018_read_zero_reactor_links(
+    const uint8_t *objects,size_t object_bytes,size_t offset,
+    uint64_t self,const MusaDwgAc1015HandleEntry *map,size_t map_count,
+    MusaDwgAc1018ReactorAudit *out){
+    uint64_t unused[1]={0};
+    return read_links_impl(objects,object_bytes,offset,self,
+                           map,map_count,unused,1u,out,1);
 }

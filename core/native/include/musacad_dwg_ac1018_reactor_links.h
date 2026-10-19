@@ -43,6 +43,17 @@ int musa_dwg_ac1018_read_reactor_links(
     const MusaDwgAc1015HandleEntry *index, size_t index_count,
     uint64_t *reactor_targets, size_t reactor_capacity,
     MusaDwgAc1018ReactorAudit *out);
+/* Same strict CRC/self-handle/member audit for LINE/LWPOLYLINE records
+ * whose encoded BL reactor count is exactly ZERO. This is a separate entry
+ * point so the original positive-reactor API retains its fail-closed scope.
+ * Owner (C H), optional XDictionary (3 H) and layer (5 H) references are
+ * checked for sorted-index membership, NOT for actual target class/type.
+ * On failure *out and source bytes remain untouched. */
+int musa_dwg_ac1018_read_zero_reactor_links(
+    const uint8_t *objects,size_t object_bytes,size_t record_offset,
+    uint64_t indexed_handle,
+    const MusaDwgAc1015HandleEntry *index,size_t index_count,
+    MusaDwgAc1018ReactorAudit *out);
 #ifdef __cplusplus
 }
 #endif
