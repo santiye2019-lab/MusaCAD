@@ -154,6 +154,14 @@ int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
     return musa_dwg_ac1018_read_line_record(s->objects,
                                 s->object_bytes,at,handle,out);
 }
+int musa_dwg_ac1018_scene_read_curve(const MusaDwgAc1018Scene *s,
+      uint64_t handle,MusaDwgAc1018Curve *out){
+    if(!out)return 0;
+    size_t at=0u;
+    if(!get_offset(s,handle,&at))return 0;
+    return musa_dwg_ac1018_read_curve_record(s->objects,
+                              s->object_bytes,at,handle,out);
+}
 int musa_dwg_ac1018_scene_read_lwpolyline(
       const MusaDwgAc1018Scene *s,uint64_t handle,
       MusaDwgAc1018LWVertex *vertices,size_t capacity,
