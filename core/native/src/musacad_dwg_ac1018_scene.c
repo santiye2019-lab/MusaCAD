@@ -421,6 +421,25 @@ int musa_dwg_ac1018_scene_inventory(
             else checked.undecodable_supported_records++;
             break;
         }
+        case 42u: /* DICTIONARY declared type */
+        case 49u: /* BLOCK_HEADER declared type */
+        case 51u: { /* LAYER declared type */
+            /* A CRC-correct target with a wrong embedded self-H cannot
+             * be treated as a harmless opaque record. Fail the entire
+             * inventory atomically; this is NOT an AcDb class proof. */
+            MusaDwgAc1018NonEntityIdentity fixed={0};
+            if(!musa_dwg_ac1018_scene_probe_nonentity_identity(
+                   s,probe.handle,&fixed)||
+               fixed.indexed_handle!=probe.handle||
+               fixed.declared_type!=probe.declared_type||
+               !fixed.record_crc_verified||!fixed.embedded_self_verified){
+                ok=0;break;
+            }
+            /* The semantic fields are still opaque: strict display and
+             * export must continue rejecting this incomplete scene. */
+            checked.other_declared_records++;
+            break;
+        }
         default:
             checked.other_declared_records++;
             break;
