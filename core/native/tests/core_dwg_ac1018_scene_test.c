@@ -182,6 +182,26 @@ int main(void){
     MusaDwgAc1018LWPolyline poly_before=poly;
     MusaDwgAc1018LWVertex old_vertices[4];
     memcpy(old_vertices,vertices,sizeof(vertices));
+    /* All public cached-scene readers must reject a caller output pointed
+     * at the opaque scene itself, leaving its index and geometry intact. */
+    assert(!musa_dwg_ac1018_scene_probe_record_at(
+                  s,0u,(MusaDwgAc1018RecordProbe*)(void*)s));
+    assert(!musa_dwg_ac1018_scene_probe_record_handle(
+                  s,0x70fu,(MusaDwgAc1018RecordProbe*)(void*)s));
+    assert(!musa_dwg_ac1018_scene_read_line(
+                  s,0x70fu,(MusaDwgAc1018Line*)(void*)s));
+    assert(!musa_dwg_ac1018_scene_read_lwpolyline(
+                  s,0x40eu,(MusaDwgAc1018LWVertex*)(void*)s,4u,&poly));
+    assert(!musa_dwg_ac1018_scene_read_lwpolyline(
+                  s,0x40eu,vertices,4u,(MusaDwgAc1018LWPolyline*)(void*)s));
+    assert(musa_dwg_ac1018_scene_handle_count(s)==2u);
+    MusaDwgAc1018RecordProbe post_alias={0};
+    assert(musa_dwg_ac1018_scene_probe_record_at(s,1u,&post_alias));
+    assert(!memcmp(&post_alias,&before,sizeof(before)));
+    assert(musa_dwg_ac1018_scene_read_line(s,0x70fu,&line));
+    assert(!memcmp(&line,&line_before,sizeof(line)));
+    assert(!memcmp(&poly,&poly_before,sizeof(poly)));
+    assert(!memcmp(vertices,old_vertices,sizeof(vertices)));
     assert(!musa_dwg_ac1018_scene_read_line(s,0x40eu,&line));
     assert(!musa_dwg_ac1018_scene_read_lwpolyline(
                    s,0x70fu,vertices,4u,&poly));
