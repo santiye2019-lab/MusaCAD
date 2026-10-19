@@ -33,7 +33,8 @@ static size_t make(uint8_t output[128],unsigned mode,
     Writer w={0};
     put(&w,2u,1u);octet(&w,19u); /* BS LINE type */
     /* RL pre-handle bit count = 88 */
-    octet(&w,88u);octet(&w,0);octet(&w,0);octet(&w,0);
+    const unsigned endbit=nonzero_pad ? 91u : 88u;
+    octet(&w,(uint8_t)endbit);octet(&w,0);octet(&w,0);octet(&w,0);
     H(&w,0u,2u,0x120u); /* self handle */
     put(&w,2u,2u); /* BS EED zero */
     put(&w,1u,0u); /* no embedded graphics */
@@ -41,12 +42,12 @@ static size_t make(uint8_t output[128],unsigned mode,
     put(&w,2u,1u);octet(&w,1u); /* BL count reactor = 1 */
     put(&w,1u,xdict_missing);
     assert(w.bits==82u);
-    while(w.bits<88u)put(&w,1u,0u); /* dummy bounded geometry */
+    while(w.bits<endbit)put(&w,1u,0u); /* dummy bounded geometry */
     if(mode==0u)H(&w,12u,1u,5u); /* owner = self - 5 */
     H(&w,4u,1u,0x75u); /* reactor */
     if(!xdict_missing)H(&w,3u,1u,0x44u); /* extension dictionary */
     H(&w,5u,1u,0x33u); /* layer */
-    if(nonzero_pad){put(&w,4u,0xau);}
+    if(nonzero_pad){put(&w,2u,3u);}
     const size_t payload=(w.bits+7u)/8u;
     assert(payload<125u);
     output[0]=(uint8_t)payload;output[1]=(uint8_t)(payload>>8u);
@@ -104,10 +105,10 @@ int main(void){
     wrong[0]=map[1];wrong[1]=map[0]; /* unsorted */
     assert(!musa_dwg_ac1018_read_reactor_links(input,mode2len,0u,0x120u,
             wrong,5u,reactor,2u,&info));
-    const size_t reactor_descriptor=2u+88u/8u;
+    const size_t changed_role_bit=91u+3u; /* bit of type nibble */
     /* In mode 2 the first H is the reactor; corrupt its H type but
      * repair CRC to prove rejection comes from reference grammar. */
-    input[reactor_descriptor]=0x51u;
+    input[2u+changed_role_bit/8u]^=(uint8_t)(1u<<(7u-changed_role_bit%8u));
     re_crc(input,mode2len);
     assert(!musa_dwg_ac1018_read_reactor_links(input,mode2len,0u,0x120u,
             map,5u,reactor,2u,&info));
