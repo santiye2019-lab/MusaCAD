@@ -85,7 +85,7 @@ static size_t make_layer_prefix(uint8_t out[64],
         else put(&w,2u,2u); /* R2004 CMC BS index=0 */
         put(&w,2u,0u); /* BL raw RGB: 32 bits follow */
         byte(&w,0x33u);byte(&w,0x22u);
-        byte(&w,0x11u);byte(&w,0u); /* raw RGB 0x00112233 */
+        byte(&w,0x11u);byte(&w,0xc2u); /* method C2 RGB: 0xC2112233 */
         const uint8_t flag=(uint8_t)(
             cmc_case==2||cmc_case==4?3u:cmc_case==3?4u:0u);
         byte(&w,flag);
@@ -193,7 +193,7 @@ int main(void){
                record,n,0u,0x33u,&color));
     assert(color.cmc_data_bits_verified&&
            color.raw_cmc_index==0u&&
-           color.raw_cmc_rgb==UINT32_C(0x00112233)&&
+           color.raw_cmc_rgb==UINT32_C(0xC2112233)&&
            !strcmp(color.prefix.name,"MEK-SU")&&
            color.prefix.raw_layer_flags==13u&&
            !color.has_color_name&&!color.has_book_name&&
@@ -221,11 +221,9 @@ int main(void){
                   record,n,0u,0x33u,&color)); /* unsupported codepage */
     assert(!memcmp(&color,&names,sizeof(color)));
     n=make_layer_prefix(record,51u,0x33u,0,5);
-    assert(musa_dwg_ac1018_layer_color_record(
-                  record,n,0u,0x33u,&color));
-    assert(color.raw_cmc_index==1u&&
-           color.raw_cmc_rgb==UINT32_C(0x00112233));
-    color=names;
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* CMC index MUST be zero */
+    assert(!memcmp(&color,&names,sizeof(color)));
     n=make_layer_prefix(record,51u,0x33u,0,0);
     assert(!musa_dwg_ac1018_layer_color_record(
                   record,n,0u,0x33u,&color)); /* incomplete CMC */
