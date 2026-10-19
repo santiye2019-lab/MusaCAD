@@ -142,6 +142,21 @@ typedef struct MusaDwgAc1018FixedLinkIdentities {
 int musa_dwg_ac1018_scene_audit_fixed_link_identities(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018FixedLinkIdentities *out);
+/* Combine one ARC/CIRCLE/LINE/LWPOLYLINE entity's VERIFIED numeric
+ * layer role, target embedded self-H, and the target LAYER CMC pre-handle
+ * data. Caller gets original LAYER name/raw index/RGB/color-book metadata
+ * without an N-record scene pass. This is still NOT resolved on-screen
+ * entity color (BYLAYER/BYBLOCK, palette/transparency, properties, block
+ * nesting and renderer rules remain unresolved). On failure *out is
+ * untouched; cached original DWG bytes are immutable. */
+typedef struct MusaDwgAc1018EntityLayerColor {
+    MusaDwgAc1018FixedLinkIdentities fixed_links;
+    MusaDwgAc1018LayerColor layer_color;
+    uint8_t verified_layer_color_link;
+} MusaDwgAc1018EntityLayerColor;
+int musa_dwg_ac1018_scene_read_entity_layer_color(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
+    MusaDwgAc1018EntityLayerColor *out);
 /* Independently audit EVERY indexed R2004 record: bounded MS-frame,
  * CRC16 and supported 2D geometry self-H checks. Numerical declared types
  * alone are NEVER counted as decoded geometry. Known LAYER/BLOCK_HEADER/
