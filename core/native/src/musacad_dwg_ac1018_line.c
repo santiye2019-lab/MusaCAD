@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_line.h"
 #include "musacad_dwg_ac1015_values.h"
+#include "musacad_dwg_ac1018_eed.h"
 #include "musacad_crc16.h"
 #include <math.h>
 #include <stddef.h>
@@ -60,18 +61,20 @@ int musa_dwg_ac1018_read_line_record(const uint8_t *object_section,
     MusaDwgAc1015Bits b = {0};
     if (!musa_dwg_ac1015_bits_init(&b, p + size_bytes,
                                   data_bytes, 0u, data_bytes * 8u)) return 0;
-    uint16_t type = 0u, eed_size = 0u;
+    uint16_t type = 0u;
+    uint32_t eed_raw_bytes = 0u;
     uint32_t pre_handle_bits = 0u, flag = 0u, reactors = 0u;
     uint64_t self = 0u;
     if (!musa_dwg_ac1015_bits_read_bs(&b, &type) || type != 19u ||
         !musa_dwg_ac1015_bits_read_rl(&b, &pre_handle_bits) ||
         pre_handle_bits > data_bytes * 8u ||
         !read_h_self(&b, &self) || self != indexed_handle ||
-        !musa_dwg_ac1015_bits_read_bs(&b, &eed_size) || eed_size != 0u ||
+        !musa_dwg_ac1018_eed_skip(&b, &eed_raw_bytes) ||
         !musa_dwg_ac1015_bits_read_u(&b, 1u, &flag) || flag != 0u)
         return 0;
     MusaDwgAc1018Line result = {0};
     result.handle = indexed_handle;
+    result.eed_raw_bytes_skipped = eed_raw_bytes;
     if (!musa_dwg_ac1015_bits_read_u(&b, 2u, &flag) || flag == 3u ||
         !musa_dwg_ac1015_bits_read_bl(&b, &reactors) || reactors != 0u)
         return 0;

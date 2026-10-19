@@ -14,6 +14,7 @@ extern "C" {
  */
 typedef struct MusaDwgAc1018Line {
     uint64_t handle;
+    uint32_t eed_raw_bytes_skipped; /* opaque EED metadata not decoded */
     double start[3];
     double end[3];
     double thickness;
