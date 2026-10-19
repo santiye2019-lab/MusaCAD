@@ -58,7 +58,8 @@ int musa_dwg_ac1018_layer_prefix_record(
     uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out);
 
 /* Verified R2004 LAYER pre-handle CMC data, first-party C11 subset.
- * Preserves raw BS color index, BL raw RGB value and RC flags with optional
+ * Verifies CMC BS color index is 0 (unlike ENC), preserves BL raw RGB
+ * value and RC flags with optional
  * printable ASCII color/book TV strings. Unsupported bit layouts and
  * non-ASCII name encodings fail closed. This does NOT establish final
  * on-screen RGB appearance, color book mapping, remaining H target
@@ -67,7 +68,7 @@ int musa_dwg_ac1018_layer_prefix_record(
 typedef struct MusaDwgAc1018LayerColor {
     MusaDwgAc1018LayerPrefix prefix;
     uint32_t raw_cmc_rgb;
-    uint16_t raw_cmc_index; /* original index; not a palette mapping */
+    uint16_t raw_cmc_index; /* verified zero for R2004 CMC (not ENC) */
     char color_name[256];
     char book_name[256];
     uint8_t has_color_name;
