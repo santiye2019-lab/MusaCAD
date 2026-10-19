@@ -252,6 +252,13 @@ int main(void){
     MusaDwgAc1018Line line={0};
     assert(!musa_dwg_ac1018_scene_read_line(scene,0x120u,&line));
     MusaDwgAc1018ReactorAudit saved=checked;
+    assert(!musa_dwg_ac1018_scene_audit_links(
+                      scene,0x120u,NULL,0u,
+                      (MusaDwgAc1018ReactorAudit*)(void*)scene));
+    assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
+    assert(musa_dwg_ac1018_scene_audit_links(scene,0x120u,
+                                             NULL,0u,&checked));
+    assert(!memcmp(&checked,&saved,sizeof(saved)));
     assert(!musa_dwg_ac1018_scene_audit_links(scene,0x11bu,
                                                NULL,0u,&checked));
     assert(!memcmp(&checked,&saved,sizeof(saved)));
