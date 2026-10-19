@@ -187,7 +187,7 @@ int musa_dwg_ac1018_layer_color_record(
              indexed_handle,&staged.prefix,&bits,&end))return 0;
     uint16_t index=0u;
     uint32_t rgb=0u,flags=0u;
-    if(!musa_dwg_ac1015_bits_read_bs(&bits,&index)||index!=0u||
+    if(!musa_dwg_ac1015_bits_read_bs(&bits,&index)||
        !musa_dwg_ac1015_bits_read_bl(&bits,&rgb)||
        !musa_dwg_ac1015_bits_read_u(&bits,8u,&flags)||
        flags>3u||bits.bit_pos>end)return 0;
@@ -196,6 +196,7 @@ int musa_dwg_ac1018_layer_color_record(
     if((flags&2u) && !read_ascii_tv(
                 &bits,end,staged.book_name))return 0;
     if(bits.bit_pos!=end)return 0;
+    staged.raw_cmc_index=index;
     staged.raw_cmc_rgb=rgb;
     staged.has_color_name=(uint8_t)((flags&1u)!=0u);
     staged.has_book_name=(uint8_t)((flags&2u)!=0u);
