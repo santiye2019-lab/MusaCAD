@@ -11,6 +11,7 @@ extern "C" {
  * ownership/layer graph performed here. Unsupported entity extras rejected. */
 typedef struct MusaDwgAc1018Curve {
     uint64_t handle;
+    uint32_t eed_raw_bytes_skipped; /* opaque EED metadata not decoded */
     uint16_t type_code; /* 17 ARC, 18 CIRCLE */
     double center[3];
     double radius;
