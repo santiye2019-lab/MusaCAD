@@ -130,6 +130,25 @@ int musa_dwg_ac1018_scene_probe_record_at(
     return 1;
 }
 
+/* Return independent record envelope evidence for an indexed handle.
+ * This is not a self-H/class check; no guessed object role admission. */
+int musa_dwg_ac1018_scene_probe_record_handle(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018RecordProbe *out){
+    if(!s||!s->objects||!s->index||!out||!handle||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out)))return 0;
+    size_t lo=0u,hi=s->index_count;
+    while(lo<hi){
+        const size_t mid=lo+(hi-lo)/2u;
+        if(s->index[mid].handle<handle)lo=mid+1u;
+        else hi=mid;
+    }
+    if(lo>=s->index_count||s->index[lo].handle!=handle)return 0;
+    return musa_dwg_ac1018_scene_probe_record_at(s,lo,out);
+}
+
 /* Stable, sorted 64-bit self handles from CRC-checked page deltas. */
 static int get_offset(const MusaDwgAc1018Scene *s,uint64_t handle,
                       size_t *offset){
@@ -228,4 +247,53 @@ int musa_dwg_ac1018_scene_audit_links(
     }
     free(converted);
     return ok;
+}
+
+/* Transactional two-stage H-link verification. The first stage checks
+ * typed H role grammar and target membership, the second checks the
+ * individual target object's MS length, CRC16 and declared BS type.
+ * A valid declared type cannot establish an AcDb layer/owner CLASS. */
+int musa_dwg_ac1018_scene_audit_link_record_envelopes(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018RecordProbe *reactor_records,size_t capacity,
+    MusaDwgAc1018LinkedRecordAudit *out){
+    if(!s||!out||!handle||capacity>64u||
+       (capacity&&!reactor_records)||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out))||
+       (capacity&&(overlaps(out,sizeof(*out),reactor_records,
+                            capacity*sizeof(*reactor_records))||
+                   overlaps(s->objects,s->object_bytes,reactor_records,
+                            capacity*sizeof(*reactor_records))||
+                   overlaps(s->index,s->index_count*sizeof(*s->index),
+                            reactor_records,capacity*sizeof(*reactor_records)))))
+        return 0;
+    MusaDwgAc1018LinkedRecordAudit staged={0};
+    MusaDwgAc1018RecordProbe inspected[64]={{0}};
+    uint64_t reactor_handles[64]={0};
+    if(!musa_dwg_ac1018_scene_audit_links(s,handle,reactor_handles,
+                        64u,&staged.link_roles)||
+       staged.link_roles.reactor_count>capacity||
+       !staged.link_roles.layer_handle||
+       !musa_dwg_ac1018_scene_probe_record_handle(
+                s,staged.link_roles.layer_handle,&staged.layer_record))
+       return 0;
+    if(staged.link_roles.owner_handle&&
+       !musa_dwg_ac1018_scene_probe_record_handle(
+                s,staged.link_roles.owner_handle,&staged.owner_record))
+       return 0;
+    if(staged.link_roles.xdictionary_handle&&
+       !musa_dwg_ac1018_scene_probe_record_handle(
+                s,staged.link_roles.xdictionary_handle,
+                &staged.xdictionary_record))
+       return 0;
+    for(uint32_t i=0u;i<staged.link_roles.reactor_count;i++)
+       if(!musa_dwg_ac1018_scene_probe_record_handle(
+                    s,reactor_handles[i],&inspected[i]))return 0;
+    if(staged.link_roles.reactor_count)
+        memcpy(reactor_records,inspected,
+             (size_t)staged.link_roles.reactor_count*sizeof(inspected[0]));
+    *out=staged;
+    return 1;
 }
