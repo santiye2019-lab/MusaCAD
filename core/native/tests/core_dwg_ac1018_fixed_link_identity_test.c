@@ -189,10 +189,10 @@ static size_t target(uint8_t out[128],uint16_t type,uint32_t self,
         put(&w,2u,2u); /* BS xref-index+1 = zero */
         put(&w,1u,0u); /* xdep false */
         put(&w,2u,1u);octet(&w,9u); /* raw layer flags */
-        put(&w,2u,1u);octet(&w,1u); /* BS CMC index = 1 */
+        put(&w,2u,2u); /* BS CMC index = 0 (R2004 CMC, not ENC) */
         put(&w,2u,0u); /* BL raw color = 0x00123456 */
         octet(&w,0x56u);octet(&w,0x34u);
-        octet(&w,0x12u);octet(&w,0u);
+        octet(&w,0x12u);octet(&w,0xc2u);
         octet(&w,0u); /* RC optional color names absent */
     }
     const size_t endbit=w.bits;
@@ -367,8 +367,8 @@ int main(void){
                colored.fixed_links.roles.link_roles.owner_handle==0x11bu&&
                colored.layer_color.prefix.indexed_handle==0x33u&&
                !strcmp(colored.layer_color.prefix.name,"MEK0")&&
-               colored.layer_color.raw_cmc_index==1u&&
-               colored.layer_color.raw_cmc_rgb==UINT32_C(0x00123456)&&
+               colored.layer_color.raw_cmc_index==0u&&
+               colored.layer_color.raw_cmc_rgb==UINT32_C(0xC2123456)&&
                colored.layer_color.cmc_data_bits_verified);
         const MusaDwgAc1018EntityLayerColor prior=colored;
         assert(!musa_dwg_ac1018_scene_read_entity_layer_color(
