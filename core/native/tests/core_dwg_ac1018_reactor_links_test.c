@@ -72,7 +72,7 @@ static size_t make_zero(uint8_t output[128],unsigned mode,
     put(&w,2u,2u); /* zero-sized EED */
     put(&w,1u,0u); /* no graphics */
     put(&w,2u,mode);
-    put(&w,2u,0u); /* BL reactor count=0 */
+    put(&w,2u,2u); /* canonical BL zero uses opcode 2, no bytes */
     put(&w,1u,xdict_missing);
     assert(w.bits==74u);
     while(w.bits<endbit)put(&w,1u,0u);
