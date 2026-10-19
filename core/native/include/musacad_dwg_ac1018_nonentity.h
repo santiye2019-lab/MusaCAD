@@ -25,8 +25,9 @@ typedef struct MusaDwgAc1018NonEntityIdentity {
 /* Validate one MS-framed record at the indexed object offset: CRC16/ARC,
  * BS type, RL pre-handle boundary, absolute H code 0 matching indexed ID,
  * bounded EED, reactor BL and R2004 xdictionary-missing bit.
- * Only fixed nonentity types 42/49/51 are currently supported. They are
- * DICTIONARY/BLOCK_HEADER/LAYER numerical claims, NOT verified classes.
+ * Only fixed nonentity types 42/49/50/51 are currently supported. They are
+ * DICTIONARY/BLOCK_HEADER/LAYER_CONTROL/LAYER numerical claims, NOT
+ * verified classes or parent/child table relationships.
  * Reject unsupported types, malformed payload, CRC mismatch, wrong self,
  * aliasing, or out of range. Preserve *out unchanged on every error.
  * A valid common prefix is NOT a complete semantic object decoder.
