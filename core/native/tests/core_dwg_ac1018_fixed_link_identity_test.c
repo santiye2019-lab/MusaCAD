@@ -125,9 +125,11 @@ static size_t make(uint8_t output[128],unsigned mode,
  * Same fixed header and H role grammar, but BL reactor count is exactly 0.
  * This fixture does not assert geometric LINE coordinates. */
 static size_t make_zero(uint8_t output[128],unsigned mode,
-                        unsigned xdict_missing){
+                        unsigned xdict_missing,unsigned entity_type){
     Writer w={0};
-    put(&w,2u,1u);octet(&w,19u);
+    assert(entity_type==17u||entity_type==18u||
+           entity_type==19u||entity_type==77u);
+    put(&w,2u,1u);octet(&w,(uint8_t)entity_type);
     const unsigned endbit=80u;
     octet(&w,(uint8_t)endbit);
     octet(&w,0u);octet(&w,0u);octet(&w,0u);
@@ -208,7 +210,7 @@ static size_t make_index(uint8_t h[16],size_t first,size_t second){
     assert(at==15u);
     return at;
 }
-static void construct(uint8_t file[1120],int wrong){
+static void construct(uint8_t file[1120],int wrong,unsigned entity_type){
     memset(file,0u,1120u);memcpy(file,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -225,7 +227,7 @@ static void construct(uint8_t file[1120],int wrong){
                              wrong==1?0x34u:0x33u);
     const size_t owner=target(objects+layer,49u,
                              wrong==2?0x11cu:0x11bu);
-    const size_t line=make_zero(objects+layer+owner,0u,1u);
+    const size_t line=make_zero(objects+layer+owner,0u,1u,entity_type);
     const size_t total=layer+owner+line;
     assert(layer<128u&&owner<128u&&total<128u);
     uint8_t h[16]={0};
@@ -252,7 +254,7 @@ static void construct(uint8_t file[1120],int wrong){
     sys_header(file+1056u,UINT32_C(0x41630e3b),32u,35u);
 }
 int main(void){
-    uint8_t file[1120];construct(file,0);
+    uint8_t file[1120];construct(file,0,19u);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
@@ -279,7 +281,7 @@ int main(void){
     assert(!memcmp(&audit,&good,sizeof(audit)));
     musa_dwg_ac1018_scene_close(scene);
     for(int invalid=1;invalid<=3;invalid++){
-        construct(file,invalid);
+        construct(file,invalid,19u);
         assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
         /* Both H indexing and the target's MS CRC are individually valid. */
         MusaDwgAc1018RecordProbe target_record={0};
@@ -291,6 +293,47 @@ int main(void){
                         scene,0x120u,&audit));
         assert(!memcmp(&audit,&good,sizeof(good)));
         musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    }
+    /* ARC/CIRCLE declared types independently exercise the SAME
+     * verified R2004 H tail used by LINE/LWPOLYLINE. The target
+     * records have valid CRC, declared role and embedded self-H.
+     * These are deliberately header-only entities: no false
+     * ARC/CIRCLE geometry acceptance is implied by link acceptance. */
+    const unsigned kinds[]={17u,18u,77u};
+    for(size_t k=0;k<sizeof(kinds)/sizeof(kinds[0]);k++){
+        construct(file,0,kinds[k]);
+        assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+        MusaDwgAc1018RecordProbe entity={0};
+        assert(musa_dwg_ac1018_scene_probe_record_handle(
+                     scene,0x120u,&entity));
+        assert(entity.record_crc_verified&&entity.declared_type==kinds[k]);
+        MusaDwgAc1018FixedLinkIdentities linked={0};
+        assert(musa_dwg_ac1018_scene_audit_fixed_link_identities(
+                     scene,0x120u,&linked));
+        assert(linked.verified_fixed_identity_links&&
+               linked.roles.link_roles.owner_handle==0x11bu&&
+               linked.roles.link_roles.layer_handle==0x33u&&
+               linked.roles.link_roles.reactor_count==0u&&
+               !linked.roles.link_roles.geometry_decoded&&
+               linked.owner.embedded_self_verified&&
+               linked.layer.embedded_self_verified);
+        if(kinds[k]==17u||kinds[k]==18u){
+            MusaDwgAc1018Curve curve={0};
+            assert(!musa_dwg_ac1018_scene_read_curve(
+                       scene,0x120u,&curve)); /* no valid curve fields */
+        }
+        musa_dwg_ac1018_scene_close(scene);scene=NULL;
+        /* Even CRC-correct ARC/CIRCLE/LWPOLYLINE references must
+         * reject fixed role targets whose embedded H is forged. */
+        for(int invalid=1;invalid<=3;invalid++){
+            construct(file,invalid,kinds[k]);
+            assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+            linked=good;
+            assert(!musa_dwg_ac1018_scene_audit_fixed_link_identities(
+                             scene,0x120u,&linked));
+            assert(!memcmp(&linked,&good,sizeof(good)));
+            musa_dwg_ac1018_scene_close(scene);scene=NULL;
+        }
     }
     return 0;
 }
