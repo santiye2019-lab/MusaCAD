@@ -158,6 +158,24 @@ typedef struct MusaDwgAc1018SceneInventory {
 int musa_dwg_ac1018_scene_inventory(
     const MusaDwgAc1018Scene *scene,int strict_supported_only,
     MusaDwgAc1018SceneInventory *out);
+/* Independent, fail-closed physical byte-range audit of ALL indexed
+ * AC1018/R2004 object records. Sorts a temporary array by SECTION offset,
+ * because H index ordering does not imply increasing physical offsets.
+ * Verifies each record CRC and rejects duplicate/overlapping ranges.
+ * Gaps are reported, not automatically interpreted as lost entities.
+ * O(N log N) time / O(N) temporary scratch; no cached index mutation.
+ * Does NOT establish full object/class/geometry semantic coverage.
+ * Output and source scene remain untouched on any failure.
+ */
+typedef struct MusaDwgAc1018RecordRangeAudit {
+    size_t indexed_records;
+    size_t covered_record_bytes;
+    size_t unindexed_section_bytes;
+    uint8_t ranges_nonoverlapping;
+} MusaDwgAc1018RecordRangeAudit;
+int musa_dwg_ac1018_scene_audit_record_ranges(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018RecordRangeAudit *out);
 #ifdef __cplusplus
 }
 #endif

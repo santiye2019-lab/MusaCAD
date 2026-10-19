@@ -84,11 +84,11 @@ static void section(uint8_t *p,uint64_t n,uint32_t section_id,
 
 /* Two strictly sorted handles, 0x40E poly @0, 0x70F LINE @53,
  * followed by the CRC-checked empty page. */
-static void make_handles(uint8_t h[14]){
+static void make_handles(uint8_t h[14],int overlap){
     memset(h,0u,14u);
     h[1]=8u;
     h[2]=0x8eu;h[3]=0x08u;h[4]=0u;
-    h[5]=0x81u;h[6]=0x06u;h[7]=(uint8_t)sizeof(poly_record);
+    h[5]=0x81u;h[6]=0x06u;h[7]=overlap?0u:(uint8_t)sizeof(poly_record);
     uint16_t crc=0u;
     assert(musa_core_crc16_arc(0xc0c1u,h,8u,&crc));
     h[8]=(uint8_t)(crc>>8u);h[9]=(uint8_t)crc;
@@ -96,7 +96,7 @@ static void make_handles(uint8_t h[14]){
     assert(musa_core_crc16_arc(0xc0c1u,h+10u,2u,&crc));
     h[12]=(uint8_t)(crc>>8u);h[13]=(uint8_t)crc;
 }
-static void construct(uint8_t f[1120]){
+static void construct(uint8_t f[1120],int overlap){
     memset(f,0u,1120u);memcpy(f,"AC1018",6u);
     uint8_t header[0x6c]={0};
     memcpy(header,"AcFssFcAJMB",11u);
@@ -112,7 +112,7 @@ static void construct(uint8_t f[1120]){
     uint8_t objects[sizeof(poly_record)+sizeof(line_record)];
     memcpy(objects,poly_record,sizeof(poly_record));
     memcpy(objects+sizeof(poly_record),line_record,sizeof(line_record));
-    uint8_t h[14];make_handles(h);
+    uint8_t h[14];make_handles(h,overlap);
     page(f,256u,11u,objects,sizeof(objects));
     page(f,576u,10u,h,sizeof(h));
     uint8_t packed[288]={0};
@@ -143,10 +143,15 @@ static void construct(uint8_t f[1120]){
 }
 static int near(double a,double b){return fabs(a-b)<1e-9;}
 int main(void){
-    uint8_t file[1120];construct(file);
+    uint8_t file[1120];construct(file,0);
     MusaDwgAc1018Scene *s=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
     assert(s!=NULL&&musa_dwg_ac1018_scene_handle_count(s)==2u);
+    MusaDwgAc1018RecordRangeAudit layout={0};
+    assert(musa_dwg_ac1018_scene_audit_record_ranges(s,&layout));
+    assert(layout.indexed_records==2u&&
+           layout.covered_record_bytes==sizeof(poly_record)+sizeof(line_record)&&
+           layout.unindexed_section_bytes==0u&&layout.ranges_nonoverlapping);
     MusaDwgAc1018SceneInventory inventory={0};
     for(int n=0;n<50;n++)
         assert(musa_dwg_ac1018_scene_inventory(s,1,&inventory));
@@ -240,12 +245,29 @@ int main(void){
     musa_dwg_ac1018_scene_close(s);
     s=NULL;
     assert(!musa_dwg_ac1018_scene_open(file,sizeof(file),&s)&&!s);
-    construct(file);file[608u]^=1u;
+    construct(file,0);file[608u]^=1u;
     assert(!musa_dwg_ac1018_scene_open(file,sizeof(file),&s)&&!s);
-    construct(file);file[788u]^=1u;
+    construct(file,0);file[788u]^=1u;
     assert(!musa_dwg_ac1018_scene_open(file,sizeof(file),&s)&&!s);
-    construct(file);
+    construct(file,0);
     assert(!musa_dwg_ac1018_scene_open(file,sizeof(file)-32u,&s)&&!s);
+    musa_dwg_ac1018_scene_close(s);s=NULL;
+    /* Both handles point into the SAME intact CRC-backed object record.
+     * The full physical interval audit rejects overlapping ranges, even
+     * though the H map and individual object CRC checks independently pass. */
+    construct(file,1);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
+    MusaDwgAc1018RecordProbe a={0},b={0};
+    assert(musa_dwg_ac1018_scene_probe_record_at(s,0u,&a));
+    assert(musa_dwg_ac1018_scene_probe_record_at(s,1u,&b));
+    assert(a.object_offset==b.object_offset&&a.record_crc_verified&&
+           b.record_crc_verified);
+    MusaDwgAc1018RecordRangeAudit unchanged=layout;
+    assert(!musa_dwg_ac1018_scene_audit_record_ranges(s,&layout));
+    assert(!memcmp(&layout,&unchanged,sizeof(layout)));
+    assert(!musa_dwg_ac1018_scene_audit_record_ranges(s,
+                 (MusaDwgAc1018RecordRangeAudit*)(void*)s));
+    assert(!memcmp(&layout,&unchanged,sizeof(layout)));
     musa_dwg_ac1018_scene_close(s);
     return 0;
 }
