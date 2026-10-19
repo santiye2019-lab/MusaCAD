@@ -272,6 +272,39 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
     assert(!memcmp(&inventory,&dictionary_inventory,sizeof(inventory)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* LAYER_CONTROL (50) is not a layer or a resolved table graph.
+     * The complete indexed inventory must nevertheless check its actual
+     * embedded H identity, not merely its MS record CRC and type claim. */
+    construct(file,0,0,50u,0);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(inventory.indexed_record_count==2u&&
+           inventory.other_declared_records==2u&&
+           !inventory.only_supported_primitives_decoded);
+    const MusaDwgAc1018SceneInventory control_inventory=inventory;
+    assert(!musa_dwg_ac1018_scene_inventory(scene,1,&inventory));
+    assert(!memcmp(&inventory,&control_inventory,sizeof(inventory)));
+    assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
+                 scene,0x11bu,&owner)&&owner.declared_type==50u&&
+           owner.indexed_handle==0x11bu&&owner.record_crc_verified&&
+           owner.embedded_self_verified);
+    MusaDwgAc1018LayerPrefix rejected_layer={0};
+    assert(!musa_dwg_ac1018_scene_read_layer_prefix(
+                 scene,0x11bu,&rejected_layer));
+    const MusaDwgAc1018NonEntityIdentity good_control=owner;
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* CRC-valid original R2004 bytes, but H map disagrees with self H. */
+    construct(file,0,1,50u,0);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_probe_record_handle(
+                 scene,0x11bu,&record)&&record.declared_type==50u&&
+           record.record_crc_verified);
+    assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(!memcmp(&inventory,&control_inventory,sizeof(inventory)));
+    assert(!musa_dwg_ac1018_scene_probe_nonentity_identity(
+                 scene,0x11bu,&owner));
+    assert(!memcmp(&owner,&good_control,sizeof(owner)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,0,0,49u,1); /* bit-coded named layer in raw DWG */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     MusaDwgAc1018LayerPrefix layer_prefix={0};
