@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "MusaCAD AC1018 2D file ingest workstream milestone coverage",
-  "metric_kind": "bounded_workstream_milestone_coverage_not_core_completion_or_autocad_parity",
+  "metric_kind": "bounded_workstream_milestone_coverage_not_core_completion_not_autocad_parity",
   "scope": "AC1018/R2004 native ham dosyadan iki boyutlu geometri/nesne okuma entegrasyon zinciri",
   "baseline_main_merge": "604470bd0bfa2fe798873ec1142234a93b8b8aed",
   "method": "Fixed 16 binary, explicitly named milestones. verified requires a merged PR and extant source+test evidence; pending never counts. Denominator only changes by separately reviewed plan revision. This is NOT a fraction of all CAD features, lines of code, labor, certified AutoCAD equivalence or full product readiness.",
