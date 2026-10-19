@@ -7,6 +7,14 @@
 
 #define MUSA_R2004_HMAP_PAGE_MAX 2040u
 
+/* Reject source/output aliasing before any validation or write. Never
+ * calculate pointer + length: uintptr_t subtraction avoids wraparound. */
+static int overlaps(const void *a,size_t na,const void *b,size_t nb) {
+    if(!na||!nb)return 0;
+    const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
+    return x<=y ? y-x<na : x-y<nb;
+}
+
 /* Modular unsigned, little 7-bit groups, high-bit continuation.
  * Explicit overflow + noncanonical + zero-delta refusal. */
 static int modular_unsigned(const uint8_t *p,size_t end,size_t *pos,
@@ -124,7 +132,18 @@ int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
     size_t handle_bytes,size_t object_section_bytes,
     MusaDwgAc1018HandleEntry *entries,size_t capacity,
     size_t *out_count) {
-    if(!handle_section||!out_count||(!entries&&capacity))return 0;
+    if(!handle_section||!out_count||(!entries&&capacity)||
+       overlaps(handle_section,handle_bytes,out_count,sizeof(*out_count)))
+        return 0;
+    if(entries){
+        /* Alias, even within unused capacity, could corrupt validated bytes.
+         * A byte count overflow must be refused before computing any range. */
+        if(capacity>SIZE_MAX/sizeof(*entries))return 0;
+        const size_t output_bytes=capacity*sizeof(*entries);
+        if(overlaps(handle_section,handle_bytes,entries,output_bytes)||
+           overlaps(entries,output_bytes,out_count,sizeof(*out_count)))
+            return 0;
+    }
     size_t needed=0u;
     if(!scan(handle_section,handle_bytes,object_section_bytes,NULL,&needed))
         return 0;
