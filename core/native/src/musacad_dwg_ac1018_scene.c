@@ -297,3 +297,32 @@ int musa_dwg_ac1018_scene_audit_link_record_envelopes(
     *out=staged;
     return 1;
 }
+
+/* Fixed R2004 BS role-code filter on top of CRC+indexed H-link evidence.
+ * These are DECLARED codes only, not decoded AcDb CLASSES, a target
+ * embedded self-handle check, or a proven block ownership graph.
+ * Standard entity owner mode zero points to BLOCK_HEADER (49);
+ * entity layers to LAYER (51), extension dictionaries to DICTIONARY (42).
+ * Reactor classes remain unclassified. Fail closed and atomic.
+ */
+int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+    const MusaDwgAc1018Scene *s,uint64_t entity_handle,
+    MusaDwgAc1018LinkedRecordAudit *out){
+    if(!s||!out||!entity_handle||
+       overlaps(s,sizeof(*s),out,sizeof(*out))||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out)))return 0;
+    MusaDwgAc1018LinkedRecordAudit staged={0};
+    MusaDwgAc1018RecordProbe reactors[64]={{0}};
+    if(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
+             s,entity_handle,reactors,64u,&staged)||
+       staged.layer_record.declared_type!=51u||
+       (staged.link_roles.owner_handle &&
+           staged.owner_record.declared_type!=49u)||
+       (staged.link_roles.xdictionary_handle &&
+           staged.xdictionary_record.declared_type!=42u))
+       return 0;
+    *out=staged;
+    return 1;
+}
