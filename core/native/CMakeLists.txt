@@ -116,6 +116,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_ac1018_scene_link_test tests/core_dwg_ac1018_scene_link_audit_test.c)
         target_link_libraries(musacad_core_ac1018_scene_link_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2004_scene_owner_layer_links COMMAND musacad_core_ac1018_scene_link_test)
+        # Verify CRC16 for each referenced H target, not merely index membership.
+        add_executable(musacad_core_ac1018_link_targets_test tests/core_dwg_ac1018_link_target_record_test.c)
+        target_link_libraries(musacad_core_ac1018_link_targets_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2004_scene_target_record_crc COMMAND musacad_core_ac1018_link_targets_test)
         # Portable checked file-region admission prior to real DWG section parsing.
         add_executable(musacad_core_dwg_regions_test tests/core_dwg_regions_test.c)
         target_link_libraries(musacad_core_dwg_regions_test PRIVATE musacad_core)
