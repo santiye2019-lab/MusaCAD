@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "name": "AC1018/R2004 native 2D reading granular evidence coverage",
+  "metric_kind": "partial_acceptance_evidence_index_not_full_engine_or_autocad_parity",
+  "source_macro_manifest": "docs/MUSACAD_AC1018_2D_INGEST_PROGRESS.json",
+  "method": "Keep original 16 binary milestones unchanged (11 verified, 5 pending). For each of the 5 pending milestones, fix eight explicitly scoped subchecks. A verified macro contributes 8/8 and a pending macro contributes only its individually merged/CI-evidenced subchecks. Equal checklist slots show documented evidence breadth, NOT equal engineering effort, real-world fidelity or release readiness. Do not interpret difference from 68.75% as gain in a single consistent measurement; it is a new finer-grained index.",
+  "macro_verified": 11,
+  "macro_total": 16,
+  "subchecks_per_pending_macro": 8,
+  "verified_pending_subchecks": 4,
+  "detail_checks_verified": 92,
+  "detail_checks_total": 128,
+  "detail_coverage_percent": 71.875,
+  "original_macro_coverage_percent": 68.75,
+  "autoCAD_2026_parity_percent": null,
+  "groups": [
+    {
+      "macro_milestone_id": "typed_layer_owner_targets",
+      "steps": [
+        {
+          "id": "indexed_nonentity_self_identity",
+          "name": "LAYER/BLOCK_HEADER/DICTIONARY declared type, CRC and embedded self-H agree with indexed record",
+          "status": "verified",
+          "merged_pr": 430,
+          "evidence": [
+            "core/native/src/musacad_dwg_ac1018_scene.c",
+            "core/native/tests/core_dwg_ac1018_scene_nonentity_test.c"
+          ],
+          "qualification": "Only synthetic original R2004/AC1018 bit-coded fixtures and shared C11 CI are verified; no independent real-DWG full-drawing parity."
+        },
+        {
+          "id": "curve_entity_link_targets",
+          "name": "ARC/CIRCLE owner/layer/optional-reactor H references and fixed target identities",
+          "status": "verified",
+          "merged_pr": 432,
+          "evidence": [
+            "core/native/src/musacad_dwg_ac1018_reactor_links.c",
+            "core/native/tests/core_dwg_ac1018_fixed_link_identity_test.c"
+          ],
+          "qualification": "Only synthetic original R2004/AC1018 bit-coded fixtures and shared C11 CI are verified; no independent real-DWG full-drawing parity."
+        },
+        {
+          "id": "layer_ascii_data_prefix",
+          "name": "LAYER ASCII TV name and basic state flags read from protected indexed original file",
+          "status": "verified",
+          "merged_pr": 433,
+          "evidence": [
+            "core/native/src/musacad_dwg_ac1018_nonentity.c",
+            "core/native/tests/core_dwg_ac1018_scene_nonentity_test.c"
+          ],
+          "qualification": "Only synthetic original R2004/AC1018 bit-coded fixtures and shared C11 CI are verified; no independent real-DWG full-drawing parity."
+        },
+        {
+          "id": "layer_raw_cmc_fields",
+          "name": "LAYER raw CMC index/RGB and optional ASCII color/book names fail-closed",
+          "status": "verified",
+          "merged_pr": 434,
+          "evidence": [
+            "core/native/src/musacad_dwg_ac1018_nonentity.c",
+            "core/native/tests/core_dwg_ac1018_nonentity_identity_test.c"
+          ],
+          "qualification": "Only synthetic original R2004/AC1018 bit-coded fixtures and shared C11 CI are verified; no independent real-DWG full-drawing parity."
+        },
+        {
+          "id": "layer_table_control_owner",
+          "name": "Resolve LAYER to verified LAYER_CONTROL parent and actual full table reference grammar",
+          "status": "pending"
+        },
+        {
+          "id": "linetype_plotstyle_material_roles",
+          "name": "Decode and verify LAYER linetype/plotstyle/material H target classes and optional cases",
+          "status": "pending"
+        },
+        {
+          "id": "block_header_full_fields",
+          "name": "Decode full BLOCK_HEADER fields and owner relationships, beyond numerical type and self-H",
+          "status": "pending"
+        },
+        {
+          "id": "real_dwg_typed_graph_parity",
+          "name": "Independently compare typed layer/owner/class graph against multi-object third-party-produced real DWG fixtures",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "macro_milestone_id": "block_insert_reference_graph",
+      "steps": [
+        {
+          "id": "block_definition_boundary",
+          "name": "Decode BLOCK_BEGIN/BLOCK_END boundaries and block definition content",
+          "status": "pending"
+        },
+        {
+          "id": "insert_object_payload",
+          "name": "Decode insertion position, scales, rotation, OCS and ownership from native INSERT",
+          "status": "pending"
+        },
+        {
+          "id": "block_entity_membership",
+          "name": "Enumerate owned entities inside each BLOCK_HEADER and handle sequence",
+          "status": "pending"
+        },
+        {
+          "id": "nested_block_transforms",
+          "name": "Compose nested INSERT matrix, extrusion and elevation consistently in WCS",
+          "status": "pending"
+        },
+        {
+          "id": "minsert_arrays",
+          "name": "Decode MINSERT rows, columns and spacing while preserving original instances",
+          "status": "pending"
+        },
+        {
+          "id": "attributes_and_dynamic_block",
+          "name": "Decode ATTDEF/ATTRIB and supported dynamic block semantics without dropping content",
+          "status": "pending"
+        },
+        {
+          "id": "xref_and_cycles",
+          "name": "Resolve or explicitly reject XREFs, external dependencies, dangling handles and graph cycles",
+          "status": "pending"
+        },
+        {
+          "id": "real_dwg_block_graph_parity",
+          "name": "Independently compare multi-depth real-world BLOCK/INSERT graph and positions",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "macro_milestone_id": "real_dwg_full_batch_parity",
+      "steps": [
+        {
+          "id": "multi_source_real_dwg_corpus",
+          "name": "Establish independently generated original R2004 multi-discipline real DWG acceptance corpus",
+          "status": "pending"
+        },
+        {
+          "id": "entire_object_inventory_and_unknowns",
+          "name": "Audit every object and classify any unsupported record instead of silently hiding it",
+          "status": "pending"
+        },
+        {
+          "id": "primitive_coordinate_parity",
+          "name": "Compare all supported 2D primitive geometry numerically against independent references",
+          "status": "pending"
+        },
+        {
+          "id": "per_entity_properties",
+          "name": "Compare layer, color, linetype, visibility, lineweight and ownership properties",
+          "status": "pending"
+        },
+        {
+          "id": "block_text_annotation_parity",
+          "name": "Compare block instances, text and annotation geometry for the corpus",
+          "status": "pending"
+        },
+        {
+          "id": "semantic_roundtrip_loss_detection",
+          "name": "Detect unsupported or lossy read/edit/save paths and refuse publication",
+          "status": "pending"
+        },
+        {
+          "id": "reference_dwg_oracle_comparison",
+          "name": "Independently validate source handles and rendering/geometry versus reference CAD outputs",
+          "status": "pending"
+        },
+        {
+          "id": "full_corpus_ci_acceptance",
+          "name": "Produce all-file batch gate evidence and pass platform CI, not only synthetic small fixtures",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "macro_milestone_id": "android_native_scene_render",
+      "steps": [
+        {
+          "id": "android_jni_scene_session",
+          "name": "Connect Android editor to one verified cached native AC1018 scene through thin JNI adapter",
+          "status": "pending"
+        },
+        {
+          "id": "native_2d_primitive_scene_enumeration",
+          "name": "Enumerate all supported drawable records from the same native verified handle index",
+          "status": "pending"
+        },
+        {
+          "id": "wcs_ocS_screen_geometry",
+          "name": "Render WCS/OCS LINE/ARC/CIRCLE/LWPOLYLINE geometry consistently across viewport",
+          "status": "pending"
+        },
+        {
+          "id": "native_layer_name_visibility",
+          "name": "Resolve and display verified real layer names, frozen/off/visibility conditions correctly",
+          "status": "pending"
+        },
+        {
+          "id": "native_resolved_draw_colors",
+          "name": "Resolve CMC/ENC/BYLAYER/BYBLOCK and transparency into actual accurate screen colors",
+          "status": "pending"
+        },
+        {
+          "id": "native_block_and_text_scene",
+          "name": "Include supported block geometry and text without dropping other objects silently",
+          "status": "pending"
+        },
+        {
+          "id": "viewport_interactions",
+          "name": "Match zoom/pan/selection/measure semantics to native scene under gestures",
+          "status": "pending"
+        },
+        {
+          "id": "android_device_visual_comparison",
+          "name": "Pass independent on-device screenshot and CAD reference-image comparisons",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "macro_milestone_id": "large_file_visual_correctness",
+      "steps": [
+        {
+          "id": "large_original_dwg_corpus",
+          "name": "Collect large original drawings of multiple sizes/disciplines, record exact file fingerprints",
+          "status": "pending"
+        },
+        {
+          "id": "cold_open_and_first_frame",
+          "name": "Meet measured cold-open and first-correct-frame targets on physical devices",
+          "status": "pending"
+        },
+        {
+          "id": "bounded_memory_and_indexing",
+          "name": "Prove bounded memory while fully accounting for all unsupported source records",
+          "status": "pending"
+        },
+        {
+          "id": "smooth_pan_zoom_benchmark",
+          "name": "Measure high-density viewport pan/zoom jitter and invalidation with no fake color flash",
+          "status": "pending"
+        },
+        {
+          "id": "stable_style_after_viewport_changes",
+          "name": "Verify correct layer/style colors after each zoom, hide/show, regen and layout switch",
+          "status": "pending"
+        },
+        {
+          "id": "source_immutability_on_errors",
+          "name": "Stress corrupted/adversarial huge DWGs and preserve byte-for-byte source",
+          "status": "pending"
+        },
+        {
+          "id": "device_and_desktop_consistency",
+          "name": "Compare Android, Windows and iOS shared engine numerical/visible outputs on same corpus",
+          "status": "pending"
+        },
+        {
+          "id": "long_run_device_acceptance",
+          "name": "Pass prolonged real-device benchmark and regression thresholds",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}
