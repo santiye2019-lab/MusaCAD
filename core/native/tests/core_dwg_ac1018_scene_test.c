@@ -147,6 +147,22 @@ int main(void){
     MusaDwgAc1018Scene *s=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
     assert(s!=NULL&&musa_dwg_ac1018_scene_handle_count(s)==2u);
+    MusaDwgAc1018RecordProbe first={0},second={0};
+    assert(musa_dwg_ac1018_scene_probe_record_at(s,0u,&first));
+    assert(musa_dwg_ac1018_scene_probe_record_at(s,1u,&second));
+    assert(first.handle==0x40eu&&first.object_offset==0u&&
+           first.declared_type==77u&&
+           first.record_bytes==sizeof(poly_record)&&
+           first.record_crc_verified);
+    assert(second.handle==0x70fu&&
+           second.object_offset==sizeof(poly_record)&&
+           second.declared_type==19u&&
+           second.record_bytes==sizeof(line_record)&&
+           second.record_crc_verified);
+    MusaDwgAc1018RecordProbe before=second;
+    assert(!musa_dwg_ac1018_scene_probe_record_at(s,2u,&second));
+    assert(!musa_dwg_ac1018_scene_probe_record_at(s,0u,NULL));
+    assert(!memcmp(&before,&second,sizeof(second)));
     MusaDwgAc1018Line line={0};
     MusaDwgAc1018LWPolyline poly={0};
     MusaDwgAc1018LWVertex vertices[4]={{0}};
