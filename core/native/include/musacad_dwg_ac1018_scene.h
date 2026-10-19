@@ -74,7 +74,7 @@ int musa_dwg_ac1018_scene_read_lwpolyline(
       MusaDwgAc1018LWVertex *vertices,size_t vertex_capacity,
       MusaDwgAc1018LWPolyline *out);
 /* Audit H owner/layer/xdictionary/reactor reference membership for one
- * indexed AC1018 LINE/LWPOLYLINE record, without accepting geometry.
+ * indexed AC1018 ARC/CIRCLE/LINE/LWPOLYLINE record, without accepting geometry.
  * Supports zero or 1..64 reactors and preserves the original positive-only
  * API semantics. All ref targets must exist in the CRC-verified scene index.
  * Caller buffers, scene, and all DWG bytes remain untouched on failure.
@@ -88,7 +88,7 @@ int musa_dwg_ac1018_scene_audit_links(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     uint64_t *reactor_targets,size_t reactor_capacity,
     MusaDwgAc1018ReactorAudit *out);
-/* Strengthen an already supported LINE/LWPOLYLINE H-link audit:
+/* Strengthen an already supported ARC/CIRCLE/LINE/LWPOLYLINE H-link audit:
  * require EVERY referenced owner, layer, XDictionary and reactor target
  * to also have a valid individual MS-framed CRC16 object record. Return
  * each record's untrusted DECLARED BS type, never infer target class role.
