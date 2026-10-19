@@ -46,7 +46,7 @@ int musa_dwg_ac1018_nonentity_identity_record(
     MusaDwgAc1015HandleRef self={0};
     if(!musa_dwg_ac1015_bits_init(&bits,record+head,body,0u,body*8u)||
        !musa_dwg_ac1015_bits_read_bs(&bits,&typ)||
-       (typ!=42u&&typ!=49u&&typ!=51u)||
+       (typ!=42u&&typ!=49u&&typ!=50u&&typ!=51u)||
        !musa_dwg_ac1015_bits_read_rl(&bits,&endbit)||
        (size_t)endbit>body*8u||
        !musa_dwg_ac1015_read_handle_ref(&bits,indexed_handle,&self)||
