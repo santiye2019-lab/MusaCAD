@@ -166,6 +166,19 @@ static int get_offset(const MusaDwgAc1018Scene *s,uint64_t handle,
     *offset=(size_t)s->index[l].object_offset;
     return 1;
 }
+int musa_dwg_ac1018_scene_probe_nonentity_identity(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018NonEntityIdentity *out){
+    if(!s||!out||!handle||!s->objects||!s->index||
+       overlaps(s,sizeof(*s),out,sizeof(*out))||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),out,sizeof(*out)))
+       return 0;
+    size_t offset=0u;
+    if(!get_offset(s,handle,&offset))return 0;
+    return musa_dwg_ac1018_nonentity_identity_record(
+               s->objects,s->object_bytes,offset,handle,out);
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out)return 0;
@@ -286,6 +299,35 @@ int musa_dwg_ac1018_scene_audit_link_record_envelopes(
     if(staged.link_roles.reactor_count)
         memcpy(reactor_records,inspected,
              (size_t)staged.link_roles.reactor_count*sizeof(inspected[0]));
+    *out=staged;
+    return 1;
+}
+
+/* Fixed R2004 BS role-code filter on top of CRC+indexed H-link evidence.
+ * These are DECLARED codes only, not decoded AcDb CLASSES, a target
+ * embedded self-handle check, or a proven block ownership graph.
+ * Standard entity owner mode zero points to BLOCK_HEADER (49);
+ * entity layers to LAYER (51), extension dictionaries to DICTIONARY (42).
+ * Reactor classes remain unclassified. Fail closed and atomic.
+ */
+int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+    const MusaDwgAc1018Scene *s,uint64_t entity_handle,
+    MusaDwgAc1018LinkedRecordAudit *out){
+    if(!s||!out||!entity_handle||
+       overlaps(s,sizeof(*s),out,sizeof(*out))||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out)))return 0;
+    MusaDwgAc1018LinkedRecordAudit staged={0};
+    MusaDwgAc1018RecordProbe reactors[64]={{0}};
+    if(!musa_dwg_ac1018_scene_audit_link_record_envelopes(
+             s,entity_handle,reactors,64u,&staged)||
+       staged.layer_record.declared_type!=51u||
+       (staged.link_roles.owner_handle &&
+           staged.owner_record.declared_type!=49u)||
+       (staged.link_roles.xdictionary_handle &&
+           staged.xdictionary_record.declared_type!=42u))
+       return 0;
     *out=staged;
     return 1;
 }
