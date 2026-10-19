@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1018_line.h"
 #include "musacad_dwg_ac1018_curve.h"
 #include "musacad_dwg_ac1018_lwpolyline.h"
+#include "musacad_dwg_ac1018_nonentity.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +46,13 @@ int musa_dwg_ac1018_scene_probe_record_at(
 int musa_dwg_ac1018_scene_probe_record_handle(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018RecordProbe *out);
+/* Look up a fixed non-entity target in the cached protected R2004 scene
+ * and independently verify its embedded self-H against the CRC-backed
+ * scene index. Does not infer a validated AcDb semantic role; no changes
+ * on failure, no extra decompression, no hidden full-map copy. */
+int musa_dwg_ac1018_scene_probe_nonentity_identity(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018NonEntityIdentity *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
@@ -93,6 +101,16 @@ typedef struct MusaDwgAc1018LinkedRecordAudit {
 int musa_dwg_ac1018_scene_audit_link_record_envelopes(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018RecordProbe *reactor_records,size_t reactor_capacity,
+    MusaDwgAc1018LinkedRecordAudit *out);
+/* Reject CRC-correct but incorrectly declared fixed object-role targets:
+ * layer must claim 51 (LAYER), graphical owner when present 49
+ * (BLOCK_HEADER), and XDictionary when present 42 (DICTIONARY).
+ * This is a numerical declared-BS filter only: it does NOT prove an
+ * AcDb class, embedded self-handle, or complete ownership semantics.
+ * Reactor targets are CRC-probed but their classes are not restricted.
+ * Entire audit is transactional. No progress milestone is satisfied. */
+int musa_dwg_ac1018_scene_audit_fixed_role_type_claims(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018LinkedRecordAudit *out);
 #ifdef __cplusplus
 }
