@@ -457,3 +457,64 @@ int musa_dwg_ac1018_scene_inventory(
     *out=checked;
     return 1;
 }
+
+/* Physical offsets are independent of strictly ascending H handles.
+ * Never assume that adjacent handles imply adjacent object records. */
+typedef struct MusaDwgAc1018ByteRange {
+    size_t start;
+    size_t length;
+} MusaDwgAc1018ByteRange;
+static int compare_byte_ranges(const void *a,const void *b){
+    const MusaDwgAc1018ByteRange *x=(const MusaDwgAc1018ByteRange*)a;
+    const MusaDwgAc1018ByteRange *y=(const MusaDwgAc1018ByteRange*)b;
+    if(x->start<y->start)return -1;
+    if(x->start>y->start)return 1;
+    return 0;
+}
+int musa_dwg_ac1018_scene_audit_record_ranges(
+    const MusaDwgAc1018Scene *s,MusaDwgAc1018RecordRangeAudit *out){
+    if(!s||!out||!s->objects||!s->index||!s->index_count||
+       s->index_count>SIZE_MAX/sizeof(MusaDwgAc1018ByteRange)||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018ByteRange *ranges=(MusaDwgAc1018ByteRange*)
+        malloc(s->index_count*sizeof(*ranges));
+    if(!ranges)return 0;
+    int ok=1;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe r={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&r)||
+           r.object_offset>(uint64_t)SIZE_MAX){
+            ok=0;break;
+        }
+        ranges[i].start=(size_t)r.object_offset;
+        ranges[i].length=r.record_bytes;
+        if(ranges[i].start>s->object_bytes||
+           ranges[i].length>s->object_bytes-ranges[i].start){
+            ok=0;break;
+        }
+    }
+    size_t cursor=0u,covered=0u;
+    if(ok){
+        qsort(ranges,s->index_count,sizeof(*ranges),
+              compare_byte_ranges);
+        for(size_t i=0u;i<s->index_count;i++){
+            const size_t start=ranges[i].start;
+            const size_t length=ranges[i].length;
+            if(start<cursor||length>s->object_bytes-start||
+               length>SIZE_MAX-covered){
+                ok=0;break;
+            }
+            covered+=length;
+            cursor=start+length;
+        }
+    }
+    free(ranges);
+    if(!ok)return 0;
+    MusaDwgAc1018RecordRangeAudit checked={0};
+    checked.indexed_records=s->index_count;
+    checked.covered_record_bytes=covered;
+    checked.unindexed_section_bytes=s->object_bytes-covered;
+    checked.ranges_nonoverlapping=1u;
+    *out=checked;
+    return 1;
+}
