@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 
-typedef struct Writer {uint8_t data[32];size_t bits;} Writer;
+typedef struct Writer {uint8_t data[64];size_t bits;} Writer;
 static void setbit(Writer *w,size_t at,uint32_t bit){
     assert(at<sizeof(w->data)*8u);
     const uint8_t mask=(uint8_t)(1u<<(7u-at%8u));
@@ -61,7 +61,7 @@ static size_t make(uint8_t out[64],uint16_t type,
  * The color BS stub is kept unclassified by the prefix decoder. */
 static size_t make_layer_prefix(uint8_t out[64],
                                 unsigned type,uint32_t indexed,
-                                int non_ascii){
+                                int non_ascii,int cmc_case){
     Writer w={0};
     const char name[]="MEK-SU";
     put(&w,2u,1u);byte(&w,(uint8_t)type);
@@ -78,7 +78,27 @@ static size_t make_layer_prefix(uint8_t out[64],
     put(&w,2u,2u); /* xrefindex+1 = 0 */
     put(&w,1u,0u); /* Xdep */
     put(&w,2u,1u);byte(&w,13u); /* raw flags BS */
-    put(&w,2u,2u); /* reserved CMC color BS prefix not decoded */
+    if(cmc_case==0){
+        put(&w,2u,2u); /* incomplete CMC: prefix-only fixture */
+    }else{
+        if(cmc_case==5){put(&w,2u,1u);byte(&w,1u);}
+        else put(&w,2u,2u); /* R2004 CMC BS index=0 */
+        put(&w,2u,0u); /* BL raw RGB: 32 bits follow */
+        byte(&w,0x33u);byte(&w,0x22u);
+        byte(&w,0x11u);byte(&w,0xc2u); /* method C2 RGB: 0xC2112233 */
+        const uint8_t flag=(uint8_t)(
+            cmc_case==2||cmc_case==4?3u:cmc_case==3?4u:0u);
+        byte(&w,flag);
+        if(flag&1u){
+            put(&w,2u,1u);byte(&w,3u);
+            byte(&w,cmc_case==4?0xe9u:'R');byte(&w,'E');byte(&w,'D');
+        }
+        if(flag&2u){
+            put(&w,2u,1u);byte(&w,4u);
+            byte(&w,'B');byte(&w,'O');
+            byte(&w,'O');byte(&w,'K');
+        }
+    }
     const size_t endbit=w.bits;
     for(unsigned i=0u;i<4u;i++)
         for(unsigned j=0u;j<8u;j++)
@@ -135,7 +155,7 @@ int main(void){
                     record,n,0u,0x33u,&out)); /* BL reactor cap */
 
     MusaDwgAc1018LayerPrefix layer={0};
-    n=make_layer_prefix(record,51u,0x33u,0);
+    n=make_layer_prefix(record,51u,0x33u,0,0);
     assert(musa_dwg_ac1018_layer_prefix_record(
                    record,n,0u,0x33u,&layer));
     assert(layer.indexed_handle==0x33u&&
@@ -154,18 +174,64 @@ int main(void){
                   record,n,0u,0x33u,
                   (MusaDwgAc1018LayerPrefix*)(void*)record)); /* alias */
     assert(!memcmp(&good,&layer,sizeof(good)));
-    n=make_layer_prefix(record,49u,0x33u,0);
+    n=make_layer_prefix(record,49u,0x33u,0,0);
     assert(!musa_dwg_ac1018_layer_prefix_record(
                   record,n,0u,0x33u,&layer)); /* not LAYER */
     assert(!memcmp(&good,&layer,sizeof(good)));
-    n=make_layer_prefix(record,51u,0x33u,1);
+    n=make_layer_prefix(record,51u,0x33u,1,0);
     assert(!musa_dwg_ac1018_layer_prefix_record(
                   record,n,0u,0x33u,&layer)); /* unsupported codepage */
     assert(!memcmp(&good,&layer,sizeof(good)));
-    n=make_layer_prefix(record,51u,0x33u,0);
+    n=make_layer_prefix(record,51u,0x33u,0,0);
     record[n-1u]^=0x01u;
     assert(!musa_dwg_ac1018_layer_prefix_record(
                   record,n,0u,0x33u,&layer)); /* CRC corruption */
     assert(!memcmp(&good,&layer,sizeof(good)));
+    MusaDwgAc1018LayerColor color={0};
+    n=make_layer_prefix(record,51u,0x33u,0,1);
+    assert(musa_dwg_ac1018_layer_color_record(
+               record,n,0u,0x33u,&color));
+    assert(color.cmc_data_bits_verified&&
+           color.raw_cmc_index==0u&&
+           color.raw_cmc_rgb==UINT32_C(0xC2112233)&&
+           !strcmp(color.prefix.name,"MEK-SU")&&
+           color.prefix.raw_layer_flags==13u&&
+           !color.has_color_name&&!color.has_book_name&&
+           !color.color_name[0]&&!color.book_name[0]);
+    const MusaDwgAc1018LayerColor good_color=color;
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x34u,&color));
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,
+                  (MusaDwgAc1018LayerColor*)(void*)record));
+    assert(!memcmp(&color,&good_color,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,2);
+    assert(musa_dwg_ac1018_layer_color_record(
+               record,n,0u,0x33u,&color));
+    assert(color.has_color_name&&color.has_book_name&&
+           !strcmp(color.color_name,"RED")&&
+           !strcmp(color.book_name,"BOOK"));
+    const MusaDwgAc1018LayerColor names=color;
+    n=make_layer_prefix(record,51u,0x33u,0,3);
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* illegal flags */
+    assert(!memcmp(&color,&names,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,4);
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* unsupported codepage */
+    assert(!memcmp(&color,&names,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,5);
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* CMC index MUST be zero */
+    assert(!memcmp(&color,&names,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,0);
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* incomplete CMC */
+    assert(!memcmp(&color,&names,sizeof(color)));
+    n=make_layer_prefix(record,51u,0x33u,0,1);
+    record[n-1u]^=1u;
+    assert(!musa_dwg_ac1018_layer_color_record(
+                  record,n,0u,0x33u,&color)); /* CRC mismatch */
+    assert(!memcmp(&color,&names,sizeof(color)));
     return 0;
 }

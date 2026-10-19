@@ -47,7 +47,13 @@ static size_t make(uint8_t out[64],uint16_t type,
         put(&w,2u,2u); /* xrefindex+1 = 0 */
         put(&w,1u,0u); /* Xdep */
         put(&w,2u,1u);byte(&w,9u); /* flags */
-        put(&w,2u,2u); /* CMC remains opaque */
+        if(named_layer==2){
+            put(&w,2u,2u); /* CMC BS index=0 */
+            put(&w,2u,0u); /* BL raw RGB */
+            byte(&w,0x33u);byte(&w,0x22u);
+            byte(&w,0x11u);byte(&w,0u);
+            byte(&w,0u); /* RC: no names */
+        }else put(&w,2u,2u); /* incomplete prefix-only CMC */
     }
     const size_t endbit=w.bits;
     for(unsigned i=0;i<4;i++)
@@ -285,6 +291,26 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_layer_prefix(
                   scene,0x33u,(MusaDwgAc1018LayerPrefix*)(void*)scene));
     assert(!memcmp(&unchanged,&layer_prefix,sizeof(unchanged)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,49u,2); /* complete bounded pre-handle CMC */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    MusaDwgAc1018LayerColor cmc={0};
+    assert(musa_dwg_ac1018_scene_read_layer_color(
+                  scene,0x33u,&cmc));
+    assert(!strcmp(cmc.prefix.name,"MEK0")&&
+           cmc.prefix.record_crc_verified&&
+           cmc.prefix.embedded_self_verified&&
+           cmc.raw_cmc_rgb==UINT32_C(0x00112233)&&
+           cmc.cmc_data_bits_verified&&
+           !cmc.has_color_name&&!cmc.has_book_name);
+    const MusaDwgAc1018LayerColor prior=cmc;
+    assert(!musa_dwg_ac1018_scene_read_layer_color(
+                  scene,0x11bu,&cmc)); /* wrong type */
+    assert(!musa_dwg_ac1018_scene_read_layer_color(
+                  scene,0x34u,&cmc)); /* missing H */
+    assert(!musa_dwg_ac1018_scene_read_layer_color(
+                  scene,0x33u,(MusaDwgAc1018LayerColor*)(void*)scene));
+    assert(!memcmp(&cmc,&prior,sizeof(cmc)));
     musa_dwg_ac1018_scene_close(scene);
     return 0;
 }

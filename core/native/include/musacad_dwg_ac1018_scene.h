@@ -61,6 +61,12 @@ int musa_dwg_ac1018_scene_probe_nonentity_identity(
 int musa_dwg_ac1018_scene_read_layer_prefix(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018LayerPrefix *out);
+/* Verify the cached R2004 LAYER pre-handle CMC fields while preserving
+ * the caller's output and immutable DWG bytes on any unsupported case.
+ * Reports raw RGB and optional ASCII color/book names ONLY. */
+int musa_dwg_ac1018_scene_read_layer_color(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018LayerColor *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
