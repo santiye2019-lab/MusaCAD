@@ -365,3 +365,76 @@ int musa_dwg_ac1018_scene_audit_fixed_link_identities(
     *out=checked;
     return 1;
 }
+
+/* Deterministic original binary DWG inventory: no selective skipping,
+ * no full-scene materialization, no O(index_count) side copy. Indexed
+ * record types are untrusted until their separate CRC and primitive
+ * reader have been verified. A success with unclassified records is
+ * deliberately marked incomplete (rather than pretending a full CAD
+ * display/export can be made from the subset). */
+int musa_dwg_ac1018_scene_inventory(
+    const MusaDwgAc1018Scene *s,int strict_supported_only,
+    MusaDwgAc1018SceneInventory *out){
+    if(!s||!out||(strict_supported_only!=0&&strict_supported_only!=1)||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018SceneInventory checked={0};
+    MusaDwgAc1018LWVertex *poly_vertices=NULL;
+    int ok=1;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            ok=0;break;
+        }
+        checked.indexed_record_count++;
+        switch(probe.declared_type){
+        case 19u: {
+            MusaDwgAc1018Line line={0};
+            if(musa_dwg_ac1018_scene_read_line(s,probe.handle,&line) &&
+               line.handle==probe.handle)checked.decoded_lines++;
+            else checked.undecodable_supported_records++;
+            break;
+        }
+        case 17u:
+        case 18u: {
+            MusaDwgAc1018Curve curve={0};
+            if(musa_dwg_ac1018_scene_read_curve(s,probe.handle,&curve) &&
+               curve.handle==probe.handle &&
+               curve.type_code==probe.declared_type){
+                if(probe.declared_type==17u)checked.decoded_arcs++;
+                else checked.decoded_circles++;
+            }else checked.undecodable_supported_records++;
+            break;
+        }
+        case 77u: {
+            /* Allocate the bounded vertex storage ONCE for the entire
+             * scan, never one scratch slab for every indexed polyline. */
+            if(!poly_vertices){
+                poly_vertices=(MusaDwgAc1018LWVertex*)malloc(
+                    100000u*sizeof(*poly_vertices));
+                if(!poly_vertices){ok=0;break;}
+            }
+            MusaDwgAc1018LWPolyline poly={0};
+            if(musa_dwg_ac1018_scene_read_lwpolyline(
+                    s,probe.handle,poly_vertices,100000u,&poly) &&
+               poly.handle==probe.handle)
+                checked.decoded_lwpolylines++;
+            else checked.undecodable_supported_records++;
+            break;
+        }
+        default:
+            checked.other_declared_records++;
+            break;
+        }
+        if(!ok)break;
+    }
+    free(poly_vertices);
+    if(!ok)return 0;
+    checked.all_indexed_record_crcs_verified=1u;
+    checked.only_supported_primitives_decoded=(uint8_t)(
+        checked.other_declared_records==0u &&
+        checked.undecodable_supported_records==0u);
+    if(strict_supported_only&&!checked.only_supported_primitives_decoded)
+        return 0;
+    *out=checked;
+    return 1;
+}

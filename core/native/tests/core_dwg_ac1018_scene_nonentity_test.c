@@ -174,6 +174,17 @@ int main(void){
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==2u);
+    MusaDwgAc1018SceneInventory inventory={0};
+    assert(musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(inventory.indexed_record_count==2u&&
+           inventory.other_declared_records==2u&&
+           inventory.decoded_lines==0u&&
+           inventory.undecodable_supported_records==0u&&
+           inventory.all_indexed_record_crcs_verified&&
+           !inventory.only_supported_primitives_decoded);
+    const MusaDwgAc1018SceneInventory saved_inventory=inventory;
+    assert(!musa_dwg_ac1018_scene_inventory(scene,1,&inventory));
+    assert(!memcmp(&inventory,&saved_inventory,sizeof(inventory)));
     MusaDwgAc1018NonEntityIdentity layer={0},owner={0};
     for(unsigned i=0;i<100u;i++){
         assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
