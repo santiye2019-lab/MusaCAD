@@ -145,8 +145,9 @@ int musa_dwg_ac1018_scene_audit_fixed_link_identities(
 /* Independently audit EVERY indexed R2004 record: bounded MS-frame,
  * CRC16 and supported 2D geometry self-H checks. Numerical declared types
  * alone are NEVER counted as decoded geometry. Known LAYER/BLOCK_HEADER/
- * DICTIONARY declarations (51/49/42) must also pass indexed embedded
+ * DICTIONARY/LAYER_CONTROL declarations (51/50/49/42) must pass indexed embedded
  * self-H checks; an invalid fixed nonentity fails the audit atomically.
+ * LAYER_CONTROL (50) must also pass strict indexed embedded self-H checks.
  * These verified prefixes remain counted as other/opaque records because
  * their complete AcDb fields are not decoded. Unknown records are counted,
  * not dropped. Known-but-unsupported geometry is counted separately.
