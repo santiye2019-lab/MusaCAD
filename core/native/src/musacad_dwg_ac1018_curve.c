@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_curve.h"
 #include "musacad_dwg_ac1015_values.h"
+#include "musacad_dwg_ac1018_eed.h"
 #include "musacad_crc16.h"
 #include <math.h>
 #include <stddef.h>
@@ -58,19 +59,20 @@ int musa_dwg_ac1018_read_curve_record(const uint8_t *object_section,
                                   0u, data_bytes * 8u)) return 0;
     MusaDwgAc1018Curve value = {0};
     uint32_t pre_handle_bits = 0u, flag = 0u, reactors = 0u;
-    uint16_t eed = 0u;
+    uint32_t eed_raw_bytes = 0u;
     if (!musa_dwg_ac1015_bits_read_bs(&b, &value.type_code) ||
         (value.type_code != 17u && value.type_code != 18u) ||
         !musa_dwg_ac1015_bits_read_rl(&b, &pre_handle_bits) ||
         (size_t)pre_handle_bits > data_bytes * 8u ||
         !read_self_handle(&b, &value.handle) ||
         value.handle != indexed_handle ||
-        !musa_dwg_ac1015_bits_read_bs(&b, &eed) || eed != 0u ||
+        !musa_dwg_ac1018_eed_skip(&b, &eed_raw_bytes) ||
         !musa_dwg_ac1015_bits_read_u(&b, 1u, &flag) || flag != 0u ||
         !musa_dwg_ac1015_bits_read_u(&b, 2u, &flag) || flag == 3u ||
         !musa_dwg_ac1015_bits_read_bl(&b, &reactors) || reactors != 0u)
         return 0;
     value.entity_mode = (uint8_t)flag;
+    value.eed_raw_bytes_skipped = eed_raw_bytes;
     if (!musa_dwg_ac1015_bits_read_u(&b, 1u, &flag)) return 0;
     value.xdictionary_missing = (uint8_t)flag;
     /* True-color and extended colorbook are deliberately not admitted yet. */
