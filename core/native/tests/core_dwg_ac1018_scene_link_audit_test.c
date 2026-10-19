@@ -232,6 +232,16 @@ int main(void){
     MusaDwgAc1018ReactorAudit checked={0};
     assert(musa_dwg_ac1018_scene_audit_links(scene,0x120u,
                                               NULL,0u,&checked));
+    /* Repeated scene H queries must use the immutable verified map
+     * without reallocation or repeated O(N) validation. */
+    for(int i=0;i<200;i++){
+        MusaDwgAc1018ReactorAudit pass={0};
+        assert(musa_dwg_ac1018_scene_audit_links(
+                         scene,0x120u,NULL,0u,&pass));
+        assert(pass.record_crc_verified&&pass.handle_membership_verified&&
+               pass.owner_handle==0x11bu&&pass.layer_handle==0x33u&&
+               pass.reactor_count==0u);
+    }
     assert(checked.handle==0x120u&&checked.owner_handle==0x11bu&&
            checked.layer_handle==0x33u&&
            checked.xdictionary_handle==0u&&
@@ -262,6 +272,15 @@ int main(void){
     assert(checked.reactor_count==1u&&checked.owner_handle==0x11bu&&
            checked.layer_handle==0x33u&&reactors[0]==0x75u&&
            reactors[1]==888u);
+    for(int i=0;i<200;i++){
+        uint64_t found[2]={999u,888u};
+        MusaDwgAc1018ReactorAudit pass={0};
+        assert(musa_dwg_ac1018_scene_audit_links(
+                         scene,0x120u,found,2u,&pass));
+        assert(found[0]==0x75u&&found[1]==888u&&
+               pass.reactor_count==1u&&
+               pass.record_crc_verified&&pass.handle_membership_verified);
+    }
     saved=checked;const uint64_t original_reactor=reactors[0];
     assert(!musa_dwg_ac1018_scene_audit_links(scene,0x120u,
                                                 NULL,0u,&checked));
