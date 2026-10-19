@@ -161,8 +161,8 @@ static size_t opaque_target(uint8_t *out,uint8_t type){
     const size_t data_len=8u;
     memset(out,0,data_len+4u);
     out[0]=(uint8_t)data_len;
-    out[2]=(uint8_t)(0x40u|(type>>6u));
-    out[3]=(uint8_t)((type&0x3fu)<<2u);
+    out[2]=(uint8_t)(0x40u|(type>>2u));
+    out[3]=(uint8_t)((type&0x03u)<<6u);
     uint16_t crc=0u;
     assert(musa_core_crc16_arc(0xc0c1u,out,data_len+2u,&crc));
     out[data_len+2u]=(uint8_t)crc;
