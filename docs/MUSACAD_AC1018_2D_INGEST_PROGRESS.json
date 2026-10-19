@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "name": "MusaCAD AC1018 2D file ingest workstream milestone coverage",
+  "metric_kind": "bounded_workstream_milestone_coverage_not_core_completion_not_autocad_parity",
+  "scope": "AC1018/R2004 native ham dosyadan iki boyutlu geometri/nesne okuma entegrasyon zinciri",
+  "baseline_main_merge": "604470bd0bfa2fe798873ec1142234a93b8b8aed",
+  "method": "Fixed 16 binary, explicitly named milestones. verified requires a merged PR and extant source+test evidence; pending never counts. Denominator only changes by separately reviewed plan revision. This is NOT a fraction of all CAD features, lines of code, labor, certified AutoCAD equivalence or full product readiness.",
+  "verified_milestones": 10,
+  "total_milestones": 16,
+  "coverage_percent": 62.5,
+  "full_core_gate_coverage_reference": {
+    "path": "docs/MUSACAD_CORE_COMPLETION_GATES.json",
+    "last_verified_accepted": 10,
+    "total": 25,
+    "percent": 40
+  },
+  "autoCAD_2026_parity_percent": null,
+  "milestones": [
+    {
+      "id": "protected_file_page_map",
+      "name": "AC1018 korumali baslik ve fiziksel sayfa haritasi",
+      "status": "verified",
+      "merged_pr": 405,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_page_map.c",
+        "core/native/tests/core_dwg_ac1018_page_map_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "lz_page_section_assembly",
+      "name": "R2004 LZ sayfa acma ve mantiksal bolum birlestirme",
+      "status": "verified",
+      "merged_pr": 403,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_section_assemble.c",
+        "core/native/tests/core_dwg_ac1018_section_assemble_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "raw_objects_handles_extract",
+      "name": "Ham DWG'den AcDbObjects ve Handles bolumlerini dogrulama",
+      "status": "verified",
+      "merged_pr": 407,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_sections.c",
+        "core/native/tests/core_dwg_ac1018_full_section_extract_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "raw_file_crc_handle_index",
+      "name": "Ham dosyadan CRC dogrulanmis handle/offset indeksi",
+      "status": "verified",
+      "merged_pr": 408,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_file_index.c",
+        "core/native/tests/core_dwg_ac1018_file_handle_index_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "raw_line_geometry_by_handle",
+      "name": "Ham DWG'den indeksli LINE WCS koordinatlari",
+      "status": "verified",
+      "merged_pr": 409,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_file_line.c",
+        "core/native/tests/core_dwg_ac1018_file_line_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "raw_scene_lwpolyline_vertices",
+      "name": "Ham DWG oturumundan LWPOLYLINE OCS noktalari ve bulge/width",
+      "status": "verified",
+      "merged_pr": 411,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_scene.c",
+        "core/native/tests/core_dwg_ac1018_scene_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "shared_ocs_to_wcs",
+      "name": "OCS extrusion/elevation'dan ortak C11 WCS donusumu",
+      "status": "verified",
+      "merged_pr": 398,
+      "evidence": [
+        "core/native/src/musacad_ocs.c",
+        "core/native/tests/core_ocs_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "reusable_cached_session",
+      "name": "Bir dosya acilisi ile coklu indexli LINE/LWPOLYLINE okuma",
+      "status": "verified",
+      "merged_pr": 411,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_scene.c",
+        "core/native/tests/core_dwg_ac1018_scene_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "crc_indexed_object_inventory",
+      "name": "Nesne CRC cercevesi, tip beyanı, ofset ve boyut envanteri",
+      "status": "verified",
+      "merged_pr": 413,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_scene.c",
+        "core/native/tests/core_dwg_ac1018_scene_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "scene_reference_membership",
+      "name": "Sifir/pozitif reaktor ile owner/layer/XDictionary H uyelik denetimi",
+      "status": "verified",
+      "merged_pr": 416,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_scene.c",
+        "core/native/tests/core_dwg_ac1018_scene_link_audit_test.c"
+      ],
+      "verification_scope": "native shared C11 plus repository CI; tests not full external CAD parity"
+    },
+    {
+      "id": "raw_arc_circle_by_handle",
+      "name": "ARC/CIRCLE nesneleri ham dosya oturumundan indeksli ve tam veri okumasi",
+      "status": "pending"
+    },
+    {
+      "id": "typed_layer_owner_targets",
+      "name": "Layer/owner referans hedeflerinin gercek DWG sinif/tur dogrulamasi",
+      "status": "pending"
+    },
+    {
+      "id": "block_insert_reference_graph",
+      "name": "BLOCK/INSERT ve coklu sahiplik iliskilerinin tam geometri grafigi",
+      "status": "pending"
+    },
+    {
+      "id": "real_dwg_full_batch_parity",
+      "name": "Gercek cok nesneli DWG dosyalarinda bagimsiz sayisal/semantik toplu kabul",
+      "status": "pending"
+    },
+    {
+      "id": "android_native_scene_render",
+      "name": "Android ekranda ayni native oturumun dogru renk/katman cizimine baglanmasi",
+      "status": "pending"
+    },
+    {
+      "id": "large_file_visual_correctness",
+      "name": "Buyuk DWG acilma/zoom/pan/renk performans ve tutarlilik testleri",
+      "status": "pending"
+    }
+  ],
+  "update_policy": "After a PR is merged and its latest-head native/Android CI passes, update the specific milestone and add its exact file/test evidence; report BOTH this scoped workstream progress and unchanged fixed 25-gate acceptance separately; never label workstream progress as full engine completion."
+}
