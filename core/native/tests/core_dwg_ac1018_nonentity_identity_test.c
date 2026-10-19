@@ -118,9 +118,9 @@ static size_t make_layer_prefix(uint8_t out[64],
 int main(void){
     uint8_t record[64]={0};
     MusaDwgAc1018NonEntityIdentity out={0};
-    const uint16_t kinds[]={51u,49u,42u};
-    const uint64_t handles[]={0x33u,0x11bu,0x44u};
-    for(size_t i=0;i<3u;i++){
+    const uint16_t kinds[]={51u,50u,49u,42u};
+    const uint64_t handles[]={0x33u,0x27u,0x11bu,0x44u};
+    for(size_t i=0;i<sizeof(kinds)/sizeof(kinds[0]);i++){
         const size_t n=make(record,kinds[i],handles[i],0);
         assert(musa_dwg_ac1018_nonentity_identity_record(
                        record,n,0u,handles[i],&out));
@@ -147,9 +147,9 @@ int main(void){
                        record,n,0u,handles[i],&out));
         assert(!memcmp(&old,&out,sizeof(old)));
     }
-    size_t n=make(record,50u,0x33u,0);
+    size_t n=make(record,48u,0x33u,0);
     assert(!musa_dwg_ac1018_nonentity_identity_record(
-                    record,n,0u,0x33u,&out)); /* LAYER_CONTROL not LAYER */
+                    record,n,0u,0x33u,&out)); /* unsupported type rejected */
     n=make(record,51u,0x33u,1);
     assert(!musa_dwg_ac1018_nonentity_identity_record(
                     record,n,0u,0x33u,&out)); /* BL reactor cap */
@@ -173,6 +173,10 @@ int main(void){
     assert(!musa_dwg_ac1018_layer_prefix_record(
                   record,n,0u,0x33u,
                   (MusaDwgAc1018LayerPrefix*)(void*)record)); /* alias */
+    assert(!memcmp(&good,&layer,sizeof(good)));
+    n=make_layer_prefix(record,50u,0x33u,0,0);
+    assert(!musa_dwg_ac1018_layer_prefix_record(
+                  record,n,0u,0x33u,&layer)); /* LAYER_CONTROL != LAYER */
     assert(!memcmp(&good,&layer,sizeof(good)));
     n=make_layer_prefix(record,49u,0x33u,0,0);
     assert(!musa_dwg_ac1018_layer_prefix_record(
