@@ -69,3 +69,70 @@ int musa_dwg_ac1018_nonentity_identity_record(
     *out=verified;
     return 1;
 }
+
+/* In the supported AC1018 layer-object prefix, text TV uses a
+ * bit-short byte count followed by codepage bytes (pre-2007).
+ * Decode only printable ASCII; non-ASCII requires an explicit future
+ * codepage converter rather than mangling an engineering layer name.
+ * All writes are deferred until *every* accepted prefix field is valid.
+ * The remaining CMC and H tails are intentionally NOT claimed decoded. */
+int musa_dwg_ac1018_layer_prefix_record(
+    const uint8_t *objects,size_t object_bytes,size_t object_offset,
+    uint64_t indexed_handle,MusaDwgAc1018LayerPrefix *out){
+    if(!objects||!out||object_offset>=object_bytes||
+       overlap(objects,object_bytes,out,sizeof(*out)))return 0;
+    MusaDwgAc1018NonEntityIdentity identity={0};
+    if(!musa_dwg_ac1018_nonentity_identity_record(
+           objects,object_bytes,object_offset,indexed_handle,&identity)||
+       identity.declared_type!=51u)return 0;
+    const uint8_t *p=objects+object_offset;
+    size_t head=0u,body=0u;
+    if(!ms(p,object_bytes-object_offset,&head,&body)||
+       body>SIZE_MAX/8u)return 0;
+    MusaDwgAc1015Bits b={0};
+    if(!musa_dwg_ac1015_bits_init(&b,p+head,body,0u,body*8u))
+        return 0;
+    uint16_t type=0u,name_len=0u,xref=0u,flags=0u;
+    uint32_t endbit=0u,eed=0u,reactors=0u,xdict=0u,bit=0u;
+    MusaDwgAc1015HandleRef self={0};
+    if(!musa_dwg_ac1015_bits_read_bs(&b,&type)||type!=51u||
+       !musa_dwg_ac1015_bits_read_rl(&b,&endbit)||
+       endbit!=identity.pre_handle_bits||
+       !musa_dwg_ac1015_read_handle_ref(&b,indexed_handle,&self)||
+       self.code!=0u||self.target!=indexed_handle||
+       !musa_dwg_ac1018_eed_skip(&b,&eed)||
+       !musa_dwg_ac1015_bits_read_bl(&b,&reactors)||
+       reactors>64u||reactors!=identity.reactor_count||
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&xdict)||
+       xdict!=identity.xdictionary_missing||
+       b.bit_pos>(size_t)endbit||
+       !musa_dwg_ac1015_bits_read_bs(&b,&name_len)||
+       name_len==0u||name_len>255u||
+       b.bit_pos>(size_t)endbit||
+       (size_t)name_len>((size_t)endbit-b.bit_pos)/8u)return 0;
+    MusaDwgAc1018LayerPrefix checked={0};
+    for(size_t i=0u;i<name_len;i++){
+        if(!musa_dwg_ac1015_bits_read_u(&b,8u,&bit)||
+           bit<0x20u||bit>0x7eu)return 0;
+        checked.name[i]=(char)bit;
+    }
+    if(b.bit_pos>(size_t)endbit||
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&bit))return 0;
+    checked.ever_referenced=(uint8_t)bit;
+    if(!musa_dwg_ac1015_bits_read_bs(&b,&xref)||
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&bit))return 0;
+    checked.xref_dependent=(uint8_t)bit;
+    if(!musa_dwg_ac1015_bits_read_bs(&b,&flags)||
+       b.bit_pos>(size_t)endbit||
+       (size_t)endbit-b.bit_pos<2u)return 0;
+    /* An actual layer still has its CMC color and H fields.
+     * Merely consuming the accepted prefix is not whole-record proof. */
+    checked.indexed_handle=indexed_handle;
+    checked.name_bytes=name_len;
+    checked.xref_index_plus_one=xref;
+    checked.raw_layer_flags=flags;
+    checked.record_crc_verified=identity.record_crc_verified;
+    checked.embedded_self_verified=identity.embedded_self_verified;
+    *out=checked;
+    return 1;
+}
