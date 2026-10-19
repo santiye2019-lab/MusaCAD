@@ -2,6 +2,7 @@
 #include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_handles.h"
+#include "musacad_dwg_ac1018_reactor_links.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_crc16.h"
 #include <stddef.h>
@@ -165,4 +166,58 @@ int musa_dwg_ac1018_scene_read_lwpolyline(
     if(!get_offset(s,handle,&at))return 0;
     return musa_dwg_ac1018_read_lwpolyline_record(s->objects,
                             s->object_bytes,at,handle,vertices,capacity,out);
+}
+
+/* An indexed H target's presence is NOT proof of its DWG CLASSES role.
+ * Existing strict common-handle-tail scanner supplies the only acceptance
+ * path for R2004 link membership (zero or positive reactors).
+ * Temporary map materialization is explicit; no unsafe struct aliasing. */
+int musa_dwg_ac1018_scene_audit_links(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint64_t *reactor_targets,size_t capacity,
+    MusaDwgAc1018ReactorAudit *out){
+    if(!s||!out||!handle||capacity>64u||
+       (capacity&&!reactor_targets)||
+       s->index_count>SIZE_MAX/sizeof(MusaDwgAc1015HandleEntry))
+       return 0;
+    if(overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),
+                out,sizeof(*out))||
+       (capacity&&(overlaps(s->objects,s->object_bytes,
+                           reactor_targets,capacity*sizeof(*reactor_targets))||
+                   overlaps(s->index,s->index_count*sizeof(*s->index),
+                            reactor_targets,capacity*sizeof(*reactor_targets))||
+                   overlaps(out,sizeof(*out),reactor_targets,
+                            capacity*sizeof(*reactor_targets)))))
+        return 0;
+    size_t offset=0u;
+    if(!get_offset(s,handle,&offset))return 0;
+    MusaDwgAc1015HandleEntry *converted=
+        (MusaDwgAc1015HandleEntry*)malloc(
+             s->index_count*sizeof(*converted));
+    if(!converted)return 0;
+    for(size_t i=0u;i<s->index_count;i++){
+        converted[i].handle=s->index[i].handle;
+        converted[i].file_offset=s->index[i].object_offset;
+    }
+    MusaDwgAc1018ReactorAudit checked={0};
+    uint64_t found[64]={0};
+    int ok=musa_dwg_ac1018_read_zero_reactor_links(
+           s->objects,s->object_bytes,offset,handle,
+           converted,s->index_count,&checked);
+    if(!ok)ok=musa_dwg_ac1018_read_reactor_links(
+           s->objects,s->object_bytes,offset,handle,
+           converted,s->index_count,found,64u,&checked);
+    if(ok){
+        if(checked.reactor_count>capacity||
+           (checked.reactor_count&&!reactor_targets))ok=0;
+        else{
+            if(checked.reactor_count)
+                memcpy(reactor_targets,found,
+                       (size_t)checked.reactor_count*sizeof(found[0]));
+            *out=checked;
+        }
+    }
+    free(converted);
+    return ok;
 }
