@@ -161,6 +161,15 @@ int main(void){
     MusaDwgAc1018Scene *s=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
     assert(musa_dwg_ac1018_scene_handle_count(s)==2u);
+    MusaDwgAc1018SceneInventory inventory={0};
+    assert(musa_dwg_ac1018_scene_inventory(s,1,&inventory));
+    assert(inventory.indexed_record_count==2u&&
+           inventory.decoded_arcs==1u&&inventory.decoded_circles==1u&&
+           inventory.decoded_lines==0u&&inventory.decoded_lwpolylines==0u&&
+           inventory.other_declared_records==0u&&
+           inventory.undecodable_supported_records==0u&&
+           inventory.all_indexed_record_crcs_verified&&
+           inventory.only_supported_primitives_decoded);
     MusaDwgAc1018RecordProbe a={0},b={0};
     assert(musa_dwg_ac1018_scene_probe_record_at(s,0u,&a));
     assert(musa_dwg_ac1018_scene_probe_record_at(s,1u,&b));
