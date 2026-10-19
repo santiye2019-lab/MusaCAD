@@ -43,10 +43,10 @@ static int read_self(MusaDwgAc1015Bits *bits, uint64_t *handle) {
 static int finite_bd(MusaDwgAc1015Bits *b, double *out) {
     return musa_dwg_ac1015_bits_read_bd(b, out) && isfinite(*out);
 }
-int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *section,
+static int read_lw_impl(const uint8_t *section,
     size_t section_bytes, size_t offset, uint64_t indexed_handle,
-    MusaDwgAc1018LWVertex *out_vertices, size_t capacity,
-    MusaDwgAc1018LWPolyline *out) {
+    uint32_t permitted_reactors, MusaDwgAc1018LWVertex *out_vertices,
+    size_t capacity, MusaDwgAc1018LWPolyline *out) {
     if (!section || !out || !out_vertices || !indexed_handle ||
         offset >= section_bytes) return 0;
     const uint8_t *p = section + offset;
@@ -73,7 +73,7 @@ int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *section,
         !musa_dwg_ac1018_eed_skip(&b,&value.eed_raw_bytes_skipped) ||
         !musa_dwg_ac1015_bits_read_u(&b,1u,&flag) || flag!=0u ||
         !musa_dwg_ac1015_bits_read_u(&b,2u,&flag) || flag==3u ||
-        !musa_dwg_ac1015_bits_read_bl(&b,&reactors) || reactors!=0u)
+        !musa_dwg_ac1015_bits_read_bl(&b,&reactors) || reactors!=permitted_reactors)
         return 0;
     value.entity_mode=(uint8_t)flag;
     if (!musa_dwg_ac1015_bits_read_u(&b,1u,&flag)) return 0;
@@ -139,6 +139,42 @@ int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *section,
     }
     free(vertices);
     return good;
+}
+
+
+/* Original read-only API remains unchanged and refuses all reactor links. */
+int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *section,
+    size_t section_bytes, size_t offset, uint64_t indexed_handle,
+    MusaDwgAc1018LWVertex *out_vertices, size_t capacity,
+    MusaDwgAc1018LWPolyline *out) {
+    return read_lw_impl(section,section_bytes,offset,indexed_handle,
+                        0u,out_vertices,capacity,out);
+}
+int musa_dwg_ac1018_read_lwpolyline_with_reactors(
+    const uint8_t *section,size_t section_bytes,size_t offset,
+    uint64_t indexed_handle,const MusaDwgAc1015HandleEntry *index,
+    size_t index_count,MusaDwgAc1018LWVertex *vertices,
+    size_t vertex_capacity,uint64_t *reactor_targets,
+    size_t reactor_capacity,MusaDwgAc1018ReactorAudit *link_audit,
+    MusaDwgAc1018LWPolyline *geometry) {
+    if(!vertices||!vertex_capacity||!reactor_targets||
+       !reactor_capacity||!link_audit||!geometry)return 0;
+    uint64_t local_handles[64]={0};
+    MusaDwgAc1018ReactorAudit checked={0};
+    MusaDwgAc1018LWPolyline checked_geometry={0};
+    if(!musa_dwg_ac1018_read_reactor_links(
+            section,section_bytes,offset,indexed_handle,index,index_count,
+            local_handles,64u,&checked) ||
+       checked.reactor_count>reactor_capacity ||
+       !read_lw_impl(section,section_bytes,offset,indexed_handle,
+                     checked.reactor_count,vertices,vertex_capacity,
+                     &checked_geometry))return 0;
+    checked.geometry_decoded=1u;
+    memcpy(reactor_targets,local_handles,
+           (size_t)checked.reactor_count*sizeof(local_handles[0]));
+    *link_audit=checked;
+    *geometry=checked_geometry;
+    return 1;
 }
 
 /* Single shared OCS-to-WCS path: no Android-specific coordinate math. */
