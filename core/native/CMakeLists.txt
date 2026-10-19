@@ -109,6 +109,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_ac1018_scene_test tests/core_dwg_ac1018_scene_test.c)
         target_link_libraries(musacad_core_ac1018_scene_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2004_cached_scene_geometry COMMAND musacad_core_ac1018_scene_test)
+        # Native raw DWG common-reference graph membership, no class claims.
+        add_executable(musacad_core_ac1018_scene_link_test tests/core_dwg_ac1018_scene_link_audit_test.c)
+        target_link_libraries(musacad_core_ac1018_scene_link_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2004_scene_owner_layer_links COMMAND musacad_core_ac1018_scene_link_test)
         # Portable checked file-region admission prior to real DWG section parsing.
         add_executable(musacad_core_dwg_regions_test tests/core_dwg_regions_test.c)
         target_link_libraries(musacad_core_dwg_regions_test PRIVATE musacad_core)
