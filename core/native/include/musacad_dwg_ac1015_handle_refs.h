@@ -35,6 +35,23 @@ int musa_dwg_ac1015_read_handle_ref(
 int musa_dwg_ac1015_read_exact_handle_tail(
     const MusaDwgAc1015ObjectRecord *record,
     size_t expected_count,MusaDwgAc1015HandleRef *refs,size_t capacity);
+/* Strict, read-only in-file reference lookup. The caller MUST provide a
+ * CRC-validated object record, refs decoded by the H reader, and a map
+ * returned by musa_dwg_ac1015_handles_index. It checks map membership and
+ * file positions, NOT semantic roles (owner/layer/reactor) or geometry.
+ * Requiring every target to exist is intentionally conservative: apply
+ * only to reference layouts known to be internal to this DWG file.
+ * Inputs are immutable; on failure preserve the entire output array.
+ */
+typedef struct MusaDwgAc1015ResolvedRef {
+    MusaDwgAc1015HandleRef ref;
+    uint64_t file_offset;
+} MusaDwgAc1015ResolvedRef;
+int musa_dwg_ac1015_resolve_refs_in_map(
+    const MusaDwgAc1015ObjectRecord *record,
+    const MusaDwgAc1015HandleRef *refs,size_t ref_count,
+    const MusaDwgAc1015HandleEntry *map,size_t map_count,
+    size_t file_bytes,MusaDwgAc1015ResolvedRef *out,size_t capacity);
 #ifdef __cplusplus
 }
 #endif
