@@ -165,6 +165,19 @@ static int get_offset(const MusaDwgAc1018Scene *s,uint64_t handle,
     *offset=(size_t)s->index[l].object_offset;
     return 1;
 }
+int musa_dwg_ac1018_scene_probe_nonentity_identity(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018NonEntityIdentity *out){
+    if(!s||!out||!handle||!s->objects||!s->index||
+       overlaps(s,sizeof(*s),out,sizeof(*out))||
+       overlaps(s->objects,s->object_bytes,out,sizeof(*out))||
+       overlaps(s->index,s->index_count*sizeof(*s->index),out,sizeof(*out)))
+       return 0;
+    size_t offset=0u;
+    if(!get_offset(s,handle,&offset))return 0;
+    return musa_dwg_ac1018_nonentity_identity_record(
+               s->objects,s->object_bytes,offset,handle,out);
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out)return 0;
