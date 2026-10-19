@@ -82,3 +82,54 @@ int musa_dwg_ac1015_read_exact_handle_tail(
     if(refs&&!tail_scan(r,expected_count,refs))return 0;
     return 1;
 }
+
+/* Binary lookup is valid only after complete, strictly increasing map
+ * verification. Do not infer link type from H.code or target membership.
+ */
+static int map_find(const MusaDwgAc1015HandleEntry *map,size_t count,
+                    uint64_t handle,uint64_t *offset){
+    size_t low=0u,high=count;
+    while(low<high){
+        const size_t mid=low+(high-low)/2u;
+        if(map[mid].handle<handle)low=mid+1u;
+        else high=mid;
+    }
+    if(low==count||map[low].handle!=handle)return 0;
+    *offset=map[low].file_offset;
+    return 1;
+}
+int musa_dwg_ac1015_resolve_refs_in_map(
+    const MusaDwgAc1015ObjectRecord *record,
+    const MusaDwgAc1015HandleRef *refs,size_t ref_count,
+    const MusaDwgAc1015HandleEntry *map,size_t map_count,
+    size_t file_bytes,MusaDwgAc1015ResolvedRef *out,size_t capacity){
+    if(!record||!record->record_crc_verified||!map||map_count==0u||
+       record->indexed_handle==0u||file_bytes==0u||
+       (uint64_t)record->absolute_offset>=(uint64_t)file_bytes||
+       (ref_count&&(!refs||!out))||ref_count>capacity||
+       (!out&&capacity!=0u))return 0;
+    /* Never trust arbitrary or unsorted arrays as a binary-search index. */
+    for(size_t i=0u;i<map_count;i++){
+        if(map[i].handle==0u||
+           map[i].file_offset>=(uint64_t)file_bytes||
+           (i&&map[i-1u].handle>=map[i].handle))return 0;
+    }
+    uint64_t origin=0u;
+    if(!map_find(map,map_count,record->indexed_handle,&origin)||
+       origin!=(uint64_t)record->absolute_offset)return 0;
+    /* First pass: every target must exist, before touching caller output. */
+    for(size_t i=0u;i<ref_count;i++){
+        uint64_t offset=0u;
+        if(refs[i].target==0u||
+           !map_find(map,map_count,refs[i].target,&offset))return 0;
+    }
+    for(size_t i=0u;i<ref_count;i++){
+        uint64_t offset=0u;
+        if(!map_find(map,map_count,refs[i].target,&offset))return 0;
+        MusaDwgAc1015ResolvedRef item={0};
+        item.ref=refs[i];
+        item.file_offset=offset;
+        out[i]=item;
+    }
+    return 1;
+}
