@@ -178,6 +178,12 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_curve(s,0u,&arc));
     assert(!musa_dwg_ac1018_scene_read_curve(s,0x1235u,&arc));
     assert(!musa_dwg_ac1018_scene_read_curve(s,0x49au,NULL));
+    /* An accidental output alias must not corrupt the cached scene. */
+    assert(!musa_dwg_ac1018_scene_read_curve(
+                   s,0x49au,(MusaDwgAc1018Curve*)(void*)s));
+    assert(musa_dwg_ac1018_scene_handle_count(s)==2u);
+    assert(musa_dwg_ac1018_scene_read_curve(s,0x49au,&circle));
+    assert(memcmp(&circle,&saved_circle,sizeof(circle))==0);
     MusaDwgAc1018Line line={0};
     assert(!musa_dwg_ac1018_scene_read_line(s,0x49au,&line));
     assert(memcmp(&arc,&saved_arc,sizeof(arc))==0);
