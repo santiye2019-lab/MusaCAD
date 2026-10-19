@@ -120,7 +120,8 @@ static void section(uint8_t *p,uint64_t n,uint32_t section_id,
  * Handle 0x33 -> LAYER @0, 0x11B -> BLOCK_HEADER @first record length.
  * A wrong embedded self H intentionally leaves outer page and object
  * CRC16 valid, testing that a matching map entry is not sufficient. */
-static void construct(uint8_t file[1120],int wrong_layer_self){
+static void construct(uint8_t file[1120],int wrong_layer_self,
+                      int wrong_other_self,uint16_t other_type){
     memset(file,0u,1120u);memcpy(file,"AC1018",6u);
     uint8_t head[0x6c]={0};
     memcpy(head,"AcFssFcAJMB",11u);
@@ -134,7 +135,8 @@ static void construct(uint8_t file[1120],int wrong_layer_self){
     }
     uint8_t objs[128]={0},h[13]={0};
     const size_t first=make(objs,51u,wrong_layer_self?0x34u:0x33u,0);
-    const size_t second=make(objs+first,49u,0x11bu,0);
+    const size_t second=make(objs+first,other_type,
+                             wrong_other_self?0x11cu:0x11bu,0);
     const size_t total=first+second;
     assert(total<=sizeof(objs)&&first<128u);
     h[1]=7u;
@@ -170,7 +172,7 @@ static void construct(uint8_t file[1120],int wrong_layer_self){
 }
 int main(void){
     uint8_t file[1120]={0};
-    construct(file,0);
+    construct(file,0,0,49u);
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==2u);
@@ -209,19 +211,48 @@ int main(void){
     assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
                  scene,0x33u,&layer));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
-    construct(file,1);
+    construct(file,1,0,49u);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     /* Both the outer page and MS record CRC remain correct. */
     MusaDwgAc1018RecordProbe record={0};
     assert(musa_dwg_ac1018_scene_probe_record_handle(
                  scene,0x33u,&record)&&record.record_crc_verified&&
                  record.declared_type==51u);
+    /* Valid page CRC and MS record CRC do not excuse a mismatched H.
+     * The all-indexed inventory must fail without touching the output. */
+    assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(!memcmp(&inventory,&saved_inventory,sizeof(inventory)));
     saved=layer;
     assert(!musa_dwg_ac1018_scene_probe_nonentity_identity(
                  scene,0x33u,&layer));
     assert(!memcmp(&layer,&saved,sizeof(saved)));
     assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
                  scene,0x11bu,&owner)); /* correct unaffected target */
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Same fail-closed policy for the indexed BLOCK_HEADER self identity. */
+    construct(file,0,1,49u);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_probe_record_handle(
+                  scene,0x11bu,&record)&&record.record_crc_verified&&
+                  record.declared_type==49u);
+    assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(!memcmp(&inventory,&saved_inventory,sizeof(inventory)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* A CRC-backed DICTIONARY (type 42) is still opaque but its
+     * embedded indexed identity must agree for non-strict inventory. */
+    construct(file,0,0,42u);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(inventory.other_declared_records==2u&&
+           !inventory.only_supported_primitives_decoded);
+    assert(musa_dwg_ac1018_scene_probe_nonentity_identity(
+                  scene,0x11bu,&owner)&&owner.declared_type==42u);
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    const MusaDwgAc1018SceneInventory dictionary_inventory=inventory;
+    construct(file,0,1,42u);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(!memcmp(&inventory,&dictionary_inventory,sizeof(inventory)));
     musa_dwg_ac1018_scene_close(scene);
     return 0;
 }
