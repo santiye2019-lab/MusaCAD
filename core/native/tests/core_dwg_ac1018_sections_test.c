@@ -95,6 +95,8 @@ int main(void){
     const size_t saved=bytes;
     assert(!musa_dwg_ac1018_extract_section(file,sizeof(file),
         MUSA_DWG_AC1018_HANDLES,result,sizeof(result)-1u,&bytes));
+    assert(!musa_dwg_ac1018_extract_section(file,sizeof(file),
+        MUSA_DWG_AC1018_HANDLES,file,sizeof(file),&bytes));
     file[288u]^=1u; /* Data checksum mismatch */
     assert(!musa_dwg_ac1018_extract_section(file,sizeof(file),
         MUSA_DWG_AC1018_HANDLES,result,sizeof(result),&bytes));
