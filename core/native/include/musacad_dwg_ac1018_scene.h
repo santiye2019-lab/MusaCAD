@@ -55,6 +55,12 @@ int musa_dwg_ac1018_scene_probe_record_handle(
 int musa_dwg_ac1018_scene_probe_nonentity_identity(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018NonEntityIdentity *out);
+/* Indexed cached-scene access to the first-party ASCII-only LAYER
+ * DATA PREFIX. Rejects wrong type/self-H/CRC, unsupported codepage and
+ * overlap with immutable cached source. NOT full AcDb semantic decode. */
+int musa_dwg_ac1018_scene_read_layer_prefix(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018LayerPrefix *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
