@@ -21,6 +21,23 @@ int musa_dwg_ac1018_scene_open(const uint8_t *file,size_t file_bytes,
                               MusaDwgAc1018Scene **out);
 void musa_dwg_ac1018_scene_close(MusaDwgAc1018Scene *scene);
 size_t musa_dwg_ac1018_scene_handle_count(const MusaDwgAc1018Scene *scene);
+/* Enumeration of the CRC-backed index in strictly ascending handle order.
+ * Probe verifies the individual MS record frame + CRC-16 and reads only
+ * the DECLARED BS type, not geometry, owner, class, or layer semantics.
+ * Thus an unknown declared type is valid inventory, not accepted geometry.
+ * Returns 0 on bad ordinal, malformed record or checksum failure and
+ * preserves *out atomically. No scan of records is hidden in scene_open.
+ */
+typedef struct MusaDwgAc1018RecordProbe {
+    uint64_t handle;
+    uint64_t object_offset;  /* relative to decoded AcDbObjects */
+    size_t record_bytes;     /* framed payload plus length and CRC */
+    uint16_t declared_type;  /* untrusted type claim from CRC-backed bits */
+    uint8_t record_crc_verified;
+} MusaDwgAc1018RecordProbe;
+int musa_dwg_ac1018_scene_probe_record_at(
+    const MusaDwgAc1018Scene *scene,size_t index_ordinal,
+    MusaDwgAc1018RecordProbe *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Reads 1..100000 OCS vertices and metadata, never partial output.
