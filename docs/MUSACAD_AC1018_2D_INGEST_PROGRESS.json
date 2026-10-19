@@ -3,11 +3,11 @@
   "name": "MusaCAD AC1018 2D file ingest workstream milestone coverage",
   "metric_kind": "bounded_workstream_milestone_coverage_not_core_completion_not_autocad_parity",
   "scope": "AC1018/R2004 native ham dosyadan iki boyutlu geometri/nesne okuma entegrasyon zinciri",
-  "baseline_main_merge": "604470bd0bfa2fe798873ec1142234a93b8b8aed",
+  "baseline_main_merge": "20e62c4f768723d5e514b133788ae27255609251",
   "method": "Fixed 16 binary, explicitly named milestones. verified requires a merged PR and extant source+test evidence; pending never counts. Denominator only changes by separately reviewed plan revision. This is NOT a fraction of all CAD features, lines of code, labor, certified AutoCAD equivalence or full product readiness.",
-  "verified_milestones": 10,
+  "verified_milestones": 11,
   "total_milestones": 16,
-  "coverage_percent": 62.5,
+  "coverage_percent": 68.75,
   "full_core_gate_coverage_reference": {
     "path": "docs/MUSACAD_CORE_COMPLETION_GATES.json",
     "last_verified_accepted": 10,
@@ -129,7 +129,13 @@
     {
       "id": "raw_arc_circle_by_handle",
       "name": "ARC/CIRCLE nesneleri ham dosya oturumundan indeksli ve tam veri okumasi",
-      "status": "pending"
+      "status": "verified",
+      "merged_pr": 418,
+      "evidence": [
+        "core/native/src/musacad_dwg_ac1018_file_curve.c",
+        "core/native/tests/core_dwg_ac1018_file_curve_test.c"
+      ],
+      "verification_scope": "7/7 latest-head GitHub checks succeeded on commit c64ce55a68dd648fc129871882b3efcf378b7a88; merged squash 20e62c4f768723d5e514b133788ae27255609251; synthetic original binary AC1018 ARC/CIRCLE checked"
     },
     {
       "id": "typed_layer_owner_targets",
