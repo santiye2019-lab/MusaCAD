@@ -188,6 +188,16 @@ int musa_dwg_ac1018_scene_probe_nonentity_identity(
     return musa_dwg_ac1018_nonentity_identity_record(
                s->objects,s->object_bytes,offset,handle,out);
 }
+int musa_dwg_ac1018_scene_read_layer_prefix(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018LayerPrefix *out){
+    if(!s||!out||!handle||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    size_t offset=0u;
+    if(!get_offset(s,handle,&offset))return 0;
+    return musa_dwg_ac1018_layer_prefix_record(
+               s->objects,s->object_bytes,offset,handle,out);
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
