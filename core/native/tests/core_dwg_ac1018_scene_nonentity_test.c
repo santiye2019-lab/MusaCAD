@@ -216,6 +216,10 @@ int main(void){
     assert(musa_dwg_ac1018_scene_probe_record_handle(
                  scene,0x33u,&record)&&record.record_crc_verified&&
                  record.declared_type==51u);
+    /* Valid page CRC and MS record CRC do not excuse a mismatched H.
+     * The all-indexed inventory must fail without touching the output. */
+    assert(!musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
+    assert(!memcmp(&inventory,&saved_inventory,sizeof(inventory)));
     saved=layer;
     assert(!musa_dwg_ac1018_scene_probe_nonentity_identity(
                  scene,0x33u,&layer));
