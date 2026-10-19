@@ -314,3 +314,20 @@ DWG object record readers. APK/release behavior is unchanged.
 Specification: Open Design Alliance, *Open Design Specification for .dwg
 files*, section "HANDLE REFERENCES" (code/count/relative handles),
 https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf.
+
+## P0: Conservative in-file handle membership validation
+
+After `musa_dwg_ac1015_handles_index` and exact-count H decoding, the
+new `musa_dwg_ac1015_resolve_refs_in_map` API validates all map keys are
+strictly increasing, file offsets lie in the source, the CRC-verified
+referring object's ID and source offset are both in the index, and every
+supplied internal handle target resolves to an object position.
+It uses bounded binary search and preserves caller output on *any*
+failure (missing/dangling handle, duplicate/unsorted index, wrong origin,
+bad CRC flag, or insufficient output capacity). Synthetic tests cover
+successful resolution and each failure mode. This is NOT a complete
+R2000 owner/reactor/layer/linetype graph: semantic role, permissible
+external/soft links, expected H count, cross-object type constraints,
+and independent real DWG coordinate evidence remain pending. The strict
+resolver must not be applied to unknown/external-reference layouts.
+Core completion remains 10/25 = 40%.

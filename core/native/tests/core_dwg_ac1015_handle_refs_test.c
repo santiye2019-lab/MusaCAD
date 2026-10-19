@@ -138,8 +138,58 @@ static void tail(void){
     CHECK(!musa_dwg_ac1015_read_exact_handle_tail(&r,2u,out,2u));
     CHECK(!memcmp(before,out,sizeof(out)));
 }
+static void indexed_resolution(void){
+    uint8_t f[512];
+    make_record(f,0,0);
+    const MusaDwgAc1015HandleEntry own={0x3au,128u};
+    MusaDwgAc1015ObjectRecord record={0};
+    CHECK(musa_dwg_ac1015_read_object_record(f,sizeof(f),&own,&record));
+    MusaDwgAc1015HandleRef refs[2]={0};
+    CHECK(musa_dwg_ac1015_read_exact_handle_tail(&record,2u,refs,2u));
+    MusaDwgAc1015HandleEntry map[3]={
+        {0x3au,128u},{0x3bu,256u},{0x7fu,384u}
+    };
+    MusaDwgAc1015ResolvedRef out[2]={0};
+    CHECK(musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));
+    CHECK(out[0].ref.target==0x7fu&&out[0].file_offset==384u);
+    CHECK(out[1].ref.target==0x3bu&&out[1].file_offset==256u);
+    const MusaDwgAc1015ResolvedRef unchanged[2]={out[0],out[1]};
+#define UNTOUCHED() CHECK(memcmp(out,unchanged,sizeof(out))==0)
+    map[2].handle=0x7eu; /* Unknown target. */
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    map[2].handle=0x7fu;
+    map[1].handle=0x3au; /* Duplicate index key. */
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    map[1].handle=0x3bu;
+    map[2].handle=0x35u; /* Non-monotonic index. */
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    map[2].handle=0x7fu;
+    map[1].file_offset=sizeof(f); /* Beyond source file. */
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    map[1].file_offset=256u;
+    map[0].file_offset=127u; /* Origin does not match CRC record. */
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    map[0].file_offset=128u;
+    MusaDwgAc1015ObjectRecord invalid=record;
+    invalid.record_crc_verified=0;
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &invalid,refs,2u,map,3u,sizeof(f),out,2u));UNTOUCHED();
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),out,1u));UNTOUCHED();
+    CHECK(!musa_dwg_ac1015_resolve_refs_in_map(
+        &record,refs,2u,map,3u,sizeof(f),NULL,0u));UNTOUCHED();
+    CHECK(musa_dwg_ac1015_resolve_refs_in_map(
+        &record,NULL,0u,map,3u,sizeof(f),NULL,0u));
+#undef UNTOUCHED
+}
 int main(void){
-    single();tail();
-    puts("PASS: R2000 canonical H absolute/typed/relative, unaligned CRC-backed tail and transactional rollback");
+    single();tail();indexed_resolution();
+    puts("PASS: R2000 H codec, CRC-backed tail, strict indexed reference targets and rollback");
     return 0;
 }
