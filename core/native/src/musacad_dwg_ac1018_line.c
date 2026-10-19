@@ -41,9 +41,9 @@ static int read_double_pair(MusaDwgAc1015Bits *b, double *first, double *last) {
     return musa_dwg_ac1015_bits_read_rd(b, first) &&
            musa_dwg_ac1015_bits_read_dd(b, *first, last);
 }
-int musa_dwg_ac1018_read_line_record(const uint8_t *object_section,
+static int read_line_impl(const uint8_t *object_section,
     size_t section_bytes, size_t object_offset, uint64_t indexed_handle,
-    MusaDwgAc1018Line *out) {
+    uint32_t permitted_reactors, MusaDwgAc1018Line *out) {
     if (!object_section || !out || !indexed_handle ||
         object_offset >= section_bytes) return 0;
     const size_t remaining = section_bytes - object_offset;
@@ -76,7 +76,7 @@ int musa_dwg_ac1018_read_line_record(const uint8_t *object_section,
     result.handle = indexed_handle;
     result.eed_raw_bytes_skipped = eed_raw_bytes;
     if (!musa_dwg_ac1015_bits_read_u(&b, 2u, &flag) || flag == 3u ||
-        !musa_dwg_ac1015_bits_read_bl(&b, &reactors) || reactors != 0u)
+        !musa_dwg_ac1015_bits_read_bl(&b, &reactors) || reactors != permitted_reactors)
         return 0;
     result.entity_mode = (uint8_t)flag;
     if (!musa_dwg_ac1015_bits_read_u(&b, 1u, &flag)) return 0;
@@ -113,5 +113,40 @@ int musa_dwg_ac1018_read_line_record(const uint8_t *object_section,
     if (!isfinite(result.thickness) || !isfinite(result.linetype_scale))
         return 0;
     *out = result;
+    return 1;
+}
+
+/* Retain original conservative API contract for all old call sites. */
+int musa_dwg_ac1018_read_line_record(const uint8_t *object_section,
+    size_t section_bytes, size_t object_offset, uint64_t indexed_handle,
+    MusaDwgAc1018Line *out) {
+    return read_line_impl(object_section,section_bytes,object_offset,
+                          indexed_handle,0u,out);
+}
+int musa_dwg_ac1018_read_line_with_reactors(
+    const uint8_t *object_section,size_t section_bytes,
+    size_t object_offset,uint64_t indexed_handle,
+    const MusaDwgAc1015HandleEntry *index,size_t index_count,
+    uint64_t *reactor_targets,size_t capacity,
+    MusaDwgAc1018ReactorAudit *link_audit,
+    MusaDwgAc1018Line *geometry) {
+    if(!reactor_targets||!link_audit||!geometry||!capacity)return 0;
+    /* Audit first into local scratch, never expose handles if geometry
+     * decoding fails. Max 64 reactors is enforced by audit routine. */
+    uint64_t local_handles[64]={0};
+    MusaDwgAc1018ReactorAudit checked={0};
+    MusaDwgAc1018Line checked_geometry={0};
+    if(!musa_dwg_ac1018_read_reactor_links(
+            object_section,section_bytes,object_offset,indexed_handle,
+            index,index_count,local_handles,64u,&checked) ||
+       checked.reactor_count>capacity ||
+       !read_line_impl(object_section,section_bytes,object_offset,
+                       indexed_handle,checked.reactor_count,
+                       &checked_geometry))return 0;
+    checked.geometry_decoded=1u;
+    memcpy(reactor_targets,local_handles,
+           (size_t)checked.reactor_count*sizeof(local_handles[0]));
+    *link_audit=checked;
+    *geometry=checked_geometry;
     return 1;
 }

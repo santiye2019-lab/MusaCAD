@@ -75,6 +75,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_ac1018_reactor_test tests/core_dwg_ac1018_reactor_links_test.c)
         target_link_libraries(musacad_core_ac1018_reactor_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2004_reactor_handle_map_audit COMMAND musacad_core_ac1018_reactor_test)
+        # R2004 LINE/LWPOLYLINE geometry gated on verified reactor H graph.
+        add_executable(musacad_core_ac1018_reactor_geometry_test tests/core_dwg_ac1018_reactor_geometry_test.c)
+        target_link_libraries(musacad_core_ac1018_reactor_geometry_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2004_reactor_gated_coordinates COMMAND musacad_core_ac1018_reactor_geometry_test)
         # Portable checked file-region admission prior to real DWG section parsing.
         add_executable(musacad_core_dwg_regions_test tests/core_dwg_regions_test.c)
         target_link_libraries(musacad_core_dwg_regions_test PRIVATE musacad_core)

@@ -3,6 +3,7 @@
 #define MUSACAD_DWG_AC1018_LWPOLYLINE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "musacad_dwg_ac1018_reactor_links.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,6 +51,19 @@ int musa_dwg_ac1018_read_lwpolyline_record(const uint8_t *object_section,
 int musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
     const MusaDwgAc1018LWPolyline *poly,
     const MusaDwgAc1018LWVertex *vertex, double out_xyz[3]);
+/* Checked entity+reactor graph entry point. OCS output stays OCS;
+ * call vertex_to_wcs to apply elevation/extrusion after validation.
+ * Existing read_lwpolyline_record() still fails closed for all reactors.
+ * Both vertex array and all metadata/handle outputs are atomic on error.
+ */
+int musa_dwg_ac1018_read_lwpolyline_with_reactors(
+    const uint8_t *object_section,size_t section_bytes,
+    size_t object_offset,uint64_t indexed_handle,
+    const MusaDwgAc1015HandleEntry *index,size_t index_count,
+    MusaDwgAc1018LWVertex *vertices,size_t vertex_capacity,
+    uint64_t *reactor_targets,size_t reactor_capacity,
+    MusaDwgAc1018ReactorAudit *link_audit,
+    MusaDwgAc1018LWPolyline *geometry);
 #ifdef __cplusplus
 }
 #endif
