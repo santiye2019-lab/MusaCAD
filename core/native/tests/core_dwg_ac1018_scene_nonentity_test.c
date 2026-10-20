@@ -39,9 +39,9 @@ static size_t make(uint8_t out[64],uint16_t type,
     if(reactor_overflow){put(&w,2u,1u);byte(&w,65u);}
     else put(&w,2u,2u); /* BL reactor zero */
     put(&w,1u,1u); /* missing extension dictionary */
-    if(named_layer==3){
+    if(named_layer==3||named_layer==4){
         assert(type==50u);
-        put(&w,2u,1u);byte(&w,1u); /* BL one LAYER entry */
+        put(&w,2u,1u);byte(&w,named_layer==4?2u:1u); /* BL */
     }else if(named_layer){
         assert(type==51u);
         put(&w,2u,1u);byte(&w,4u); /* TV length BS */
@@ -63,10 +63,13 @@ static size_t make(uint8_t out[64],uint16_t type,
         for(unsigned b=0;b<8u;b++)
             setbit(&w,rl_at+(size_t)i*8u+b,
                    ((uint32_t)endbit>>(8u*i+7u-b))&1u);
-    if(named_layer==3){
+    if(named_layer==3||named_layer==4){
         byte(&w,0x40u); /* NULL soft pointer root, H 4:0 */
         byte(&w,0x22u);byte(&w,0x01u);byte(&w,0x1bu);
         /* LAYER target H 2:2:01:1b, matching the scene's second handle */
+        if(named_layer==4){
+            byte(&w,0x22u);byte(&w,0x01u);byte(&w,0x1bu);
+        } /* duplicate layer entries must be rejected by scene audit */
     }
     const size_t body=(w.bits+7u)/8u;
     assert(body<sizeof(w.data)&&body<UINT16_MAX);
@@ -159,7 +162,7 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
     uint8_t objs[128]={0},h[13]={0};
-    const size_t first=make(objs,named_layer==3?50u:51u,
+    const size_t first=make(objs,(named_layer==3||named_layer==4)?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
                             0,named_layer);
     const size_t second=make(objs+first,other_type,
@@ -378,6 +381,14 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
                   scene,0x33u,refs,2u,
                   (MusaDwgAc1018LayerControlRefs*)(void*)scene));
+    assert(!memcmp(refs,original_refs,sizeof(refs))&&
+           !memcmp(&ref_report,&original_report,sizeof(ref_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Even CRC-valid LAYER_CONTROL -> LAYER targets may not repeat. */
+    construct(file,0,0,51u,4);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,2u,&ref_report));
     assert(!memcmp(refs,original_refs,sizeof(refs))&&
            !memcmp(&ref_report,&original_report,sizeof(ref_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
