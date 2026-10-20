@@ -803,7 +803,7 @@ typedef struct MusaDwgAc1018LwRibbonBevelWcsEnvelope {
     uint32_t straight_segments;
     uint32_t bevel_bridge_count;
     uint32_t discontinuous_width_junctions;
-    uint32_t curve_intervals_total;
+    uint64_t curve_intervals_total;
     double maximum_curve_gap;
     double maximum_bevel_edge_gap;
     double requested_tolerance;
