@@ -601,6 +601,146 @@ int musa_dwg_ac1018_scene_read_verified_entity_layer(
     free(layers);
     return valid;
 }
+/* Strict batch validation: one entire supported palette/table pass,
+ * then per-entity O(log N) handle resolution and checked link identities.
+ * This avoids repeatedly rebuilding the layer graph for every drawable.
+ */
+int musa_dwg_ac1018_scene_read_entity_layer_batch(
+    const MusaDwgAc1018Scene *s,
+    const uint64_t *entity_handles,size_t count,
+    MusaDwgAc1018EntityLayerLink *links,size_t capacity,
+    MusaDwgAc1018EntityLayerBatchReport *out){
+    if(!s||!s->index||!s->objects||!entity_handles||!links||!out||
+       !count||count>262144u||capacity<count||capacity>262144u||
+       count>s->index_count||
+       count>SIZE_MAX/sizeof(*entity_handles)||
+       count>SIZE_MAX/sizeof(*links)||
+       capacity>SIZE_MAX/sizeof(*links)||
+       scene_output_overlaps(s,links,capacity*sizeof(*links))||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       scene_output_overlaps(s,entity_handles,count*sizeof(*entity_handles))||
+       overlaps(entity_handles,count*sizeof(*entity_handles),
+                links,capacity*sizeof(*links))||
+       overlaps(entity_handles,count*sizeof(*entity_handles),
+                out,sizeof(*out))||
+       overlaps(links,capacity*sizeof(*links),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018LayerTableCoverage coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_layer_table_coverage(s,&coverage)||
+       !coverage.all_indexed_layers_have_unique_table||
+       !coverage.indexed_layers||coverage.indexed_layers>65536u||
+       coverage.indexed_layers>SIZE_MAX/sizeof(MusaDwgAc1018LayerColor)||
+       coverage.indexed_layers>SIZE_MAX/sizeof(uint64_t))
+        return 0;
+    const size_t n=coverage.indexed_layers;
+    MusaDwgAc1018LayerColor *palette=
+        (MusaDwgAc1018LayerColor*)calloc(n,sizeof(*palette));
+    uint64_t *controls=(uint64_t*)calloc(n,sizeof(*controls));
+    uint64_t *refs=(uint64_t*)malloc(4096u*sizeof(*refs));
+    uint64_t *sorted=(uint64_t*)malloc(count*sizeof(*sorted));
+    MusaDwgAc1018EntityLayerLink *staged=
+        (MusaDwgAc1018EntityLayerLink*)calloc(count,sizeof(*staged));
+    int valid=palette&&controls&&refs&&sorted&&staged;
+    if(!valid)goto batch_done;
+    MusaDwgAc1018LayerPaletteReport report={0};
+    if(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+             s,palette,n,&report)||
+       report.indexed_layers!=n||
+       report.indexed_layer_controls!=coverage.indexed_controls||
+       !report.unique_ascii_names_verified||
+       !report.raw_cmc_fields_verified){
+        valid=0;goto batch_done;
+    }
+    memcpy(sorted,entity_handles,count*sizeof(*sorted));
+    qsort(sorted,count,sizeof(*sorted),compare_layer_handle_u64);
+    for(size_t i=0u;i<count;i++){
+        if(!sorted[i]||(i&&sorted[i]==sorted[i-1u])){
+            valid=0;goto batch_done;
+        }
+    }
+    /* Derive per-layer table H ONCE from exact original table H tails. */
+    size_t matched=0u,table_count=0u;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;goto batch_done;
+        }
+        if(probe.declared_type!=50u)continue;
+        MusaDwgAc1018LayerControlRefs control={0};
+        if(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                s,probe.handle,refs,4096u,&control)||
+           control.indexed_handle!=probe.handle||
+           !control.crc_verified||!control.embedded_self_verified||
+           !control.supported_handle_roles_verified){
+            valid=0;goto batch_done;
+        }
+        table_count++;
+        for(uint32_t j=0u;j<control.entry_count;j++){
+            const uint64_t h=refs[j];
+            size_t lo=0u,hi=n;
+            while(lo<hi){
+                const size_t m=lo+(hi-lo)/2u;
+                if(palette[m].prefix.indexed_handle<h)lo=m+1u;
+                else hi=m;
+            }
+            if(lo==n||palette[lo].prefix.indexed_handle!=h||
+               controls[lo]!=0u){
+                valid=0;goto batch_done;
+            }
+            controls[lo]=probe.handle;
+            matched++;
+        }
+    }
+    if(matched!=n||table_count!=coverage.indexed_controls){
+        valid=0;goto batch_done;
+    }
+    for(size_t i=0u;i<count;i++){
+        const uint64_t h=entity_handles[i];
+        MusaDwgAc1018RecordProbe record={0};
+        if(!musa_dwg_ac1018_scene_probe_record_handle(s,h,&record)||
+           (record.declared_type!=17u&&record.declared_type!=18u&&
+            record.declared_type!=19u&&record.declared_type!=77u)){
+            valid=0;goto batch_done;
+        }
+        MusaDwgAc1018FixedLinkIdentities checked={0};
+        if(!musa_dwg_ac1018_scene_audit_fixed_link_identities(
+                 s,h,&checked)||
+           !checked.verified_fixed_identity_links||
+           checked.roles.link_roles.handle!=h||
+           !checked.layer.record_crc_verified||
+           !checked.layer.embedded_self_verified){
+            valid=0;goto batch_done;
+        }
+        const uint64_t target=checked.roles.link_roles.layer_handle;
+        size_t lo=0u,hi=n;
+        while(lo<hi){
+            const size_t m=lo+(hi-lo)/2u;
+            if(palette[m].prefix.indexed_handle<target)lo=m+1u;
+            else hi=m;
+        }
+        if(lo==n||palette[lo].prefix.indexed_handle!=target||
+           checked.layer.indexed_handle!=target||!controls[lo]){
+            valid=0;goto batch_done;
+        }
+        staged[i].entity_handle=h;
+        staged[i].layer_handle=target;
+        staged[i].layer_control_handle=controls[lo];
+        staged[i].raw_cmc_rgb=palette[lo].raw_cmc_rgb;
+    }
+    {
+        MusaDwgAc1018EntityLayerBatchReport summary={0};
+        summary.verified_entities=count;
+        summary.verified_layers=n;
+        summary.verified_layer_controls=table_count;
+        summary.verified_unique_entity_handles=1u;
+        summary.complete_layer_membership_verified=1u;
+        memcpy(links,staged,count*sizeof(*links));
+        *out=summary;
+    }
+batch_done:
+    free(staged);free(sorted);free(refs);free(controls);free(palette);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
