@@ -1784,11 +1784,13 @@ int musa_dwg_ac1018_bulge_segment_wcs_bounds(
     *out=checked;
     return 1;
 }
-int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+/* Shared original-DWG parser: width admission changes ONLY the nature of
+ * the published EVIDENCE, never the actual bulge/segment decode. */
+static int read_bulge_centerline_impl(
     const MusaDwgAc1018Scene *s,uint64_t handle,
-    MusaDwgAc1018BulgedPolylineWcsBounds *out){
-    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
-        return 0;
+    int reject_nonzero_width,
+    MusaDwgAc1018BulgeCenterlineAudit *out){
+    if(!s||!handle||!out)return 0;
     MusaDwgAc1018RecordProbe record={0};
     if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
        record.declared_type!=77u)return 0;
@@ -1800,20 +1802,28 @@ int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
                s,handle,vertices,100000u,&poly)&&
               poly.handle==handle&&poly.vertex_count>=2u&&
               poly.vertex_count<=100000u&&
-              isfinite(poly.constant_width)&&poly.constant_width==0.0&&
+              isfinite(poly.constant_width)&&
               isfinite(poly.thickness)&&isfinite(poly.elevation);
+    MusaDwgAc1018BulgeCenterlineAudit audit={0};
     MusaDwgAc1018BulgedPolylineWcsBounds checked={0};
     if(valid){
+        audit.nonzero_constant_width=
+                    (uint8_t)(poly.constant_width!=0.0);
+        if(reject_nonzero_width&&audit.nonzero_constant_width)valid=0;
         checked.handle=handle;
         checked.vertex_count=poly.vertex_count;
         checked.segment_count=poly.vertex_count-(poly.closed?0u:1u);
         for(uint32_t i=0u;i<poly.vertex_count;i++){
             const MusaDwgAc1018LWVertex *v=&vertices[i];
-            if(!isfinite(v->start_width)||v->start_width!=0.0||
-               !isfinite(v->end_width)||v->end_width!=0.0||
+            if(!isfinite(v->start_width)||
+               !isfinite(v->end_width)||
                !isfinite(v->x)||!isfinite(v->y)||
                !isfinite(v->bulge)){
                 valid=0;break;
+            }
+            if(v->start_width!=0.0||v->end_width!=0.0){
+                audit.nonzero_variable_width_vertices++;
+                if(reject_nonzero_width){valid=0;break;}
             }
         }
         if(!poly.closed&&vertices[poly.vertex_count-1u].bulge!=0.0)
@@ -1844,6 +1854,29 @@ int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
     }
     free(vertices);
     if(!valid)return 0;
+    audit.centerline=checked;
+    audit.excluded_width_geometry=(uint8_t)(
+                audit.nonzero_constant_width||
+                audit.nonzero_variable_width_vertices!=0u);
+    *out=audit;
+    return 1;
+}
+int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018BulgedPolylineWcsBounds *out){
+    if(!s||!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018BulgeCenterlineAudit checked={0};
+    if(!read_bulge_centerline_impl(s,handle,1,&checked)||
+       checked.excluded_width_geometry)return 0;
+    *out=checked.centerline;
+    return 1;
+}
+int musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018BulgeCenterlineAudit *out){
+    if(!s||!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018BulgeCenterlineAudit checked={0};
+    if(!read_bulge_centerline_impl(s,handle,0,&checked))return 0;
     *out=checked;
     return 1;
 }
