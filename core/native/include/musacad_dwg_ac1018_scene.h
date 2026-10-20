@@ -77,6 +77,18 @@ int musa_dwg_ac1018_scene_read_layer_control_refs(
     const MusaDwgAc1018Scene *scene,uint64_t control_handle,
     uint64_t *entry_handles,size_t capacity,
     MusaDwgAc1018LayerControlRefs *out);
+/* Reverse membership SEARCH, not the embedded LAYER owner-H grammar.
+ * Verify a numeric LAYER 51 self-H, then scan every indexed object for
+ * supported, CRC/self-H checked LAYER_CONTROL 50 tables. Each such table's
+ * full H target set must resolve, and the requested layer must appear in
+ * exactly one of them. Unsupported/corrupt tables cause fail-closed return.
+ * O(scene records + validated table refs), one bounded scratch allocation.
+ * Never infer a verified AcDb class, owner/parent H, or DWG parity.
+ * The output is unchanged on failure.
+ */
+int musa_dwg_ac1018_scene_find_layer_control_membership(
+    const MusaDwgAc1018Scene *scene,uint64_t layer_handle,
+    uint64_t *out_control_handle);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
