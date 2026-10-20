@@ -1012,7 +1012,7 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x42bu,3u,&complex_join));
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
-                  s,UINT64_C(0xbeefu),0u,&complex_join));
+                  s,UINT64_C(0xbeef),0u,&complex_join));
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x42bu,1u,NULL));
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
