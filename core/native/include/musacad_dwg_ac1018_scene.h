@@ -697,6 +697,50 @@ int musa_dwg_ac1018_bulge_edge_snapshot_enclose(
     const MusaDwgAc1018BulgeEdgeSnapshot *snapshot,
     double requested_tolerance,uint32_t max_intervals,
     MusaDwgAc1018BulgeEdgeWcsEnvelope *out);
+/* Audit ONE adjacent-segment junction in an original CRC-protected
+ * R2004/AC1018 LWPOLYLINE (2B or 3B projected from genuine OCS data).
+ * For an open polyline, only interior vertices have two segments; for a
+ * closed polyline, every vertex including vertex 0 has a previous/next.
+ *
+ * The returned endpoints are exact mathematical left/right ribbon EDGE
+ * points of the incoming segment at fraction 1 and outgoing at fraction
+ * 0. The unit edge tangents are derivatives of the true width-varying
+ * curves, NOT simply centerline/chord directions: bulges account for
+ * signed sweep and the radial term from start/end width differences.
+ * Both OCS->WCS geometry and signed thickness base/end are inspected.
+ *
+ * An edge gap is the WCS separation of the two boundary points at the
+ * joint; unequal source widths and unequal tangent directions are not
+ * silently stitched. This is a source-geometry AUDIT, not a DWG render
+ * join policy: no miter/bevel/round join fill, caps, linetype, lineweight,
+ * scene-wide closure or AutoCAD equivalence is asserted.
+ * Caller output is untouched on any malformed/nonfinite record.
+ */
+typedef struct MusaDwgAc1018LwJoinEdgeAudit {
+    uint64_t handle;
+    uint32_t vertex_index;
+    uint32_t incoming_segment_index;
+    uint32_t outgoing_segment_index;
+    uint8_t incoming_curved;
+    uint8_t outgoing_curved;
+    uint8_t source_widths_match;
+    uint8_t edge_endpoints_match;
+    uint8_t complete_visible_join_verified; /* always 0 */
+    double incoming_end_width;
+    double outgoing_start_width;
+    double center_wcs[3];
+    double incoming_edge_wcs[2][3]; /* [left,right] */
+    double outgoing_edge_wcs[2][3]; /* [left,right] */
+    double incoming_edge_tangent_wcs[2][3]; /* unit directed derivative */
+    double outgoing_edge_tangent_wcs[2][3];
+    double incoming_edge_thickness_wcs[2][3];
+    double outgoing_edge_thickness_wcs[2][3];
+    double edge_gap[2]; /* finite left/right 3D displacement */
+} MusaDwgAc1018LwJoinEdgeAudit;
+int musa_dwg_ac1018_scene_audit_lw_join_edges(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t vertex_index,MusaDwgAc1018LwJoinEdgeAudit *out);
+
 #ifdef __cplusplus
 }
 #endif
