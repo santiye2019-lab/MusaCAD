@@ -592,6 +592,51 @@ int main(void){
     MusaDwgAc1018Line incomplete_line={0};
     assert(!musa_dwg_ac1018_scene_read_line(
                   scene,0x120u,&incomplete_line));
+    /* Batch resolves all requested entities against ONE validated
+     * palette + per-layer table map. Header-only entity stays non-geometry. */
+    uint64_t requested[2]={UINT64_C(0x120),UINT64_C(0x120)};
+    MusaDwgAc1018EntityLayerLink batch_links[2]={{0}};
+    batch_links[1].raw_cmc_rgb=UINT32_C(0xdeadbeef);
+    MusaDwgAc1018EntityLayerBatchReport batch_report={0};
+    assert(musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,2u,&batch_report));
+    assert(batch_links[0].entity_handle==UINT64_C(0x120)&&
+           batch_links[0].layer_handle==UINT64_C(0x11b)&&
+           batch_links[0].layer_control_handle==UINT64_C(0x33)&&
+           batch_links[0].raw_cmc_rgb==UINT32_C(0x00112233)&&
+           batch_links[1].raw_cmc_rgb==UINT32_C(0xdeadbeef)&&
+           batch_report.verified_entities==1u&&
+           batch_report.verified_layers==1u&&
+           batch_report.verified_layer_controls==1u&&
+           batch_report.verified_unique_entity_handles&&
+           batch_report.complete_layer_membership_verified);
+    const MusaDwgAc1018EntityLayerLink kept_batch0=batch_links[0];
+    const MusaDwgAc1018EntityLayerLink kept_batch1=batch_links[1];
+    const MusaDwgAc1018EntityLayerBatchReport kept_batch_report=batch_report;
+    /* Duplicate requested IDs cannot cause duplicate viewport instances. */
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,2u,batch_links,2u,&batch_report));
+    requested[0]=UINT64_C(0x33); /* LAYER is not a 2D entity */
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,2u,&batch_report));
+    requested[0]=UINT64_C(0x121); /* missing entity */
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,2u,&batch_report));
+    requested[0]=UINT64_C(0x120);
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,0u,batch_links,2u,&batch_report));
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,0u,&batch_report));
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,2u,
+                  (MusaDwgAc1018EntityLayerBatchReport*)(void*)scene));
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,(const uint64_t*)(const void*)batch_links,
+                  1u,batch_links,2u,&batch_report));
+    assert(!memcmp(&batch_links[0],&kept_batch0,sizeof(kept_batch0))&&
+           !memcmp(&batch_links[1],&kept_batch1,sizeof(kept_batch1))&&
+           !memcmp(&batch_report,&kept_batch_report,
+                   sizeof(kept_batch_report)));
     const MusaDwgAc1018EntityLayerEvidence good_entity_layer=entity_layer;
     assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
                   scene,0x11bu,&entity_layer)); /* LAYER != entity */
@@ -610,6 +655,11 @@ int main(void){
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
                   scene,0x120u,&entity_layer));
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,1u,batch_links,2u,&batch_report));
+    assert(!memcmp(&batch_links[0],&kept_batch0,sizeof(kept_batch0))&&
+           !memcmp(&batch_report,&kept_batch_report,
+                   sizeof(kept_batch_report)));
     assert(!memcmp(&entity_layer,&good_entity_layer,sizeof(entity_layer)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
