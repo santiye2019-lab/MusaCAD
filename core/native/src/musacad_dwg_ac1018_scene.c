@@ -832,6 +832,96 @@ int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
     free(requested);
     return valid;
 }
+/* Evidence counters are deliberately independent: do not mark an
+ * arbitrary header-only LINE as geometry or a geometric LINE as linked.
+ * Whole indexed scene CRC + non-overlapping record envelopes are fatal
+ * integrity requirements. Unsupported valid records remain opaque counts.
+ */
+int musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+    const MusaDwgAc1018Scene *s,
+    MusaDwgAc1018GeometryLinkEvidence *out){
+    if(!s||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018SceneInventory inv={0};
+    MusaDwgAc1018RecordRangeAudit ranges={0};
+    if(!musa_dwg_ac1018_scene_inventory(s,0,&inv)||
+       !musa_dwg_ac1018_scene_audit_record_ranges(s,&ranges)||
+       !inv.all_indexed_record_crcs_verified||
+       !ranges.ranges_nonoverlapping||
+       inv.indexed_record_count!=ranges.indexed_records||
+       inv.indexed_record_count!=s->index_count)
+        return 0;
+
+    MusaDwgAc1018GeometryLinkEvidence checked={0};
+    checked.indexed_records=inv.indexed_record_count;
+    checked.other_declared_records=inv.other_declared_records;
+    checked.all_record_ranges_nonoverlapping=1u;
+    checked.all_indexed_record_crcs_verified=1u;
+    MusaDwgAc1018LWVertex *scratch=NULL;
+    int valid=1;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe record={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&record)){
+            valid=0;break;
+        }
+        if(record.declared_type!=17u&&record.declared_type!=18u&&
+           record.declared_type!=19u&&record.declared_type!=77u)
+            continue;
+        checked.declared_supported_2d_entities++;
+        int decoded=0;
+        if(record.declared_type==19u){
+            MusaDwgAc1018Line line={0};
+            decoded=musa_dwg_ac1018_scene_read_line(
+                        s,record.handle,&line)&&line.handle==record.handle;
+        }else if(record.declared_type==17u||record.declared_type==18u){
+            MusaDwgAc1018Curve curve={0};
+            decoded=musa_dwg_ac1018_scene_read_curve(
+                        s,record.handle,&curve)&&
+                    curve.handle==record.handle&&
+                    curve.type_code==record.declared_type;
+        }else{
+            if(!scratch){
+                scratch=(MusaDwgAc1018LWVertex*)malloc(
+                       100000u*sizeof(*scratch));
+                if(!scratch){valid=0;break;}
+            }
+            MusaDwgAc1018LWPolyline poly={0};
+            decoded=musa_dwg_ac1018_scene_read_lwpolyline(
+                        s,record.handle,scratch,100000u,&poly)&&
+                    poly.handle==record.handle;
+        }
+        MusaDwgAc1018FixedLinkIdentities link={0};
+        const int linked=musa_dwg_ac1018_scene_audit_fixed_link_identities(
+                           s,record.handle,&link)&&
+                           link.verified_fixed_identity_links&&
+                           link.roles.link_roles.handle==record.handle&&
+                           link.layer.indexed_handle==
+                                  link.roles.link_roles.layer_handle&&
+                           link.layer.embedded_self_verified;
+        if(decoded)checked.geometry_decoded++;
+        if(linked)checked.fixed_link_identities_verified++;
+        if(decoded&&linked)checked.geometry_and_links_verified++;
+        else if(decoded)checked.geometry_only++;
+        else if(linked)checked.links_only++;
+        else checked.neither_verified++;
+    }
+    free(scratch);
+    if(!valid||
+       checked.geometry_decoded!=inv.decoded_lines+
+          inv.decoded_arcs+inv.decoded_circles+inv.decoded_lwpolylines||
+       checked.declared_supported_2d_entities!=
+          checked.geometry_decoded+inv.undecodable_supported_records||
+       checked.declared_supported_2d_entities!=
+          checked.geometry_and_links_verified+checked.geometry_only+
+          checked.links_only+checked.neither_verified||
+       checked.geometry_decoded!=
+          checked.geometry_and_links_verified+checked.geometry_only||
+       checked.fixed_link_identities_verified!=
+          checked.geometry_and_links_verified+checked.links_only)
+        return 0;
+    *out=checked;
+    return 1;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
