@@ -288,6 +288,28 @@ int musa_dwg_ac1018_scene_read_record_diagnosis_page(
     const MusaDwgAc1018Scene *scene,size_t first_index,
     MusaDwgAc1018RecordDiagnosis *rows,size_t capacity,
     MusaDwgAc1018RecordDiagnosisPage *out);
+/* Immutable, self-contained original-H diagnosis snapshot.
+ * Audit the entire source once at creation (CRC, interval integrity and
+ * independent geometry/link evidence), copy all indexed results, and
+ * traverse pages without re-opening, reparsing or rescanning the DWG.
+ * Snapshot survives scene_close; the caller owns its lifetime. Results
+ * are diagnostics, not a claim of complete geometric CAD equivalence.
+ * Creation is bounded by the existing scene 1,000,000-H safety cap.
+ * Only the creator allocates; read_page performs NO allocations.
+ * On failed create/read, caller output is preserved byte-for-byte.
+ */
+typedef struct MusaDwgAc1018DiagnosisSnapshot MusaDwgAc1018DiagnosisSnapshot;
+int musa_dwg_ac1018_scene_create_diagnosis_snapshot(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018DiagnosisSnapshot **out);
+void musa_dwg_ac1018_diagnosis_snapshot_close(
+    MusaDwgAc1018DiagnosisSnapshot *snapshot);
+size_t musa_dwg_ac1018_diagnosis_snapshot_handle_count(
+    const MusaDwgAc1018DiagnosisSnapshot *snapshot);
+int musa_dwg_ac1018_diagnosis_snapshot_read_page(
+    const MusaDwgAc1018DiagnosisSnapshot *snapshot,
+    size_t first_index,MusaDwgAc1018RecordDiagnosis *rows,
+    size_t capacity,MusaDwgAc1018RecordDiagnosisPage *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object

@@ -221,6 +221,52 @@ int main(void){
     const MusaDwgAc1018RecordDiagnosis kept_diagnosis1=diagnoses[1];
     const MusaDwgAc1018RecordDiagnosisPage kept_diagnostic_page=
         diagnostic_page;
+    /* One full-scene audit/materialization, then O(page) reads without
+     * consulting original DWG or scene. Original H and flags preserved. */
+    MusaDwgAc1018DiagnosisSnapshot *snapshot=NULL;
+    assert(musa_dwg_ac1018_scene_create_diagnosis_snapshot(s,&snapshot));
+    assert(musa_dwg_ac1018_diagnosis_snapshot_handle_count(snapshot)==2u);
+    MusaDwgAc1018RecordDiagnosis cached_rows[3]={{0}};
+    MusaDwgAc1018RecordDiagnosisPage cached_page={0};
+    assert(musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,0u,cached_rows,1u,&cached_page));
+    assert(cached_page.total_indexed_records==2u&&
+           cached_page.records_written==1u&&
+           cached_page.next_index==1u&&
+           cached_page.link_audit_rejected_in_page==1u&&
+           cached_rows[0].indexed_handle==UINT64_C(0x40e)&&
+           cached_rows[0].geometry_decoded&&
+           cached_rows[0].evidence_issues==
+                MUSA_DWG_AC1018_DIAG_LINK_AUDIT_REJECTED);
+    assert(musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,0u,cached_rows,2u,&cached_page));
+    assert(cached_page.records_written==2u&&
+           cached_page.next_index==2u&&
+           cached_page.link_audit_rejected_in_page==2u&&
+           cached_rows[0].indexed_handle==UINT64_C(0x40e)&&
+           cached_rows[1].indexed_handle==UINT64_C(0x70f)&&
+           cached_rows[1].geometry_decoded);
+    MusaDwgAc1018RecordDiagnosis saved_cache0=cached_rows[0];
+    MusaDwgAc1018RecordDiagnosis saved_cache1=cached_rows[1];
+    MusaDwgAc1018RecordDiagnosisPage saved_cache_page=cached_page;
+    assert(!musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,2u,cached_rows,2u,&cached_page));
+    assert(!musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,0u,cached_rows,0u,&cached_page));
+    assert(!musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,0u,
+                  (MusaDwgAc1018RecordDiagnosis*)(void*)snapshot,
+                  1u,&cached_page));
+    assert(!musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                  snapshot,0u,cached_rows,2u,
+                  (MusaDwgAc1018RecordDiagnosisPage*)(void*)cached_rows));
+    assert(!musa_dwg_ac1018_scene_create_diagnosis_snapshot(
+                  s,(MusaDwgAc1018DiagnosisSnapshot**)(void*)s));
+    assert(!memcmp(&cached_rows[0],&saved_cache0,sizeof(saved_cache0))&&
+           !memcmp(&cached_rows[1],&saved_cache1,sizeof(saved_cache1))&&
+           !memcmp(&cached_page,&saved_cache_page,
+                   sizeof(saved_cache_page)));
+
     assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
                   s,2u,diagnoses,2u,&diagnostic_page));
     assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
@@ -360,5 +406,13 @@ int main(void){
                  (MusaDwgAc1018RecordRangeAudit*)(void*)s));
     assert(!memcmp(&layout,&unchanged,sizeof(layout)));
     musa_dwg_ac1018_scene_close(s);
+    /* Source scene already closed, yet snapshot owns the original H data. */
+    assert(musa_dwg_ac1018_diagnosis_snapshot_read_page(
+                 snapshot,1u,cached_rows,2u,&cached_page));
+    assert(cached_rows[0].indexed_handle==UINT64_C(0x70f)&&
+           cached_rows[0].geometry_decoded&&
+           cached_page.records_written==1u);
+    musa_dwg_ac1018_diagnosis_snapshot_close(snapshot);
+    assert(musa_dwg_ac1018_diagnosis_snapshot_handle_count(NULL)==0u);
     return 0;
 }
