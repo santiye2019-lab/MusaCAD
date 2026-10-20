@@ -89,6 +89,25 @@ int musa_dwg_ac1018_scene_read_layer_control_refs(
 int musa_dwg_ac1018_scene_find_layer_control_membership(
     const MusaDwgAc1018Scene *scene,uint64_t layer_handle,
     uint64_t *out_control_handle);
+/* Closed-world LAYER_CONTROL table MEMBERSHIP coverage for a cached
+ * original AC1018 scene, not owner-H semantics or AutoCAD parity.
+ * Inspect all CRC-checked indexed records. Every numeric type-51 LAYER must
+ * have valid embedded self-H and occur in exactly one complete validated
+ * type-50 LAYER_CONTROL H list. Every table reference must resolve to a
+ * type-51 self-consistent LAYER. Reject absent tables, orphaned layers,
+ * repeated membership and unsupported/malformed tables. Other object
+ * types remain opaque; no block/text/geometry coverage is asserted.
+ * On any failure the caller output and source session are unchanged.
+ */
+typedef struct MusaDwgAc1018LayerTableCoverage {
+    size_t indexed_layers;
+    size_t indexed_controls;
+    size_t resolved_layer_references;
+    uint8_t all_indexed_layers_have_unique_table;
+} MusaDwgAc1018LayerTableCoverage;
+int musa_dwg_ac1018_scene_audit_layer_table_coverage(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018LayerTableCoverage *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
