@@ -748,6 +748,60 @@ int main(void){
             }
         }
     }
+    /* Original CRC-backed R2004 H=0x42B; both nonlinear variable-width
+     * signed edges are enclosed for every t, not just their endpoints.
+     * The public numerical certificate compares analytic outer interval
+     * extrema with genuinely evaluated inner extrema at dense fractions. */
+    MusaDwgAc1018BulgeEdgeWcsEnvelope posbox={0},negbox={0};
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,32768u,&posbox));
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  negative_snap,0.02,32768u,&negbox));
+    assert(posbox.handle==0x42bu&&posbox.segment_index==0u&&
+           negbox.handle==0x42bu&&negbox.segment_index==2u&&
+           posbox.intervals_used>=16u&&negbox.intervals_used>=16u&&
+           posbox.max_outward_gap<=0.02&&
+           negbox.max_outward_gap<=0.02&&
+           !posbox.full_stroke_verified&&!negbox.full_stroke_verified);
+    for(unsigned sample=0u;sample<=1000u;sample++){
+        const double t=(double)sample/1000.0;
+        for(size_t kind=0u;kind<2u;kind++){
+            MusaDwgAc1018BulgeWidthEdgePoint v={0};
+            MusaDwgAc1018BulgeEdgeSnapshot *snapshot=
+                kind==0u?positive_snap:negative_snap;
+            const MusaDwgAc1018BulgeEdgeWcsEnvelope *bounds=
+                kind==0u?&posbox:&negbox;
+            assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                          snapshot,t,&v));
+            const double *points[4]={
+                v.left_wcs,v.right_wcs,
+                v.left_thickness_wcs,v.right_thickness_wcs};
+            for(size_t j=0u;j<4u;j++){
+                for(size_t axis=0u;axis<3u;axis++){
+                    assert(points[j][axis]>=bounds->minimum[axis]-1e-9&&
+                           points[j][axis]<=bounds->maximum[axis]+1e-9);
+                }
+            }
+        }
+    }
+    const MusaDwgAc1018BulgeEdgeWcsEnvelope original_box=posbox;
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,1e-12,16u,&posbox));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.0,32768u,&posbox));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,NAN,32768u,&posbox));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,15u,&posbox));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,65537u,&posbox));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,32768u,NULL));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,32768u,
+                  (MusaDwgAc1018BulgeEdgeWcsEnvelope*)
+                   (void*)positive_snap));
+    assert(!memcmp(&original_box,&posbox,sizeof(posbox)));
     MusaDwgAc1018BulgeWidthEdgePoint immutable_sample={0};
     assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
                   positive_snap,0.5,&immutable_sample));
@@ -918,6 +972,15 @@ int main(void){
     assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
                   positive_snap,0.5,&after_close));
     assert(!memcmp(&after_close,&saved_sample,sizeof(after_close)));
+    /* Envelope remains computable after source file + native scene
+     * destruction. No borrowing original compressed or indexed data. */
+    MusaDwgAc1018BulgeEdgeWcsEnvelope after_close_box={0};
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                  positive_snap,0.02,32768u,&after_close_box));
+    for(size_t k=0u;k<3u;k++){
+        assert(near(after_close_box.minimum[k],original_box.minimum[k])&&
+               near(after_close_box.maximum[k],original_box.maximum[k]));
+    }
     assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
                   negative_snap,1.0,&after_close));
     assert(after_close.segment_index==2u&&
