@@ -511,6 +511,36 @@ int main(void){
            near(straight.maximum[0],12.5)&&
            near(straight.minimum[1],0.0)&&
            near(straight.maximum[1],10.0));
+    /* Real CRC-backed open H=0x40e: two straight segments meet at
+     * vertex 1 exactly, zero width. Reject open endpoint joins. */
+    MusaDwgAc1018LwJoinEdgeAudit join={0};
+    assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x40eu,1u,&join));
+    assert(join.handle==0x40eu&&join.vertex_index==1u&&
+           join.incoming_segment_index==0u&&
+           join.outgoing_segment_index==1u&&
+           !join.incoming_curved&&!join.outgoing_curved&&
+           join.source_widths_match&&join.edge_endpoints_match&&
+           !join.complete_visible_join_verified&&
+           near(join.center_wcs[0],12.5)&&
+           near(join.center_wcs[1],0.0)&&
+           near(join.edge_gap[0],0.0)&&
+           near(join.edge_gap[1],0.0)&&
+           near(join.incoming_edge_tangent_wcs[0][0],1.0)&&
+           near(join.outgoing_edge_tangent_wcs[0][1],1.0));
+    const MusaDwgAc1018LwJoinEdgeAudit saved_straight_join=join;
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x40eu,0u,&join));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x40eu,2u,&join));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x70fu,1u,&join));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x40eu,1u,NULL));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x40eu,1u,
+                  (MusaDwgAc1018LwJoinEdgeAudit*)(void*)s));
+    assert(!memcmp(&saved_straight_join,&join,sizeof(join)));
     const MusaDwgAc1018StraightTaperWcs straight_saved=straight;
     assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
                   s,0x40eu,2u,&straight)); /* open last index */
@@ -895,6 +925,100 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
                   s,UINT64_C(0xdead),1u,&taper));
     assert(!memcmp(&keep_taper,&taper,sizeof(taper)));
+    /* True source H=0x42b has TWO curved and one tapered straight
+     * edge: audit both curve->line and line->curve junctions, plus
+     * closed vertex zero connecting the two signed bulges. */
+    MusaDwgAc1018LwJoinEdgeAudit complex_join={0};
+    MusaDwgAc1018BulgeWidthEdgePoint boundary_sample={0};
+    assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,1u,&complex_join));
+    assert(complex_join.handle==0x42bu&&
+           complex_join.vertex_index==1u&&
+           complex_join.incoming_segment_index==0u&&
+           complex_join.outgoing_segment_index==1u&&
+           complex_join.incoming_curved&&!complex_join.outgoing_curved&&
+           !complex_join.complete_visible_join_verified&&
+           near(complex_join.incoming_end_width,0.25)&&
+           near(complex_join.outgoing_start_width,sw)&&
+           near(complex_join.center_wcs[0],-2.5)&&
+           near(complex_join.center_wcs[1],3.5)&&
+           near(complex_join.center_wcs[2],-4.5));
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,1.0,&boundary_sample));
+    for(size_t side=0u;side<2u;side++){
+        const double *incoming=side==0u?
+                   boundary_sample.left_wcs:boundary_sample.right_wcs;
+        for(size_t k=0u;k<3u;k++){
+            assert(near(complex_join.incoming_edge_wcs[side][k],
+                        incoming[k])&&
+                   near(complex_join.outgoing_edge_wcs[side][k],
+                        taper.corners[side][k]));
+        }
+        assert(near(complex_join.incoming_edge_thickness_wcs[side][1],
+                    3.75)&&
+               near(complex_join.outgoing_edge_thickness_wcs[side][1],
+                    3.75));
+        const double gap=hypot(
+                  complex_join.incoming_edge_wcs[side][0]-
+                  complex_join.outgoing_edge_wcs[side][0],
+                  complex_join.incoming_edge_wcs[side][2]-
+                  complex_join.outgoing_edge_wcs[side][2]);
+        assert(near(complex_join.edge_gap[side],gap));
+        for(size_t dir=0u;dir<2u;dir++){
+            const double *t=dir==0u?
+               complex_join.incoming_edge_tangent_wcs[side]:
+               complex_join.outgoing_edge_tangent_wcs[side];
+            assert(near(hypot(hypot(t[0],t[1]),t[2]),1.0));
+        }
+    }
+    assert(complex_join.source_widths_match==
+           (uint8_t)(fabs(0.25-sw)<=
+                     1e-10*(1.0+0.25+fabs(sw)+7.0)));
+    assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,2u,&complex_join));
+    assert(!complex_join.incoming_curved&&
+           complex_join.outgoing_curved&&
+           complex_join.incoming_segment_index==1u&&
+           complex_join.outgoing_segment_index==2u&&
+           near(complex_join.incoming_end_width,ew)&&
+           near(complex_join.outgoing_start_width,1.0));
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  negative_snap,0.0,&boundary_sample));
+    for(size_t side=0u;side<2u;side++){
+        const double *outward=side==0u?
+                  boundary_sample.left_wcs:boundary_sample.right_wcs;
+        for(size_t k=0u;k<3u;k++){
+            assert(near(complex_join.incoming_edge_wcs[side][k],
+                        taper.corners[2u+side][k])&&
+                   near(complex_join.outgoing_edge_wcs[side][k],
+                        outward[k]));
+        }
+    }
+    assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,0u,&complex_join));
+    assert(complex_join.incoming_curved&&
+           complex_join.outgoing_curved&&
+           complex_join.incoming_segment_index==2u&&
+           complex_join.outgoing_segment_index==0u&&
+           near(complex_join.incoming_end_width,1.5)&&
+           near(complex_join.outgoing_start_width,0.125));
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  negative_snap,1.0,&boundary_sample));
+    for(size_t k=0u;k<3u;k++){
+        assert(near(complex_join.incoming_edge_wcs[0][k],
+                    boundary_sample.left_wcs[k]));
+    }
+    const MusaDwgAc1018LwJoinEdgeAudit joined_saved=complex_join;
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,3u,&complex_join));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,UINT64_C(0xbeefu),0u,&complex_join));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,1u,NULL));
+    assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,1u,
+                  (MusaDwgAc1018LwJoinEdgeAudit*)(void*)s));
+    assert(!memcmp(&joined_saved,&complex_join,sizeof(complex_join)));
     /* Width and signed thickness are present: never report exact
      * centerline-only WCS bounds as complete original stroke geometry. */
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
