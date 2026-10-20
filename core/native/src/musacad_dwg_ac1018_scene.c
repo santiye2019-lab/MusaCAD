@@ -2608,3 +2608,101 @@ int musa_dwg_ac1018_scene_audit_lw_join_edges(
     *out=checked;
     return 1;
 }
+
+
+/* Standalone WCS bevel and finite, tangent-line miter CANDIDATES.
+ * The underlying source-curve endpoints and true width-dependent edge
+ * derivatives come from the CRC-checked original R2004 LW join audit.
+ * No claim that an AutoCAD-style visible joining policy uses them. */
+int musa_dwg_ac1018_scene_lw_join_candidates(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t vertex_index,double miter_limit,
+    MusaDwgAc1018LwJoinCandidates *out){
+    if(!s||!handle||!out||!isfinite(miter_limit)||
+       miter_limit<1.0||miter_limit>100.0||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018LwJoinCandidates checked={0};
+    if(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+                 s,handle,vertex_index,&checked.source))return 0;
+    checked.miter_limit=miter_limit;
+    const double width=fmax(checked.source.incoming_end_width,
+                            checked.source.outgoing_start_width);
+    const double half=width*0.5;
+    const double allowed=miter_limit*half;
+    if(!isfinite(width)||!isfinite(allowed)||width<0.0)return 0;
+    for(size_t side=0u;side<2u;side++){
+        double in[3]={0},outgoing[3]={0},tin[3]={0},tout[3]={0};
+        double delta[3]={0};
+        for(size_t k=0u;k<3u;k++){
+            in[k]=checked.source.incoming_edge_wcs[side][k];
+            outgoing[k]=checked.source.outgoing_edge_wcs[side][k];
+            tin[k]=checked.source.incoming_edge_tangent_wcs[side][k];
+            tout[k]=checked.source.outgoing_edge_tangent_wcs[side][k];
+            checked.bevel_wcs[side][0][k]=in[k];
+            checked.bevel_wcs[side][1][k]=outgoing[k];
+            checked.bevel_thickness_wcs[side][0][k]=
+                checked.source.incoming_edge_thickness_wcs[side][k];
+            checked.bevel_thickness_wcs[side][1][k]=
+                checked.source.outgoing_edge_thickness_wcs[side][k];
+            delta[k]=outgoing[k]-in[k];
+            if(!isfinite(in[k])||!isfinite(outgoing[k])||
+               !isfinite(tin[k])||!isfinite(tout[k])||
+               !isfinite(delta[k]))return 0;
+        }
+        const double dot=tin[0]*tout[0]+tin[1]*tout[1]+
+                         tin[2]*tout[2];
+        const double denominator=1.0-dot*dot;
+        /* Parallel or near parallel: bevel geometry remains correct;
+         * intersection is not well-defined or would be unstable. */
+        if(!isfinite(dot)||!isfinite(denominator)||
+           denominator<=1e-10)continue;
+        const double p=delta[0]*tin[0]+delta[1]*tin[1]+
+                       delta[2]*tin[2];
+        const double q=delta[0]*tout[0]+delta[1]*tout[1]+
+                       delta[2]*tout[2];
+        const double v=(dot*p-q)/denominator;
+        const double u=p+dot*v;
+        if(!isfinite(u)||!isfinite(v))continue;
+        double candidate[3]={0},other[3]={0};
+        double diff2=0.0;
+        double scale=1.0+fabs(u)+fabs(v)+fabs(width);
+        for(size_t k=0u;k<3u;k++){
+            candidate[k]=in[k]+u*tin[k];
+            other[k]=outgoing[k]+v*tout[k];
+            if(!isfinite(candidate[k])||!isfinite(other[k])){
+                scale=INFINITY;break;
+            }
+            const double error=candidate[k]-other[k];
+            diff2+=error*error;
+            scale+=fabs(in[k])+fabs(outgoing[k]);
+        }
+        if(!isfinite(scale)||!isfinite(diff2))continue;
+        const double consistency=1e-10*scale;
+        const double radius_guard=1e-10*scale;
+        if(sqrt(diff2)>consistency||
+           fabs(u)>allowed+radius_guard||
+           fabs(v)>allowed+radius_guard)continue;
+        for(size_t k=0u;k<3u;k++){
+            const double shift=
+              checked.source.incoming_edge_thickness_wcs[side][k]-in[k];
+            const double outgoing_shift=
+              checked.source.outgoing_edge_thickness_wcs[side][k]-
+              outgoing[k];
+            const double translated=candidate[k]+shift;
+            if(!isfinite(shift)||!isfinite(outgoing_shift)||
+               !isfinite(translated)||
+               fabs(shift-outgoing_shift)>consistency){
+                scale=INFINITY;break;
+            }
+            checked.miter_wcs[side][k]=candidate[k];
+            checked.miter_thickness_wcs[side][k]=translated;
+        }
+        if(!isfinite(scale))continue;
+        checked.tangent_miter_valid[side]=1u;
+        checked.incoming_extension[side]=u;
+        checked.outgoing_extension[side]=v;
+    }
+    checked.complete_visible_join_verified=0u;
+    *out=checked;
+    return 1;
+}
