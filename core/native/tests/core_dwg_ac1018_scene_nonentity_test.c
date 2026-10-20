@@ -414,6 +414,47 @@ int main(void){
                  scene,0x11bu,&table_of_layer));
     assert(table_of_layer==0x33u);
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Complete supported type-50 table membership coverage: every
+     * indexed type-51 layer appears once, no orphan or extra reference.
+     * This deliberately does NOT claim LAYER embedded owner-H semantics. */
+    construct(file,0,0,51u,3);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    MusaDwgAc1018LayerTableCoverage coverage={0};
+    assert(musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                  scene,&coverage));
+    assert(coverage.indexed_layers==1u&&
+           coverage.indexed_controls==1u&&
+           coverage.resolved_layer_references==1u&&
+           coverage.all_indexed_layers_have_unique_table);
+    const MusaDwgAc1018LayerTableCoverage saved_coverage=coverage;
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,(MusaDwgAc1018LayerTableCoverage*)(void*)scene));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,4); /* duplicate layer references */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,0); /* type-51 but no table */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,49u,3); /* table points to a non-LAYER */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,1,51u,3); /* target self-H mismatch, CRC valid */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* The target exists and has an intact CRC, but is not a LAYER. */
     construct(file,0,0,49u,3);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
