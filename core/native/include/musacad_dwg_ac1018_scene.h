@@ -601,6 +601,47 @@ typedef struct MusaDwgAc1018StraightTaperWcs {
 int musa_dwg_ac1018_scene_read_straight_taper_wcs(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     uint32_t segment_index,MusaDwgAc1018StraightTaperWcs *out);
+/* Evaluate ACTUAL parametric width-edge points of ONE ORIGINAL CRC-protected
+ * R2004/AC1018 LWPOLYLINE bulge segment at finite arc fraction 0..1.
+ * The original starting vertex owns bulge and start/end widths; if a
+ * complete per-vertex width vector exists it takes precedence, else
+ * the constant width applies. Width is linearly interpolated in the
+ * normalized sweep parameter (=arc-length fraction for a circle).
+ *
+ * Left/right use the directed OCS arc tangent and its 90deg left normal,
+ * not the straight chord or a fixed-radius circle approximation.
+ * A linearly varying arc width produces noncircular, spiral-like edges;
+ * this API evaluates their true ruled-ribbon point coordinates WITHOUT
+ * implying that endpoint extrema are the full curve extents.
+ *
+ * WCS values at base OCS elevation and the corresponding two translated
+ * edge points at signed thickness are returned. No joins, caps, linetype,
+ * lineweight, entity style, or fully rendered DWG parity is claimed.
+ * Refuse straight bulge=0, near-zero/extreme arcs, degenerate chords,
+ * negative/nonfinite widths, incomplete vertex widths, and bad inputs.
+ * Output and original DWG bytes stay unchanged on failure.
+ */
+typedef struct MusaDwgAc1018BulgeWidthEdgePoint {
+    uint64_t handle;
+    uint32_t segment_index;
+    uint8_t widths_from_vertices;
+    double fraction;
+    double start_width;
+    double end_width;
+    double interpolated_width;
+    double signed_sweep;
+    double radius;
+    double thickness;
+    double center_wcs[3];
+    double left_wcs[3];
+    double right_wcs[3];
+    double left_thickness_wcs[3];
+    double right_thickness_wcs[3];
+} MusaDwgAc1018BulgeWidthEdgePoint;
+int musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t segment_index,double fraction,
+    MusaDwgAc1018BulgeWidthEdgePoint *out);
 #ifdef __cplusplus
 }
 #endif
