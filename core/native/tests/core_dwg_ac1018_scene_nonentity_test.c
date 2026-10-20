@@ -737,6 +737,68 @@ int main(void){
            evidence.other_declared_records==2u&&
            evidence.all_record_ranges_nonoverlapping&&
            evidence.all_indexed_record_crcs_verified);
+    /* Four independent protected R2004 original H records; two are
+     * fixed nonentities, two are link-only LINEs with NO coordinates.
+     * Page with constant memory and preserve the original H order. */
+    MusaDwgAc1018RecordDiagnosis diagnoses[3]={{0}};
+    MusaDwgAc1018RecordDiagnosisPage diagnostic_page={0};
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,0u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.total_indexed_records==4u&&
+           diagnostic_page.first_index==0u&&
+           diagnostic_page.records_written==2u&&
+           diagnostic_page.next_index==2u&&
+           diagnostic_page.supported_2d_in_page==0u&&
+           diagnostic_page.unclassified_in_page==0u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x33)&&
+           diagnoses[1].indexed_handle==UINT64_C(0x11b)&&
+           diagnoses[0].declared_type==50u&&
+           diagnoses[1].declared_type==51u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_FIXED_NONENTITY&&
+           diagnoses[1].category==MUSA_DWG_AC1018_DIAG_FIXED_NONENTITY&&
+           !diagnoses[0].evidence_issues&&
+           !diagnoses[1].evidence_issues);
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.records_written==2u&&
+           diagnostic_page.next_index==4u&&
+           diagnostic_page.supported_2d_in_page==2u&&
+           diagnostic_page.geometry_rejected_in_page==2u&&
+           diagnostic_page.link_audit_rejected_in_page==0u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x120)&&
+           diagnoses[1].indexed_handle==UINT64_C(0x121)&&
+           diagnoses[0].declared_type==19u&&
+           diagnoses[1].declared_type==19u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_2D_ENTITY&&
+           diagnoses[1].category==MUSA_DWG_AC1018_DIAG_2D_ENTITY&&
+           !diagnoses[0].geometry_decoded&&
+           !diagnoses[1].geometry_decoded&&
+           diagnoses[0].fixed_link_identities_verified&&
+           diagnoses[1].fixed_link_identities_verified&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED&&
+           diagnoses[1].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED);
+    const MusaDwgAc1018RecordDiagnosis saved_diagnosis0=diagnoses[0];
+    const MusaDwgAc1018RecordDiagnosis saved_diagnosis1=diagnoses[1];
+    const MusaDwgAc1018RecordDiagnosisPage saved_diagnostic_page=
+        diagnostic_page;
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,4u,diagnoses,2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,0u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,(MusaDwgAc1018RecordDiagnosis*)(void*)scene,
+                  2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,2u,
+                  (MusaDwgAc1018RecordDiagnosisPage*)(void*)diagnoses));
+    assert(!memcmp(&diagnoses[0],&saved_diagnosis0,
+                   sizeof(saved_diagnosis0))&&
+           !memcmp(&diagnoses[1],&saved_diagnosis1,
+                   sizeof(saved_diagnosis1))&&
+           !memcmp(&diagnostic_page,&saved_diagnostic_page,
+                   sizeof(saved_diagnostic_page)));
     const MusaDwgAc1018GeometryLinkEvidence retained_evidence=evidence;
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   scene,(MusaDwgAc1018GeometryLinkEvidence*)(void*)scene));
@@ -758,6 +820,12 @@ int main(void){
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,1,0,51u,7); /* broken complete table/target graph */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,0u,diagnoses,2u,&diagnostic_page));
+    assert(!memcmp(&diagnostic_page,&saved_diagnostic_page,
+                   sizeof(saved_diagnostic_page))&&
+           !memcmp(&diagnoses[0],&saved_diagnosis0,
+                   sizeof(saved_diagnosis0)));
     /* Wrong embedded nonentity self-H is fatal even with valid CRC. */
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   scene,&evidence));
@@ -780,6 +848,18 @@ int main(void){
            evidence.fixed_link_identities_verified==1u&&
            evidence.links_only==1u&&
            evidence.other_declared_records==3u);
+    /* Unknown type may be metadata or unsupported drawable: record its
+     * indexed H without pretending the object is safely rendered. */
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,3u,diagnoses,1u,&diagnostic_page));
+    assert(diagnostic_page.records_written==1u&&
+           diagnostic_page.next_index==4u&&
+           diagnostic_page.unclassified_in_page==1u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x121)&&
+           diagnoses[0].declared_type==88u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_UNCLASSIFIED&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_UNCLASSIFIED_TYPE);
     assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
                   scene,batch_links,2u,&strict));
     assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
