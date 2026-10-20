@@ -1941,3 +1941,111 @@ int musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
     *out=checked;
     return 1;
 }
+
+
+/* Straight source LW ribbon is a ruled OCS quadrilateral, not the
+ * oversized circular-neighborhood proxy of the complete DWG polyline.
+ * This deliberately does NOT include join/cap/miter/lineweight semantics.
+ */
+int musa_dwg_ac1018_scene_read_straight_taper_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t segment_index,MusaDwgAc1018StraightTaperWcs *out){
+    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       record.declared_type!=77u)return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int good=musa_dwg_ac1018_scene_read_lwpolyline(
+                 s,handle,vertices,100000u,&poly)&&
+             poly.handle==handle&&poly.vertex_count>=2u&&
+             poly.vertex_count<=100000u&&
+             isfinite(poly.elevation)&&isfinite(poly.thickness)&&
+             isfinite(poly.constant_width)&&poly.constant_width>=0.0;
+    MusaDwgAc1018StraightTaperWcs checked={0};
+    if(good){
+        const uint32_t count=
+             poly.vertex_count-(poly.closed?0u:1u);
+        if(segment_index>=count||
+           (poly.width_count!=0u&&
+            poly.width_count!=poly.vertex_count))good=0;
+    }
+    if(good){
+        const uint32_t j=(segment_index+1u==poly.vertex_count)?
+                         0u:segment_index+1u;
+        const MusaDwgAc1018LWVertex *a=&vertices[segment_index];
+        const MusaDwgAc1018LWVertex *b=&vertices[j];
+        const double dx=b->x-a->x,dy=b->y-a->y;
+        const double len=hypot(dx,dy);
+        if(!isfinite(a->x)||!isfinite(a->y)||
+           !isfinite(b->x)||!isfinite(b->y)||
+           !isfinite(a->bulge)||a->bulge!=0.0||
+           !isfinite(dx)||!isfinite(dy)||
+           !isfinite(len)||!(len>0.0))good=0;
+        if(good){
+            const int per_vertex=poly.width_count!=0u;
+            const double sw=per_vertex?a->start_width:poly.constant_width;
+            const double ew=per_vertex?a->end_width:poly.constant_width;
+            MusaCoreOcsBasis basis={0};
+            if(!isfinite(sw)||sw<0.0||!isfinite(ew)||ew<0.0||
+               !musa_core_ocs_basis(poly.extrusion,&basis))good=0;
+            if(good){
+                checked.handle=handle;
+                checked.segment_index=segment_index;
+                checked.widths_from_vertices=(uint8_t)per_vertex;
+                checked.start_width=sw;
+                checked.end_width=ew;
+                checked.thickness=poly.thickness;
+                const double left_x=-dy/len,left_y=dx/len;
+                for(size_t side=0u;side<4u;side++){
+                    const int at_end=side>=2u;
+                    const int is_left=(side%2u)==0u;
+                    const MusaDwgAc1018LWVertex *v=at_end?b:a;
+                    const double half=0.5*(at_end?ew:sw);
+                    const double sign=is_left?1.0:-1.0;
+                    const double xy[2]={
+                         v->x+sign*left_x*half,
+                         v->y+sign*left_y*half};
+                    if(!isfinite(xy[0])||!isfinite(xy[1])||
+                       !musa_core_ocs_to_world(
+                             &basis,xy,poly.elevation,
+                             checked.corners[side])||
+                       !finite_vec3(checked.corners[side])){
+                        good=0;break;
+                    }
+                    for(size_t axis=0u;axis<3u;axis++){
+                        const double value=checked.corners[side][axis];
+                        if(side==0u){
+                            checked.minimum[axis]=value;
+                            checked.maximum[axis]=value;
+                        }else{
+                            if(value<checked.minimum[axis])
+                                checked.minimum[axis]=value;
+                            if(value>checked.maximum[axis])
+                                checked.maximum[axis]=value;
+                        }
+                    }
+                }
+                if(good){
+                    for(size_t axis=0u;axis<3u;axis++){
+                        const double delta=poly.thickness*basis.z[axis];
+                        if(!isfinite(delta)){good=0;break;}
+                        if(delta<0.0)checked.minimum[axis]+=delta;
+                        else checked.maximum[axis]+=delta;
+                        if(!isfinite(checked.minimum[axis])||
+                           !isfinite(checked.maximum[axis])){
+                            good=0;break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    free(vertices);
+    if(!good)return 0;
+    *out=checked;
+    return 1;
+}
