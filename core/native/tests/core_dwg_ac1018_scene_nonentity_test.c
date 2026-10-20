@@ -392,6 +392,28 @@ int main(void){
     assert(!memcmp(refs,original_refs,sizeof(refs))&&
            !memcmp(&ref_report,&original_report,sizeof(ref_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Reverse membership search proves only uniqueness among
+     * CRC/self-H validated table H references. It does not read LAYER's
+     * own parent H tail or establish AcDb class semantics. */
+    construct(file,0,0,51u,3);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    uint64_t table_of_layer=UINT64_C(0xcafe);
+    assert(musa_dwg_ac1018_scene_find_layer_control_membership(
+                 scene,0x11bu,&table_of_layer)&&table_of_layer==0x33u);
+    assert(!musa_dwg_ac1018_scene_find_layer_control_membership(
+                 scene,0x33u,&table_of_layer));
+    assert(!musa_dwg_ac1018_scene_find_layer_control_membership(
+                 scene,0x999u,&table_of_layer));
+    assert(!musa_dwg_ac1018_scene_find_layer_control_membership(
+                 scene,0x11bu,(uint64_t*)(void*)scene));
+    assert(table_of_layer==0x33u);
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,4); /* duplicate refs in one table */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_find_layer_control_membership(
+                 scene,0x11bu,&table_of_layer));
+    assert(table_of_layer==0x33u);
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* The target exists and has an intact CRC, but is not a LAYER. */
     construct(file,0,0,49u,3);
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
