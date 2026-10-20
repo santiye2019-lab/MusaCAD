@@ -776,6 +776,10 @@ jobs:
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/CadDocumentSupport.java app/src/main/java/com/musa/cad/OfficeTextExtractor.java app/src/main/java/com/musa/cad/DxfOleTextExtractor.java tests/DxfOleTextExtractorTest.java
           java -cp /tmp/musacad-tests DxfOleTextExtractorTest
+      - name: Guard viewport culling in paper-space renderer
+        run: |
+          javac -d /tmp/musacad-tests tests/CadPaperViewportCullingContractTest.java
+          java -cp /tmp/musacad-tests CadPaperViewportCullingContractTest
       - name: Test DXF paper-space viewport geometry
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfViewport.java tests/DxfViewportTest.java
