@@ -108,6 +108,25 @@ typedef struct MusaDwgAc1018LayerTableCoverage {
 int musa_dwg_ac1018_scene_audit_layer_table_coverage(
     const MusaDwgAc1018Scene *scene,
     MusaDwgAc1018LayerTableCoverage *out);
+/* Complete supported R2004 LAYER palette ingestion, NOT final display RGB:
+ * require full layer-table membership coverage, exact indexed identity and
+ * a readable ASCII name + bounded raw CMC for every numerical LAYER 51.
+ * Reject missing/unreadable layers and ASCII case-insensitive duplicate
+ * names; preserve caller output atomically on all failure paths.
+ * Colors are ordered by ascending layer handle (scene H-index order).
+ * Deliberately bounded to 65536 layers; this is not visual parity or
+ * decoded owner-H, XREF, plotstyle, or True Color presentation semantics.
+ */
+typedef struct MusaDwgAc1018LayerPaletteReport {
+    size_t indexed_layers;
+    size_t indexed_layer_controls;
+    uint8_t unique_ascii_names_verified;
+    uint8_t raw_cmc_fields_verified;
+} MusaDwgAc1018LayerPaletteReport;
+int musa_dwg_ac1018_scene_read_verified_layer_palette(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018LayerColor *layers,size_t capacity,
+    MusaDwgAc1018LayerPaletteReport *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
