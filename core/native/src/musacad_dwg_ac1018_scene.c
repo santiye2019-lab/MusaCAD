@@ -208,6 +208,63 @@ int musa_dwg_ac1018_scene_read_layer_color(
     return musa_dwg_ac1018_layer_color_record(
                s->objects,s->object_bytes,offset,handle,out);
 }
+static int compare_layer_handle_u64(const void *left,const void *right){
+    const uint64_t a=*(const uint64_t*)left;
+    const uint64_t b=*(const uint64_t*)right;
+    return (a>b)-(a<b);
+}
+int musa_dwg_ac1018_scene_read_layer_control_refs(
+    const MusaDwgAc1018Scene *s,uint64_t control_handle,
+    uint64_t *entry_handles,size_t capacity,
+    MusaDwgAc1018LayerControlRefs *out){
+    if(!s||!out||!control_handle||!entry_handles||
+       !capacity||capacity>4096u||capacity>SIZE_MAX/sizeof(uint64_t)||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       scene_output_overlaps(s,entry_handles,capacity*sizeof(uint64_t))||
+       overlaps(out,sizeof(*out),entry_handles,
+                capacity*sizeof(uint64_t)))return 0;
+    size_t offset=0u;
+    if(!get_offset(s,control_handle,&offset))return 0;
+    MusaDwgAc1018LayerControlRefs checked={0};
+    if(!musa_dwg_ac1018_layer_control_refs_record(
+           s->objects,s->object_bytes,offset,control_handle,
+           NULL,0u,&checked)||
+       !checked.entry_count||checked.entry_count>capacity||
+       checked.entry_count>SIZE_MAX/sizeof(uint64_t))return 0;
+    const size_t n=(size_t)checked.entry_count;
+    uint64_t *resolved=(uint64_t*)malloc(n*sizeof(*resolved));
+    uint64_t *sorted=(uint64_t*)malloc(n*sizeof(*sorted));
+    int valid=resolved!=NULL&&sorted!=NULL;
+    if(valid){
+        MusaDwgAc1018LayerControlRefs tested={0};
+        if(!musa_dwg_ac1018_layer_control_refs_record(
+               s->objects,s->object_bytes,offset,control_handle,
+               resolved,n,&tested)||
+           tested.entry_count!=checked.entry_count)valid=0;
+    }
+    if(valid){
+        memcpy(sorted,resolved,n*sizeof(*sorted));
+        qsort(sorted,n,sizeof(*sorted),compare_layer_handle_u64);
+        for(size_t i=0u;i<n;i++){
+            MusaDwgAc1018NonEntityIdentity layer={0};
+            if((i&&sorted[i]==sorted[i-1u])||
+               !musa_dwg_ac1018_scene_probe_nonentity_identity(
+                        s,sorted[i],&layer)||
+               layer.declared_type!=51u||
+               layer.indexed_handle!=sorted[i]||
+               !layer.record_crc_verified||!layer.embedded_self_verified){
+                valid=0;break;
+            }
+        }
+    }
+    if(valid){
+        memcpy(entry_handles,resolved,n*sizeof(*resolved));
+        *out=checked;
+    }
+    free(sorted);
+    free(resolved);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
