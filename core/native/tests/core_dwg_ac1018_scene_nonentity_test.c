@@ -39,7 +39,10 @@ static size_t make(uint8_t out[64],uint16_t type,
     if(reactor_overflow){put(&w,2u,1u);byte(&w,65u);}
     else put(&w,2u,2u); /* BL reactor zero */
     put(&w,1u,1u); /* missing extension dictionary */
-    if(named_layer){
+    if(named_layer==3){
+        assert(type==50u);
+        put(&w,2u,1u);byte(&w,1u); /* BL one LAYER entry */
+    }else if(named_layer){
         assert(type==51u);
         put(&w,2u,1u);byte(&w,4u); /* TV length BS */
         for(unsigned i=0;i<4u;i++)byte(&w,(uint8_t)"MEK0"[i]);
@@ -60,6 +63,11 @@ static size_t make(uint8_t out[64],uint16_t type,
         for(unsigned b=0;b<8u;b++)
             setbit(&w,rl_at+(size_t)i*8u+b,
                    ((uint32_t)endbit>>(8u*i+7u-b))&1u);
+    if(named_layer==3){
+        byte(&w,0x40u); /* NULL soft pointer root, H 4:0 */
+        byte(&w,0x22u);byte(&w,0x01u);byte(&w,0x1bu);
+        /* LAYER target H 2:2:01:1b, matching the scene's second handle */
+    }
     const size_t body=(w.bits+7u)/8u;
     assert(body<sizeof(w.data)&&body<UINT16_MAX);
     memset(out,0u,64u);
@@ -151,7 +159,8 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
     uint8_t objs[128]={0},h[13]={0};
-    const size_t first=make(objs,51u,wrong_layer_self?0x34u:0x33u,
+    const size_t first=make(objs,named_layer==3?50u:51u,
+                            wrong_layer_self?0x34u:0x33u,
                             0,named_layer);
     const size_t second=make(objs+first,other_type,
                              wrong_other_self?0x11cu:0x11bu,0,0);
@@ -344,6 +353,49 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_layer_color(
                   scene,0x33u,(MusaDwgAc1018LayerColor*)(void*)scene));
     assert(!memcmp(&cmc,&prior,sizeof(cmc)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* A protected original DWG with LAYER_CONTROL @ 0x33 and LAYER @
+     * 0x11b: resolve the actual soft-owner H and enforce the target class
+     * claim and embedded self identity from the same cached scene. */
+    construct(file,0,0,51u,3);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    uint64_t refs[2]={UINT64_C(0xdead),UINT64_C(0xbeef)};
+    MusaDwgAc1018LayerControlRefs ref_report={0};
+    assert(musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,2u,&ref_report));
+    assert(ref_report.indexed_handle==0x33u&&
+           ref_report.entry_count==1u&&refs[0]==0x11bu&&
+           refs[1]==UINT64_C(0xbeef)&&
+           ref_report.crc_verified&&ref_report.embedded_self_verified);
+    const MusaDwgAc1018LayerControlRefs original_report=ref_report;
+    const uint64_t original_refs[2]={refs[0],refs[1]};
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,0u,&ref_report));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x11bu,refs,2u,&ref_report));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,(uint64_t*)(void*)scene,2u,&ref_report));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,2u,
+                  (MusaDwgAc1018LayerControlRefs*)(void*)scene));
+    assert(!memcmp(refs,original_refs,sizeof(refs))&&
+           !memcmp(&ref_report,&original_report,sizeof(ref_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* The target exists and has an intact CRC, but is not a LAYER. */
+    construct(file,0,0,49u,3);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,2u,&ref_report));
+    assert(!memcmp(refs,original_refs,sizeof(refs))&&
+           !memcmp(&ref_report,&original_report,sizeof(ref_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Target type and CRC are correct, but embedded self-H is forged. */
+    construct(file,0,1,51u,3);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                  scene,0x33u,refs,2u,&ref_report));
+    assert(!memcmp(refs,original_refs,sizeof(refs))&&
+           !memcmp(&ref_report,&original_report,sizeof(ref_report)));
     musa_dwg_ac1018_scene_close(scene);
     return 0;
 }
