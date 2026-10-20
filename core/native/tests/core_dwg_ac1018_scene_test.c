@@ -567,6 +567,48 @@ int main(void){
                   s,0x40eu,1u,4.0,
                   (MusaDwgAc1018LwJoinCandidates*)(void*)s));
     assert(!memcmp(&saved_candidate,&candidate,sizeof(candidate)));
+    /* Single-pass, CRC-protected original R2004 H=0x40e:
+     * two exact straight 0-width segments and their sole open bevel
+     * bridge. No repeated per-segment source parsing. */
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope whole_open={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.02,32768u,&whole_open));
+    assert(whole_open.handle==0x40eu&&
+           whole_open.vertex_count==3u&&
+           whole_open.segment_count==2u&&
+           whole_open.straight_segments==2u&&
+           whole_open.curved_segments==0u&&
+           whole_open.curve_intervals_total==0u&&
+           whole_open.bevel_bridge_count==1u&&
+           whole_open.discontinuous_width_junctions==0u&&
+           whole_open.bevel_bridge_endpoints_enclosed&&
+           !whole_open.all_miters_enclosed&&
+           !whole_open.all_round_joins_enclosed&&
+           !whole_open.complete_visible_stroke_verified&&
+           near(whole_open.maximum_bevel_edge_gap,0.0)&&
+           near(whole_open.minimum[0],0.0)&&
+           near(whole_open.maximum[0],12.5)&&
+           near(whole_open.minimum[1],0.0)&&
+           near(whole_open.maximum[1],10.0)&&
+           near(whole_open.minimum[2],0.0)&&
+           near(whole_open.maximum[2],0.0));
+    const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_open=whole_open;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x70fu,0.02,32768u,&whole_open));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.0,32768u,&whole_open));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,NAN,32768u,&whole_open));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.02,15u,&whole_open));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.02,65537u,&whole_open));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.02,32768u,NULL));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x40eu,0.02,32768u,
+                (MusaDwgAc1018LwRibbonBevelWcsEnvelope*)(void*)s));
+    assert(!memcmp(&whole_open,&keep_open,sizeof(whole_open)));
     const MusaDwgAc1018LwJoinEdgeAudit saved_straight_join=join;
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x40eu,0u,&join));
@@ -954,6 +996,48 @@ int main(void){
            near(taper.maximum[1],3.75)&&
            near(taper.minimum[2],-4.5)&&
            near(taper.maximum[2],5.25));
+    /* Protected original R2004 H=0x42B CLOSED, with positive and
+     * negative signed bulges plus one straight TAPER: the single-read
+     * complete ribbon/bevel numerical box must enclose EACH independently
+     * tested curve envelope and all four true tapered straight corners.
+     * An affine bevel between endpoints cannot escape that union. */
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope whole_complex={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x42bu,0.02,32768u,&whole_complex));
+    assert(whole_complex.handle==0x42bu&&
+           whole_complex.vertex_count==3u&&
+           whole_complex.segment_count==3u&&
+           whole_complex.curved_segments==2u&&
+           whole_complex.straight_segments==1u&&
+           whole_complex.bevel_bridge_count==3u&&
+           whole_complex.discontinuous_width_junctions>=1u&&
+           whole_complex.curve_intervals_total>=32u&&
+           whole_complex.maximum_curve_gap<=0.02&&
+           whole_complex.maximum_bevel_edge_gap>0.0&&
+           whole_complex.bevel_bridge_endpoints_enclosed&&
+           !whole_complex.all_miters_enclosed&&
+           !whole_complex.all_round_joins_enclosed&&
+           !whole_complex.complete_visible_stroke_verified);
+    for(size_t axis=0u;axis<3u;axis++){
+        const double expected_min=
+              fmin(fmin(posbox.minimum[axis],negbox.minimum[axis]),
+                   taper.minimum[axis]);
+        const double expected_max=
+              fmax(fmax(posbox.maximum[axis],negbox.maximum[axis]),
+                   taper.maximum[axis]);
+        assert(near(whole_complex.minimum[axis],expected_min)&&
+               near(whole_complex.maximum[axis],expected_max));
+    }
+    const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_whole=
+             whole_complex;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x42bu,1e-12,16u,&whole_complex));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x42bu,0.02,32768u,NULL));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+                s,0x42bu,0.02,32768u,
+                (MusaDwgAc1018LwRibbonBevelWcsEnvelope*)(void*)s));
+    assert(!memcmp(&keep_whole,&whole_complex,sizeof(whole_complex)));
     const MusaDwgAc1018StraightTaperWcs keep_taper=taper;
     assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
                   s,0x42bu,0u,&taper)); /* bulged */
