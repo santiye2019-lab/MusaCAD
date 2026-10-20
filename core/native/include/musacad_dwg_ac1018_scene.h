@@ -642,6 +642,26 @@ int musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     uint32_t segment_index,double fraction,
     MusaDwgAc1018BulgeWidthEdgePoint *out);
+/* Immutable, scene-independent original-H bulge edge segment snapshot.
+ * The creator reads and CRC-checks the original R2004 LWPOLYLINE ONCE,
+ * stores only the selected segment's verified geometry/widths and OCS
+ * basis, and owns that finite copy. The snapshot survives scene_close.
+ * Any number of fractions may be evaluated in O(1) time and O(1) memory:
+ * no DWG bytes/handle searches, allocations or native file IO per sample.
+ * Callers must close the snapshot. Failure leaves output untouched.
+ * This returns exact parametric edge points, NOT a whole-curve bbox
+ * or complete joined/capped AutoCAD stroke. No APK.
+ */
+typedef struct MusaDwgAc1018BulgeEdgeSnapshot
+    MusaDwgAc1018BulgeEdgeSnapshot;
+int musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t segment_index,MusaDwgAc1018BulgeEdgeSnapshot **out);
+int musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+    const MusaDwgAc1018BulgeEdgeSnapshot *snapshot,double fraction,
+    MusaDwgAc1018BulgeWidthEdgePoint *out);
+void musa_dwg_ac1018_bulge_edge_snapshot_close(
+    MusaDwgAc1018BulgeEdgeSnapshot *snapshot);
 #ifdef __cplusplus
 }
 #endif
