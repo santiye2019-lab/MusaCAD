@@ -443,6 +443,7 @@ int musa_dwg_ac1018_scene_inventory(
         }
         case 42u: /* DICTIONARY declared type */
         case 49u: /* BLOCK_HEADER declared type */
+        case 50u: /* LAYER_CONTROL declared type */
         case 51u: { /* LAYER declared type */
             /* A CRC-correct target with a wrong embedded self-H cannot
              * be treated as a harmless opaque record. Fail the entire
