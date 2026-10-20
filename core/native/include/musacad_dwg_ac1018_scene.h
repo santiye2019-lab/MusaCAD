@@ -819,6 +819,36 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
     double requested_tolerance,uint32_t max_intervals_per_curve,
     MusaDwgAc1018LwRibbonBevelWcsEnvelope *out);
 
+/* Original CRC-protected R2004 LWPOLYLINE, COMPLETE ideal ribbon/bevel
+ * box PLUS each bounded, mathematically verified tangent-miter candidate
+ * point from every junction (at both signed thickness endpoints).
+ *
+ * This adds the union of ALL possible finite candidate points, not an
+ * Autodesk/DWG joint-style selection. Parallel or over-limit tangents
+ * are rejected and counted; their bevels remain in the base envelope.
+ * The numerical box therefore covers the source ribbon/bevel model and
+ * available bounded miter POINT/SEGMENT candidates, but NOT round joins,
+ * real Autodesk miter policy, caps, linetypes, lineweights or fill rules.
+ *
+ * Uses the SAME original record decode loop as the baseline envelope,
+ * O(N + Ncurves*bounded_interval_budget), no per-junction DWG re-read.
+ * Output untouched on every failure. 1 <= miter_limit <= 100.
+ */
+typedef struct MusaDwgAc1018LwRibbonMiterWcsEnvelope {
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope bevel;
+    double miter_limit;
+    uint32_t valid_miter_candidates;
+    uint32_t rejected_miter_candidates;
+    double minimum[3];
+    double maximum[3];
+    uint8_t bounded_tangent_candidates_enclosed; /* 1 on success */
+    uint8_t complete_visible_stroke_verified; /* always 0 */
+} MusaDwgAc1018LwRibbonMiterWcsEnvelope;
+int musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    double miter_limit,MusaDwgAc1018LwRibbonMiterWcsEnvelope *out);
+
 #ifdef __cplusplus
 }
 #endif

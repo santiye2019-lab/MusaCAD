@@ -592,6 +592,34 @@ int main(void){
            near(whole_open.maximum[1],10.0)&&
            near(whole_open.minimum[2],0.0)&&
            near(whole_open.maximum[2],0.0));
+    /* Whole original H=0x40E open right-angle source has two coincident
+     * zero-width edge miter candidates and no geometric protrusion. */
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope open_miter={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,4.0,&open_miter));
+    assert(open_miter.valid_miter_candidates==2u&&
+           open_miter.rejected_miter_candidates==0u&&
+           near(open_miter.miter_limit,4.0)&&
+           open_miter.bounded_tangent_candidates_enclosed&&
+           !open_miter.complete_visible_stroke_verified);
+    for(size_t axis=0;axis<3;axis++){
+        assert(near(open_miter.minimum[axis],whole_open.minimum[axis])&&
+               near(open_miter.maximum[axis],whole_open.maximum[axis]));
+    }
+    const MusaDwgAc1018LwRibbonMiterWcsEnvelope
+           keep_open_miter=open_miter;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,0.5,&open_miter));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,101.0,&open_miter));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,NAN,&open_miter));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,4.0,NULL));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                s,0x40eu,0.02,32768u,4.0,
+                (MusaDwgAc1018LwRibbonMiterWcsEnvelope*)(void*)s));
+    assert(!memcmp(&keep_open_miter,&open_miter,sizeof(open_miter)));
     const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_open=whole_open;
     assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
                 s,0x70fu,0.02,32768u,&whole_open));
@@ -1028,6 +1056,67 @@ int main(void){
         assert(near(whole_complex.minimum[axis],expected_min)&&
                near(whole_complex.maximum[axis],expected_max));
     }
+    /* Full R2004 H=0x42B mixed curved/straight, variable width and
+     * closed junctions: compare the single-pass miter union with the
+     * independently validated per-junction candidate reader.
+     * Only valid tangent-line intersections count, not DWG join styles. */
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope whole_miter={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                 s,0x42bu,0.02,32768u,8.0,&whole_miter));
+    assert(whole_miter.bounded_tangent_candidates_enclosed&&
+           !whole_miter.complete_visible_stroke_verified&&
+           whole_miter.valid_miter_candidates+
+             whole_miter.rejected_miter_candidates==6u);
+    assert(!memcmp(&whole_miter.bevel,&whole_complex,
+                   sizeof(whole_complex)));
+    double expected_min[3]={0},expected_max[3]={0};
+    for(size_t axis=0;axis<3;axis++){
+        expected_min[axis]=whole_complex.minimum[axis];
+        expected_max[axis]=whole_complex.maximum[axis];
+    }
+    uint32_t expected_candidates=0u;
+    for(uint32_t vertex=0;vertex<3;vertex++){
+        MusaDwgAc1018LwJoinCandidates single_join={0};
+        assert(musa_dwg_ac1018_scene_lw_join_candidates(
+                       s,0x42bu,vertex,8.0,&single_join));
+        for(size_t side=0;side<2;side++){
+            if(!single_join.tangent_miter_valid[side])continue;
+            expected_candidates++;
+            for(size_t axis=0;axis<3;axis++){
+                const double low=fmin(single_join.miter_wcs[side][axis],
+                              single_join.miter_thickness_wcs[side][axis]);
+                const double high=fmax(single_join.miter_wcs[side][axis],
+                              single_join.miter_thickness_wcs[side][axis]);
+                if(low<expected_min[axis])expected_min[axis]=low;
+                if(high>expected_max[axis])expected_max[axis]=high;
+            }
+        }
+    }
+    assert(expected_candidates==whole_miter.valid_miter_candidates);
+    for(size_t axis=0;axis<3;axis++){
+        assert(near(whole_miter.minimum[axis],expected_min[axis])&&
+               near(whole_miter.maximum[axis],expected_max[axis])&&
+               whole_miter.minimum[axis]<=whole_complex.minimum[axis]&&
+               whole_miter.maximum[axis]>=whole_complex.maximum[axis]);
+    }
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope restricted={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                 s,0x42bu,0.02,32768u,1.0,&restricted));
+    assert(restricted.valid_miter_candidates<=
+           whole_miter.valid_miter_candidates);
+    for(size_t axis=0;axis<3;axis++){
+        assert(restricted.minimum[axis]>=whole_miter.minimum[axis]-1e-8&&
+               restricted.maximum[axis]<=whole_miter.maximum[axis]+1e-8);
+    }
+    const MusaDwgAc1018LwRibbonMiterWcsEnvelope kept_miter=whole_miter;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                 s,0x42bu,1e-12,16u,8.0,&whole_miter));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                 s,0x42bu,0.02,32768u,0.0,&whole_miter));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+                 s,0x42bu,0.02,32768u,8.0,
+                 (MusaDwgAc1018LwRibbonMiterWcsEnvelope*)(void*)s));
+    assert(!memcmp(&kept_miter,&whole_miter,sizeof(whole_miter)));
     const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_whole=
              whole_complex;
     assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
