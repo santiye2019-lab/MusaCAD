@@ -195,28 +195,28 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
     uint8_t objs[128]={0},h[18]={0};
     /* Mode 5: type-50 table + fully bit-coded, CMC-bearing type-51 LAYER,
      * both in one original protected R2004 section (no fake lookup). */
-    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6||named_layer==7||named_layer==8);
+    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6||named_layer==7||named_layer==8||named_layer==9);
     const size_t first=make(objs,table_first?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
-                            0,(named_layer>=5&&named_layer<=8)?3:named_layer);
+                            0,(named_layer>=5&&named_layer<=9)?3:named_layer);
     const size_t second=make(objs+first,other_type,
                              wrong_other_self?0x11cu:0x11bu,
-                             0,(named_layer>=5&&named_layer<=8)?2:0);
+                             0,(named_layer>=5&&named_layer<=9)?2:0);
     /* Mode 6: actual 3-record table / CMC LAYER / link-only entity
      * fixture. No materialized/guessed link graph or fake DWG geometry. */
-    const size_t third=(named_layer>=6&&named_layer<=8)?
+    const size_t third=(named_layer>=6&&named_layer<=9)?
         make_entity_link_only(objs+first+second,0x120u,
                               wrong_layer_self!=0,0):0u;
-    const size_t fourth=(named_layer==7||named_layer==8)?
+    const size_t fourth=(named_layer==7||named_layer==8||named_layer==9)?
         make_entity_link_only(objs+first+second+third,0x121u,
-                              0,named_layer==8):0u;
+                              named_layer==9,named_layer==8):0u;
     const size_t total=first+second+third+fourth;
     assert(total<=sizeof(objs)&&first<128u&&first+second<128u);
     h[2]=0x33u;h[3]=0u; /* delta H=0x33 and zero offset */
     h[4]=0xe8u;h[5]=0x01u;h[6]=(uint8_t)first; /* H +232 */
     uint16_t crc=0u;
     size_t hlen=0u;
-    if(named_layer==7||named_layer==8){
+    if(named_layer==7||named_layer==8||named_layer==9){
         /* Indexed self H sequence: 0x33, 0x11b, 0x120, 0x121. */
         h[1]=11u;h[7]=5u;h[8]=(uint8_t)second;
         h[9]=1u;h[10]=(uint8_t)third;
@@ -737,6 +737,68 @@ int main(void){
            evidence.other_declared_records==2u&&
            evidence.all_record_ranges_nonoverlapping&&
            evidence.all_indexed_record_crcs_verified);
+    /* Four independent protected R2004 original H records; two are
+     * fixed nonentities, two are link-only LINEs with NO coordinates.
+     * Page with constant memory and preserve the original H order. */
+    MusaDwgAc1018RecordDiagnosis diagnoses[3]={{0}};
+    MusaDwgAc1018RecordDiagnosisPage diagnostic_page={0};
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,0u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.total_indexed_records==4u&&
+           diagnostic_page.first_index==0u&&
+           diagnostic_page.records_written==2u&&
+           diagnostic_page.next_index==2u&&
+           diagnostic_page.supported_2d_in_page==0u&&
+           diagnostic_page.unclassified_in_page==0u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x33)&&
+           diagnoses[1].indexed_handle==UINT64_C(0x11b)&&
+           diagnoses[0].declared_type==50u&&
+           diagnoses[1].declared_type==51u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_FIXED_NONENTITY&&
+           diagnoses[1].category==MUSA_DWG_AC1018_DIAG_FIXED_NONENTITY&&
+           !diagnoses[0].evidence_issues&&
+           !diagnoses[1].evidence_issues);
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.records_written==2u&&
+           diagnostic_page.next_index==4u&&
+           diagnostic_page.supported_2d_in_page==2u&&
+           diagnostic_page.geometry_rejected_in_page==2u&&
+           diagnostic_page.link_audit_rejected_in_page==0u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x120)&&
+           diagnoses[1].indexed_handle==UINT64_C(0x121)&&
+           diagnoses[0].declared_type==19u&&
+           diagnoses[1].declared_type==19u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_2D_ENTITY&&
+           diagnoses[1].category==MUSA_DWG_AC1018_DIAG_2D_ENTITY&&
+           !diagnoses[0].geometry_decoded&&
+           !diagnoses[1].geometry_decoded&&
+           diagnoses[0].fixed_link_identities_verified&&
+           diagnoses[1].fixed_link_identities_verified&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED&&
+           diagnoses[1].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED);
+    const MusaDwgAc1018RecordDiagnosis saved_diagnosis0=diagnoses[0];
+    const MusaDwgAc1018RecordDiagnosis saved_diagnosis1=diagnoses[1];
+    const MusaDwgAc1018RecordDiagnosisPage saved_diagnostic_page=
+        diagnostic_page;
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,4u,diagnoses,2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,0u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,(MusaDwgAc1018RecordDiagnosis*)(void*)scene,
+                  2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,2u,
+                  (MusaDwgAc1018RecordDiagnosisPage*)(void*)diagnoses));
+    assert(!memcmp(&diagnoses[0],&saved_diagnosis0,
+                   sizeof(saved_diagnosis0))&&
+           !memcmp(&diagnoses[1],&saved_diagnosis1,
+                   sizeof(saved_diagnosis1))&&
+           !memcmp(&diagnostic_page,&saved_diagnostic_page,
+                   sizeof(saved_diagnostic_page)));
     const MusaDwgAc1018GeometryLinkEvidence retained_evidence=evidence;
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   scene,(MusaDwgAc1018GeometryLinkEvidence*)(void*)scene));
@@ -758,6 +820,12 @@ int main(void){
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,1,0,51u,7); /* broken complete table/target graph */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,0u,diagnoses,2u,&diagnostic_page));
+    assert(!memcmp(&diagnostic_page,&saved_diagnostic_page,
+                   sizeof(saved_diagnostic_page))&&
+           !memcmp(&diagnoses[0],&saved_diagnosis0,
+                   sizeof(saved_diagnosis0)));
     /* Wrong embedded nonentity self-H is fatal even with valid CRC. */
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   scene,&evidence));
@@ -780,11 +848,48 @@ int main(void){
            evidence.fixed_link_identities_verified==1u&&
            evidence.links_only==1u&&
            evidence.other_declared_records==3u);
+    /* Unknown type may be metadata or unsupported drawable: record its
+     * indexed H without pretending the object is safely rendered. */
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,3u,diagnoses,1u,&diagnostic_page));
+    assert(diagnostic_page.records_written==1u&&
+           diagnostic_page.next_index==4u&&
+           diagnostic_page.unclassified_in_page==1u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x121)&&
+           diagnoses[0].declared_type==88u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_UNCLASSIFIED&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_UNCLASSIFIED_TYPE);
     assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
                   scene,batch_links,2u,&strict));
     assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
            !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
            !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* A CRC-valid unsupported geometry payload AND dangling layer H
+     * must be reported as NEITHER, separately from another valid link-only
+     * entity. The fixed table/palette graph is otherwise unaltered. */
+    construct(file,0,0,51u,9);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  scene,&evidence));
+    assert(evidence.declared_supported_2d_entities==2u&&
+           evidence.geometry_decoded==0u&&
+           evidence.fixed_link_identities_verified==1u&&
+           evidence.links_only==1u&&evidence.neither_verified==1u);
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  scene,2u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.geometry_rejected_in_page==2u&&
+           diagnostic_page.link_audit_rejected_in_page==1u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x120)&&
+           diagnoses[0].evidence_issues==
+              MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED&&
+           diagnoses[1].indexed_handle==UINT64_C(0x121)&&
+           diagnoses[1].evidence_issues==
+             (MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED|
+              MUSA_DWG_AC1018_DIAG_LINK_AUDIT_REJECTED));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
      * or forged embedded identity. The output must remain unchanged. */
