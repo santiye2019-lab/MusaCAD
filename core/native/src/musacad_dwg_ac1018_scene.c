@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <math.h>
+#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 #define MUSA_AC1018_SCENE_MAX_HANDLES 1000000u
@@ -2236,4 +2237,179 @@ int musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
                          snapshot,fraction,out);
     musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
     return result;
+}
+
+
+/* Conservative interval enclosure of original variable-width arc edges.
+ * Each WCS axis component is Ck + q(t)*(Uxk*cos(theta(t))+
+ * Uyk*sin(theta(t))), with q(t)=r +/- width(t)/2 LINEAR and theta
+ * MONOTONE over each subinterval. Bound the harmonic by its analytic
+ * extrema and multiply with the independent radial interval. This
+ * cannot silently miss interior extrema as point-only sampling can.
+ *
+ * Rounded finite doubles are padded with a scaled floating guard.
+ * Results are numerical enclosures, not formal real-arithmetic proofs. */
+static int arc_axis_harmonic_range(
+    double ux,double uy,double theta0,double theta1,
+    double *low,double *high){
+    if(!isfinite(ux)||!isfinite(uy)||
+       !isfinite(theta0)||!isfinite(theta1)||
+       !low||!high)return 0;
+    const double a=fmin(theta0,theta1),b=fmax(theta0,theta1);
+    const double v0=ux*cos(a)+uy*sin(a);
+    const double v1=ux*cos(b)+uy*sin(b);
+    const double amplitude=hypot(ux,uy);
+    const double period=2.0*acos(-1.0);
+    const double phase=atan2(uy,ux);
+    if(!isfinite(v0)||!isfinite(v1)||!isfinite(amplitude)||
+       !isfinite(period)||!isfinite(phase))return 0;
+    double lo=fmin(v0,v1),hi=fmax(v0,v1);
+    /* A small outward angular guard avoids missing a critical angle
+     * exactly on an interval boundary due to double phase rounding. */
+    const double tol=1e-12;
+    if(ceil((a-phase-tol)/period)<=
+       floor((b-phase+tol)/period))hi=amplitude;
+    if(ceil((a-(phase+0.5*period)-tol)/period)<=
+       floor((b-(phase+0.5*period)+tol)/period))lo=-amplitude;
+    if(!isfinite(lo)||!isfinite(hi))return 0;
+    *low=lo;*high=hi;
+    return 1;
+}
+static void bounds_include_edge_sample(
+    MusaDwgAc1018BulgeEdgeWcsEnvelope *box,
+    const MusaDwgAc1018BulgeWidthEdgePoint *v){
+    const double *pts[4]={
+        v->left_wcs,v->right_wcs,
+        v->left_thickness_wcs,v->right_thickness_wcs};
+    for(size_t j=0u;j<4u;j++){
+        for(size_t k=0u;k<3u;k++){
+            const double x=pts[j][k];
+            if(x<box->inner_minimum[k])box->inner_minimum[k]=x;
+            if(x>box->inner_maximum[k])box->inner_maximum[k]=x;
+        }
+    }
+}
+int musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+    const MusaDwgAc1018BulgeEdgeSnapshot *s,
+    double requested_tolerance,uint32_t max_intervals,
+    MusaDwgAc1018BulgeEdgeWcsEnvelope *out){
+    if(!s||!out||overlaps(s,sizeof(*s),out,sizeof(*out))||
+       !isfinite(requested_tolerance)||!(requested_tolerance>0.0)||
+       max_intervals<16u||max_intervals>65536u)
+        return 0;
+    const double center_xy[2]={s->center_ocs[0],s->center_ocs[1]};
+    double center[3]={0};
+    if(!musa_core_ocs_to_world(
+               &s->basis,center_xy,s->elevation,center)||
+       !finite_vec3(center))return 0;
+    uint32_t n=16u;
+    for(;;){
+        MusaDwgAc1018BulgeEdgeWcsEnvelope box={0};
+        box.handle=s->handle;
+        box.segment_index=s->segment_index;
+        box.intervals_used=n;
+        box.requested_tolerance=requested_tolerance;
+        for(size_t k=0u;k<3u;k++){
+            box.minimum[k]=DBL_MAX;
+            box.maximum[k]=-DBL_MAX;
+            box.inner_minimum[k]=DBL_MAX;
+            box.inner_maximum[k]=-DBL_MAX;
+        }
+        int good=1;
+        for(uint32_t i=0u;i<n&&good;i++){
+            const double t0=(double)i/(double)n;
+            const double t1=(double)(i+1u)/(double)n;
+            const double angle0=s->start_angle+s->sweep*t0;
+            const double angle1=s->start_angle+s->sweep*t1;
+            const double w0=(1.0-t0)*s->start_width+
+                                          t0*s->end_width;
+            const double w1=(1.0-t1)*s->start_width+
+                                          t1*s->end_width;
+            if(!isfinite(angle0)||!isfinite(angle1)||
+               !isfinite(w0)||!isfinite(w1)||w0<0.0||w1<0.0){
+                good=0;break;
+            }
+            /* A centerline and two true edge curves have the SAME
+             * sin/cos basis. Only edge curves contribute to this box. */
+            for(size_t k=0u;k<3u;k++){
+                double harmonic_lo=0,harmonic_hi=0;
+                if(!arc_axis_harmonic_range(
+                        s->basis.x[k],s->basis.y[k],
+                        angle0,angle1,&harmonic_lo,&harmonic_hi)){
+                    good=0;break;
+                }
+                const double delta=s->thickness*s->basis.z[k];
+                if(!isfinite(delta)){good=0;break;}
+                const double bottom=fmin(0.0,delta);
+                const double top=fmax(0.0,delta);
+                for(int side=-1;side<=1;side+=2){
+                    const double dir=s->sweep>0.0?-1.0:1.0;
+                    const double q0=s->radius+
+                            (double)side*dir*0.5*w0;
+                    const double q1=s->radius+
+                            (double)side*dir*0.5*w1;
+                    const double qlo=fmin(q0,q1),qhi=fmax(q0,q1);
+                    const double p[4]={qlo*harmonic_lo,
+                                       qlo*harmonic_hi,
+                                       qhi*harmonic_lo,
+                                       qhi*harmonic_hi};
+                    double lo=p[0],hi=p[0];
+                    for(size_t j=0u;j<4u;j++){
+                        if(!isfinite(p[j])){good=0;break;}
+                        if(p[j]<lo)lo=p[j];
+                        if(p[j]>hi)hi=p[j];
+                    }
+                    if(!good)break;
+                    const double raw_min=center[k]+lo+bottom;
+                    const double raw_max=center[k]+hi+top;
+                    /* Widen, never shrink interval endpoints. */
+                    const double guard=256.0*DBL_EPSILON*
+                        (1.0+fabs(center[k])+fabs(qlo)+fabs(qhi)+
+                         fabs(harmonic_lo)+fabs(harmonic_hi)+
+                         fabs(delta)+fabs(raw_min)+fabs(raw_max));
+                    const double lower=raw_min-guard;
+                    const double upper=raw_max+guard;
+                    if(!isfinite(lower)||!isfinite(upper)){
+                        good=0;break;
+                    }
+                    if(lower<box.minimum[k])box.minimum[k]=lower;
+                    if(upper>box.maximum[k])box.maximum[k]=upper;
+                }
+                if(!good)break;
+            }
+            if(!good)break;
+            MusaDwgAc1018BulgeWidthEdgePoint sample={0};
+            if(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                        s,t0,&sample)){good=0;break;}
+            bounds_include_edge_sample(&box,&sample);
+            if(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                        s,(t0+t1)*0.5,&sample)){good=0;break;}
+            bounds_include_edge_sample(&box,&sample);
+            if(i+1u==n){
+                if(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                            s,1.0,&sample)){good=0;break;}
+                bounds_include_edge_sample(&box,&sample);
+            }
+        }
+        if(!good)return 0;
+        double gap=0.0;
+        for(size_t k=0u;k<3u;k++){
+            if(!isfinite(box.minimum[k])||
+               !isfinite(box.maximum[k])||
+               !isfinite(box.inner_minimum[k])||
+               !isfinite(box.inner_maximum[k])||
+               box.minimum[k]>box.inner_minimum[k]||
+               box.maximum[k]<box.inner_maximum[k])return 0;
+            const double gl=box.inner_minimum[k]-box.minimum[k];
+            const double gr=box.maximum[k]-box.inner_maximum[k];
+            if(gl>gap)gap=gl;
+            if(gr>gap)gap=gr;
+        }
+        box.max_outward_gap=gap;
+        if(isfinite(gap)&&gap<=requested_tolerance){
+            *out=box;return 1;
+        }
+        if(n==max_intervals)return 0;
+        n=n<=max_intervals/2u?n*2u:max_intervals;
+    }
 }
