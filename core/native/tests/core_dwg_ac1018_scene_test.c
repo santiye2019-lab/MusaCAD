@@ -490,6 +490,38 @@ int main(void){
                near(zero_width.padded_minimum[k],poly_bulged.minimum[k])&&
                near(zero_width.padded_maximum[k],poly_bulged.maximum[k]));
     }
+    /* The R2004 protected open polyline has 2 straight zero-width
+     * segments. The exact quadrilateral degenerates safely to each
+     * true source LINE chord, with no guessed stroke. */
+    MusaDwgAc1018StraightTaperWcs straight={0};
+    assert(musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x40eu,0u,&straight));
+    assert(straight.handle==0x40eu&&straight.segment_index==0u&&
+           !straight.widths_from_vertices&&
+           near(straight.start_width,0.0)&&
+           near(straight.end_width,0.0)&&
+           near(straight.minimum[0],0.0)&&
+           near(straight.maximum[0],12.5)&&
+           near(straight.minimum[1],0.0)&&
+           near(straight.maximum[1],0.0));
+    assert(musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x40eu,1u,&straight));
+    assert(straight.segment_index==1u&&
+           near(straight.minimum[0],12.5)&&
+           near(straight.maximum[0],12.5)&&
+           near(straight.minimum[1],0.0)&&
+           near(straight.maximum[1],10.0));
+    const MusaDwgAc1018StraightTaperWcs straight_saved=straight;
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x40eu,2u,&straight)); /* open last index */
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x70fu,0u,&straight)); /* LINE is not LW */
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x40eu,0u,NULL));
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x40eu,0u,
+                  (MusaDwgAc1018StraightTaperWcs*)(void*)s));
+    assert(!memcmp(&straight_saved,&straight,sizeof(straight)));
     const MusaDwgAc1018BulgedPolylineWcsBounds keep_bulged=
            poly_bulged;
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
@@ -607,6 +639,48 @@ int main(void){
            complex_poly.width_count==3u&&
            near(complex_vertices[0].bulge,0.5)&&
            near(complex_vertices[2].bulge,-0.25));
+    /* CRC-protected actual R2004 H=0x42b, closed 3-vertex LW:
+     * segment 1 is a vertical OCS straight taper between the original
+     * vertex[1] and vertex[2]. Its 4 exact mathematical edge corners
+     * are calculable even though adjacent segments are curved.
+     * OCS normal +Y makes OCS +X become WCS -X; extrusion thickness
+     * contributes Y=3.5..3.75, without inventing adjacent joins. */
+    MusaDwgAc1018StraightTaperWcs taper={0};
+    assert(musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x42bu,1u,&taper));
+    const double sw=complex_vertices[1].start_width;
+    const double ew=complex_vertices[1].end_width;
+    assert(taper.handle==0x42bu&&taper.segment_index==1u&&
+           taper.widths_from_vertices&&
+           near(taper.start_width,sw)&&near(taper.end_width,ew)&&
+           near(taper.thickness,0.25));
+    assert(near(taper.corners[0][0],-2.5+0.5*sw)&&
+           near(taper.corners[1][0],-2.5-0.5*sw)&&
+           near(taper.corners[2][0],-2.5+0.5*ew)&&
+           near(taper.corners[3][0],-2.5-0.5*ew));
+    assert(near(taper.corners[0][1],3.5)&&
+           near(taper.corners[3][1],3.5)&&
+           near(taper.corners[0][2],-4.5)&&
+           near(taper.corners[1][2],-4.5)&&
+           near(taper.corners[2][2],5.25)&&
+           near(taper.corners[3][2],5.25));
+    const double halfmax=0.5*fmax(sw,ew);
+    assert(near(taper.minimum[0],-2.5-halfmax)&&
+           near(taper.maximum[0],-2.5+halfmax)&&
+           near(taper.minimum[1],3.5)&&
+           near(taper.maximum[1],3.75)&&
+           near(taper.minimum[2],-4.5)&&
+           near(taper.maximum[2],5.25));
+    const MusaDwgAc1018StraightTaperWcs keep_taper=taper;
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x42bu,0u,&taper)); /* bulged */
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x42bu,2u,&taper)); /* curved closing edge */
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,0x42bu,3u,&taper));
+    assert(!musa_dwg_ac1018_scene_read_straight_taper_wcs(
+                  s,UINT64_C(0xdead),1u,&taper));
+    assert(!memcmp(&keep_taper,&taper,sizeof(taper)));
     /* Width and signed thickness are present: never report exact
      * centerline-only WCS bounds as complete original stroke geometry. */
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
