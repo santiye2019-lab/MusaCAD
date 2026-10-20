@@ -180,6 +180,63 @@ int main(void){
            evidence.other_declared_records==0u&&
            evidence.all_record_ranges_nonoverlapping&&
            evidence.all_indexed_record_crcs_verified);
+    /* Diagnostic pages retain indexed H and numeric type for every
+     * record. Real decoded geometry does NOT prove layer H semantics.
+     * First page has POLYLINE, second has LINE; no row is omitted. */
+    MusaDwgAc1018RecordDiagnosis diagnoses[3]={{0}};
+    MusaDwgAc1018RecordDiagnosisPage diagnostic_page={0};
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,diagnoses,1u,&diagnostic_page));
+    assert(diagnostic_page.total_indexed_records==2u&&
+           diagnostic_page.first_index==0u&&
+           diagnostic_page.records_written==1u&&
+           diagnostic_page.next_index==1u&&
+           diagnostic_page.supported_2d_in_page==1u&&
+           diagnostic_page.geometry_rejected_in_page==0u&&
+           diagnostic_page.link_audit_rejected_in_page==1u&&
+           diagnostic_page.unclassified_in_page==0u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x40e)&&
+           diagnoses[0].declared_type==77u&&
+           diagnoses[0].category==MUSA_DWG_AC1018_DIAG_2D_ENTITY&&
+           diagnoses[0].geometry_decoded&&
+           !diagnoses[0].fixed_link_identities_verified&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_LINK_AUDIT_REJECTED);
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,1u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.records_written==1u&&
+           diagnostic_page.next_index==2u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x70f)&&
+           diagnoses[0].declared_type==19u&&
+           diagnoses[0].geometry_decoded&&
+           diagnoses[0].evidence_issues==
+             MUSA_DWG_AC1018_DIAG_LINK_AUDIT_REJECTED);
+    assert(musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,diagnoses,2u,&diagnostic_page));
+    assert(diagnostic_page.records_written==2u&&
+           diagnostic_page.next_index==2u&&
+           diagnoses[0].indexed_handle==UINT64_C(0x40e)&&
+           diagnoses[1].indexed_handle==UINT64_C(0x70f));
+    const MusaDwgAc1018RecordDiagnosis kept_diagnosis0=diagnoses[0];
+    const MusaDwgAc1018RecordDiagnosis kept_diagnosis1=diagnoses[1];
+    const MusaDwgAc1018RecordDiagnosisPage kept_diagnostic_page=
+        diagnostic_page;
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,2u,diagnoses,2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,diagnoses,0u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,(MusaDwgAc1018RecordDiagnosis*)(void*)s,
+                  2u,&diagnostic_page));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,diagnoses,2u,
+                  (MusaDwgAc1018RecordDiagnosisPage*)(void*)diagnoses));
+    assert(!memcmp(&diagnoses[0],&kept_diagnosis0,
+                   sizeof(kept_diagnosis0))&&
+           !memcmp(&diagnoses[1],&kept_diagnosis1,
+                   sizeof(kept_diagnosis1))&&
+           !memcmp(&diagnostic_page,&kept_diagnostic_page,
+                   sizeof(kept_diagnostic_page)));
     const MusaDwgAc1018GeometryLinkEvidence keep_evidence=evidence;
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   s,NULL));
@@ -293,6 +350,12 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
                   s,&evidence));
     assert(!memcmp(&keep_evidence,&evidence,sizeof(evidence)));
+    assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
+                  s,0u,diagnoses,2u,&diagnostic_page));
+    assert(!memcmp(&diagnoses[0],&kept_diagnosis0,
+                   sizeof(kept_diagnosis0))&&
+           !memcmp(&diagnostic_page,&kept_diagnostic_page,
+                   sizeof(kept_diagnostic_page)));
     assert(!musa_dwg_ac1018_scene_audit_record_ranges(s,
                  (MusaDwgAc1018RecordRangeAudit*)(void*)s));
     assert(!memcmp(&layout,&unchanged,sizeof(layout)));
