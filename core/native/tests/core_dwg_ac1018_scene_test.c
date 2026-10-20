@@ -163,6 +163,29 @@ int main(void){
            inventory.undecodable_supported_records==0u&&
            inventory.all_indexed_record_crcs_verified&&
            inventory.only_supported_primitives_decoded);
+    /* Geometry and layer-link evidence must never be conflated.
+     * This protected raw AC1018 binary has fully decoded geometry but
+     * no LAYER table or verified fixed-role links. */
+    MusaDwgAc1018GeometryLinkEvidence evidence={0};
+    assert(musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  s,&evidence));
+    assert(evidence.indexed_records==2u&&
+           evidence.declared_supported_2d_entities==2u&&
+           evidence.geometry_decoded==2u&&
+           evidence.fixed_link_identities_verified==0u&&
+           evidence.geometry_and_links_verified==0u&&
+           evidence.geometry_only==2u&&
+           evidence.links_only==0u&&
+           evidence.neither_verified==0u&&
+           evidence.other_declared_records==0u&&
+           evidence.all_record_ranges_nonoverlapping&&
+           evidence.all_indexed_record_crcs_verified);
+    const MusaDwgAc1018GeometryLinkEvidence keep_evidence=evidence;
+    assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  s,NULL));
+    assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  s,(MusaDwgAc1018GeometryLinkEvidence*)(void*)s));
+    assert(!memcmp(&keep_evidence,&evidence,sizeof(evidence)));
     const MusaDwgAc1018SceneInventory saved_inventory=inventory;
     assert(!musa_dwg_ac1018_scene_inventory(s,2,&inventory));
     assert(!musa_dwg_ac1018_scene_inventory(s,0,NULL));
@@ -265,6 +288,11 @@ int main(void){
     MusaDwgAc1018RecordRangeAudit unchanged=layout;
     assert(!musa_dwg_ac1018_scene_audit_record_ranges(s,&layout));
     assert(!memcmp(&layout,&unchanged,sizeof(layout)));
+    /* Two H entries aliased to one physical CRC-backed record must
+     * invalidate the entire diagnostic and preserve caller report. */
+    assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  s,&evidence));
+    assert(!memcmp(&keep_evidence,&evidence,sizeof(evidence)));
     assert(!musa_dwg_ac1018_scene_audit_record_ranges(s,
                  (MusaDwgAc1018RecordRangeAudit*)(void*)s));
     assert(!memcmp(&layout,&unchanged,sizeof(layout)));
