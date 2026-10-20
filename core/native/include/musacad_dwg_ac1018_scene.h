@@ -217,6 +217,35 @@ int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
     const MusaDwgAc1018Scene *scene,
     MusaDwgAc1018EntityLayerLink *links,size_t capacity,
     MusaDwgAc1018IndexedLayerLinkCoverage *out);
+/* Independent evidence MATRIX for original indexed AC1018 2D objects.
+ * Count only geometry actually accepted by the primitive decoder and only
+ * H link roles accepted by fixed target CRC/self-H identity audits.
+ * Distinguish both vs geometry-only vs link-only vs neither. Include all
+ * indexed records, report opaque/unsupported ones rather than dropping.
+ * Requires whole-scene record/physical-range CRC checks first. A positive
+ * 2D H-link probe is NOT geometry, named-layer, ByLayer display RGB, AcDb
+ * class validation, writer support or AutoCAD parity.
+ * A successful diagnostic can report many incomplete records; callers
+ * MUST check counters, not treat function success as full CAD acceptance.
+ * C11 portable, no external DWG decoder, no source or output mutation
+ * on any fatal integrity error. O(N log N) index + scratch vertices.
+ */
+typedef struct MusaDwgAc1018GeometryLinkEvidence {
+    size_t indexed_records;
+    size_t declared_supported_2d_entities;
+    size_t geometry_decoded;
+    size_t fixed_link_identities_verified;
+    size_t geometry_and_links_verified;
+    size_t geometry_only;
+    size_t links_only;
+    size_t neither_verified;
+    size_t other_declared_records;
+    uint8_t all_record_ranges_nonoverlapping;
+    uint8_t all_indexed_record_crcs_verified;
+} MusaDwgAc1018GeometryLinkEvidence;
+int musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018GeometryLinkEvidence *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
