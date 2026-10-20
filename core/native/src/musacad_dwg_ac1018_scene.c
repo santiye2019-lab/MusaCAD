@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_scene.h"
+#include "musacad_ocs.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_handles.h"
 #include "musacad_dwg_ac1018_reactor_links.h"
@@ -1552,6 +1553,117 @@ int musa_dwg_ac1018_scene_read_linear_wcs_bounds(
         }
         free(vertices);
         if(!valid)return 0;
+    }
+    *out=checked;
+    return 1;
+}
+
+/* Parametric original OCS circular centerline in WCS:
+ * P(t) = OCS_to_WCS(center) +
+ *        radius * (basis.x * cos(t) + basis.y * sin(t)).
+ * Its coordinate-axis extrema occur where theta = atan2(Yaxis,Xaxis)
+ * (max) and theta+PI (min), independently of axis-aligned orientation.
+ */
+static double curve_wrapped_angle(double a,double turn){
+    double t=fmod(a,turn);
+    return t<0.0?t+turn:t;
+}
+static int curve_point_wcs(
+    const MusaCoreOcsBasis *basis,const double center[3],
+    double radius,double theta,double out[3]){
+    const double ct=cos(theta),st=sin(theta);
+    if(!isfinite(ct)||!isfinite(st))return 0;
+    for(size_t k=0u;k<3u;k++){
+        out[k]=center[k]+radius*(basis->x[k]*ct+basis->y[k]*st);
+        if(!isfinite(out[k]))return 0;
+    }
+    return 1;
+}
+static void curve_bounds_include(
+    MusaDwgAc1018CurveWcsBounds *bounds,const double xyz[3]){
+    for(size_t k=0u;k<3u;k++){
+        if(xyz[k]<bounds->minimum[k])bounds->minimum[k]=xyz[k];
+        if(xyz[k]>bounds->maximum[k])bounds->maximum[k]=xyz[k];
+    }
+}
+int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018CurveWcsBounds *out){
+    if(!s||!out||!handle||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018Curve curve={0};
+    if(!musa_dwg_ac1018_scene_read_curve(s,handle,&curve)||
+       curve.handle!=handle||
+       (curve.type_code!=17u&&curve.type_code!=18u)||
+       !isfinite(curve.radius)||!(curve.radius>0.0)||
+       !isfinite(curve.thickness)||curve.thickness!=0.0)
+        return 0;
+    MusaCoreOcsBasis basis={0};
+    const double xy[2]={curve.center[0],curve.center[1]};
+    double center[3]={0};
+    if(!musa_core_ocs_basis(curve.extrusion,&basis)||
+       !musa_core_ocs_to_world(&basis,xy,curve.center[2],center)||
+       !finite_vec3(center))
+        return 0;
+    const double pi=acos(-1.0),turn=2.0*pi;
+    if(!isfinite(pi)||!isfinite(turn))return 0;
+    const int is_arc=curve.type_code==17u;
+    double start=0.0,sweep=turn;
+    if(is_arc){
+        /* Reject a full-turn ARC masquerading as two coincident angles,
+         * and unbounded/repeated turns outside the standard single sweep.
+         * Numeric angle reduction is limited for stable precision. */
+        if(!isfinite(curve.start_angle)||
+           !isfinite(curve.end_angle)||
+           fabs(curve.start_angle)>1e8||
+           fabs(curve.end_angle)>1e8||
+           fabs(curve.end_angle-curve.start_angle)>turn+1e-10)
+            return 0;
+        start=curve_wrapped_angle(curve.start_angle,turn);
+        sweep=curve_wrapped_angle(
+                    curve.end_angle-curve.start_angle,turn);
+        if(!isfinite(start)||!isfinite(sweep)||sweep<=1e-12||
+           sweep>=turn-1e-12)return 0;
+    }
+    MusaDwgAc1018CurveWcsBounds checked={0};
+    checked.handle=handle;
+    checked.type_code=curve.type_code;
+    checked.radius=curve.radius;
+    checked.start_angle=start;
+    checked.sweep_angle=sweep;
+    memcpy(checked.center_wcs,center,sizeof(center));
+    if(!is_arc){
+        for(size_t k=0u;k<3u;k++){
+            /* Analytic full-circle bounds, no tessellation/sample error. */
+            const double amp=curve.radius*hypot(basis.x[k],basis.y[k]);
+            checked.minimum[k]=center[k]-amp;
+            checked.maximum[k]=center[k]+amp;
+            if(!isfinite(amp)||!isfinite(checked.minimum[k])||
+               !isfinite(checked.maximum[k]))return 0;
+        }
+    }else{
+        double point[3]={0};
+        if(!curve_point_wcs(&basis,center,curve.radius,start,point))
+            return 0;
+        memcpy(checked.minimum,point,sizeof(point));
+        memcpy(checked.maximum,point,sizeof(point));
+        if(!curve_point_wcs(&basis,center,curve.radius,
+                            start+sweep,point))return 0;
+        curve_bounds_include(&checked,point);
+        for(size_t k=0u;k<3u;k++){
+            const double a=curve_wrapped_angle(
+                                 atan2(basis.y[k],basis.x[k]),turn);
+            for(size_t j=0u;j<2u;j++){
+                const double candidate=curve_wrapped_angle(a+j*pi,turn);
+                const double dist=curve_wrapped_angle(candidate-start,turn);
+                if(!isfinite(candidate)||!isfinite(dist))return 0;
+                if(dist<=sweep+1e-12){
+                    if(!curve_point_wcs(&basis,center,curve.radius,
+                                        candidate,point))return 0;
+                    curve_bounds_include(&checked,point);
+                }
+            }
+        }
     }
     *out=checked;
     return 1;
