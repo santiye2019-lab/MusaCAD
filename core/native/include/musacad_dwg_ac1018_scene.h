@@ -160,6 +160,36 @@ typedef struct MusaDwgAc1018EntityLayerEvidence {
 int musa_dwg_ac1018_scene_read_verified_entity_layer(
     const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
     MusaDwgAc1018EntityLayerEvidence *out);
+/* Performance-oriented, READ-ONLY diagnostic batch, not a renderer:
+ * establish complete R2004 LAYER_CONTROL -> LAYER membership and raw CMC
+ * once per bounded batch, then independently audit the fixed entity H
+ * references (ARC/CIRCLE/LINE/LWPOLYLINE) and resolve by exact layer H.
+ * Results keep the caller's entity order. Duplicate entity handles, wrong
+ * type, unsupported CMC, corrupted graph or non-ASCII names fail closed.
+ * 1..262144 distinct entities per call; page larger input. One global
+ * palette and reference traversal, not a full graph scan per entity.
+ * raw_cmc_rgb is unprocessed original metadata, NOT final display RGB.
+ * NOT a geometry proof, AcDb class/owner proof, visual parity or writer.
+ * Source and all caller outputs are unchanged on any failure.
+ */
+typedef struct MusaDwgAc1018EntityLayerLink {
+    uint64_t entity_handle;
+    uint64_t layer_handle;
+    uint64_t layer_control_handle;
+    uint32_t raw_cmc_rgb;
+} MusaDwgAc1018EntityLayerLink;
+typedef struct MusaDwgAc1018EntityLayerBatchReport {
+    size_t verified_entities;
+    size_t verified_layers;
+    size_t verified_layer_controls;
+    uint8_t verified_unique_entity_handles;
+    uint8_t complete_layer_membership_verified;
+} MusaDwgAc1018EntityLayerBatchReport;
+int musa_dwg_ac1018_scene_read_entity_layer_batch(
+    const MusaDwgAc1018Scene *scene,
+    const uint64_t *entity_handles,size_t entity_count,
+    MusaDwgAc1018EntityLayerLink *links,size_t link_capacity,
+    MusaDwgAc1018EntityLayerBatchReport *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
