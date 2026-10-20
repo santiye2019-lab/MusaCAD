@@ -454,13 +454,14 @@ int musa_dwg_ac1018_scene_read_linear_wcs_bounds(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018LinearWcsBounds *out);
 /* Analytic WCS XYZ extents of a genuinely CRC-decoded original R2004
- * ARC (17) or CIRCLE (18) centerline, including the arbitrary-axis OCS
- * extrusion transform. For an ARC include BOTH true endpoints plus all
- * interior axis extrema; never approximate by endpoints/tessellation.
- * Reject nonzero entity thickness, degenerate/overlong ARC sweeps,
- * invalid angular metadata, nonfinite transformed coordinates and
- * unsupported entity types atomically. Zero linewidth/stroke expansion
- * is assumed; no owner/layer visibility, RGB, complete CAD semantics.
+ * ARC (17) or CIRCLE (18) curve and optional signed-thickness extrusion,
+ * including the arbitrary-axis OCS-to-WCS transform. For an ARC include
+ * BOTH true endpoints plus all interior axis extrema; never approximate
+ * by endpoints/tessellation. The exact translated sweep along the unit
+ * extrusion axis expands per-coordinate bounds for nonzero thickness.
+ * Reject degenerate/overlong ARC sweeps, invalid angles/nonfinite geometry
+ * and unsupported entity types atomically. Not expanded for lineweight,
+ * linetype strokes or layer/visibility; no complete CAD semantics.
  * No DWG writer, external CAD SDK or real-file parity is asserted.
  */
 typedef struct MusaDwgAc1018CurveWcsBounds {
@@ -470,6 +471,7 @@ typedef struct MusaDwgAc1018CurveWcsBounds {
     double maximum[3];
     double center_wcs[3];
     double radius;
+    double thickness; /* signed OCS-normal extrusion included in bounds */
     double start_angle;
     double sweep_angle; /* full turn for CIRCLE */
 } MusaDwgAc1018CurveWcsBounds;
