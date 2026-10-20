@@ -926,31 +926,12 @@ int musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
  * publishing a partial result. The complete evidence audit is deliberately
  * repeated before each page; this is diagnostic integrity, not rendering.
  */
-int musa_dwg_ac1018_scene_read_record_diagnosis_page(
-    const MusaDwgAc1018Scene *s,size_t first_index,
-    MusaDwgAc1018RecordDiagnosis *rows,size_t capacity,
+/* Parse a page against the already globally audited scene. Not public:
+ * caller MUST preflight CRC/range coverage before invoking this helper. */
+static int fill_diagnosis_range(
+    const MusaDwgAc1018Scene *s,size_t first_index,size_t count,
+    MusaDwgAc1018RecordDiagnosis *rows,
     MusaDwgAc1018RecordDiagnosisPage *out){
-    if(!s||!s->index||!s->objects||!rows||!out||
-       !capacity||capacity>4096u||first_index>=s->index_count||
-       capacity>SIZE_MAX/sizeof(*rows)||
-       scene_output_overlaps(s,rows,capacity*sizeof(*rows))||
-       scene_output_overlaps(s,out,sizeof(*out))||
-       overlaps(rows,capacity*sizeof(*rows),out,sizeof(*out)))
-        return 0;
-
-    MusaDwgAc1018GeometryLinkEvidence coverage={0};
-    if(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
-             s,&coverage)||
-       coverage.indexed_records!=s->index_count||
-       !coverage.all_record_ranges_nonoverlapping||
-       !coverage.all_indexed_record_crcs_verified)
-        return 0;
-
-    const size_t remaining=s->index_count-first_index;
-    const size_t count=remaining<capacity?remaining:capacity;
-    MusaDwgAc1018RecordDiagnosis *staged=
-        (MusaDwgAc1018RecordDiagnosis*)calloc(count,sizeof(*staged));
-    if(!staged)return 0;
     MusaDwgAc1018LWVertex *vertices=NULL;
     MusaDwgAc1018RecordDiagnosisPage page={0};
     page.total_indexed_records=s->index_count;
@@ -966,7 +947,7 @@ int musa_dwg_ac1018_scene_read_record_diagnosis_page(
            !record.handle){
             valid=0;break;
         }
-        MusaDwgAc1018RecordDiagnosis *row=&staged[j];
+        MusaDwgAc1018RecordDiagnosis *row=&rows[j];
         row->indexed_handle=record.handle;
         row->declared_type=record.declared_type;
         if(record.declared_type==17u||record.declared_type==18u||
@@ -1038,13 +1019,133 @@ int musa_dwg_ac1018_scene_read_record_diagnosis_page(
             page.unclassified_in_page++;
         }
     }
+    free(vertices);
+    if(valid)*out=page;
+    return valid;
+}
+/* Legacy page API retains its fully audited fail-closed behavior. */
+int musa_dwg_ac1018_scene_read_record_diagnosis_page(
+    const MusaDwgAc1018Scene *s,size_t first_index,
+    MusaDwgAc1018RecordDiagnosis *rows,size_t capacity,
+    MusaDwgAc1018RecordDiagnosisPage *out){
+    if(!s||!s->index||!s->objects||!rows||!out||
+       !capacity||capacity>4096u||first_index>=s->index_count||
+       capacity>SIZE_MAX/sizeof(*rows)||
+       scene_output_overlaps(s,rows,capacity*sizeof(*rows))||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       overlaps(rows,capacity*sizeof(*rows),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018GeometryLinkEvidence coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+             s,&coverage)||
+       coverage.indexed_records!=s->index_count||
+       !coverage.all_record_ranges_nonoverlapping||
+       !coverage.all_indexed_record_crcs_verified)
+        return 0;
+    const size_t remaining=s->index_count-first_index;
+    const size_t count=remaining<capacity?remaining:capacity;
+    MusaDwgAc1018RecordDiagnosis *staged=
+        (MusaDwgAc1018RecordDiagnosis*)calloc(count,sizeof(*staged));
+    if(!staged)return 0;
+    MusaDwgAc1018RecordDiagnosisPage page={0};
+    const int valid=fill_diagnosis_range(
+              s,first_index,count,staged,&page);
     if(valid){
         memcpy(rows,staged,count*sizeof(*staged));
         *out=page;
     }
-    free(vertices);
     free(staged);
     return valid;
+}
+/* Immutable diagnostic snapshot owns its entire materialized H page set.
+ * It never borrows source scene memory after successful creation. */
+struct MusaDwgAc1018DiagnosisSnapshot {
+    size_t count;
+    MusaDwgAc1018RecordDiagnosis *records;
+};
+void musa_dwg_ac1018_diagnosis_snapshot_close(
+    MusaDwgAc1018DiagnosisSnapshot *snapshot){
+    if(!snapshot)return;
+    free(snapshot->records);
+    free(snapshot);
+}
+size_t musa_dwg_ac1018_diagnosis_snapshot_handle_count(
+    const MusaDwgAc1018DiagnosisSnapshot *snapshot){
+    return snapshot?snapshot->count:0u;
+}
+int musa_dwg_ac1018_scene_create_diagnosis_snapshot(
+    const MusaDwgAc1018Scene *s,
+    MusaDwgAc1018DiagnosisSnapshot **out){
+    if(!s||!s->index||!s->objects||!out||!s->index_count||
+       s->index_count>1000000u||
+       s->index_count>SIZE_MAX/sizeof(MusaDwgAc1018RecordDiagnosis)||
+       scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018GeometryLinkEvidence coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(s,&coverage)||
+       coverage.indexed_records!=s->index_count||
+       !coverage.all_record_ranges_nonoverlapping||
+       !coverage.all_indexed_record_crcs_verified)
+        return 0;
+    MusaDwgAc1018DiagnosisSnapshot *snapshot=
+        (MusaDwgAc1018DiagnosisSnapshot*)calloc(1u,sizeof(*snapshot));
+    if(!snapshot)return 0;
+    snapshot->count=s->index_count;
+    snapshot->records=(MusaDwgAc1018RecordDiagnosis*)calloc(
+                    snapshot->count,sizeof(*snapshot->records));
+    MusaDwgAc1018RecordDiagnosisPage unused={0};
+    if(!snapshot->records||
+       !fill_diagnosis_range(s,0u,snapshot->count,
+                             snapshot->records,&unused)){
+        musa_dwg_ac1018_diagnosis_snapshot_close(snapshot);
+        return 0;
+    }
+    *out=snapshot;
+    return 1;
+}
+/* Pages are copied from immutable stored records in O(page_size).
+ * No file, stream, mutable scene, repeated audit or heap allocation. */
+int musa_dwg_ac1018_diagnosis_snapshot_read_page(
+    const MusaDwgAc1018DiagnosisSnapshot *snapshot,
+    size_t first_index,MusaDwgAc1018RecordDiagnosis *rows,
+    size_t capacity,MusaDwgAc1018RecordDiagnosisPage *out){
+    if(!snapshot||!snapshot->records||!snapshot->count||
+       !rows||!out||!capacity||capacity>4096u||
+       first_index>=snapshot->count||
+       capacity>SIZE_MAX/sizeof(*rows)||
+       snapshot->count>SIZE_MAX/sizeof(*snapshot->records)||
+       overlaps(snapshot,sizeof(*snapshot),rows,capacity*sizeof(*rows))||
+       overlaps(snapshot,sizeof(*snapshot),out,sizeof(*out))||
+       overlaps(snapshot->records,
+                snapshot->count*sizeof(*snapshot->records),
+                rows,capacity*sizeof(*rows))||
+       overlaps(snapshot->records,
+                snapshot->count*sizeof(*snapshot->records),
+                out,sizeof(*out))||
+       overlaps(rows,capacity*sizeof(*rows),out,sizeof(*out)))
+        return 0;
+    const size_t remain=snapshot->count-first_index;
+    const size_t n=remain<capacity?remain:capacity;
+    MusaDwgAc1018RecordDiagnosisPage page={0};
+    page.total_indexed_records=snapshot->count;
+    page.first_index=first_index;
+    page.records_written=n;
+    page.next_index=first_index+n;
+    for(size_t i=0u;i<n;i++){
+        const MusaDwgAc1018RecordDiagnosis *d=
+             &snapshot->records[first_index+i];
+        if(d->category==MUSA_DWG_AC1018_DIAG_2D_ENTITY){
+            page.supported_2d_in_page++;
+            if(!d->geometry_decoded)page.geometry_rejected_in_page++;
+            if(!d->fixed_link_identities_verified)
+                page.link_audit_rejected_in_page++;
+        }else if(d->category==MUSA_DWG_AC1018_DIAG_UNCLASSIFIED){
+            page.unclassified_in_page++;
+        }
+    }
+    memcpy(rows,snapshot->records+first_index,n*sizeof(*rows));
+    *out=page;
+    return 1;
 }
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
