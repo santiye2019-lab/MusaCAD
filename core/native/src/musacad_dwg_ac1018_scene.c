@@ -8,6 +8,7 @@
 #include "musacad_crc16.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #define MUSA_AC1018_SCENE_MAX_HANDLES 1000000u
@@ -1374,6 +1375,83 @@ int musa_dwg_ac1018_scene_audit_record_ranges(
     checked.covered_record_bytes=covered;
     checked.unindexed_section_bytes=s->object_bytes-covered;
     checked.ranges_nonoverlapping=1u;
+    *out=checked;
+    return 1;
+}
+
+/* Exact centerline vertex extrema only. No synthetic bounds for arc
+ * bulges, variable-width strokes or non-planar thickness. */
+static int finite_vec3(const double xyz[3]){
+    return isfinite(xyz[0])&&isfinite(xyz[1])&&isfinite(xyz[2]);
+}
+static void bounds_include(MusaDwgAc1018LinearWcsBounds *box,
+                           const double xyz[3]){
+    for(size_t axis=0u;axis<3u;axis++){
+        if(xyz[axis]<box->minimum[axis])box->minimum[axis]=xyz[axis];
+        if(xyz[axis]>box->maximum[axis])box->maximum[axis]=xyz[axis];
+    }
+}
+int musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018LinearWcsBounds *out){
+    if(!s||!handle||!out||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       (record.declared_type!=19u&&record.declared_type!=77u))
+        return 0;
+    MusaDwgAc1018LinearWcsBounds checked={0};
+    checked.handle=handle;
+    checked.type_code=record.declared_type;
+    if(record.declared_type==19u){
+        MusaDwgAc1018Line line={0};
+        if(!musa_dwg_ac1018_scene_read_line(s,handle,&line)||
+           line.handle!=handle||!isfinite(line.thickness)||
+           line.thickness!=0.0||
+           !finite_vec3(line.start)||!finite_vec3(line.end))
+            return 0;
+        checked.vertex_count=2u;
+        checked.segment_count=1u;
+        memcpy(checked.minimum,line.start,sizeof(checked.minimum));
+        memcpy(checked.maximum,line.start,sizeof(checked.maximum));
+        bounds_include(&checked,line.end);
+    }else{
+        MusaDwgAc1018LWVertex *vertices=
+            (MusaDwgAc1018LWVertex*)malloc(
+                    100000u*sizeof(MusaDwgAc1018LWVertex));
+        if(!vertices)return 0;
+        MusaDwgAc1018LWPolyline poly={0};
+        int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+                    s,handle,vertices,100000u,&poly)&&
+                  poly.handle==handle&&
+                  poly.vertex_count>=2u&&poly.vertex_count<=100000u&&
+                  isfinite(poly.thickness)&&poly.thickness==0.0&&
+                  isfinite(poly.constant_width)&&poly.constant_width==0.0;
+        if(valid){
+            checked.vertex_count=poly.vertex_count;
+            checked.segment_count=poly.vertex_count-(poly.closed?0u:1u);
+            for(uint32_t i=0u;i<poly.vertex_count;i++){
+                const MusaDwgAc1018LWVertex *v=&vertices[i];
+                if(!isfinite(v->x)||!isfinite(v->y)||
+                   !isfinite(v->bulge)||v->bulge!=0.0||
+                   !isfinite(v->start_width)||v->start_width!=0.0||
+                   !isfinite(v->end_width)||v->end_width!=0.0){
+                    valid=0;break;
+                }
+                double wcs[3]={0};
+                if(!musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
+                        &poly,v,wcs)||!finite_vec3(wcs)){
+                    valid=0;break;
+                }
+                if(i==0u){
+                    memcpy(checked.minimum,wcs,sizeof(wcs));
+                    memcpy(checked.maximum,wcs,sizeof(wcs));
+                }else bounds_include(&checked,wcs);
+            }
+        }
+        free(vertices);
+        if(!valid)return 0;
+    }
     *out=checked;
     return 1;
 }
