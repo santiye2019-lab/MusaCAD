@@ -519,6 +519,30 @@ typedef struct MusaDwgAc1018BulgedPolylineWcsBounds {
 int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018BulgedPolylineWcsBounds *out);
+/* Explicitly audited CENTERLINE-only geometry from original CRC-backed
+ * R2004 LWPOLYLINE records, INCLUDING records whose width data cannot
+ * be represented by an exact stroke/surface envelope yet.
+ *
+ * Coordinates and signed thickness come from the verified original DWG;
+ * geometry min/max spans the thin segment centerlines and their extrusion,
+ * NOT the visual painted stroke/width. The out flags make missing stroke
+ * coverage observable; a positive return MUST NOT be used for a lossless
+ * zoom-to-drawing or complete source renderer while excluded_width=1.
+ *
+ * The narrower read_bulged_polyline_wcs_bounds API remains fail-closed
+ * for widths and is unchanged. Failures leave caller output untouched.
+ * No graphics proxy approximation, third-party DWG decoder or APK.
+ */
+typedef struct MusaDwgAc1018BulgeCenterlineAudit {
+    MusaDwgAc1018BulgedPolylineWcsBounds centerline;
+    uint32_t nonzero_variable_width_vertices;
+    uint8_t nonzero_constant_width;
+    uint8_t excluded_width_geometry;
+} MusaDwgAc1018BulgeCenterlineAudit;
+int musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018BulgeCenterlineAudit *out);
+
 #ifdef __cplusplus
 }
 #endif
