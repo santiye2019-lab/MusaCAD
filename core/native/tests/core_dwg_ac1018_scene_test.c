@@ -323,6 +323,38 @@ int main(void){
         assert(poly.vertex_count==3u&&poly.closed==0u);
         assert(near(vertices[1].x,12.5)&&near(vertices[2].y,10.0));
     }
+    /* Bounding data is computed from CRC-verified actual coordinates,
+     * not the presence of an H record or guessed view dimensions. */
+    MusaDwgAc1018LinearWcsBounds line_box={0},poly_box={0};
+    assert(musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,0x70fu,&line_box));
+    assert(line_box.handle==0x70fu&&line_box.type_code==19u&&
+           line_box.vertex_count==2u&&line_box.segment_count==1u);
+    for(size_t axis=0u;axis<3u;axis++){
+        assert(near(line_box.minimum[axis],
+                    fmin(line.start[axis],line.end[axis])));
+        assert(near(line_box.maximum[axis],
+                    fmax(line.start[axis],line.end[axis])));
+    }
+    assert(musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,0x40eu,&poly_box));
+    assert(poly_box.handle==0x40eu&&poly_box.type_code==77u&&
+           poly_box.vertex_count==3u&&poly_box.segment_count==2u&&
+           near(poly_box.minimum[0],0.0)&&
+           near(poly_box.maximum[0],12.5)&&
+           near(poly_box.minimum[1],0.0)&&
+           near(poly_box.maximum[1],10.0)&&
+           near(poly_box.minimum[2],0.0)&&
+           near(poly_box.maximum[2],0.0));
+    const MusaDwgAc1018LinearWcsBounds unchanged_bounds=poly_box;
+    assert(!musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,UINT64_C(0xdead),&poly_box));
+    assert(!musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,0x40eu,NULL));
+    assert(!musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,0x40eu,
+                  (MusaDwgAc1018LinearWcsBounds*)(void*)s));
+    assert(!memcmp(&poly_box,&unchanged_bounds,sizeof(poly_box)));
     double wcs[3]={0};
     assert(musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
                    &poly,&vertices[2],wcs));
@@ -398,6 +430,11 @@ int main(void){
     assert(!memcmp(&keep_evidence,&evidence,sizeof(evidence)));
     assert(!musa_dwg_ac1018_scene_read_record_diagnosis_page(
                   s,0u,diagnoses,2u,&diagnostic_page));
+    /* CRC-correct duplicate H reference targets are not accepted as
+     * actual source-verified geometry for a caller-chosen indexed handle. */
+    assert(!musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+                  s,0x70fu,&poly_box));
+    assert(!memcmp(&poly_box,&unchanged_bounds,sizeof(poly_box)));
     assert(!memcmp(&diagnoses[0],&kept_diagnosis0,
                    sizeof(kept_diagnosis0))&&
            !memcmp(&diagnostic_page,&kept_diagnostic_page,
