@@ -704,6 +704,51 @@ int main(void){
     assert(!memcmp(&batch_links[0],&two_good0,sizeof(two_good0))&&
            !memcmp(&batch_links[1],&two_good1,sizeof(two_good1))&&
            !memcmp(&batch_report,&two_good_report,sizeof(two_good_report)));
+    /* Enumerate ALL supported fixed numeric indexed records, not merely
+     * a hand-picked caller list. Opaque/unknown records must fail closed. */
+    MusaDwgAc1018IndexedLayerLinkCoverage strict={0};
+    assert(musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(strict.indexed_records_checked==4u&&
+           strict.fixed_nonentity_prefixes_checked==2u&&
+           strict.supported_entity_links_checked==2u&&
+           strict.verified_layers==1u&&
+           strict.verified_layer_controls==1u&&
+           strict.no_unclassified_record_types&&
+           strict.all_supported_entity_links_verified&&
+           batch_links[0].entity_handle==UINT64_C(0x120)&&
+           batch_links[1].entity_handle==UINT64_C(0x121));
+    const MusaDwgAc1018EntityLayerLink strict0=batch_links[0],strict1=batch_links[1];
+    const MusaDwgAc1018IndexedLayerLinkCoverage keep_strict=strict;
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,1u,&strict)); /* no partial batch */
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,0u,&strict));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,
+                  (MusaDwgAc1018IndexedLayerLinkCoverage*)(void*)batch_links));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,(MusaDwgAc1018EntityLayerLink*)(void*)scene,
+                  2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,1,0,51u,7); /* broken complete table/target graph */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,88u,7); /* numeric unknown type, refuse partial map */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
      * or forged embedded identity. The output must remain unchanged. */
