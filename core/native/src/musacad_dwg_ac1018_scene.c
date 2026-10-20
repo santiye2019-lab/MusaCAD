@@ -2049,3 +2049,132 @@ int musa_dwg_ac1018_scene_read_straight_taper_wcs(
     *out=checked;
     return 1;
 }
+
+
+/* First-party signed bulge variable-width edge evaluation in original
+ * OCS, then through the original arbitrary-axis basis into world XYZ.
+ * The left normal is -sign(sweep) * (cos(theta), sin(theta)), which
+ * differs from a chord normal except for a straight segment. */
+int musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t segment_index,double fraction,
+    MusaDwgAc1018BulgeWidthEdgePoint *out){
+    if(!s||!handle||!out||!isfinite(fraction)||
+       fraction<0.0||fraction>1.0||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       record.declared_type!=77u)return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int good=musa_dwg_ac1018_scene_read_lwpolyline(
+                 s,handle,vertices,100000u,&poly)&&
+             poly.handle==handle&&poly.vertex_count>=2u&&
+             poly.vertex_count<=100000u&&
+             isfinite(poly.elevation)&&isfinite(poly.thickness)&&
+             isfinite(poly.constant_width)&&poly.constant_width>=0.0;
+    MusaDwgAc1018BulgeWidthEdgePoint checked={0};
+    if(good){
+        const uint32_t segments=
+            poly.vertex_count-(poly.closed?0u:1u);
+        if(segment_index>=segments||
+           (poly.width_count!=0u&&
+            poly.width_count!=poly.vertex_count))good=0;
+    }
+    if(good){
+        const uint32_t next=segment_index+1u==poly.vertex_count?
+                            0u:segment_index+1u;
+        const MusaDwgAc1018LWVertex *a=&vertices[segment_index];
+        const MusaDwgAc1018LWVertex *b=&vertices[next];
+        const int from_vertices=poly.width_count!=0u;
+        const double sw=from_vertices?a->start_width:poly.constant_width;
+        const double ew=from_vertices?a->end_width:poly.constant_width;
+        const double bulge=a->bulge;
+        const double dx=b->x-a->x,dy=b->y-a->y;
+        const double chord=hypot(dx,dy);
+        if(!isfinite(a->x)||!isfinite(a->y)||
+           !isfinite(b->x)||!isfinite(b->y)||
+           !isfinite(sw)||sw<0.0||!isfinite(ew)||ew<0.0||
+           !isfinite(bulge)||bulge==0.0||
+           fabs(bulge)<1e-12||fabs(bulge)>1e6||
+           !isfinite(dx)||!isfinite(dy)||
+           !isfinite(chord)||!(chord>0.0))good=0;
+        if(good){
+            const double offset=(chord*0.25)*
+                                ((1.0-bulge*bulge)/bulge);
+            const double radius=(chord*0.25)*
+                                ((1.0+bulge*bulge)/fabs(bulge));
+            const double cx=0.5*a->x+0.5*b->x-(dy/chord)*offset;
+            const double cy=0.5*a->y+0.5*b->y+(dx/chord)*offset;
+            const double sweep=4.0*atan(bulge);
+            const double turn=2.0*acos(-1.0);
+            const double theta=atan2(a->y-cy,a->x-cx)+sweep*fraction;
+            const double ct=cos(theta),st=sin(theta);
+            const double width=(1.0-fraction)*sw+fraction*ew;
+            MusaCoreOcsBasis basis={0};
+            if(!isfinite(offset)||!isfinite(radius)||!(radius>0.0)||
+               !isfinite(cx)||!isfinite(cy)||
+               !isfinite(sweep)||fabs(sweep)>=turn-1e-12||
+               !isfinite(theta)||!isfinite(ct)||!isfinite(st)||
+               !isfinite(width)||width<0.0||
+               !musa_core_ocs_basis(poly.extrusion,&basis)){
+                good=0;
+            }else{
+                checked.handle=handle;
+                checked.segment_index=segment_index;
+                checked.widths_from_vertices=(uint8_t)from_vertices;
+                checked.fraction=fraction;
+                checked.start_width=sw;
+                checked.end_width=ew;
+                checked.interpolated_width=width;
+                checked.signed_sweep=sweep;
+                checked.radius=radius;
+                checked.thickness=poly.thickness;
+                const double normal_sign=sweep>0.0?-1.0:1.0;
+                const double ocs_x=cx+radius*ct;
+                const double ocs_y=cy+radius*st;
+                const double half=width*0.5;
+                const double center_xy[2]={ocs_x,ocs_y};
+                const double left_xy[2]={
+                    ocs_x+normal_sign*half*ct,
+                    ocs_y+normal_sign*half*st};
+                const double right_xy[2]={
+                    ocs_x-normal_sign*half*ct,
+                    ocs_y-normal_sign*half*st};
+                if(!isfinite(ocs_x)||!isfinite(ocs_y)||
+                   !isfinite(left_xy[0])||!isfinite(left_xy[1])||
+                   !isfinite(right_xy[0])||!isfinite(right_xy[1])||
+                   !musa_core_ocs_to_world(
+                       &basis,center_xy,poly.elevation,checked.center_wcs)||
+                   !musa_core_ocs_to_world(
+                       &basis,left_xy,poly.elevation,checked.left_wcs)||
+                   !musa_core_ocs_to_world(
+                       &basis,right_xy,poly.elevation,checked.right_wcs)||
+                   !finite_vec3(checked.center_wcs)||
+                   !finite_vec3(checked.left_wcs)||
+                   !finite_vec3(checked.right_wcs)){
+                    good=0;
+                }else{
+                    for(size_t k=0u;k<3u;k++){
+                        const double shift=poly.thickness*basis.z[k];
+                        checked.left_thickness_wcs[k]=
+                            checked.left_wcs[k]+shift;
+                        checked.right_thickness_wcs[k]=
+                            checked.right_wcs[k]+shift;
+                        if(!isfinite(shift)||
+                           !isfinite(checked.left_thickness_wcs[k])||
+                           !isfinite(checked.right_thickness_wcs[k])){
+                            good=0;break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    free(vertices);
+    if(!good)return 0;
+    *out=checked;
+    return 1;
+}

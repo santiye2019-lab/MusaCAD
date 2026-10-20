@@ -639,6 +639,91 @@ int main(void){
            complex_poly.width_count==3u&&
            near(complex_vertices[0].bulge,0.5)&&
            near(complex_vertices[2].bulge,-0.25));
+    /* True ORIGINAL binary R2004 bulge width edges. The variable-width
+     * normal follows the ARC TANGENT at each fractional sweep, rather
+     * than a chord normal or concentric fixed-radius arc approximation.
+     * Source segment 0: OCS (1.5,-4.5)->(2.5,-4.5), bulge +0.5,
+     * r=0.625 and original widths 0.125 -> 0.25; world normal +Y. */
+    MusaDwgAc1018BulgeWidthEdgePoint curved_edges={0};
+    assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,0.0,&curved_edges));
+    assert(curved_edges.handle==0x42bu&&
+           curved_edges.segment_index==0u&&
+           curved_edges.widths_from_vertices&&
+           near(curved_edges.radius,0.625)&&
+           near(curved_edges.start_width,0.125)&&
+           near(curved_edges.end_width,0.25)&&
+           near(curved_edges.interpolated_width,0.125)&&
+           curved_edges.signed_sweep>0.0&&
+           near(curved_edges.center_wcs[0],-1.5)&&
+           near(curved_edges.center_wcs[1],3.5)&&
+           near(curved_edges.center_wcs[2],-4.5)&&
+           near(curved_edges.left_wcs[0],-1.55)&&
+           near(curved_edges.right_wcs[0],-1.45)&&
+           near(curved_edges.left_wcs[2],-4.4625)&&
+           near(curved_edges.right_wcs[2],-4.5375)&&
+           near(curved_edges.left_thickness_wcs[1],3.75)&&
+           near(curved_edges.right_thickness_wcs[1],3.75));
+    assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,0.5,&curved_edges));
+    assert(near(curved_edges.interpolated_width,0.1875)&&
+           near(curved_edges.center_wcs[0],-2.0)&&
+           near(curved_edges.center_wcs[2],-4.75)&&
+           near(curved_edges.left_wcs[0],-2.0)&&
+           near(curved_edges.right_wcs[0],-2.0)&&
+           near(curved_edges.left_wcs[2],-4.65625)&&
+           near(curved_edges.right_wcs[2],-4.84375)&&
+           near(curved_edges.left_thickness_wcs[1],3.75));
+    assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,1.0,&curved_edges));
+    assert(near(curved_edges.interpolated_width,0.25)&&
+           near(curved_edges.center_wcs[0],-2.5)&&
+           near(curved_edges.center_wcs[2],-4.5)&&
+           near(curved_edges.left_wcs[0],-2.4)&&
+           near(curved_edges.right_wcs[0],-2.6)&&
+           near(curved_edges.left_wcs[2],-4.425)&&
+           near(curved_edges.right_wcs[2],-4.575));
+    /* The CLOSED closing edge has a negative/cw bulge. Its directed
+     * left edge is on the other RADIAL side from the positive arc. */
+    assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,2u,0.0,&curved_edges));
+    assert(curved_edges.segment_index==2u&&
+           curved_edges.signed_sweep<0.0&&
+           near(curved_edges.start_width,1.0)&&
+           near(curved_edges.end_width,1.5)&&
+           near(curved_edges.interpolated_width,1.0)&&
+           curved_edges.left_wcs[0]<curved_edges.center_wcs[0]&&
+           curved_edges.right_wcs[0]>curved_edges.center_wcs[0]&&
+           near(hypot(curved_edges.left_wcs[0]-
+                      curved_edges.right_wcs[0],
+                      curved_edges.left_wcs[2]-
+                      curved_edges.right_wcs[2]),1.0));
+    assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,2u,0.5,&curved_edges));
+    assert(near(curved_edges.interpolated_width,1.25)&&
+           near(hypot(curved_edges.left_wcs[0]-
+                      curved_edges.right_wcs[0],
+                      curved_edges.left_wcs[2]-
+                      curved_edges.right_wcs[2]),1.25));
+    const MusaDwgAc1018BulgeWidthEdgePoint edge_saved=curved_edges;
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,1u,0.5,&curved_edges)); /* straight */
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,3u,0.5,&curved_edges)); /* out of range */
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x40eu,0u,0.5,&curved_edges)); /* original straight */
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,-0.01,&curved_edges));
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,1.01,&curved_edges));
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,NAN,&curved_edges));
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,0.5,NULL));
+    assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                  s,0x42bu,0u,0.5,
+                  (MusaDwgAc1018BulgeWidthEdgePoint*)(void*)s));
+    assert(!memcmp(&edge_saved,&curved_edges,sizeof(curved_edges)));
     /* CRC-protected actual R2004 H=0x42b, closed 3-vertex LW:
      * segment 1 is a vertical OCS straight taper between the original
      * vertex[1] and vertex[2]. Its 4 exact mathematical edge corners
