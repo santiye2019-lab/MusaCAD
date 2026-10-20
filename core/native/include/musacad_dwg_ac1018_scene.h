@@ -432,6 +432,27 @@ typedef struct MusaDwgAc1018RecordRangeAudit {
 int musa_dwg_ac1018_scene_audit_record_ranges(
     const MusaDwgAc1018Scene *scene,
     MusaDwgAc1018RecordRangeAudit *out);
+/* First-party original R2004 LINE and straight LWPOLYLINE centerline
+ * geometry bounds in WCS (world XYZ). This is ACTUAL decoded geometry,
+ * unlike the H-only link audit, but still NOT full drawing coverage.
+ * Refuse bulge arcs, nonzero widths, thickness, less than two vertices,
+ * or non-finite transforms: otherwise a misleading undersized viewport
+ * bound might silently clip actual geometry. No strokes/lineweight or
+ * owner/layer/style semantics are covered. No ARC/CIRCLE here.
+ * O(N vertices) for LWPOLYLINE, bounded by the existing 100000-vertex
+ * native decoder limit. The caller output is unchanged on failure.
+ */
+typedef struct MusaDwgAc1018LinearWcsBounds {
+    uint64_t handle;
+    uint16_t type_code; /* 19 LINE, 77 straight LWPOLYLINE */
+    uint32_t vertex_count;
+    uint32_t segment_count;
+    double minimum[3];
+    double maximum[3];
+} MusaDwgAc1018LinearWcsBounds;
+int musa_dwg_ac1018_scene_read_linear_wcs_bounds(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018LinearWcsBounds *out);
 #ifdef __cplusplus
 }
 #endif
