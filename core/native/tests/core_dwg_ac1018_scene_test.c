@@ -705,6 +705,81 @@ int main(void){
                       curved_edges.right_wcs[0],
                       curved_edges.left_wcs[2]-
                       curved_edges.right_wcs[2]),1.25));
+    /* Repeated viewport sample reads must not decode the DWG each time.
+     * Both snapshots own exact source H, OCS transforms and widths; their
+     * materialized values match the original binary one-shot reader. */
+    MusaDwgAc1018BulgeEdgeSnapshot *positive_snap=NULL;
+    MusaDwgAc1018BulgeEdgeSnapshot *negative_snap=NULL;
+    assert(musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,0u,&positive_snap)&&positive_snap);
+    assert(musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,2u,&negative_snap)&&negative_snap);
+    const double fractions[5]={0.0,0.25,0.5,0.75,1.0};
+    for(size_t iteration=0u;iteration<5u;iteration++){
+        const double t=fractions[iteration];
+        for(uint32_t index=0u;index<=2u;index+=2u){
+            MusaDwgAc1018BulgeWidthEdgePoint cached={0},direct={0};
+            MusaDwgAc1018BulgeEdgeSnapshot *snapshot=
+                index==0u?positive_snap:negative_snap;
+            assert(musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
+                          s,0x42bu,index,t,&direct));
+            assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                          snapshot,t,&cached));
+            assert(cached.handle==direct.handle&&
+                   cached.segment_index==direct.segment_index&&
+                   cached.widths_from_vertices==
+                        direct.widths_from_vertices&&
+                   near(cached.fraction,t)&&
+                   near(cached.interpolated_width,
+                        direct.interpolated_width)&&
+                   near(cached.radius,direct.radius)&&
+                   near(cached.signed_sweep,direct.signed_sweep));
+            for(size_t axis=0u;axis<3u;axis++){
+                assert(near(cached.center_wcs[axis],
+                            direct.center_wcs[axis])&&
+                       near(cached.left_wcs[axis],
+                            direct.left_wcs[axis])&&
+                       near(cached.right_wcs[axis],
+                            direct.right_wcs[axis])&&
+                       near(cached.left_thickness_wcs[axis],
+                            direct.left_thickness_wcs[axis])&&
+                       near(cached.right_thickness_wcs[axis],
+                            direct.right_thickness_wcs[axis]));
+            }
+        }
+    }
+    MusaDwgAc1018BulgeWidthEdgePoint immutable_sample={0};
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,0.5,&immutable_sample));
+    const MusaDwgAc1018BulgeWidthEdgePoint saved_sample=
+                  immutable_sample;
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,-0.1,&immutable_sample));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,1.01,&immutable_sample));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,NAN,&immutable_sample));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,0.5,NULL));
+    assert(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,0.5,
+                  (MusaDwgAc1018BulgeWidthEdgePoint*)
+                   (void*)positive_snap));
+    assert(!memcmp(&saved_sample,&immutable_sample,
+                   sizeof(saved_sample)));
+    MusaDwgAc1018BulgeEdgeSnapshot *unchanged_snapshot=positive_snap;
+    assert(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,1u,&unchanged_snapshot)); /* straight */
+    assert(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x70fu,0u,&unchanged_snapshot)); /* wrong H */
+    assert(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,3u,&unchanged_snapshot)); /* bad index */
+    assert(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,0u,NULL));
+    assert(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                  s,0x42bu,0u,
+                  (MusaDwgAc1018BulgeEdgeSnapshot**)(void*)s));
+    assert(unchanged_snapshot==positive_snap);
     const MusaDwgAc1018BulgeWidthEdgePoint edge_saved=curved_edges;
     assert(!musa_dwg_ac1018_scene_evaluate_bulge_width_edges(
                   s,0x42bu,1u,0.5,&curved_edges)); /* straight */
@@ -837,5 +912,20 @@ int main(void){
     assert(!memcmp(&original_bulge,&retained_bulge,
                    sizeof(original_bulge)));
     musa_dwg_ac1018_scene_close(s);
+    /* Original protected DWG/scene is gone: cached WCS edges are
+     * independent and remain byte-for-byte stable across reads. */
+    MusaDwgAc1018BulgeWidthEdgePoint after_close={0};
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  positive_snap,0.5,&after_close));
+    assert(!memcmp(&after_close,&saved_sample,sizeof(after_close)));
+    assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                  negative_snap,1.0,&after_close));
+    assert(after_close.segment_index==2u&&
+           after_close.signed_sweep<0.0&&
+           near(after_close.interpolated_width,1.5));
+    musa_dwg_ac1018_bulge_edge_snapshot_close(negative_snap);
+    musa_dwg_ac1018_bulge_edge_snapshot_close(positive_snap);
+    musa_dwg_ac1018_bulge_edge_snapshot_close(NULL);
     return 0;
 }
+
