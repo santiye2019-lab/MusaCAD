@@ -22,6 +22,19 @@ static const uint8_t poly_record[]={
     0x00,0x0a,0x50,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x40,
     0x52,0x01,0xab,0xdc,0xc1,
 };
+static const uint8_t bulged_record[] = {
+    0x80,0x00,0x53,0x79,0x00,0xc0,0x00,0x00,0x81,0x0a,0xd0,0x35,
+    0x11,0x20,0x10,0x20,0x38,0x5d,0x48,0x74,0x3f,0x03,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x3a,0x0f,0xc0,0x00,0x00,0x00,0x00,0x00,
+    0x00,0xc4,0x00,0x00,0x00,0x00,0x00,0x00,0x03,0x40,0xfe,0x64,
+    0x0d,0x03,0x40,0xc0,0x00,0x00,0x00,0x00,0x00,0x3e,0x0f,0xc0,
+    0x00,0x00,0x00,0x00,0x00,0x04,0xb0,0x30,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x44,0x00,0xc0,0x00,0x00,0x00,0x00,0x00,0x05,0x50,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x0e,0x03,0xf8,0x00,0x00,0x00,
+    0x00,0x00,0x00,0xd0,0xbf,0x00,0x00,0x00,0x00,0x00,0x00,0x30,
+    0x0f,0xc0,0x00,0x00,0x00,0x00,0x00,0x0d,0x03,0xfa,0x40,0x00,
+    0x00,0x00,0x00,0x00,0x0f,0x83,0xf5,0x20,0x1a,0xb0,0x25,0xb0,
+};
 static void put32(uint8_t *p,uint32_t v){
     p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8u);
     p[2]=(uint8_t)(v>>16u);p[3]=(uint8_t)(v>>24u);
@@ -140,6 +153,36 @@ static void construct(uint8_t f[1120],int overlap){
     m[0]=0u;m[1]=14u;
     memcpy(m+2u,map,sizeof(map));m[34]=0x11u;
     sys_header(f+1056u,UINT32_C(0x41630e3b),32u,35u);
+}
+
+/* Protected original R2004 bulge/width fixture with one indexed H=0x42b.
+ * Keep its source geometry unmodified; no private CAD data are used. */
+static void construct_bulged(uint8_t f[1120]){
+    construct(f,0);
+    uint8_t h[11]={0u,5u,0xabu,0x08u,0u};
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,h,5u,&crc));
+    h[5]=(uint8_t)(crc>>8u);h[6]=(uint8_t)crc;
+    h[7]=0u;h[8]=2u;
+    assert(musa_core_crc16_arc(0xc0c1u,h+7u,2u,&crc));
+    h[9]=(uint8_t)(crc>>8u);h[10]=(uint8_t)crc;
+    page(f,256u,11u,bulged_record,sizeof(bulged_record));
+    page(f,576u,10u,h,sizeof(h));
+    uint8_t packed[288]={0};
+    const uint32_t po=(uint32_t)lz_data(
+                  packed,bulged_record,sizeof(bulged_record));
+    const uint32_t ph=(uint32_t)lz_data(packed,h,sizeof(h));
+    assert(po<288u&&ph<160u);
+    uint8_t layout[244]={0};
+    put32(layout,2u);
+    section(layout+20u,sizeof(bulged_record),11u,
+            "AcDb:AcDbObjects",1u,po);
+    section(layout+132u,sizeof(h),10u,
+            "AcDb:Handles",2u,ph);
+    uint8_t *s=f+768u+20u;
+    s[0]=0u;s[1]=226u;memcpy(s+2u,layout,sizeof(layout));
+    s[246]=0x11u;
+    sys_header(f+768u,UINT32_C(0x4163003b),244u,247u);
 }
 static int near(double a,double b){return fabs(a-b)<1e-9;}
 int main(void){
@@ -355,6 +398,87 @@ int main(void){
                   s,0x40eu,
                   (MusaDwgAc1018LinearWcsBounds*)(void*)s));
     assert(!memcmp(&poly_box,&unchanged_bounds,sizeof(poly_box)));
+    /* Analytic signed bulge exact WCS bounds: semicircle below/above
+     * a horizontal chord; 253-degree major arc; arbitrary normal +Y.
+     * Endpoints-only envelopes would miss the interior extrema. */
+    const double up[3]={0.0,0.0,1.0};
+    const double tilted[3]={0.0,1.0,0.0};
+    MusaDwgAc1018LWVertex va={0},vb={0};
+    va.x=0.0;va.y=0.0;va.bulge=1.0;
+    vb.x=2.0;vb.y=0.0;
+    MusaDwgAc1018BulgeSegmentWcsBounds seg={0};
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(seg.curved&&near(seg.radius,1.0)&&
+           near(seg.sweep_angle,acos(-1.0))&&
+           near(seg.minimum[0],0.0)&&near(seg.maximum[0],2.0)&&
+           near(seg.minimum[1],-1.0)&&near(seg.maximum[1],0.0)&&
+           near(seg.minimum[2],0.0)&&near(seg.maximum[2],0.0));
+    va.bulge=-1.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(near(seg.minimum[1],0.0)&&near(seg.maximum[1],1.0)&&
+           near(seg.sweep_angle,-acos(-1.0)));
+    va.bulge=2.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(seg.sweep_angle>acos(-1.0)&&
+           near(seg.minimum[0],-0.25)&&
+           near(seg.maximum[0],2.25)&&
+           near(seg.minimum[1],-2.0)&&
+           near(seg.maximum[1],0.0));
+    va.bulge=1.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,tilted,3.5,0.5,&seg));
+    assert(near(seg.minimum[0],-2.0)&&near(seg.maximum[0],0.0)&&
+           near(seg.minimum[1],3.5)&&near(seg.maximum[1],4.0)&&
+           near(seg.minimum[2],-1.0)&&near(seg.maximum[2],0.0));
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,tilted,3.5,-0.25,&seg));
+    assert(near(seg.minimum[1],3.25)&&near(seg.maximum[1],3.5));
+    va.bulge=0.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(!seg.curved&&near(seg.minimum[0],0.0)&&
+           near(seg.maximum[0],2.0)&&near(seg.minimum[1],0.0)&&
+           near(seg.maximum[1],0.0));
+    const MusaDwgAc1018BulgeSegmentWcsBounds seg_saved=seg;
+    va.bulge=1e-14;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    va.bulge=1e9;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    va.bulge=1.0;
+    vb.x=0.0; /* a nonzero bulge needs a nonzero chord */
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    vb.x=2.0;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,
+                  (MusaDwgAc1018BulgeSegmentWcsBounds*)(void*)&va));
+    assert(!memcmp(&seg,&seg_saved,sizeof(seg)));
+    /* Original CRC-backed R2004 straight LWPOLYLINE remains supported
+     * by the GENERAL bulge-aware union API as a strict subset. */
+    MusaDwgAc1018BulgedPolylineWcsBounds poly_bulged={0};
+    assert(musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x40eu,&poly_bulged));
+    assert(poly_bulged.handle==0x40eu&&
+           poly_bulged.vertex_count==3u&&
+           poly_bulged.segment_count==2u&&
+           poly_bulged.curved_segment_count==0u&&
+           near(poly_bulged.minimum[0],poly_box.minimum[0])&&
+           near(poly_bulged.maximum[0],poly_box.maximum[0])&&
+           near(poly_bulged.minimum[1],poly_box.minimum[1])&&
+           near(poly_bulged.maximum[1],poly_box.maximum[1]));
+    const MusaDwgAc1018BulgedPolylineWcsBounds keep_bulged=
+           poly_bulged;
+    assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x70fu,&poly_bulged));
+    assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x40eu,
+                  (MusaDwgAc1018BulgedPolylineWcsBounds*)(void*)s));
+    assert(!memcmp(&keep_bulged,&poly_bulged,sizeof(poly_bulged)));
     double wcs[3]={0};
     assert(musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
                    &poly,&vertices[2],wcs));
@@ -451,5 +575,24 @@ int main(void){
            cached_page.records_written==1u);
     musa_dwg_ac1018_diagnosis_snapshot_close(snapshot);
     assert(musa_dwg_ac1018_diagnosis_snapshot_handle_count(NULL)==0u);
+    construct_bulged(file);
+    s=NULL;
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
+    assert(musa_dwg_ac1018_scene_handle_count(s)==1u);
+    MusaDwgAc1018LWPolyline complex_poly={0};
+    MusaDwgAc1018LWVertex complex_vertices[4]={{0}};
+    assert(musa_dwg_ac1018_scene_read_lwpolyline(
+                  s,0x42bu,complex_vertices,4u,&complex_poly));
+    assert(complex_poly.closed==1u&&complex_poly.vertex_count==3u&&
+           complex_poly.bulge_count==3u&&
+           complex_poly.width_count==3u&&
+           near(complex_vertices[0].bulge,0.5)&&
+           near(complex_vertices[2].bulge,-0.25));
+    /* Width and signed thickness are present: never report exact
+     * centerline-only WCS bounds as complete original stroke geometry. */
+    assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x42bu,&poly_bulged));
+    assert(!memcmp(&poly_bulged,&keep_bulged,sizeof(poly_bulged)));
+    musa_dwg_ac1018_scene_close(s);
     return 0;
 }

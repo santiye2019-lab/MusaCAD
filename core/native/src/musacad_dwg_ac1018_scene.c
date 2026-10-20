@@ -1679,3 +1679,171 @@ int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
     *out=checked;
     return 1;
 }
+
+/* Exact original signed LW bulge geometry (b=tan(sweep/4)).
+ * Center offset from chord midpoint along its OCS left normal is
+ * (chord/4)*(1-b*b)/b. Use the SAME native arbitrary-axis basis as
+ * all other R2004 geometric coordinates; never conflate OCS and WCS. */
+int musa_dwg_ac1018_bulge_segment_wcs_bounds(
+    const MusaDwgAc1018LWVertex *start,
+    const MusaDwgAc1018LWVertex *end,
+    const double extrusion[3],double elevation,double thickness,
+    MusaDwgAc1018BulgeSegmentWcsBounds *out){
+    if(!start||!end||!extrusion||!out||
+       overlaps(start,sizeof(*start),out,sizeof(*out))||
+       overlaps(end,sizeof(*end),out,sizeof(*out))||
+       overlaps(extrusion,3u*sizeof(double),out,sizeof(*out))||
+       !isfinite(start->x)||!isfinite(start->y)||
+       !isfinite(end->x)||!isfinite(end->y)||
+       !isfinite(start->bulge)||!isfinite(elevation)||
+       !isfinite(thickness))return 0;
+    const double bulge=start->bulge;
+    if(fabs(bulge)>1e6||
+       (bulge!=0.0&&fabs(bulge)<1e-12))
+        return 0;
+    MusaCoreOcsBasis basis={0};
+    if(!musa_core_ocs_basis(extrusion,&basis))return 0;
+    double p0[3]={0},p1[3]={0};
+    const double xy0[2]={start->x,start->y};
+    const double xy1[2]={end->x,end->y};
+    if(!musa_core_ocs_to_world(&basis,xy0,elevation,p0)||
+       !musa_core_ocs_to_world(&basis,xy1,elevation,p1)||
+       !finite_vec3(p0)||!finite_vec3(p1))return 0;
+    MusaDwgAc1018BulgeSegmentWcsBounds checked={0};
+    memcpy(checked.minimum,p0,sizeof(p0));
+    memcpy(checked.maximum,p0,sizeof(p0));
+    for(size_t k=0u;k<3u;k++){
+        if(p1[k]<checked.minimum[k])checked.minimum[k]=p1[k];
+        if(p1[k]>checked.maximum[k])checked.maximum[k]=p1[k];
+    }
+    if(bulge!=0.0){
+        const double dx=end->x-start->x,dy=end->y-start->y;
+        const double chord=hypot(dx,dy);
+        if(!isfinite(dx)||!isfinite(dy)||
+           !isfinite(chord)||!(chord>0.0))return 0;
+        const double center_offset=
+             (chord*0.25)*((1.0-bulge*bulge)/bulge);
+        const double radius=(chord*0.25)*
+                                   (1.0+bulge*bulge)/fabs(bulge);
+        const double cx=0.5*start->x+0.5*end->x-
+                        (dy/chord)*center_offset;
+        const double cy=0.5*start->y+0.5*end->y+
+                        (dx/chord)*center_offset;
+        const double sweep=4.0*atan(bulge);
+        const double pi=acos(-1.0),turn=2.0*pi;
+        if(!isfinite(center_offset)||!isfinite(radius)||
+           !isfinite(cx)||!isfinite(cy)||!isfinite(sweep)||
+           !isfinite(turn)||!(radius>0.0)||
+           fabs(sweep)<1e-12||fabs(sweep)>=turn-1e-12)
+            return 0;
+        const double center_xy[2]={cx,cy};
+        double center[3]={0};
+        if(!musa_core_ocs_to_world(&basis,center_xy,elevation,center)||
+           !finite_vec3(center))return 0;
+        const double start_angle=curve_wrapped_angle(
+                 atan2(start->y-cy,start->x-cx),turn);
+        if(!isfinite(start_angle))return 0;
+        for(size_t k=0u;k<3u;k++){
+            const double a=curve_wrapped_angle(
+                                  atan2(basis.y[k],basis.x[k]),turn);
+            if(!isfinite(a))return 0;
+            for(size_t j=0u;j<2u;j++){
+                const double candidate=curve_wrapped_angle(a+j*pi,turn);
+                const double distance=curve_wrapped_angle(
+                   sweep>0.0 ? candidate-start_angle:
+                               start_angle-candidate,turn);
+                if(!isfinite(candidate)||!isfinite(distance))return 0;
+                if(distance<=fabs(sweep)+1e-12){
+                    double point[3]={0};
+                    if(!curve_point_wcs(
+                            &basis,center,radius,candidate,point))
+                        return 0;
+                    for(size_t axis=0u;axis<3u;axis++){
+                        if(point[axis]<checked.minimum[axis])
+                           checked.minimum[axis]=point[axis];
+                        if(point[axis]>checked.maximum[axis])
+                           checked.maximum[axis]=point[axis];
+                    }
+                }
+            }
+        }
+        checked.curved=1u;
+        checked.radius=radius;
+        checked.sweep_angle=sweep;
+    }
+    /* Include the signed 3D extrusion of the WHOLE WCS curve; geometric
+     * stroke width/variable widths are validated by caller separately. */
+    for(size_t k=0u;k<3u;k++){
+        const double delta=thickness*basis.z[k];
+        if(!isfinite(delta))return 0;
+        if(delta<0.0)checked.minimum[k]+=delta;
+        else checked.maximum[k]+=delta;
+        if(!isfinite(checked.minimum[k])||
+           !isfinite(checked.maximum[k]))return 0;
+    }
+    *out=checked;
+    return 1;
+}
+int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018BulgedPolylineWcsBounds *out){
+    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       record.declared_type!=77u)return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+               s,handle,vertices,100000u,&poly)&&
+              poly.handle==handle&&poly.vertex_count>=2u&&
+              poly.vertex_count<=100000u&&
+              isfinite(poly.constant_width)&&poly.constant_width==0.0&&
+              isfinite(poly.thickness)&&isfinite(poly.elevation);
+    MusaDwgAc1018BulgedPolylineWcsBounds checked={0};
+    if(valid){
+        checked.handle=handle;
+        checked.vertex_count=poly.vertex_count;
+        checked.segment_count=poly.vertex_count-(poly.closed?0u:1u);
+        for(uint32_t i=0u;i<poly.vertex_count;i++){
+            const MusaDwgAc1018LWVertex *v=&vertices[i];
+            if(!isfinite(v->start_width)||v->start_width!=0.0||
+               !isfinite(v->end_width)||v->end_width!=0.0||
+               !isfinite(v->x)||!isfinite(v->y)||
+               !isfinite(v->bulge)){
+                valid=0;break;
+            }
+        }
+        if(!poly.closed&&vertices[poly.vertex_count-1u].bulge!=0.0)
+            valid=0;
+        for(uint32_t i=0u;valid&&i<checked.segment_count;i++){
+            const uint32_t next=i+1u==poly.vertex_count?0u:i+1u;
+            MusaDwgAc1018BulgeSegmentWcsBounds segment={0};
+            if(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &vertices[i],&vertices[next],poly.extrusion,
+                  poly.elevation,poly.thickness,&segment)){
+                valid=0;break;
+            }
+            checked.curved_segment_count+=(uint32_t)segment.curved;
+            if(i==0u){
+                memcpy(checked.minimum,segment.minimum,
+                       sizeof(checked.minimum));
+                memcpy(checked.maximum,segment.maximum,
+                       sizeof(checked.maximum));
+            }else{
+                for(size_t k=0u;k<3u;k++){
+                    if(segment.minimum[k]<checked.minimum[k])
+                        checked.minimum[k]=segment.minimum[k];
+                    if(segment.maximum[k]>checked.maximum[k])
+                        checked.maximum[k]=segment.maximum[k];
+                }
+            }
+        }
+    }
+    free(vertices);
+    if(!valid)return 0;
+    *out=checked;
+    return 1;
+}
