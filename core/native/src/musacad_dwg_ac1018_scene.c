@@ -265,6 +265,50 @@ int musa_dwg_ac1018_scene_read_layer_control_refs(
     free(resolved);
     return valid;
 }
+/* A validated table->layer H link permits reverse MEMBERSHIP
+ * lookup; it is not a decoded LAYER->owner H field. Refuse unsupported
+ * tables rather than silently skipping them. No session modifications.
+ */
+int musa_dwg_ac1018_scene_find_layer_control_membership(
+    const MusaDwgAc1018Scene *s,uint64_t layer_handle,
+    uint64_t *out_control_handle){
+    if(!s||!out_control_handle||!layer_handle||
+       scene_output_overlaps(s,out_control_handle,sizeof(*out_control_handle)))
+        return 0;
+    MusaDwgAc1018NonEntityIdentity checked_layer={0};
+    if(!musa_dwg_ac1018_scene_probe_nonentity_identity(
+             s,layer_handle,&checked_layer)||
+       checked_layer.declared_type!=51u||
+       checked_layer.indexed_handle!=layer_handle||
+       !checked_layer.record_crc_verified||
+       !checked_layer.embedded_self_verified)return 0;
+    uint64_t *refs=(uint64_t*)malloc(4096u*sizeof(*refs));
+    if(!refs)return 0;
+    uint64_t found=0u;
+    int valid=1;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;break;
+        }
+        if(probe.declared_type!=50u)continue;
+        MusaDwgAc1018LayerControlRefs table={0};
+        if(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                 s,probe.handle,refs,4096u,&table)){
+            valid=0;break;
+        }
+        for(uint32_t j=0u;j<table.entry_count;j++){
+            if(refs[j]!=layer_handle)continue;
+            if(found!=0u){valid=0;break;}
+            found=probe.handle;
+        }
+        if(!valid)break;
+    }
+    free(refs);
+    if(!valid||found==0u)return 0;
+    *out_control_handle=found;
+    return 1;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
