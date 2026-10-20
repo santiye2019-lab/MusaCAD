@@ -720,6 +720,27 @@ int main(void){
            batch_links[0].entity_handle==UINT64_C(0x120)&&
            batch_links[1].entity_handle==UINT64_C(0x121));
     const MusaDwgAc1018EntityLayerLink strict0=batch_links[0],strict1=batch_links[1];
+    /* This protected raw DWG has complete supported fixed H links,
+     * but its entities are header-only and have NO geometry coordinates.
+     * Never count them as decoded LINE objects. */
+    MusaDwgAc1018GeometryLinkEvidence evidence={0};
+    assert(musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  scene,&evidence));
+    assert(evidence.indexed_records==4u&&
+           evidence.declared_supported_2d_entities==2u&&
+           evidence.geometry_decoded==0u&&
+           evidence.fixed_link_identities_verified==2u&&
+           evidence.geometry_and_links_verified==0u&&
+           evidence.geometry_only==0u&&
+           evidence.links_only==2u&&
+           evidence.neither_verified==0u&&
+           evidence.other_declared_records==2u&&
+           evidence.all_record_ranges_nonoverlapping&&
+           evidence.all_indexed_record_crcs_verified);
+    const MusaDwgAc1018GeometryLinkEvidence retained_evidence=evidence;
+    assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  scene,(MusaDwgAc1018GeometryLinkEvidence*)(void*)scene));
+    assert(!memcmp(&retained_evidence,&evidence,sizeof(evidence)));
     const MusaDwgAc1018IndexedLayerLinkCoverage keep_strict=strict;
     assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
                   scene,batch_links,1u,&strict)); /* no partial batch */
@@ -737,6 +758,10 @@ int main(void){
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,1,0,51u,7); /* broken complete table/target graph */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    /* Wrong embedded nonentity self-H is fatal even with valid CRC. */
+    assert(!musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  scene,&evidence));
+    assert(!memcmp(&retained_evidence,&evidence,sizeof(evidence)));
     assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
                   scene,batch_links,2u,&strict));
     assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
@@ -745,6 +770,16 @@ int main(void){
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,0,0,51u,8); /* type 88 instead of second LINE: refuse partial */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    /* Unknown type is not ignored: retain it in opaque count, while
+     * the separate STRICT admission API rightly refuses this scene. */
+    assert(musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
+                  scene,&evidence));
+    assert(evidence.indexed_records==4u&&
+           evidence.declared_supported_2d_entities==1u&&
+           evidence.geometry_decoded==0u&&
+           evidence.fixed_link_identities_verified==1u&&
+           evidence.links_only==1u&&
+           evidence.other_declared_records==3u);
     assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
                   scene,batch_links,2u,&strict));
     assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
