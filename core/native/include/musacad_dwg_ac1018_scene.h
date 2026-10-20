@@ -543,6 +543,34 @@ int musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018BulgeCenterlineAudit *out);
 
+/* Conservative width neighborhood of the true bulged centerline in
+ * original R2004 WCS. Every source start/end width (including constant
+ * width) is checked for >=0 and bounded; max_width/2 is used as the
+ * radius of a circular OCS cross-section swept around ALL centerline
+ * points, and projected through the DWG arbitrary-axis basis. This
+ * includes the source variable-width ribbon as a SUBSET under ordinary
+ * normal/radial width interpolation, but need not be a tight bound.
+ *
+ * IMPORTANT: This is NOT a complete AutoCAD/DWG rendered visible bbox:
+ * join geometry (especially unbounded/miter join extensions), cap style,
+ * lineweight, drawing visibility, custom AcDb objects and linetype
+ * embellishments are NOT audited here. Never label this result exact or
+ * use it as complete whole-drawing fit-to-window proof.
+ * Failure leaves caller output untouched. No third-party DWG core.
+ */
+typedef struct MusaDwgAc1018BulgeWidthNeighborhood {
+    MusaDwgAc1018BulgeCenterlineAudit evidence;
+    double source_max_width;
+    double radial_pad_wcs[3];
+    double padded_minimum[3];
+    double padded_maximum[3];
+    uint8_t complete_visible_stroke_verified; /* always 0 */
+} MusaDwgAc1018BulgeWidthNeighborhood;
+int musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018BulgeWidthNeighborhood *out);
+
+
 #ifdef __cplusplus
 }
 #endif
