@@ -478,6 +478,47 @@ typedef struct MusaDwgAc1018CurveWcsBounds {
 int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018CurveWcsBounds *out);
+/* Exact analytic WCS envelope of a single ORIGINAL LWPOLYLINE OCS
+ * segment. The start vertex's signed bulge = tan(sweep/4); positive is
+ * counterclockwise, negative is clockwise in the OCS basis. Includes
+ * end points, all major/minor arc coordinate extrema and signed thickness
+ * along the normalized DWG arbitrary-axis extrusion. NO tessellation.
+ * Straight b=0 accepted; nonzero nearly-degenerate bulge (<1e-12) and
+ * excessive |bulge|>1e6 rejected instead of falsely flattening curvature.
+ * These represent segment centerlines plus thickness ONLY: width/lineweight
+ * and AcDb graphics are not represented.
+ * Atomic caller output; source coordinates/extrusion are never modified.
+ */
+typedef struct MusaDwgAc1018BulgeSegmentWcsBounds {
+    double minimum[3];
+    double maximum[3];
+    double sweep_angle; /* signed OCS angle (rad), zero for straight */
+    double radius;      /* zero for straight */
+    uint8_t curved;
+} MusaDwgAc1018BulgeSegmentWcsBounds;
+int musa_dwg_ac1018_bulge_segment_wcs_bounds(
+    const MusaDwgAc1018LWVertex *start,
+    const MusaDwgAc1018LWVertex *end,
+    const double extrusion[3],double elevation,double thickness,
+    MusaDwgAc1018BulgeSegmentWcsBounds *out);
+/* Entire original CRC-backed indexed R2004 LWPOLYLINE: union exact WCS
+ * envelopes of every accepted straight/bulge segment, including the
+ * final-to-first closing segment only if its CLOSED flag is set. Refuse
+ * unrepresented constant/vertex widths, malformed/nonfinite entities and
+ * ignored open-polyline terminal bulges. Max 100000 decoded vertices.
+ * A genuine decoded geometry result, NOT layer/owner or full DWG parity.
+ * All-or-nothing output and no modification to the cached scene. */
+typedef struct MusaDwgAc1018BulgedPolylineWcsBounds {
+    uint64_t handle;
+    uint32_t vertex_count;
+    uint32_t segment_count;
+    uint32_t curved_segment_count;
+    double minimum[3];
+    double maximum[3];
+} MusaDwgAc1018BulgedPolylineWcsBounds;
+int musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    MusaDwgAc1018BulgedPolylineWcsBounds *out);
 #ifdef __cplusplus
 }
 #endif
