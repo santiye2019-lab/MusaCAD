@@ -741,6 +741,40 @@ int musa_dwg_ac1018_scene_audit_lw_join_edges(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     uint32_t vertex_index,MusaDwgAc1018LwJoinEdgeAudit *out);
 
+/* Geometric join CANDIDATES for a vertex from original, CRC-protected
+ * R2004/AC1018 LWPOLYLINE. The bevel is the explicit straight bridge
+ * between each incoming/outgoing LEFT and RIGHT source edge endpoint.
+ * Miter is the intersection of each pair of ENDPOINT EDGE TANGENT LINES,
+ * conservatively limited to miter_limit * half(max source width). If
+ * parallel, divergent beyond this limit or numerically inconsistent, mark
+ * the candidate absent; never produce an infinite spike.
+ *
+ * For curved or linearly tapered variable-width edges the tangents are
+ * the TRUE derivatives of the edge curves, not their centerline chords.
+ * Their intersection is ONLY a geometric TANGENT-LINE CANDIDATE: neither
+ * this nor the bevel declares any Autodesk/DWG-visible join policy.
+ * No selection of inner/outer side, round join, fill or rendering occurs.
+ * miter_limit finite between 1 and 100. Each returned join edge is in
+ * genuine WCS and includes the original signed-thickness translated base.
+ * No caller output changes on error; no third-party CAD decoder.
+ */
+typedef struct MusaDwgAc1018LwJoinCandidates {
+    MusaDwgAc1018LwJoinEdgeAudit source;
+    double miter_limit;
+    uint8_t tangent_miter_valid[2]; /* left,right */
+    double bevel_wcs[2][2][3]; /* [side][incoming,end; outgoing,start][xyz] */
+    double bevel_thickness_wcs[2][2][3];
+    double miter_wcs[2][3]; /* only meaningful if corresponding valid */
+    double miter_thickness_wcs[2][3];
+    double incoming_extension[2]; /* signed in units of WCS length */
+    double outgoing_extension[2];
+    uint8_t complete_visible_join_verified; /* always 0 */
+} MusaDwgAc1018LwJoinCandidates;
+int musa_dwg_ac1018_scene_lw_join_candidates(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t vertex_index,double miter_limit,
+    MusaDwgAc1018LwJoinCandidates *out);
+
 #ifdef __cplusplus
 }
 #endif
