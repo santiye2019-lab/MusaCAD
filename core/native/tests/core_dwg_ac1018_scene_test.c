@@ -471,6 +471,14 @@ int main(void){
            near(poly_bulged.maximum[0],poly_box.maximum[0])&&
            near(poly_bulged.minimum[1],poly_box.minimum[1])&&
            near(poly_bulged.maximum[1],poly_box.maximum[1]));
+    MusaDwgAc1018BulgeCenterlineAudit straight_evidence={0};
+    assert(musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                  s,0x40eu,&straight_evidence));
+    assert(!straight_evidence.nonzero_constant_width&&
+           !straight_evidence.nonzero_variable_width_vertices&&
+           !straight_evidence.excluded_width_geometry&&
+           !memcmp(&straight_evidence.centerline,&poly_bulged,
+                   sizeof(poly_bulged)));
     const MusaDwgAc1018BulgedPolylineWcsBounds keep_bulged=
            poly_bulged;
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
@@ -593,6 +601,38 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
                   s,0x42bu,&poly_bulged));
     assert(!memcmp(&poly_bulged,&keep_bulged,sizeof(poly_bulged)));
+    /* The original independently protected R2004 record with H=0x42b
+     * contains TWO genuine signed arc bulges plus 3 variable-width pairs.
+     * Decode its exact mathematically defined CENTERLINE without ever
+     * claiming that the omitted widths are visible-stroke coverage. */
+    MusaDwgAc1018BulgeCenterlineAudit original_bulge={0};
+    assert(musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                  s,0x42bu,&original_bulge));
+    assert(original_bulge.centerline.handle==0x42bu&&
+           original_bulge.centerline.vertex_count==3u&&
+           original_bulge.centerline.segment_count==3u&&
+           original_bulge.centerline.curved_segment_count==2u&&
+           original_bulge.nonzero_constant_width&&
+           original_bulge.nonzero_variable_width_vertices>=1u&&
+           original_bulge.excluded_width_geometry&&
+           near(original_bulge.centerline.minimum[0],
+                  -3.2730946352036)&&
+           near(original_bulge.centerline.maximum[0],-1.5)&&
+           near(original_bulge.centerline.minimum[1],3.5)&&
+           near(original_bulge.centerline.maximum[1],3.75)&&
+           near(original_bulge.centerline.minimum[2],-4.75)&&
+           near(original_bulge.centerline.maximum[2],5.25));
+    const MusaDwgAc1018BulgeCenterlineAudit retained_bulge=
+                 original_bulge;
+    assert(!musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                  s,0x70fu,&original_bulge));
+    assert(!musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                  s,0x42bu,NULL));
+    assert(!musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                  s,0x42bu,
+                  (MusaDwgAc1018BulgeCenterlineAudit*)(void*)s));
+    assert(!memcmp(&original_bulge,&retained_bulge,
+                   sizeof(original_bulge)));
     musa_dwg_ac1018_scene_close(s);
     return 0;
 }
