@@ -355,6 +355,87 @@ int main(void){
                   s,0x40eu,
                   (MusaDwgAc1018LinearWcsBounds*)(void*)s));
     assert(!memcmp(&poly_box,&unchanged_bounds,sizeof(poly_box)));
+    /* Analytic signed bulge exact WCS bounds: semicircle below/above
+     * a horizontal chord; 253-degree major arc; arbitrary normal +Y.
+     * Endpoints-only envelopes would miss the interior extrema. */
+    const double up[3]={0.0,0.0,1.0};
+    const double tilted[3]={0.0,1.0,0.0};
+    MusaDwgAc1018LWVertex va={0},vb={0};
+    va.x=0.0;va.y=0.0;va.bulge=1.0;
+    vb.x=2.0;vb.y=0.0;
+    MusaDwgAc1018BulgeSegmentWcsBounds seg={0};
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(seg.curved&&near(seg.radius,1.0)&&
+           near(seg.sweep_angle,acos(-1.0))&&
+           near(seg.minimum[0],0.0)&&near(seg.maximum[0],2.0)&&
+           near(seg.minimum[1],-1.0)&&near(seg.maximum[1],0.0)&&
+           near(seg.minimum[2],0.0)&&near(seg.maximum[2],0.0));
+    va.bulge=-1.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(near(seg.minimum[1],0.0)&&near(seg.maximum[1],1.0)&&
+           near(seg.sweep_angle,-acos(-1.0)));
+    va.bulge=2.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(seg.sweep_angle>acos(-1.0)&&
+           near(seg.minimum[0],-0.25)&&
+           near(seg.maximum[0],2.25)&&
+           near(seg.minimum[1],-2.0)&&
+           near(seg.maximum[1],0.0));
+    va.bulge=1.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,tilted,3.5,0.5,&seg));
+    assert(near(seg.minimum[0],-2.0)&&near(seg.maximum[0],0.0)&&
+           near(seg.minimum[1],3.5)&&near(seg.maximum[1],4.0)&&
+           near(seg.minimum[2],-1.0)&&near(seg.maximum[2],0.0));
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,tilted,3.5,-0.25,&seg));
+    assert(near(seg.minimum[1],3.25)&&near(seg.maximum[1],3.5));
+    va.bulge=0.0;
+    assert(musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    assert(!seg.curved&&near(seg.minimum[0],0.0)&&
+           near(seg.maximum[0],2.0)&&near(seg.minimum[1],0.0)&&
+           near(seg.maximum[1],0.0));
+    const MusaDwgAc1018BulgeSegmentWcsBounds seg_saved=seg;
+    va.bulge=1e-14;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    va.bulge=1e9;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    va.bulge=1.0;
+    vb.x=0.0; /* a nonzero bulge needs a nonzero chord */
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,&seg));
+    vb.x=2.0;
+    assert(!musa_dwg_ac1018_bulge_segment_wcs_bounds(
+                  &va,&vb,up,0.0,0.0,
+                  (MusaDwgAc1018BulgeSegmentWcsBounds*)(void*)&va));
+    assert(!memcmp(&seg,&seg_saved,sizeof(seg)));
+    /* Original CRC-backed R2004 straight LWPOLYLINE remains supported
+     * by the GENERAL bulge-aware union API as a strict subset. */
+    MusaDwgAc1018BulgedPolylineWcsBounds poly_bulged={0};
+    assert(musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x40eu,&poly_bulged));
+    assert(poly_bulged.handle==0x40eu&&
+           poly_bulged.vertex_count==3u&&
+           poly_bulged.segment_count==2u&&
+           poly_bulged.curved_segment_count==0u&&
+           near(poly_bulged.minimum[0],poly_box.minimum[0])&&
+           near(poly_bulged.maximum[0],poly_box.maximum[0])&&
+           near(poly_bulged.minimum[1],poly_box.minimum[1])&&
+           near(poly_bulged.maximum[1],poly_box.maximum[1]));
+    const MusaDwgAc1018BulgedPolylineWcsBounds keep_bulged=
+           poly_bulged;
+    assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x70fu,&poly_bulged));
+    assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
+                  s,0x40eu,
+                  (MusaDwgAc1018BulgedPolylineWcsBounds*)(void*)s));
+    assert(!memcmp(&keep_bulged,&poly_bulged,sizeof(poly_bulged)));
     double wcs[3]={0};
     assert(musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
                    &poly,&vertices[2],wcs));
