@@ -479,6 +479,17 @@ int main(void){
            !straight_evidence.excluded_width_geometry&&
            !memcmp(&straight_evidence.centerline,&poly_bulged,
                    sizeof(poly_bulged)));
+    MusaDwgAc1018BulgeWidthNeighborhood zero_width={0};
+    assert(musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+                  s,0x40eu,&zero_width));
+    assert(zero_width.source_max_width==0.0&&
+           !zero_width.evidence.excluded_width_geometry&&
+           !zero_width.complete_visible_stroke_verified);
+    for(size_t k=0u;k<3u;k++){
+        assert(near(zero_width.radial_pad_wcs[k],0.0)&&
+               near(zero_width.padded_minimum[k],poly_bulged.minimum[k])&&
+               near(zero_width.padded_maximum[k],poly_bulged.maximum[k]));
+    }
     const MusaDwgAc1018BulgedPolylineWcsBounds keep_bulged=
            poly_bulged;
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
@@ -622,6 +633,39 @@ int main(void){
            near(original_bulge.centerline.maximum[1],3.75)&&
            near(original_bulge.centerline.minimum[2],-4.75)&&
            near(original_bulge.centerline.maximum[2],5.25));
+    /* Positive end-to-end original CRC-protected R2004 geometry
+     * WITH variable/constant widths, tilted plane and 0.25 thickness.
+     * A conservative OCS disk radius maxWidth/2=0.75 projected to WCS
+     * adds 0.75 to X and Z, zero to Y for +Y extrusion. It does not
+     * establish the exact DWG miter/cap/lineweight output. */
+    MusaDwgAc1018BulgeWidthNeighborhood padded={0};
+    assert(musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+                  s,0x42bu,&padded));
+    assert(padded.evidence.centerline.handle==0x42bu&&
+           padded.evidence.centerline.curved_segment_count==2u&&
+           padded.evidence.nonzero_constant_width&&
+           padded.evidence.nonzero_variable_width_vertices>=1u&&
+           padded.evidence.excluded_width_geometry&&
+           !padded.complete_visible_stroke_verified&&
+           near(padded.source_max_width,1.5)&&
+           near(padded.radial_pad_wcs[0],0.75)&&
+           near(padded.radial_pad_wcs[1],0.0)&&
+           near(padded.radial_pad_wcs[2],0.75)&&
+           near(padded.padded_minimum[0],-4.0230946352036)&&
+           near(padded.padded_maximum[0],-0.75)&&
+           near(padded.padded_minimum[1],3.5)&&
+           near(padded.padded_maximum[1],3.75)&&
+           near(padded.padded_minimum[2],-5.5)&&
+           near(padded.padded_maximum[2],6.0));
+    const MusaDwgAc1018BulgeWidthNeighborhood kept_padded=padded;
+    assert(!musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+                  s,0x70fu,&padded));
+    assert(!musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+                  s,0x42bu,NULL));
+    assert(!musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+                  s,0x42bu,
+                  (MusaDwgAc1018BulgeWidthNeighborhood*)(void*)s));
+    assert(!memcmp(&padded,&kept_padded,sizeof(padded)));
     const MusaDwgAc1018BulgeCenterlineAudit retained_bulge=
                  original_bulge;
     assert(!musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
