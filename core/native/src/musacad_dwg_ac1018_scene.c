@@ -485,6 +485,54 @@ int musa_dwg_ac1018_scene_read_verified_layer_palette(
     free(names);free(checked);
     return valid;
 }
+/* Conservatively resolve a single ASCII name against the COMPLETE
+ * already-supported graph/palette, not against a guessed subset. No global
+ * locale, static scratch buffer, scene mutation or appearance assumptions.
+ */
+int musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+    const MusaDwgAc1018Scene *s,const char *ascii_name,
+    MusaDwgAc1018LayerColor *out){
+    if(!s||!ascii_name||!out||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    char query[256]={0};
+    size_t len=0u;
+    for(;len<sizeof(query);len++){
+        const unsigned char c=(unsigned char)ascii_name[len];
+        if(!c)break;
+        if(c<32u||c>126u)return 0;
+        query[len]=(char)c;
+    }
+    if(!len||len==sizeof(query))return 0;
+    MusaDwgAc1018LayerTableCoverage coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_layer_table_coverage(s,&coverage)||
+       !coverage.indexed_layers||
+       coverage.indexed_layers>65536u||
+       coverage.indexed_layers>SIZE_MAX/sizeof(MusaDwgAc1018LayerColor))
+        return 0;
+    const size_t count=coverage.indexed_layers;
+    MusaDwgAc1018LayerColor *palette=
+        (MusaDwgAc1018LayerColor*)calloc(count,sizeof(*palette));
+    if(!palette)return 0;
+    MusaDwgAc1018LayerPaletteReport report={0};
+    int matched=0;
+    if(musa_dwg_ac1018_scene_read_verified_layer_palette(
+              s,palette,count,&report)&&
+       report.indexed_layers==count&&
+       report.unique_ascii_names_verified&&report.raw_cmc_fields_verified){
+        const MusaDwgAc1018PaletteNameRef desired={query};
+        for(size_t i=0u;i<count;i++){
+            const MusaDwgAc1018PaletteNameRef actual={
+                palette[i].prefix.name};
+            if(compare_palette_ascii_names(&desired,&actual)==0){
+                *out=palette[i];
+                matched=1;
+                break;
+            }
+        }
+    }
+    free(palette);
+    return matched;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;

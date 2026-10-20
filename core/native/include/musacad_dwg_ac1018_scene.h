@@ -127,6 +127,18 @@ int musa_dwg_ac1018_scene_read_verified_layer_palette(
     const MusaDwgAc1018Scene *scene,
     MusaDwgAc1018LayerColor *layers,size_t capacity,
     MusaDwgAc1018LayerPaletteReport *out);
+/* Find a layer by an ASCII case-insensitive name only after accepting the
+ * entire verified LAYER_CONTROL membership and name/CMC palette. Input must
+ * be 1..255 printable ASCII bytes followed by NUL. Every layer must be
+ * readable, unique under ASCII folding and valid before a match is returned.
+ * This bounded O(N) lookup rebuilds the palette; cache the palette instead
+ * of calling this for each primitive during rendering. No inferred display
+ * RGB, entity layer assignment, or AcDb ownership is provided.
+ * Read-only and transactional: *out remains unchanged on every failure.
+ */
+int musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+    const MusaDwgAc1018Scene *scene,const char *ascii_name,
+    MusaDwgAc1018LayerColor *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object

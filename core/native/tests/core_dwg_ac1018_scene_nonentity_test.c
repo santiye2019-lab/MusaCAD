@@ -501,11 +501,43 @@ int main(void){
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&colors[1],&keep1,sizeof(keep1))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
+    /* A name lookup must never bypass the complete table/palette gate.
+     * ASCII folding is deterministic across all three target platforms. */
+    MusaDwgAc1018LayerColor by_name={0};
+    assert(musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"mEk0",&by_name));
+    assert(by_name.prefix.indexed_handle==0x11bu&&
+           !strcmp(by_name.prefix.name,"MEK0")&&
+           by_name.raw_cmc_rgb==UINT32_C(0x00112233));
+    const MusaDwgAc1018LayerColor named_keep=by_name;
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"OTHER",&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"",&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK\\n0",&by_name));
+    const char invalid_utf8[3]={'M',(char)0xc3,0};
+    char too_long[257];
+    memset(too_long,'X',256u);too_long[256]=0;
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,invalid_utf8,&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,too_long,&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,NULL,&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",(MusaDwgAc1018LayerColor*)(void*)scene));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* No false success for a readable name with broken CMC, membership
+     * or forged embedded identity. The output must remain unchanged. */
     construct(file,0,0,51u,3); /* self-valid but truncated CMC */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
                   scene,colors,2u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",&by_name));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&colors[1],&keep1,sizeof(keep1))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
@@ -514,6 +546,9 @@ int main(void){
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
                   scene,colors,2u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",&by_name));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
@@ -521,6 +556,9 @@ int main(void){
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
                   scene,colors,2u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",&by_name));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
