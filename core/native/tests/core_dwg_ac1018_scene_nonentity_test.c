@@ -449,6 +449,18 @@ int main(void){
                    scene,&coverage));
     assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,1,0,51u,3); /* table self-H mismatch, CRC valid */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,49u,0); /* no type-51 layers and no table */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
+                   scene,&coverage));
+    assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
     construct(file,0,1,51u,3); /* target self-H mismatch, CRC valid */
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
