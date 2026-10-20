@@ -82,6 +82,35 @@ static size_t make(uint8_t out[64],uint16_t type,
     out[body+3u]=(uint8_t)(crc>>8u);
     return body+4u;
 }
+/* Original R2004 MS/BS/RL/H synthetic link-only LINE.
+ * The 80-bit pre-handle section has no geometry; success must not count as
+ * decoded LINE coordinates. The final code-5 H points to LAYER 0x11b.
+ */
+static size_t make_entity_link_only(uint8_t out[64],int wrong_layer){
+    Writer w={0};
+    put(&w,2u,1u);byte(&w,19u);  /* declared BS LINE */
+    byte(&w,80u);byte(&w,0u);byte(&w,0u);byte(&w,0u); /* RL */
+    byte(&w,0x02u);byte(&w,0x01u);byte(&w,0x20u); /* self H */
+    put(&w,2u,2u); /* zero EED */
+    put(&w,1u,0u); /* no embedded graphics */
+    put(&w,2u,2u); /* entity mode 2 -> no owner H */
+    put(&w,2u,2u); /* zero reactors */
+    put(&w,1u,1u); /* missing XDictionary */
+    assert(w.bits==74u);
+    while(w.bits<80u)put(&w,1u,0u);
+    byte(&w,0x52u);byte(&w,0x01u);
+    byte(&w,wrong_layer?0x1cu:0x1bu); /* code 5 / length 2 */
+    const size_t body=(w.bits+7u)/8u;
+    assert(body<32u);
+    memset(out,0u,64u);
+    out[0]=(uint8_t)body;out[1]=(uint8_t)(body>>8u);
+    memcpy(out+2u,w.data,body);
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,out,body+2u,&crc));
+    out[body+2u]=(uint8_t)crc;
+    out[body+3u]=(uint8_t)(crc>>8u);
+    return body+4u;
+}
 static void put32(uint8_t *p,uint32_t v){
     p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8u);
     p[2]=(uint8_t)(v>>16u);p[3]=(uint8_t)(v>>24u);
@@ -161,35 +190,51 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         state=state*UINT32_C(0x343fd)+UINT32_C(0x269ec3);
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
-    uint8_t objs[128]={0},h[13]={0};
+    uint8_t objs[128]={0},h[16]={0};
     /* Mode 5: type-50 table + fully bit-coded, CMC-bearing type-51 LAYER,
      * both in one original protected R2004 section (no fake lookup). */
-    const int table_first=(named_layer==3||named_layer==4||named_layer==5);
+    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6);
     const size_t first=make(objs,table_first?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
-                            0,named_layer==5?3:named_layer);
+                            0,(named_layer==5||named_layer==6)?3:named_layer);
     const size_t second=make(objs+first,other_type,
                              wrong_other_self?0x11cu:0x11bu,
-                             0,named_layer==5?2:0);
-    const size_t total=first+second;
-    assert(total<=sizeof(objs)&&first<128u);
-    h[1]=7u;
+                             0,(named_layer==5||named_layer==6)?2:0);
+    /* Mode 6: actual 3-record table / CMC LAYER / link-only entity
+     * fixture. No materialized/guessed link graph or fake DWG geometry. */
+    const size_t third=named_layer==6?
+        make_entity_link_only(objs+first+second,wrong_layer_self!=0):0u;
+    const size_t total=first+second+third;
+    assert(total<=sizeof(objs)&&first<128u&&first+second<128u);
     h[2]=0x33u;h[3]=0u; /* delta H=0x33 and zero offset */
     h[4]=0xe8u;h[5]=0x01u;h[6]=(uint8_t)first; /* H +232 */
     uint16_t crc=0u;
-    assert(musa_core_crc16_arc(0xc0c1u,h,7u,&crc));
-    h[7]=(uint8_t)(crc>>8u);h[8]=(uint8_t)crc;
-    h[9]=0u;h[10]=2u;
-    assert(musa_core_crc16_arc(0xc0c1u,h+9u,2u,&crc));
-    h[11]=(uint8_t)(crc>>8u);h[12]=(uint8_t)crc;
+    size_t hlen=0u;
+    if(named_layer==6){
+        h[1]=9u;h[7]=5u;h[8]=(uint8_t)second; /* delta H +5 */
+        assert(musa_core_crc16_arc(0xc0c1u,h,9u,&crc));
+        h[9]=(uint8_t)(crc>>8u);h[10]=(uint8_t)crc;
+        h[11]=0u;h[12]=2u;
+        assert(musa_core_crc16_arc(0xc0c1u,h+11u,2u,&crc));
+        h[13]=(uint8_t)(crc>>8u);h[14]=(uint8_t)crc;
+        hlen=15u;
+    }else{
+        h[1]=7u;
+        assert(musa_core_crc16_arc(0xc0c1u,h,7u,&crc));
+        h[7]=(uint8_t)(crc>>8u);h[8]=(uint8_t)crc;
+        h[9]=0u;h[10]=2u;
+        assert(musa_core_crc16_arc(0xc0c1u,h+9u,2u,&crc));
+        h[11]=(uint8_t)(crc>>8u);h[12]=(uint8_t)crc;
+        hlen=13u;
+    }
     page(file,256u,11u,objs,total);
-    page(file,576u,10u,h,sizeof(h));
+    page(file,576u,10u,h,hlen);
     uint8_t packed[288]={0};
     const uint32_t obj_packed=(uint32_t)lz_data(packed,objs,total);
-    const uint32_t h_packed=(uint32_t)lz_data(packed,h,sizeof(h));
+    const uint32_t h_packed=(uint32_t)lz_data(packed,h,hlen);
     uint8_t layout[244]={0};put32(layout,2u);
     section(layout+20u,total,11u,"AcDb:AcDbObjects",1u,obj_packed);
-    section(layout+132u,sizeof(h),10u,"AcDb:Handles",2u,h_packed);
+    section(layout+132u,hlen,10u,"AcDb:Handles",2u,h_packed);
     uint8_t *sect=file+768u+20u;
     sect[0]=0u;sect[1]=226u;
     memcpy(sect+2u,layout,sizeof(layout));sect[246]=0x11u;
@@ -528,6 +573,44 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
                  scene,"MEK0",(MusaDwgAc1018LayerColor*)(void*)scene));
     assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Full original protected binary: TABLE -> LAYER <- entity H-tail.
+     * Header-only entity link proof, not decoded LINE geometry. */
+    construct(file,0,0,51u,6);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_handle_count(scene)==3u);
+    MusaDwgAc1018EntityLayerEvidence entity_layer={0};
+    assert(musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x120u,&entity_layer));
+    assert(entity_layer.entity_handle==0x120u&&
+           entity_layer.layer_control_handle==0x33u&&
+           entity_layer.layer.prefix.indexed_handle==0x11bu&&
+           !strcmp(entity_layer.layer.prefix.name,"MEK0")&&
+           entity_layer.layer.raw_cmc_rgb==UINT32_C(0x00112233)&&
+           entity_layer.fixed_entity_links_verified&&
+           entity_layer.complete_layer_table_verified);
+    MusaDwgAc1018Line incomplete_line={0};
+    assert(!musa_dwg_ac1018_scene_read_line(
+                  scene,0x120u,&incomplete_line));
+    const MusaDwgAc1018EntityLayerEvidence good_entity_layer=entity_layer;
+    assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x11bu,&entity_layer)); /* LAYER != entity */
+    assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x121u,&entity_layer));
+    assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x120u,NULL));
+    assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x120u,
+                  (MusaDwgAc1018EntityLayerEvidence*)(void*)scene));
+    assert(!memcmp(&entity_layer,&good_entity_layer,sizeof(entity_layer)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Original entity points to absent H although both sections are
+     * CRC consistent; reject and preserve caller output. */
+    construct(file,1,0,51u,6);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_verified_entity_layer(
+                  scene,0x120u,&entity_layer));
+    assert(!memcmp(&entity_layer,&good_entity_layer,sizeof(entity_layer)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
      * or forged embedded identity. The output must remain unchanged. */

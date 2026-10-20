@@ -139,6 +139,27 @@ int musa_dwg_ac1018_scene_read_verified_layer_palette(
 int musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
     const MusaDwgAc1018Scene *scene,const char *ascii_name,
     MusaDwgAc1018LayerColor *out);
+/* Diagnostic read-only bridge from a supported numeric 2D entity
+ * (17 ARC, 18 CIRCLE, 19 LINE, 77 LWPOLYLINE) to its referenced LAYER.
+ * First verify the entity's CRC-backed fixed H role targets/self identity,
+ * then require the COMPLETE supported LAYER_CONTROL membership and layer
+ * palette, and find that layer by its indexed H (not a guessed name).
+ * In particular this accepts LINK evidence, not decoded entity geometry.
+ * It does not infer AcDb CLASSES, draw order, owner-H, layer visibility,
+ * effective ByLayer/ByBlock RGB, full DWG parity or a release milestone.
+ * This bounded diagnostic recomputes global layer coverage, O(N) memory;
+ * never invoke once per entity in a viewport hot path. Outputs are atomic.
+ */
+typedef struct MusaDwgAc1018EntityLayerEvidence {
+    uint64_t entity_handle;
+    uint64_t layer_control_handle;
+    MusaDwgAc1018LayerColor layer;
+    uint8_t fixed_entity_links_verified;
+    uint8_t complete_layer_table_verified;
+} MusaDwgAc1018EntityLayerEvidence;
+int musa_dwg_ac1018_scene_read_verified_entity_layer(
+    const MusaDwgAc1018Scene *scene,uint64_t entity_handle,
+    MusaDwgAc1018EntityLayerEvidence *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
