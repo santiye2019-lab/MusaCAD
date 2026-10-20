@@ -190,6 +190,33 @@ int musa_dwg_ac1018_scene_read_entity_layer_batch(
     const uint64_t *entity_handles,size_t entity_count,
     MusaDwgAc1018EntityLayerLink *links,size_t link_capacity,
     MusaDwgAc1018EntityLayerBatchReport *out);
+/* Strict indexed original R2004 layer-link collection. Check EVERY H
+ * record before admitting the small supported numeric object vocabulary:
+ * 17 ARC, 18 CIRCLE, 19 LINE, 77 LWPOLYLINE, plus fixed-prefix-only
+ * 42 DICTIONARY, 49 BLOCK_HEADER, 50 LAYER_CONTROL, 51 LAYER.
+ * Unknown/unclassified record types are FATAL, never silently skipped.
+ * The numeric fixed nonentity prefixes are NOT fully decoded classes,
+ * and link-only entities are NOT proof of decoded drawable geometry.
+ * Entity links are ordered by original ascending indexed H; no guesswork.
+ * Resolve all entities using one bounded verified layer-table/palette
+ * batch call; never partially publish or modify the source on failure.
+ * Reject zero entities, insufficient capacity or >262144 entities.
+ * This is a deliberately narrow subset acceptance diagnostic, NOT
+ * full-drawing coverage, 2D geometric parity, color fidelity or writer.
+ */
+typedef struct MusaDwgAc1018IndexedLayerLinkCoverage {
+    size_t indexed_records_checked;
+    size_t fixed_nonentity_prefixes_checked;
+    size_t supported_entity_links_checked;
+    size_t verified_layers;
+    size_t verified_layer_controls;
+    uint8_t no_unclassified_record_types;
+    uint8_t all_supported_entity_links_verified;
+} MusaDwgAc1018IndexedLayerLinkCoverage;
+int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+    const MusaDwgAc1018Scene *scene,
+    MusaDwgAc1018EntityLayerLink *links,size_t capacity,
+    MusaDwgAc1018IndexedLayerLinkCoverage *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object

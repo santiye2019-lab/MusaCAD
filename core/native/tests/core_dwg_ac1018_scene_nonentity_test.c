@@ -86,9 +86,9 @@ static size_t make(uint8_t out[64],uint16_t type,
  * The 80-bit pre-handle section has no geometry; success must not count as
  * decoded LINE coordinates. The final code-5 H points to LAYER 0x11b.
  */
-static size_t make_entity_link_only(uint8_t out[64],uint32_t self,int wrong_layer){
+static size_t make_entity_link_only(uint8_t out[64],uint32_t self,int wrong_layer,int unknown_type){
     Writer w={0};
-    put(&w,2u,1u);byte(&w,19u);  /* declared BS LINE */
+    put(&w,2u,1u);byte(&w,unknown_type?88u:19u); /* BS numeric */
     byte(&w,80u);byte(&w,0u);byte(&w,0u);byte(&w,0u); /* RL */
     assert(self==0x120u||self==0x121u);
     byte(&w,0x02u);byte(&w,(uint8_t)(self>>8u));
@@ -195,27 +195,28 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
     uint8_t objs[128]={0},h[18]={0};
     /* Mode 5: type-50 table + fully bit-coded, CMC-bearing type-51 LAYER,
      * both in one original protected R2004 section (no fake lookup). */
-    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6||named_layer==7);
+    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6||named_layer==7||named_layer==8);
     const size_t first=make(objs,table_first?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
-                            0,(named_layer>=5&&named_layer<=7)?3:named_layer);
+                            0,(named_layer>=5&&named_layer<=8)?3:named_layer);
     const size_t second=make(objs+first,other_type,
                              wrong_other_self?0x11cu:0x11bu,
-                             0,(named_layer>=5&&named_layer<=7)?2:0);
+                             0,(named_layer>=5&&named_layer<=8)?2:0);
     /* Mode 6: actual 3-record table / CMC LAYER / link-only entity
      * fixture. No materialized/guessed link graph or fake DWG geometry. */
-    const size_t third=(named_layer==6||named_layer==7)?
+    const size_t third=(named_layer>=6&&named_layer<=8)?
         make_entity_link_only(objs+first+second,0x120u,
-                              wrong_layer_self!=0):0u;
-    const size_t fourth=named_layer==7?
-        make_entity_link_only(objs+first+second+third,0x121u,0):0u;
+                              wrong_layer_self!=0,0):0u;
+    const size_t fourth=(named_layer==7||named_layer==8)?
+        make_entity_link_only(objs+first+second+third,0x121u,
+                              0,named_layer==8):0u;
     const size_t total=first+second+third+fourth;
     assert(total<=sizeof(objs)&&first<128u&&first+second<128u);
     h[2]=0x33u;h[3]=0u; /* delta H=0x33 and zero offset */
     h[4]=0xe8u;h[5]=0x01u;h[6]=(uint8_t)first; /* H +232 */
     uint16_t crc=0u;
     size_t hlen=0u;
-    if(named_layer==7){
+    if(named_layer==7||named_layer==8){
         /* Indexed self H sequence: 0x33, 0x11b, 0x120, 0x121. */
         h[1]=11u;h[7]=5u;h[8]=(uint8_t)second;
         h[9]=1u;h[10]=(uint8_t)third;
@@ -704,6 +705,51 @@ int main(void){
     assert(!memcmp(&batch_links[0],&two_good0,sizeof(two_good0))&&
            !memcmp(&batch_links[1],&two_good1,sizeof(two_good1))&&
            !memcmp(&batch_report,&two_good_report,sizeof(two_good_report)));
+    /* Enumerate ALL supported fixed numeric indexed records, not merely
+     * a hand-picked caller list. Opaque/unknown records must fail closed. */
+    MusaDwgAc1018IndexedLayerLinkCoverage strict={0};
+    assert(musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(strict.indexed_records_checked==4u&&
+           strict.fixed_nonentity_prefixes_checked==2u&&
+           strict.supported_entity_links_checked==2u&&
+           strict.verified_layers==1u&&
+           strict.verified_layer_controls==1u&&
+           strict.no_unclassified_record_types&&
+           strict.all_supported_entity_links_verified&&
+           batch_links[0].entity_handle==UINT64_C(0x120)&&
+           batch_links[1].entity_handle==UINT64_C(0x121));
+    const MusaDwgAc1018EntityLayerLink strict0=batch_links[0],strict1=batch_links[1];
+    const MusaDwgAc1018IndexedLayerLinkCoverage keep_strict=strict;
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,1u,&strict)); /* no partial batch */
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,0u,&strict));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,
+                  (MusaDwgAc1018IndexedLayerLinkCoverage*)(void*)batch_links));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,(MusaDwgAc1018EntityLayerLink*)(void*)scene,
+                  2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,1,0,51u,7); /* broken complete table/target graph */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,8); /* type 88 instead of second LINE: refuse partial */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+                  scene,batch_links,2u,&strict));
+    assert(!memcmp(&strict,&keep_strict,sizeof(strict))&&
+           !memcmp(&batch_links[0],&strict0,sizeof(strict0))&&
+           !memcmp(&batch_links[1],&strict1,sizeof(strict1)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
      * or forged embedded identity. The output must remain unchanged. */

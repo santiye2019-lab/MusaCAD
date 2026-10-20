@@ -741,6 +741,97 @@ batch_done:
     free(staged);free(sorted);free(refs);free(controls);free(palette);
     return valid;
 }
+/* Original protected H-index strict coverage. Unlike a user-selected
+ * batch, enumeration is comprehensive inside this LIMITED code vocabulary.
+ * Any unknown object means the scene CANNOT be represented by this API:
+ * return failure, not a plausible-looking incomplete layer scene.
+ */
+int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
+    const MusaDwgAc1018Scene *s,
+    MusaDwgAc1018EntityLayerLink *links,size_t capacity,
+    MusaDwgAc1018IndexedLayerLinkCoverage *out){
+    if(!s||!links||!out||!s->index||!s->objects||
+       !capacity||capacity>262144u||
+       capacity>SIZE_MAX/sizeof(*links)||
+       scene_output_overlaps(s,links,capacity*sizeof(*links))||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       overlaps(links,capacity*sizeof(*links),out,sizeof(*out)))
+        return 0;
+    size_t entities=0u,fixed=0u;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe))
+            return 0;
+        switch(probe.declared_type){
+            case 17u: case 18u: case 19u: case 77u:
+                entities++;
+                if(entities>capacity)return 0;
+                break;
+            case 42u: case 49u: case 50u: case 51u: {
+                MusaDwgAc1018NonEntityIdentity item={0};
+                if(!musa_dwg_ac1018_scene_probe_nonentity_identity(
+                         s,probe.handle,&item)||
+                   item.indexed_handle!=probe.handle||
+                   item.declared_type!=probe.declared_type||
+                   !item.record_crc_verified||
+                   !item.embedded_self_verified)return 0;
+                fixed++;
+                break;
+            }
+            default:
+                /* Explicit refusal of TEXT/INSERT/XREF/unknown data. */
+                return 0;
+        }
+    }
+    if(!entities||entities>262144u||
+       entities>SIZE_MAX/sizeof(uint64_t))return 0;
+    uint64_t *requested=(uint64_t*)malloc(entities*sizeof(*requested));
+    MusaDwgAc1018EntityLayerLink *staged=
+        (MusaDwgAc1018EntityLayerLink*)malloc(
+              entities*sizeof(*staged));
+    if(!requested||!staged){
+        free(staged);free(requested);return 0;
+    }
+    size_t cursor=0u;
+    int valid=1;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;break;
+        }
+        switch(probe.declared_type){
+            case 17u: case 18u: case 19u: case 77u:
+                if(cursor>=entities){valid=0;break;}
+                requested[cursor++]=probe.handle;
+                break;
+            default: break;
+        }
+        if(!valid)break;
+    }
+    MusaDwgAc1018EntityLayerBatchReport batch={0};
+    if(!valid||cursor!=entities||
+       !musa_dwg_ac1018_scene_read_entity_layer_batch(
+             s,requested,entities,staged,entities,&batch)||
+       batch.verified_entities!=entities||
+       !batch.verified_unique_entity_handles||
+       !batch.complete_layer_membership_verified)
+        valid=0;
+    if(valid){
+        MusaDwgAc1018IndexedLayerLinkCoverage summary={0};
+        summary.indexed_records_checked=s->index_count;
+        summary.fixed_nonentity_prefixes_checked=fixed;
+        summary.supported_entity_links_checked=entities;
+        summary.verified_layers=batch.verified_layers;
+        summary.verified_layer_controls=batch.verified_layer_controls;
+        summary.no_unclassified_record_types=1u;
+        summary.all_supported_entity_links_verified=1u;
+        memcpy(links,staged,entities*sizeof(*links));
+        *out=summary;
+    }
+    free(staged);
+    free(requested);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
