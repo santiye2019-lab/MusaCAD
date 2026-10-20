@@ -571,6 +571,36 @@ int musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
     MusaDwgAc1018BulgeWidthNeighborhood *out);
 
 
+/* Exact four edge endpoints of a STRAIGHT LWPOLYLINE segment with
+ * linearly interpolated source width in its original OCS plane, converted
+ * into WCS. The start vertex owns the selected segment's widths/bulge.
+ * For source with per-vertex width data, require exactly vertex_count
+ * pairs; a partial width vector is deliberately refused. Otherwise the
+ * constant width applies to BOTH endpoints.
+ *
+ * corners order: start-left, start-right, end-left, end-right (left means
+ * counterclockwise 90 degrees from the directed OCS chord).
+ * Signed thickness shifts this quadrilateral along OCS unit extrusion;
+ * min/max contain BOTH bases (t=0 and t=thickness).
+ * This geometrically exact STRAIGHT tapered ribbon segment is NOT the
+ * joined/capped/linetype-expanded outline of a complete DWG polyline.
+ * Curved bulge != 0 or zero-length chords are refused, not flattened.
+ * The original source and all caller bytes are unchanged on error.
+ */
+typedef struct MusaDwgAc1018StraightTaperWcs {
+    uint64_t handle;
+    uint32_t segment_index;
+    uint8_t widths_from_vertices;
+    double start_width;
+    double end_width;
+    double thickness;
+    double corners[4][3];
+    double minimum[3];
+    double maximum[3];
+} MusaDwgAc1018StraightTaperWcs;
+int musa_dwg_ac1018_scene_read_straight_taper_wcs(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t segment_index,MusaDwgAc1018StraightTaperWcs *out);
 #ifdef __cplusplus
 }
 #endif
