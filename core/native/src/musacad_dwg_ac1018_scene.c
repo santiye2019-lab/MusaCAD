@@ -1596,7 +1596,7 @@ int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
        curve.handle!=handle||
        (curve.type_code!=17u&&curve.type_code!=18u)||
        !isfinite(curve.radius)||!(curve.radius>0.0)||
-       !isfinite(curve.thickness)||curve.thickness!=0.0)
+       !isfinite(curve.thickness))
         return 0;
     MusaCoreOcsBasis basis={0};
     const double xy[2]={curve.center[0],curve.center[1]};
@@ -1629,6 +1629,7 @@ int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
     checked.handle=handle;
     checked.type_code=curve.type_code;
     checked.radius=curve.radius;
+    checked.thickness=curve.thickness;
     checked.start_angle=start;
     checked.sweep_angle=sweep;
     memcpy(checked.center_wcs,center,sizeof(center));
@@ -1664,6 +1665,16 @@ int musa_dwg_ac1018_scene_read_curve_wcs_bounds(
                 }
             }
         }
+    }
+    /* Exact bounds of the extruded circular sweep over 0..thickness,
+     * including negative extrusion. OCS Z is a UNIT WORLD vector. */
+    for(size_t k=0u;k<3u;k++){
+        const double delta=curve.thickness*basis.z[k];
+        if(!isfinite(delta))return 0;
+        if(delta<0.0)checked.minimum[k]+=delta;
+        else checked.maximum[k]+=delta;
+        if(!isfinite(checked.minimum[k])||
+           !isfinite(checked.maximum[k]))return 0;
     }
     *out=checked;
     return 1;
