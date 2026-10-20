@@ -775,6 +775,50 @@ int musa_dwg_ac1018_scene_lw_join_candidates(
     uint32_t vertex_index,double miter_limit,
     MusaDwgAc1018LwJoinCandidates *out);
 
+/* One original CRC-backed R2004 LWPOLYLINE, read just ONCE:
+ * numerical WCS enclosure of the complete set of STRAIGHT variable-width
+ * ribbon segments, both continuous CURLING/BLUGE variable-width edge
+ * curves, and the straight BEVEL BRIDGES between their endpoint edges.
+ *
+ * OCS extrusion and signed thickness included. Bridges are exact
+ * straight chords between source edges, so their extrema lie at known
+ * endpoints already enclosed with the source segments. The entire
+ * envelope is conservative under the selected BEVEL connection model.
+ *
+ * Critically: does NOT include miter spikes, round join arcs, caps,
+ * linetype/lineweight or filled DWG stroke. No native DWG writer or
+ * complete AutoCAD rendering equivalence is proven. The result marks
+ * every such exclusion rather than pretending a complete scene.
+ * The original DWG is CRC-checked; at most 100000 segments per call.
+ * The supplied per-curve max_intervals applies to EACH curved segment.
+ * No unbounded per-segment rescanning or object re-decompression:
+ * read original LW record once, O(N * bounded curve intervals).
+ * Output is transactional on error, with no original bytes modified.
+ */
+typedef struct MusaDwgAc1018LwRibbonBevelWcsEnvelope {
+    uint64_t handle;
+    uint32_t vertex_count;
+    uint32_t segment_count;
+    uint32_t curved_segments;
+    uint32_t straight_segments;
+    uint32_t bevel_bridge_count;
+    uint32_t discontinuous_width_junctions;
+    uint64_t curve_intervals_total;
+    double maximum_curve_gap;
+    double maximum_bevel_edge_gap;
+    double requested_tolerance;
+    double minimum[3];
+    double maximum[3];
+    uint8_t bevel_bridge_endpoints_enclosed; /* 1 on success */
+    uint8_t all_miters_enclosed; /* always 0 */
+    uint8_t all_round_joins_enclosed; /* always 0 */
+    uint8_t complete_visible_stroke_verified; /* always 0 */
+} MusaDwgAc1018LwRibbonBevelWcsEnvelope;
+int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *out);
+
 #ifdef __cplusplus
 }
 #endif

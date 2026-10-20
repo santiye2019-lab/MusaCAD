@@ -2706,3 +2706,222 @@ int musa_dwg_ac1018_scene_lw_join_candidates(
     *out=checked;
     return 1;
 }
+
+
+/* Original R2004 polyline ribbon-bevel envelope: one CRC-backed decode.
+ * Segment computation and junction bridges are O(N), apart from bounded
+ * interval arithmetic per curved edge. The bridge between two source
+ * edge endpoints cannot extend an axis-aligned box enclosing them.
+ * Genuinely different miter/round/cap strokes are NOT included.
+ */
+static int lw_envelope_include(
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *dst,
+    const double v[3]){
+    if(!dst||!v||!finite_vec3(v))return 0;
+    for(size_t k=0u;k<3u;k++){
+        if(v[k]<dst->minimum[k])dst->minimum[k]=v[k];
+        if(v[k]>dst->maximum[k])dst->maximum[k]=v[k];
+    }
+    return 1;
+}
+static int lw_envelope_bridge(
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *dst,
+    const double prior[2][3],double prior_width,
+    const double following[2][3],double following_width){
+    if(!dst||!prior||!following||
+       !isfinite(prior_width)||!isfinite(following_width)||
+       prior_width<0.0||following_width<0.0)return 0;
+    const double tolerance=1e-10*
+            (1.0+fabs(prior_width)+fabs(following_width));
+    if(!isfinite(tolerance))return 0;
+    if(fabs(prior_width-following_width)>tolerance)
+        dst->discontinuous_width_junctions++;
+    for(size_t side=0u;side<2u;side++){
+        if(!lw_envelope_include(dst,prior[side])||
+           !lw_envelope_include(dst,following[side]))return 0;
+        const double dx=prior[side][0]-following[side][0];
+        const double dy=prior[side][1]-following[side][1];
+        const double dz=prior[side][2]-following[side][2];
+        const double gap=hypot(hypot(dx,dy),dz);
+        if(!isfinite(gap))return 0;
+        if(gap>dst->maximum_bevel_edge_gap)
+            dst->maximum_bevel_edge_gap=gap;
+    }
+    dst->bevel_bridge_count++;
+    return 1;
+}
+int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
+    if(!s||!handle||!out||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       !isfinite(requested_tolerance)||!(requested_tolerance>0.0)||
+       max_intervals_per_curve<16u||
+       max_intervals_per_curve>65536u)return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       record.declared_type!=77u)return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+                 s,handle,vertices,100000u,&poly)&&
+              poly.handle==handle&&
+              poly.vertex_count>=2u&&poly.vertex_count<=100000u&&
+              (poly.width_count==0u||
+               poly.width_count==poly.vertex_count)&&
+              isfinite(poly.elevation)&&isfinite(poly.thickness)&&
+              isfinite(poly.constant_width)&&
+              poly.constant_width>=0.0;
+    MusaCoreOcsBasis basis={0};
+    if(valid)valid=musa_core_ocs_basis(poly.extrusion,&basis);
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope checked={0};
+    if(valid){
+        checked.handle=handle;
+        checked.vertex_count=poly.vertex_count;
+        checked.segment_count=poly.vertex_count-
+                                   (poly.closed?0u:1u);
+        checked.requested_tolerance=requested_tolerance;
+        for(size_t k=0u;k<3u;k++){
+            checked.minimum[k]=DBL_MAX;
+            checked.maximum[k]=-DBL_MAX;
+        }
+        double first_start[2][3]={{0}};
+        double previous_end[2][3]={{0}};
+        double first_width=0.0,prior_width=0.0;
+        const int per_vertex=poly.width_count!=0u;
+        const uint32_t n=poly.vertex_count;
+        for(uint32_t i=0u;i<checked.segment_count&&valid;i++){
+            const uint32_t next=i+1u==n?0u:i+1u;
+            const MusaDwgAc1018LWVertex *a=&vertices[i];
+            const MusaDwgAc1018LWVertex *b=&vertices[next];
+            const double sw=per_vertex?a->start_width:
+                                       poly.constant_width;
+            const double ew=per_vertex?a->end_width:
+                                       poly.constant_width;
+            double from[2][3]={{0}},to[2][3]={{0}};
+            double tangent[2][3]={{0}};
+            double extruded[2][3]={{0}};
+            uint8_t curved=0u;
+            valid=lw_join_segment_endpoint(
+                a,b,&basis,poly.elevation,poly.thickness,sw,ew,0,
+                from,tangent,extruded,&curved);
+            if(!valid)break;
+            for(size_t side=0u;side<2u&&valid;side++){
+                if(!lw_envelope_include(&checked,from[side])||
+                   !lw_envelope_include(&checked,extruded[side]))
+                    valid=0;
+            }
+            if(!valid)break;
+            if(i==0u){
+                memcpy(first_start,from,sizeof(first_start));
+                first_width=sw;
+            }else{
+                valid=lw_envelope_bridge(&checked,previous_end,
+                                         prior_width,from,sw);
+                if(!valid)break;
+            }
+            uint8_t end_curved=0u;
+            valid=lw_join_segment_endpoint(
+                a,b,&basis,poly.elevation,poly.thickness,sw,ew,1,
+                to,tangent,extruded,&end_curved);
+            if(!valid||end_curved!=curved){valid=0;break;}
+            for(size_t side=0u;side<2u&&valid;side++){
+                if(!lw_envelope_include(&checked,to[side])||
+                   !lw_envelope_include(&checked,extruded[side]))
+                    valid=0;
+            }
+            if(!valid)break;
+            if(!curved){
+                checked.straight_segments++;
+            }else{
+                checked.curved_segments++;
+                /* A local immutable snapshot uses the ONE already
+                 * verified DWG read. No per-segment scene re-open, no
+                 * source data re-decompression or O(N^2) lookup. */
+                const double dx=b->x-a->x,dy=b->y-a->y;
+                const double chord=hypot(dx,dy),bulge=a->bulge;
+                if(!isfinite(chord)||!(chord>0.0)||
+                   !isfinite(bulge)||fabs(bulge)<1e-12||
+                   fabs(bulge)>1e6){valid=0;break;}
+                const double off=(chord*0.25)*
+                                     ((1.0-bulge*bulge)/bulge);
+                const double radius=(chord*0.25)*
+                                     ((1.0+bulge*bulge)/fabs(bulge));
+                const double cx=0.5*a->x+0.5*b->x-
+                                                 (dy/chord)*off;
+                const double cy=0.5*a->y+0.5*b->y+
+                                                 (dx/chord)*off;
+                const double sweep=4.0*atan(bulge);
+                if(!isfinite(off)||!isfinite(radius)||
+                   !(radius>0.0)||!isfinite(cx)||!isfinite(cy)||
+                   !isfinite(sweep)||
+                   fabs(sweep)>=2.0*acos(-1.0)-1e-12){
+                    valid=0;break;
+                }
+                MusaDwgAc1018BulgeEdgeSnapshot curve={0};
+                curve.handle=handle;
+                curve.segment_index=i;
+                curve.widths_from_vertices=(uint8_t)per_vertex;
+                curve.center_ocs[0]=cx;curve.center_ocs[1]=cy;
+                curve.start_angle=atan2(a->y-cy,a->x-cx);
+                curve.radius=radius;curve.sweep=sweep;
+                curve.elevation=poly.elevation;
+                curve.thickness=poly.thickness;
+                curve.start_width=sw;curve.end_width=ew;
+                curve.basis=basis;
+                MusaDwgAc1018BulgeEdgeWcsEnvelope bound={0};
+                if(!musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+                            &curve,requested_tolerance,
+                            max_intervals_per_curve,&bound)){
+                    valid=0;break;
+                }
+                for(size_t k=0u;k<3u;k++){
+                    const double lo=bound.minimum[k];
+                    const double hi=bound.maximum[k];
+                    if(!isfinite(lo)||!isfinite(hi)||lo>hi){
+                        valid=0;break;
+                    }
+                    if(lo<checked.minimum[k])
+                        checked.minimum[k]=lo;
+                    if(hi>checked.maximum[k])
+                        checked.maximum[k]=hi;
+                }
+                if(!valid)break;
+                checked.curve_intervals_total+=
+                                        bound.intervals_used;
+                if(bound.max_outward_gap>checked.maximum_curve_gap)
+                    checked.maximum_curve_gap=bound.max_outward_gap;
+            }
+            memcpy(previous_end,to,sizeof(previous_end));
+            prior_width=ew;
+        }
+        if(valid&&poly.closed)
+            valid=lw_envelope_bridge(&checked,previous_end,
+                                    prior_width,first_start,first_width);
+        if(valid){
+            valid=checked.straight_segments+
+                        checked.curved_segments==
+                                  checked.segment_count&&
+                  checked.bevel_bridge_count==
+                   (poly.closed?checked.segment_count:
+                          checked.segment_count-1u);
+            for(size_t k=0u;k<3u;k++){
+                if(!isfinite(checked.minimum[k])||
+                   !isfinite(checked.maximum[k])||
+                   checked.minimum[k]>checked.maximum[k])
+                    valid=0;
+            }
+            checked.bevel_bridge_endpoints_enclosed=(uint8_t)valid;
+            checked.all_miters_enclosed=0u;
+            checked.all_round_joins_enclosed=0u;
+            checked.complete_visible_stroke_verified=0u;
+        }
+    }
+    free(vertices);
+    if(!valid)return 0;
+    *out=checked;
+    return 1;
+}
