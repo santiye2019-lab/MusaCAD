@@ -162,11 +162,15 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
     uint8_t objs[128]={0},h[13]={0};
-    const size_t first=make(objs,(named_layer==3||named_layer==4)?50u:51u,
+    /* Mode 5: type-50 table + fully bit-coded, CMC-bearing type-51 LAYER,
+     * both in one original protected R2004 section (no fake lookup). */
+    const int table_first=(named_layer==3||named_layer==4||named_layer==5);
+    const size_t first=make(objs,table_first?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
-                            0,named_layer);
+                            0,named_layer==5?3:named_layer);
     const size_t second=make(objs+first,other_type,
-                             wrong_other_self?0x11cu:0x11bu,0,0);
+                             wrong_other_self?0x11cu:0x11bu,
+                             0,named_layer==5?2:0);
     const size_t total=first+second;
     assert(total<=sizeof(objs)&&first<128u);
     h[1]=7u;
@@ -466,6 +470,59 @@ int main(void){
     assert(!musa_dwg_ac1018_scene_audit_layer_table_coverage(
                    scene,&coverage));
     assert(!memcmp(&coverage,&saved_coverage,sizeof(coverage)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Full supported ASCII layer palette from a genuine protected R2004
+     * binary fixture. The CMC is verified RAW, not asserted screen RGB. */
+    construct(file,0,0,51u,5);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    MusaDwgAc1018LayerColor colors[2]={{0}};
+    colors[1].raw_cmc_rgb=UINT32_C(0xdeadbeef);
+    MusaDwgAc1018LayerPaletteReport palette_report={0};
+    assert(musa_dwg_ac1018_scene_read_verified_layer_palette(
+                 scene,colors,2u,&palette_report));
+    assert(palette_report.indexed_layers==1u&&
+           palette_report.indexed_layer_controls==1u&&
+           palette_report.unique_ascii_names_verified&&
+           palette_report.raw_cmc_fields_verified&&
+           colors[0].prefix.indexed_handle==0x11bu&&
+           !strcmp(colors[0].prefix.name,"MEK0")&&
+           colors[0].raw_cmc_rgb==UINT32_C(0x00112233)&&
+           colors[1].raw_cmc_rgb==UINT32_C(0xdeadbeef));
+    const MusaDwgAc1018LayerColor keep0=colors[0],keep1=colors[1];
+    const MusaDwgAc1018LayerPaletteReport keep_report=palette_report;
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                 scene,colors,0u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                 scene,(MusaDwgAc1018LayerColor*)(void*)scene,
+                 1u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                 scene,colors,2u,
+                 (MusaDwgAc1018LayerPaletteReport*)(void*)scene));
+    assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
+           !memcmp(&colors[1],&keep1,sizeof(keep1))&&
+           !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,3); /* self-valid but truncated CMC */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                  scene,colors,2u,&palette_report));
+    assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
+           !memcmp(&colors[1],&keep1,sizeof(keep1))&&
+           !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,0,51u,4); /* duplicate H */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                  scene,colors,2u,&palette_report));
+    assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
+           !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    construct(file,0,1,51u,5); /* valid CRC, forged embedded self-H */
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
+                  scene,colors,2u,&palette_report));
+    assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
+           !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* The target exists and has an intact CRC, but is not a LAYER. */
     construct(file,0,0,49u,3);
