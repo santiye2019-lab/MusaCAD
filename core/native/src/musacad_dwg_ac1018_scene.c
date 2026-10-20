@@ -786,7 +786,12 @@ int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
     if(!entities||entities>262144u||
        entities>SIZE_MAX/sizeof(uint64_t))return 0;
     uint64_t *requested=(uint64_t*)malloc(entities*sizeof(*requested));
-    if(!requested)return 0;
+    MusaDwgAc1018EntityLayerLink *staged=
+        (MusaDwgAc1018EntityLayerLink*)malloc(
+              entities*sizeof(*staged));
+    if(!requested||!staged){
+        free(staged);free(requested);return 0;
+    }
     size_t cursor=0u;
     int valid=1;
     for(size_t i=0u;i<s->index_count;i++){
@@ -806,7 +811,7 @@ int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
     MusaDwgAc1018EntityLayerBatchReport batch={0};
     if(!valid||cursor!=entities||
        !musa_dwg_ac1018_scene_read_entity_layer_batch(
-             s,requested,entities,links,capacity,&batch)||
+             s,requested,entities,staged,entities,&batch)||
        batch.verified_entities!=entities||
        !batch.verified_unique_entity_handles||
        !batch.complete_layer_membership_verified)
@@ -820,8 +825,10 @@ int musa_dwg_ac1018_scene_collect_strict_indexed_layer_links(
         summary.verified_layer_controls=batch.verified_layer_controls;
         summary.no_unclassified_record_types=1u;
         summary.all_supported_entity_links_verified=1u;
+        memcpy(links,staged,entities*sizeof(*links));
         *out=summary;
     }
+    free(staged);
     free(requested);
     return valid;
 }
