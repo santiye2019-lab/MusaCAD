@@ -2413,3 +2413,198 @@ int musa_dwg_ac1018_bulge_edge_snapshot_enclose(
         n=n<=max_intervals/2u?n*2u:max_intervals;
     }
 }
+
+
+/* Exact source width-edge endpoint with the derivative of its true
+ * variable-width ribbon curve. A straight segment's OCS derivative is
+ * chord + d(width)/dt * half-left-normal. For signed circular bulges,
+ * theta'=sweep and r_edge(t)=radius +/- width(t)/2, hence the edge
+ * derivative contains BOTH angular AND radial-width contributions.
+ * Use genuine original DWG OCS->WCS basis, never viewer UCS.
+ */
+static int lw_join_segment_endpoint(
+    const MusaDwgAc1018LWVertex *a,
+    const MusaDwgAc1018LWVertex *b,
+    const MusaCoreOcsBasis *basis,
+    double elevation,double thickness,double sw,double ew,int end,
+    double positions[2][3],double directions[2][3],
+    double translated[2][3],uint8_t *curved){
+    if(!a||!b||!basis||!positions||!directions||!translated||!curved||
+       !isfinite(a->x)||!isfinite(a->y)||!isfinite(b->x)||!isfinite(b->y)||
+       !isfinite(a->bulge)||!isfinite(sw)||!isfinite(ew)||
+       sw<0.0||ew<0.0||!isfinite(elevation)||!isfinite(thickness))
+        return 0;
+    const double dx=b->x-a->x,dy=b->y-a->y;
+    const double chord=hypot(dx,dy);
+    if(!isfinite(dx)||!isfinite(dy)||
+       !isfinite(chord)||!(chord>0.0))return 0;
+    double tanx=dx/chord,tany=dy/chord;
+    double radialx=0.0,radialy=0.0;
+    double radius=0.0,sweep=0.0;
+    const double bulge=a->bulge;
+    if(bulge!=0.0){
+        if(fabs(bulge)<1e-12||fabs(bulge)>1e6)return 0;
+        const double offset=(chord*0.25)*
+                            ((1.0-bulge*bulge)/bulge);
+        radius=(chord*0.25)*
+                            ((1.0+bulge*bulge)/fabs(bulge));
+        const double cx=0.5*a->x+0.5*b->x-(dy/chord)*offset;
+        const double cy=0.5*a->y+0.5*b->y+(dx/chord)*offset;
+        const MusaDwgAc1018LWVertex *at=end?b:a;
+        const double vx=at->x-cx,vy=at->y-cy;
+        const double rn=hypot(vx,vy);
+        sweep=4.0*atan(bulge);
+        if(!isfinite(offset)||!isfinite(radius)||!(radius>0.0)||
+           !isfinite(cx)||!isfinite(cy)||!isfinite(rn)||
+           !(rn>0.0)||!isfinite(sweep)||
+           fabs(sweep)>=2.0*acos(-1.0)-1e-12)
+            return 0;
+        radialx=vx/rn;radialy=vy/rn;
+        const double dir=bulge>0.0?1.0:-1.0;
+        tanx=-dir*radialy;
+        tany= dir*radialx;
+    }
+    const double nx=-tany,ny=tanx;
+    const MusaDwgAc1018LWVertex *v=end?b:a;
+    const double width=end?ew:sw;
+    const double delta_width=ew-sw;
+    const double center_xy[2]={v->x,v->y};
+    double center[3]={0};
+    if(!musa_core_ocs_to_world(basis,center_xy,elevation,center)||
+       !finite_vec3(center))return 0;
+    for(size_t i=0u;i<2u;i++){
+        const double side=i==0u?1.0:-1.0;
+        const double x=v->x+side*0.5*width*nx;
+        const double y=v->y+side*0.5*width*ny;
+        const double xy[2]={x,y};
+        double derivx=0.0,derivy=0.0;
+        if(bulge==0.0){
+            derivx=dx+side*0.5*delta_width*nx;
+            derivy=dy+side*0.5*delta_width*ny;
+        }else{
+            const double radial_dir=bulge>0.0?-1.0:1.0;
+            const double q=radius+side*radial_dir*0.5*width;
+            const double dq=side*radial_dir*0.5*delta_width;
+            derivx=dq*radialx-q*sweep*radialy;
+            derivy=dq*radialy+q*sweep*radialx;
+        }
+        const double norm=hypot(derivx,derivy);
+        if(!isfinite(x)||!isfinite(y)||!isfinite(norm)||
+           !(norm>0.0))return 0;
+        if(!musa_core_ocs_to_world(basis,xy,elevation,positions[i])||
+           !finite_vec3(positions[i]))return 0;
+        for(size_t k=0u;k<3u;k++){
+            directions[i][k]=(basis->x[k]*derivx+
+                               basis->y[k]*derivy)/norm;
+            translated[i][k]=positions[i][k]+
+                               thickness*basis->z[k];
+            if(!isfinite(directions[i][k])||
+               !isfinite(translated[i][k]))return 0;
+        }
+    }
+    *curved=(uint8_t)(bulge!=0.0);
+    return 1;
+}
+int musa_dwg_ac1018_scene_audit_lw_join_edges(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t vertex_index,MusaDwgAc1018LwJoinEdgeAudit *out){
+    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018RecordProbe rec={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&rec)||
+       rec.declared_type!=77u)return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(
+                        100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+                      s,handle,vertices,100000u,&poly)&&
+              poly.handle==handle&&poly.vertex_count>=2u&&
+              poly.vertex_count<=100000u&&
+              vertex_index<poly.vertex_count&&
+              (poly.closed||
+               (vertex_index>0u&&
+                vertex_index+1u<poly.vertex_count))&&
+              (poly.width_count==0u||
+               poly.width_count==poly.vertex_count)&&
+              isfinite(poly.elevation)&&isfinite(poly.thickness)&&
+              isfinite(poly.constant_width)&&poly.constant_width>=0.0;
+    MusaDwgAc1018LwJoinEdgeAudit checked={0};
+    if(valid){
+        const uint32_t n=poly.vertex_count;
+        const uint32_t before=vertex_index==0u?n-1u:
+                                        vertex_index-1u;
+        const uint32_t next=vertex_index+1u==n?0u:
+                                        vertex_index+1u;
+        const MusaDwgAc1018LWVertex *last=&vertices[before];
+        const MusaDwgAc1018LWVertex *joint=&vertices[vertex_index];
+        const MusaDwgAc1018LWVertex *following=&vertices[next];
+        const int per_vertex=poly.width_count!=0u;
+        const double in_sw=per_vertex?last->start_width:
+                                      poly.constant_width;
+        const double in_ew=per_vertex?last->end_width:
+                                      poly.constant_width;
+        const double out_sw=per_vertex?joint->start_width:
+                                       poly.constant_width;
+        const double out_ew=per_vertex?joint->end_width:
+                                       poly.constant_width;
+        MusaCoreOcsBasis basis={0};
+        valid=musa_core_ocs_basis(poly.extrusion,&basis);
+        if(valid){
+            valid=lw_join_segment_endpoint(
+                 last,joint,&basis,poly.elevation,poly.thickness,
+                 in_sw,in_ew,1,checked.incoming_edge_wcs,
+                 checked.incoming_edge_tangent_wcs,
+                 checked.incoming_edge_thickness_wcs,
+                 &checked.incoming_curved)&&
+                 lw_join_segment_endpoint(
+                 joint,following,&basis,poly.elevation,poly.thickness,
+                 out_sw,out_ew,0,checked.outgoing_edge_wcs,
+                 checked.outgoing_edge_tangent_wcs,
+                 checked.outgoing_edge_thickness_wcs,
+                 &checked.outgoing_curved);
+        }
+        if(valid){
+            const double xy[2]={joint->x,joint->y};
+            valid=musa_core_ocs_to_world(&basis,xy,poly.elevation,
+                                         checked.center_wcs)&&
+                  finite_vec3(checked.center_wcs);
+            checked.handle=handle;
+            checked.vertex_index=vertex_index;
+            checked.incoming_segment_index=before;
+            checked.outgoing_segment_index=vertex_index;
+            checked.incoming_end_width=in_ew;
+            checked.outgoing_start_width=out_sw;
+            const double scale=1.0+fabs(in_ew)+fabs(out_sw)+
+                    fabs(joint->x)+fabs(joint->y);
+            const double limit=1e-10*scale;
+            if(!isfinite(scale)||!isfinite(limit))valid=0;
+            checked.source_widths_match=(uint8_t)(
+                isfinite(in_ew)&&isfinite(out_sw)&&
+                fabs(in_ew-out_sw)<=limit);
+            double largest=0.0;
+            for(size_t side=0u;side<2u&&valid;side++){
+                double difference[3]={0};
+                for(size_t k=0u;k<3u;k++)
+                    difference[k]=checked.incoming_edge_wcs[side][k]-
+                                  checked.outgoing_edge_wcs[side][k];
+                const double gap=hypot(hypot(difference[0],
+                                             difference[1]),
+                                             difference[2]);
+                if(!isfinite(gap)){valid=0;break;}
+                checked.edge_gap[side]=gap;
+                if(gap>largest)largest=gap;
+            }
+            if(valid)checked.edge_endpoints_match=
+                           (uint8_t)(largest<=limit);
+            /* A coincident endpoint does NOT prove a visible CAD join:
+             * no miter/round/bevel construction was done here. */
+            checked.complete_visible_join_verified=0u;
+        }
+    }
+    free(vertices);
+    if(!valid)return 0;
+    *out=checked;
+    return 1;
+}
