@@ -1880,3 +1880,65 @@ int musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
     *out=checked;
     return 1;
 }
+
+
+/* Width is permitted for EVIDENCE of the OCS radial neighborhood, not
+ * interpreted as a complete DWG stroke mesh / join/cap equivalence.
+ * For every source centerline point and interpolated width <= maxWidth,
+ * its cross-sectional OCS offset lies within a disk of radius maxWidth/2.
+ * The world axis projection of that disk is norm((OCS Xk, OCS Yk))*r.
+ * An AABB of the centerline + this disk is a provable conservative bound
+ * for this mathematical neighborhood, with tilted extrusion and signed
+ * thickness already covered in the centerline input. */
+int musa_dwg_ac1018_scene_audit_bulge_width_neighborhood(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018BulgeWidthNeighborhood *out){
+    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018BulgeWidthNeighborhood checked={0};
+    if(!musa_dwg_ac1018_scene_audit_bulge_centerline_wcs(
+                    s,handle,&checked.evidence))
+        return 0;
+    MusaDwgAc1018LWVertex *vertices=
+        (MusaDwgAc1018LWVertex*)malloc(100000u*sizeof(*vertices));
+    if(!vertices)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+                   s,handle,vertices,100000u,&poly)&&
+              poly.handle==handle&&
+              poly.vertex_count==checked.evidence.centerline.vertex_count&&
+              poly.vertex_count<=100000u&&
+              isfinite(poly.constant_width)&&poly.constant_width>=0.0;
+    double largest=0.0;
+    MusaCoreOcsBasis basis={0};
+    if(valid){
+        largest=poly.constant_width;
+        valid=musa_core_ocs_basis(poly.extrusion,&basis);
+        for(uint32_t i=0u;valid&&i<poly.vertex_count;i++){
+            const double a=vertices[i].start_width;
+            const double b=vertices[i].end_width;
+            if(!isfinite(a)||!isfinite(b)||a<0.0||b<0.0){
+                valid=0;break;
+            }
+            if(a>largest)largest=a;
+            if(b>largest)largest=b;
+        }
+    }
+    free(vertices);
+    if(!valid||!isfinite(largest))return 0;
+    checked.source_max_width=largest;
+    for(size_t k=0u;k<3u;k++){
+        const double axisnorm=hypot(basis.x[k],basis.y[k]);
+        const double pad=0.5*largest*axisnorm;
+        const double min=checked.evidence.centerline.minimum[k]-pad;
+        const double max=checked.evidence.centerline.maximum[k]+pad;
+        if(!isfinite(axisnorm)||!isfinite(pad)||!isfinite(min)||
+           !isfinite(max)||min>max)return 0;
+        checked.radial_pad_wcs[k]=pad;
+        checked.padded_minimum[k]=min;
+        checked.padded_maximum[k]=max;
+    }
+    checked.complete_visible_stroke_verified=0u;
+    *out=checked;
+    return 1;
+}
