@@ -203,8 +203,9 @@ int main(void){
            near(arc_box.center_wcs[1],-7.125)&&
            near(arc_box.minimum[0],-3.5-1.25*cos(0.25))&&
            near(arc_box.maximum[0],-3.5+1.25)&&
+           near(arc_box.thickness,0.5)&&
            near(arc_box.minimum[1],-7.125)&&
-           near(arc_box.maximum[1],-7.125)&&
+           near(arc_box.maximum[1],-7.125+0.5)&&
            near(arc_box.minimum[2],arc_box.center_wcs[2]-1.25)&&
            near(arc_box.maximum[2],arc_box.center_wcs[2]+1.25));
     /* Dense independent parametric reference samples lie inside the
@@ -221,6 +222,9 @@ int main(void){
                    point[axis]<=arc_box.maximum[axis]+1e-9);
         }
     }
+    /* Complete thickness sweep: world +Y extrusion ranges from
+     * base ARC y=-7.125 to swept ARC y=-6.625. */
+    assert(near(arc_box.maximum[1]-arc_box.minimum[1],0.5));
     const MusaDwgAc1018CurveWcsBounds saved_box=arc_box;
     assert(!musa_dwg_ac1018_scene_read_curve_wcs_bounds(
                  s,0x1235u,&arc_box));
