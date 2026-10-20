@@ -516,6 +516,13 @@ int main(void){
                  scene,"",&by_name));
     assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
                  scene,"MEK\\n0",&by_name));
+    const char invalid_utf8[3]={'M',(char)0xc3,0};
+    char too_long[257];
+    memset(too_long,'X',256u);too_long[256]=0;
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,invalid_utf8,&by_name));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,too_long,&by_name));
     assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
                  scene,NULL,&by_name));
     assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
