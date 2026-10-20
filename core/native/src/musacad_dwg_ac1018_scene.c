@@ -2714,6 +2714,71 @@ int musa_dwg_ac1018_scene_lw_join_candidates(
  * edge endpoints cannot extend an axis-aligned box enclosing them.
  * Genuinely different miter/round/cap strokes are NOT included.
  */
+/* Work exclusively on once-decoded edge points and true WCS edge
+ * tangents. Reject unstable or over-limit tangent-line intersections.
+ * These are finite candidate points, not a DWG stroke style promise. */
+static int lw_miter_accumulate(
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope *sum,
+    const double in[2][3],const double ti[2][3],double wi,
+    const double out[2][3],const double to[2][3],double wo,
+    const MusaCoreOcsBasis *basis,double thickness){
+    if(!sum||!in||!ti||!out||!to||!basis||
+       !isfinite(wi)||!isfinite(wo)||wi<0.0||wo<0.0||
+       !isfinite(thickness))return 0;
+    const double w=fmax(wi,wo);
+    const double limit=sum->miter_limit*0.5*w;
+    if(!isfinite(limit))return 0;
+    for(size_t side=0;side<2;side++){
+        const double *a=in[side],*b=out[side];
+        const double *uvec=ti[side],*vvec=to[side];
+        double d[3]={0};
+        for(size_t k=0;k<3;k++){
+            d[k]=b[k]-a[k];
+            if(!isfinite(d[k])||!isfinite(uvec[k])||
+               !isfinite(vvec[k]))return 0;
+        }
+        const double dot=uvec[0]*vvec[0]+uvec[1]*vvec[1]+
+                         uvec[2]*vvec[2];
+        const double den=1.0-dot*dot;
+        if(!isfinite(den)||den<=1e-10){
+            sum->rejected_miter_candidates++;continue;
+        }
+        const double p=d[0]*uvec[0]+d[1]*uvec[1]+d[2]*uvec[2];
+        const double q=d[0]*vvec[0]+d[1]*vvec[1]+d[2]*vvec[2];
+        const double v=(dot*p-q)/den,u=p+dot*v;
+        if(!isfinite(u)||!isfinite(v)){
+            sum->rejected_miter_candidates++;continue;
+        }
+        double point[3]={0},extruded[3]={0},err2=0;
+        double scale=1.0+fabs(u)+fabs(v)+fabs(w);
+        for(size_t k=0;k<3;k++){
+            point[k]=a[k]+u*uvec[k];
+            const double other=b[k]+v*vvec[k];
+            const double diff=point[k]-other;
+            extruded[k]=point[k]+thickness*basis->z[k];
+            err2+=diff*diff;
+            scale+=fabs(a[k])+fabs(b[k]);
+            if(!isfinite(point[k])||!isfinite(other)||
+               !isfinite(extruded[k])||!isfinite(err2)||
+               !isfinite(scale)){scale=INFINITY;break;}
+        }
+        if(!isfinite(scale)||sqrt(err2)>1e-10*scale||
+           fabs(u)>limit+1e-10*scale||
+           fabs(v)>limit+1e-10*scale){
+            sum->rejected_miter_candidates++;continue;
+        }
+        for(size_t k=0;k<3;k++){
+            if(point[k]<sum->minimum[k])sum->minimum[k]=point[k];
+            if(point[k]>sum->maximum[k])sum->maximum[k]=point[k];
+            if(extruded[k]<sum->minimum[k])
+                sum->minimum[k]=extruded[k];
+            if(extruded[k]>sum->maximum[k])
+                sum->maximum[k]=extruded[k];
+        }
+        sum->valid_miter_candidates++;
+    }
+    return 1;
+}
 static int lw_envelope_include(
     MusaDwgAc1018LwRibbonBevelWcsEnvelope *dst,
     const double v[3]){
@@ -2750,10 +2815,11 @@ static int lw_envelope_bridge(
     dst->bevel_bridge_count++;
     return 1;
 }
-int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+static int lw_enclose_model_impl(
     const MusaDwgAc1018Scene *s,uint64_t handle,
     double requested_tolerance,uint32_t max_intervals_per_curve,
-    MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope *miter,
+    double miter_limit,MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
     if(!s||!handle||!out||
        scene_output_overlaps(s,out,sizeof(*out))||
        !isfinite(requested_tolerance)||!(requested_tolerance>0.0)||
@@ -2778,6 +2844,13 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
     MusaCoreOcsBasis basis={0};
     if(valid)valid=musa_core_ocs_basis(poly.extrusion,&basis);
     MusaDwgAc1018LwRibbonBevelWcsEnvelope checked={0};
+    if(miter){
+        miter->miter_limit=miter_limit;
+        for(size_t k=0;k<3;k++){
+            miter->minimum[k]=DBL_MAX;
+            miter->maximum[k]=-DBL_MAX;
+        }
+    }
     if(valid){
         checked.handle=handle;
         checked.vertex_count=poly.vertex_count;
@@ -2788,8 +2861,8 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
             checked.minimum[k]=DBL_MAX;
             checked.maximum[k]=-DBL_MAX;
         }
-        double first_start[2][3]={{0}};
-        double previous_end[2][3]={{0}};
+        double first_start[2][3]={{0}},first_tangent[2][3]={{0}};
+        double previous_end[2][3]={{0}},previous_tangent[2][3]={{0}};
         double first_width=0.0,prior_width=0.0;
         const int per_vertex=poly.width_count!=0u;
         const uint32_t n=poly.vertex_count;
@@ -2802,13 +2875,14 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
             const double ew=per_vertex?a->end_width:
                                        poly.constant_width;
             double from[2][3]={{0}},to[2][3]={{0}};
-            double tangent[2][3]={{0}};
+            double tangent[2][3]={{0}},from_tangent[2][3]={{0}};
             double extruded[2][3]={{0}};
             uint8_t curved=0u;
             valid=lw_join_segment_endpoint(
                 a,b,&basis,poly.elevation,poly.thickness,sw,ew,0,
                 from,tangent,extruded,&curved);
             if(!valid)break;
+            memcpy(from_tangent,tangent,sizeof(from_tangent));
             for(size_t side=0u;side<2u&&valid;side++){
                 if(!lw_envelope_include(&checked,from[side])||
                    !lw_envelope_include(&checked,extruded[side]))
@@ -2817,10 +2891,15 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
             if(!valid)break;
             if(i==0u){
                 memcpy(first_start,from,sizeof(first_start));
+                memcpy(first_tangent,from_tangent,sizeof(first_tangent));
                 first_width=sw;
             }else{
                 valid=lw_envelope_bridge(&checked,previous_end,
                                          prior_width,from,sw);
+                if(valid&&miter)
+                    valid=lw_miter_accumulate(miter,previous_end,
+                           previous_tangent,prior_width,
+                           from,from_tangent,sw,&basis,poly.thickness);
                 if(!valid)break;
             }
             uint8_t end_curved=0u;
@@ -2896,11 +2975,18 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
                     checked.maximum_curve_gap=bound.max_outward_gap;
             }
             memcpy(previous_end,to,sizeof(previous_end));
+            memcpy(previous_tangent,tangent,sizeof(previous_tangent));
             prior_width=ew;
         }
-        if(valid&&poly.closed)
+        if(valid&&poly.closed){
             valid=lw_envelope_bridge(&checked,previous_end,
                                     prior_width,first_start,first_width);
+            if(valid&&miter)
+                valid=lw_miter_accumulate(miter,previous_end,
+                           previous_tangent,prior_width,
+                           first_start,first_tangent,first_width,
+                           &basis,poly.thickness);
+        }
         if(valid){
             valid=checked.straight_segments+
                         checked.curved_segments==
@@ -2922,6 +3008,41 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
     }
     free(vertices);
     if(!valid)return 0;
+    if(miter){
+        miter->bevel=checked;
+        for(size_t k=0;k<3;k++){
+            if(checked.minimum[k]<miter->minimum[k])
+                miter->minimum[k]=checked.minimum[k];
+            if(checked.maximum[k]>miter->maximum[k])
+                miter->maximum[k]=checked.maximum[k];
+            if(!isfinite(miter->minimum[k])||
+               !isfinite(miter->maximum[k]))return 0;
+        }
+        miter->bounded_tangent_candidates_enclosed=1u;
+        miter->complete_visible_stroke_verified=0u;
+    }
     *out=checked;
+    return 1;
+}
+int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
+    return lw_enclose_model_impl(s,handle,requested_tolerance,
+                  max_intervals_per_curve,NULL,0.0,out);
+}
+int musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    double miter_limit,MusaDwgAc1018LwRibbonMiterWcsEnvelope *out){
+    if(!s||!out||scene_output_overlaps(s,out,sizeof(*out))||
+       !isfinite(miter_limit)||miter_limit<1.0||miter_limit>100.0)
+        return 0;
+    MusaDwgAc1018LwRibbonMiterWcsEnvelope result={0};
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope baseline={0};
+    if(!lw_enclose_model_impl(s,handle,requested_tolerance,
+                   max_intervals_per_curve,&result,miter_limit,
+                   &baseline))return 0;
+    *out=result;
     return 1;
 }
