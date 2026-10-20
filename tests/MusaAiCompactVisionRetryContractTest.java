@@ -54,6 +54,16 @@ public final class MusaAiCompactVisionRetryContractTest {
         contains(synthesis,"KISMİ; eksik bölgeler hakkında teknik çıkarım yapılmadı.");
 
         contains(client,"visualEvidence==null?MusaAiCadJson.DEFAULT_MAX_ITEMS:650");
+        // Transport resets must be correlated without uploading credentials to logs.
+        contains(client,"MAX_REQUEST_BYTES=3*1024*1024");
+        contains(client,"X-MusaCAD-Request-ID");
+        contains(client,"phase=\"görsel/CAD yüklemesi\"");
+        contains(client,"phase=\"sunucu yanıtını bekleme\"");
+        contains(client,"İstek: ");
+        contains(worker,"MUSACAD_AI_VISUAL_ACCEPTED");
+        contains(worker,"MUSACAD_AI_VISUAL_FAILURE");
+        contains(worker,"MUSACAD_AI_VISUAL_UPSTREAM");
+        contains(worker,"request.headers.get(\"x-musacad-request-id\")");
         contains(worker,"Math.max(1536, Math.min(2048, maxOutputTokens))");
         contains(pilot,"AI_UPSTREAM_TIMEOUT_MS = \"72000\"");
         System.out.println("MusaAiCompactVisionRetryContractTest OK");
