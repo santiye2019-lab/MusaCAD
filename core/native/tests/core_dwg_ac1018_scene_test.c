@@ -528,6 +528,45 @@ int main(void){
            near(join.edge_gap[1],0.0)&&
            near(join.incoming_edge_tangent_wcs[0][0],1.0)&&
            near(join.outgoing_edge_tangent_wcs[0][1],1.0));
+    /* Protected original R2004 open zero-width right-angle junction:
+     * bevel is the exact two coincident source edge endpoints; the
+     * bounded tangent-line miter is also exactly their shared vertex.
+     * None of these candidates implies a rendered join/paint stroke. */
+    MusaDwgAc1018LwJoinCandidates candidate={0};
+    assert(musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,4.0,&candidate));
+    assert(candidate.source.handle==0x40eu&&
+           candidate.source.vertex_index==1u&&
+           near(candidate.miter_limit,4.0)&&
+           !candidate.complete_visible_join_verified);
+    for(size_t side=0u;side<2u;side++){
+        assert(candidate.tangent_miter_valid[side]);
+        for(size_t k=0u;k<3u;k++){
+            assert(near(candidate.bevel_wcs[side][0][k],
+                        candidate.source.incoming_edge_wcs[side][k])&&
+                   near(candidate.bevel_wcs[side][1][k],
+                        candidate.source.outgoing_edge_wcs[side][k])&&
+                   near(candidate.miter_wcs[side][k],
+                        candidate.source.center_wcs[k])&&
+                   near(candidate.miter_thickness_wcs[side][k],
+                        candidate.source.center_wcs[k]));
+        }
+    }
+    const MusaDwgAc1018LwJoinCandidates saved_candidate=candidate;
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,0u,4.0,&candidate));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,0.0,&candidate));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,101.0,&candidate));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,NAN,&candidate));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,4.0,NULL));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x40eu,1u,4.0,
+                  (MusaDwgAc1018LwJoinCandidates*)(void*)s));
+    assert(!memcmp(&saved_candidate,&candidate,sizeof(candidate)));
     const MusaDwgAc1018LwJoinEdgeAudit saved_straight_join=join;
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x40eu,0u,&join));
@@ -1008,6 +1047,69 @@ int main(void){
         assert(near(complex_join.incoming_edge_wcs[0][k],
                     boundary_sample.left_wcs[k]));
     }
+    /* Genuine protected R2004 H=0x42B has mixed curved and tapered
+     * straight edges with signed extrusion. For every one of its 3
+     * joins, bevel bridge points are EXACT source boundary endpoints;
+     * finite miter candidates are bounded tangent intersections, NOT
+     * a claim about DWG rendered join style or round/miter fills. */
+    for(uint32_t vertex=0u;vertex<3u;vertex++){
+        MusaDwgAc1018LwJoinCandidates joined={0};
+        assert(musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x42bu,vertex,8.0,&joined));
+        assert(joined.source.handle==0x42bu&&
+               joined.source.vertex_index==vertex&&
+               !joined.complete_visible_join_verified&&
+               near(joined.miter_limit,8.0));
+        const double allowed=8.0*0.5*fmax(
+                          joined.source.incoming_end_width,
+                          joined.source.outgoing_start_width);
+        for(size_t side=0u;side<2u;side++){
+            for(size_t k=0u;k<3u;k++){
+                assert(near(joined.bevel_wcs[side][0][k],
+                            joined.source.incoming_edge_wcs[side][k])&&
+                       near(joined.bevel_wcs[side][1][k],
+                            joined.source.outgoing_edge_wcs[side][k])&&
+                       near(joined.bevel_thickness_wcs[side][0][k],
+                            joined.source.incoming_edge_thickness_wcs[side][k])&&
+                       near(joined.bevel_thickness_wcs[side][1][k],
+                            joined.source.outgoing_edge_thickness_wcs[side][k]));
+            }
+            if(joined.tangent_miter_valid[side]){
+                assert(fabs(joined.incoming_extension[side])<=
+                       allowed+1e-7&&
+                       fabs(joined.outgoing_extension[side])<=
+                       allowed+1e-7);
+                for(size_t k=0u;k<3u;k++){
+                    const double from_in=
+                       joined.source.incoming_edge_wcs[side][k]+
+                       joined.incoming_extension[side]*
+                       joined.source.incoming_edge_tangent_wcs[side][k];
+                    const double from_out=
+                       joined.source.outgoing_edge_wcs[side][k]+
+                       joined.outgoing_extension[side]*
+                       joined.source.outgoing_edge_tangent_wcs[side][k];
+                    assert(near(joined.miter_wcs[side][k],from_in)&&
+                           near(joined.miter_wcs[side][k],from_out)&&
+                           near(joined.miter_thickness_wcs[side][k]-
+                                joined.miter_wcs[side][k],
+                                k==1u?0.25:0.0));
+                }
+            }
+        }
+    }
+    /* A very small miter budget can reject a spike on either side,
+     * while ALWAYS preserving the source bevel bridge geometry. */
+    MusaDwgAc1018LwJoinCandidates strict_join={0};
+    assert(musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x42bu,1u,1.0,&strict_join));
+    assert(!strict_join.complete_visible_join_verified);
+    assert(near(strict_join.source.center_wcs[1],3.5));
+    const MusaDwgAc1018LwJoinCandidates keep_strict=strict_join;
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,UINT64_C(0xbad),1u,8.0,&strict_join));
+    assert(!musa_dwg_ac1018_scene_lw_join_candidates(
+                  s,0x42bu,3u,8.0,&strict_join));
+    assert(!memcmp(&keep_strict,&strict_join,sizeof(strict_join)));
     const MusaDwgAc1018LwJoinEdgeAudit joined_saved=complex_join;
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x42bu,3u,&complex_join));
