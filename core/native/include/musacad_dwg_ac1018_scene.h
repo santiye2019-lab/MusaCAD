@@ -246,6 +246,48 @@ typedef struct MusaDwgAc1018GeometryLinkEvidence {
 int musa_dwg_ac1018_scene_audit_2d_geometry_vs_links(
     const MusaDwgAc1018Scene *scene,
     MusaDwgAc1018GeometryLinkEvidence *out);
+/* Bounded per-record evidence page from the original indexed AC1018 H
+ * map. This is an OFFLINE diagnostic, not a viewport read hot path.
+ * Preflight verifies the entire scene (CRC, nonoverlapping ranges and
+ * independent 2D geometry/H-role coverage) on EACH page; costly but no
+ * unsupported record may be silently omitted. Returns original indexed
+ * numeric H and BS type, sorted by H; nonentities are not assumed to
+ * be lost drawable geometry, and unsupported types are UNCLASSIFIED.
+ *
+ * Geometry-reader rejection vs fixed-target H-audit rejection are separate
+ * EVIDENCE LIMITS, not precise root causes. Neither is equivalent to a
+ * completely decoded AcDb class, layer style or original screen RGB.
+ * 1..4096 records/page; next_index allows bounded, repeatable traversal.
+ * Source, caller's rows and report are unchanged upon fatal failure.
+ */
+#define MUSA_DWG_AC1018_DIAG_2D_ENTITY 1u
+#define MUSA_DWG_AC1018_DIAG_FIXED_NONENTITY 2u
+#define MUSA_DWG_AC1018_DIAG_UNCLASSIFIED 3u
+#define MUSA_DWG_AC1018_DIAG_GEOMETRY_REJECTED 1u
+#define MUSA_DWG_AC1018_DIAG_LINK_AUDIT_REJECTED 2u
+#define MUSA_DWG_AC1018_DIAG_UNCLASSIFIED_TYPE 4u
+typedef struct MusaDwgAc1018RecordDiagnosis {
+    uint64_t indexed_handle;
+    uint16_t declared_type;
+    uint8_t category;
+    uint8_t geometry_decoded;
+    uint8_t fixed_link_identities_verified;
+    uint8_t evidence_issues;
+} MusaDwgAc1018RecordDiagnosis;
+typedef struct MusaDwgAc1018RecordDiagnosisPage {
+    size_t total_indexed_records;
+    size_t first_index;
+    size_t records_written;
+    size_t next_index;
+    size_t supported_2d_in_page;
+    size_t geometry_rejected_in_page;
+    size_t link_audit_rejected_in_page;
+    size_t unclassified_in_page;
+} MusaDwgAc1018RecordDiagnosisPage;
+int musa_dwg_ac1018_scene_read_record_diagnosis_page(
+    const MusaDwgAc1018Scene *scene,size_t first_index,
+    MusaDwgAc1018RecordDiagnosis *rows,size_t capacity,
+    MusaDwgAc1018RecordDiagnosisPage *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
