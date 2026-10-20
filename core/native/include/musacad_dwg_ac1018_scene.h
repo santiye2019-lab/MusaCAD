@@ -662,6 +662,41 @@ int musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
     MusaDwgAc1018BulgeWidthEdgePoint *out);
 void musa_dwg_ac1018_bulge_edge_snapshot_close(
     MusaDwgAc1018BulgeEdgeSnapshot *snapshot);
+/* Provable interval-arithmetic enclosure of BOTH continuously varying
+ * width-edge curves of ONE original R2004/AC1018 bulge segment, including
+ * either signed OCS thickness endpoint. NOT an endpoint-only/sample-only
+ * bounding box: cover ALL fractions t in [0,1] using analytic extrema
+ * of each projected sinusoid and a bounded radial width interval.
+ *
+ * The returned inner_minimum/inner_maximum are sampled, ACTUAL geometry
+ * witnesses, while minimum/maximum are outward conservative bounds.
+ * max_outward_gap bounds the max component-wise difference between the
+ * outer envelope and its sampled inner witnesses (excluding FP rounding).
+ * If requested_tolerance cannot be achieved within max_intervals,
+ * fail without modifying caller output, never return a false tight bbox.
+ *
+ * This encloses the mathematical VARIABLE-WIDTH ribbon edges only.
+ * Joints/caps/miter/linetype/lineweight/rendered appearance and complete
+ * polyline or full drawing are NOT included. No third-party CAD core.
+ * Snapshot must be valid; does not read original DWG during evaluation.
+ * 16 <= max_intervals <= 65536. tolerance > 0 finite.
+ */
+typedef struct MusaDwgAc1018BulgeEdgeWcsEnvelope {
+    uint64_t handle;
+    uint32_t segment_index;
+    uint32_t intervals_used;
+    double minimum[3];
+    double maximum[3];
+    double inner_minimum[3];
+    double inner_maximum[3];
+    double max_outward_gap;
+    double requested_tolerance;
+    uint8_t full_stroke_verified; /* always 0 */
+} MusaDwgAc1018BulgeEdgeWcsEnvelope;
+int musa_dwg_ac1018_bulge_edge_snapshot_enclose(
+    const MusaDwgAc1018BulgeEdgeSnapshot *snapshot,
+    double requested_tolerance,uint32_t max_intervals,
+    MusaDwgAc1018BulgeEdgeWcsEnvelope *out);
 #ifdef __cplusplus
 }
 #endif
