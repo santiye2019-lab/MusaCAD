@@ -309,6 +309,93 @@ int musa_dwg_ac1018_scene_find_layer_control_membership(
     *out_control_handle=found;
     return 1;
 }
+/* Verify TOTAL numeric LAYER membership for the bounded supported
+ * table grammar. Indexed handles are already ascending, so keep LAYER
+ * handles sorted and use binary lookup for every table H target.
+ * Not a reverse decoded owner-H reference or AcDb class certification.
+ */
+int musa_dwg_ac1018_scene_audit_layer_table_coverage(
+    const MusaDwgAc1018Scene *s,
+    MusaDwgAc1018LayerTableCoverage *out){
+    if(!s||!out||!s->index||!s->objects||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    size_t layer_count=0u,control_count=0u;
+    for(size_t i=0u;i<s->index_count;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe))
+            return 0;
+        if(probe.declared_type==51u)layer_count++;
+        else if(probe.declared_type==50u)control_count++;
+    }
+    if(!layer_count||!control_count||
+       layer_count>SIZE_MAX/sizeof(uint64_t))return 0;
+    uint64_t *layers=(uint64_t*)malloc(layer_count*sizeof(*layers));
+    uint8_t *seen=(uint8_t*)calloc(layer_count,sizeof(*seen));
+    uint64_t *refs=(uint64_t*)malloc(4096u*sizeof(*refs));
+    if(!layers||!seen||!refs){
+        free(layers);free(seen);free(refs);return 0;
+    }
+    int valid=1;
+    size_t next=0u,matched=0u;
+    for(size_t i=0u;i<s->index_count&&valid;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;break;
+        }
+        if(probe.declared_type!=51u)continue;
+        MusaDwgAc1018NonEntityIdentity identity={0};
+        if(!musa_dwg_ac1018_scene_probe_nonentity_identity(
+                 s,probe.handle,&identity)||
+           identity.declared_type!=51u||
+           identity.indexed_handle!=probe.handle||
+           !identity.record_crc_verified||
+           !identity.embedded_self_verified||next>=layer_count){
+            valid=0;break;
+        }
+        layers[next++]=probe.handle;
+    }
+    if(next!=layer_count)valid=0;
+    for(size_t i=0u;i<s->index_count&&valid;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;break;
+        }
+        if(probe.declared_type!=50u)continue;
+        MusaDwgAc1018LayerControlRefs table={0};
+        if(!musa_dwg_ac1018_scene_read_layer_control_refs(
+                 s,probe.handle,refs,4096u,&table)||
+           table.indexed_handle!=probe.handle||
+           !table.crc_verified||!table.embedded_self_verified||
+           !table.supported_handle_roles_verified){
+            valid=0;break;
+        }
+        for(uint32_t j=0u;j<table.entry_count;j++){
+            const uint64_t h=refs[j];
+            size_t lo=0u,hi=layer_count;
+            while(lo<hi){
+                const size_t mid=lo+(hi-lo)/2u;
+                if(layers[mid]<h)lo=mid+1u;
+                else hi=mid;
+            }
+            if(lo==layer_count||layers[lo]!=h||seen[lo]){
+                valid=0;break;
+            }
+            seen[lo]=1u;
+            matched++;
+        }
+    }
+    if(valid&&matched!=layer_count)valid=0;
+    if(valid){
+        MusaDwgAc1018LayerTableCoverage checked={0};
+        checked.indexed_layers=layer_count;
+        checked.indexed_controls=control_count;
+        checked.resolved_layer_references=matched;
+        checked.all_indexed_layers_have_unique_table=1u;
+        *out=checked;
+    }
+    free(refs);free(seen);free(layers);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
