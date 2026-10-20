@@ -182,6 +182,54 @@ int main(void){
         assert(musa_dwg_ac1018_scene_read_curve(s,0x49au,&circle));
         assert(musa_dwg_ac1018_scene_read_curve(s,0x1234u,&arc));
     }
+    /* Analytic extrema on original CRC-protected circles/arcs, NOT
+     * endpoint-only bounds. Circle is XY; ARC normal points along +Y. */
+    MusaDwgAc1018CurveWcsBounds circle_box={0},arc_box={0};
+    assert(musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+                  s,0x49au,&circle_box));
+    assert(circle_box.handle==0x49au&&circle_box.type_code==18u&&
+           near(circle_box.radius,6.75)&&
+           near(circle_box.minimum[0],-4.5)&&
+           near(circle_box.maximum[0],9.0)&&
+           near(circle_box.minimum[1],-15.25)&&
+           near(circle_box.maximum[1],-1.75)&&
+           near(circle_box.minimum[2],0.0)&&
+           near(circle_box.maximum[2],0.0));
+    assert(musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+                  s,0x1234u,&arc_box));
+    assert(arc_box.handle==0x1234u&&arc_box.type_code==17u&&
+           near(arc_box.radius,1.25)&&
+           near(arc_box.center_wcs[0],-3.5)&&
+           near(arc_box.center_wcs[1],-7.125)&&
+           near(arc_box.minimum[0],-3.5-1.25*cos(0.25))&&
+           near(arc_box.maximum[0],-3.5+1.25)&&
+           near(arc_box.minimum[1],-7.125)&&
+           near(arc_box.maximum[1],-7.125)&&
+           near(arc_box.minimum[2],arc_box.center_wcs[2]-1.25)&&
+           near(arc_box.maximum[2],arc_box.center_wcs[2]+1.25));
+    /* Dense independent parametric reference samples lie inside the
+     * exact computed bounds; endpoints alone would miss extrema. */
+    for(unsigned j=0u;j<=1000u;j++){
+        const double a=arc.start_angle+
+            (arc.end_angle-arc.start_angle)*(double)j/1000.0;
+        const double point[3]={
+            arc_box.center_wcs[0]-arc.radius*cos(a),
+            arc_box.center_wcs[1],
+            arc_box.center_wcs[2]+arc.radius*sin(a)};
+        for(unsigned axis=0u;axis<3u;axis++){
+            assert(point[axis]>=arc_box.minimum[axis]-1e-9&&
+                   point[axis]<=arc_box.maximum[axis]+1e-9);
+        }
+    }
+    const MusaDwgAc1018CurveWcsBounds saved_box=arc_box;
+    assert(!musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+                 s,0x1235u,&arc_box));
+    assert(!musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+                 s,0x49au,NULL));
+    assert(!musa_dwg_ac1018_scene_read_curve_wcs_bounds(
+                 s,0x49au,(MusaDwgAc1018CurveWcsBounds*)(void*)s));
+    assert(!memcmp(&arc_box,&saved_box,sizeof(arc_box)));
+
     assert(memcmp(&circle,&saved_circle,sizeof(circle))==0);
     assert(memcmp(&arc,&saved_arc,sizeof(arc))==0);
     assert(!musa_dwg_ac1018_scene_read_curve(s,0u,&arc));
