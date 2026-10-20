@@ -396,6 +396,95 @@ int musa_dwg_ac1018_scene_audit_layer_table_coverage(
     free(refs);free(seen);free(layers);
     return valid;
 }
+typedef struct MusaDwgAc1018PaletteNameRef {
+    const char *name;
+} MusaDwgAc1018PaletteNameRef;
+/* Fixed ASCII case folding avoids locale-dependent layer collisions. */
+static int compare_palette_ascii_names(const void *a,const void *b){
+    const unsigned char *left=(const unsigned char*)
+        ((const MusaDwgAc1018PaletteNameRef*)a)->name;
+    const unsigned char *right=(const unsigned char*)
+        ((const MusaDwgAc1018PaletteNameRef*)b)->name;
+    for(;;){
+        unsigned l=*left++,r=*right++;
+        if(l>='A'&&l<='Z')l+=('a'-'A');
+        if(r>='A'&&r<='Z')r+=('a'-'A');
+        if(l!=r)return (l>r)-(l<r);
+        if(!l)return 0;
+    }
+}
+/* All-or-nothing metadata extraction: require verified global table graph
+ * before accepting ANY LAYER color/name. No guessed screen presentation.
+ * Out-of-memory and unsupported codepages/CMC never produce partial results.
+ */
+int musa_dwg_ac1018_scene_read_verified_layer_palette(
+    const MusaDwgAc1018Scene *s,
+    MusaDwgAc1018LayerColor *layers,size_t capacity,
+    MusaDwgAc1018LayerPaletteReport *out){
+    if(!s||!layers||!out||!capacity||capacity>65536u||
+       capacity>SIZE_MAX/sizeof(*layers)||
+       scene_output_overlaps(s,layers,capacity*sizeof(*layers))||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       overlaps(layers,capacity*sizeof(*layers),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018LayerTableCoverage coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_layer_table_coverage(s,&coverage)||
+       !coverage.all_indexed_layers_have_unique_table||
+       !coverage.indexed_layers||
+       coverage.indexed_layers>capacity||
+       coverage.indexed_layers>65536u||
+       coverage.indexed_layers>
+           SIZE_MAX/sizeof(MusaDwgAc1018PaletteNameRef))
+        return 0;
+    const size_t n=coverage.indexed_layers;
+    MusaDwgAc1018LayerColor *checked=
+        (MusaDwgAc1018LayerColor*)calloc(n,sizeof(*checked));
+    MusaDwgAc1018PaletteNameRef *names=
+        (MusaDwgAc1018PaletteNameRef*)malloc(n*sizeof(*names));
+    if(!checked||!names){free(checked);free(names);return 0;}
+    size_t found=0u;
+    int valid=1;
+    for(size_t i=0u;i<s->index_count&&valid;i++){
+        MusaDwgAc1018RecordProbe probe={0};
+        if(!musa_dwg_ac1018_scene_probe_record_at(s,i,&probe)){
+            valid=0;break;
+        }
+        if(probe.declared_type!=51u)continue;
+        if(found>=n||
+           !musa_dwg_ac1018_scene_read_layer_color(
+                    s,probe.handle,&checked[found])||
+           checked[found].prefix.indexed_handle!=probe.handle||
+           !checked[found].prefix.record_crc_verified||
+           !checked[found].prefix.embedded_self_verified||
+           !checked[found].cmc_data_bits_verified||
+           !checked[found].prefix.name_bytes||
+           !checked[found].prefix.name[0]){
+            valid=0;break;
+        }
+        names[found].name=checked[found].prefix.name;
+        found++;
+    }
+    if(found!=n)valid=0;
+    if(valid){
+        qsort(names,n,sizeof(*names),compare_palette_ascii_names);
+        for(size_t i=1u;i<n;i++){
+            if(compare_palette_ascii_names(&names[i-1u],&names[i])==0){
+                valid=0;break;
+            }
+        }
+    }
+    if(valid){
+        MusaDwgAc1018LayerPaletteReport report={0};
+        report.indexed_layers=n;
+        report.indexed_layer_controls=coverage.indexed_controls;
+        report.unique_ascii_names_verified=1u;
+        report.raw_cmc_fields_verified=1u;
+        memcpy(layers,checked,n*sizeof(*checked));
+        *out=report;
+    }
+    free(names);free(checked);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
