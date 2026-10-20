@@ -86,11 +86,13 @@ static size_t make(uint8_t out[64],uint16_t type,
  * The 80-bit pre-handle section has no geometry; success must not count as
  * decoded LINE coordinates. The final code-5 H points to LAYER 0x11b.
  */
-static size_t make_entity_link_only(uint8_t out[64],int wrong_layer){
+static size_t make_entity_link_only(uint8_t out[64],uint32_t self,int wrong_layer){
     Writer w={0};
     put(&w,2u,1u);byte(&w,19u);  /* declared BS LINE */
     byte(&w,80u);byte(&w,0u);byte(&w,0u);byte(&w,0u); /* RL */
-    byte(&w,0x02u);byte(&w,0x01u);byte(&w,0x20u); /* self H */
+    assert(self==0x120u||self==0x121u);
+    byte(&w,0x02u);byte(&w,(uint8_t)(self>>8u));
+    byte(&w,(uint8_t)self); /* original absolute self H */
     put(&w,2u,2u); /* zero EED */
     put(&w,1u,0u); /* no embedded graphics */
     put(&w,2u,2u); /* entity mode 2 -> no owner H */
@@ -190,27 +192,40 @@ static void construct(uint8_t file[1120],int wrong_layer_self,
         state=state*UINT32_C(0x343fd)+UINT32_C(0x269ec3);
         file[0x80u+i]=(uint8_t)(head[i]^(uint8_t)(state>>16u));
     }
-    uint8_t objs[128]={0},h[16]={0};
+    uint8_t objs[128]={0},h[18]={0};
     /* Mode 5: type-50 table + fully bit-coded, CMC-bearing type-51 LAYER,
      * both in one original protected R2004 section (no fake lookup). */
-    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6);
+    const int table_first=(named_layer==3||named_layer==4||named_layer==5||named_layer==6||named_layer==7);
     const size_t first=make(objs,table_first?50u:51u,
                             wrong_layer_self?0x34u:0x33u,
-                            0,(named_layer==5||named_layer==6)?3:named_layer);
+                            0,(named_layer>=5&&named_layer<=7)?3:named_layer);
     const size_t second=make(objs+first,other_type,
                              wrong_other_self?0x11cu:0x11bu,
-                             0,(named_layer==5||named_layer==6)?2:0);
+                             0,(named_layer>=5&&named_layer<=7)?2:0);
     /* Mode 6: actual 3-record table / CMC LAYER / link-only entity
      * fixture. No materialized/guessed link graph or fake DWG geometry. */
-    const size_t third=named_layer==6?
-        make_entity_link_only(objs+first+second,wrong_layer_self!=0):0u;
-    const size_t total=first+second+third;
+    const size_t third=(named_layer==6||named_layer==7)?
+        make_entity_link_only(objs+first+second,0x120u,
+                              wrong_layer_self!=0):0u;
+    const size_t fourth=named_layer==7?
+        make_entity_link_only(objs+first+second+third,0x121u,0):0u;
+    const size_t total=first+second+third+fourth;
     assert(total<=sizeof(objs)&&first<128u&&first+second<128u);
     h[2]=0x33u;h[3]=0u; /* delta H=0x33 and zero offset */
     h[4]=0xe8u;h[5]=0x01u;h[6]=(uint8_t)first; /* H +232 */
     uint16_t crc=0u;
     size_t hlen=0u;
-    if(named_layer==6){
+    if(named_layer==7){
+        /* Indexed self H sequence: 0x33, 0x11b, 0x120, 0x121. */
+        h[1]=11u;h[7]=5u;h[8]=(uint8_t)second;
+        h[9]=1u;h[10]=(uint8_t)third;
+        assert(musa_core_crc16_arc(0xc0c1u,h,11u,&crc));
+        h[11]=(uint8_t)(crc>>8u);h[12]=(uint8_t)crc;
+        h[13]=0u;h[14]=2u;
+        assert(musa_core_crc16_arc(0xc0c1u,h+13u,2u,&crc));
+        h[15]=(uint8_t)(crc>>8u);h[16]=(uint8_t)crc;
+        hlen=17u;
+    }else if(named_layer==6){
         h[1]=9u;h[7]=5u;h[8]=(uint8_t)second; /* delta H +5 */
         assert(musa_core_crc16_arc(0xc0c1u,h,9u,&crc));
         h[9]=(uint8_t)(crc>>8u);h[10]=(uint8_t)crc;
@@ -661,6 +676,34 @@ int main(void){
            !memcmp(&batch_report,&kept_batch_report,
                    sizeof(kept_batch_report)));
     assert(!memcmp(&entity_layer,&good_entity_layer,sizeof(entity_layer)));
+    musa_dwg_ac1018_scene_close(scene);scene=NULL;
+    /* Two independent entities sharing the same layer: process in
+     * caller-specified order, not sorted H order. A bad SECOND entity must
+     * invalidate the entire batch without changing the first result. */
+    construct(file,0,0,51u,7);
+    assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
+    assert(musa_dwg_ac1018_scene_handle_count(scene)==4u);
+    requested[0]=UINT64_C(0x121);
+    requested[1]=UINT64_C(0x120);
+    assert(musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,2u,batch_links,2u,&batch_report));
+    assert(batch_report.verified_entities==2u&&
+           batch_report.verified_layers==1u&&
+           batch_links[0].entity_handle==UINT64_C(0x121)&&
+           batch_links[1].entity_handle==UINT64_C(0x120)&&
+           batch_links[0].layer_handle==UINT64_C(0x11b)&&
+           batch_links[1].layer_handle==UINT64_C(0x11b)&&
+           batch_links[0].layer_control_handle==UINT64_C(0x33)&&
+           batch_links[1].layer_control_handle==UINT64_C(0x33));
+    const MusaDwgAc1018EntityLayerLink two_good0=batch_links[0];
+    const MusaDwgAc1018EntityLayerLink two_good1=batch_links[1];
+    const MusaDwgAc1018EntityLayerBatchReport two_good_report=batch_report;
+    requested[1]=UINT64_C(0xdead); /* second entity missing */
+    assert(!musa_dwg_ac1018_scene_read_entity_layer_batch(
+                  scene,requested,2u,batch_links,2u,&batch_report));
+    assert(!memcmp(&batch_links[0],&two_good0,sizeof(two_good0))&&
+           !memcmp(&batch_links[1],&two_good1,sizeof(two_good1))&&
+           !memcmp(&batch_report,&two_good_report,sizeof(two_good_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
     /* No false success for a readable name with broken CMC, membership
      * or forged embedded identity. The output must remain unchanged. */
