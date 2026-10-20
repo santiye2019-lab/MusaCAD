@@ -539,6 +539,9 @@ int main(void){
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
                   scene,colors,2u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",&by_name));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
@@ -546,6 +549,9 @@ int main(void){
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(!musa_dwg_ac1018_scene_read_verified_layer_palette(
                   scene,colors,2u,&palette_report));
+    assert(!musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
+                 scene,"MEK0",&by_name));
+    assert(!memcmp(&by_name,&named_keep,sizeof(by_name)));
     assert(!memcmp(&colors[0],&keep0,sizeof(keep0))&&
            !memcmp(&palette_report,&keep_report,sizeof(keep_report)));
     musa_dwg_ac1018_scene_close(scene);scene=NULL;
