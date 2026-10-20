@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1018_curve.h"
 #include "musacad_dwg_ac1018_lwpolyline.h"
 #include "musacad_dwg_ac1018_nonentity.h"
+#include "musacad_dwg_ac1018_layer_control.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,6 +68,15 @@ int musa_dwg_ac1018_scene_read_layer_prefix(
 int musa_dwg_ac1018_scene_read_layer_color(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018LayerColor *out);
+/* Strict one-way R2004 LAYER_CONTROL -> LAYER target verification:
+ * decode exact H tail; check all targets in the CRC-backed native scene,
+ * their type 51 and embedded self-H, and reject duplicate targets.
+ * Fail atomically. NOT a reverse parent graph, AcDb class proof, or parity.
+ */
+int musa_dwg_ac1018_scene_read_layer_control_refs(
+    const MusaDwgAc1018Scene *scene,uint64_t control_handle,
+    uint64_t *entry_handles,size_t capacity,
+    MusaDwgAc1018LayerControlRefs *out);
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *scene,
       uint64_t handle,MusaDwgAc1018Line *out);
 /* Read one CRC-backed ARC (type 17) or CIRCLE (type 18) geometry object
