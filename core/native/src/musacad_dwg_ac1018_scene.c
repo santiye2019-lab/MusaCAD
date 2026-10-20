@@ -533,6 +533,74 @@ int musa_dwg_ac1018_scene_find_verified_layer_ascii_name(
     free(palette);
     return matched;
 }
+/* All-or-nothing entity->LAYER lookup from original indexed R2004 bytes.
+ * Never claim verified primitive coordinates from a header-only fixture.
+ */
+int musa_dwg_ac1018_scene_read_verified_entity_layer(
+    const MusaDwgAc1018Scene *s,uint64_t entity_handle,
+    MusaDwgAc1018EntityLayerEvidence *out){
+    if(!s||!out||!entity_handle||
+       scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018RecordProbe entity={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(
+            s,entity_handle,&entity)||
+       (entity.declared_type!=17u&&entity.declared_type!=18u&&
+        entity.declared_type!=19u&&entity.declared_type!=77u))
+        return 0;
+    MusaDwgAc1018FixedLinkIdentities links={0};
+    if(!musa_dwg_ac1018_scene_audit_fixed_link_identities(
+            s,entity_handle,&links)||
+       !links.verified_fixed_identity_links||
+       links.roles.link_roles.handle!=entity_handle||
+       !links.roles.link_roles.layer_handle||
+       links.layer.indexed_handle!=links.roles.link_roles.layer_handle||
+       !links.layer.embedded_self_verified||
+       !links.layer.record_crc_verified)return 0;
+
+    MusaDwgAc1018LayerTableCoverage coverage={0};
+    if(!musa_dwg_ac1018_scene_audit_layer_table_coverage(s,&coverage)||
+       !coverage.all_indexed_layers_have_unique_table||
+       !coverage.indexed_layers||coverage.indexed_layers>65536u||
+       coverage.indexed_layers>SIZE_MAX/sizeof(MusaDwgAc1018LayerColor))
+        return 0;
+    const size_t count=coverage.indexed_layers;
+    MusaDwgAc1018LayerColor *layers=
+        (MusaDwgAc1018LayerColor*)calloc(count,sizeof(*layers));
+    if(!layers)return 0;
+    MusaDwgAc1018LayerPaletteReport palette={0};
+    MusaDwgAc1018EntityLayerEvidence checked={0};
+    int valid=musa_dwg_ac1018_scene_read_verified_layer_palette(
+                     s,layers,count,&palette)&&
+              palette.indexed_layers==count&&
+              palette.unique_ascii_names_verified&&
+              palette.raw_cmc_fields_verified;
+    if(valid){
+        /* Palette is sorted by numeric handle; enforce exact H identity. */
+        size_t lo=0u,hi=count;
+        const uint64_t target=links.roles.link_roles.layer_handle;
+        while(lo<hi){
+            const size_t m=lo+(hi-lo)/2u;
+            if(layers[m].prefix.indexed_handle<target)lo=m+1u;
+            else hi=m;
+        }
+        if(lo==count||layers[lo].prefix.indexed_handle!=target)valid=0;
+        else checked.layer=layers[lo];
+    }
+    if(valid){
+        if(!musa_dwg_ac1018_scene_find_layer_control_membership(
+                 s,links.roles.link_roles.layer_handle,
+                 &checked.layer_control_handle)||
+           !checked.layer_control_handle)valid=0;
+    }
+    if(valid){
+        checked.entity_handle=entity_handle;
+        checked.fixed_entity_links_verified=1u;
+        checked.complete_layer_table_verified=1u;
+        *out=checked;
+    }
+    free(layers);
+    return valid;
+}
 int musa_dwg_ac1018_scene_read_line(const MusaDwgAc1018Scene *s,
       uint64_t handle,MusaDwgAc1018Line *out){
     if(!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
