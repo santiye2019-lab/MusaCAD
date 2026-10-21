@@ -3737,3 +3737,58 @@ int musa_dwg_ac1018_lw_source_snapshot_read_page(
     *out=page;
     return 1;
 }
+
+
+/* Preserve the original source H/index adjacency, not reconstructed
+ * triangulation vertices. Closing arc consumes LAST original vertex's
+ * bulge/width and targets original vertex 0, with no fake fourth point. */
+int musa_dwg_ac1018_lw_source_snapshot_read_segment(
+    const MusaDwgAc1018LwSourceSnapshot *snap,
+    uint32_t segment_index,MusaDwgAc1018LwSourceSegment *out){
+    if(!snap||!snap->vertices||!out||
+       !snap->source.source_handle||
+       snap->source.vertex_count<2u||
+       snap->source.vertex_count>100000u||
+       snap->source.segment_count!=
+          snap->source.vertex_count-(snap->source.closed?0u:1u)||
+       segment_index>=snap->source.segment_count)
+        return 0;
+    const size_t vertex_bytes=(size_t)snap->source.vertex_count*
+                              sizeof(*snap->vertices);
+    if(overlaps(snap,sizeof(*snap),out,sizeof(*out))||
+       overlaps(snap->vertices,vertex_bytes,out,sizeof(*out)))
+        return 0;
+    const uint32_t i=segment_index;
+    const uint32_t last=i+1u==snap->source.vertex_count;
+    const uint32_t next=last?0u:i+1u;
+    const MusaDwgAc1018LwSourceVertex *a=&snap->vertices[i];
+    const MusaDwgAc1018LwSourceVertex *b=&snap->vertices[next];
+    if(a->original_index!=i||b->original_index!=next||
+       !a->has_outgoing_segment||!snap->source.source_handle)
+        return 0;
+    MusaDwgAc1018LwSourceSegment segment={0};
+    segment.source_handle=snap->source.source_handle;
+    segment.original_segment_index=i;
+    segment.start_vertex_index=i;
+    segment.end_vertex_index=next;
+    segment.original_vertex_count=snap->source.vertex_count;
+    segment.source_color_index=snap->source.color_index;
+    segment.closed=snap->source.closed;
+    segment.wraps_to_first_vertex=(uint8_t)last;
+    segment.widths_from_vertices=snap->source.widths_from_vertices;
+    segment.source_identity_verified=1u;
+    segment.thickness=snap->source.thickness;
+    segment.signed_bulge=a->bulge;
+    segment.source_start_width=a->start_width;
+    segment.source_end_width=a->end_width;
+    for(size_t k=0u;k<2u;k++){
+        segment.start_ocs_xy[k]=a->ocs_xy[k];
+        segment.end_ocs_xy[k]=b->ocs_xy[k];
+    }
+    for(size_t k=0u;k<3u;k++){
+        segment.start_wcs_xyz[k]=a->wcs_xyz[k];
+        segment.end_wcs_xyz[k]=b->wcs_xyz[k];
+    }
+    *out=segment;
+    return 1;
+}
