@@ -1149,12 +1149,12 @@ int main(void){
     MusaDwgAc1018LwRadialBridgeWcsEnvelope whole_round={0};
     assert(musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
                   s,0x42bu,0.02,32768u,&whole_round));
-    assert(whole_round.radial_bridges_enclosed==6u&&
-           whole_round.radial_bridges_rejected==0u&&
-           whole_round.variable_radius_bridges==6u&&
-           whole_round.all_admitted_radial_bridges_enclosed&&
-           !whole_round.complete_visible_stroke_verified&&
-           !memcmp(&whole_round.bevel,&whole_complex,
+    assert(whole_round.radial_bridges_enclosed==6u);
+    assert(whole_round.radial_bridges_rejected==0u);
+    assert(whole_round.variable_radius_bridges==6u);
+    assert(whole_round.all_admitted_radial_bridges_enclosed);
+    assert(!whole_round.complete_visible_stroke_verified);
+    assert(!memcmp(&whole_round.bevel,&whole_complex,
                    sizeof(whole_complex)));
     assert(near(whole_round.minimum[1],3.5)&&
            near(whole_round.maximum[1],3.75));
