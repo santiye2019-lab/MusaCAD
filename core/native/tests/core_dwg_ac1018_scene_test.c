@@ -978,6 +978,96 @@ int main(void){
                   (MusaDwgAc1018BulgeEdgeWcsEnvelope*)
                    (void*)positive_snap));
     assert(!memcmp(&original_box,&posbox,sizeof(posbox)));
+    /* Two true CRC-checked binary R2004 curved LW segments (opposing
+     * signs and variable widths): independently compare every WCS mesh
+     * cross section to the original-source immutable edge snapshots,
+     * then every cell midpoint to the ideal curve. These explicit
+     * 4-triangle-per-cell strip faces were previously unavailable. */
+    for(uint32_t index=0u;index<=2u;index+=2u){
+        MusaDwgAc1018BulgeEdgeSnapshot *snap=
+             index==0u?positive_snap:negative_snap;
+        MusaDwgAc1018BulgeRibbonSection mesh[513]={0};
+        MusaDwgAc1018BulgeRibbonStrip strip={0};
+        assert(musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                    s,0x42bu,index,0.01,512u,mesh,513u,&strip));
+        assert(strip.handle==0x42bu&&strip.segment_index==index&&
+               strip.cell_count>=1u&&strip.cell_count<=512u&&
+               strip.section_count==strip.cell_count+1u&&
+               strip.triangles_per_face==2u*strip.cell_count&&
+               strip.triangles_both_faces==4u*strip.cell_count&&
+               strip.maximum_chord_deviation_bound<=0.01&&
+               !strip.full_visible_stroke_verified);
+        for(uint32_t i=0u;i<=strip.cell_count;i++){
+            const double t=(double)i/(double)strip.cell_count;
+            MusaDwgAc1018BulgeWidthEdgePoint e={0};
+            assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                          snap,t,&e));
+            const double *expected[4]={
+                  e.left_wcs,e.right_wcs,
+                  e.left_thickness_wcs,e.right_thickness_wcs};
+            const double *got[4]={
+                  mesh[i].left_wcs,mesh[i].right_wcs,
+                  mesh[i].left_thickness_wcs,mesh[i].right_thickness_wcs};
+            for(size_t edge=0u;edge<4u;edge++)
+                for(size_t k=0u;k<3u;k++)
+                    assert(near(got[edge][k],expected[edge][k])&&
+                           got[edge][k]>=strip.minimum[k]-1e-9&&
+                           got[edge][k]<=strip.maximum[k]+1e-9);
+            if(i==strip.cell_count)continue;
+            MusaDwgAc1018BulgeWidthEdgePoint mid={0};
+            const double midpoint=((double)i+0.5)/
+                                     (double)strip.cell_count;
+            assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                          snap,midpoint,&mid));
+            const double *truth[2]={mid.left_wcs,mid.right_wcs};
+            const double *m0[2]={mesh[i].left_wcs,
+                                   mesh[i].right_wcs};
+            const double *m1[2]={mesh[i+1u].left_wcs,
+                                   mesh[i+1u].right_wcs};
+            for(size_t side=0u;side<2u;side++){
+                double error2=0.0;
+                for(size_t k=0u;k<3u;k++){
+                    const double interp=0.5*(m0[side][k]+
+                                              m1[side][k]);
+                    error2+=(interp-truth[side][k])*
+                            (interp-truth[side][k]);
+                }
+                assert(sqrt(error2)<=
+                        strip.maximum_chord_deviation_bound+1e-9);
+            }
+        }
+        MusaDwgAc1018BulgeRibbonSection sentinel[2]={0};
+        sentinel[0].left_wcs[0]=321.0;
+        const MusaDwgAc1018BulgeRibbonStrip saved_strip=strip;
+        assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                     s,0x42bu,index,1e-12,1u,sentinel,2u,&strip));
+        assert(near(sentinel[0].left_wcs[0],321.0)&&
+               !memcmp(&strip,&saved_strip,sizeof(strip)));
+    }
+    MusaDwgAc1018BulgeRibbonSection invalid_mesh[513]={0};
+    MusaDwgAc1018BulgeRibbonStrip invalid_strip={0};
+    invalid_mesh[0].left_wcs[0]=678.0;
+    invalid_strip.handle=UINT64_C(0xabcd);
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x40eu,0u,0.01,512u,invalid_mesh,513u,
+                &invalid_strip)); /* original straight only */
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x42bu,1u,0.01,512u,invalid_mesh,513u,
+                &invalid_strip)); /* selected straight segment */
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x42bu,0u,NAN,512u,invalid_mesh,513u,
+                &invalid_strip));
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x42bu,0u,0.01,512u,invalid_mesh,1u,
+                &invalid_strip));
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x42bu,0u,0.01,512u,NULL,513u,
+                &invalid_strip));
+    assert(!musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+                s,0x42bu,0u,0.01,512u,invalid_mesh,513u,
+                (MusaDwgAc1018BulgeRibbonStrip*)(void*)s));
+    assert(near(invalid_mesh[0].left_wcs[0],678.0)&&
+           invalid_strip.handle==UINT64_C(0xabcd));
     MusaDwgAc1018BulgeWidthEdgePoint immutable_sample={0};
     assert(musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
                   positive_snap,0.5,&immutable_sample));
