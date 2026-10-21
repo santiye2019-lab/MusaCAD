@@ -190,6 +190,46 @@ int main(void){
     MusaDwgAc1018Scene *s=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
     assert(s!=NULL&&musa_dwg_ac1018_scene_handle_count(s)==2u);
+    /* Genuine CRC-backed AC1018 indexed OPEN H=0x40e. Source vertex
+     * geometry paged independently of renderer, complete original XYZ
+     * and end-vertex segment exclusion. No repeated DWG parsing. */
+    MusaDwgAc1018LwSourceSnapshot *open_source=NULL;
+    assert(musa_dwg_ac1018_scene_create_lw_source_snapshot(
+                 s,0x40eu,&open_source)&&open_source);
+    MusaDwgAc1018LwSourceVertex open_row[2]={{0}};
+    MusaDwgAc1018LwSourcePage open_page={0};
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 open_source,0u,open_row,2u,&open_page));
+    assert(open_page.source_handle==0x40eu&&
+           open_page.vertex_count==3u&&open_page.segment_count==2u&&
+           !open_page.closed&&!open_page.widths_from_vertices&&
+           open_page.vertices_written==2u&&open_page.next_index==2u&&
+           !open_page.full_dwg_semantics_verified);
+    assert(open_row[0].original_index==0u&&
+           near(open_row[0].wcs_xyz[0],0.0)&&
+           near(open_row[1].wcs_xyz[0],12.5)&&
+           open_row[0].has_outgoing_segment);
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 open_source,2u,open_row,2u,&open_page));
+    assert(open_page.vertices_written==1u&&open_page.next_index==3u&&
+           open_row[0].original_index==2u&&
+           near(open_row[0].wcs_xyz[0],12.5)&&
+           near(open_row[0].wcs_xyz[1],10.0)&&
+           !open_row[0].has_outgoing_segment);
+    const MusaDwgAc1018LwSourcePage saved_open_page=open_page;
+    open_row[0].ocs_xy[0]=987.0;
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 open_source,3u,open_row,2u,&open_page));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 open_source,0u,open_row,4097u,&open_page));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 open_source,0u,open_row,2u,
+                 (MusaDwgAc1018LwSourcePage*)(void*)open_row));
+    assert(open_row[0].ocs_xy[0]==987.0&&
+           !memcmp(&saved_open_page,&open_page,sizeof(open_page)));
+    musa_dwg_ac1018_lw_source_snapshot_close(open_source);
+    assert(!musa_dwg_ac1018_scene_create_lw_source_snapshot(
+                 s,0x70fu,&open_source)); /* LINE, never LW */
     MusaDwgAc1018RecordRangeAudit layout={0};
     assert(musa_dwg_ac1018_scene_audit_record_ranges(s,&layout));
     assert(layout.indexed_records==2u&&
@@ -815,6 +855,53 @@ int main(void){
            complex_poly.width_count==3u&&
            near(complex_vertices[0].bulge,0.5)&&
            near(complex_vertices[2].bulge,-0.25));
+    /* Source-accurate THREE original CLOSED vertices. Keep the whole
+     * vertex graph's OCS/WCS and bulge/width semantics independently
+     * accessible after native DWG scene_close. */
+    MusaDwgAc1018LwSourceSnapshot *closed_source=NULL;
+    assert(musa_dwg_ac1018_scene_create_lw_source_snapshot(
+                 s,0x42bu,&closed_source)&&closed_source);
+    MusaDwgAc1018LwSourceVertex closed_rows[4]={{0}};
+    MusaDwgAc1018LwSourcePage closed_page={0};
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 closed_source,0u,closed_rows,4u,&closed_page));
+    assert(closed_page.source_handle==0x42bu&&
+           closed_page.vertex_count==3u&&closed_page.segment_count==3u&&
+           closed_page.closed&&closed_page.widths_from_vertices&&
+           closed_page.vertices_written==3u&&closed_page.next_index==3u&&
+           near(closed_page.thickness,0.25)&&
+           !closed_page.full_dwg_semantics_verified);
+    for(uint32_t i=0u;i<3u;i++){
+        double expected[3]={0};
+        assert(musa_dwg_ac1018_lwpolyline_vertex_to_wcs(
+                    &complex_poly,&complex_vertices[i],expected));
+        assert(closed_rows[i].original_index==i&&
+               closed_rows[i].has_outgoing_segment&&
+               near(closed_rows[i].ocs_xy[0],complex_vertices[i].x)&&
+               near(closed_rows[i].ocs_xy[1],complex_vertices[i].y)&&
+               near(closed_rows[i].bulge,complex_vertices[i].bulge)&&
+               near(closed_rows[i].start_width,
+                    complex_vertices[i].start_width)&&
+               near(closed_rows[i].end_width,
+                    complex_vertices[i].end_width));
+        for(size_t k=0u;k<3u;k++)
+            assert(near(closed_rows[i].wcs_xyz[k],expected[k]));
+    }
+    const MusaDwgAc1018LwSourcePage saved_closed_page=closed_page;
+    closed_rows[0].wcs_xyz[0]=654.0;
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 closed_source,0u,closed_rows,4u,
+                 (MusaDwgAc1018LwSourcePage*)(void*)closed_rows));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 closed_source,0u,
+                 (MusaDwgAc1018LwSourceVertex*)(void*)closed_source,
+                 4u,&closed_page));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 closed_source,0u,closed_rows,0u,&closed_page));
+    assert(!musa_dwg_ac1018_scene_create_lw_source_snapshot(
+                 s,0x70fu,&closed_source)); /* missing source handle */
+    assert(closed_rows[0].wcs_xyz[0]==654.0&&
+           !memcmp(&saved_closed_page,&closed_page,sizeof(closed_page)));
     /* True ORIGINAL binary R2004 bulge width edges. The variable-width
      * normal follows the ARC TANGENT at each fractional sweep, rather
      * than a chord normal or concentric fixed-radius arc approximation.
@@ -1724,6 +1811,17 @@ int main(void){
     assert(!memcmp(&original_bulge,&retained_bulge,
                    sizeof(original_bulge)));
     musa_dwg_ac1018_scene_close(s);
+    /* Original binary scene can be closed before a page is requested.
+     * Immutable source vertices remain valid, no borrowed source bytes. */
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_page(
+                 closed_source,1u,closed_rows,2u,&closed_page));
+    assert(closed_page.first_index==1u&&
+           closed_page.vertices_written==2u&&closed_page.next_index==3u&&
+           closed_rows[0].original_index==1u&&
+           closed_rows[1].original_index==2u&&
+           closed_rows[1].has_outgoing_segment);
+    musa_dwg_ac1018_lw_source_snapshot_close(closed_source);
+    musa_dwg_ac1018_lw_source_snapshot_close(NULL);
     /* Original protected DWG/scene is gone: cached WCS edges are
      * independent and remain byte-for-byte stable across reads. */
     MusaDwgAc1018BulgeWidthEdgePoint after_close={0};
