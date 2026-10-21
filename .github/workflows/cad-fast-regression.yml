@@ -13,6 +13,8 @@ on:
       - 'docs/MUSACAD_AC1018_2D_INGEST_PROGRESS.json'
       - 'docs/AUTOCAD_2026_PARITY_MATRIX.json'
       - 'docs/AUTOCAD_2026_ACCEPTANCE_51.json'
+      - 'docs/AUTOCAD_2027_TARGET.json'
+      - 'docs/AUTOCAD_2027_ROADMAP.md'
       - 'docs/autocad2026_evidence/**'
       - 'docs/AUTOCAD_2026_COMMAND_CATALOG.json'
       - '.github/workflows/cad-fast-regression.yml'
@@ -580,6 +582,10 @@ jobs:
           javac -d /tmp/musacad-autocad2026-router-smoke app/src/main/java/com/musa/cad/CadCommand.java tests/AutoCAD2026CommandRouterSmokeTest.java
           java -cp /tmp/musacad-autocad2026-router-smoke AutoCAD2026CommandRouterSmokeTest
           echo 'Parsing command names is NOT equivalent to working AutoCAD 2026 operations.'
+      - name: AutoCAD 2027 target invariants and verified evidence guard
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_autocad_2027_target.py' -v
       - name: CAD progress and AutoCAD 2026 parity claims audit
         run: |
           set -euo pipefail
