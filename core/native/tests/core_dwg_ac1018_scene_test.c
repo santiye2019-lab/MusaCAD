@@ -1036,6 +1036,57 @@ int main(void){
                         strip.maximum_chord_deviation_bound+1e-9);
             }
         }
+        /* Extrude the genuine original signed-bulge source sections
+         * into explicitly indexed base/top, left/right wall and endcap
+         * triangles. No guessed DWG joins, no source mutation. */
+        uint32_t shell_faces[8u*512u+4u][3]={{0}};
+        MusaDwgAc1018BulgeRibbonIndexedShell shell={0};
+        assert(musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+                    mesh,&strip,shell_faces,8u*512u+4u,&shell));
+        assert(shell.source_handle==0x42bu&&
+               shell.source_segment_index==index&&
+               shell.vertex_count==4u*(strip.cell_count+1u)&&
+               shell.triangle_count==8u*strip.cell_count+4u&&
+               shell.base_triangles==2u*strip.cell_count&&
+               shell.translated_triangles==2u*strip.cell_count&&
+               shell.left_wall_triangles==2u*strip.cell_count&&
+               shell.right_wall_triangles==2u*strip.cell_count&&
+               shell.endpoint_triangles==4u&&
+               !shell.full_visible_stroke_verified&&
+               !shell.global_watertightness_verified);
+        assert(near(shell.signed_extrusion_offset_wcs[0],0.0)&&
+               near(shell.signed_extrusion_offset_wcs[1],0.25)&&
+               near(shell.signed_extrusion_offset_wcs[2],0.0));
+        for(uint32_t face=0u;face<shell.triangle_count;face++)
+            for(size_t corner=0u;corner<3u;corner++)
+                assert(shell_faces[face][corner]<shell.vertex_count);
+        assert(shell_faces[0][0]==0u&&
+               shell_faces[0][1]==4u&&
+               shell_faces[0][2]==1u);
+        assert(shell_faces[8u*strip.cell_count][0]==0u&&
+               shell_faces[8u*strip.cell_count][1]==1u&&
+               shell_faces[8u*strip.cell_count][2]==2u);
+        assert(shell_faces[shell.triangle_count-1u][0]==
+                   4u*strip.cell_count+1u);
+        const MusaDwgAc1018BulgeRibbonIndexedShell saved_shell=shell;
+        shell_faces[0][0]=UINT32_C(56789);
+        assert(!musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+                    mesh,&strip,shell_faces,1u,&shell));
+        assert(shell_faces[0][0]==UINT32_C(56789)&&
+               !memcmp(&shell,&saved_shell,sizeof(shell)));
+        MusaDwgAc1018BulgeRibbonSection malformed[513]={{0}};
+        memcpy(malformed,mesh,strip.section_count*sizeof(mesh[0]));
+        malformed[0].right_thickness_wcs[1]+=0.125;
+        assert(!musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+                    malformed,&strip,shell_faces,8u*512u+4u,&shell));
+        assert(shell_faces[0][0]==UINT32_C(56789)&&
+               !memcmp(&shell,&saved_shell,sizeof(shell)));
+        assert(!musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+                    mesh,&strip,(uint32_t (*)[3])(void*)mesh,
+                    8u*512u+4u,&shell));
+        assert(!musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+                    mesh,&strip,shell_faces,8u*512u+4u,NULL));
+        assert(!memcmp(&shell,&saved_shell,sizeof(shell)));
         MusaDwgAc1018BulgeRibbonSection sentinel[2]={0};
         sentinel[0].left_wcs[0]=321.0;
         const MusaDwgAc1018BulgeRibbonStrip saved_strip=strip;
