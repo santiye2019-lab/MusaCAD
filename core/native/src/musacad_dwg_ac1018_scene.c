@@ -162,6 +162,38 @@ int musa_dwg_ac1018_scene_probe_record_handle(
     return musa_dwg_ac1018_scene_probe_record_at(s,lo,out);
 }
 
+/* Retain all indexed binary records, including unknown declared types,
+ * using the exact already CRC-verified section framing. Never interpret
+ * unknown data as geometry or invent a reconstructed class graph. */
+int musa_dwg_ac1018_scene_copy_verified_record(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint8_t *bytes,size_t capacity,size_t *out_written,
+    MusaDwgAc1018RecordProbe *out_evidence){
+    if(!s||!s->objects||!s->index||!handle||!bytes||
+       !capacity||!out_written||!out_evidence||
+       capacity>SIZE_MAX/sizeof(*bytes)||
+       scene_output_overlaps(s,bytes,capacity)||
+       scene_output_overlaps(s,out_written,sizeof(*out_written))||
+       scene_output_overlaps(s,out_evidence,sizeof(*out_evidence))||
+       overlaps(bytes,capacity,out_written,sizeof(*out_written))||
+       overlaps(bytes,capacity,out_evidence,sizeof(*out_evidence))||
+       overlaps(out_written,sizeof(*out_written),
+                out_evidence,sizeof(*out_evidence)))
+        return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       !record.record_crc_verified||
+       record.object_offset>SIZE_MAX||
+       (size_t)record.object_offset>s->object_bytes||
+       record.record_bytes>s->object_bytes-(size_t)record.object_offset||
+       record.record_bytes>capacity)return 0;
+    const uint8_t *original=s->objects+(size_t)record.object_offset;
+    memcpy(bytes,original,record.record_bytes);
+    *out_written=record.record_bytes;
+    *out_evidence=record;
+    return 1;
+}
+
 /* Stable, sorted 64-bit self handles from CRC-checked page deltas. */
 static int get_offset(const MusaDwgAc1018Scene *s,uint64_t handle,
                       size_t *offset){
