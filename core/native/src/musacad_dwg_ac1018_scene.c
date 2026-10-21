@@ -2779,6 +2779,95 @@ static int lw_miter_accumulate(
     }
     return 1;
 }
+/* Conservative full continuous WCS coverage of one mathematical
+ * radial-arc bridge between actual adjacent source edge endpoints.
+ * Variable widths interpolate linearly; angles take shortest OCS path.
+ * No assertion of Autodesk-selected round join or painted fill. */
+static int lw_radial_bridge_accumulate(
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope *box,
+    const double incoming[2][3],double incoming_width,
+    const double following[2][3],double following_width,
+    const double vertex_xy[2],const MusaCoreOcsBasis *basis,
+    double elevation,double thickness){
+    if(!box||!incoming||!following||!vertex_xy||!basis||
+       !isfinite(incoming_width)||!isfinite(following_width)||
+       incoming_width<0.0||following_width<0.0)return 0;
+    double center[3]={0};
+    if(!musa_core_ocs_to_world(basis,vertex_xy,elevation,center)||
+       !finite_vec3(center))return 0;
+    const double r0=0.5*incoming_width,r1=0.5*following_width;
+    for(size_t side=0u;side<2u;side++){
+        if(!(r0>0.0)||!(r1>0.0)){
+            box->radial_bridges_rejected++;continue;
+        }
+        double dr[2][2]={{0}};
+        const double *p[2]={incoming[side],following[side]};
+        const double radii[2]={r0,r1};
+        for(size_t j=0u;j<2u;j++){
+            double wcs[3]={0};
+            for(size_t k=0u;k<3u;k++)wcs[k]=p[j][k]-center[k];
+            dr[j][0]=wcs[0]*basis->x[0]+wcs[1]*basis->x[1]+
+                     wcs[2]*basis->x[2];
+            dr[j][1]=wcs[0]*basis->y[0]+wcs[1]*basis->y[1]+
+                     wcs[2]*basis->y[2];
+            const double rr=hypot(dr[j][0],dr[j][1]);
+            const double tol=1e-9*
+                        (1.0+radii[j]+fabs(center[0])+
+                         fabs(center[1])+fabs(center[2]));
+            if(!isfinite(rr)||!isfinite(tol)||
+               fabs(rr-radii[j])>tol)return 0;
+        }
+        const double angle0=atan2(dr[0][1],dr[0][0]);
+        const double angle1=atan2(dr[1][1],dr[1][0]);
+        const double delta=angle1-angle0;
+        const double sweep=atan2(sin(delta),cos(delta));
+        if(!isfinite(sweep)||
+           fabs(sweep)>=acos(-1.0)-1e-12){
+            box->radial_bridges_rejected++;continue;
+        }
+        if(fabs(r1-r0)>1e-10*(1.0+r0+r1))
+            box->variable_radius_bridges++;
+        /* Each independent harmonic×radial interval product encloses
+         * EVERY intermediate point; 64 pieces sharpen the conservative
+         * box and never substitute sampled points for true extrema. */
+        for(uint32_t i=0u;i<64u;i++){
+            const double t0=(double)i/64.0,t1=(double)(i+1u)/64.0;
+            const double a0=angle0+sweep*t0;
+            const double a1=angle0+sweep*t1;
+            const double rt0=(1.0-t0)*r0+t0*r1;
+            const double rt1=(1.0-t1)*r0+t1*r1;
+            const double rl=fmin(rt0,rt1),rh=fmax(rt0,rt1);
+            for(size_t k=0u;k<3u;k++){
+                double hlo=0.0,hhi=0.0;
+                if(!arc_axis_harmonic_range(
+                        basis->x[k],basis->y[k],a0,a1,&hlo,&hhi))
+                    return 0;
+                const double v[4]={rl*hlo,rl*hhi,rh*hlo,rh*hhi};
+                double lo=v[0],hi=v[0];
+                for(size_t j=0u;j<4u;j++){
+                    if(!isfinite(v[j]))return 0;
+                    if(v[j]<lo)lo=v[j];
+                    if(v[j]>hi)hi=v[j];
+                }
+                const double shift=thickness*basis->z[k];
+                const double mn=center[k]+lo+fmin(0.0,shift);
+                const double mx=center[k]+hi+fmax(0.0,shift);
+                const double guard=256.0*DBL_EPSILON*
+                          (1.0+fabs(center[k])+fabs(mn)+fabs(mx)+
+                           fabs(rh)+fabs(shift));
+                if(!isfinite(mn)||!isfinite(mx)||
+                   !isfinite(guard)||!isfinite(mn-guard)||
+                   !isfinite(mx+guard))return 0;
+                if(mn-guard<box->minimum[k])
+                    box->minimum[k]=mn-guard;
+                if(mx+guard>box->maximum[k])
+                    box->maximum[k]=mx+guard;
+            }
+        }
+        box->radial_bridges_enclosed++;
+    }
+    return 1;
+}
 static int lw_envelope_include(
     MusaDwgAc1018LwRibbonBevelWcsEnvelope *dst,
     const double v[3]){
@@ -2819,7 +2908,9 @@ static int lw_enclose_model_impl(
     const MusaDwgAc1018Scene *s,uint64_t handle,
     double requested_tolerance,uint32_t max_intervals_per_curve,
     MusaDwgAc1018LwRibbonMiterWcsEnvelope *miter,
-    double miter_limit,MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
+    double miter_limit,
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope *radial,
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
     if(!s||!handle||!out||
        scene_output_overlaps(s,out,sizeof(*out))||
        !isfinite(requested_tolerance)||!(requested_tolerance>0.0)||
@@ -2851,6 +2942,12 @@ static int lw_enclose_model_impl(
             miter->maximum[k]=-DBL_MAX;
         }
     }
+    if(radial){
+        for(size_t k=0u;k<3u;k++){
+            radial->minimum[k]=DBL_MAX;
+            radial->maximum[k]=-DBL_MAX;
+        }
+    }
     if(valid){
         checked.handle=handle;
         checked.vertex_count=poly.vertex_count;
@@ -2862,6 +2959,7 @@ static int lw_enclose_model_impl(
             checked.maximum[k]=-DBL_MAX;
         }
         double first_start[2][3]={{0}},first_tangent[2][3]={{0}};
+        double first_vertex_xy[2]={0};
         double previous_end[2][3]={{0}},previous_tangent[2][3]={{0}};
         double first_width=0.0,prior_width=0.0;
         const int per_vertex=poly.width_count!=0u;
@@ -2892,10 +2990,18 @@ static int lw_enclose_model_impl(
             if(i==0u){
                 memcpy(first_start,from,sizeof(first_start));
                 memcpy(first_tangent,from_tangent,sizeof(first_tangent));
+                first_vertex_xy[0]=a->x;
+                first_vertex_xy[1]=a->y;
                 first_width=sw;
             }else{
                 valid=lw_envelope_bridge(&checked,previous_end,
                                          prior_width,from,sw);
+                if(valid&&radial){
+                    const double xy[2]={a->x,a->y};
+                    valid=lw_radial_bridge_accumulate(radial,
+                               previous_end,prior_width,from,sw,
+                               xy,&basis,poly.elevation,poly.thickness);
+                }
                 if(valid&&miter)
                     valid=lw_miter_accumulate(miter,previous_end,
                            previous_tangent,prior_width,
@@ -2981,6 +3087,11 @@ static int lw_enclose_model_impl(
         if(valid&&poly.closed){
             valid=lw_envelope_bridge(&checked,previous_end,
                                     prior_width,first_start,first_width);
+            if(valid&&radial)
+                valid=lw_radial_bridge_accumulate(radial,
+                           previous_end,prior_width,
+                           first_start,first_width,first_vertex_xy,
+                           &basis,poly.elevation,poly.thickness);
             if(valid&&miter)
                 valid=lw_miter_accumulate(miter,previous_end,
                            previous_tangent,prior_width,
@@ -3021,6 +3132,19 @@ static int lw_enclose_model_impl(
         miter->bounded_tangent_candidates_enclosed=1u;
         miter->complete_visible_stroke_verified=0u;
     }
+    if(radial){
+        radial->bevel=checked;
+        for(size_t k=0u;k<3u;k++){
+            if(checked.minimum[k]<radial->minimum[k])
+                radial->minimum[k]=checked.minimum[k];
+            if(checked.maximum[k]>radial->maximum[k])
+                radial->maximum[k]=checked.maximum[k];
+            if(!isfinite(radial->minimum[k])||
+               !isfinite(radial->maximum[k]))return 0;
+        }
+        radial->all_admitted_radial_bridges_enclosed=1u;
+        radial->complete_visible_stroke_verified=0u;
+    }
     *out=checked;
     return 1;
 }
@@ -3029,7 +3153,7 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
     double requested_tolerance,uint32_t max_intervals_per_curve,
     MusaDwgAc1018LwRibbonBevelWcsEnvelope *out){
     return lw_enclose_model_impl(s,handle,requested_tolerance,
-                  max_intervals_per_curve,NULL,0.0,out);
+                  max_intervals_per_curve,NULL,0.0,NULL,out);
 }
 int musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
     const MusaDwgAc1018Scene *s,uint64_t handle,
@@ -3042,7 +3166,21 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
     MusaDwgAc1018LwRibbonBevelWcsEnvelope baseline={0};
     if(!lw_enclose_model_impl(s,handle,requested_tolerance,
                    max_intervals_per_curve,&result,miter_limit,
-                   &baseline))return 0;
+                   NULL,&baseline))return 0;
     *out=result;
+    return 1;
+}
+
+int musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope *out){
+    if(!s||!out||scene_output_overlaps(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope evaluated={0};
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope base={0};
+    if(!lw_enclose_model_impl(s,handle,requested_tolerance,
+                  max_intervals_per_curve,NULL,0.0,&evaluated,
+                  &base))return 0;
+    *out=evaluated;
     return 1;
 }

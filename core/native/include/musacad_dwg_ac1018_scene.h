@@ -849,6 +849,38 @@ int musa_dwg_ac1018_scene_enclose_lw_ribbon_miter_wcs(
     double requested_tolerance,uint32_t max_intervals_per_curve,
     double miter_limit,MusaDwgAc1018LwRibbonMiterWcsEnvelope *out);
 
+/* Independent first-party ideal RADIAL JOIN connector WCS enclosure.
+ * Original R2004 LWPOLYLINE decoded just once. Both true incoming and
+ * outgoing variable-width source EDGE endpoints are used to construct
+ * shortest-angle radial interpolants around the original vertex. Each
+ * connector has r(t)=(1-t)*incomingWidth/2+t*outgoingWidth/2 and a
+ * linearly swept OCS angle. A constant width gives a circular sector;
+ * discontinuous widths produce a NONCIRCULAR radial transition.
+ *
+ * Its continuous WCS bounds are conservative harmonic/linear interval
+ * arithmetic on 64 subintervals, including signed thickness. It is a
+ * MODEL OF POSSIBLE round/radial bridges, NOT evidence that original DWG
+ * uses the same round-join style or cap/lineweight/linetype/fill policy.
+ * Zero width, near-antipodal or malformed bridges are rejected and the
+ * base source bevel coverage stays intact. Both LEFT and RIGHT options
+ * are included; a renderer may later choose the outer side by policy.
+ * Original source is CRC verified. No per-junction source DWG re-read.
+ */
+typedef struct MusaDwgAc1018LwRadialBridgeWcsEnvelope {
+    MusaDwgAc1018LwRibbonBevelWcsEnvelope bevel;
+    uint32_t radial_bridges_enclosed;
+    uint32_t radial_bridges_rejected;
+    uint32_t variable_radius_bridges;
+    double minimum[3];
+    double maximum[3];
+    uint8_t all_admitted_radial_bridges_enclosed; /* 1 */
+    uint8_t complete_visible_stroke_verified; /* always 0 */
+} MusaDwgAc1018LwRadialBridgeWcsEnvelope;
+int musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    double requested_tolerance,uint32_t max_intervals_per_curve,
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope *out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -620,6 +620,31 @@ int main(void){
                 s,0x40eu,0.02,32768u,4.0,
                 (MusaDwgAc1018LwRibbonMiterWcsEnvelope*)(void*)s));
     assert(!memcmp(&keep_open_miter,&open_miter,sizeof(open_miter)));
+    /* Original H=0x40E open source has no width: radial arcs cannot
+     * be identified, so all degenerate corners fall back to bevel.
+     * The baseline model and its exact WCS boundaries stay identical. */
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope open_round={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x40eu,0.02,32768u,&open_round));
+    assert(open_round.radial_bridges_enclosed==0u&&
+           open_round.radial_bridges_rejected==2u&&
+           open_round.variable_radius_bridges==0u&&
+           open_round.all_admitted_radial_bridges_enclosed&&
+           !open_round.complete_visible_stroke_verified&&
+           !memcmp(&open_round.bevel,&whole_open,sizeof(whole_open)));
+    for(size_t k=0u;k<3u;k++){
+        assert(near(open_round.minimum[k],whole_open.minimum[k])&&
+               near(open_round.maximum[k],whole_open.maximum[k]));
+    }
+    const MusaDwgAc1018LwRadialBridgeWcsEnvelope keep_open_round=open_round;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x40eu,NAN,32768u,&open_round));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x40eu,0.02,32768u,NULL));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x40eu,0.02,32768u,
+                  (MusaDwgAc1018LwRadialBridgeWcsEnvelope*)(void*)s));
+    assert(!memcmp(&keep_open_round,&open_round,sizeof(open_round)));
     const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_open=whole_open;
     assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
                 s,0x70fu,0.02,32768u,&whole_open));
@@ -1117,6 +1142,80 @@ int main(void){
                  s,0x42bu,0.02,32768u,8.0,
                  (MusaDwgAc1018LwRibbonMiterWcsEnvelope*)(void*)s));
     assert(!memcmp(&kept_miter,&whole_miter,sizeof(whole_miter)));
+    /* R2004 original closed H=0x42B: 3 joints * 2 sides, all variable
+     * source radii. Independent dense intermediate source-edge connector
+     * points must lie inside the analytic harmonic-interval WCS envelope,
+     * with signed thickness Y=3.50..3.75. Not an AutoCAD join policy. */
+    MusaDwgAc1018LwRadialBridgeWcsEnvelope whole_round={0};
+    assert(musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x42bu,0.02,32768u,&whole_round));
+    /* Exactly six source side transitions are CONSIDERED. A genuine
+     * source zero-width or antipodal side is fail-closed and stays under
+     * the original bevel envelope instead of fabricating a round arc. */
+    assert(whole_round.radial_bridges_enclosed+
+           whole_round.radial_bridges_rejected==6u);
+    assert(whole_round.radial_bridges_enclosed>=1u);
+    assert(whole_round.variable_radius_bridges<=
+           whole_round.radial_bridges_enclosed);
+    assert(whole_round.all_admitted_radial_bridges_enclosed);
+    assert(!whole_round.complete_visible_stroke_verified);
+    assert(!memcmp(&whole_round.bevel,&whole_complex,
+                   sizeof(whole_complex)));
+    assert(near(whole_round.minimum[1],3.5)&&
+           near(whole_round.maximum[1],3.75));
+    for(size_t k=0u;k<3u;k++){
+        assert(whole_round.minimum[k]<=whole_complex.minimum[k]&&
+               whole_round.maximum[k]>=whole_complex.maximum[k]);
+    }
+    for(uint32_t vertex=0u;vertex<3u;vertex++){
+        MusaDwgAc1018LwJoinEdgeAudit j={0};
+        assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                      s,0x42bu,vertex,&j));
+        for(size_t side=0u;side<2u;side++){
+            /* +Y extrusion: true OCS X/Y map to world -X/Z.
+             * Using atan2 of WCS Z/X radial vectors is an independent
+             * physical-circle parameterization with the same short arc
+             * (reflection reverses sweep, not the circle's point set). */
+            const double x=j.center_wcs[0],z=j.center_wcs[2];
+            const double dx0=j.incoming_edge_wcs[side][0]-x;
+            const double dz0=j.incoming_edge_wcs[side][2]-z;
+            const double dx1=j.outgoing_edge_wcs[side][0]-x;
+            const double dz1=j.outgoing_edge_wcs[side][2]-z;
+            const double r0=hypot(dx0,dz0),r1=hypot(dx1,dz1);
+            const double a0=atan2(dz0,dx0),a1=atan2(dz1,dx1);
+            const double sweep=atan2(sin(a1-a0),cos(a1-a0));
+            /* The production engine REFUSES zero-radius and
+             * near-antipodal geometry; independently reproduce those
+             * explicit admissions before checking continuous coverage. */
+            if(!(r0>0.0)||!(r1>0.0)||
+               fabs(sweep)>=acos(-1.0)-1e-12)
+                continue;
+            for(uint32_t sample=0u;sample<=1000u;sample++){
+                const double t=(double)sample/1000.0;
+                const double radius=(1.0-t)*r0+t*r1;
+                const double angle=a0+t*sweep;
+                const double vx=x+radius*cos(angle);
+                const double vz=z+radius*sin(angle);
+                assert(vx>=whole_round.minimum[0]-1e-9&&
+                       vx<=whole_round.maximum[0]+1e-9&&
+                       vz>=whole_round.minimum[2]-1e-9&&
+                       vz<=whole_round.maximum[2]+1e-9&&
+                       j.center_wcs[1]>=whole_round.minimum[1]-1e-9&&
+                       j.center_wcs[1]+0.25<=
+                                           whole_round.maximum[1]+1e-9);
+            }
+        }
+    }
+    const MusaDwgAc1018LwRadialBridgeWcsEnvelope saved_round=
+                 whole_round;
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x42bu,1e-12,16u,&whole_round));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x42bu,0.02,15u,&whole_round));
+    assert(!musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
+                  s,0x42bu,0.02,32768u,
+                  (MusaDwgAc1018LwRadialBridgeWcsEnvelope*)(void*)s));
+    assert(!memcmp(&saved_round,&whole_round,sizeof(whole_round)));
     const MusaDwgAc1018LwRibbonBevelWcsEnvelope keep_whole=
              whole_complex;
     assert(!musa_dwg_ac1018_scene_enclose_lw_ribbon_bevel_wcs(
