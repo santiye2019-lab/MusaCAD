@@ -20,7 +20,7 @@
     "Selection",
     "Recovery"
   ],
-  "java_candidate_count": 110,
+  "java_candidate_count": 111,
   "remaining_migration_policy": "All CAD semantics in any Java or platform-specific code are migration debt until independently proven in shared core. Adapter candidates require manual audit too.",
   "java_modules": [
     {
@@ -494,6 +494,12 @@
       "migrated_verified": false
     },
     {
+      "path": "app/src/main/java/com/musa/cad/DxfPortableLines.java",
+      "classification": "platform_adapter_candidate",
+      "family": "file_io_and_dxf_dwg_semantics",
+      "migrated_verified": false
+    },
+    {
       "path": "app/src/main/java/com/musa/cad/DxfRay.java",
       "classification": "needs_core_audit",
       "family": "file_io_and_dxf_dwg_semantics",
@@ -502,12 +508,6 @@
     {
       "path": "app/src/main/java/com/musa/cad/DxfReplacementLayerStyle.java",
       "classification": "needs_core_audit",
-      "family": "file_io_and_dxf_dwg_semantics",
-      "migrated_verified": false
-    },
-    {
-      "path": "app/src/main/java/com/musa/cad/DxfPortableLines.java",
-      "classification": "platform_adapter_candidate",
       "family": "file_io_and_dxf_dwg_semantics",
       "migrated_verified": false
     },
@@ -612,6 +612,17 @@
       "classification": "platform_adapter_candidate",
       "family": "ai_cad_evidence",
       "migrated_verified": false
+    },
+    {
+      "path": "app/src/main/java/com/musa/cad/NativeAc1018Inspection.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false,
+      "audit_date": "2026-10-22",
+      "audit_status": "thin_firstparty_r2004_jni_inventory_transport_unverified_on_physical_android",
+      "portable_core": "core/native/src/musacad_dwg_ac1018_inspection.c",
+      "android_adapter": "app/src/main/cpp/ac1018_inspection_jni.c",
+      "qualification": "No full DWG open, no AC1032 decode, no certified 2027 parity; source-safe bounded R2004 inventory only."
     },
     {
       "path": "app/src/main/java/com/musa/cad/NativeCadEngine.java",
@@ -728,6 +739,6 @@
       "migrated_verified": false
     }
   ],
-  "last_incremental_audit": "2026-10-18",
+  "last_incremental_audit": "2026-10-22",
   "audit_method": "Migrations are not independently certified from code presence alone; Java host oracle retained until physically validated."
 }
