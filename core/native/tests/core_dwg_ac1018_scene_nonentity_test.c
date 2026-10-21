@@ -285,6 +285,7 @@ int main(void){
                  scene,0x11bu,raw_owner,sizeof(raw_owner),
                  &owner_bytes,&owner_probe));
     assert(layer_bytes>=4u&&owner_bytes>=4u&&
+           layer_bytes<sizeof(raw_layer)&&owner_bytes<sizeof(raw_owner)&&
            layer_probe.handle==0x33u&&layer_probe.declared_type==51u&&
            owner_probe.handle==0x11bu&&owner_probe.declared_type==49u&&
            layer_probe.record_crc_verified&&owner_probe.record_crc_verified);
