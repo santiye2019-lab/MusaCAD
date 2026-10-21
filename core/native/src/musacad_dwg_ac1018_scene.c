@@ -3339,3 +3339,127 @@ int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
     free(translated);
     return valid;
 }
+
+
+/* Single original CRC-protected R2004 bulge record -> cached math ->
+ * cross-section strip mesh. Each cell is a ruled quadrilateral with 2
+ * explicit triangles per OCS base/thickness face (4 total).
+ * The TRUE source curve on each boundary differs from the polyline
+ * chord by <= M/(8*N²) + outward numerical guard for all parameter t.
+ * Does NOT establish gap-free union with adjoining joins or caps. */
+int musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t segment_index,double max_chord_error,uint32_t max_cells,
+    MusaDwgAc1018BulgeRibbonSection *sections,
+    uint32_t section_capacity,MusaDwgAc1018BulgeRibbonStrip *out){
+    if(!s||!handle||!sections||!out||
+       !isfinite(max_chord_error)||!(max_chord_error>0.0)||
+       max_cells<1u||max_cells>4096u||
+       section_capacity<2u||section_capacity>65536u||
+       section_capacity>SIZE_MAX/sizeof(*sections))return 0;
+    const size_t capacity_bytes=(size_t)section_capacity*
+                                sizeof(*sections);
+    if(scene_output_overlaps(s,sections,capacity_bytes)||
+       scene_output_overlaps(s,out,sizeof(*out))||
+       overlaps(sections,capacity_bytes,out,sizeof(*out)))return 0;
+    MusaDwgAc1018BulgeEdgeSnapshot *snapshot=NULL;
+    if(!musa_dwg_ac1018_scene_create_bulge_edge_snapshot(
+                     s,handle,segment_index,&snapshot))return 0;
+    MusaDwgAc1018BulgeWidthEdgePoint first={0},last={0};
+    int valid=musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                     snapshot,0.0,&first)&&
+              musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                     snapshot,1.0,&last);
+    if(!valid){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    const double r=first.radius;
+    const double sweep=fabs(first.signed_sweep);
+    const double w0=first.start_width,w1=first.end_width;
+    const double dw=fabs(w1-w0);
+    const double m=(r+0.5*fmax(w0,w1))*sweep*sweep+
+                   dw*sweep;
+    const double guard=256.0*DBL_EPSILON*
+                 (1.0+r+fabs(w0)+fabs(w1)+sweep+fabs(m));
+    if(!isfinite(m)||!(m>0.0)||!isfinite(guard)||
+       !(max_chord_error>guard)){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    const double wanted=sqrt(m/(8.0*(max_chord_error-guard)));
+    if(!isfinite(wanted)||wanted>(double)max_cells){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    uint32_t cells=(uint32_t)ceil(wanted);
+    if(cells<1u)cells=1u;
+    if(cells>max_cells||cells+1u>section_capacity){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    const double max_bound=m/
+                (8.0*(double)cells*(double)cells)+guard;
+    if(!isfinite(max_bound)||max_bound>max_chord_error){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    const size_t output_bytes=(size_t)(cells+1u)*sizeof(*sections);
+    MusaDwgAc1018BulgeRibbonSection *tmp=
+              (MusaDwgAc1018BulgeRibbonSection*)malloc(output_bytes);
+    if(!tmp){
+        musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+        return 0;
+    }
+    MusaDwgAc1018BulgeRibbonStrip report={0};
+    report.handle=handle;
+    report.segment_index=segment_index;
+    report.cell_count=cells;
+    report.section_count=cells+1u;
+    report.triangles_per_face=2u*cells;
+    report.triangles_both_faces=4u*cells;
+    report.requested_chord_error=max_chord_error;
+    report.maximum_chord_deviation_bound=max_bound;
+    report.source_start_width=w0;
+    report.source_end_width=w1;
+    report.source_signed_sweep=first.signed_sweep;
+    for(size_t k=0u;k<3u;k++){
+        report.minimum[k]=DBL_MAX;
+        report.maximum[k]=-DBL_MAX;
+    }
+    valid=1;
+    for(uint32_t i=0u;i<=cells&&valid;i++){
+        MusaDwgAc1018BulgeWidthEdgePoint v={0};
+        const double t=(double)i/(double)cells;
+        if(!musa_dwg_ac1018_bulge_edge_snapshot_evaluate(
+                          snapshot,t,&v)){
+            valid=0;break;
+        }
+        for(size_t k=0u;k<3u;k++){
+            tmp[i].left_wcs[k]=v.left_wcs[k];
+            tmp[i].right_wcs[k]=v.right_wcs[k];
+            tmp[i].left_thickness_wcs[k]=v.left_thickness_wcs[k];
+            tmp[i].right_thickness_wcs[k]=v.right_thickness_wcs[k];
+            const double vals[4]={v.left_wcs[k],v.right_wcs[k],
+                 v.left_thickness_wcs[k],v.right_thickness_wcs[k]};
+            for(size_t p=0u;p<4u;p++){
+                if(!isfinite(vals[p])){valid=0;break;}
+                if(vals[p]<report.minimum[k])
+                    report.minimum[k]=vals[p];
+                if(vals[p]>report.maximum[k])
+                    report.maximum[k]=vals[p];
+            }
+            if(!valid)break;
+        }
+    }
+    if(valid){
+        /* Each section is a real mathematical strip cross section;
+         * the WCS XYZ box here encloses the TRIANGLE MESH ONLY, not
+         * the untessellated continuous width edge (use bounded error). */
+        memcpy(sections,tmp,output_bytes);
+        *out=report;
+    }
+    free(tmp);
+    musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
+    return valid;
+}
