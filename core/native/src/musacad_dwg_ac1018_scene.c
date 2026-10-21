@@ -3612,3 +3612,128 @@ int musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
     free(tmp);
     return 1;
 }
+
+
+/* Original CRC-backed R2004 LWPOLYLINE -> immutable, paginated source
+ * geometry. The source and index are read once at snapshot creation.
+ * This is independent OCS/WCS geometry, NOT a lossless AcDb object graph. */
+struct MusaDwgAc1018LwSourceSnapshot {
+    MusaDwgAc1018LwSourcePage source;
+    MusaDwgAc1018LwSourceVertex *vertices;
+};
+void musa_dwg_ac1018_lw_source_snapshot_close(
+    MusaDwgAc1018LwSourceSnapshot *snapshot){
+    if(!snapshot)return;
+    free(snapshot->vertices);
+    free(snapshot);
+}
+int musa_dwg_ac1018_scene_create_lw_source_snapshot(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    MusaDwgAc1018LwSourceSnapshot **out){
+    if(!s||!handle||!out||scene_output_overlaps(s,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1018RecordProbe record={0};
+    if(!musa_dwg_ac1018_scene_probe_record_handle(s,handle,&record)||
+       record.declared_type!=77u||!record.record_crc_verified)
+        return 0;
+    MusaDwgAc1018LWVertex *decoded=
+        (MusaDwgAc1018LWVertex*)malloc(
+            100000u*sizeof(MusaDwgAc1018LWVertex));
+    if(!decoded)return 0;
+    MusaDwgAc1018LWPolyline poly={0};
+    int valid=musa_dwg_ac1018_scene_read_lwpolyline(
+                s,handle,decoded,100000u,&poly)&&
+              poly.handle==handle&&poly.vertex_count>=2u&&
+              poly.vertex_count<=100000u&&
+              (poly.width_count==0u||
+               poly.width_count==poly.vertex_count)&&
+              isfinite(poly.constant_width)&&poly.constant_width>=0.0&&
+              isfinite(poly.elevation)&&isfinite(poly.thickness);
+    MusaCoreOcsBasis basis={0};
+    if(valid)valid=musa_core_ocs_basis(poly.extrusion,&basis);
+    MusaDwgAc1018LwSourceSnapshot *tmp=NULL;
+    if(valid){
+        tmp=(MusaDwgAc1018LwSourceSnapshot*)calloc(1u,sizeof(*tmp));
+        if(!tmp)valid=0;
+    }
+    if(valid){
+        tmp->vertices=(MusaDwgAc1018LwSourceVertex*)calloc(
+                        poly.vertex_count,sizeof(*tmp->vertices));
+        if(!tmp->vertices)valid=0;
+    }
+    if(valid){
+        MusaDwgAc1018LwSourcePage *src=&tmp->source;
+        src->source_handle=handle;
+        src->vertex_count=poly.vertex_count;
+        src->closed=(uint8_t)(poly.closed!=0u);
+        src->segment_count=poly.vertex_count-(src->closed?0u:1u);
+        src->color_index=poly.color;
+        src->widths_from_vertices=(uint8_t)(poly.width_count!=0u);
+        src->constant_width=poly.constant_width;
+        src->elevation=poly.elevation;
+        src->thickness=poly.thickness;
+        for(size_t k=0u;k<3u;k++)src->extrusion[k]=poly.extrusion[k];
+        for(uint32_t i=0u;i<poly.vertex_count;i++){
+            const MusaDwgAc1018LWVertex *raw=&decoded[i];
+            MusaDwgAc1018LwSourceVertex *v=&tmp->vertices[i];
+            const double sw=src->widths_from_vertices?
+                       raw->start_width:poly.constant_width;
+            const double ew=src->widths_from_vertices?
+                       raw->end_width:poly.constant_width;
+            const double xy[2]={raw->x,raw->y};
+            if(!isfinite(xy[0])||!isfinite(xy[1])||
+               !isfinite(raw->bulge)||!isfinite(sw)||sw<0.0||
+               !isfinite(ew)||ew<0.0||
+               !musa_core_ocs_to_world(
+                           &basis,xy,poly.elevation,v->wcs_xyz)||
+               !finite_vec3(v->wcs_xyz)){
+                valid=0;break;
+            }
+            v->original_index=i;
+            v->ocs_xy[0]=xy[0];v->ocs_xy[1]=xy[1];
+            v->bulge=raw->bulge;
+            v->start_width=sw;
+            v->end_width=ew;
+            v->has_outgoing_segment=
+                     (uint8_t)(src->closed||i+1u<poly.vertex_count);
+        }
+    }
+    free(decoded);
+    if(!valid){
+        musa_dwg_ac1018_lw_source_snapshot_close(tmp);
+        return 0;
+    }
+    *out=tmp;
+    return 1;
+}
+/* Publish a page only after the entire verified source was captured.
+ * A page never dereferences the old DWG scene, original bytes or index. */
+int musa_dwg_ac1018_lw_source_snapshot_read_page(
+    const MusaDwgAc1018LwSourceSnapshot *snap,
+    uint32_t first_index,MusaDwgAc1018LwSourceVertex *rows,
+    uint32_t capacity,MusaDwgAc1018LwSourcePage *out){
+    if(!snap||!snap->vertices||!rows||!out||
+       !capacity||capacity>4096u||
+       !snap->source.vertex_count||
+       first_index>=snap->source.vertex_count||
+       capacity>SIZE_MAX/sizeof(*rows))
+        return 0;
+    const size_t rows_bytes=(size_t)capacity*sizeof(*rows);
+    const size_t src_bytes=(size_t)snap->source.vertex_count*
+                           sizeof(*snap->vertices);
+    if(overlaps(snap,sizeof(*snap),rows,rows_bytes)||
+       overlaps(snap,sizeof(*snap),out,sizeof(*out))||
+       overlaps(snap->vertices,src_bytes,rows,rows_bytes)||
+       overlaps(snap->vertices,src_bytes,out,sizeof(*out))||
+       overlaps(rows,rows_bytes,out,sizeof(*out)))
+        return 0;
+    const uint32_t remaining=snap->source.vertex_count-first_index;
+    const uint32_t count=remaining<capacity?remaining:capacity;
+    MusaDwgAc1018LwSourcePage page=snap->source;
+    page.first_index=first_index;
+    page.vertices_written=count;
+    page.next_index=first_index+count;
+    memcpy(rows,snap->vertices+first_index,(size_t)count*sizeof(*rows));
+    *out=page;
+    return 1;
+}
