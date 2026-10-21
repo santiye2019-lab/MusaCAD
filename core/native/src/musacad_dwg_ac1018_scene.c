@@ -3184,3 +3184,158 @@ int musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
     *out=evaluated;
     return 1;
 }
+
+
+/* First-party mathematical radial sector fan from an ORIGINAL R2004
+ * junction. Two planar WCS caps are emitted; caller can form each
+ * triangle [center,boundary[i],boundary[i+1]]. A sidewall is NOT emitted.
+ * The difference from true curved edges is bounded by the second
+ * derivative of p(t)=(r0+t*(r1-r0))*(u*cos(theta*t)+v*sin(theta*t)).
+ * ||p''|| <= 2*|dr|*theta + max(radius)*theta^2.
+ * For N equal parameter intervals, linear chord deviation <= M/(8*N²).
+ */
+int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+    const MusaDwgAc1018Scene *s,uint64_t handle,
+    uint32_t vertex_index,uint32_t side,
+    double max_chord_error,uint32_t max_triangles,
+    double (*boundary_wcs)[3],
+    double (*boundary_thickness_wcs)[3],uint32_t point_capacity,
+    MusaDwgAc1018LwRadialFan *out){
+    if(!s||!handle||side>1u||!out||!boundary_wcs||
+       !boundary_thickness_wcs||
+       !isfinite(max_chord_error)||!(max_chord_error>0.0)||
+       max_triangles<1u||max_triangles>4096u||
+       point_capacity<2u||point_capacity>65536u||
+       point_capacity>SIZE_MAX/sizeof(*boundary_wcs))
+        return 0;
+    const size_t bytes=(size_t)point_capacity*sizeof(*boundary_wcs);
+    if(scene_output_overlaps(s,out,sizeof(*out))||
+       scene_output_overlaps(s,boundary_wcs,bytes)||
+       scene_output_overlaps(s,boundary_thickness_wcs,bytes)||
+       overlaps(out,sizeof(*out),boundary_wcs,bytes)||
+       overlaps(out,sizeof(*out),boundary_thickness_wcs,bytes)||
+       overlaps(boundary_wcs,bytes,boundary_thickness_wcs,bytes))
+        return 0;
+    MusaDwgAc1018LwJoinEdgeAudit source={0};
+    if(!musa_dwg_ac1018_scene_audit_lw_join_edges(
+               s,handle,vertex_index,&source))return 0;
+    const double r0=0.5*source.incoming_end_width;
+    const double r1=0.5*source.outgoing_start_width;
+    if(!isfinite(r0)||!isfinite(r1)||!(r0>0.0)||!(r1>0.0))
+        return 0;
+    const double *a=source.incoming_edge_wcs[side];
+    const double *b=source.outgoing_edge_wcs[side];
+    const double *center=source.center_wcs;
+    double u[3]={0},v[3]={0},w[3]={0},delta[3]={0};
+    double dot=0.0,shift_scale=1.0;
+    for(size_t k=0u;k<3u;k++){
+        u[k]=(a[k]-center[k])/r0;
+        w[k]=(b[k]-center[k])/r1;
+        delta[k]=source.incoming_edge_thickness_wcs[side][k]-a[k];
+        const double other=source.outgoing_edge_thickness_wcs[side][k]-
+                         b[k];
+        if(!isfinite(u[k])||!isfinite(w[k])||
+           !isfinite(delta[k])||!isfinite(other))return 0;
+        shift_scale+=fabs(delta[k])+fabs(other)+fabs(center[k]);
+        if(fabs(delta[k]-other)>1e-10*shift_scale)return 0;
+        dot+=u[k]*w[k];
+    }
+    const double u_len=hypot(hypot(u[0],u[1]),u[2]);
+    const double w_len=hypot(hypot(w[0],w[1]),w[2]);
+    if(!isfinite(u_len)||!isfinite(w_len)||
+       fabs(u_len-1.0)>1e-8||fabs(w_len-1.0)>1e-8||
+       !isfinite(dot))return 0;
+    dot=fmax(-1.0,fmin(1.0,dot));
+    const double theta=acos(dot);
+    const double sangle=sin(theta);
+    if(!isfinite(theta)||!isfinite(sangle)||
+       theta<=1e-10||theta>=acos(-1.0)-1e-12||
+       !(sangle>1e-12))return 0;
+    double v_len2=0.0,unit_dot=0.0;
+    for(size_t k=0u;k<3u;k++){
+        v[k]=(w[k]-dot*u[k])/sangle;
+        if(!isfinite(v[k]))return 0;
+        v_len2+=v[k]*v[k];
+        unit_dot+=u[k]*v[k];
+    }
+    if(!isfinite(v_len2)||fabs(v_len2-1.0)>1e-7||
+       fabs(unit_dot)>1e-7)return 0;
+    const double dr=r1-r0,max_radius=fmax(r0,r1);
+    const double second_bound=2.0*fabs(dr)*theta+
+                               max_radius*theta*theta;
+    const double guard=256.0*DBL_EPSILON*
+                        (1.0+r0+r1+shift_scale);
+    if(!isfinite(second_bound)||!(second_bound>0.0)||
+       !isfinite(guard)||!(max_chord_error>guard))return 0;
+    const double required=sqrt(second_bound/
+                     (8.0*(max_chord_error-guard)));
+    if(!isfinite(required)||required>(double)max_triangles)
+        return 0;
+    uint32_t triangles=(uint32_t)ceil(required);
+    if(triangles<1u)triangles=1u;
+    if(triangles>max_triangles||triangles+1u>point_capacity)
+        return 0;
+    const double bounded=second_bound/
+                   (8.0*(double)triangles*(double)triangles)+guard;
+    if(!isfinite(bounded)||bounded>max_chord_error)return 0;
+    const size_t used=(size_t)(triangles+1u)*
+                      sizeof(*boundary_wcs);
+    double (*first)[3]=(double (*)[3])malloc(used);
+    double (*translated)[3]=(double (*)[3])malloc(used);
+    if(!first||!translated){free(first);free(translated);return 0;}
+    int valid=1;
+    for(uint32_t i=0u;i<=triangles&&valid;i++){
+        const double t=(double)i/(double)triangles;
+        const double radius=(1.0-t)*r0+t*r1;
+        const double ct=cos(theta*t),st=sin(theta*t);
+        for(size_t k=0u;k<3u;k++){
+            first[i][k]=center[k]+radius*
+                                (ct*u[k]+st*v[k]);
+            translated[i][k]=first[i][k]+delta[k];
+            if(!isfinite(first[i][k])||
+               !isfinite(translated[i][k])){valid=0;break;}
+        }
+    }
+    if(valid){
+        /* Preserve exact original source boundary WCS endpoints.
+         * These are source-verified and avoid recomputed trig drift. */
+        for(size_t k=0u;k<3u;k++){
+            if(fabs(first[0][k]-a[k])>1e-8*
+                     (1.0+fabs(a[k]))||
+               fabs(first[triangles][k]-b[k])>1e-8*
+                     (1.0+fabs(b[k]))){valid=0;break;}
+            first[0][k]=a[k];
+            first[triangles][k]=b[k];
+            translated[0][k]=source.incoming_edge_thickness_wcs[side][k];
+            translated[triangles][k]=
+                         source.outgoing_edge_thickness_wcs[side][k];
+        }
+    }
+    MusaDwgAc1018LwRadialFan report={0};
+    if(valid){
+        report.handle=handle;
+        report.vertex_index=vertex_index;
+        report.side=side;
+        report.triangle_count=triangles;
+        report.boundary_point_count=triangles+1u;
+        report.incoming_radius=r0;
+        report.outgoing_radius=r1;
+        report.arc_angle_abs=theta;
+        report.maximum_chord_deviation_bound=bounded;
+        for(size_t k=0u;k<3u;k++){
+            report.center_wcs[k]=center[k];
+            report.center_thickness_wcs[k]=center[k]+delta[k];
+            if(!isfinite(report.center_thickness_wcs[k])){
+                valid=0;break;
+            }
+        }
+    }
+    if(valid){
+        memcpy(boundary_wcs,first,used);
+        memcpy(boundary_thickness_wcs,translated,used);
+        *out=report;
+    }
+    free(first);
+    free(translated);
+    return valid;
+}
