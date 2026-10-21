@@ -1017,6 +1017,59 @@ int musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
     uint32_t (*triangles)[3],uint32_t triangle_capacity,
     MusaDwgAc1018BulgeRibbonIndexedShell *out);
 
+
+/* Independently verified original R2004/AC1018 LWPOLYLINE vertex snapshot.
+ * One indexed, CRC-checked native binary DWG record -> immutable per-vertex
+ * OCS and full arbitrary-axis WCS XYZ. Read the source once, validate every
+ * coordinate/width/bulge, then page it in O(page size), even after closing
+ * the DWG scene. No per-page decompression, object search, disk IO or SDK.
+ *
+ * Preserve original index, bulge, width, elevation, extrusion, thickness,
+ * color and source handle. End vertex of an OPEN polyline does not own a
+ * drawable next segment, though its original bulge is still retained.
+ * This is source GEOMETRY + declared primitive style only; it does not
+ * validate owner/reactor graphs, layouts, joins, linestyles, shading, XREF,
+ * AC1032 versions or native DWG Save As. No source changes or APK.
+ *
+ * Page API is atomic: invalid/overlapping output, empty/out-of-range page
+ * or wrong capacity must leave BOTH rows and report unchanged. */
+typedef struct MusaDwgAc1018LwSourceVertex {
+    uint32_t original_index;
+    double ocs_xy[2];
+    double wcs_xyz[3];
+    double bulge;
+    double start_width;
+    double end_width;
+    uint8_t has_outgoing_segment;
+} MusaDwgAc1018LwSourceVertex;
+typedef struct MusaDwgAc1018LwSourcePage {
+    uint64_t source_handle;
+    uint32_t vertex_count;
+    uint32_t segment_count;
+    uint32_t first_index;
+    uint32_t vertices_written;
+    uint32_t next_index;
+    uint16_t color_index;
+    uint8_t closed;
+    uint8_t widths_from_vertices;
+    uint8_t full_dwg_semantics_verified; /* always 0 */
+    double constant_width;
+    double elevation;
+    double thickness;
+    double extrusion[3];
+} MusaDwgAc1018LwSourcePage;
+typedef struct MusaDwgAc1018LwSourceSnapshot
+    MusaDwgAc1018LwSourceSnapshot;
+int musa_dwg_ac1018_scene_create_lw_source_snapshot(
+    const MusaDwgAc1018Scene *scene,uint64_t source_handle,
+    MusaDwgAc1018LwSourceSnapshot **out);
+int musa_dwg_ac1018_lw_source_snapshot_read_page(
+    const MusaDwgAc1018LwSourceSnapshot *snapshot,
+    uint32_t first_index,MusaDwgAc1018LwSourceVertex *rows,
+    uint32_t capacity,MusaDwgAc1018LwSourcePage *out);
+void musa_dwg_ac1018_lw_source_snapshot_close(
+    MusaDwgAc1018LwSourceSnapshot *snapshot);
+
 #ifdef __cplusplus
 }
 #endif
