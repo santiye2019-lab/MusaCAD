@@ -11,6 +11,7 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../../../core/native" "${CMAKE_CU
 if(ANDROID)
   add_library(musacad_dwg SHARED
     firstparty_dwg_unavailable_jni.c
+    ac1018_inspection_jni.c
     mesh_mass_jni.c mesh_surface_jni.c mesh_topology_jni.c pick_bounds_jni.c open3d_guard_jni.c
     dwg_signature_jni.c gizmo_jni.c face_light_jni.c mc1032_jni.c mc1032_v2_jni.c mc1032_migrate_jni.c dxf_handle_jni.c dxf_saved_handles_jni.c
     dxf_group_jni.c ucs_jni.c source_sha256_jni.c
