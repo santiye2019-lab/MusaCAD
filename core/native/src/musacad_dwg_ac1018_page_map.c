@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -21,9 +22,10 @@ static uint32_t checksum(uint32_t seed,const uint8_t *p,size_t n){
     }
     return ((uint32_t)hi<<16u)|(uint32_t)lo;
 }
-int musa_dwg_ac1018_page_map_header(const uint8_t *file,size_t n,
-                                    MusaDwgAc1018FileMapHeader *out){
-    if(!file||!out||n<256u||memcmp(file,"AC1018",6u)!=0)return 0;
+static int shared_page_map_header(const uint8_t *file,size_t n,
+    const char required_signature[6],MusaDwgAc1018FileMapHeader *out){
+    if(!file||!out||n<256u||
+       memcmp(file,required_signature,6u)!=0)return 0;
     uint8_t plain[0x6c];
     uint32_t state=1u;
     for(size_t i=0u;i<sizeof(plain);++i){
@@ -55,11 +57,23 @@ int musa_dwg_ac1018_page_map_header(const uint8_t *file,size_t n,
     result.map_decoded_bytes=expanded;result.map_compressed_bytes=packed;
     *out=result;return 1;
 }
-int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
+int musa_dwg_ac1018_page_map_header(
+    const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
+    return shared_page_map_header(file,n,"AC1018",out);
+}
+/* AC1032 is a different OBJECT schema but retains the documented R2004
+ * family encrypted HEADER/page-location structural organization. The
+ * original AC1018 body readers are deliberately NEVER called here. */
+int musa_dwg_ac1032_page_map_header(
+    const uint8_t *file,size_t n,MusaDwgAc1032FileMapHeader *out){
+    return shared_page_map_header(file,n,"AC1032",out);
+}
+static int shared_page_locations(const uint8_t *file,size_t n,
+    const char required_signature[6],
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *out_count){
     if(!file||!out_count||(!entries&&capacity))return 0;
     MusaDwgAc1018FileMapHeader h={0};
-    if(!musa_dwg_ac1018_page_map_header(file,n,&h)||
+    if(!shared_page_map_header(file,n,required_signature,&h)||
        (entries&&(size_t)h.page_count>capacity))return 0;
     uint8_t *plain=(uint8_t*)malloc(h.map_decoded_bytes);
     if(!plain)return 0;
@@ -99,4 +113,15 @@ int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
     free(plain);
     *out_count=h.page_count;
     return 1;
+}
+
+/* Never promote AC1032 signatures to the existing AC1018 geometry decoder.
+ * Only physical page-map layout and file-bound offsets are shared. */
+int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
+    MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *count){
+    return shared_page_locations(file,n,"AC1018",entries,capacity,count);
+}
+int musa_dwg_ac1032_page_locations(const uint8_t *file,size_t n,
+    MusaDwgAc1032PageLocation *entries,size_t capacity,size_t *count){
+    return shared_page_locations(file,n,"AC1032",entries,capacity,count);
 }
