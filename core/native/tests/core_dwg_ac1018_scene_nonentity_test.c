@@ -271,6 +271,40 @@ int main(void){
     MusaDwgAc1018Scene *scene=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&scene));
     assert(musa_dwg_ac1018_scene_handle_count(scene)==2u);
+    /* Opaque/nonentity source records are retained byte-for-byte,
+     * instead of disappearing because the geometry vocabulary is smaller. */
+    uint8_t raw_layer[128],raw_owner[128];
+    memset(raw_layer,0xC7,sizeof(raw_layer));
+    memset(raw_owner,0xD5,sizeof(raw_owner));
+    size_t layer_bytes=0u,owner_bytes=0u;
+    MusaDwgAc1018RecordProbe layer_probe={0},owner_probe={0};
+    assert(musa_dwg_ac1018_scene_copy_verified_record(
+                 scene,0x33u,raw_layer,sizeof(raw_layer),
+                 &layer_bytes,&layer_probe));
+    assert(musa_dwg_ac1018_scene_copy_verified_record(
+                 scene,0x11bu,raw_owner,sizeof(raw_owner),
+                 &owner_bytes,&owner_probe));
+    assert(layer_bytes>=4u&&owner_bytes>=4u&&
+           layer_probe.handle==0x33u&&layer_probe.declared_type==51u&&
+           owner_probe.handle==0x11bu&&owner_probe.declared_type==49u&&
+           layer_probe.record_crc_verified&&owner_probe.record_crc_verified);
+    assert(raw_layer[layer_bytes]==0xC7&&raw_owner[owner_bytes]==0xD5);
+    size_t bad_count=999u;
+    MusaDwgAc1018RecordProbe unchanged_probe=layer_probe;
+    uint8_t layer_copy[sizeof(raw_layer)];
+    memcpy(layer_copy,raw_layer,sizeof(layer_copy));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                 scene,0x33u,raw_layer,layer_bytes-1u,
+                 &bad_count,&layer_probe));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                 scene,0x33u,raw_layer,sizeof(raw_layer),
+                 (size_t*)(void*)raw_layer,&layer_probe));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                 scene,0x33u,raw_layer,sizeof(raw_layer),
+                 &bad_count,(MusaDwgAc1018RecordProbe*)(void*)scene));
+    assert(bad_count==999u&&
+           !memcmp(raw_layer,layer_copy,sizeof(raw_layer))&&
+           !memcmp(&layer_probe,&unchanged_probe,sizeof(layer_probe)));
     MusaDwgAc1018SceneInventory inventory={0};
     assert(musa_dwg_ac1018_scene_inventory(scene,0,&inventory));
     assert(inventory.indexed_record_count==2u&&
