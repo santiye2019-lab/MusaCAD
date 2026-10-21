@@ -12,7 +12,6 @@ int main(void){
     MusaDwgAc1032FileMapHeader h={0};
     assert(!musa_dwg_ac1032_page_map_header(file,sizeof(file),&h));
     memcpy(file,"AC1032",6u);
-    const uint8_t saved[380]={0};(void)saved;
     assert(musa_dwg_ac1032_page_map_header(file,sizeof(file),&h));
     assert(h.page_count==2u&&h.page_map_id==2u&&
            h.section_map_id==1u&&h.page_map_offset==320u&&
