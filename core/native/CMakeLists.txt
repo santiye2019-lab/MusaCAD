@@ -94,6 +94,11 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_ac1018_page_map_test tests/core_dwg_ac1018_page_map_test.c)
         target_link_libraries(musacad_core_ac1018_page_map_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2004_protected_page_locations COMMAND musacad_core_ac1018_page_map_test)
+        # First-party R2018 structural encrypted page-map proof only.
+        # No native DWG AC1032 entity decoder or unsupported format promotion.
+        add_executable(musacad_core_ac1032_page_map_test tests/core_dwg_ac1032_page_map_test.c)
+        target_link_libraries(musacad_core_ac1032_page_map_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_protected_physical_page_map COMMAND musacad_core_ac1032_page_map_test)
         # End-to-end raw R2004 DWG section extraction; verified maps and page CRCs.
         add_executable(musacad_core_ac1018_full_section_extract_test tests/core_dwg_ac1018_full_section_extract_test.c)
         target_link_libraries(musacad_core_ac1018_full_section_extract_test PRIVATE musacad_core)
