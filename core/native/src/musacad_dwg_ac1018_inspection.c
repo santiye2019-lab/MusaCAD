@@ -2,6 +2,7 @@
 /* Single platform-independent R2004 original-binary admission entry point. */
 #include "musacad_dwg_ac1018_inspection.h"
 #include "musacad_dwg_ac1018_scene.h"
+#include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_signature.h"
 #include <stdint.h>
 #include <string.h>
@@ -13,9 +14,23 @@ static int disjoint(const void *p,size_t n,const void *o,size_t m){
 }
 int musa_dwg_ac1018_inspect_file(
     const uint8_t *file,size_t n,MusaDwgAc1018FileInspection *out){
-    if(!file||!out||n<256u||
+    /* This is a bounded in-memory Android diagnostic, not the large-file
+     * streaming reader. Defend the same core API on Windows/iOS callers. */
+    if(!file||!out||n<256u||n>32u*1024u*1024u||
        !disjoint(file,n,out,sizeof(*out))||
        musa_core_dwg_identify_signature(file,n)!=MUSA_DWG_2004)
+        return 0;
+    MusaDwgAc1018SectionDescriptor objects={0},handles={0};
+    size_t object_pages=0u,handle_pages=0u;
+    if(!musa_dwg_ac1018_section_pages(
+                file,n,MUSA_DWG_AC1018_OBJECTS,NULL,0u,
+                &objects,&object_pages)||
+       !musa_dwg_ac1018_section_pages(
+                file,n,MUSA_DWG_AC1018_HANDLES,NULL,0u,
+                &handles,&handle_pages)||
+       !object_pages||!handle_pages||
+       objects.logical_bytes>64u*1024u*1024u||
+       handles.logical_bytes>32u*1024u*1024u)
         return 0;
     MusaDwgAc1018Scene *scene=NULL;
     if(!musa_dwg_ac1018_scene_open(file,n,&scene)||!scene)
