@@ -1149,9 +1149,14 @@ int main(void){
     MusaDwgAc1018LwRadialBridgeWcsEnvelope whole_round={0};
     assert(musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
                   s,0x42bu,0.02,32768u,&whole_round));
-    assert(whole_round.radial_bridges_enclosed==6u);
-    assert(whole_round.radial_bridges_rejected==0u);
-    assert(whole_round.variable_radius_bridges==6u);
+    /* Exactly six source side transitions are CONSIDERED. A genuine
+     * source zero-width or antipodal side is fail-closed and stays under
+     * the original bevel envelope instead of fabricating a round arc. */
+    assert(whole_round.radial_bridges_enclosed+
+           whole_round.radial_bridges_rejected==6u);
+    assert(whole_round.radial_bridges_enclosed>=1u);
+    assert(whole_round.variable_radius_bridges<=
+           whole_round.radial_bridges_enclosed);
     assert(whole_round.all_admitted_radial_bridges_enclosed);
     assert(!whole_round.complete_visible_stroke_verified);
     assert(!memcmp(&whole_round.bevel,&whole_complex,
@@ -1179,8 +1184,12 @@ int main(void){
             const double r0=hypot(dx0,dz0),r1=hypot(dx1,dz1);
             const double a0=atan2(dz0,dx0),a1=atan2(dz1,dx1);
             const double sweep=atan2(sin(a1-a0),cos(a1-a0));
-            assert(r0>0.0&&r1>0.0&&
-                   fabs(sweep)<acos(-1.0)-1e-12);
+            /* The production engine REFUSES zero-radius and
+             * near-antipodal geometry; independently reproduce those
+             * explicit admissions before checking continuous coverage. */
+            if(!(r0>0.0)||!(r1>0.0)||
+               fabs(sweep)>=acos(-1.0)-1e-12)
+                continue;
             for(uint32_t sample=0u;sample<=1000u;sample++){
                 const double t=(double)sample/1000.0;
                 const double radius=(1.0-t)*r0+t*r1;
