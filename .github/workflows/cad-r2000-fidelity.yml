@@ -9,6 +9,7 @@ on:
       - 'app/src/main/cpp/native_scene.c'
       - 'app/src/main/cpp/native_color.h'
       - 'core/native/**'
+      - 'docs/AUTOCAD_2027_TARGET.json'
       - 'app/src/main/cpp/native_nurbs.h'
       - 'tests/native_nurbs_test.c'
       - 'tests/native_fit_spline_test.c'
