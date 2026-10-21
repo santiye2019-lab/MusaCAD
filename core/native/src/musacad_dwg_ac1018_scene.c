@@ -3463,3 +3463,152 @@ int musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
     musa_dwg_ac1018_bulge_edge_snapshot_close(snapshot);
     return valid;
 }
+
+
+/* Triangulate already verified first-party curved width-strip sections
+ * into base/top, both sidewalls and the two section end caps. This is an
+ * indexed single-segment mathematical shell, not DWG stroke-style parity
+ * or proof against global self-intersections. */
+int musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+    const MusaDwgAc1018BulgeRibbonSection *sections,
+    const MusaDwgAc1018BulgeRibbonStrip *strip,
+    uint32_t (*triangles)[3],uint32_t triangle_capacity,
+    MusaDwgAc1018BulgeRibbonIndexedShell *out){
+    if(!sections||!strip||!triangles||!out||
+       !strip->handle||strip->cell_count<1u||strip->cell_count>4096u||
+       strip->section_count!=strip->cell_count+1u||
+       strip->triangles_per_face!=2u*strip->cell_count||
+       strip->triangles_both_faces!=4u*strip->cell_count||
+       !isfinite(strip->source_start_width)||
+       !isfinite(strip->source_end_width)||
+       !(strip->source_start_width>0.0)||
+       !(strip->source_end_width>0.0))return 0;
+    const uint32_t cells=strip->cell_count;
+    const uint32_t count=8u*cells+4u;
+    const uint32_t vertex_count=4u*(cells+1u);
+    if(triangle_capacity<count||
+       (size_t)triangle_capacity>SIZE_MAX/sizeof(*triangles))return 0;
+    const size_t sections_bytes=
+        (size_t)(cells+1u)*sizeof(*sections);
+    const size_t triangles_bytes=
+        (size_t)triangle_capacity*sizeof(*triangles);
+    if(overlaps(sections,sections_bytes,triangles,triangles_bytes)||
+       overlaps(sections,sections_bytes,out,sizeof(*out))||
+       overlaps(strip,sizeof(*strip),triangles,triangles_bytes)||
+       overlaps(strip,sizeof(*strip),out,sizeof(*out))||
+       overlaps(triangles,triangles_bytes,out,sizeof(*out)))return 0;
+    double shift[3]={0};
+    double shift_norm2=0.0;
+    for(size_t k=0u;k<3u;k++){
+        shift[k]=sections[0].left_thickness_wcs[k]-
+                 sections[0].left_wcs[k];
+        if(!isfinite(shift[k]))return 0;
+        shift_norm2+=shift[k]*shift[k];
+    }
+    if(!isfinite(shift_norm2)||!(shift_norm2>0.0))return 0;
+    const double shift_len=sqrt(shift_norm2);
+    int winding=0;
+    for(uint32_t i=0u;i<=cells;i++){
+        const MusaDwgAc1018BulgeRibbonSection *p=&sections[i];
+        const double *pts[4]={p->left_wcs,p->right_wcs,
+                              p->left_thickness_wcs,
+                              p->right_thickness_wcs};
+        for(size_t q=0u;q<4u;q++)
+            for(size_t k=0u;k<3u;k++)
+                if(!isfinite(pts[q][k]))return 0;
+        double width2=0.0;
+        for(size_t k=0u;k<3u;k++){
+            const double w=p->left_wcs[k]-p->right_wcs[k];
+            width2+=w*w;
+            for(size_t side=0u;side<2u;side++){
+                const double *base=side?p->right_wcs:p->left_wcs;
+                const double *top=side?p->right_thickness_wcs:
+                                       p->left_thickness_wcs;
+                const double actual=top[k]-base[k];
+                const double tol=256.0*DBL_EPSILON*
+                       (1.0+fabs(base[k])+fabs(top[k])+
+                        fabs(shift[k]));
+                if(!isfinite(actual)||fabs(actual-shift[k])>tol)
+                    return 0;
+            }
+        }
+        if(!isfinite(width2)||!(width2>0.0))return 0;
+        if(i==cells)continue;
+        const MusaDwgAc1018BulgeRibbonSection *next=&sections[i+1u];
+        double along[3],across[3],normal[3],crossnorm2=0.0,dot=0.0;
+        for(size_t k=0u;k<3u;k++){
+            along[k]=next->left_wcs[k]-p->left_wcs[k];
+            across[k]=p->right_wcs[k]-p->left_wcs[k];
+            if(!isfinite(along[k])||!isfinite(across[k]))return 0;
+        }
+        normal[0]=across[1]*along[2]-across[2]*along[1];
+        normal[1]=across[2]*along[0]-across[0]*along[2];
+        normal[2]=across[0]*along[1]-across[1]*along[0];
+        for(size_t k=0u;k<3u;k++){
+            crossnorm2+=normal[k]*normal[k];
+            dot+=normal[k]*shift[k];
+        }
+        if(!isfinite(crossnorm2)||!isfinite(dot)||
+           !(crossnorm2>0.0)||
+           fabs(dot)<=1e-12*sqrt(crossnorm2)*shift_len)
+            return 0;
+        const int direction=dot<0.0?-1:1;
+        if(winding&&direction!=winding)return 0;
+        winding=direction;
+    }
+    uint32_t (*tmp)[3]=(uint32_t (*)[3])malloc(
+                               (size_t)count*sizeof(*triangles));
+    if(!tmp)return 0;
+    for(uint32_t i=0u;i<cells;i++){
+        const uint32_t a=4u*i,b=a+4u;
+        const uint32_t base=2u*i;
+        const uint32_t top=2u*cells+2u*i;
+        const uint32_t left=4u*cells+2u*i;
+        const uint32_t right=6u*cells+2u*i;
+        /* Base faces point away from extrusion, top toward it. */
+        const uint32_t fixed[8][3]={
+            {a+0u,b+0u,a+1u},{a+1u,b+0u,b+1u},
+            {a+2u,a+3u,b+2u},{a+3u,b+3u,b+2u},
+            {a+0u,a+2u,b+0u},{a+2u,b+2u,b+0u},
+            {a+1u,b+1u,a+3u},{a+3u,b+1u,b+3u}
+        };
+        memcpy(tmp[base+0u],fixed[0],sizeof(tmp[0]));
+        memcpy(tmp[base+1u],fixed[1],sizeof(tmp[0]));
+        memcpy(tmp[top+0u],fixed[2],sizeof(tmp[0]));
+        memcpy(tmp[top+1u],fixed[3],sizeof(tmp[0]));
+        memcpy(tmp[left+0u],fixed[4],sizeof(tmp[0]));
+        memcpy(tmp[left+1u],fixed[5],sizeof(tmp[0]));
+        memcpy(tmp[right+0u],fixed[6],sizeof(tmp[0]));
+        memcpy(tmp[right+1u],fixed[7],sizeof(tmp[0]));
+    }
+    const uint32_t end=4u*cells,cap=8u*cells;
+    const uint32_t caps[4][3]={
+        {0u,1u,2u},{1u,3u,2u},
+        {end+0u,end+2u,end+1u},
+        {end+1u,end+2u,end+3u}
+    };
+    memcpy(tmp[cap],caps,sizeof(caps));
+    if(winding<0)
+        for(uint32_t i=0u;i<count;i++){
+            const uint32_t swap=tmp[i][1];
+            tmp[i][1]=tmp[i][2];
+            tmp[i][2]=swap;
+        }
+    MusaDwgAc1018BulgeRibbonIndexedShell report={0};
+    report.source_handle=strip->handle;
+    report.source_segment_index=strip->segment_index;
+    report.vertex_count=vertex_count;
+    report.triangle_count=count;
+    report.base_triangles=2u*cells;
+    report.translated_triangles=2u*cells;
+    report.left_wall_triangles=2u*cells;
+    report.right_wall_triangles=2u*cells;
+    report.endpoint_triangles=4u;
+    report.winding_reversed=(uint8_t)(winding<0);
+    for(size_t k=0u;k<3u;k++)
+        report.signed_extrusion_offset_wcs[k]=shift[k];
+    memcpy(triangles,tmp,(size_t)count*sizeof(*triangles));
+    *out=report;
+    free(tmp);
+    return 1;
+}
