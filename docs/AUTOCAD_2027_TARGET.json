@@ -1,0 +1,720 @@
+{
+  "schema_version": 1,
+  "target": "AutoCAD 2027",
+  "decision_date": "2026-10-21",
+  "source_baseline": {
+    "product": "AutoCAD 2026",
+    "filename": "docs/AUTOCAD_2026_PARITY_MATRIX.json",
+    "previous_family_count": 51,
+    "immutable_case_ids": true
+  },
+  "goal": "MusaCAD first-party unified Android/iOS/Windows CAD core: independently verified full 2027 functional parity, then independently developed superior features",
+  "native_dwg_compatibility": {
+    "external": "AutoCAD 2018 DWG-compatible AC1032 remains used by AutoCAD 2027",
+    "first_party_private_format": "MC1032 (.mcad) is a separate original MusaCAD format and MUST NOT replace AC1032 signatures"
+  },
+  "reporting": {
+    "initial_certified_family_count": 0,
+    "certification_status": "unverified",
+    "family_denominator": 51,
+    "excluded_from_percentage": "2027-specific feature enhancements and implementation planning steps are not counted as certified equivalence until all strict evidence gates pass",
+    "independent_approval_required": true
+  },
+  "mandatory_evidence": [
+    "same-input AutoCAD 2027 reference on licensed environment",
+    "MusaCAD native engine semantic result",
+    "independently reviewed geometry/object comparison",
+    "DWG read-write-reopen by independent checker",
+    "Android physical device",
+    "Windows desktop runtime",
+    "iOS physical device",
+    "all required latest-head CI workflows",
+    "human independent certification"
+  ],
+  "build_policy": {
+    "third_party_cad_decoder_runtime": false,
+    "platforms": [
+      "Android",
+      "Windows",
+      "iOS"
+    ],
+    "unified_core": true,
+    "apk_without_user_final_approval": false,
+    "fail_closed_on_unsupported": true
+  },
+  "families": [
+    {
+      "id": "file_01",
+      "index": 1,
+      "area": "file",
+      "capability": "DWG binary read AC1015/AC1032+",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/NativeDwg.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "file_02",
+      "index": 2,
+      "area": "file",
+      "capability": "Lossless modern DWG Save As / reopen",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": "docs/DWG_WRITER_PILOT.md",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "file_03",
+      "index": 3,
+      "area": "file",
+      "capability": "DXF read / drawing import",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfParser.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "file_04",
+      "index": 4,
+      "area": "file",
+      "capability": "Editable DXF save / reopen",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfWriter.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "file_05",
+      "index": 5,
+      "area": "file",
+      "capability": "Complete drawing metadata / ownership preservation",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": "tests/dwg_entity_identity_audit.py",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "file_06",
+      "index": 6,
+      "area": "file",
+      "capability": "DWG recovery, audit and drawing repair",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_07",
+      "index": 7,
+      "area": "draw",
+      "capability": "2D LINE / PLINE / CIRCLE / ARC primitives",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadEdit.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_08",
+      "index": 8,
+      "area": "draw",
+      "capability": "ELLIPSE / SPLINE / HELIX and curved objects",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfSpline.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_09",
+      "index": 9,
+      "area": "draw",
+      "capability": "HATCH / boundary / gradients / associative patterns",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfHatch.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_10",
+      "index": 10,
+      "area": "draw",
+      "capability": "TRIM / EXTEND / BREAK / FILLET / CHAMFER",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadCommand.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_11",
+      "index": 11,
+      "area": "draw",
+      "capability": "OFFSET / ARRAY / MIRROR / STRETCH / PEDIT",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadEdit.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_12",
+      "index": 12,
+      "area": "draw",
+      "capability": "Grip editing, multi-select and properties",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadView.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_13",
+      "index": 13,
+      "area": "draw",
+      "capability": "Object snaps, object tracking, grid, ortho and polar",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/SnapPoints.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "draw_14",
+      "index": 14,
+      "area": "draw",
+      "capability": "Parametric geometric and dimensional constraints",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "annotation_15",
+      "index": 15,
+      "area": "annotation",
+      "capability": "TEXT/MTEXT formatting and SHX fonts",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfMText.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "annotation_16",
+      "index": 16,
+      "area": "annotation",
+      "capability": "Associative dimensions and DIMSTYLE",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadDimension.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "annotation_17",
+      "index": 17,
+      "area": "annotation",
+      "capability": "LEADER / MLEADER / annotation scales",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfMLeader.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "annotation_18",
+      "index": 18,
+      "area": "annotation",
+      "capability": "TABLE, FIELD, spreadsheet and data extraction",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadSpreadsheetLayout.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "annotation_19",
+      "index": 19,
+      "area": "annotation",
+      "capability": "Revision clouds and drawing markups",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadCommand.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "blocks_20",
+      "index": 20,
+      "area": "blocks",
+      "capability": "BLOCK/INSERT nested transforms, attributes",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "blocks_21",
+      "index": 21,
+      "area": "blocks",
+      "capability": "Dynamic blocks, constraints and visibility states",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": "docs/CAD_2026_PROGRESS.json",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "blocks_22",
+      "index": 22,
+      "area": "blocks",
+      "capability": "Smart Blocks detect, place and replace (2026)",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "blocks_23",
+      "index": 23,
+      "area": "blocks",
+      "capability": "XREF attach/reload/bind/overlay/paths",
+      "priority": "P0",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfBlocks.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "documents_24",
+      "index": 24,
+      "area": "documents",
+      "capability": "Model/paper space layouts and viewports",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/DxfViewport.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "documents_25",
+      "index": 25,
+      "area": "documents",
+      "capability": "PLOT/print, PDF/A0–A4 to scale",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadPrint.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "documents_26",
+      "index": 26,
+      "area": "documents",
+      "capability": "Sheet Set Manager and batch publish",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "documents_27",
+      "index": 27,
+      "area": "documents",
+      "capability": "PDFIMPORT (PDF -> CAD entities)",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "documents_28",
+      "index": 28,
+      "area": "documents",
+      "capability": "Raster image attach, underlays and clipping",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadImageOverlay.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_29",
+      "index": 29,
+      "area": "3d",
+      "capability": "3D orbit, UCS and object visualization",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/Mesh3dActivity.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_30",
+      "index": 30,
+      "area": "3d",
+      "capability": "B-Rep/ACIS SAT/SAB read and preserve",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/AcisSatMesh.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_31",
+      "index": 31,
+      "area": "3d",
+      "capability": "EXTRUDE / REVOLVE / SWEEP / LOFT solids",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadPrismBrep.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_32",
+      "index": 32,
+      "area": "3d",
+      "capability": "UNION / SUBTRACT / INTERSECT Boolean solids",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": "docs/CAD_2026_PROGRESS.json",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_33",
+      "index": 33,
+      "area": "3d",
+      "capability": "SOLIDEDIT face/edge/shell/imprint tools",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": "docs/CAD_2026_PROGRESS.json",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_34",
+      "index": 34,
+      "area": "3d",
+      "capability": "Mesh/surface modeling and conversions",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/Cad3dMeshTopology.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_35",
+      "index": 35,
+      "area": "3d",
+      "capability": "3D materials, light, camera and photoreal render",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "3d_36",
+      "index": 36,
+      "area": "3d",
+      "capability": "3D measurement, volume and mass properties",
+      "priority": "P2",
+      "legacy_2026_implementation_status": "partial",
+      "source_evidence": "app/src/main/java/com/musa/cad/Cad3dSignedVolume.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "automation_37",
+      "index": 37,
+      "area": "automation",
+      "capability": "AutoLISP / Visual LISP compatible programs",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": "app/src/main/java/com/musa/cad/CadCommand.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "automation_38",
+      "index": 38,
+      "area": "automation",
+      "capability": "ObjectARX/.NET/VBA plugin interfaces",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "blocked",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "automation_39",
+      "index": 39,
+      "area": "automation",
+      "capability": "Action recorder, scripts, macros and customization",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "collaboration_40",
+      "index": 40,
+      "area": "collaboration",
+      "capability": "DWG COMPARE and XREF comparison",
+      "priority": "P1",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": "app/src/main/java/com/musa/cad/MusaAiRevisionCompare.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "collaboration_41",
+      "index": 41,
+      "area": "collaboration",
+      "capability": "TRACE, markup import/assist and activity insights",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "collaboration_42",
+      "index": 42,
+      "area": "collaboration",
+      "capability": "Autodesk Docs/cloud support files/linked files",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "collaboration_43",
+      "index": 43,
+      "area": "collaboration",
+      "capability": "Autodesk Assistant and in-product insights",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": "app/src/main/java/com/musa/cad/MusaAiPanel.java",
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "geo_44",
+      "index": 44,
+      "area": "geo",
+      "capability": "Geolocation, ArcGIS basemaps, point clouds",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_45",
+      "index": 45,
+      "area": "toolsets",
+      "capability": "Architecture toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_46",
+      "index": 46,
+      "area": "toolsets",
+      "capability": "Mechanical toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_47",
+      "index": 47,
+      "area": "toolsets",
+      "capability": "Electrical toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_48",
+      "index": 48,
+      "area": "toolsets",
+      "capability": "MEP toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_49",
+      "index": 49,
+      "area": "toolsets",
+      "capability": "Plant 3D / P&ID toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_50",
+      "index": 50,
+      "area": "toolsets",
+      "capability": "Map 3D toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    },
+    {
+      "id": "toolsets_51",
+      "index": 51,
+      "area": "toolsets",
+      "capability": "Raster Design toolset",
+      "priority": "P3",
+      "legacy_2026_implementation_status": "unassessed",
+      "source_evidence": null,
+      "status_2027": "not_certified",
+      "scenario_inventory_complete": false,
+      "independently_verified": false
+    }
+  ],
+  "release_2027_deltas": [
+    {
+      "id": "geometry_cleanup",
+      "title": "Geometry Cleanup — geometry errors (gaps, over/undershoots, angles) and guarded fixes",
+      "family_ids": [
+        "draw_09",
+        "draw_10",
+        "draw_11"
+      ],
+      "reference_url": "https://www.autodesk.com/solutions/aec/autocad-updates",
+      "status": "not_certified",
+      "implementation_status": "not_assessed"
+    },
+    {
+      "id": "checkout",
+      "title": "Checkout — object-scoped collaborative edits with review and safe merge",
+      "family_ids": [
+        "collaboration_41",
+        "collaboration_42"
+      ],
+      "reference_url": "https://www.autodesk.com/solutions/aec/autocad-updates",
+      "status": "not_certified",
+      "implementation_status": "not_assessed"
+    },
+    {
+      "id": "connected_references",
+      "title": "Connected References — relocated or renamed xref path repair",
+      "family_ids": [
+        "blocks_23"
+      ],
+      "reference_url": "https://www.autodesk.com/products/autocad/overview",
+      "status": "not_certified",
+      "implementation_status": "not_assessed"
+    },
+    {
+      "id": "assistant_2027",
+      "title": "AI-enhanced Autodesk Assistant contextual workflows (compare functionality, not copy proprietary implementation)",
+      "family_ids": [
+        "collaboration_43"
+      ],
+      "reference_url": "https://help.autodesk.com/view/BLDSYS/2027/ENU/?contextId=WHATS_NEW_2027_ACD",
+      "status": "not_certified",
+      "implementation_status": "not_assessed"
+    },
+    {
+      "id": "forma_data_management",
+      "title": "Forma Data Management Essentials integration and collaborative file management",
+      "family_ids": [
+        "collaboration_42"
+      ],
+      "reference_url": "https://www.autodesk.com/products/autocad/product-details",
+      "status": "not_certified",
+      "implementation_status": "not_assessed"
+    }
+  ],
+  "sources": [
+    "https://www.autodesk.com/solutions/aec/autocad-updates",
+    "https://help.autodesk.com/view/BLDSYS/2027/ENU/?contextId=WHATS_NEW_2027_ACD",
+    "https://help.autodesk.com/view/ACADWEB/ENU/?caas=caas%2Fsfdcarticles%2Fsfdcarticles%2FAutoCAD-drawing-file-format.html"
+  ],
+  "next_priority": "Start P0 file_01 real modern DWG objects and data-safe read; treat portable numeric ribbon and AC1018 decoding as partial evidence, not file-family certification"
+}
