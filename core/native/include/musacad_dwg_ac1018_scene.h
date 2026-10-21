@@ -881,6 +881,47 @@ int musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
     double requested_tolerance,uint32_t max_intervals_per_curve,
     MusaDwgAc1018LwRadialBridgeWcsEnvelope *out);
 
+/* Original R2004 radial junction: drawable mathematical fan tessellation.
+ * One CRC-protected original LW source join is audited; the radial
+ * shortest-arc model from the previous bounded envelope is triangulated
+ * into center -> boundary[i] -> boundary[i+1] triangles.  Both original
+ * OCS elevation and translated signed-thickness faces are emitted in
+ * WCS.  Points arrays have (triangle_count+1) records, and the explicit
+ * fan center for each face is in the result. The guaranteed geometric
+ * upper chord-deviation bound uses max(|p''|)/(8*N*N), where p(t) has
+ * linearly interpolated source width and constant angular sweep.
+ *
+ * side: 0 left; 1 right. max_chord_error > 0 finite; at most 4096
+ * triangles; max_triangles >= 1; every input/output buffer is checked
+ * before touching it; insufficient budget/capacity or degenerate
+ * zero-width, same-ray or antipodal connectors fail atomically.
+ * Boundary endpoints match the genuine incoming/outgoing source edges.
+ * This builds actual mathematical fill TRIANGLES, not an AutoCAD
+ * selected round-join/fill rule, not a solid with closed sidewalls,
+ * not complete DWG visible-stroke parity or an APK.
+ */
+typedef struct MusaDwgAc1018LwRadialFan {
+    uint64_t handle;
+    uint32_t vertex_index;
+    uint32_t side;
+    uint32_t triangle_count;
+    uint32_t boundary_point_count;
+    double incoming_radius;
+    double outgoing_radius;
+    double arc_angle_abs;
+    double maximum_chord_deviation_bound;
+    double center_wcs[3];
+    double center_thickness_wcs[3];
+    uint8_t complete_visible_join_verified; /* always 0 */
+} MusaDwgAc1018LwRadialFan;
+int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t vertex_index,uint32_t side,
+    double max_chord_error,uint32_t max_triangles,
+    double (*boundary_wcs)[3],
+    double (*boundary_thickness_wcs)[3],uint32_t point_capacity,
+    MusaDwgAc1018LwRadialFan *out);
+
 #ifdef __cplusplus
 }
 #endif

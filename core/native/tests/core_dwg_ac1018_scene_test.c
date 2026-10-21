@@ -662,6 +662,18 @@ int main(void){
                 s,0x40eu,0.02,32768u,
                 (MusaDwgAc1018LwRibbonBevelWcsEnvelope*)(void*)s));
     assert(!memcmp(&whole_open,&keep_open,sizeof(whole_open)));
+    /* In the original H=0x40E open 90deg LW the width is zero.
+     * Never invent a positive-area radial fill at zero radius. */
+    double zero_base[8][3]={{0}},zero_top[8][3]={{0}};
+    MusaDwgAc1018LwRadialFan zero_report={0};
+    zero_base[0][0]=17.0;zero_top[0][0]=19.0;
+    zero_report.handle=UINT64_C(0x12345);
+    assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+        s,0x40eu,1u,0u,0.01,7u,zero_base,zero_top,8u,
+        &zero_report));
+    assert(near(zero_base[0][0],17.0)&&
+           near(zero_top[0][0],19.0)&&
+           zero_report.handle==UINT64_C(0x12345));
     const MusaDwgAc1018LwJoinEdgeAudit saved_straight_join=join;
     assert(!musa_dwg_ac1018_scene_audit_lw_join_edges(
                   s,0x40eu,0u,&join));
@@ -1393,6 +1405,113 @@ int main(void){
                   s,0x42bu,1u,
                   (MusaDwgAc1018LwJoinEdgeAudit*)(void*)s));
     assert(!memcmp(&joined_saved,&complex_join,sizeof(complex_join)));
+    /* Genuine CRC-backed original R2004 H=0x42B variable-width
+     * curved/straight mixed polyline. Fan point triangles are the
+     * explicit mathematical radial-sector fill, not AutoCAD's DWG
+     * selection of round/inner/outer join or final stroke topology.
+     * Check WCS endpoint exactness, thickness and the upper
+     * interpolation deviation by independent mid-segment evaluation. */
+    uint32_t admitted_fans=0u,rejected_fans=0u;
+    for(uint32_t vertex=0u;vertex<3u;vertex++){
+        MusaDwgAc1018LwJoinEdgeAudit j={0};
+        assert(musa_dwg_ac1018_scene_audit_lw_join_edges(
+                  s,0x42bu,vertex,&j));
+        for(uint32_t side=0u;side<2u;side++){
+            double boundary[513][3]={{0}},thick[513][3]={{0}};
+            MusaDwgAc1018LwRadialFan fan={0};
+            const int ok=musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+                  s,0x42bu,vertex,side,0.01,512u,
+                  boundary,thick,513u,&fan);
+            const double r0=0.5*j.incoming_end_width;
+            const double r1=0.5*j.outgoing_start_width;
+            if(!(r0>0.0)||!(r1>0.0)){
+                assert(!ok);
+                rejected_fans++;
+                continue;
+            }
+            assert(ok);
+            admitted_fans++;
+            assert(fan.handle==0x42bu&&
+                   fan.vertex_index==vertex&&fan.side==side&&
+                   fan.triangle_count>0u&&fan.triangle_count<=512u&&
+                   fan.boundary_point_count==fan.triangle_count+1u&&
+                   fan.maximum_chord_deviation_bound<=0.01&&
+                   !fan.complete_visible_join_verified&&
+                   near(fan.incoming_radius,r0)&&
+                   near(fan.outgoing_radius,r1));
+            for(size_t k=0u;k<3u;k++){
+                assert(near(boundary[0][k],
+                            j.incoming_edge_wcs[side][k])&&
+                       near(boundary[fan.triangle_count][k],
+                            j.outgoing_edge_wcs[side][k])&&
+                       near(fan.center_wcs[k],j.center_wcs[k])&&
+                       near(thick[0][k],
+                            j.incoming_edge_thickness_wcs[side][k])&&
+                       near(thick[fan.triangle_count][k],
+                            j.outgoing_edge_thickness_wcs[side][k]));
+            }
+            double u[3]={0},v[3]={0},w[3]={0},dot=0.0;
+            for(size_t k=0u;k<3u;k++){
+                u[k]=(j.incoming_edge_wcs[side][k]-
+                         j.center_wcs[k])/r0;
+                w[k]=(j.outgoing_edge_wcs[side][k]-
+                         j.center_wcs[k])/r1;
+                dot+=u[k]*w[k];
+            }
+            dot=fmax(-1.0,fmin(1.0,dot));
+            const double theta=acos(dot);
+            for(size_t k=0u;k<3u;k++)
+                v[k]=(w[k]-dot*u[k])/sin(theta);
+            for(uint32_t i=0u;i<fan.triangle_count;i++){
+                const double t=((double)i+0.5)/
+                                (double)fan.triangle_count;
+                const double r=(1.0-t)*r0+t*r1;
+                const double ct=cos(t*theta),st=sin(t*theta);
+                double err2=0.0;
+                for(size_t k=0u;k<3u;k++){
+                    const double exact=j.center_wcs[k]+
+                              r*(ct*u[k]+st*v[k]);
+                    const double linear=0.5*(boundary[i][k]+
+                                              boundary[i+1u][k]);
+                    err2+=(exact-linear)*(exact-linear);
+                    assert(near(thick[i][k]-boundary[i][k],
+                                k==1u?0.25:0.0));
+                }
+                assert(sqrt(err2)<=
+                         fan.maximum_chord_deviation_bound+1e-9);
+            }
+            /* A single triangle cannot meet a strict error budget.
+             * Failure must not alter the caller's geometry or report. */
+            double guard[2][3]={{0}},guard_thick[2][3]={{0}};
+            guard[0][0]=77.0;
+            guard_thick[0][0]=88.0;
+            MusaDwgAc1018LwRadialFan retained=fan;
+            assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+                  s,0x42bu,vertex,side,1e-10,1u,
+                  guard,guard_thick,2u,&fan));
+            assert(near(guard[0][0],77.0)&&
+                   near(guard_thick[0][0],88.0)&&
+                   !memcmp(&retained,&fan,sizeof(fan)));
+        }
+    }
+    assert(admitted_fans>0u&&
+           admitted_fans+rejected_fans==6u);
+    double scratch[513][3]={{0}},scratch_thick[513][3]={{0}};
+    MusaDwgAc1018LwRadialFan last_fan={0};
+    last_fan.handle=UINT64_C(0x222);
+    assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+         s,0x42bu,3u,0u,0.01,512u,scratch,scratch_thick,
+         513u,&last_fan));
+    assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+         s,0x42bu,1u,2u,0.01,512u,scratch,scratch_thick,
+         513u,&last_fan));
+    assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+         s,0x42bu,1u,0u,NAN,512u,scratch,scratch_thick,
+         513u,&last_fan));
+    assert(!musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
+         s,0x42bu,1u,0u,0.01,512u,scratch,scratch,
+         513u,&last_fan));
+    assert(last_fan.handle==UINT64_C(0x222));
     /* Width and signed thickness are present: never report exact
      * centerline-only WCS bounds as complete original stroke geometry. */
     assert(!musa_dwg_ac1018_scene_read_bulged_polyline_wcs_bounds(
