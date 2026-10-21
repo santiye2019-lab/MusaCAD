@@ -972,6 +972,51 @@ int musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
     MusaDwgAc1018BulgeRibbonSection *sections,
     uint32_t section_capacity,MusaDwgAc1018BulgeRibbonStrip *out);
 
+
+/* First-party indexed 3D shell faces for a *single already validated*
+ * R2004 variable-width curved ribbon strip. Every input section has four
+ * WCS vertices in this exact stable order: [base-left, base-right,
+ * translated-left, translated-right]. The caller supplies the original
+ * result from scene_tessellate_bulge_ribbon_strip, not raw DWG.
+ *
+ * Output triangles are zero-based indices into that implicit flattened
+ * 4*section_count vertex array. Group order is: base (2*N), translated
+ * top (2*N), left sidewall (2*N), right sidewall (2*N), first end cap
+ * (2), last end cap (2). Their winding is consistently outward relative
+ * to the nonzero signed extrusion offset; negative thickness is handled.
+ * All 8*N+4 face indices represent REAL triangles, not bbox substitutes.
+ *
+ * Reject zero source endpoint width, zero extrusion, folded cells,
+ * inconsistent top/base extrusion, nonfinite coordinates, aliased outputs,
+ * insufficient capacity and unsupported segment counts. This is a
+ * mathematical single-segment shell, NOT proof of global watertightness
+ * (joins, caps shared by neighboring segments, self-intersections, linetype
+ * and visual-style equivalence remain unverified). No original DWG read,
+ * edit, re-encode, third-party kernel or APK.
+ *
+ * On failure both outputs and all input sections remain untouched.
+ */
+typedef struct MusaDwgAc1018BulgeRibbonIndexedShell {
+    uint64_t source_handle;
+    uint32_t source_segment_index;
+    uint32_t vertex_count;
+    uint32_t triangle_count;
+    uint32_t base_triangles;
+    uint32_t translated_triangles;
+    uint32_t left_wall_triangles;
+    uint32_t right_wall_triangles;
+    uint32_t endpoint_triangles;
+    double signed_extrusion_offset_wcs[3];
+    uint8_t winding_reversed;
+    uint8_t full_visible_stroke_verified; /* always 0 */
+    uint8_t global_watertightness_verified; /* always 0 */
+} MusaDwgAc1018BulgeRibbonIndexedShell;
+int musa_dwg_ac1018_bulge_ribbon_strip_indexed_shell(
+    const MusaDwgAc1018BulgeRibbonSection *sections,
+    const MusaDwgAc1018BulgeRibbonStrip *strip,
+    uint32_t (*triangles)[3],uint32_t triangle_capacity,
+    MusaDwgAc1018BulgeRibbonIndexedShell *out);
+
 #ifdef __cplusplus
 }
 #endif
