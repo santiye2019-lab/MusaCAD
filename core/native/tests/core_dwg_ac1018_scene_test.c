@@ -216,6 +216,34 @@ int main(void){
            near(open_row[0].wcs_xyz[0],12.5)&&
            near(open_row[0].wcs_xyz[1],10.0)&&
            !open_row[0].has_outgoing_segment);
+    /* Verified OPEN source geometry: N=3 means only TWO drawable
+     * segments; last vertex's source bulge is not a closing stroke. */
+    MusaDwgAc1018LwSourceSegment open_segment={0};
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 open_source,0u,&open_segment));
+    assert(open_segment.source_handle==0x40eu&&
+           open_segment.original_segment_index==0u&&
+           open_segment.start_vertex_index==0u&&
+           open_segment.end_vertex_index==1u&&
+           open_segment.original_vertex_count==3u&&
+           !open_segment.closed&&!open_segment.wraps_to_first_vertex&&
+           open_segment.source_identity_verified&&
+           !open_segment.full_dwg_semantics_verified);
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 open_source,1u,&open_segment));
+    assert(open_segment.start_vertex_index==1u&&
+           open_segment.end_vertex_index==2u&&
+           near(open_segment.end_wcs_xyz[0],12.5)&&
+           near(open_segment.end_wcs_xyz[1],10.0));
+    const MusaDwgAc1018LwSourceSegment saved_open_segment=open_segment;
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 open_source,2u,&open_segment));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 open_source,UINT32_MAX,&open_segment));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 open_source,0u,
+                 (MusaDwgAc1018LwSourceSegment*)(void*)open_source));
+    assert(!memcmp(&saved_open_segment,&open_segment,sizeof(open_segment)));
     const MusaDwgAc1018LwSourcePage saved_open_page=open_page;
     open_row[0].ocs_xy[0]=987.0;
     assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
@@ -887,6 +915,47 @@ int main(void){
         for(size_t k=0u;k<3u;k++)
             assert(near(closed_rows[i].wcs_xyz[k],expected[k]));
     }
+    /* Every original CLOSED H=0x42B source segment has exact
+     * start/end identity, original signed bulge and variable widths.
+     * Closing edge 2 -> 0 uses vertex 2's negative bulge. */
+    MusaDwgAc1018LwSourceSegment curved_segment={0};
+    for(uint32_t i=0u;i<3u;i++){
+        const uint32_t next=(i+1u)%3u;
+        assert(musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                     closed_source,i,&curved_segment));
+        assert(curved_segment.source_handle==0x42bu&&
+               curved_segment.original_segment_index==i&&
+               curved_segment.start_vertex_index==i&&
+               curved_segment.end_vertex_index==next&&
+               curved_segment.original_vertex_count==3u&&
+               curved_segment.closed&&
+               curved_segment.wraps_to_first_vertex==(i==2u)&&
+               curved_segment.widths_from_vertices&&
+               curved_segment.source_identity_verified&&
+               !curved_segment.full_dwg_semantics_verified&&
+               near(curved_segment.signed_bulge,
+                    complex_vertices[i].bulge)&&
+               near(curved_segment.source_start_width,
+                    complex_vertices[i].start_width)&&
+               near(curved_segment.source_end_width,
+                    complex_vertices[i].end_width));
+        for(size_t k=0u;k<3u;k++){
+            assert(near(curved_segment.start_wcs_xyz[k],
+                        closed_rows[i].wcs_xyz[k]));
+            assert(near(curved_segment.end_wcs_xyz[k],
+                        closed_rows[next].wcs_xyz[k]));
+        }
+    }
+    assert(near(curved_segment.signed_bulge,-0.25));
+    const MusaDwgAc1018LwSourceSegment saved_curved=curved_segment;
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 closed_source,3u,&curved_segment));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 closed_source,UINT32_MAX,&curved_segment));
+    assert(!musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 closed_source,0u,
+                 (MusaDwgAc1018LwSourceSegment*)(void*)closed_source));
+    assert(!memcmp(&curved_segment,&saved_curved,sizeof(curved_segment)));
     const MusaDwgAc1018LwSourcePage saved_closed_page=closed_page;
     closed_rows[0].wcs_xyz[0]=654.0;
     assert(!musa_dwg_ac1018_lw_source_snapshot_read_page(
@@ -1811,6 +1880,13 @@ int main(void){
     assert(!memcmp(&original_bulge,&retained_bulge,
                    sizeof(original_bulge)));
     musa_dwg_ac1018_scene_close(s);
+    /* Source adjacency survives scene close, including closing edge.
+     * Access is snapshot-only, no original DWG bytes are consulted. */
+    assert(musa_dwg_ac1018_lw_source_snapshot_read_segment(
+                 closed_source,2u,&curved_segment));
+    assert(curved_segment.start_vertex_index==2u&&
+           curved_segment.end_vertex_index==0u&&
+           near(curved_segment.signed_bulge,-0.25));
     /* Original binary scene can be closed before a page is requested.
      * Immutable source vertices remain valid, no borrowed source bytes. */
     assert(musa_dwg_ac1018_lw_source_snapshot_read_page(
