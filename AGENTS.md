@@ -2,6 +2,25 @@
 
 > Owner directive confirmed 2026-10-17. These rules are binding for every subsequent CAD development and PR in this repository. See [docs/UNIFIED_CAD_ENGINE_POLICY.md](docs/UNIFIED_CAD_ENGINE_POLICY.md), [issue #295](https://github.com/santiye2019-lab/MusaCAD/issues/295), and [docs/UNIFIED_CAD_ENGINE_INVENTORY.json](docs/UNIFIED_CAD_ENGINE_INVENTORY.json).
 
+## AutoCAD 2027 functional equivalence supersedes 2026 — owner decision 21 October 2026
+
+- **The active comparative product goal is AutoCAD 2027, not AutoCAD 2026.**
+  Keep the existing 51 capability family IDs unchanged and track five
+  verified 2027 feature deltas in
+  [docs/AUTOCAD_2027_TARGET.json](docs/AUTOCAD_2027_TARGET.json).
+- Treat prior 2026 matrix, acceptance records and 2026 command/catalog
+  tests as historical compatibility baselines. Do NOT blindly rename
+  earlier test output, invent 2027 evidence or conflate existing code
+  with certified 2027 parity. Report certified 2027 families separately:
+  initially 0/51 pending real independent reference acceptance.
+- Preserve the fixed 25 common-core gates and 16 AC1018 ingest milestones
+  as independent scoped metrics. Do not increment percentages for a
+  planning/target revision or partially implemented features.
+- The external AutoCAD 2018-family DWG wire format (AC1032) persists in
+  AutoCAD 2027. Original MusaCAD MC1032 (.mcad) must stay separate.
+- All existing source-integrity, fail-closed, independent C/C++ one-core
+  and no-APK-until-explicit-owner-approval rules remain binding.
+
 ## Verified sequential development — owner instruction 18 October 2026
 
 - Within an active development session, after each independently verified P0
@@ -17,7 +36,7 @@
   of a phone installation until explicit owner approval. Do not claim
   development continues while the conversation is inactive; only actual
   executed GitHub commits/tests/merges count as completed progress.
-- Certified AutoCAD 2026 functional equivalence remains separately tracked
+- Certified AutoCAD 2027 functional equivalence remains separately tracked
   from completed implementation work, with no unverified percent increases.
 
 ## MC1032 native file-format naming — binding owner decision (18 October 2026)
@@ -62,6 +81,6 @@
 3. **If ANY gate fails: read job logs, reproduce, fix the source bug or erroneous test, re-run affected and full relevant gates until green.** Do not abandon the task just because a test fails. Do not force-merge broken or stale PRs, and do not claim success while a required gate is pending.
 4. For old PRs, compare their diff to the latest `main`, preserve newer changes and cherry-pick only verified relevant code; create clean incremental PRs.
 5. **No APK creation, production/cloud deployments, storefront packages or app-store releases until the owner explicitly provides final approval.** Test-only iOS object compiles are not iPhone apps.
-6. **AutoCAD 2026 parity is NOT established by compile success.** Report separately implemented feature scope, migration status and independently reference-certified capability families (currently no family has independent full certification). Never increase a percentage without evidence.
+6. **AutoCAD 2027 parity is NOT established by compile success.** Report separately implemented feature scope, migration status and independently reference-certified capability families (currently no family has independent full certification). Never increase a percentage without evidence.
 
 When constrained, continue incrementally with honest uncompleted-work status; never say all engine functions are ported unless the entire tracked inventory, all platform builds and tests demonstrate that outcome.
