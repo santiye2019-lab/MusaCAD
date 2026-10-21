@@ -171,7 +171,6 @@ int musa_dwg_ac1018_scene_copy_verified_record(
     MusaDwgAc1018RecordProbe *out_evidence){
     if(!s||!s->objects||!s->index||!handle||!bytes||
        !capacity||!out_written||!out_evidence||
-       capacity>SIZE_MAX/sizeof(*bytes)||
        scene_output_overlaps(s,bytes,capacity)||
        scene_output_overlaps(s,out_written,sizeof(*out_written))||
        scene_output_overlaps(s,out_evidence,sizeof(*out_evidence))||
