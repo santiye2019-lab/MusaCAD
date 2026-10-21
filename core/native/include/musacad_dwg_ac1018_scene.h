@@ -49,6 +49,23 @@ int musa_dwg_ac1018_scene_probe_record_at(
 int musa_dwg_ac1018_scene_probe_record_handle(
     const MusaDwgAc1018Scene *scene,uint64_t handle,
     MusaDwgAc1018RecordProbe *out);
+/* Preserve an EXACT framed record in the uncompressed AC1018 AcDbObjects
+ * section: variable-length length prefix + original payload + CRC16.
+ * Works for ALL indexed declared types, including unknown/proxy records:
+ * no object is reserialized, interpreted as geometry, or dropped.
+ * Record existence, bounds, physical CRC and indexed 64-bit H are verified;
+ * declared type alone does NOT prove AcDb class or embedded self-H.
+ *
+ * To size the caller-owned buffer, use scene_probe_record_handle()
+ * and its record_bytes. The entire source record is copied atomically,
+ * no partial writes on short buffer, invalid output or any alias with
+ * the source scene and each other. 'capacity' can exceed exact bytes.
+ * This extraction alone is NOT a lossless DWG writer, page-map copy,
+ * owner/XREF/class interpretation or user-readable AC1032 decoder. */
+int musa_dwg_ac1018_scene_copy_verified_record(
+    const MusaDwgAc1018Scene *scene,uint64_t indexed_handle,
+    uint8_t *record_bytes,size_t capacity,size_t *out_written,
+    MusaDwgAc1018RecordProbe *out_evidence);
 /* Look up a fixed non-entity target in the cached protected R2004 scene
  * and independently verify its embedded self-H against the CRC-backed
  * scene index. Does not infer a validated AcDb semantic role; no changes

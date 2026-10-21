@@ -190,6 +190,58 @@ int main(void){
     MusaDwgAc1018Scene *s=NULL;
     assert(musa_dwg_ac1018_scene_open(file,sizeof(file),&s));
     assert(s!=NULL&&musa_dwg_ac1018_scene_handle_count(s)==2u);
+    /* Exact original decoded AcDbObjects record retention: source H,
+     * frame/CRC and opaque payload bytes are not simplified to geometry.
+     * These are source records, not a full DWG file reserialization. */
+    uint8_t original_poly[sizeof(poly_record)+5u];
+    uint8_t original_line[sizeof(line_record)+5u];
+    memset(original_poly,0xA5,sizeof(original_poly));
+    memset(original_line,0x5A,sizeof(original_line));
+    size_t copied=UINT32_MAX;
+    MusaDwgAc1018RecordProbe source_record={0};
+    assert(musa_dwg_ac1018_scene_copy_verified_record(
+              s,0x40eu,original_poly,sizeof(original_poly),
+              &copied,&source_record));
+    assert(copied==sizeof(poly_record)&&
+           source_record.handle==0x40eu&&
+           source_record.declared_type==77u&&
+           source_record.record_crc_verified&&
+           source_record.record_bytes==sizeof(poly_record)&&
+           memcmp(original_poly,poly_record,sizeof(poly_record))==0);
+    assert(original_poly[sizeof(poly_record)]==0xA5);
+    assert(musa_dwg_ac1018_scene_copy_verified_record(
+              s,0x70fu,original_line,sizeof(original_line),
+              &copied,&source_record));
+    assert(copied==sizeof(line_record)&&
+           source_record.handle==0x70fu&&
+           source_record.declared_type==19u&&
+           source_record.record_crc_verified&&
+           memcmp(original_line,line_record,sizeof(line_record))==0);
+    const MusaDwgAc1018RecordProbe saved_source=source_record;
+    const size_t saved_copied=copied;
+    uint8_t saved_original[sizeof(original_line)];
+    memcpy(saved_original,original_line,sizeof(original_line));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0x70fu,original_line,sizeof(line_record)-1u,
+                &copied,&source_record));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0x120u,original_line,sizeof(original_line),
+                &copied,&source_record));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0u,original_line,sizeof(original_line),
+                &copied,&source_record));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0x70fu,(uint8_t*)(void*)s,sizeof(original_line),
+                &copied,&source_record));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0x70fu,original_line,sizeof(original_line),
+                (size_t*)(void*)original_line,&source_record));
+    assert(!musa_dwg_ac1018_scene_copy_verified_record(
+                s,0x70fu,original_line,sizeof(original_line),
+                &copied,(MusaDwgAc1018RecordProbe*)(void*)original_line));
+    assert(copied==saved_copied&&
+           !memcmp(&source_record,&saved_source,sizeof(source_record))&&
+           !memcmp(original_line,saved_original,sizeof(original_line)));
     /* Genuine CRC-backed AC1018 indexed OPEN H=0x40e. Source vertex
      * geometry paged independently of renderer, complete original XYZ
      * and end-vertex segment exclusion. No repeated DWG parsing. */
