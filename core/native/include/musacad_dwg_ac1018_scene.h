@@ -922,6 +922,56 @@ int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
     double (*boundary_thickness_wcs)[3],uint32_t point_capacity,
     MusaDwgAc1018LwRadialFan *out);
 
+/* True variable-width BULGE RIBBON mathematical surface strips.
+ * Decode one CRC-protected R2004/AC1018 LWPOLYLINE curved segment
+ * and reuse its immutable OCS/WCS snapshot for all cross sections.
+ * Every section has actual LEFT and RIGHT signed-bulge edge coordinates
+ * in original WCS, both at OCS elevation and signed thickness.
+ *
+ * Consecutive sections i,i+1 define TWO drawable triangles on EACH
+ * face: (left[i],right[i],left[i+1]) and
+ *       (right[i],right[i+1],left[i+1]).
+ * No triangle-vertex duplication or repeated source DWG decoding.
+ * Curve-vs-straight-chord WCS deviation on either edge is bounded by
+ * M/(8*N*N) + floating guard, where M <= max|q|*sweep^2 +
+ * abs(delta_width)*abs(sweep) for
+ * q(t)=radius +/- width(t)/2 and theta'=signed sweep.
+ * No automatic CAD viewport/cache/renderer integration is claimed.
+ *
+ * Strict: only curved bulge segments, finite positive tolerance,
+ * 1 <= max_cells <= 4096, capacity >= cells+1. Failure leaves BOTH
+ * caller arrays/report and original verified DWG source untouched.
+ * Variable-width self-overlap/topological fill rules, joins/caps,
+ * linetype/lineweight and AutoCAD visual parity are NOT validated.
+ */
+typedef struct MusaDwgAc1018BulgeRibbonSection {
+    double left_wcs[3];
+    double right_wcs[3];
+    double left_thickness_wcs[3];
+    double right_thickness_wcs[3];
+} MusaDwgAc1018BulgeRibbonSection;
+typedef struct MusaDwgAc1018BulgeRibbonStrip {
+    uint64_t handle;
+    uint32_t segment_index;
+    uint32_t cell_count;
+    uint32_t section_count;
+    uint32_t triangles_per_face;
+    uint32_t triangles_both_faces;
+    double requested_chord_error;
+    double maximum_chord_deviation_bound;
+    double source_start_width;
+    double source_end_width;
+    double source_signed_sweep;
+    double minimum[3];
+    double maximum[3];
+    uint8_t full_visible_stroke_verified; /* always 0 */
+} MusaDwgAc1018BulgeRibbonStrip;
+int musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
+    const MusaDwgAc1018Scene *scene,uint64_t handle,
+    uint32_t segment_index,double max_chord_error,uint32_t max_cells,
+    MusaDwgAc1018BulgeRibbonSection *sections,
+    uint32_t section_capacity,MusaDwgAc1018BulgeRibbonStrip *out);
+
 #ifdef __cplusplus
 }
 #endif
