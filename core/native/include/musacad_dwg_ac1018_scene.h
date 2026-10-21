@@ -1070,6 +1070,40 @@ int musa_dwg_ac1018_lw_source_snapshot_read_page(
 void musa_dwg_ac1018_lw_source_snapshot_close(
     MusaDwgAc1018LwSourceSnapshot *snapshot);
 
+/* One exact original R2004 LWPOLYLINE segment from an immutable verified
+ * source vertex snapshot. OPEN objects have N-1 segments, CLOSED N: the last
+ * CLOSED segment wraps from vertex N-1 to original vertex 0. Neither width,
+ * signed bulge, nor source H is interpolated or guessed; all come from the
+ * source decoded once when creating the snapshot. No source scene needed.
+ * This is an OBJECT-LOCAL connectivity result, not whole-DWG ownership,
+ * resolved layer/visibility/color, surface stroke, B-Rep or writer parity.
+ * On bad index or any memory alias, out is left byte-for-byte unchanged. */
+typedef struct MusaDwgAc1018LwSourceSegment {
+    uint64_t source_handle;
+    uint32_t original_segment_index;
+    uint32_t start_vertex_index;
+    uint32_t end_vertex_index;
+    uint32_t original_vertex_count;
+    uint16_t source_color_index;
+    uint8_t closed;
+    uint8_t wraps_to_first_vertex;
+    uint8_t widths_from_vertices;
+    uint8_t source_identity_verified; /* self H and CRC-backed source = 1 */
+    uint8_t full_dwg_semantics_verified; /* always 0 */
+    double start_ocs_xy[2];
+    double end_ocs_xy[2];
+    double start_wcs_xyz[3];
+    double end_wcs_xyz[3];
+    double signed_bulge;
+    double source_start_width;
+    double source_end_width;
+    double thickness;
+} MusaDwgAc1018LwSourceSegment;
+int musa_dwg_ac1018_lw_source_snapshot_read_segment(
+    const MusaDwgAc1018LwSourceSnapshot *snapshot,
+    uint32_t original_segment_index,
+    MusaDwgAc1018LwSourceSegment *out);
+
 #ifdef __cplusplus
 }
 #endif
