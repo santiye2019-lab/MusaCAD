@@ -407,6 +407,20 @@ int main(int argc,char **argv){
                     " sample=%zu handle=%llu offset=%llu\\n",
                     i,(unsigned long long)e->handle,
                     (unsigned long long)e->object_offset);
+            /* Read ORIGINAL authenticated Objects section for precise
+             * on-failure diagnostics. Never weaken proof to make CI green. */
+            uint8_t *raw=(uint8_t*)malloc(object_logical);
+            size_t original_bytes=0u;
+            if(raw && musa_dwg_ac1032_extract_named_section(
+                 file,len,"AcDb:AcDbObjects",raw,object_logical,
+                 &original_bytes)&&original_bytes==object_logical){
+                const size_t at=(size_t)e->object_offset;
+                fprintf(stderr,"original R2018 object bytes at %zu:",at);
+                for(size_t k=0u;k<32u&&k<original_bytes-at;k++)
+                    fprintf(stderr," %02X",raw[at+k]);
+                fputc('\\n',stderr);
+            }
+            free(raw);
             fail("original AC1032 object record envelope",file,len);
             free(original_handles);free(entry);goto done;
         }
