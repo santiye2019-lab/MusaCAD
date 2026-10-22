@@ -230,6 +230,22 @@ int main(int argc,char **argv){
     }
     MusaDwgAc1032ClassesFrame class_frame={0};
     if(!musa_dwg_ac1032_classes_frame_probe(file,len,&class_frame)){
+        for(size_t i=0;i<section_count;i++)
+            if(!strcmp((const char*)entry[i].name,"AcDb:Classes") &&
+               entry[i].logical_bytes>=32u &&
+               entry[i].logical_bytes<=8192u){
+                const size_t n=(size_t)entry[i].logical_bytes;
+                uint8_t *bytes=(uint8_t*)calloc(n,1u);
+                size_t got=0u;
+                const int ok=bytes&&musa_dwg_ac1032_extract_named_section(
+                         file,len,"AcDb:Classes",bytes,n,&got);
+                fprintf(stderr,"Classes raw-section extraction=%d"
+                        " bytes=%zu expected=%zu first32:",ok,got,n);
+                if(ok)for(size_t j=0;j<32u;j++)
+                    fprintf(stderr," %02X",bytes[j]);
+                fputc('\n',stderr);
+                free(bytes);
+            }
         fail("first-party AC1032 Classes section framing and sentinel",
              file,len);
         free(entry);goto done;
