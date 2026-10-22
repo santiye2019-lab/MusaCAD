@@ -20,8 +20,8 @@ int main(void){
     bits(payload,&at,2u,2u); /* reactor BL 10 => zero */
     bits(payload,&at,1u,1u); /* XDic missing */
     bits(payload,&at,1u,0u); /* no datastore */
-    bits(payload,&at,1u,1u); /* no links */
-    assert(at==44u);
+    /* R2018 no-link status is implicit, no serialized bit. */
+    assert(at==43u);
     MusaDwgAc1032ObjectStreams layout={0};
     layout.indexed_handle=0x1CAu;
     layout.raw_object_type=19u;
@@ -34,7 +34,7 @@ int main(void){
     MusaDwgAc1032LinePrefix out={0};
     assert(musa_dwg_ac1032_line_prefix_bytes(payload,sizeof(payload),
         &layout,&out));
-    assert(out.indexed_handle==0x1CAu&&out.next_color_bit==44u);
+    assert(out.indexed_handle==0x1CAu&&out.next_color_bit==43u);
     assert(out.entity_mode==2u&&out.xdictionary_missing==1u);
     assert(out.prefix_decoded&&out.reactor_count==0u);
     const MusaDwgAc1032LinePrefix saved=out;
@@ -65,8 +65,8 @@ int main(void){
     bits(full,&bit,8u,0xCAu);bits(full,&bit,2u,2u);
     bits(full,&bit,1u,0u);bits(full,&bit,2u,2u);
     bits(full,&bit,2u,2u);bits(full,&bit,1u,1u);
-    bits(full,&bit,1u,0u);bits(full,&bit,1u,1u);
-    assert(bit==44u);
+    bits(full,&bit,1u,0u);
+    assert(bit==43u);
     bits(full,&bit,2u,3u); /* ENC: BYLAYER ACI 256 */
     bits(full,&bit,2u,1u); /* BD linetype scale 1.0 */
     bits(full,&bit,2u,0u); /* linetype BYLAYER */
@@ -77,7 +77,7 @@ int main(void){
     bits(full,&bit,1u,0u); /* visualstyle overrides */
     bits(full,&bit,2u,2u); /* invisible=0 */
     bits(full,&bit,8u,29u); /* lineweight BYLAYER */
-    assert(bit==75u);
+    assert(bit==74u);
     MusaDwgAc1032ObjectStreams full_layout=layout;
     full_layout.total_payload_bits=sizeof(full)*8u;
     full_layout.data_stream_bits=sizeof(full)*8u-8u;
@@ -85,13 +85,13 @@ int main(void){
     MusaDwgAc1032LineCommon common={0};
     assert(musa_dwg_ac1032_line_common_bytes(full,sizeof(full),
            &full_layout,&common));
-    assert(common.common_decoded&&common.geometry_start_bit==75u);
+    assert(common.common_decoded&&common.geometry_start_bit==74u);
     assert(common.color_index==256u&&common.linetype_scale==1.0);
     assert(common.lineweight==29u&&common.visualstyle_flags==0u);
     const MusaDwgAc1032LineCommon preserve=common;
-    full_layout.data_stream_bits=75u;
-    full_layout.handle_stream_start_bit=75u;
-    full_layout.handle_stream_bits=sizeof(full)*8u-75u;
+    full_layout.data_stream_bits=74u;
+    full_layout.handle_stream_start_bit=74u;
+    full_layout.handle_stream_bits=sizeof(full)*8u-74u;
     assert(!musa_dwg_ac1032_line_common_bytes(full,sizeof(full),
            &full_layout,&common));
     assert(!memcmp(&preserve,&common,sizeof(preserve)));
