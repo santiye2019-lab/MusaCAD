@@ -137,6 +137,7 @@ static int scan(const uint8_t *file,size_t file_bytes,
         const uint8_t *record=decoded+at;
         const uint64_t logical=get64(record);
         const uint32_t npage=get32(record+8u);
+        const uint32_t logical_page_bytes=get32(record+12u);
         const uint32_t compression=get32(record+20u);
         const uint32_t section_id=get32(record+24u);
         const uint32_t encrypted=get32(record+28u);
@@ -145,8 +146,15 @@ static int scan(const uint8_t *file,size_t file_bytes,
         if(npage>num||(size_t)npage>(expanded-at)/16u)goto finish;
         const int match=!memcmp(name,wanted,wanted_size)&&
                         name[wanted_size]==0u;
+        const int empty_section=(!name[0] && !logical &&
+                                  !npage && !section_id &&
+                                  compression==2u && encrypted==0u);
         if(catalog_mode){
-            if(!memchr(name,0,64u)||!name[0])goto finish;
+            /* Genuine AC1032 may contain a single empty physical
+             * placeholder section (id 0 / 0 pages). This must stay in
+             * the complete directory rather than being silently lost. */
+            if(!memchr(name,0,64u)||
+               (!name[0]&&!empty_section))goto finish;
             for(uint32_t prev=0u;prev<i;prev++){
                 /* A section name is NUL-terminated. Different trailing
                  * padding must not bypass duplicate-name rejection. Keep
@@ -165,10 +173,18 @@ static int scan(const uint8_t *file,size_t file_bytes,
             catalog[i].all_physical_page_checksums_verified=1u;
         }
         if(match||catalog_mode) {
+            if(empty_section && catalog_mode){
+                /* Preserve but do not fabricate physical data for it. */
+                at+=(size_t)npage*16u;
+                continue;
+            }
             if((match&&found)||!logical||logical>128u*1024u*1024u||
-               logical>SIZE_MAX||!section_id||compression!=2u||
-               encrypted!=0u||!npage||
-               npage!=(logical-1u)/R2004_BLOCK+1u)goto finish;
+               logical>SIZE_MAX||!section_id||
+               (compression!=1u&&compression!=2u)||
+               encrypted!=0u||!npage||!logical_page_bytes||
+               logical_page_bytes>128u*1024u*1024u||
+               npage!=(logical-1u)/logical_page_bytes+1u)
+                goto finish;
             if(match)found=1;
             selected.section_id=section_id;
             selected.compression=compression;
@@ -184,7 +200,7 @@ static int scan(const uint8_t *file,size_t file_bytes,
                 const uint32_t packed_bytes=get32(entry+4u);
                 const uint64_t logical_offset=get64(entry+8u);
                 if(!pid||!packed_bytes||
-                   logical_offset!=(uint64_t)j*R2004_BLOCK)
+                   logical_offset!=(uint64_t)j*logical_page_bytes)
                     goto finish;
                 size_t slot=0u;
                 const MusaDwgAc1018PageLocation *loc=
