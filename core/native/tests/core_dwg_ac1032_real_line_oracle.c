@@ -10,6 +10,7 @@
 #include "musacad_dwg_ac1032_object_streams.h"
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,38 @@ static void diagnose_line(const uint8_t *f,size_t n){
          hdr_ok,loc_ok,hdr.page_count,phys,hdr.page_map_id,
          hdr.section_map_id,(unsigned long long)hdr.page_map_offset,
          hdr.map_compressed_bytes,hdr.map_decoded_bytes);
+    if(hdr_ok&&hdr.map_decoded_bytes>0u&&
+       hdr.map_decoded_bytes<=65536u&&
+       hdr.page_map_offset+20u+hdr.map_compressed_bytes<=n){
+        uint8_t *plain=(uint8_t*)malloc(hdr.map_decoded_bytes);
+        size_t used=0u;
+        const int ok=plain&&musa_dwg_ac1018_lz_decode(
+             f+(size_t)hdr.page_map_offset+20u,
+             hdr.map_compressed_bytes,plain,hdr.map_decoded_bytes,&used);
+        fprintf(stderr,"Original LINE map LZ=%d used=%zu expanded=%u\\n",
+                ok,used,hdr.map_decoded_bytes);
+        if(ok){
+            uint64_t offset=256u;
+            for(size_t pos=0u;pos+8u<=hdr.map_decoded_bytes;){
+                const uint32_t id=(uint32_t)plain[pos]|
+                  ((uint32_t)plain[pos+1u]<<8u)|
+                  ((uint32_t)plain[pos+2u]<<16u)|
+                  ((uint32_t)plain[pos+3u]<<24u);
+                const uint32_t span=(uint32_t)plain[pos+4u]|
+                  ((uint32_t)plain[pos+5u]<<8u)|
+                  ((uint32_t)plain[pos+6u]<<16u)|
+                  ((uint32_t)plain[pos+7u]<<24u);
+                const int gap=(id&UINT32_C(0x80000000))!=0;
+                fprintf(stderr,"Original LINE physical entry offset=%zu"
+                     " id=%08X span=%u physical=%llu gap=%d\\n",
+                     pos,id,span,(unsigned long long)offset,gap);
+                const size_t stride=gap?24u:8u;
+                if(hdr.map_decoded_bytes-pos<stride)break;
+                pos+=stride;offset+=span;
+            }
+        }
+        free(plain);
+    }
     fprintf(stderr,"Original LINE encrypted header at 0x80 first 24 bytes:");
     if(n>=0x98u)for(size_t k=0x80u;k<0x98u;k++)
         fprintf(stderr," %02X",f[k]);
