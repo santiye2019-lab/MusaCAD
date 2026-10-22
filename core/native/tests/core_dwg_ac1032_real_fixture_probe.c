@@ -10,7 +10,9 @@
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1032_classes.h"
 #include "musacad_dwg_ac1032_handles.h"
+#include "musacad_dwg_ac1032_record.h"
 #include "musacad_dwg_ac1018_lz.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -388,6 +390,65 @@ int main(int argc,char **argv){
             index_count,
             (unsigned long long)original_handles[0].handle,
             (unsigned long long)original_handles[0].object_offset);
+
+    /* GENUINE original R2018 object MS/MC/CRC envelopes from real indexed
+     * handles. A successful physical page or handle map alone is NOT
+     * evidence of an actual object record decode. */
+    const size_t source_samples[3]={0u,index_count/2u,index_count-1u};
+    for(size_t i=0u;i<3u;i++){
+        const MusaDwgAc1032HandleEntry *e=&original_handles[source_samples[i]];
+        MusaDwgAc1032RecordEnvelope record={0};
+        if(!musa_dwg_ac1032_record_envelope_file(
+                file,len,e->handle,&record)||
+           !record.record_crc_verified||
+           record.indexed_handle!=e->handle||
+           record.object_section_offset!=e->object_offset||
+           record.payload_bytes<2u||record.total_record_bytes<7u){
+            fprintf(stderr,"REAL R2018 object MS/MC/CRC rejected"
+                    " sample=%zu handle=%llu offset=%llu\\n",
+                    i,(unsigned long long)e->handle,
+                    (unsigned long long)e->object_offset);
+            /* Read ORIGINAL authenticated Objects section for precise
+             * on-failure diagnostics. Never weaken proof to make CI green. */
+            uint8_t *raw=(uint8_t*)malloc(object_logical);
+            size_t original_bytes=0u;
+            if(raw && musa_dwg_ac1032_extract_named_section(
+                 file,len,"AcDb:AcDbObjects",raw,object_logical,
+                 &original_bytes)&&original_bytes==object_logical){
+                const size_t at=(size_t)e->object_offset;
+                fprintf(stderr,"original R2018 object bytes at %zu:",at);
+                for(size_t k=0u;k<32u&&k<original_bytes-at;k++)
+                    fprintf(stderr," %02X",raw[at+k]);
+        
+                if(original_bytes-at>512u){
+                    const size_t ms=(size_t)raw[at]|((size_t)raw[at+1u]<<8u);
+                    fprintf(stderr,"record MS=%zu first MC=%02X %02X "
+                          "next indexed offset=%llu\\n",ms,
+                          raw[at+2u],raw[at+3u],
+                          (unsigned long long)original_handles[1u].object_offset);
+                    for(int delta=-4;delta<=4;delta++){
+                        const size_t crcpos=at+2u+ms+(size_t)((int64_t)delta);
+                        if(crcpos<at||crcpos+2u>original_bytes)continue;
+                        uint16_t crc=0u;
+                        if(musa_core_crc16_arc(0xc0c1u,raw+at,crcpos-at,&crc))
+                          fprintf(stderr,
+                            "record CRC delta %+d computed=%04X storedLE=%04X storedBE=%04X\\n",
+                            delta,crc,
+                            (unsigned)(raw[crcpos]|(raw[crcpos+1u]<<8u)),
+                            (unsigned)((raw[crcpos]<<8u)|raw[crcpos+1u]));
+                    }
+                }
+        fputc('\n',stderr);
+            }
+            free(raw);
+            fail("original AC1032 object record envelope",file,len);
+            free(original_handles);free(entry);goto done;
+        }
+        fprintf(stderr,"PASS original AC1032 indexed object envelope:"
+               " handle=%llu payload=%u handle_bits=%u CRC=verified\\n",
+               (unsigned long long)record.indexed_handle,
+               record.payload_bytes,record.handle_stream_bits);
+    }
     free(original_handles);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
