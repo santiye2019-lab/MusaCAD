@@ -34,6 +34,25 @@ typedef struct MusaDwgAc1032ClassIdentityPrefix {
 int musa_dwg_ac1032_classes_identity_prefix(
     const uint8_t *file,size_t bytes,
     MusaDwgAc1032ClassIdentityPrefix *out);
+
+/* Independently decode ALL NUMERIC class-record metadata (not class
+ * names; the R2007+ TU strings live in a separate Unicode stream).
+ * Ordered by original source class index; class numbers and declared
+ * type 0x1f2 entity / 0x1f3 object are verified. No class contents or
+ * AcDbObject layout are interpreted, no DWG reserialization.
+ * On error, output records and out_count are unchanged. Query counts
+ * with records=NULL, capacity=0; all source bytes remain unchanged. */
+typedef struct MusaDwgAc1032ClassNumeric {
+    uint16_t class_number,proxy_flags,item_class_id;
+    uint16_t dwg_version,maintenance_version;
+    uint8_t was_proxy;
+    uint32_t object_instance_count;
+    uint32_t unknown_number1,unknown_number2;
+} MusaDwgAc1032ClassNumeric;
+int musa_dwg_ac1032_classes_numeric_records(
+    const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1032ClassNumeric *records,size_t capacity,
+    size_t *out_count);
 #ifdef __cplusplus
 }
 #endif
