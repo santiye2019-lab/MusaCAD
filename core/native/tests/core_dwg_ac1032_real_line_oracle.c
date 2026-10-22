@@ -224,6 +224,25 @@ int main(int argc,char **argv){
         f[0]=first;goto done;
     }
     f[0]=first;
+    /* The 108-byte repeat at EOF is NOT arbitrary trailing garbage:
+     * corrupting even one byte must reject the complete file page map
+     * atomically rather than ignoring unindexed bytes. */
+    size_t original_page_count=0u;
+    if(bytes<110u||!musa_dwg_ac1032_page_locations(
+         f,bytes,NULL,0u,&original_page_count)||
+       !original_page_count){goto done;}
+    const uint8_t last_byte=f[bytes-1u];
+    f[bytes-1u]^=1u;
+    size_t unchanged_count=original_page_count;
+    const int wrongly_accepted=musa_dwg_ac1032_page_locations(
+         f,bytes,NULL,0u,&unchanged_count);
+    f[bytes-1u]=last_byte;
+    if(wrongly_accepted||unchanged_count!=original_page_count){
+        fprintf(stderr,"FAIL appended secondary-header tamper was accepted\n");
+        goto done;
+    }
+    fprintf(stderr,"PASS R2018 authentic repeated second header:"
+         " physical_pages=%zu tamper_rejected=1\n",original_page_count);
     fprintf(stderr,"PASS original AC1032 AutoCAD LINE:"
         " indexed_handle=0x%llX raw_OT=%u payload=%zu"
         " DATA_bits=%llu HANDLES_bits=%llu source_CRC=verified\n",
