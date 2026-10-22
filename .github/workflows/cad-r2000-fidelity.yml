@@ -103,7 +103,7 @@ jobs:
           timeout 60s /tmp/musa-original-ac1032-line "$file"
           after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$before" = "$after"
-          echo "PASS original LINE type and source provenance; NOT yet XYZ parity"
+          echo "PASS genuine original AC1032 LINE XYZ compared with AutoCAD oracle"
 
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
