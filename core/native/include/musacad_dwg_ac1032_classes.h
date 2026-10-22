@@ -64,6 +64,25 @@ typedef struct MusaDwgAc1032ClassTextRegion {
 int musa_dwg_ac1032_classes_text_region(const uint8_t *file,
     size_t file_bytes,MusaDwgAc1032ClassTextRegion *out);
 
+
+/* Source-backed R2018 class name triplets. Each returned string is UTF-8
+ * converted from the verified DWG TU UCS-2/UTF-16 string bit stream.
+ * Indices match musa_dwg_ac1032_classes_numeric_records in file order.
+ * Original class/object semantics are not inferred from spelling.
+ * The fixed per-name limit fails CLOSED on oversize/invalid sequences.
+ * Query with entries=NULL/capacity=0; no partial output on error. */
+#define MUSA_AC1032_CLASS_NAME_UTF8 256u
+typedef struct MusaDwgAc1032ClassNames {
+    uint16_t class_number;
+    char application[MUSA_AC1032_CLASS_NAME_UTF8];
+    char cpp_class[MUSA_AC1032_CLASS_NAME_UTF8];
+    char dxf_name[MUSA_AC1032_CLASS_NAME_UTF8];
+} MusaDwgAc1032ClassNames;
+int musa_dwg_ac1032_classes_names(
+    const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1032ClassNames *entries,size_t capacity,
+    size_t *out_count);
+
 #ifdef __cplusplus
 }
 #endif

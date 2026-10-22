@@ -311,3 +311,85 @@ int musa_dwg_ac1032_classes_text_region(
     if(!ok)return 0;
     *out=region;return 1;
 }
+
+/* AC1032 Unicode class names are sourced from the verified string stream. */
+
+static int musacad_class_emit_utf8(uint32_t cp,char *dst,size_t cap,size_t *n){
+    if(!cp||cp>0x10ffffu||(cp>=0xd800u&&cp<=0xdfffu))return 0;
+    const size_t k=cp<128u?1u:cp<2048u?2u:cp<65536u?3u:4u;
+    if(*n>=cap||k>=cap-*n)return 0;
+    if(k==4u)dst[(*n)++]=(char)(0xf0u|(cp>>18u));
+    if(k>=3u)dst[(*n)++]=(char)((k==3u?0xe0u:0x80u)|((cp>>(k==3u?12u:12u))&(k==3u?15u:63u)));
+    if(k>=2u)dst[(*n)++]=(char)((k==2u?0xc0u:0x80u)|((cp>>6u)&(k==2u?31u:63u)));
+    dst[(*n)++]=(char)((k==1u?0u:0x80u)|(cp&(k==1u?127u:63u)));
+    dst[*n]=0;return 1;
+}
+
+static int musacad_class_read_tu(DwgClassBits *cur,char *name,size_t cap){
+    DwgClassBits b=*cur;uint16_t units=0u;size_t used=0u;
+    if(!bitshort(&b,&units)||units>2048u||
+       (size_t)units>(b.valid_bits-b.at)/16u)return 0;
+    name[0]=0;
+    for(unsigned k=0u;k<units;k++){
+        uint32_t unit=0u;
+        if(!lebytes(&b,2u,&unit))return 0;
+        if(!musacad_class_emit_utf8(unit,name,cap,&used))return 0;
+    }
+    *cur=b;return 1;
+}
+
+int musa_dwg_ac1032_classes_names(
+    const uint8_t *file,size_t len,MusaDwgAc1032ClassNames *names,
+    size_t cap,size_t *count){
+    if(!file||!count||len<256u||len>64u*1024u*1024u||
+       (!names&&cap)||!nonoverlap(file,len,count,sizeof(*count)))
+        return 0;
+    if(names&&(cap>SIZE_MAX/sizeof(*names)||
+       !nonoverlap(file,len,names,cap*sizeof(*names))||
+       !nonoverlap(count,sizeof(*count),names,cap*sizeof(*names))))
+        return 0;
+    MusaDwgAc1032ClassTextRegion text={0};
+    MusaDwgAc1032ClassesFrame frame={0};
+    size_t n=0u;
+    if(!musa_dwg_ac1032_classes_text_region(file,len,&text)||
+       !text.present||!text.source_verified||
+       !musa_dwg_ac1032_classes_frame_probe(file,len,&frame)||
+       !musa_dwg_ac1032_classes_numeric_records(file,len,NULL,0u,&n)||
+       !n||n>4096u||(names&&cap<n))return 0;
+    MusaDwgAc1032ClassNumeric *ids=calloc(n,sizeof(*ids));
+    MusaDwgAc1032ClassNames *temp=calloc(n,sizeof(*temp));
+    uint8_t *plain=malloc((size_t)frame.section_logical_bytes);
+    if(!ids||!temp||!plain){
+        free(ids);free(temp);free(plain);return 0;
+    }
+    size_t read_count=0u,read_bytes=0u;
+    int ok=musa_dwg_ac1032_classes_numeric_records(
+          file,len,ids,n,&read_count)&&read_count==n&&
+       musa_dwg_ac1032_extract_named_section(file,len,"AcDb:Classes",
+          plain,(size_t)frame.section_logical_bytes,&read_bytes)&&
+          read_bytes==frame.section_logical_bytes;
+
+    if(ok){
+        const uint64_t end=text.start_bit+text.length_bits;
+        if(end<text.start_bit||end>read_bytes*8u)ok=0;
+        else{
+            DwgClassBits bits={plain,(size_t)end,(size_t)text.start_bit};
+            for(size_t i=0u;i<n&&ok;i++){
+                temp[i].class_number=ids[i].class_number;
+                ok=musacad_class_read_tu(&bits,temp[i].application,
+                      sizeof(temp[i].application))&&
+                   musacad_class_read_tu(&bits,temp[i].cpp_class,
+                      sizeof(temp[i].cpp_class))&&
+                   musacad_class_read_tu(&bits,temp[i].dxf_name,
+                      sizeof(temp[i].dxf_name));
+            }
+            if(ok&&bits.at!=end)ok=0;
+        }
+    }
+    if(ok){
+        if(names)memcpy(names,temp,n*sizeof(*names));
+        *count=n;
+    }
+    free(plain);free(temp);free(ids);
+    return ok;
+}
