@@ -104,6 +104,10 @@ if(PROJECT_IS_TOP_LEVEL)
         add_executable(musacad_core_ac1032_sections_test tests/core_dwg_ac1032_sections_test.c)
         target_link_libraries(musacad_core_ac1032_sections_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_physical_section_extraction COMMAND musacad_core_ac1032_sections_test)
+        # DWG MSB-first BL/BS codes in the NEW verified AC1032 Classes reader.
+        add_executable(musacad_core_ac1032_class_bits_test tests/core_dwg_ac1032_class_bit_prefix_test.c)
+        target_link_libraries(musacad_core_ac1032_class_bits_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_classes_bit_codes COMMAND musacad_core_ac1032_class_bits_test)
         # End-to-end raw R2004 DWG section extraction; verified maps and page CRCs.
         add_executable(musacad_core_ac1018_full_section_extract_test tests/core_dwg_ac1018_full_section_extract_test.c)
         target_link_libraries(musacad_core_ac1018_full_section_extract_test PRIVATE musacad_core)
