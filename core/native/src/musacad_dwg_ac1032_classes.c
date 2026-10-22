@@ -313,3 +313,14 @@ int musa_dwg_ac1032_classes_text_region(
 }
 
 /* AC1032 Unicode class names are sourced from the verified string stream. */
+
+static int musacad_class_emit_utf8(uint32_t cp,char *dst,size_t cap,size_t *n){
+    if(!cp||cp>0x10ffffu||(cp>=0xd800u&&cp<=0xdfffu))return 0;
+    const size_t k=cp<128u?1u:cp<2048u?2u:cp<65536u?3u:4u;
+    if(*n>=cap||k>=cap-*n)return 0;
+    if(k==4u)dst[(*n)++]=(char)(0xf0u|(cp>>18u));
+    if(k>=3u)dst[(*n)++]=(char)((k==3u?0xe0u:0x80u)|((cp>>(k==3u?12u:12u))&(k==3u?15u:63u)));
+    if(k>=2u)dst[(*n)++]=(char)((k==2u?0xc0u:0x80u)|((cp>>6u)&(k==2u?31u:63u)));
+    dst[(*n)++]=(char)((k==1u?0u:0x80u)|(cp&(k==1u?127u:63u)));
+    dst[*n]=0;return 1;
+}
