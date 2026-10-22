@@ -82,6 +82,29 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 original AC1032 AutoCAD LINE indexed source + reference provenance
+        run: |
+          set -euo pipefail
+          # An ORIGINAL 2018-family DWG with matching AutoCAD property text;
+          # the first-party probe links ONLY musacad_core (NO LibreDWG).
+          file=third_party/libredwg/test/test-data/2018/Line.dwg
+          oracle=third_party/libredwg/test/test-data/2018/Line.txt
+          test -s "$file"
+          test -s "$oracle"
+          test "$(head -c 6 "$file")" = AC1032
+          grep -F 'Handle (RO) = "1CA"' "$oracle"
+          grep -F 'StartPoint = (21.6078 2.81192 0.0)' "$oracle"
+          grep -F 'EndPoint = (11.0307 16.6375 0.0)' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_line_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-line
+          timeout 60s /tmp/musa-original-ac1032-line "$file"
+          after="$(sha256sum "$file" | cut -d ' ' -f1)"
+          test "$before" = "$after"
+          echo "PASS original LINE type and source provenance; NOT yet XYZ parity"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
