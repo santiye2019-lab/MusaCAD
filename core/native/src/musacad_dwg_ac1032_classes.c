@@ -311,3 +311,5 @@ int musa_dwg_ac1032_classes_text_region(
     if(!ok)return 0;
     *out=region;return 1;
 }
+
+/* AC1032 Unicode class names are sourced from the verified string stream. */
