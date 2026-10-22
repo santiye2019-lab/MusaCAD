@@ -98,5 +98,131 @@ int main(void){
          source,1080u,MUSA_DWG_AC1032_HANDLES,
          page,2u,&info,&count));
     assert(!memcmp(&info,&saved,sizeof(saved)));
+    /* New feature: complete protected section DIRECTORY, including
+     * non-geometry/unknown sections, with no partial result. */
+    memcpy(source,before,sizeof(source));
+    MusaDwgAc1032SectionCatalogEntry catalog[2]={{0}},backup[2]={{0}};
+    size_t catalog_count=999u;
+    assert(musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),NULL,0u,&catalog_count));
+    assert(catalog_count==2u);
+    assert(musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==2u&&
+           !strcmp((const char*)catalog[0].name,"AcDb:AcDbObjects")&&
+           !strcmp((const char*)catalog[1].name,"AcDb:Handles")&&
+           catalog[0].section_id==11u&&
+           catalog[1].section_id==10u&&
+           catalog[0].page_count==1u&&catalog[1].page_count==1u&&
+           catalog[0].all_physical_page_checksums_verified&&
+           catalog[1].all_physical_page_checksums_verified);
+    memcpy(backup,catalog,sizeof(backup));
+    size_t previous_catalog_count=catalog_count;
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,1u,&catalog_count));
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),
+                (MusaDwgAc1032SectionCatalogEntry*)(void*)source,
+                2u,&catalog_count));
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,
+                (size_t*)(void*)catalog));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
+    source[608u]^=1u; /* corrupt Handles: catalog must inspect ALL pages */
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
+    memcpy(source,before,sizeof(source));
+    /* Re-label second descriptor as original unknown content, keeping
+     * physical record and map CRC independently valid. */
+    const size_t second_name=768u+20u+2u+132u+32u;
+    memset(source+second_name,0,64u);
+    memcpy(source+second_name,"AcDb:AcDsPrototype_1b",22u);
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    assert(musa_dwg_ac1032_section_catalog(
+               source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==2u&&
+           !strcmp((const char*)catalog[1].name,"AcDb:AcDsPrototype_1b")&&
+           catalog[1].all_physical_page_checksums_verified);
+    assert(!musa_dwg_ac1032_section_pages(
+               source,sizeof(source),MUSA_DWG_AC1032_HANDLES,
+               page,2u,&info,&count)); /* no fabricated Handles section */
+    /* NEW: extract unknown (renamed) section's original opaque bytes,
+     * never pretending the payload is an R2018 AcDb or R2004 HANDLE map. */
+    uint8_t raw_unknown[24],raw_objects[sizeof(poly_record)+sizeof(line_record)+2u];
+    memset(raw_unknown,0x5Au,sizeof(raw_unknown));
+    memset(raw_objects,0x6Bu,sizeof(raw_objects));
+    size_t named_written=999u;
+    uint8_t renamed_good[sizeof(source)];
+    memcpy(renamed_good,source,sizeof(source));
+    assert(musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_unknown,sizeof(raw_unknown),&named_written));
+    assert(named_written==sizeof(expected)&&
+           !memcmp(raw_unknown,expected,sizeof(expected))&&
+           raw_unknown[named_written]==0x5Au);
+    assert(musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDbObjects",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(named_written==sizeof(poly_record)+sizeof(line_record)&&
+           !memcmp(raw_objects,poly_record,sizeof(poly_record))&&
+           !memcmp(raw_objects+sizeof(poly_record),
+                   line_record,sizeof(line_record))&&
+           raw_objects[named_written]==0x6Bu);
+    assert(!memcmp(source,renamed_good,sizeof(source)));
+    size_t previous_named=named_written;
+    uint8_t preserved_objects[sizeof(raw_objects)];
+    memcpy(preserved_objects,raw_objects,sizeof(raw_objects));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:Handles",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_unknown,sizeof(expected)-1u,&named_written));
+    char too_long[65];
+    memset(too_long,'X',sizeof(too_long));
+    too_long[64]='\0';
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),too_long,
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            (uint8_t*)(void*)source,sizeof(source),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_objects,sizeof(raw_objects),(size_t*)(void*)raw_objects));
+    assert(previous_named==named_written&&
+           !memcmp(preserved_objects,raw_objects,sizeof(raw_objects)));
+    source[288u]^=1u;  /* even an UNSELECTED corrupt page fails */
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(previous_named==named_written&&
+           !memcmp(preserved_objects,raw_objects,sizeof(raw_objects)));
+    memcpy(source,renamed_good,sizeof(source));
+    /* Two descriptors with the same name must be rejected without writes
+     * even when the section-map checksum has been regenerated. */
+    memset(source+second_name,0,64u);
+    memcpy(source+second_name,"AcDb:AcDbObjects",16u);
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    memcpy(backup,catalog,sizeof(backup));
+    previous_catalog_count=catalog_count;
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
+    /* Same NUL-terminated section name with different original 64-byte
+     * trailing bytes is STILL a duplicate and must fail closed. */
+    source[second_name+63u]=0xA5u;
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
     return 0;
 }

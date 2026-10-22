@@ -34,6 +34,48 @@ int musa_dwg_ac1032_extract_section(
     const uint8_t *file,size_t file_bytes,MusaDwgAc1032SectionKind kind,
     uint8_t *output,size_t capacity,size_t *out_bytes);
 
+
+/* Complete physical AC1032 section DIRECTORY, including unrecognized
+ * sections needed to retain independent class, annotation, XREF and ACIS
+ * data in a future lossless database. Raw name bytes are copied exactly.
+ * Does NOT interpret any version-specific class or object payload.
+ *
+ * The entire section directory and each referenced physical data page are
+ * validated, not just selected Objects/Handles. Duplicate section names,
+ * section IDs or shared data-page IDs fail closed. Unsupported/empty or
+ * encrypted sections fail closed rather than silently dropping records.
+ * Caller output and original source never change on failure.
+ *
+ * entries=NULL/capacity=0: verified count query. A non-NULL entries
+ * requires capacity for ALL directory records; no partial output.
+ */
+typedef struct MusaDwgAc1032SectionCatalogEntry {
+    uint8_t name[64];             /* original fixed 64-byte name, NUL within */
+    uint64_t logical_bytes;
+    uint32_t section_id;
+    uint32_t page_count;
+    uint32_t compression;
+    uint32_t encryption;
+    uint8_t all_physical_page_checksums_verified;
+} MusaDwgAc1032SectionCatalogEntry;
+int musa_dwg_ac1032_section_catalog(
+    const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1032SectionCatalogEntry *entries,size_t capacity,
+    size_t *out_count);
+
+/* Extract ANY verified physical AC1032 section by its exact original
+ * NUL-terminated name (1..63 bytes), including unknown sections (e.g.
+ * classes/metadata) not handled by the fixed Objects/Handles APIs.
+ * The WHOLE catalog and all referenced page checksums are verified first,
+ * so corrupt unselected sections cannot silently disappear. Section bytes
+ * are returned as opaque originals, NOT R2004 or R2018 typed objects.
+ * Caller must size output from section_catalog()'s logical_bytes.
+ * On any failure original source, output and out_bytes are unchanged.
+ * Source / output / count must not alias each other. No DWG writer claim. */
+int musa_dwg_ac1032_extract_named_section(
+    const uint8_t *file,size_t file_bytes,const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes);
+
 #ifdef __cplusplus
 }
 #endif
