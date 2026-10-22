@@ -155,6 +155,14 @@ static int scan(const uint8_t *file,size_t file_bytes,
         const int empty_section=(!name[0] && !logical &&
                                   !npage && !section_id &&
                                   compression==2u && encrypted==0u);
+        /* Genuine small original 2018/Line.dwg has a named Template
+         * descriptor declaring 4 bytes but with zero physical pages.
+         * This is CATALOG evidence only; never fabricate section bytes
+         * or allow a read/extract call to treat it as physical data. */
+        const int header_only_template=modern&&catalog_mode&&
+             !strcmp((const char*)name,"AcDb:Template")&&
+             logical==4u&&npage==0u&&section_id!=0u&&
+             compression==2u&&encrypted==0u;
         if(catalog_mode){
             /* Genuine AC1032 may contain a single empty physical
              * placeholder section (id 0 / 0 pages). This must stay in
@@ -179,15 +187,21 @@ static int scan(const uint8_t *file,size_t file_bytes,
             catalog[i].all_physical_page_checksums_verified=1u;
         }
         if(match||catalog_mode) {
-            if(empty_section && catalog_mode){
-                /* Preserve but do not fabricate physical data for it. */
+            if((empty_section&&catalog_mode)||header_only_template){
+                /* Physical catalog records may have no DATA pages.
+                 * Never expose one as an extractable logical section. */
                 at+=(size_t)npage*16u;
                 continue;
             }
             if((match&&found)||!logical||logical>128u*1024u*1024u||
                logical>SIZE_MAX||!section_id||
                (compression!=1u&&compression!=2u)||
-               encrypted!=0u||!npage||!logical_page_bytes||
+               /* Some catalog sections (e.g. FileDepList) are
+                * deliberately encrypted. Validate all physical CRCs
+                * and metadata, but NEVER decode/export those sections
+                * via the named extraction interface. */
+               (encrypted!=0u&&!(catalog_mode&&modern&&encrypted==2u))||
+               !npage||!logical_page_bytes||
                logical_page_bytes>128u*1024u*1024u||
                npage!=(logical-1u)/logical_page_bytes+1u)
                 goto finish;
