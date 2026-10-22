@@ -8,6 +8,7 @@
  * checksums. No entity, class graph, XREF or edit/save claim. */
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_sections.h"
+#include "musacad_dwg_ac1032_classes.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -226,6 +227,36 @@ int main(int argc,char **argv){
         fprintf(stderr,"PASS first-party opaque AC1032 section '%s': %zu bytes\n",
                 extracts[i],written);
         free(plain);
+    }
+    MusaDwgAc1032ClassesFrame class_frame={0};
+    if(!musa_dwg_ac1032_classes_frame_probe(file,len,&class_frame)){
+        fail("first-party AC1032 Classes section framing and sentinel",
+             file,len);
+        free(entry);goto done;
+    }
+    if(!class_frame.original_sentinel_verified||
+       !class_frame.page_crcs_verified||
+       !class_frame.class_area_bytes||!class_frame.total_data_bits){
+        fail("uncertified original R2018 classes frame",file,len);
+        free(entry);goto done;
+    }
+    fprintf(stderr,"PASS real AC1032 Classes frame: area=%u bytes"
+            " bits=%u physical_section=%u\n",
+            class_frame.class_area_bytes,class_frame.total_data_bits,
+            class_frame.section_id);
+    const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
+    const uint8_t original_sig=file[0];
+    file[0]=(uint8_t)(original_sig^1u);
+    if(musa_dwg_ac1032_classes_frame_probe(file,len,&class_frame)){
+        fail("wrong AC1032 signature incorrectly accepted by class probe",file,len);
+        file[0]=original_sig;free(entry);goto done;
+    }
+    file[0]=original_sig;
+    if(memcmp(&class_frame,&saved_classes,sizeof(saved_classes))||
+       musa_dwg_ac1032_classes_frame_probe(file,len,
+            (MusaDwgAc1032ClassesFrame*)(void*)(file+32u))){
+        fail("Classes invalid input not rejected atomically",file,len);
+        free(entry);goto done;
     }
     free(entry);
     fprintf(stderr,
