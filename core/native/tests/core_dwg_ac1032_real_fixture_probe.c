@@ -47,6 +47,9 @@ int main(int argc,char **argv){
     }
     MusaDwgAc1032FileMapHeader header={0};
     if(!musa_dwg_ac1032_page_map_header(file,len,&header)){
+        fprintf(stderr,"First 32 original bytes at 0x80:");
+        for(size_t i=0;i<32u;i++)fprintf(stderr," %02X",file[0x80u+i]);
+        fputc('\n',stderr);
         fail("protected R2018 header/page-map envelope",file,len);goto done;
     }
     fprintf(stderr,"PASS original AC1032 protected map header:"
