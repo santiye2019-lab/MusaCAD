@@ -123,8 +123,12 @@ static int scan(const uint8_t *file,size_t file_bytes,
         if(catalog_mode){
             if(!memchr(name,0,64u)||!name[0])goto finish;
             for(uint32_t prev=0u;prev<i;prev++){
+                /* A section name is NUL-terminated. Different trailing
+                 * padding must not bypass duplicate-name rejection. Keep
+                 * the entire 64-byte raw spelling in the saved catalog. */
                 if(catalog[prev].section_id==section_id||
-                   !memcmp(catalog[prev].name,name,64u))
+                   !strcmp((const char*)catalog[prev].name,
+                           (const char*)name))
                     goto finish;
             }
             memcpy(catalog[i].name,name,64u);
