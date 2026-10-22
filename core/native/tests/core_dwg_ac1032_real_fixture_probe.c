@@ -299,6 +299,21 @@ int main(int argc,char **argv){
         free(entry);goto done;
     }
     fprintf(stderr,"PASS AC1032 real 50 numeric class identities\n");
+    MusaDwgAc1032ClassTextRegion unicode_region={0};
+    if(!musa_dwg_ac1032_classes_text_region(
+          file,len,&unicode_region)||
+       !unicode_region.source_verified||
+       !unicode_region.present||
+       unicode_region.length_bits<256u||
+       unicode_region.start_bit<224u){
+        fail("independent R2018 class Unicode text region",file,len);
+        free(entry);goto done;
+    }
+    fprintf(stderr,
+        "PASS REAL AC1032 Unicode stream: start=%llu bits=%llu flag=%llu\n",
+        (unsigned long long)unicode_region.start_bit,
+        (unsigned long long)unicode_region.length_bits,
+        (unsigned long long)unicode_region.flag_bit);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);

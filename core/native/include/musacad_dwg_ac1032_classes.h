@@ -53,6 +53,17 @@ int musa_dwg_ac1032_classes_numeric_records(
     const uint8_t *file,size_t file_bytes,
     MusaDwgAc1032ClassNumeric *records,size_t capacity,
     size_t *out_count);
+/* Original AC1032 class-section Unicode stream positions are BIT offsets. */
+typedef struct MusaDwgAc1032ClassTextRegion {
+    uint64_t start_bit;
+    uint64_t length_bits;
+    uint64_t flag_bit;
+    uint8_t present;
+    uint8_t source_verified;
+} MusaDwgAc1032ClassTextRegion;
+int musa_dwg_ac1032_classes_text_region(const uint8_t *file,
+    size_t file_bytes,MusaDwgAc1032ClassTextRegion *out);
+
 #ifdef __cplusplus
 }
 #endif
