@@ -70,3 +70,76 @@ int musa_dwg_ac1032_line_prefix_bytes(
     *out=result;
     return 1;
 }
+
+/* Specification-derived AC1032 ENTITY common tail, after the independently
+ * CRC/handle-authenticated OT/H/EED/flags early prefix. No LibreDWG runtime.
+ * The common C11 source supports Android, Windows and iOS.
+ */
+#include <math.h>
+int musa_dwg_ac1032_line_common_bytes(
+    const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LineCommon *out){
+    if(!raw||!layout||!out||!bytes||bytes>MAX_BYTES||
+       overlap(raw,bytes,layout,sizeof(*layout))||
+       overlap(raw,bytes,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1032LinePrefix early={0};
+    if(!musa_dwg_ac1032_line_prefix_bytes(raw,bytes,layout,&early)||
+       !early.prefix_decoded||
+       (uint64_t)early.next_color_bit>=layout->data_stream_bits||
+       layout->data_stream_bits>SIZE_MAX)return 0;
+    MusaDwgAc1015Bits c={0};
+    if(!musa_dwg_ac1015_bits_init(&c,raw,bytes,
+        early.next_color_bit,(size_t)layout->data_stream_bits))return 0;
+    MusaDwgAc1032LineCommon candidate={0};
+    candidate.prefix=early;
+    if(!musa_dwg_ac1015_bits_read_bs(&c,&candidate.encoded_color))
+        return 0;
+    const uint16_t flags=(uint16_t)(candidate.encoded_color&0xe000u);
+    candidate.color_index=(uint16_t)(candidate.encoded_color&0x1fffu);
+    /* Unknown/reserved combinations must not be reinterpreted as
+     * legitimate geometry; the color reference is in the handle stream. */
+    if((flags&0x4000u)&&!(flags&0x8000u))return 0;
+    if(flags&0x8000u){
+        if(!musa_dwg_ac1015_bits_read_bl(&c,&candidate.rgb)||
+           candidate.rgb>0x00ffffffu)return 0;
+        candidate.has_rgb=1u;
+        candidate.has_color_reference=(flags&0x4000u)!=0u;
+    }else if(candidate.color_index>256u)return 0;
+    if(flags&0x2000u){
+        if(!musa_dwg_ac1015_bits_read_bl(&c,&candidate.transparency))
+            return 0;
+        const uint32_t mode=(candidate.transparency>>24u)&0xffu;
+        if(mode!=0u&&mode!=1u&&mode!=3u)return 0;
+        candidate.has_transparency=1u;
+    }
+    uint32_t ltype=0u,plot=0u,material=0u;
+    uint32_t shadow=0u,full=0u,face=0u,edge=0u,weight=0u;
+    uint16_t invisible=0u;
+    if(!musa_dwg_ac1015_bits_read_bd(&c,&candidate.linetype_scale)||
+       !isfinite(candidate.linetype_scale)||
+       candidate.linetype_scale<=0.0||
+       !musa_dwg_ac1015_bits_read_u(&c,2u,&ltype)||
+       !musa_dwg_ac1015_bits_read_u(&c,2u,&plot)||
+       !musa_dwg_ac1015_bits_read_u(&c,2u,&material)||
+       !musa_dwg_ac1015_bits_read_u(&c,8u,&shadow)||
+       !musa_dwg_ac1015_bits_read_u(&c,1u,&full)||
+       !musa_dwg_ac1015_bits_read_u(&c,1u,&face)||
+       !musa_dwg_ac1015_bits_read_u(&c,1u,&edge)||
+       !musa_dwg_ac1015_bits_read_bs(&c,&invisible)||
+       !musa_dwg_ac1015_bits_read_u(&c,8u,&weight)||
+       c.bit_pos>=c.bit_end)return 0;
+    candidate.linetype_flags=(uint8_t)ltype;
+    candidate.plotstyle_flags=(uint8_t)plot;
+    candidate.material_flags=(uint8_t)material;
+    candidate.shadow_flags=(uint8_t)shadow;
+    candidate.visualstyle_flags=(uint8_t)(full|(face<<1u)|(edge<<2u));
+    candidate.invisibility=invisible;
+    candidate.lineweight=(uint8_t)weight;
+    candidate.geometry_start_bit=c.bit_pos;
+    candidate.common_decoded=1u;
+    *out=candidate;
+    return 1;
+}
