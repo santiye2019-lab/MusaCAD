@@ -160,5 +160,13 @@ int main(void){
                 source,sizeof(source),catalog,2u,&catalog_count));
     assert(catalog_count==previous_catalog_count&&
            !memcmp(catalog,backup,sizeof(catalog)));
+    /* Same NUL-terminated section name with different original 64-byte
+     * trailing bytes is STILL a duplicate and must fail closed. */
+    source[second_name+63u]=0xA5u;
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
     return 0;
 }
