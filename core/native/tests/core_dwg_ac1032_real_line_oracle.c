@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* P0 REAL original R2018 LINE source: object handle, OT, CRC and streams.
- * Does NOT assert decoded coordinates: true R2018 ENT common-prefix logic
- * and its independently determined geometry_start_bit still pending.
- * AutoCAD reference coordinates are in same upstream 2018/Line.txt.
+/* P0 real original R2018 LINE: authenticated handle, OT, streams,
+ * source-derived common ENTITY prefix and six independently verified XYZ
+ * coordinates. One 2D fixture, NOT the full 2018 geometry family.
+ * AutoCAD reference coordinates are in upstream 2018/Line.txt.
  */
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_object_type.h"
