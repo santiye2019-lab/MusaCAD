@@ -12,6 +12,7 @@
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_record.h"
 #include "musacad_dwg_ac1032_object_type.h"
+#include "musacad_dwg_ac1032_class_resolution.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
@@ -475,6 +476,45 @@ int main(int argc,char **argv){
                (unsigned long long)obj.indexed_handle,
                obj.type_code,obj.ot_opcode);
     }
+    /* Pair a TRUE source-CRC-checked builtin OT with its correct
+     * provisional meaning (numeric ONLY), and a real Unicode/numeric
+     * AcDb:Classes directory entry with its actual original DXF name. */
+    MusaDwgAc1032ClassResolution builtin={0},registered={0};
+    if(!musa_dwg_ac1032_resolve_object_class_file(
+             file,len,original_handles[0].handle,&builtin)||
+       builtin.raw_object_type!=48u||
+       builtin.indexed_handle!=original_handles[0].handle||
+       !builtin.original_record_crc_verified||
+       builtin.is_custom_class||builtin.class_number||
+       builtin.source_class_metadata_verified){
+        fail("R2018 original built-in type incorrectly classified",file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    if(!musa_dwg_ac1032_resolve_declared_class_file(
+             file,len,500u,&registered)||
+       registered.class_number!=500u||
+       registered.raw_object_type!=500u||
+       registered.indexed_handle!=0u||
+       registered.original_record_crc_verified||
+       !registered.source_class_metadata_verified||
+       !registered.is_custom_class||
+       (registered.item_class_id!=0x1f2u&&
+        registered.item_class_id!=0x1f3u)||
+       strcmp(registered.dxf_name,"ACDBDICTIONARYWDFLT")){
+        fail("R2018 original named class 500 numeric/Unicode join",file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    const MusaDwgAc1032ClassResolution saved_registered=registered;
+    if(musa_dwg_ac1032_resolve_declared_class_file(
+         file,len,550u,&registered)||
+       memcmp(&saved_registered,&registered,sizeof(registered))){
+        fail("AC1032 unregistered class must fail atomically",file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    fprintf(stderr,"PASS real original R2018 class join:"
+            " builtin_OT=%u class_500='%s' kind=%u\\n",
+            builtin.raw_object_type,saved_registered.dxf_name,
+            saved_registered.item_class_id);
     free(original_handles);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
