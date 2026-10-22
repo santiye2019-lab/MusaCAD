@@ -61,6 +61,27 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: third_party/libredwg
+      - name: P0 FIRST-PARTY real AC1032 protected header / all section pages / opaque extraction
+        run: |
+          set -euo pipefail
+          # Real public upstream AC1032 source; no LibreDWG decoder library
+          # is linked or invoked in the independent MusaCAD C11 probe.
+          file=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          test -s "$file"
+          test "$(head -c 6 "$file")" = AC1032
+          source_before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cmake -S core/native -B /tmp/musacad-real-ac1032-core \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build /tmp/musacad-real-ac1032-core --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_fixture_probe.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1032-real-probe
+          timeout 60s /tmp/musacad-ac1032-real-probe "$file"
+          source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
+          test "$source_before" = "$source_after"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
