@@ -35,6 +35,23 @@ static uint32_t check_adler(uint32_t seed,const uint8_t *p,size_t n) {
     }
     return ((uint32_t)high<<16u)|(uint32_t)low;
 }
+/* Physical map page IDs are sparse when the underlying file contains
+ * negative-ID gap nodes. Binary search sorted positive physical pages;
+ * NEVER index the location array by the DWG-provided page ID. */
+static const MusaDwgAc1018PageLocation *find_physical_page(
+    const MusaDwgAc1018PageLocation *pages,size_t count,
+    uint32_t id,size_t *physical_index){
+    size_t lo=0u,hi=count;
+    while(lo<hi){
+        const size_t mid=lo+(hi-lo)/2u;
+        const uint32_t key=pages[mid].page_id;
+        if(key<id)lo=mid+1u;
+        else hi=mid;
+    }
+    if(lo==count||pages[lo].page_id!=id)return NULL;
+    if(physical_index)*physical_index=lo;
+    return &pages[lo];
+}
 static int scan(const uint8_t *file,size_t file_bytes,
                 MusaDwgAc1018SectionKind kind,int modern,
                 MusaDwgAc1018SectionPage *pages,
@@ -70,19 +87,20 @@ static int scan(const uint8_t *file,size_t file_bytes,
         musa_dwg_ac1032_page_locations(file,file_bytes,locations,num,&num):
         musa_dwg_ac1018_page_locations(file,file_bytes,locations,num,&num);
     if(!entries_ok)goto finish;
-    const size_t sid=(size_t)hdr.section_map_id-1u;
-    if(sid>=num||locations[sid].page_id!=hdr.section_map_id||
-       locations[sid].file_offset>file_bytes||
-       file_bytes-(size_t)locations[sid].file_offset<20u||
-       locations[sid].file_span_bytes<20u)goto finish;
-    const size_t start=(size_t)locations[sid].file_offset;
+    const MusaDwgAc1018PageLocation *section_page=
+        find_physical_page(locations,num,hdr.section_map_id,NULL);
+    if(!section_page||
+       section_page->file_offset>file_bytes||
+       file_bytes-(size_t)section_page->file_offset<20u||
+       section_page->file_span_bytes<20u)goto finish;
+    const size_t start=(size_t)section_page->file_offset;
     const uint8_t *header=file+start;
     const uint32_t kind_code=get32(header),expanded=get32(header+4u),
         packed=get32(header+8u),codec=get32(header+12u),
         stored=get32(header+16u);
     if(kind_code!=UINT32_C(0x4163003b)||codec!=2u||
        expanded<20u||expanded>R2004_MAX_EXPANDED||
-       !packed||packed>locations[sid].file_span_bytes-20u||
+       !packed||packed>section_page->file_span_bytes-20u||
        packed>file_bytes-start-20u)goto finish;
     uint8_t clean_head[20];
     memcpy(clean_head,header,20u);
@@ -165,15 +183,18 @@ static int scan(const uint8_t *file,size_t file_bytes,
                 const uint32_t pid=get32(entry);
                 const uint32_t packed_bytes=get32(entry+4u);
                 const uint64_t logical_offset=get64(entry+8u);
-                if(!pid||pid>num||!packed_bytes||
+                if(!pid||!packed_bytes||
                    logical_offset!=(uint64_t)j*R2004_BLOCK)
                     goto finish;
+                size_t slot=0u;
+                const MusaDwgAc1018PageLocation *loc=
+                    find_physical_page(locations,num,pid,&slot);
+                if(!loc)goto finish;
                 if(catalog_mode){
-                    if(seen_pages[pid-1u])goto finish;
-                    seen_pages[pid-1u]=1u;
+                    if(seen_pages[slot])goto finish;
+                    seen_pages[slot]=1u;
                 }
-                const MusaDwgAc1018PageLocation *loc=&locations[pid-1u];
-                if(loc->page_id!=pid||loc->file_offset>file_bytes||
+                if(loc->file_offset>file_bytes||
                    loc->file_span_bytes<32u||
                    file_bytes-(size_t)loc->file_offset<32u)goto finish;
                 const uint64_t physical=loc->file_offset;
