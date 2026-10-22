@@ -63,6 +63,19 @@ int musa_dwg_ac1032_section_catalog(
     MusaDwgAc1032SectionCatalogEntry *entries,size_t capacity,
     size_t *out_count);
 
+/* Extract ANY verified physical AC1032 section by its exact original
+ * NUL-terminated name (1..63 bytes), including unknown sections (e.g.
+ * classes/metadata) not handled by the fixed Objects/Handles APIs.
+ * The WHOLE catalog and all referenced page checksums are verified first,
+ * so corrupt unselected sections cannot silently disappear. Section bytes
+ * are returned as opaque originals, NOT R2004 or R2018 typed objects.
+ * Caller must size output from section_catalog()'s logical_bytes.
+ * On any failure original source, output and out_bytes are unchanged.
+ * Source / output / count must not alias each other. No DWG writer claim. */
+int musa_dwg_ac1032_extract_named_section(
+    const uint8_t *file,size_t file_bytes,const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes);
+
 #ifdef __cplusplus
 }
 #endif
