@@ -149,6 +149,62 @@ int main(void){
     assert(!musa_dwg_ac1032_section_pages(
                source,sizeof(source),MUSA_DWG_AC1032_HANDLES,
                page,2u,&info,&count)); /* no fabricated Handles section */
+    /* NEW: extract unknown (renamed) section's original opaque bytes,
+     * never pretending the payload is an R2018 AcDb or R2004 HANDLE map. */
+    uint8_t raw_unknown[24],raw_objects[sizeof(poly_record)+sizeof(line_record)+2u];
+    memset(raw_unknown,0x5Au,sizeof(raw_unknown));
+    memset(raw_objects,0x6Bu,sizeof(raw_objects));
+    size_t named_written=999u;
+    uint8_t renamed_good[sizeof(source)];
+    memcpy(renamed_good,source,sizeof(source));
+    assert(musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_unknown,sizeof(raw_unknown),&named_written));
+    assert(named_written==sizeof(expected)&&
+           !memcmp(raw_unknown,expected,sizeof(expected))&&
+           raw_unknown[named_written]==0x5Au);
+    assert(musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDbObjects",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(named_written==sizeof(poly_record)+sizeof(line_record)&&
+           !memcmp(raw_objects,poly_record,sizeof(poly_record))&&
+           !memcmp(raw_objects+sizeof(poly_record),
+                   line_record,sizeof(line_record))&&
+           raw_objects[named_written]==0x6Bu);
+    assert(!memcmp(source,renamed_good,sizeof(source)));
+    size_t previous_named=named_written;
+    uint8_t preserved_objects[sizeof(raw_objects)];
+    memcpy(preserved_objects,raw_objects,sizeof(raw_objects));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:Handles",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_unknown,sizeof(expected)-1u,&named_written));
+    char too_long[65];
+    memset(too_long,'X',sizeof(too_long));
+    too_long[64]='\0';
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),too_long,
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            (uint8_t*)(void*)source,sizeof(source),&named_written));
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_objects,sizeof(raw_objects),(size_t*)(void*)raw_objects));
+    assert(previous_named==named_written&&
+           !memcmp(preserved_objects,raw_objects,sizeof(raw_objects)));
+    source[288u]^=1u;  /* even an UNSELECTED corrupt page fails */
+    assert(!musa_dwg_ac1032_extract_named_section(
+            source,sizeof(source),"AcDb:AcDsPrototype_1b",
+            raw_objects,sizeof(raw_objects),&named_written));
+    assert(previous_named==named_written&&
+           !memcmp(preserved_objects,raw_objects,sizeof(raw_objects)));
+    memcpy(source,renamed_good,sizeof(source));
     /* Two descriptors with the same name must be rejected without writes
      * even when the section-map checksum has been regenerated. */
     memset(source+second_name,0,64u);
