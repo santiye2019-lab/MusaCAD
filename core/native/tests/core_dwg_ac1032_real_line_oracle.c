@@ -32,8 +32,27 @@ static int read_file(const char *path,uint8_t **out,size_t *n){
 }
 static void diagnose_line(const uint8_t *f,size_t n){
     size_t count=0u;
-    if(!musa_dwg_ac1032_handles_index(f,n,NULL,0u,&count)||
-       count==0u||count>1000000u)return;
+    const int index_count_ok=musa_dwg_ac1032_handles_index(f,n,NULL,0u,&count);
+    fprintf(stderr,"Original LINE diagnostic: handle_index_ok=%d count=%zu file_bytes=%zu\\n",
+            index_count_ok,count,n);
+    size_t cat=0u;
+    const int cat_ok=musa_dwg_ac1032_section_catalog(
+          f,n,NULL,0u,&cat);
+    fprintf(stderr,"Original LINE diagnostic: section_catalog_ok=%d sections=%zu\\n",
+            cat_ok,cat);
+    if(cat_ok&&cat>0u&&cat<=256u){
+        MusaDwgAc1032SectionCatalogEntry *sect=calloc(cat,sizeof(*sect));
+        size_t got=0u;
+        if(sect&&musa_dwg_ac1032_section_catalog(f,n,sect,cat,&got)){
+            for(size_t i=0u;i<got;i++)
+                fprintf(stderr,"Original LINE section[%zu]: '%s' logical=%llu CRCs=%u\\n",
+                     i,sect[i].name,
+                     (unsigned long long)sect[i].logical_bytes,
+                     (unsigned)sect[i].all_physical_page_checksums_verified);
+        }
+        free(sect);
+    }
+    if(!index_count_ok||count==0u||count>1000000u)return;
     MusaDwgAc1032HandleEntry *idx=calloc(count,sizeof(*idx));
     if(!idx)return;
     if(!musa_dwg_ac1032_handles_index(f,n,idx,count,&count)){
