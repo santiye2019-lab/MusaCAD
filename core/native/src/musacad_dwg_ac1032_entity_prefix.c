@@ -32,7 +32,8 @@ int musa_dwg_ac1032_line_prefix_bytes(
     if(!musa_dwg_ac1015_bits_init(&c,raw,bytes,
          layout->object_type_field_bits,(size_t)layout->data_stream_bits))
         return 0;
-    uint32_t h_header=0u,edata=0u,preview=0u,mode=0u;
+    uint32_t h_header=0u,preview=0u,mode=0u;
+    uint16_t edata=0u;
     uint32_t reactors=0u,xdic=0u,ds=0u,nolinks=0u;
     uint64_t self=0u;
     if(!musa_dwg_ac1015_bits_read_u(&c,8u,&h_header)||
@@ -44,7 +45,7 @@ int musa_dwg_ac1032_line_prefix_bytes(
         self=(self<<8u)|byte;
     }
     if(self!=layout->indexed_handle||
-       !musa_dwg_ac1015_bits_read_bs(&c,(uint16_t*)&edata))
+       !musa_dwg_ac1015_bits_read_bs(&c,&edata))
         return 0;
     /* Do not publish a partially parsed source if uncommon forms are
      * encountered; next increments need dedicated safe EED/preview. */
