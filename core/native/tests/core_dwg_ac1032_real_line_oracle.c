@@ -32,6 +32,13 @@ static int read_file(const char *path,uint8_t **out,size_t *n){
     if(!ok){free(mem);return 0;}
     *out=mem;*n=(size_t)len;return 1;
 }
+static uint32_t rd32(const uint8_t *p){
+    return (uint32_t)p[0]|((uint32_t)p[1]<<8u)|
+           ((uint32_t)p[2]<<16u)|((uint32_t)p[3]<<24u);
+}
+static uint64_t rd64(const uint8_t *p){
+    return (uint64_t)rd32(p)|((uint64_t)rd32(p+4u)<<32u);
+}
 static void diagnose_line(const uint8_t *f,size_t n){
     MusaDwgAc1032FileMapHeader hdr={0};
     const int hdr_ok=musa_dwg_ac1032_page_map_header(f,n,&hdr);
@@ -93,6 +100,54 @@ static void diagnose_line(const uint8_t *f,size_t n){
     if(n>=0x98u)for(size_t k=0x80u;k<0x98u;k++)
         fprintf(stderr," %02X",f[k]);
     fputc('\n',stderr);
+    if(loc_ok&&phys&&phys<=131072u){
+        MusaDwgAc1032PageLocation *loc=calloc(phys,sizeof(*loc));
+        size_t got=0u;
+        if(loc&&musa_dwg_ac1032_page_locations(f,n,loc,phys,&got)){
+            for(size_t i=0u;i<got;i++){
+                if(loc[i].page_id!=hdr.section_map_id)continue;
+                const size_t at=(size_t)loc[i].file_offset;
+                if(at>n||n-at<20u)break;
+                const uint8_t *sys=f+at;
+                const uint32_t typ=rd32(sys),expanded=rd32(sys+4u);
+                const uint32_t packed=rd32(sys+8u),codec=rd32(sys+12u);
+                fprintf(stderr,"Original LINE section SYSTEM:"
+                    " page=%u at=%zu span=%u type=%08X"
+                    " packed=%u expanded=%u codec=%u\n",
+                    loc[i].page_id,at,loc[i].file_span_bytes,
+                    typ,packed,expanded,codec);
+                if(expanded>1024u*1024u||packed>n-at-20u)break;
+                uint8_t *bytes=malloc(expanded);
+                size_t read=0u;
+                const int ok=bytes&&musa_dwg_ac1018_lz_decode(
+                    sys+20u,packed,bytes,expanded,&read);
+                fprintf(stderr,"Original LINE section SYSTEM LZ=%d"
+                    " decoded=%u sections=%u\n",
+                    ok,expanded,ok&&expanded>=4u?rd32(bytes):0u);
+                if(ok&&expanded>=20u){
+                    const uint32_t max=rd32(bytes);
+                    size_t off=20u;
+                    for(uint32_t j=0;j<max&&j<64u;j++){
+                        if(off>expanded||expanded-off<96u)break;
+                        const uint8_t *d=bytes+off;
+                        const uint32_t np=rd32(d+8u);
+                        fprintf(stderr,"Original LINE descriptor %u:"
+                            " name='%.*s' logical=%llu pages=%u"
+                            " page_bytes=%u compression=%u id=%u encrypted=%u\n",
+                            j,64,(const char*)(d+32u),
+                            (unsigned long long)rd64(d),
+                            np,rd32(d+12u),rd32(d+20u),
+                            rd32(d+24u),rd32(d+28u));
+                        off+=96u;
+                        if(np>(expanded-off)/16u)break;
+                        off+=(size_t)np*16u;
+                    }
+                }
+                free(bytes);break;
+            }
+        }
+        free(loc);
+    }
     size_t count=0u;
     const int index_count_ok=musa_dwg_ac1032_handles_index(f,n,NULL,0u,&count);
     fprintf(stderr,"Original LINE diagnostic: handle_index_ok=%d count=%zu file_bytes=%zu\n",
