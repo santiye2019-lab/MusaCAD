@@ -126,7 +126,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                  * arbitrary unindexed trailer or injected hidden data.
                  * Observed original 2018/Line.dwg has exactly this form.
                  * Earlier original Dynblocks leaves no such trailer. */
-                if(available-size!=110u||size>SIZE_MAX||
+                if(available-size!=110u||
                    pos+(uint64_t)size>SIZE_MAX||
                    file[(size_t)(pos+(uint64_t)size)]!=0u||
                    file[(size_t)(pos+(uint64_t)size)+1u]!=0u||
