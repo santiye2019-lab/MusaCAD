@@ -35,6 +35,36 @@ int musa_dwg_ac1032_line_prefix_bytes(
     const uint8_t *payload,size_t payload_bytes,
     const MusaDwgAc1032ObjectStreams *layout,
     MusaDwgAc1032LinePrefix *out);
+
+/* Strict R2018 common ENTITY attributes through geometry's first bit.
+ * The early validated prefix is supplied only by same immutable source
+ * + CRC/handle-bound partition, never by scanning for plausible floats.
+ * ENC color: 0x8000 RGB, 0x4000 DBCOLOR handle, 0x2000 transparency.
+ * Complex color handle stays in separate HANDLES stream for later graph
+ * resolution; the DATA bit range never extends into HANDLES.
+ */
+typedef struct MusaDwgAc1032LineCommon {
+    MusaDwgAc1032LinePrefix prefix;
+    uint16_t color_index;
+    uint16_t encoded_color;
+    uint32_t rgb;
+    uint32_t transparency;
+    double linetype_scale;
+    uint32_t invisibility;
+    size_t geometry_start_bit;
+    uint8_t linetype_flags,plotstyle_flags,material_flags;
+    uint8_t shadow_flags,visualstyle_flags,lineweight;
+    uint8_t has_rgb,has_color_reference,has_transparency;
+    uint8_t common_decoded;
+} MusaDwgAc1032LineCommon;
+
+/* Does not itself claim that coordinates are decoded or a full DWG
+ * document is readable; the independent LINE fields/oracle must pass. */
+int musa_dwg_ac1032_line_common_bytes(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LineCommon *out);
+
 #ifdef __cplusplus
 }
 #endif
