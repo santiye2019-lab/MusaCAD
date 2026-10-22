@@ -324,3 +324,16 @@ static int musacad_class_emit_utf8(uint32_t cp,char *dst,size_t cap,size_t *n){
     dst[(*n)++]=(char)((k==1u?0u:0x80u)|(cp&(k==1u?127u:63u)));
     dst[*n]=0;return 1;
 }
+
+static int musacad_class_read_tu(DwgClassBits *cur,char *name,size_t cap){
+    DwgClassBits b=*cur;uint16_t units=0u;size_t used=0u;
+    if(!bitshort(&b,&units)||units>2048u||
+       (size_t)units>(b.valid_bits-b.at)/16u)return 0;
+    name[0]=0;
+    for(unsigned k=0u;k<units;k++){
+        uint32_t unit=0u;
+        if(!lebytes(&b,2u,&unit))return 0;
+        if(!musacad_class_emit_utf8(unit,name,cap,&used))return 0;
+    }
+    *cur=b;return 1;
+}
