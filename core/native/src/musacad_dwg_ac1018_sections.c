@@ -39,7 +39,10 @@ static int scan(const uint8_t *file,size_t file_bytes,
                 MusaDwgAc1018SectionKind kind,int modern,
                 MusaDwgAc1018SectionPage *pages,
                 MusaDwgAc1018SectionDescriptor *desc,
-                size_t *out_count) {
+                size_t *out_count,
+                MusaDwgAc1032SectionCatalogEntry *catalog_entries,
+                size_t catalog_capacity,size_t *out_catalog_count) {
+    const int catalog_mode=(out_catalog_count!=NULL);
     if(!file||!desc||!out_count||
        (kind!=MUSA_DWG_AC1018_OBJECTS&&kind!=MUSA_DWG_AC1018_HANDLES))
         return 0;
@@ -57,6 +60,8 @@ static int scan(const uint8_t *file,size_t file_bytes,
         (MusaDwgAc1018PageLocation*)calloc(num,sizeof(*locations));
     if(!locations)return 0;
     uint8_t *decoded=NULL;
+    MusaDwgAc1032SectionCatalogEntry *catalog=NULL;
+    uint8_t *seen_pages=NULL;
     int ok=0;
     const int entries_ok=modern?
         musa_dwg_ac1032_page_locations(file,file_bytes,locations,num,&num):
@@ -87,7 +92,15 @@ static int scan(const uint8_t *file,size_t file_bytes,
     if(!musa_dwg_ac1018_lz_decode(header+20u,packed,decoded,expanded,
                                    &consumed)||consumed>packed)goto finish;
     const uint32_t nsections=get32(decoded);
-    if(!nsections||nsections>R2004_MAX_SECTIONS)goto finish;
+    if(!nsections||nsections>R2004_MAX_SECTIONS||
+       (catalog_mode&&catalog_entries&&nsections>catalog_capacity))
+        goto finish;
+    if(catalog_mode){
+        catalog=(MusaDwgAc1032SectionCatalogEntry*)calloc(
+                  nsections,sizeof(*catalog));
+        seen_pages=(uint8_t*)calloc(num,sizeof(*seen_pages));
+        if(!catalog||!seen_pages)goto finish;
+    }
     const char *wanted=kind==MUSA_DWG_AC1018_OBJECTS?
         "AcDb:AcDbObjects":"AcDb:Handles";
     size_t at=20u,page_count=0u;
@@ -107,12 +120,27 @@ static int scan(const uint8_t *file,size_t file_bytes,
         const size_t name_length=strlen(wanted);
         const int match=!memcmp(name,wanted,name_length)&&
                         name[name_length]==0u;
-        if(match) {
-            if(found||!logical||logical>128u*1024u*1024u||
+        if(catalog_mode){
+            if(!memchr(name,0,64u)||!name[0])goto finish;
+            for(uint32_t prev=0u;prev<i;prev++){
+                if(catalog[prev].section_id==section_id||
+                   !memcmp(catalog[prev].name,name,64u))
+                    goto finish;
+            }
+            memcpy(catalog[i].name,name,64u);
+            catalog[i].logical_bytes=logical;
+            catalog[i].section_id=section_id;
+            catalog[i].page_count=npage;
+            catalog[i].compression=compression;
+            catalog[i].encryption=encrypted;
+            catalog[i].all_physical_page_checksums_verified=1u;
+        }
+        if(match||catalog_mode) {
+            if((match&&found)||!logical||logical>128u*1024u*1024u||
                logical>SIZE_MAX||!section_id||compression!=2u||
                encrypted!=0u||!npage||
                npage!=(logical-1u)/R2004_BLOCK+1u)goto finish;
-            found=1;
+            if(match)found=1;
             selected.section_id=section_id;
             selected.compression=compression;
             selected.encryption=encrypted;
@@ -129,6 +157,10 @@ static int scan(const uint8_t *file,size_t file_bytes,
                 if(!pid||pid>num||!packed_bytes||
                    logical_offset!=(uint64_t)j*R2004_BLOCK)
                     goto finish;
+                if(catalog_mode){
+                    if(seen_pages[pid-1u])goto finish;
+                    seen_pages[pid-1u]=1u;
+                }
                 const MusaDwgAc1018PageLocation *loc=&locations[pid-1u];
                 if(loc->page_id!=pid||loc->file_offset>file_bytes||
                    loc->file_span_bytes<32u||
@@ -168,9 +200,16 @@ static int scan(const uint8_t *file,size_t file_bytes,
         }
         at+=(size_t)npage*16u;
     }
-    if(!found||at!=expanded)goto finish;
+    if((!catalog_mode&&!found)||at!=expanded)goto finish;
+    if(catalog_mode){
+        if(catalog_entries)
+            memcpy(catalog_entries,catalog,
+                   (size_t)nsections*sizeof(*catalog_entries));
+        *out_catalog_count=(size_t)nsections;
+    }
     *desc=selected;*out_count=page_count;ok=1;
 finish:
+    free(seen_pages);free(catalog);
     free(decoded);free(locations);return ok;
 }
 static int shared_section_pages(const uint8_t *file,size_t file_bytes,
@@ -181,7 +220,8 @@ static int shared_section_pages(const uint8_t *file,size_t file_bytes,
     if(!file||!desc||!out_page_count||(!pages&&capacity))return 0;
     MusaDwgAc1018SectionDescriptor checked={0};
     size_t count=0u;
-    if(!scan(file,file_bytes,kind,modern,NULL,&checked,&count))return 0;
+    if(!scan(file,file_bytes,kind,modern,NULL,&checked,&count,
+             NULL,0u,NULL))return 0;
     if(pages) {
         if(count>capacity)return 0;
         MusaDwgAc1018SectionPage *tmp=
@@ -189,7 +229,8 @@ static int shared_section_pages(const uint8_t *file,size_t file_bytes,
         if(!tmp)return 0;
         MusaDwgAc1018SectionDescriptor twice={0};
         size_t again=0u;
-        const int ok=scan(file,file_bytes,kind,modern,tmp,&twice,&again)&&
+        const int ok=scan(file,file_bytes,kind,modern,tmp,&twice,&again,
+                          NULL,0u,NULL)&&
                      again==count;
         if(ok)memcpy(pages,tmp,count*sizeof(*pages));
         free(tmp);
@@ -269,4 +310,34 @@ int musa_dwg_ac1032_extract_section(const uint8_t *file,size_t file_bytes,
     size_t *out_bytes){
     return shared_extract_section(file,file_bytes,kind,1,
                                   output,capacity,out_bytes);
+}
+
+/* All-section catalog: reuses the already validated R2018 protected
+ * section-map and physical page checksum logic. Unknown names are kept,
+ * not assigned an invented AcDb class. Caller output remains atomic. */
+int musa_dwg_ac1032_section_catalog(const uint8_t *file,size_t n,
+    MusaDwgAc1032SectionCatalogEntry *entries,size_t capacity,
+    size_t *out_count){
+    if(!file||!out_count||(!entries&&capacity)||
+       (uintptr_t)out_count>UINTPTR_MAX-sizeof(*out_count))
+        return 0;
+    const uintptr_t src=(uintptr_t)file,cnt=(uintptr_t)out_count;
+    if((cnt>=src&&cnt-src<n)||
+       (src>=cnt&&src-cnt<sizeof(*out_count)))
+        return 0;
+    if(entries){
+        if(capacity>SIZE_MAX/sizeof(*entries))return 0;
+        const size_t bytes=capacity*sizeof(*entries);
+        const uintptr_t dst=(uintptr_t)entries;
+        if((dst>=src&&dst-src<n)||
+           (src>=dst&&src-dst<bytes)||
+           (dst>=cnt&&dst-cnt<sizeof(*out_count))||
+           (cnt>=dst&&cnt-dst<bytes))
+            return 0;
+    }
+    MusaDwgAc1018SectionDescriptor unused={0};
+    size_t ignored_pages=0u;
+    return scan(file,n,MUSA_DWG_AC1018_OBJECTS,1,
+                NULL,&unused,&ignored_pages,
+                entries,capacity,out_count);
 }
