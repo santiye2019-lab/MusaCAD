@@ -13,6 +13,7 @@
 #include "musacad_dwg_ac1032_record.h"
 #include "musacad_dwg_ac1032_object_type.h"
 #include "musacad_dwg_ac1032_class_resolution.h"
+#include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
@@ -515,6 +516,35 @@ int main(int argc,char **argv){
             " builtin_OT=%u class_500='%s' kind=%u\\n",
             builtin.raw_object_type,saved_registered.dxf_name,
             saved_registered.item_class_id);
+    /* New distinct acceptance: copy ORIGINAL type-coded object bytes from
+     * the verified source record, not just type/CRC metadata. */
+    MusaDwgAc1032PayloadInfo payload_info={0};
+    size_t payload_len=0u;
+    const uint64_t first_handle=original_handles[0].handle;
+    if(!musa_dwg_ac1032_object_payload_file(
+            file,len,first_handle,NULL,0u,&payload_len,&payload_info)||
+       payload_len<2u||payload_len!=payload_info.payload_bytes||
+       payload_info.indexed_handle!=first_handle||
+       payload_info.object_section_offset!=original_handles[0].object_offset||
+       payload_info.raw_object_type!=48u||
+       !payload_info.original_record_crc_verified){
+        fail("R2018 original payload size/CRC/type proof",file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    uint8_t *copied_payload=(uint8_t*)malloc(payload_len);
+    if(!copied_payload||
+       !musa_dwg_ac1032_object_payload_file(
+           file,len,first_handle,copied_payload,payload_len,
+           &payload_len,&payload_info)||
+       (((unsigned)(copied_payload[0]&63u)<<2u)|
+          ((unsigned)copied_payload[1]>>6u))!=48u){
+        fail("R2018 original indexed payload bytes proof",file,len);
+        free(copied_payload);free(original_handles);free(entry);goto done;
+    }
+    free(copied_payload);
+    fprintf(stderr,"PASS real original AC1032 object payload:"
+        " handle=%llu copied=%zu type=%u CRC=verified\\n",
+        (unsigned long long)first_handle,payload_len,payload_info.raw_object_type);
     free(original_handles);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
