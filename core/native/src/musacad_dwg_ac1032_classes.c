@@ -70,3 +70,100 @@ int musa_dwg_ac1032_classes_frame_probe(
     if(!ok)return 0;
     *out=result;return 1;
 }
+
+/* The DWG proprietary class data stream packs the two-bit BS/BL opcode
+ * MSB-first. Raw numeric bytes themselves are little-endian. This is
+ * intentionally DISTINCT from musacad_bits_reader (internal LSB-first).
+ * Cursor remains inside the declared class-area bit count. */
+typedef struct DwgClassBits {
+    const uint8_t *p;
+    size_t valid_bits;
+    size_t at;
+} DwgClassBits;
+static int rawbits(DwgClassBits *b,unsigned width,uint32_t *out){
+    if(!b||!out||!width||width>8u||
+       b->at>b->valid_bits||width>b->valid_bits-b->at)return 0;
+    uint32_t v=0u;
+    for(unsigned i=0u;i<width;i++){
+        const size_t pos=b->at+(size_t)i;
+        v=(v<<1u)|((b->p[pos>>3u]>>(7u-(pos&7u)))&1u);
+    }
+    b->at+=width;
+    *out=v;return 1;
+}
+static int lebytes(DwgClassBits *b,unsigned n,uint32_t *out){
+    if(!b||!out||n==0u||n>4u)return 0;
+    DwgClassBits tmp=*b;
+    uint32_t v=0u;
+    for(unsigned i=0u;i<n;i++){
+        uint32_t byte=0u;
+        if(!rawbits(&tmp,8u,&byte))return 0;
+        v|=byte<<(8u*i);
+    }
+    *b=tmp;*out=v;return 1;
+}
+static int bitshort(DwgClassBits *b,uint16_t *out){
+    if(!b||!out)return 0;
+    DwgClassBits tmp=*b;
+    uint32_t kind=0u,value=0u;
+    if(!rawbits(&tmp,2u,&kind))return 0;
+    switch(kind){
+        case 0u:if(!lebytes(&tmp,2u,&value))return 0;break;
+        case 1u:if(!lebytes(&tmp,1u,&value))return 0;break;
+        case 2u:value=0u;break;
+        case 3u:value=256u;break;
+        default:return 0;
+    }
+    *b=tmp;*out=(uint16_t)value;return 1;
+}
+static int bitlong(DwgClassBits *b,uint32_t *out){
+    if(!b||!out)return 0;
+    DwgClassBits tmp=*b;
+    uint32_t kind=0u,value=0u;
+    if(!rawbits(&tmp,2u,&kind))return 0;
+    switch(kind){
+        case 0u:if(!lebytes(&tmp,4u,&value))return 0;break;
+        case 1u:if(!lebytes(&tmp,1u,&value))return 0;break;
+        case 2u:value=0u;break;
+        default:return 0; /* reserved 11 in DWG bitlong */
+    }
+    *b=tmp;*out=value;return 1;
+}
+int musa_dwg_ac1032_classes_identity_prefix(
+    const uint8_t *file,size_t len,
+    MusaDwgAc1032ClassIdentityPrefix *out){
+    if(!file||!out||len<256u||len>64u*1024u*1024u||
+       !nonoverlap(file,len,out,sizeof(*out)))return 0;
+    MusaDwgAc1032ClassesFrame frame={0};
+    if(!musa_dwg_ac1032_classes_frame_probe(file,len,&frame)||
+       frame.section_logical_bytes>8u*1024u*1024u||
+       frame.section_logical_bytes<32u||frame.total_data_bits<24u)
+        return 0;
+    uint8_t *plain=(uint8_t*)malloc((size_t)frame.section_logical_bytes);
+    if(!plain)return 0;
+    size_t got=0u;
+    int ok=musa_dwg_ac1032_extract_named_section(
+       file,len,"AcDb:Classes",plain,
+       (size_t)frame.section_logical_bytes,&got)&&
+       got==frame.section_logical_bytes;
+    MusaDwgAc1032ClassIdentityPrefix result={0};
+    if(ok){
+        DwgClassBits bits={plain+28u,frame.total_data_bits-32u,0u};
+        uint32_t maxnum=0u,headerflag=0u;
+        uint16_t first=0u,flags=0u;
+        ok=bitlong(&bits,&maxnum)&&rawbits(&bits,1u,&headerflag)&&
+           bitshort(&bits,&first)&&bitshort(&bits,&flags)&&
+           maxnum>=500u&&maxnum<=65535u&&
+           first>=500u&&first<=maxnum&&headerflag<=1u;
+        if(ok){
+            result.max_class_number=maxnum;
+            result.first_class_number=first;
+            result.first_proxy_flags=flags;
+            result.header_boolean=(uint8_t)headerflag;
+            result.source_crc_verified=1u;
+        }
+    }
+    free(plain);
+    if(!ok)return 0;
+    *out=result;return 1;
+}
