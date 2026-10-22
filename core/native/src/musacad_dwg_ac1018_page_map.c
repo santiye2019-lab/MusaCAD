@@ -94,7 +94,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
      * pass is separate from publication of caller-owned output. */
     uint64_t pos=256u;
     uint32_t actual=0u,last_abs_id=0u,found_map=0u,found_section=0u;
-    int valid=1;
+    int valid=1,verified_secondary_header=0;
     size_t at=0u;
     while(at<h.map_decoded_bytes){
         if(h.map_decoded_bytes-at<8u){valid=0;break;}
@@ -110,11 +110,33 @@ static int shared_page_locations(const uint8_t *file,size_t n,
          * compressed content must still be fully present and checksummed.
          * Earlier pages and gaps MUST fit entirely in source bytes. */
         if(!id||id<=last_abs_id||id>1048576u||
-           !size||pos>UINT64_MAX-size||pos>=n||
-           (final?(gap||id!=h.page_map_id||
-                   (uint64_t)n-pos>size||
-                   (uint64_t)n-pos<20u):
-                  (uint64_t)n-pos<size)){
+           !size||pos>UINT64_MAX-size||pos>=n){
+            valid=0;break;
+        }
+        const uint64_t available=(uint64_t)n-pos;
+        if(final){
+            if(gap||id!=h.page_map_id||available<20u){
+                valid=0;break;
+            }
+            if(available>size){
+                /* A genuine R2018 file can store a SECOND copy of the
+                 * authenticated 108-byte encrypted file header at EOF,
+                 * preceded by exactly two zero alignment bytes.
+                 * Only admit the precise byte-for-byte copy, NEVER an
+                 * arbitrary unindexed trailer or injected hidden data.
+                 * Observed original 2018/Line.dwg has exactly this form.
+                 * Earlier original Dynblocks leaves no such trailer. */
+                if(available-size!=110u||size>SIZE_MAX||
+                   pos+(uint64_t)size>SIZE_MAX||
+                   file[(size_t)(pos+(uint64_t)size)]!=0u||
+                   file[(size_t)(pos+(uint64_t)size)+1u]!=0u||
+                   memcmp(file+(size_t)(pos+(uint64_t)size)+2u,
+                          file+0x80u,0x6cu)!=0){
+                    valid=0;break;
+                }
+                verified_secondary_header=1;
+            }
+        }else if(available<size){
             valid=0;break;
         }
         last_abs_id=id;
@@ -133,7 +155,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
     }
     if(!valid||at!=h.map_decoded_bytes||
        actual!=h.page_count||!found_map||!found_section||
-       pos<n){
+       (pos<n&&(!verified_secondary_header||
+                 n-(size_t)pos!=110u))){
         free(plain);return 0;
     }
     /* To uphold atomic publication, validate without writing entries
