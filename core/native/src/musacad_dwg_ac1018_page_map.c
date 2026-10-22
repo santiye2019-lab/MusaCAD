@@ -38,8 +38,12 @@ static int shared_page_map_header(const uint8_t *file,size_t n,
     const uint32_t map_id=u32(plain+0x50u);
     const uint32_t sec_id=u32(plain+0x5cu);
     const uint64_t offset=u64(plain+0x54u);
-    if(!count||count>131072u||!map_id||map_id>count||
-       !sec_id||sec_id>count||offset>UINT64_MAX-256u)return 0;
+    /* Real DWG files may contain negative-numbered physical *gaps*.
+     * Their file page IDs are sparse: map and section-map IDs must not
+     * be assumed equal to an array position or <= stored page count. */
+    if(!count||count>131072u||!map_id||!sec_id||
+       map_id==sec_id||map_id>1048576u||sec_id>1048576u||
+       offset>UINT64_MAX-256u)return 0;
     const uint64_t pos=offset+256u;
     if(pos>SIZE_MAX||(size_t)pos>n||n-(size_t)pos<20u)return 0;
     const uint8_t *p=file+(size_t)pos;
@@ -47,7 +51,8 @@ static int shared_page_map_header(const uint8_t *file,size_t n,
                    packed=u32(p+8u),codec=u32(p+12u),
                    stored=u32(p+16u);
     if(type!=UINT32_C(0x41630e3b)||codec!=2u||
-       expanded!=(uint64_t)count*8u||!packed||
+       expanded<(uint64_t)count*8u||
+       expanded>16u*1024u*1024u||!packed||
        (size_t)packed>n-(size_t)pos-20u)return 0;
     uint8_t head[20];memcpy(head,p,20u);memset(head+16u,0,4u);
     if(checksum(checksum(0u,head,20u),p+20u,packed)!=stored)return 0;
@@ -82,32 +87,63 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         file+(size_t)h.page_map_offset+20u,h.map_compressed_bytes,
         plain,h.map_decoded_bytes,&consumed);
     if(!ok||consumed>h.map_compressed_bytes){free(plain);return 0;}
+    /* Parse the ENTIRE variable-length physical page map. Positive IDs
+     * are actual section pages; negative IDs are file gaps and carry an
+     * additional 16-byte gap-tree record (R2004+ physical format).
+     * Never trust a sequential page-id == index assumption. Validation
+     * pass is separate from publication of caller-owned output. */
     uint64_t pos=256u;
+    uint32_t actual=0u,last_abs_id=0u,found_map=0u,found_section=0u;
     int valid=1;
-    for(uint32_t i=0u;i<h.page_count;++i){
-        const uint32_t id=u32(plain+(size_t)i*8u);
-        const uint32_t size=u32(plain+(size_t)i*8u+4u);
-        if(id!=i+1u||!size||pos>UINT64_MAX-size||pos>=n){
+    size_t at=0u;
+    while(at<h.map_decoded_bytes){
+        if(h.map_decoded_bytes-at<8u){valid=0;break;}
+        const uint32_t raw=u32(plain+at);
+        const uint32_t size=u32(plain+at+4u);
+        const int gap=(raw&UINT32_C(0x80000000))!=0u;
+        if(gap&&h.map_decoded_bytes-at<24u){valid=0;break;}
+        const uint32_t id=gap?(uint32_t)(-(int64_t)(int32_t)raw):raw;
+        if(!id||id<=last_abs_id||id>1048576u||
+           !size||pos>UINT64_MAX-size||pos>=n||
+           pos>n||(uint64_t)n-pos<size){
             valid=0;break;
         }
-        if(i==h.page_map_id-1u&&pos!=h.page_map_offset){
-            valid=0;break;
-        }
-        if(i+1u<h.page_count&&(uint64_t)n-pos<size){
-            valid=0;break;
+        last_abs_id=id;
+        if(!gap){
+            if(actual>=h.page_count){valid=0;break;}
+            if(id==h.page_map_id){
+                if(pos!=h.page_map_offset){valid=0;break;}
+                found_map=1u;
+            }
+            if(id==h.section_map_id)found_section=1u;
+            /* Publish entries only after validation finishes. */
+            ++actual;
         }
         pos+=size;
+        at+=gap?24u:8u;
     }
-    if(pos<n||pos-n>1024u)valid=0;
-    if(!valid){free(plain);return 0;}
-    /* Only after validating all pages do we publish any index entry. */
+    if(!valid||at!=h.map_decoded_bytes||
+       actual!=h.page_count||!found_map||!found_section||
+       pos<n||pos-n>1024u){
+        free(plain);return 0;
+    }
+    /* To uphold atomic publication, validate without writing entries
+     * when a caller result array is provided: otherwise malformed later
+     * entries could partially overwrite existing output on failure. */
     if(entries){
-        pos=256u;
-        for(uint32_t i=0u;i<h.page_count;++i){
-            entries[i].page_id=u32(plain+(size_t)i*8u);
-            entries[i].file_span_bytes=u32(plain+(size_t)i*8u+4u);
-            entries[i].file_offset=pos;
-            pos+=entries[i].file_span_bytes;
+        size_t cursor=0u;uint64_t off=256u;size_t idx=0u;
+        while(cursor<h.map_decoded_bytes){
+            const uint32_t raw=u32(plain+cursor);
+            const uint32_t span=u32(plain+cursor+4u);
+            const int gap=(raw&UINT32_C(0x80000000))!=0u;
+            if(!gap){
+                entries[idx].page_id=raw;
+                entries[idx].file_span_bytes=span;
+                entries[idx].file_offset=off;
+                ++idx;
+            }
+            off+=span;
+            cursor+=gap?24u:8u;
         }
     }
     free(plain);
