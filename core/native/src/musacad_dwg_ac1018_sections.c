@@ -137,7 +137,13 @@ static int scan(const uint8_t *file,size_t file_bytes,
         const uint8_t *record=decoded+at;
         const uint64_t logical=get64(record);
         const uint32_t npage=get32(record+8u);
-        const uint32_t logical_page_bytes=get32(record+12u);
+        const uint32_t declared_page_bytes=get32(record+12u);
+        /* Older accepted synthetic fixtures omit this field. The
+         * established original R2004 native decoder used the standard
+         * 0x7400 data-page span. Preserve that proven fallback while
+         * honoring actual per-section spans in real modern files. */
+        const uint32_t logical_page_bytes=
+            declared_page_bytes?declared_page_bytes:R2004_BLOCK;
         const uint32_t compression=get32(record+20u);
         const uint32_t section_id=get32(record+24u);
         const uint32_t encrypted=get32(record+28u);
