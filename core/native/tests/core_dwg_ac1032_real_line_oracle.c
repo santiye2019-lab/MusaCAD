@@ -9,6 +9,7 @@
 #include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1032_object_streams.h"
 #include "musacad_dwg_ac1032_sections.h"
+#include "musacad_dwg_ac1032_page_map.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,21 @@ static int read_file(const char *path,uint8_t **out,size_t *n){
     *out=mem;*n=(size_t)len;return 1;
 }
 static void diagnose_line(const uint8_t *f,size_t n){
+    MusaDwgAc1032FileMapHeader hdr={0};
+    const int hdr_ok=musa_dwg_ac1032_page_map_header(f,n,&hdr);
+    size_t phys=0u;
+    const int loc_ok=musa_dwg_ac1032_page_locations(
+         f,n,NULL,0u,&phys);
+    fprintf(stderr,"Original LINE physical header_ok=%d locations_ok=%d"
+         " page_count=%u physical=%zu map_id=%u secmap_id=%u"
+         " offset=%llu packed=%u expanded=%u\\n",
+         hdr_ok,loc_ok,hdr.page_count,phys,hdr.page_map_id,
+         hdr.section_map_id,(unsigned long long)hdr.page_map_offset,
+         hdr.map_compressed_bytes,hdr.map_decoded_bytes);
+    fprintf(stderr,"Original LINE encrypted header at 0x80 first 24 bytes:");
+    if(n>=0x98u)for(size_t k=0x80u;k<0x98u;k++)
+        fprintf(stderr," %02X",f[k]);
+    fputc('\\n',stderr);
     size_t count=0u;
     const int index_count_ok=musa_dwg_ac1032_handles_index(f,n,NULL,0u,&count);
     fprintf(stderr,"Original LINE diagnostic: handle_index_ok=%d count=%zu file_bytes=%zu\\n",
