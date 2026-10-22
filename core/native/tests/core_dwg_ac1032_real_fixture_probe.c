@@ -8,6 +8,7 @@
  * checksums. No entity, class graph, XREF or edit/save claim. */
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_sections.h"
+#include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +30,47 @@ static int real_file(const char *name,uint8_t **out,size_t *n){
     if(fclose(f)!=0)ok=0;
     if(!ok){free(p);return 0;}
     *out=p;*n=(size_t)bytes;return 1;
+}
+/* Diagnostic on a REAL public fixture only. Uses the SAME first-party
+ * LZ decoder; no external CAD library or format reinterpretation. */
+static uint32_t u32_probe(const uint8_t *p){
+    return (uint32_t)p[0] | ((uint32_t)p[1]<<8u) |
+           ((uint32_t)p[2]<<16u) | ((uint32_t)p[3]<<24u);
+}
+static void explain_real_page_map(const uint8_t *file,size_t n,
+    const MusaDwgAc1032FileMapHeader *h){
+    const size_t pos=(size_t)h->page_map_offset+20u;
+    if(h->page_map_offset>SIZE_MAX-20u||pos>n||
+       h->map_compressed_bytes>n-pos||
+       h->map_decoded_bytes>4u*1024u*1024u)return;
+    uint8_t *plain=(uint8_t*)malloc(h->map_decoded_bytes);
+    if(!plain)return;
+    size_t consumed=0u;
+    const int ok=musa_dwg_ac1018_lz_decode(file+pos,
+        h->map_compressed_bytes,plain,h->map_decoded_bytes,&consumed);
+    fprintf(stderr,"Real AC1032 page-map decode=%d expanded=%u"
+           " packed=%u consumed=%zu\n",ok,h->map_decoded_bytes,
+           h->map_compressed_bytes,consumed);
+    if(ok){
+        size_t at=0u;unsigned idx=0u;uint64_t position=256u;
+        while(at+8u<=h->map_decoded_bytes && idx<2048u){
+            const uint32_t raw=u32_probe(plain+at);
+            const uint32_t len=u32_probe(plain+at+4u);
+            const int negative=(raw&UINT32_C(0x80000000))!=0u;
+            if(idx<8u||at+24u>=h->map_decoded_bytes)
+                fprintf(stderr," map entry[%u] raw=%08X"
+                  " size=%u file_off=%llu gap=%d\n",
+                  idx,raw,len,(unsigned long long)position,negative);
+            if(negative&&at+24u>h->map_decoded_bytes)break;
+            at+=negative?24u:8u;
+            position+=len;
+            idx++;
+        }
+        fprintf(stderr," Real AC1032 page-map summary records=%u"
+                " parsed_bytes=%zu file_end=%llu real_size=%zu\n",
+                idx,at,(unsigned long long)position,n);
+    }
+    free(plain);
 }
 static void fail(const char *stage,const uint8_t *file,size_t n){
     fprintf(stderr,
@@ -59,6 +101,7 @@ int main(int argc,char **argv){
     if(!musa_dwg_ac1032_page_locations(
                  file,len,NULL,0u,&map_count)||
        !map_count||map_count!=header.page_count){
+        explain_real_page_map(file,len,&header);
         fail("decoded original AC1032 page locations",file,len);goto done;
     }
     MusaDwgAc1032PageLocation *map=(MusaDwgAc1032PageLocation*)calloc(
