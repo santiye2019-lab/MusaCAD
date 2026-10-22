@@ -314,6 +314,14 @@ int main(int argc,char **argv){
         (unsigned long long)unicode_region.start_bit,
         (unsigned long long)unicode_region.length_bits,
         (unsigned long long)unicode_region.flag_bit);
+    MusaDwgAc1032ClassNames class_names[50]={{0}};
+    size_t names_count=0u;
+    if(!musa_dwg_ac1032_classes_names(
+             file,len,class_names,50u,&names_count)||
+       names_count!=50u){
+        fail("original R2018 Unicode TU class name decoding",file,len);
+        free(entry);goto done;
+    }
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);
