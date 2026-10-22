@@ -20,7 +20,7 @@ int musa_dwg_ac1032_class_join(
     uint16_t type,uint64_t handle,const MusaDwgAc1032ClassNumeric *nums,
     const MusaDwgAc1032ClassNames *names,size_t n,
     MusaDwgAc1032ClassResolution *out){
-    if(!out||!type||!handle||n>MAX_REGISTERED_CLASSES||
+    if(!out||!type||n>MAX_REGISTERED_CLASSES||
        (n&&(!nums||!names)))return 0;
     if(n>SIZE_MAX/sizeof(*nums)||
        n>SIZE_MAX/sizeof(*names))return 0;
@@ -114,5 +114,5 @@ int musa_dwg_ac1032_resolve_declared_class_file(
     if(!file||!out||class_number<500u||bytes<256u||
        bytes>MAX_CLASS_SOURCE_FILE||
        overlaps(file,bytes,out,sizeof(*out)))return 0;
-    return resolve(file,bytes,class_number,1u,0u,out);
+    return resolve(file,bytes,class_number,0u,0u,out);
 }
