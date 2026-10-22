@@ -13,6 +13,7 @@
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_dwg_ac1032_entity_prefix.h"
 #include "musacad_dwg_ac1032_line_fields.h"
+#include "musacad_dwg_ac1032_line_file.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -339,6 +340,46 @@ int main(int argc,char **argv){
              " independently pinned H=0x1CA\n",
              decoded[0],decoded[1],decoded[2],
              decoded[3],decoded[4],decoded[5]);
+
+        /* The PRODUCTION common ABI, not only the test's manual
+         * bitstream decode, must independently reproduce the same
+         * original AutoCAD source's indexed LINE endpoints. */
+        MusaDwgAc1032NativeLine native={0};
+        if(!musa_dwg_ac1032_read_line_file(
+               f,bytes,ORIGINAL_LINE_HANDLE,&native)){
+            fprintf(stderr,"FAIL original DWG to first-party LINE API\n");
+            free(payload);goto done;
+        }
+        const double native_xyz[6]={
+            native.geometry.start[0],native.geometry.start[1],
+            native.geometry.start[2],native.geometry.end[0],
+            native.geometry.end[1],native.geometry.end[2]
+        };
+        for(unsigned i=0u;i<6u;i++){
+            if(fabs(native_xyz[i]-reference[i])>0.0001){
+                fprintf(stderr,"FAIL production LINE API XYZ[%u]\n",i);
+                free(payload);goto done;
+            }
+        }
+        if(native.common.geometry_start_bit!=common.geometry_start_bit||
+           native.geometry.geometry_end_bit!=geometry.geometry_end_bit||
+           native.common.prefix.indexed_handle!=ORIGINAL_LINE_HANDLE){
+            fprintf(stderr,"FAIL production LINE API source provenance\n");
+            free(payload);goto done;
+        }
+        const MusaDwgAc1032NativeLine saved_native=native;
+        if(musa_dwg_ac1032_read_line_file(
+             f,bytes,UINT64_MAX,&native)||
+           memcmp(&saved_native,&native,sizeof(native))||
+           musa_dwg_ac1032_read_line_file(
+             f,bytes,ORIGINAL_LINE_HANDLE,
+             (MusaDwgAc1032NativeLine*)(void*)f)){
+            fprintf(stderr,"FAIL production LINE API fail-atomic aliases\n");
+            free(payload);goto done;
+        }
+        fprintf(stderr,"PASS first-party portable DWG->LINE API:"
+             " source H=0x%llX XYZ/oracle and failure-atomic\n",
+             (unsigned long long)ORIGINAL_LINE_HANDLE);
     }
     free(payload);
     if(!copied){
