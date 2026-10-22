@@ -14,6 +14,7 @@
 #include "musacad_dwg_ac1032_object_type.h"
 #include "musacad_dwg_ac1032_class_resolution.h"
 #include "musacad_dwg_ac1032_object_payload.h"
+#include "musacad_dwg_ac1032_object_streams.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
@@ -541,7 +542,41 @@ int main(int argc,char **argv){
         fail("R2018 original indexed payload bytes proof",file,len);
         free(copied_payload);free(original_handles);free(entry);goto done;
     }
+    /* Physically authentic R2018: MC partitions end-of-record handles
+     * (INCLUDING byte alignment padding) from object-data OT and body.
+     * Require the known first source OT=48 to lie in the DATA stream. */
+    MusaDwgAc1032ObjectStreams streams={0};
+    uint32_t first_bits=0u,first_handle_bits=0u;
+    if(!musa_dwg_ac1032_stream_layout_file(
+             file,len,first_handle,&streams)||
+       streams.raw_object_type!=payload_info.raw_object_type||
+       streams.indexed_handle!=first_handle||
+       streams.object_section_offset!=payload_info.object_section_offset||
+       streams.total_payload_bits!=(uint64_t)payload_len*8u||
+       streams.handle_stream_bits!=payload_info.handle_stream_bits||
+       streams.data_stream_bits!=streams.handle_stream_start_bit||
+       streams.data_stream_bits+streams.handle_stream_bits!=
+                streams.total_payload_bits||
+       streams.object_type_field_bits!=10u||
+       !streams.original_record_crc_verified||
+       !musa_dwg_ac1032_stream_read_bits(
+             copied_payload,payload_len,&streams,
+             MUSA_AC1032_STREAM_OBJECT_DATA,0u,10u,&first_bits)||
+       first_bits!=48u||
+       !musa_dwg_ac1032_stream_read_bits(
+             copied_payload,payload_len,&streams,
+             MUSA_AC1032_STREAM_HANDLES,0u,
+             (unsigned)(streams.handle_stream_bits<8u?
+                        streams.handle_stream_bits:8u),
+             &first_handle_bits)){
+        fail("R2018 original source-backed DATA/HANDLES partition",file,len);
+        free(copied_payload);free(original_handles);free(entry);goto done;
+    }
     free(copied_payload);
+    fprintf(stderr,"PASS real original AC1032 stream partition:"
+         " data=%llu handle=%llu first_handle_bits=%u\\n",
+         (unsigned long long)streams.data_stream_bits,
+         (unsigned long long)streams.handle_stream_bits,first_handle_bits);
     fprintf(stderr,"PASS real original AC1032 object payload:"
         " handle=%llu copied=%zu type=%u CRC=verified\\n",
         (unsigned long long)first_handle,payload_len,payload_info.raw_object_type);
