@@ -12,6 +12,8 @@
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_dwg_ac1032_entity_prefix.h"
+#include "musacad_dwg_ac1032_line_fields.h"
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -290,6 +292,53 @@ int main(int argc,char **argv){
              prefix.entity_mode,prefix.reactor_count,
              prefix.xdictionary_missing,prefix.has_binary_data_store,
              prefix.no_prev_next_links,prefix.next_color_bit);
+
+        /* Original file, original indexed H, exact DATA partition.
+         * Do not use guessed geometry bit offsets. The external
+         * AutoCAD Line.txt values have limited decimal precision. */
+        MusaDwgAc1032LineCommon common={0};
+        MusaDwgAc1032LineFields geometry={0};
+        const int tail_ok=musa_dwg_ac1032_line_common_bytes(
+            payload,needed,&layout,&common);
+        const int xyz_ok=tail_ok&&musa_dwg_ac1032_line_fields_at(
+            payload,needed,&layout,common.geometry_start_bit,&geometry);
+        fprintf(stderr,"R2018 real LINE common tail_ok=%d"
+             " geometry_start_bit=%zu color=%u lt_flags=%u"
+             " plot_flags=%u material_flags=%u"
+             " geometry_numeric_ok=%d DATA_bits=%llu\\n",
+             tail_ok,common.geometry_start_bit,
+             common.color_index,common.linetype_flags,
+             common.plotstyle_flags,common.material_flags,xyz_ok,
+             (unsigned long long)layout.data_stream_bits);
+        if(!xyz_ok){
+            fprintf(stderr,"R2018 original LINE authenticated payload hex:");
+            for(size_t i=0u;i<needed&&i<48u;i++)
+                fprintf(stderr," %02X",payload[i]);
+            fputc('\\n',stderr);
+            free(payload);goto done;
+        }
+        const double reference[6]={
+            21.6078,2.81192,0.0,11.0307,16.6375,0.0
+        };
+        const double decoded[6]={
+            geometry.start[0],geometry.start[1],geometry.start[2],
+            geometry.end[0],geometry.end[1],geometry.end[2]
+        };
+        for(unsigned i=0u;i<6u;i++){
+            if(fabs(decoded[i]-reference[i])>0.0001){
+                fprintf(stderr,"FAIL R2018 LINE oracle[%u]:"
+                     " decoded=%.17g expected=%.10g"
+                     " geometry_bit=%zu\\n",
+                     i,decoded[i],reference[i],common.geometry_start_bit);
+                free(payload);goto done;
+            }
+        }
+        fprintf(stderr,"PASS ORIGINAL R2018 XYZ:"
+             " start=(%.9g,%.9g,%.9g)"
+             " end=(%.9g,%.9g,%.9g)"
+             " independently pinned H=0x1CA\\n",
+             decoded[0],decoded[1],decoded[2],
+             decoded[3],decoded[4],decoded[5]);
     }
     free(payload);
     if(!copied){
