@@ -34,7 +34,7 @@ int musa_dwg_ac1032_line_prefix_bytes(
         return 0;
     uint32_t h_header=0u,preview=0u,mode=0u;
     uint16_t edata=0u;
-    uint32_t reactors=0u,xdic=0u,ds=0u,nolinks=0u;
+    uint32_t reactors=0u,xdic=0u,ds=0u;
     uint64_t self=0u;
     if(!musa_dwg_ac1015_bits_read_u(&c,8u,&h_header)||
        h_header>>4u||!(h_header&15u)||(h_header&15u)>8u)
@@ -55,8 +55,7 @@ int musa_dwg_ac1032_line_prefix_bytes(
        !musa_dwg_ac1015_bits_read_bl(&c,&reactors)||reactors!=0u||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&xdic)||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&ds)||
-       !musa_dwg_ac1015_bits_read_u(&c,1u,&nolinks)||
-       !nolinks||!xdic||ds)return 0;
+       !xdic||ds)return 0;
     MusaDwgAc1032LinePrefix result={0};
     result.indexed_handle=self;
     result.raw_object_type=19u;
@@ -64,7 +63,10 @@ int musa_dwg_ac1032_line_prefix_bytes(
     result.reactor_count=reactors;
     result.xdictionary_missing=(uint8_t)xdic;
     result.has_binary_data_store=(uint8_t)ds;
-    result.no_prev_next_links=(uint8_t)nolinks;
+    /* R2018 does not store the obsolete R2000 previous/next linker bit.
+     * Those links are absent by format invariant (R2004+), not a B in DATA.
+     * Original AutoCAD LINE 0x1CA verifies next ENC starts at bit 43. */
+    result.no_prev_next_links=1u;
     result.next_color_bit=c.bit_pos;
     result.prefix_decoded=1u;
     *out=result;
