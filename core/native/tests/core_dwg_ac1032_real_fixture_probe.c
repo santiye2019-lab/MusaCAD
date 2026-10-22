@@ -72,6 +72,63 @@ static void explain_real_page_map(const uint8_t *file,size_t n,
     }
     free(plain);
 }
+static void explain_real_sections(const uint8_t *file,size_t n,
+    const MusaDwgAc1032FileMapHeader *h){
+    size_t count=0u;
+    if(!musa_dwg_ac1032_page_locations(file,n,NULL,0u,&count)||
+       !count||count>131072u)return;
+    MusaDwgAc1032PageLocation *pages=
+        (MusaDwgAc1032PageLocation*)calloc(count,sizeof(*pages));
+    if(!pages)return;
+    if(!musa_dwg_ac1032_page_locations(file,n,pages,count,&count)){
+        free(pages);return;
+    }
+    for(size_t i=0u;i<count;i++){
+        if(pages[i].page_id!=h->section_map_id)continue;
+        const size_t at=(size_t)pages[i].file_offset;
+        if(at>n||n-at<20u){break;}
+        const uint32_t typ=u32_probe(file+at);
+        const uint32_t expanded=u32_probe(file+at+4u);
+        const uint32_t packed=u32_probe(file+at+8u);
+        const uint32_t method=u32_probe(file+at+12u);
+        fprintf(stderr,"R2018 original section-map system page:"
+                " id=%u pos=%zu span=%u type=%08X expanded=%u"
+                " packed=%u codec=%u\n",pages[i].page_id,at,
+                pages[i].file_span_bytes,typ,expanded,packed,method);
+        if(expanded<20u||expanded>1024u*1024u||
+           packed>n-at-20u)break;
+        uint8_t *mem=(uint8_t*)malloc(expanded);
+        if(!mem)break;
+        size_t consumed=0u;
+        const int ok=musa_dwg_ac1018_lz_decode(
+             file+at+20u,packed,mem,expanded,&consumed);
+        fprintf(stderr,"R2018 original section-map LZ=%d"
+                " consumed=%zu sections=%u\n",
+                ok,consumed,ok?u32_probe(mem):0u);
+        if(ok){
+            size_t off=20u;
+            for(uint32_t k=0u;k<u32_probe(mem)&&k<12u;k++){
+                if(off+96u>expanded)break;
+                const uint8_t *d=mem+off;
+                const uint32_t pages_n=u32_probe(d+8u);
+                const uint32_t maxbytes=u32_probe(d+12u);
+                const uint32_t compression=u32_probe(d+20u);
+                const uint32_t sectid=u32_probe(d+24u);
+                const uint32_t encrypted=u32_probe(d+28u);
+                fprintf(stderr," descriptor %u:"
+                   " pages=%u page_bytes=%u compr=%u id=%u"
+                   " encrypted=%u name=%.64s\n",
+                   k,pages_n,maxbytes,compression,sectid,encrypted,
+                   (const char*)(d+32u));
+                off+=96u+(size_t)pages_n*16u;
+                if(off>expanded)break;
+            }
+        }
+        free(mem);
+        break;
+    }
+    free(pages);
+}
 static void fail(const char *stage,const uint8_t *file,size_t n){
     fprintf(stderr,
         "FAIL first-party AC1032 real DWG physical acceptance: %s;"
@@ -117,6 +174,7 @@ int main(int argc,char **argv){
     if(!musa_dwg_ac1032_section_catalog(
                  file,len,NULL,0u,&section_count)||
        !section_count||section_count>256u){
+        explain_real_sections(file,len,&header);
         fail("FULL physical section directory and every page CRC",
              file,len);goto done;
     }
