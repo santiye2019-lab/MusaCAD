@@ -12,6 +12,7 @@
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_record.h"
 #include "musacad_dwg_ac1018_lz.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -418,7 +419,26 @@ int main(int argc,char **argv){
                 fprintf(stderr,"original R2018 object bytes at %zu:",at);
                 for(size_t k=0u;k<32u&&k<original_bytes-at;k++)
                     fprintf(stderr," %02X",raw[at+k]);
-                fputc('\n',stderr);
+        
+                if(original_bytes-at>512u){
+                    const size_t ms=(size_t)raw[at]|((size_t)raw[at+1u]<<8u);
+                    fprintf(stderr,"record MS=%zu first MC=%02X %02X "
+                          "next indexed offset=%llu\\n",ms,
+                          raw[at+2u],raw[at+3u],
+                          (unsigned long long)original_handles[1u].object_offset);
+                    for(int delta=-4;delta<=4;delta++){
+                        const size_t crcpos=at+2u+ms+(size_t)((int64_t)delta);
+                        if(crcpos<at||crcpos+2u>original_bytes)continue;
+                        uint16_t crc=0u;
+                        if(musa_core_crc16_arc(0xc0c1u,raw+at,crcpos-at,&crc))
+                          fprintf(stderr,
+                            "record CRC delta %+d computed=%04X storedLE=%04X storedBE=%04X\\n",
+                            delta,crc,
+                            (unsigned)(raw[crcpos]|(raw[crcpos+1u]<<8u)),
+                            (unsigned)((raw[crcpos]<<8u)|raw[crcpos+1u]));
+                    }
+                }
+        fputc('\n',stderr);
             }
             free(raw);
             fail("original AC1032 object record envelope",file,len);
