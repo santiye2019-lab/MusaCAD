@@ -37,7 +37,7 @@ int musa_dwg_ac1032_classes_frame_probe(
         }
     }
     free(items);
-    if(!ok||found!=1u||logical<25u||
+    if(!ok||found!=1u||logical<29u||
        logical>8u*1024u*1024u)return 0;
     uint8_t *bytes=(uint8_t*)malloc((size_t)logical);
     if(!bytes)return 0;
@@ -48,10 +48,15 @@ int musa_dwg_ac1032_classes_frame_probe(
        !memcmp(bytes,class_marker,sizeof(class_marker));
     MusaDwgAc1032ClassesFrame result={0};
     if(ok){
+        /* R2018 stores a 64-bit class data area length (two raw
+         * little-endian longs), then a 32-bit bit count. The public
+         * genuine AC1032 fixture has area=6531, high=0, bits=52242.
+         * Reject >32-bit areas until a bounded streaming reader exists. */
         const uint32_t area=u32(bytes+16u);
-        const uint32_t bits=u32(bytes+20u);
-        ok=area>0u&&area<=logical-24u&&
-           bits>0u&&(uint64_t)bits<=(logical-24u)*8u;
+        const uint32_t high=u32(bytes+20u);
+        const uint32_t bits=u32(bytes+24u);
+        ok=area>0u&&!high&&area<=logical-28u&&
+           bits>0u&&(uint64_t)bits<=(uint64_t)area*8u;
         if(ok){
             result.class_area_bytes=area;
             result.total_data_bits=bits;
