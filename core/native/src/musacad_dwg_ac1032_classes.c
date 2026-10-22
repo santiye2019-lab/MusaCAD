@@ -248,3 +248,66 @@ int musa_dwg_ac1032_classes_numeric_records(
     free(original);
     return ok;
 }
+
+/* R2010+ R2018 class data appends the TU stream before a 16/32-bit
+ * length descriptor and a trailing presence bit. All access is bounded
+ * against the original authenticated logical section. Unicode is not
+ * interpreted until its exact source span can be demonstrated. */
+int musa_dwg_ac1032_classes_text_region(
+    const uint8_t *file,size_t file_len,MusaDwgAc1032ClassTextRegion *out){
+    if(!file||!out||file_len<256u||file_len>64u*1024u*1024u||
+       !nonoverlap(file,file_len,out,sizeof(*out)))return 0;
+    MusaDwgAc1032ClassesFrame frame={0};
+    if(!musa_dwg_ac1032_classes_frame_probe(file,file_len,&frame)||
+       frame.section_logical_bytes>8u*1024u*1024u)return 0;
+    uint8_t *bytes=(uint8_t*)malloc((size_t)frame.section_logical_bytes);
+    if(!bytes)return 0;
+    size_t written=0u;
+    int ok=musa_dwg_ac1032_extract_named_section(
+       file,file_len,"AcDb:Classes",bytes,
+       (size_t)frame.section_logical_bytes,&written)&&
+       written==frame.section_logical_bytes;
+    MusaDwgAc1032ClassTextRegion region={0};
+    if(ok){
+        const uint64_t flag=(uint64_t)frame.total_data_bits+191u;
+        if(flag>=frame.section_logical_bytes*8u||flag<240u)
+            ok=0;
+        else{
+            DwgClassBits bits={bytes,frame.section_logical_bytes*8u,(size_t)flag};
+            uint32_t present=0u;
+            ok=rawbits(&bits,1u,&present);
+            region.flag_bit=flag;
+            region.present=(uint8_t)present;
+            region.source_verified=1u;
+            if(ok&&present){
+                if(flag<16u)ok=0;
+                else{
+                    bits.at=(size_t)flag-16u;
+                    uint32_t low=0u,high=0u;
+                    ok=lebytes(&bits,2u,&low);
+                    uint64_t length=low;
+                    uint64_t before=flag-16u;
+                    if(ok&&(low&0x8000u)){
+                        if(before<16u)ok=0;
+                        else{
+                            bits.at=(size_t)(before-16u);
+                            ok=lebytes(&bits,2u,&high);
+                            length=(uint64_t)(low&0x7fffu)+
+                                   ((uint64_t)high<<15u);
+                            before-=16u;
+                        }
+                    }
+                    if(ok&&(!length||length>before-224u))
+                        ok=0;
+                    if(ok){
+                        region.start_bit=before-length;
+                        region.length_bits=length;
+                    }
+                }
+            }
+        }
+    }
+    free(bytes);
+    if(!ok)return 0;
+    *out=region;return 1;
+}
