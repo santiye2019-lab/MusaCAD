@@ -11,6 +11,7 @@
 #include "musacad_dwg_ac1032_classes.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_record.h"
+#include "musacad_dwg_ac1032_object_type.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
@@ -448,6 +449,31 @@ int main(int argc,char **argv){
                " handle=%llu payload=%u handle_bits=%u CRC=verified\\n",
                (unsigned long long)record.indexed_handle,
                record.payload_bytes,record.handle_stream_bits);
+    }
+    /* New source-backed R2018 variable-length OT record type proof.
+     * All samples have verified original H, MS, MC and CRC already.
+     * No type-specific object body is decoded or called renderable. */
+    for(size_t i=0u;i<3u;i++){
+        const MusaDwgAc1032HandleEntry *e=&original_handles[source_samples[i]];
+        MusaDwgAc1032ObjectType obj={0};
+        if(!musa_dwg_ac1032_object_type_file(
+                  file,len,e->handle,&obj)||
+           !obj.record_crc_verified||
+           obj.indexed_handle!=e->handle||
+           obj.object_section_offset!=e->object_offset||
+           !obj.type_code||obj.ot_opcode>2u||
+           (i==0u&&obj.type_code!=48u)){
+            fprintf(stderr,"FAIL first-party genuine AC1032 OT"
+                           " source index=%zu handle=%llu offset=%llu\\n",
+                    source_samples[i],(unsigned long long)e->handle,
+                    (unsigned long long)e->object_offset);
+            fail("original R2018 bit-coded OT object type",file,len);
+            free(original_handles);free(entry);goto done;
+        }
+        fprintf(stderr,"PASS REAL AC1032 object OT:"
+               " handle=%llu type=%u mode=%u original_CRC=verified\\n",
+               (unsigned long long)obj.indexed_handle,
+               obj.type_code,obj.ot_opcode);
     }
     free(original_handles);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
