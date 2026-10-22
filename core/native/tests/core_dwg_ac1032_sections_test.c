@@ -98,5 +98,67 @@ int main(void){
          source,1080u,MUSA_DWG_AC1032_HANDLES,
          page,2u,&info,&count));
     assert(!memcmp(&info,&saved,sizeof(saved)));
+    /* New feature: complete protected section DIRECTORY, including
+     * non-geometry/unknown sections, with no partial result. */
+    memcpy(source,before,sizeof(source));
+    MusaDwgAc1032SectionCatalogEntry catalog[2]={{0}},backup[2]={{0}};
+    size_t catalog_count=999u;
+    assert(musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),NULL,0u,&catalog_count));
+    assert(catalog_count==2u);
+    assert(musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==2u&&
+           !strcmp((const char*)catalog[0].name,"AcDb:AcDbObjects")&&
+           !strcmp((const char*)catalog[1].name,"AcDb:Handles")&&
+           catalog[0].section_id==11u&&
+           catalog[1].section_id==10u&&
+           catalog[0].page_count==1u&&catalog[1].page_count==1u&&
+           catalog[0].all_physical_page_checksums_verified&&
+           catalog[1].all_physical_page_checksums_verified);
+    memcpy(backup,catalog,sizeof(backup));
+    size_t previous_catalog_count=catalog_count;
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,1u,&catalog_count));
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),
+                (MusaDwgAc1032SectionCatalogEntry*)(void*)source,
+                2u,&catalog_count));
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,
+                (size_t*)(void*)catalog));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
+    source[608u]^=1u; /* corrupt Handles: catalog must inspect ALL pages */
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
+    memcpy(source,before,sizeof(source));
+    /* Re-label second descriptor as original unknown content, keeping
+     * physical record and map CRC independently valid. */
+    const size_t second_name=768u+20u+2u+132u+32u;
+    memset(source+second_name,0,64u);
+    memcpy(source+second_name,"AcDb:AcDsPrototype_1b",22u);
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    assert(musa_dwg_ac1032_section_catalog(
+               source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==2u&&
+           !strcmp((const char*)catalog[1].name,"AcDb:AcDsPrototype_1b")&&
+           catalog[1].all_physical_page_checksums_verified);
+    assert(!musa_dwg_ac1032_section_pages(
+               source,sizeof(source),MUSA_DWG_AC1032_HANDLES,
+               page,2u,&info,&count)); /* no fabricated Handles section */
+    /* Two descriptors with the same name must be rejected without writes
+     * even when the section-map checksum has been regenerated. */
+    memset(source+second_name,0,64u);
+    memcpy(source+second_name,"AcDb:AcDbObjects",16u);
+    sys_header(source+768u,UINT32_C(0x4163003b),244u,247u);
+    memcpy(backup,catalog,sizeof(backup));
+    previous_catalog_count=catalog_count;
+    assert(!musa_dwg_ac1032_section_catalog(
+                source,sizeof(source),catalog,2u,&catalog_count));
+    assert(catalog_count==previous_catalog_count&&
+           !memcmp(catalog,backup,sizeof(catalog)));
     return 0;
 }
