@@ -39,29 +39,29 @@ static void diagnose_line(const uint8_t *f,size_t n){
          f,n,NULL,0u,&phys);
     fprintf(stderr,"Original LINE physical header_ok=%d locations_ok=%d"
          " page_count=%u physical=%zu map_id=%u secmap_id=%u"
-         " offset=%llu packed=%u expanded=%u\\n",
+         " offset=%llu packed=%u expanded=%u\n",
          hdr_ok,loc_ok,hdr.page_count,phys,hdr.page_map_id,
          hdr.section_map_id,(unsigned long long)hdr.page_map_offset,
          hdr.map_compressed_bytes,hdr.map_decoded_bytes);
     fprintf(stderr,"Original LINE encrypted header at 0x80 first 24 bytes:");
     if(n>=0x98u)for(size_t k=0x80u;k<0x98u;k++)
         fprintf(stderr," %02X",f[k]);
-    fputc('\\n',stderr);
+    fputc('\n',stderr);
     size_t count=0u;
     const int index_count_ok=musa_dwg_ac1032_handles_index(f,n,NULL,0u,&count);
-    fprintf(stderr,"Original LINE diagnostic: handle_index_ok=%d count=%zu file_bytes=%zu\\n",
+    fprintf(stderr,"Original LINE diagnostic: handle_index_ok=%d count=%zu file_bytes=%zu\n",
             index_count_ok,count,n);
     size_t cat=0u;
     const int cat_ok=musa_dwg_ac1032_section_catalog(
           f,n,NULL,0u,&cat);
-    fprintf(stderr,"Original LINE diagnostic: section_catalog_ok=%d sections=%zu\\n",
+    fprintf(stderr,"Original LINE diagnostic: section_catalog_ok=%d sections=%zu\n",
             cat_ok,cat);
     if(cat_ok&&cat>0u&&cat<=256u){
         MusaDwgAc1032SectionCatalogEntry *sect=calloc(cat,sizeof(*sect));
         size_t got=0u;
         if(sect&&musa_dwg_ac1032_section_catalog(f,n,sect,cat,&got)){
             for(size_t i=0u;i<got;i++)
-                fprintf(stderr,"Original LINE section[%zu]: '%s' logical=%llu CRCs=%u\\n",
+                fprintf(stderr,"Original LINE section[%zu]: '%s' logical=%llu CRCs=%u\n",
                      i,sect[i].name,
                      (unsigned long long)sect[i].logical_bytes,
                      (unsigned)sect[i].all_physical_page_checksums_verified);
