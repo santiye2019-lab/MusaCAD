@@ -103,9 +103,18 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         const int gap=(raw&UINT32_C(0x80000000))!=0u;
         if(gap&&h.map_decoded_bytes-at<24u){valid=0;break;}
         const uint32_t id=gap?(uint32_t)(-(int64_t)(int32_t)raw):raw;
+        const size_t stride=gap?24u:8u;
+        const int final=(at+stride==h.map_decoded_bytes);
+        /* On real R2018 files the last physical SYSTEM page's reported
+         * allocated span may exceed the actual file EOF; its encoded
+         * compressed content must still be fully present and checksummed.
+         * Earlier pages and gaps MUST fit entirely in source bytes. */
         if(!id||id<=last_abs_id||id>1048576u||
            !size||pos>UINT64_MAX-size||pos>=n||
-           pos>n||(uint64_t)n-pos<size){
+           (final?(gap||id!=h.page_map_id||
+                   (uint64_t)n-pos>size||
+                   (uint64_t)n-pos<20u):
+                  (uint64_t)n-pos<size)){
             valid=0;break;
         }
         last_abs_id=id;
@@ -124,7 +133,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
     }
     if(!valid||at!=h.map_decoded_bytes||
        actual!=h.page_count||!found_map||!found_section||
-       pos<n||pos-n>1024u){
+       pos<n){
         free(plain);return 0;
     }
     /* To uphold atomic publication, validate without writing entries
