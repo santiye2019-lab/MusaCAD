@@ -368,3 +368,28 @@ int musa_dwg_ac1032_classes_names(
        musa_dwg_ac1032_extract_named_section(file,len,"AcDb:Classes",
           plain,(size_t)frame.section_logical_bytes,&read_bytes)&&
           read_bytes==frame.section_logical_bytes;
+
+    if(ok){
+        const uint64_t end=text.start_bit+text.length_bits;
+        if(end<text.start_bit||end>read_bytes*8u)ok=0;
+        else{
+            DwgClassBits bits={plain,(size_t)end,(size_t)text.start_bit};
+            for(size_t i=0u;i<n&&ok;i++){
+                temp[i].class_number=ids[i].class_number;
+                ok=musacad_class_read_tu(&bits,temp[i].application,
+                      sizeof(temp[i].application))&&
+                   musacad_class_read_tu(&bits,temp[i].cpp_class,
+                      sizeof(temp[i].cpp_class))&&
+                   musacad_class_read_tu(&bits,temp[i].dxf_name,
+                      sizeof(temp[i].dxf_name));
+            }
+            if(ok&&bits.at!=end)ok=0;
+        }
+    }
+    if(ok){
+        if(names)memcpy(names,temp,n*sizeof(*names));
+        *count=n;
+    }
+    free(plain);free(temp);free(ids);
+    return ok;
+}
