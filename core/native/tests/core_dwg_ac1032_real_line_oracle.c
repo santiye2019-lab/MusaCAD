@@ -11,7 +11,7 @@
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1018_lz.h"
-#include "musacad_dwg_ac1015_values.h"
+#include "musacad_dwg_ac1032_entity_prefix.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -266,44 +266,30 @@ int main(int argc,char **argv){
          payload,needed,&layout,MUSA_AC1032_STREAM_OBJECT_DATA,
          0u,10u,&type)&&type==19u;
     if(copied){
-        /* SOURCE-GROUNDED DIAGNOSTIC ONLY (not a prefix acceptance).
-         * The R2018 body differs from AC1018: read the documented OT
-         * and following raw 32-bit data-length candidate in the same
-         * first-party bounded number codec, retain the real source.
-         * Never infer a geometry-start offset from a double scan. */
-        fprintf(stderr,"R2018 original LINE first payload bytes:");
-        for(size_t k=0u;k<needed&&k<45u;k++)
-            fprintf(stderr," %02X",payload[k]);
-        fputc('\n',stderr);
-        MusaDwgAc1015Bits common={0};
-        uint32_t data_size=0u,header_word=0u;
-        uint16_t eed_size=0u;
-        if(musa_dwg_ac1015_bits_init(
-               &common,payload,needed,layout.object_type_field_bits,
-               (size_t)layout.data_stream_bits)&&
-           musa_dwg_ac1015_bits_read_rl(&common,&data_size)&&
-           musa_dwg_ac1015_bits_read_u(&common,8u,&header_word)){
-            fprintf(stderr,"R2018 original LINE common-prefix PROBE:"
-               " raw_data_bits=%u next_H_header=0x%02X"
-               " after=%zu DATA_end=%llu\n",
-               data_size,header_word,common.bit_pos,
-               (unsigned long long)layout.data_stream_bits);
-            const unsigned hlen=header_word&15u;
-            if((header_word>>4u)==0u&&hlen>0u&&hlen<=8u){
-                uint64_t self=0u;
-                for(unsigned k=0;k<hlen;k++){
-                    uint32_t b=0u;
-                    if(!musa_dwg_ac1015_bits_read_u(&common,8u,&b))
-                        break;
-                    self=(self<<8u)|b;
-                }
-                if(musa_dwg_ac1015_bits_read_bs(&common,&eed_size)){
-                    fprintf(stderr,"R2018 original LINE common-prefix PROBE:"
-                       " embedded_H=%llX EED=%u offset_after_EED_BS=%zu\n",
-                       (unsigned long long)self,eed_size,common.bit_pos);
-                }
-            }
+        MusaDwgAc1032LinePrefix prefix={0};
+        if(!musa_dwg_ac1032_line_prefix_bytes(
+             payload,needed,&layout,&prefix)||
+           !prefix.prefix_decoded||
+           prefix.indexed_handle!=ORIGINAL_LINE_HANDLE||
+           prefix.raw_object_type!=19u||
+           prefix.entity_mode!=2u||
+           prefix.reactor_count!=0u||
+           prefix.xdictionary_missing!=1u||
+           prefix.has_binary_data_store!=0u||
+           prefix.no_prev_next_links!=1u||
+           prefix.next_color_bit!=44u){
+            fprintf(stderr,"FAIL authentic R2018 LINE common"
+                 " H/EED/mode/reactors/XDic/DS/Nolinks source fields\n");
+            free(payload);goto done;
         }
+        fprintf(stderr,"PASS REAL R2018 common LINE early prefix:"
+             " handle=0x%llX entitymode=%u reactors=%u"
+             " XDic_missing=%u DS=%u no_links=%u"
+             " next_color_bit=%zu NOT geometry_offset\n",
+             (unsigned long long)prefix.indexed_handle,
+             prefix.entity_mode,prefix.reactor_count,
+             prefix.xdictionary_missing,prefix.has_binary_data_store,
+             prefix.no_prev_next_links,prefix.next_color_bit);
     }
     free(payload);
     if(!copied){
