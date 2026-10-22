@@ -279,7 +279,7 @@ int main(int argc,char **argv){
            prefix.xdictionary_missing!=1u||
            prefix.has_binary_data_store!=0u||
            prefix.no_prev_next_links!=1u||
-           prefix.next_color_bit!=44u){
+           prefix.next_color_bit!=43u){
             fprintf(stderr,"FAIL authentic R2018 LINE common"
                  " H/EED/mode/reactors/XDic/DS/Nolinks source fields\n");
             free(payload);goto done;
