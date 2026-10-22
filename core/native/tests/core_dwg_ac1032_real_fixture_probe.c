@@ -9,6 +9,7 @@
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1032_classes.h"
+#include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -334,6 +335,60 @@ int main(int argc,char **argv){
             " cpp='%s' dxf='%s'\n",
             class_names[0].application,
             class_names[0].cpp_class,class_names[0].dxf_name);
+    /* New read-only semantic step: locate genuine R2018 object handles
+     * in ORIGINAL decompressed AcDb:AcDbObjects logical address space.
+     * The AC1018 page-delta codec is shared, but modern object payload
+     * bytes are NOT decoded by the older object parser. */
+    size_t object_logical=0u;
+    for(size_t i=0u;i<section_count;i++){
+        if(!strcmp((const char*)entry[i].name,"AcDb:AcDbObjects"))
+            object_logical=(size_t)entry[i].logical_bytes;
+    }
+    size_t index_count=0u;
+    if(!object_logical||
+       !musa_dwg_ac1032_handles_index(file,len,NULL,0u,&index_count)||
+       index_count<1u||index_count>1000000u){
+        fail("original AC1032 bounded object handle-map count",file,len);
+        free(entry);goto done;
+    }
+    MusaDwgAc1032HandleEntry *original_handles=
+         (MusaDwgAc1032HandleEntry*)calloc(index_count,
+                                           sizeof(*original_handles));
+    size_t listed_count=0u;
+    if(!original_handles||
+       !musa_dwg_ac1032_handles_index(file,len,original_handles,
+                                       index_count,&listed_count)||
+       listed_count!=index_count){
+        fail("original AC1032 handle / relative object-offset decode",
+             file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    for(size_t i=0u;i<index_count;i++){
+        if(!original_handles[i].handle||
+           original_handles[i].object_offset>=object_logical||
+           (i>0u&&original_handles[i].handle<=original_handles[i-1u].handle)){
+            fail("AC1032 original source invalid handle map order or offset",
+                 file,len);
+            free(original_handles);free(entry);goto done;
+        }
+    }
+    /* Caller failure must not publish partial output. */
+    const MusaDwgAc1032HandleEntry preserved=original_handles[0];
+    const size_t preserved_count=listed_count;
+    if(musa_dwg_ac1032_handles_index(file,len,original_handles,
+                index_count-1u,&listed_count)||
+       listed_count!=preserved_count||
+       memcmp(&original_handles[0],&preserved,sizeof(preserved))){
+        fail("AC1032 original handle index short-buffer rollback",
+             file,len);
+        free(original_handles);free(entry);goto done;
+    }
+    fprintf(stderr,"PASS REAL AC1032 source-backed handles: count=%zu"
+            " first_H=%llu first_object_offset=%llu\n",
+            index_count,
+            (unsigned long long)original_handles[0].handle,
+            (unsigned long long)original_handles[0].object_offset);
+    free(original_handles);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);
