@@ -58,16 +58,21 @@ int musa_dwg_ac1032_record_envelope_bytes(
     const size_t start=(size_t)at,remaining=n-start;
     size_t ms_bytes=0u,mc_bytes=0u;
     uint32_t payload=0u,handle_bits=0u;
+    /* Genuine R2018 evidence: MS excludes the *separate* MC field.
+     * The first public record's 2-byte MC shifts the original verified
+     * CRC exactly +2 bytes; do not miscount the MC inside MS payload. */
     if(!read_ms(section+start,remaining,&ms_bytes,&payload)||
        remaining<ms_bytes+2u||
-       (size_t)payload>remaining-ms_bytes-2u||
-       !read_mc(section+start+ms_bytes,payload,&mc_bytes,&handle_bits)||
-       !handle_bits||mc_bytes>=payload||
-       (uint64_t)handle_bits>(uint64_t)(payload-mc_bytes)*8u)return 0;
-    const size_t crc_at=start+ms_bytes+(size_t)payload;
+       !read_mc(section+start+ms_bytes,remaining-ms_bytes-2u,
+                &mc_bytes,&handle_bits)||
+       mc_bytes>remaining-ms_bytes-2u||
+       (size_t)payload>remaining-ms_bytes-mc_bytes-2u||
+       !handle_bits||
+       (uint64_t)handle_bits>(uint64_t)payload*8u)return 0;
+    const size_t crc_at=start+ms_bytes+mc_bytes+(size_t)payload;
     uint16_t computed=0u;
     if(!musa_core_crc16_arc(0xc0c1u,section+start,
-                            ms_bytes+(size_t)payload,&computed)||
+                            ms_bytes+mc_bytes+(size_t)payload,&computed)||
        computed!=((uint16_t)section[crc_at]|
                    ((uint16_t)section[crc_at+1u]<<8u)))return 0;
     MusaDwgAc1032RecordEnvelope result={0};
@@ -75,7 +80,7 @@ int musa_dwg_ac1032_record_envelope_bytes(
     result.object_section_offset=at;
     result.payload_bytes=payload;
     result.handle_stream_bits=handle_bits;
-    result.total_record_bytes=(uint32_t)(ms_bytes+(size_t)payload+2u);
+    result.total_record_bytes=(uint32_t)(ms_bytes+mc_bytes+(size_t)payload+2u);
     result.ms_field_bytes=(uint8_t)ms_bytes;
     result.mc_field_bytes=(uint8_t)mc_bytes;
     result.record_crc_verified=1u;
