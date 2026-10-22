@@ -52,7 +52,7 @@ static void diagnose_line(const uint8_t *f,size_t n){
         const int ok=plain&&musa_dwg_ac1018_lz_decode(
              f+(size_t)hdr.page_map_offset+20u,
              hdr.map_compressed_bytes,plain,hdr.map_decoded_bytes,&used);
-        fprintf(stderr,"Original LINE map LZ=%d used=%zu expanded=%u\\n",
+        fprintf(stderr,"Original LINE map LZ=%d used=%zu expanded=%u\n",
                 ok,used,hdr.map_decoded_bytes);
         if(ok){
             uint64_t offset=256u;
@@ -67,7 +67,7 @@ static void diagnose_line(const uint8_t *f,size_t n){
                   ((uint32_t)plain[pos+7u]<<24u);
                 const int gap=(id&UINT32_C(0x80000000))!=0;
                 fprintf(stderr,"Original LINE physical entry offset=%zu"
-                     " id=%08X span=%u physical=%llu gap=%d\\n",
+                     " id=%08X span=%u physical=%llu gap=%d\n",
                      pos,id,span,(unsigned long long)offset,gap);
                 const size_t stride=gap?24u:8u;
                 if(hdr.map_decoded_bytes-pos<stride)break;
@@ -75,6 +75,19 @@ static void diagnose_line(const uint8_t *f,size_t n){
             }
         }
         free(plain);
+    }
+    if(hdr_ok&&n>256u&&hdr.page_map_offset+160u<=n){
+        const size_t trailer=(size_t)hdr.page_map_offset+160u;
+        fprintf(stderr,"Original LINE last SYSTEM page end=%zu trailing=%zu"
+             " header_copy_equal_at_EOFminus108=%d\n",
+             trailer,n-trailer,
+             memcmp(f+0x80u,f+n-108u,108u)==0);
+        if(n-trailer<=256u){
+            fprintf(stderr,"Original LINE trailer hex:");
+            for(size_t i=trailer;i<n;i++)
+               fprintf(stderr," %02X",f[i]);
+            fputc('\n',stderr);
+        }
     }
     fprintf(stderr,"Original LINE encrypted header at 0x80 first 24 bytes:");
     if(n>=0x98u)for(size_t k=0x80u;k<0x98u;k++)
