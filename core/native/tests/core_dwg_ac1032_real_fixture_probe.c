@@ -418,7 +418,7 @@ int main(int argc,char **argv){
                 fprintf(stderr,"original R2018 object bytes at %zu:",at);
                 for(size_t k=0u;k<32u&&k<original_bytes-at;k++)
                     fprintf(stderr," %02X",raw[at+k]);
-                fputc('\\n',stderr);
+                fputc('\n',stderr);
             }
             free(raw);
             fail("original AC1032 object record envelope",file,len);
