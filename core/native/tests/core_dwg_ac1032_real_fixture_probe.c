@@ -289,6 +289,16 @@ int main(int argc,char **argv){
         first_class.max_class_number,
         first_class.first_proxy_flags,
         first_class.header_boolean);
+    MusaDwgAc1032ClassNumeric numbered[50]={{0}};
+    size_t numbered_count=0u;
+    if(!musa_dwg_ac1032_classes_numeric_records(
+              file,len,numbered,50u,&numbered_count)||
+       numbered_count!=50u||numbered[0].class_number!=500u||
+       numbered[49].class_number!=549u){
+        fail("real AC1032 numeric class list",file,len);
+        free(entry);goto done;
+    }
+    fprintf(stderr,"PASS AC1032 real 50 numeric class identities\n");
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);
