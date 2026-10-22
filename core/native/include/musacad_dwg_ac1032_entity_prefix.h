@@ -9,7 +9,7 @@ extern "C" {
 #endif
 /* ORIGINAL R2018 LINE entity prefix, authenticated DATA payload precondition.
  * Parses ONLY OT followed by H self, EED size, preview flag, entity
- * mode, reactor BL, XDic, DS bit and no-link bit. R2010+ separate MC
+ * mode, reactor BL, XDic and DS bit. R2018 has no serialized\n * previous/next link bit (links are implicitly absent). R2010+ separate MC
  * handle-stream bits REPLACE the obsolete in-payload R2000 RL length
  * assumption, demonstrated by real R2018 2018/Line.dwg.
  *
