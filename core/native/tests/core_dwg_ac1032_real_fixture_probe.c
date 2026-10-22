@@ -322,6 +322,18 @@ int main(int argc,char **argv){
         fail("original R2018 Unicode TU class name decoding",file,len);
         free(entry);goto done;
     }
+    if(class_names[0].class_number!=500u||
+       class_names[49].class_number!=549u||
+       !class_names[0].application[0]||
+       !class_names[0].cpp_class[0]||
+       !class_names[0].dxf_name[0]){
+        fail("original Unicode name to class ID alignment",file,len);
+        free(entry);goto done;
+    }
+    fprintf(stderr,"PASS REAL AC1032 names: first app='%s'"
+            " cpp='%s' dxf='%s'\n",
+            class_names[0].application,
+            class_names[0].cpp_class,class_names[0].dxf_name);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);
