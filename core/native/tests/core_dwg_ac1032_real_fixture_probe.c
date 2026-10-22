@@ -260,6 +260,35 @@ int main(int argc,char **argv){
             " bits=%u physical_section=%u\n",
             class_frame.class_area_bytes,class_frame.total_data_bits,
             class_frame.section_id);
+    MusaDwgAc1032ClassIdentityPrefix first_class={0};
+    if(!musa_dwg_ac1032_classes_identity_prefix(
+                    file,len,&first_class)){
+        /* Real-file-only diagnostic. Source remains unchanged and no
+         * classes are invented if the bit layout is still unsupported. */
+        uint8_t payload[8192];size_t count_bytes=0u;
+        const int got=musa_dwg_ac1032_extract_named_section(
+           file,len,"AcDb:Classes",payload,sizeof(payload),&count_bytes);
+        fprintf(stderr,"real Classes first bit-coded bytes (%d):",got);
+        if(got&&count_bytes>44u)
+            for(size_t i=28u;i<44u;i++)
+                fprintf(stderr," %02X",payload[i]);
+        fputc('\n',stderr);
+        fail("independent R2018 class identity prefix (BL+BS) mismatch",
+             file,len);
+        free(entry);goto done;
+    }
+    if(!first_class.source_crc_verified ||
+       first_class.first_class_number<500u ||
+       first_class.max_class_number<first_class.first_class_number){
+        fail("invalid original class number proof",file,len);
+        free(entry);goto done;
+    }
+    fprintf(stderr,"PASS REAL AC1032 first-class number=%u"
+        " maxclass=%u proxy_flags=%u headerflag=%u\n",
+        first_class.first_class_number,
+        first_class.max_class_number,
+        first_class.first_proxy_flags,
+        first_class.header_boolean);
     const MusaDwgAc1032ClassesFrame saved_classes=class_frame;
     const uint8_t original_sig=file[0];
     file[0]=(uint8_t)(original_sig^1u);
