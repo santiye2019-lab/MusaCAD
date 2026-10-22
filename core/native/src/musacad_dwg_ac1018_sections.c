@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_dwg_ac1018_section_assemble.h"
 #include <stddef.h>
@@ -34,7 +36,7 @@ static uint32_t check_adler(uint32_t seed,const uint8_t *p,size_t n) {
     return ((uint32_t)high<<16u)|(uint32_t)low;
 }
 static int scan(const uint8_t *file,size_t file_bytes,
-                MusaDwgAc1018SectionKind kind,
+                MusaDwgAc1018SectionKind kind,int modern,
                 MusaDwgAc1018SectionPage *pages,
                 MusaDwgAc1018SectionDescriptor *desc,
                 size_t *out_count) {
@@ -42,18 +44,24 @@ static int scan(const uint8_t *file,size_t file_bytes,
        (kind!=MUSA_DWG_AC1018_OBJECTS&&kind!=MUSA_DWG_AC1018_HANDLES))
         return 0;
     MusaDwgAc1018FileMapHeader hdr={0};
-    if(!musa_dwg_ac1018_page_map_header(file,file_bytes,&hdr)||
-       hdr.page_count>R2004_MAX_PAGES)return 0;
+    const int header_ok=modern?
+            musa_dwg_ac1032_page_map_header(file,file_bytes,&hdr):
+            musa_dwg_ac1018_page_map_header(file,file_bytes,&hdr);
+    if(!header_ok||hdr.page_count>R2004_MAX_PAGES)return 0;
     size_t num=0u;
-    if(!musa_dwg_ac1018_page_locations(file,file_bytes,NULL,0u,&num)||
-       num!=hdr.page_count||num>R2004_MAX_PAGES)return 0;
+    const int map_ok=modern?
+            musa_dwg_ac1032_page_locations(file,file_bytes,NULL,0u,&num):
+            musa_dwg_ac1018_page_locations(file,file_bytes,NULL,0u,&num);
+    if(!map_ok||num!=hdr.page_count||num>R2004_MAX_PAGES)return 0;
     MusaDwgAc1018PageLocation *locations=
         (MusaDwgAc1018PageLocation*)calloc(num,sizeof(*locations));
     if(!locations)return 0;
     uint8_t *decoded=NULL;
     int ok=0;
-    if(!musa_dwg_ac1018_page_locations(file,file_bytes,locations,num,&num))
-        goto finish;
+    const int entries_ok=modern?
+        musa_dwg_ac1032_page_locations(file,file_bytes,locations,num,&num):
+        musa_dwg_ac1018_page_locations(file,file_bytes,locations,num,&num);
+    if(!entries_ok)goto finish;
     const size_t sid=(size_t)hdr.section_map_id-1u;
     if(sid>=num||locations[sid].page_id!=hdr.section_map_id||
        locations[sid].file_offset>file_bytes||
@@ -165,14 +173,15 @@ static int scan(const uint8_t *file,size_t file_bytes,
 finish:
     free(decoded);free(locations);return ok;
 }
-int musa_dwg_ac1018_section_pages(const uint8_t *file,size_t file_bytes,
-    MusaDwgAc1018SectionKind kind,MusaDwgAc1018SectionPage *pages,
+static int shared_section_pages(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1018SectionKind kind,int modern,
+    MusaDwgAc1018SectionPage *pages,
     size_t capacity,MusaDwgAc1018SectionDescriptor *desc,
     size_t *out_page_count) {
     if(!file||!desc||!out_page_count||(!pages&&capacity))return 0;
     MusaDwgAc1018SectionDescriptor checked={0};
     size_t count=0u;
-    if(!scan(file,file_bytes,kind,NULL,&checked,&count))return 0;
+    if(!scan(file,file_bytes,kind,modern,NULL,&checked,&count))return 0;
     if(pages) {
         if(count>capacity)return 0;
         MusaDwgAc1018SectionPage *tmp=
@@ -180,7 +189,7 @@ int musa_dwg_ac1018_section_pages(const uint8_t *file,size_t file_bytes,
         if(!tmp)return 0;
         MusaDwgAc1018SectionDescriptor twice={0};
         size_t again=0u;
-        const int ok=scan(file,file_bytes,kind,tmp,&twice,&again)&&
+        const int ok=scan(file,file_bytes,kind,modern,tmp,&twice,&again)&&
                      again==count;
         if(ok)memcpy(pages,tmp,count*sizeof(*pages));
         free(tmp);
@@ -190,8 +199,9 @@ int musa_dwg_ac1018_section_pages(const uint8_t *file,size_t file_bytes,
     *out_page_count=count;
     return 1;
 }
-int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
-    MusaDwgAc1018SectionKind kind,uint8_t *output,size_t capacity,
+static int shared_extract_section(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1018SectionKind kind,int modern,
+    uint8_t *output,size_t capacity,
     size_t *out_bytes) {
     if(!file||!output||!out_bytes)return 0;
     const uintptr_t src=(uintptr_t)file,dst=(uintptr_t)output;
@@ -199,8 +209,8 @@ int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
        (src>=dst&&src-dst<capacity))return 0;
     MusaDwgAc1018SectionDescriptor info={0};
     size_t n=0u;
-    if(!musa_dwg_ac1018_section_pages(file,file_bytes,kind,NULL,0u,
-                                      &info,&n)||
+    if(!shared_section_pages(file,file_bytes,kind,modern,NULL,0u,
+                             &info,&n)||
        info.logical_bytes>capacity||info.logical_bytes>SIZE_MAX||!n)
         return 0;
     MusaDwgAc1018SectionPage *pages=
@@ -210,8 +220,8 @@ int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
     if(!pages||!inputs){free(pages);free(inputs);return 0;}
     MusaDwgAc1018SectionDescriptor again={0};
     size_t n2=0u;
-    int ok=musa_dwg_ac1018_section_pages(file,file_bytes,kind,pages,n,
-                  &again,&n2)&&n2==n&&
+    int ok=shared_section_pages(file,file_bytes,kind,modern,pages,n,
+                                &again,&n2)&&n2==n&&
            again.logical_bytes==info.logical_bytes&&
            again.data_page_checksums_verified;
     if(ok) {
@@ -230,4 +240,33 @@ int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
                           inputs,n,output,(size_t)info.logical_bytes);
     if(ok)*out_bytes=(size_t)info.logical_bytes;
     free(pages);free(inputs);return ok;
+}
+
+/* Two public entry points share ONLY the physical DWG page envelope.
+ * AC1032 objects are opaque; AC1018 entity parsers are not involved. */
+int musa_dwg_ac1018_section_pages(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1018SectionKind kind,MusaDwgAc1018SectionPage *pages,
+    size_t capacity,MusaDwgAc1018SectionDescriptor *desc,
+    size_t *out_page_count){
+    return shared_section_pages(file,file_bytes,kind,0,pages,capacity,
+                                desc,out_page_count);
+}
+int musa_dwg_ac1032_section_pages(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1032SectionKind kind,MusaDwgAc1032SectionPage *pages,
+    size_t capacity,MusaDwgAc1032SectionDescriptor *desc,
+    size_t *out_page_count){
+    return shared_section_pages(file,file_bytes,kind,1,pages,capacity,
+                                desc,out_page_count);
+}
+int musa_dwg_ac1018_extract_section(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1018SectionKind kind,uint8_t *output,size_t capacity,
+    size_t *out_bytes){
+    return shared_extract_section(file,file_bytes,kind,0,
+                                  output,capacity,out_bytes);
+}
+int musa_dwg_ac1032_extract_section(const uint8_t *file,size_t file_bytes,
+    MusaDwgAc1032SectionKind kind,uint8_t *output,size_t capacity,
+    size_t *out_bytes){
+    return shared_extract_section(file,file_bytes,kind,1,
+                                  output,capacity,out_bytes);
 }
