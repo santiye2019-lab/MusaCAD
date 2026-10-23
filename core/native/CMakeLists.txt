@@ -39,6 +39,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_preview_v6_curve_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_native_v6_curve_preview_atomic_smoke
                  COMMAND musacad_core_ac1032_original_preview_v6_curve_test)
+        # Real indexed original AutoCAD AC1032 LWPLINE -> native v6 polyline.
+        add_executable(musacad_core_ac1032_original_preview_v6_lwpolyline_test
+                tests/core_dwg_ac1032_original_preview_v6_lwpolyline_test.c)
+        target_link_libraries(musacad_core_ac1032_original_preview_v6_lwpolyline_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_native_v6_lwpolyline_atomic_smoke
+                 COMMAND musacad_core_ac1032_original_preview_v6_lwpolyline_test)
         add_executable(musacad_core_portable_abi_smoke tests/core_portable_abi_smoke.c)
         target_link_libraries(musacad_core_portable_abi_smoke PRIVATE musacad_core)
         add_test(NAME musacad_core_one_engine_abi_smoke COMMAND musacad_core_portable_abi_smoke)
