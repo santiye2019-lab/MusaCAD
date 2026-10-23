@@ -247,6 +247,22 @@ jobs:
           done
           echo "PASS genuine original indexed 6-type source-free repeated geometry read"
 
+      - name: P0 audit complete original AC1032 handle index and all record CRCs without dropping opaque objects
+        run: |
+          set -euo pipefail
+          line=third_party/libredwg/test/test-data/2018/Line.dwg
+          lw=third_party/libredwg/test/test-data/2018/Polyline.dwg
+          poly3d=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          for file in "$line" "$lw" "$poly3d"; do test -s "$file"; done
+          sha_before="$(sha256sum "$line" "$lw" "$poly3d")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_indexed_audit_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-ac1032-indexed-audit
+          timeout 90s /tmp/musa-ac1032-indexed-audit "$line" "$lw" "$poly3d"
+          test "$(sha256sum "$line" "$lw" "$poly3d")" = "$sha_before"
+          echo "PASS all indexed real R2018 source records CRC and nonoverlap"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
