@@ -51,6 +51,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_flat_polyline3d_preview_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_flat_polyline3d_native_v6_atomic_smoke
                  COMMAND musacad_core_ac1032_flat_polyline3d_preview_v6_test)
+        # Genuine R2018 source direct-color vs BYLAYER unresolved v6,
+        # plus pure selector ACI 1..255 and corruption/atomic negative smoke.
+        add_executable(musacad_core_ac1032_original_preview_v6_aci_test
+                tests/core_dwg_ac1032_original_preview_v6_aci_test.c)
+        target_link_libraries(musacad_core_ac1032_original_preview_v6_aci_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_v6_aci_provenance_smoke
+                 COMMAND musacad_core_ac1032_original_preview_v6_aci_test)
         add_executable(musacad_core_portable_abi_smoke tests/core_portable_abi_smoke.c)
         target_link_libraries(musacad_core_portable_abi_smoke PRIVATE musacad_core)
         add_test(NAME musacad_core_one_engine_abi_smoke COMMAND musacad_core_portable_abi_smoke)
