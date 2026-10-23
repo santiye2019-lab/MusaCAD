@@ -1183,6 +1183,27 @@ jobs:
             app/src/main/java/com/musa/cad/DxfBlocks.java \
             tests/DxfStreamingLargeTest.java
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -Xmx64m -cp /tmp/musacad-tests DxfStreamingLargeTest
+      - name: P0 first-party original AC1032 Android JNI links against ONE portable C11 engine
+        run: |
+          set -euo pipefail
+          test -s app/src/main/cpp/ac1032_firstparty_preview_jni.c
+          grep -F 'ac1032_firstparty_preview_jni.c' app/src/main/cpp/CMakeLists.txt
+          grep -F 'musa_dwg_ac1032_preview_v6_planar_polylines(' app/src/main/cpp/ac1032_firstparty_preview_jni.c
+          cmake -S core/native -B /tmp/musacad-r2018-android-jni-core \
+            -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/musacad-r2018-android-jni-core --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror -fPIC \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+            -Icore/native/include -c \
+            app/src/main/cpp/ac1032_firstparty_preview_jni.c \
+            -o /tmp/musacad-r2018-android-jni.o
+          cc -shared -o /tmp/musacad-r2018-preview-jni-host.so \
+            /tmp/musacad-r2018-android-jni.o \
+            /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
+          nm -D /tmp/musacad-r2018-preview-jni-host.so \
+            | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative'
+          echo 'PASS source-authenticated original R2018 JNI linked without any external DWG engine'
+
       - name: Android lint and unit tests
         run: |
           chmod +x gradlew
