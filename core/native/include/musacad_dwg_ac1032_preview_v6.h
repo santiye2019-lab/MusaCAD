@@ -36,6 +36,14 @@ typedef struct MusaAc1032PreviewV6Stats {
 int musa_dwg_ac1032_preview_v6_line_point(
     const MusaDwgAc1032SceneIndex *scene,
     float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* Extended planar original-CAD subset: also ARC/CIRCLE, with exact
+ * source center, radius, +Z normal, and CCW angular sweep. V6 CURVE:
+ * [1031,cx,cy,rx,0,0,ry,startRadians,sweepRadians].
+ * Retains incomplete indicator for unsupported/proxy/layer classes.
+ * Does NOT claim full model-space visibility or correct layer colors. */
+int musa_dwg_ac1032_preview_v6_planar_curves(
+    const MusaDwgAc1032SceneIndex *scene,
+    float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
 #ifdef __cplusplus
 }
 #endif
