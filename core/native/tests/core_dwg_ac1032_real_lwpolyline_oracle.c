@@ -156,22 +156,36 @@ int main(int argc,char **argv){
        vertices[2].x,vertices[2].y);
     if(ok){
        const MusaDwgAc1032NativeLWPolyline old=poly;
-       const MusaDwgAc1032LWVertex old_vertices[VERTEX_CAP]={
-          {vertices[0].x,vertices[0].y,vertices[0].bulge,
-            vertices[0].start_width,vertices[0].end_width}
-       };
+       MusaDwgAc1032LWVertex old_vertices[VERTEX_CAP];
+       memcpy(old_vertices,vertices,sizeof(old_vertices));
        ok=!musa_dwg_ac1032_read_lwpolyline_file(
           file,n,h,vertices,2u,&poly)&&
           !memcmp(&old,&poly,sizeof(poly))&&
-          !memcmp(old_vertices,vertices,sizeof(*vertices));
+          !memcmp(old_vertices,vertices,sizeof(old_vertices));
        const uint8_t first=file[0];
        file[0]^=1u;
        ok=ok&&!musa_dwg_ac1032_read_lwpolyline_file(
           file,n,h,vertices,VERTEX_CAP,&poly)&&
           !memcmp(&old,&poly,sizeof(poly));
        file[0]=first;
-       ok=ok&&!musa_dwg_ac1032_read_lwpolyline_file(
-          file,n,UINT64_MAX,vertices,VERTEX_CAP,&poly);
+       /* This exact original R2018 file has a 20-byte empty SYSTEM
+        * record before the repeated authenticated encrypted header.
+        * Corruption there must not be accepted as valid source. */
+       if(ok&&n>=128u){
+          const uint8_t footer_first=file[n-128u];
+          ok=footer_first==0x3bu;
+          if(ok){
+             file[n-128u]^=1u;
+             ok=!musa_dwg_ac1032_read_lwpolyline_file(
+                  file,n,h,vertices,VERTEX_CAP,&poly)&&
+                !memcmp(&old,&poly,sizeof(poly))&&
+                !memcmp(old_vertices,vertices,sizeof(old_vertices));
+             file[n-128u]=footer_first;
+          }
+       }
+       if(ok)
+          ok=!musa_dwg_ac1032_read_lwpolyline_file(
+             file,n,UINT64_MAX,vertices,VERTEX_CAP,&poly);
     }
     if(!ok)diagnose(file,n,h);
     fprintf(stderr,"%s genuine 2018 LWPOLYLINE verified OCS"
