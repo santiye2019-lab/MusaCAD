@@ -136,6 +136,26 @@ jobs:
           test "$(sha256sum "$circle" | cut -d ' ' -f1)" = "$c_before"
           echo "PASS real ARC/CIRCLE source geometry and immutable DWG"
 
+      - name: P0 original AC1032 AutoCAD POINT indexed XYZ reference
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/Point.dwg
+          oracle=third_party/libredwg/test/test-data/2018/Point.txt
+          test -s "$file"
+          test -s "$oracle"
+          test "$(head -c 6 "$file")" = AC1032
+          grep -F 'Handle (RO) = "1C0"' "$oracle"
+          grep -F 'Coordinates = (27.928 8.65308 0.0)' "$oracle"
+          grep -F 'Extrusion = (0.0 0.0 1.0)' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_point_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-point
+          timeout 60s /tmp/musa-original-ac1032-point "$file"
+          test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
+          echo "PASS real first-party POINT XYZ from unchanged DWG"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail

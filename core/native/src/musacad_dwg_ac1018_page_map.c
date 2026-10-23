@@ -118,7 +118,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
             if(gap||id!=h.page_map_id||available<20u){
                 valid=0;break;
             }
-            if(available>size){
+            if(available>size&&available-size!=106u){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -136,6 +136,9 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                 }
                 verified_secondary_header=1;
             }
+            /* Only the exact R2018 106-byte terminal form is allowed to
+             * reach the authenticated empty-SYSTEM-footer validation
+             * below; no unindexed trailer is accepted by itself. */
         }else if(available<size){
             valid=0;break;
         }
@@ -153,10 +156,36 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         pos+=size;
         at+=gap?24u:8u;
     }
+    /* Another original R2018 physical terminal form is present in the
+     * independent AutoCAD 2018/Point.dwg. It has a EXACT empty 20-byte
+     * SYSTEM-page marker after the CRC-authenticated compressed map body,
+     * then the original 108-byte encrypted file header copied at EOF.
+     * The allocated final 160-byte map span ends two bytes into the
+     * duplicated header: n - declared_map_end = 106. Do not accept
+     * arbitrary 106-byte garbage or an unverified footer. */
+    if(valid&&!verified_secondary_header&&
+       !memcmp(required_signature,"AC1032",6u)&&
+       pos<n&&n-(size_t)pos==106u&&n>=108u&&
+       memcmp(file+n-108u,file+0x80u,0x6cu)==0){
+        static const uint8_t exact_empty_system[20]={
+            0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+            0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+        };
+        const uint64_t body_end=h.page_map_offset+20u+
+                                 (uint64_t)h.map_compressed_bytes;
+        if(body_end<=SIZE_MAX&&body_end<=n&&
+           n-(size_t)body_end>=20u+108u&&
+           body_end+20u==n-108u&&
+           body_end+22u==pos&&
+           memcmp(file+(size_t)body_end,exact_empty_system,
+                  sizeof(exact_empty_system))==0)
+           verified_secondary_header=2;
+    }
     if(!valid||at!=h.map_decoded_bytes||
        actual!=h.page_count||!found_map||!found_section||
-       (pos<n&&(!verified_secondary_header||
-                 n-(size_t)pos!=110u))){
+       (pos<n&&
+        !((verified_secondary_header==1&&n-(size_t)pos==110u)||
+          (verified_secondary_header==2&&n-(size_t)pos==106u)))){
         free(plain);return 0;
     }
     /* To uphold atomic publication, validate without writing entries
