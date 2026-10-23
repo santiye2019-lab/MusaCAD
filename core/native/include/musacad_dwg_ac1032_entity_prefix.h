@@ -29,7 +29,7 @@ typedef struct MusaDwgAc1032LinePrefix {
     uint8_t prefix_decoded;
 } MusaDwgAc1032LinePrefix;
 
-/* Common R2018 built-in entity type 17 ARC / 18 CIRCLE / 19 LINE / 27 POINT.
+/* Common R2018 built-in entity type 17 ARC / 18 CIRCLE / 19 LINE / 27 POINT / 77 LWPOLYLINE.
  * Verifies OT bits against the authenticated source/layout, then admits only
  * supported no-EED/no-preview/no-reactors forms. Fail atomic. */
 typedef MusaDwgAc1032LinePrefix MusaDwgAc1032EntityPrefix;
