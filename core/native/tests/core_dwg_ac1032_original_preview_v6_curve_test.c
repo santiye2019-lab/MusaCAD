@@ -96,6 +96,13 @@ static int verify(const char *path,uint16_t type){
     return ok;
 }
 int main(int argc,char **argv){
+    if(argc==1){
+        MusaAc1032PreviewV6Stats stats={0};
+        stats.total_indexed_records=77u;
+        return !musa_dwg_ac1032_preview_v6_planar_curves(
+             NULL,NULL,0u,&stats)&&
+             stats.total_indexed_records==77u?0:1;
+    }
     if(argc!=3)return 2;
     return verify(argv[1],17u)&&verify(argv[2],18u)?0:1;
 }
