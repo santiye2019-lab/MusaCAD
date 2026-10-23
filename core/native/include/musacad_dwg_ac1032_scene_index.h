@@ -52,6 +52,17 @@ int musa_dwg_ac1032_scene_index_read_lwpolyline(
 int musa_dwg_ac1032_scene_index_read_vertex3d(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032Vertex3D *out);
+/* Complete R2018 OT16 3D POLYLINE: original indexed hard-owner sequence
+ * -> original OT11 children -> independently verified reverse owner H,
+ * same layer H, and indexed OT6 SEQEND. All lookups use cached authenticated
+ * Objects/H index, so the original file bytes may already be freed.
+ * Never invent geometry from numeric H order or positional proximity.
+ * Fail-atomic for both outputs and no partial emission. No nested full-file
+ * extraction, no external CAD runtime, no claim of arbitrary DWG scene. */
+int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
+    const MusaDwgAc1032SceneIndex *index,uint64_t polyline_handle,
+    MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
+    MusaDwgAc1032Polyline3DOrdered *out);
 #ifdef __cplusplus
 }
 #endif
