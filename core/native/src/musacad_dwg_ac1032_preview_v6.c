@@ -155,8 +155,6 @@ static int process(const MusaDwgAc1032SceneIndex *s,
 static int preview(const MusaDwgAc1032SceneIndex *s,
                   float *words,size_t capacity,
                   MusaAc1032PreviewV6Stats *out,int curves){
-    const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
-    MusaAc1032PreviewV6Stats *out){
     if(!s||!out||(!words&&capacity)||
        capacity>SIZE_MAX/sizeof(float)||
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
