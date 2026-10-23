@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_preview_v6.h"
+#include "musacad_bulge.h"
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
@@ -30,19 +31,122 @@ static void bounds(double x,double y,double b[4],int *has){
     if(x<b[0])b[0]=x;if(x>b[2])b[2]=x;
     if(y<b[1])b[1]=y;if(y>b[3])b[3]=y;
 }
+/* LWPOLYLINE is validated as ONE geometry before emission. No straight
+ * approximation for source bulges, no arbitrary OCS->WCS assumption. */
+static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
+                  MusaDwgAc1032LWVertex *vertices,float *dst,size_t cap,
+                  size_t *w,size_t *primitive_count,double ext[4],int *has){
+    MusaDwgAc1032NativeLWPolyline poly={0};
+    if(!musa_dwg_ac1032_scene_index_read_lwpolyline(
+         s,h,vertices,100000u,&poly)||
+       !poly.geometry_decoded||poly.vertex_count<2u||
+       poly.vertex_count>100000u||
+       !isfinite(poly.elevation)||poly.elevation!=0.0||
+       !isfinite(poly.thickness)||poly.thickness!=0.0||
+       !isfinite(poly.constant_width)||poly.constant_width!=0.0||
+       !isfinite(poly.extrusion[0])||poly.extrusion[0]!=0.0||
+       !isfinite(poly.extrusion[1])||poly.extrusion[1]!=0.0||
+       !isfinite(poly.extrusion[2])||poly.extrusion[2]!=1.0)
+       return 0;
+    const size_t n=(size_t)poly.vertex_count;
+    const size_t segments=n-(poly.closed?0u:1u);
+    int has_bulge=0;
+    for(size_t i=0u;i<n;i++){
+        const MusaDwgAc1032LWVertex *a=&vertices[i];
+        if(!valid(a->x)||!valid(a->y)||!isfinite(a->bulge)||
+           !isfinite(a->start_width)||!isfinite(a->end_width)||
+           a->start_width!=0.0||a->end_width!=0.0)return 0;
+    }
+    for(size_t i=0u;i<segments;i++){
+        const MusaDwgAc1032LWVertex *a=&vertices[i],
+                                   *z=&vertices[(i+1u)%n];
+        if(a->bulge!=0.0){
+            MusaCoreBulgeArc arc={0};
+            if(!musa_core_bulge_to_arc(
+                 a->x,a->y,z->x,z->y,a->bulge,&arc)||
+               !valid(arc.cx)||!valid(arc.cy)||!valid(arc.radius)||
+               !valid(arc.start)||!valid(arc.sweep)||
+               !valid(arc.cx-arc.radius)||!valid(arc.cx+arc.radius)||
+               !valid(arc.cy-arc.radius)||!valid(arc.cy+arc.radius))
+                return 0;
+            has_bulge=1;
+        }
+    }
+    if(!has_bulge){
+        if(n>(SIZE_MAX-2u)/2u||*w>SIZE_MAX-(2u+2u*n))
+            return -1;
+        const size_t need=2u+2u*n;
+        if(dst){
+            if(*w>cap||need>cap-*w)return -1;
+            dst[*w]=519.0f;
+            dst[*w+1u]=(float)(poly.closed?-(int)n:(int)n);
+            for(size_t i=0;i<n;i++){
+                dst[*w+2u+2u*i]=(float)vertices[i].x;
+                dst[*w+3u+2u*i]=(float)vertices[i].y;
+            }
+        }
+        for(size_t i=0;i<n;i++)
+            bounds(vertices[i].x,vertices[i].y,ext,has);
+        *w+=need;(*primitive_count)++;return 1;
+    }
+    /* Bulged paths use separate v6 straight LINE and parametric CURVE
+     * segments, retaining source ordering including final CLOSED edge. */
+    size_t required=0u;
+    for(size_t i=0;i<segments;i++){
+        const size_t extra=vertices[i].bulge==0.0?5u:9u;
+        if(required>SIZE_MAX-extra)return -1;
+        required+=extra;
+    }
+    if(*w>SIZE_MAX-required||*primitive_count>SIZE_MAX-segments)
+        return -1;
+    if(dst&&(*w>cap||required>cap-*w))return -1;
+    size_t pos=*w;
+    for(size_t i=0;i<segments;i++){
+        const MusaDwgAc1032LWVertex *a=&vertices[i],
+                                   *z=&vertices[(i+1u)%n];
+        if(a->bulge==0.0){
+            if(dst){
+                dst[pos]=263.0f;dst[pos+1u]=(float)a->x;
+                dst[pos+2u]=(float)a->y;
+                dst[pos+3u]=(float)z->x;
+                dst[pos+4u]=(float)z->y;
+            }
+            bounds(a->x,a->y,ext,has);bounds(z->x,z->y,ext,has);
+            pos+=5u;
+        }else{
+            MusaCoreBulgeArc arc={0};
+            /* Same verified, deterministic arithmetic as validation. */
+            if(!musa_core_bulge_to_arc(
+                a->x,a->y,z->x,z->y,a->bulge,&arc))return -1;
+            if(dst){
+                dst[pos]=1031.0f;dst[pos+1u]=(float)arc.cx;
+                dst[pos+2u]=(float)arc.cy;
+                dst[pos+3u]=(float)arc.radius;dst[pos+4u]=0.0f;
+                dst[pos+5u]=0.0f;dst[pos+6u]=(float)arc.radius;
+                dst[pos+7u]=(float)arc.start;
+                dst[pos+8u]=(float)arc.sweep;
+            }
+            bounds(arc.cx-arc.radius,arc.cy-arc.radius,ext,has);
+            bounds(arc.cx+arc.radius,arc.cy+arc.radius,ext,has);
+            pos+=9u;
+        }
+    }
+    *w=pos;*primitive_count+=segments;return 1;
+}
 /* Probe/emit in the same immutable source-index order. All integrity
  * failures abort BEFORE touching output through a mandatory probe pass.
  * This transport deliberately leaves original color/layer unresolved.
  */
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
-                   MusaAc1032PreviewV6Stats *stats,int curves){
+                   MusaAc1032PreviewV6Stats *stats,int curves,int polylines){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
     MusaAc1032PreviewV6Stats v={0};
     v.total_indexed_records=n;
     v.required_float_words=7u;
     v.provisional_aci_style=1u;
+    MusaDwgAc1032LWVertex *lw=NULL;
     double ext[4]={0};int has=0;
     size_t w=7u;uint64_t prev=0u;
     for(size_t i=0;i<n;i++){
@@ -119,6 +223,17 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                        curve.center[1]+curve.radius,ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
+        }else if(t==77u&&polylines){
+            if(!lw){
+                lw=(MusaDwgAc1032LWVertex*)malloc(
+                     100000u*sizeof(*lw));
+                if(!lw){free(lw);return 0;}
+            }
+            const int handled=lwpoly(
+                 s,e.handle,lw,dst,cap,&w,
+                 &v.rendered_primitives,ext,&has);
+            if(handled<0){free(lw);return 0;}
+            if(!handled)v.omitted_records++;
         }else if(t==27u){
             MusaDwgAc1032NativePoint point={0};
             if(musa_dwg_ac1032_scene_index_read_point(s,e.handle,&point)&&
@@ -150,17 +265,18 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         dst[6]=v.partial_geometry?1.0f:0.0f;
     }
     *stats=v;
+    free(lw);
     return 1;
 }
 static int preview(const MusaDwgAc1032SceneIndex *s,
                   float *words,size_t capacity,
-                  MusaAc1032PreviewV6Stats *out,int curves){
+                  MusaAc1032PreviewV6Stats *out,int curves,int polylines){
     if(!s||!out||(!words&&capacity)||
        capacity>SIZE_MAX/sizeof(float)||
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before,curves))return 0;
+    if(!process(s,NULL,0u,&before,curves,polylines))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -168,7 +284,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after,curves)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
@@ -179,10 +295,16 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
 int musa_dwg_ac1032_preview_v6_line_point(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,0);
+    return preview(s,words,capacity,out,0,0);
 }
 int musa_dwg_ac1032_preview_v6_planar_curves(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1);
+    return preview(s,words,capacity,out,1,0);
+}
+
+int musa_dwg_ac1032_preview_v6_planar_polylines(
+    const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(s,words,capacity,out,1,1);
 }
