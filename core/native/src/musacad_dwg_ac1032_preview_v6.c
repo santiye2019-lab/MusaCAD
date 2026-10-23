@@ -423,3 +423,17 @@ int musa_dwg_ac1032_preview_v6_planar_source_aci(
     MusaAc1032PreviewV6Stats *out){
     return preview(scene,words,cap,out,1,1,1);
 }
+
+int musa_dwg_ac1032_preview_v6_entity_aci_code(
+    const MusaDwgAc1032EntityCommon *source,
+    uint8_t kind,float *code,uint8_t *exact){
+    if(!source||!code||!exact||!source->common_decoded||
+       kind<1u||kind>4u||overlaps(code,sizeof(*code),exact,sizeof(*exact))||
+       overlaps(source,sizeof(*source),code,sizeof(*code))||
+       overlaps(source,sizeof(*source),exact,sizeof(*exact)))return 0;
+    uint8_t unresolved=0u;
+    const float value=original_direct_aci(source,kind,1,&unresolved);
+    *code=value;
+    *exact=(uint8_t)!unresolved;
+    return 1;
+}
