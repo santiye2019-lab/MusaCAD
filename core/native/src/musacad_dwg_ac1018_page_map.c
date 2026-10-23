@@ -118,7 +118,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
             if(gap||id!=h.page_map_id||available<20u){
                 valid=0;break;
             }
-            if(available>size&&available-size!=106u){
+            if(available>size&&available-size!=106u&&
+               available-size!=107u){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -136,7 +137,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                 }
                 verified_secondary_header=1;
             }
-            /* Only the exact R2018 106-byte terminal form is allowed to
+            /* Only the exact R2018 106/107-byte terminal forms are allowed to
              * reach the authenticated empty-SYSTEM-footer validation
              * below; no unindexed trailer is accepted by itself. */
         }else if(available<size){
@@ -160,12 +161,15 @@ static int shared_page_locations(const uint8_t *file,size_t n,
      * independent AutoCAD 2018/Point.dwg. It has a EXACT empty 20-byte
      * SYSTEM-page marker after the CRC-authenticated compressed map body,
      * then the original 108-byte encrypted file header copied at EOF.
-     * The allocated final 160-byte map span ends two bytes into the
-     * duplicated header: n - declared_map_end = 106. Do not accept
-     * arbitrary 106-byte garbage or an unverified footer. */
+     * The allocated final map span ends one or two bytes into the
+     * duplicated header, depending on compressed map size. Original
+     * Point.dwg has n-end=106 and Polyline.dwg n-end=107; require exact
+     * structure, never accept arbitrary trailing bytes. */
     if(valid&&!verified_secondary_header&&
        !memcmp(required_signature,"AC1032",6u)&&
-       pos<n&&n-(size_t)pos==106u&&n>=108u&&
+       pos<n&&
+       (n-(size_t)pos==106u||n-(size_t)pos==107u)&&
+       n>=108u&&
        memcmp(file+n-108u,file+0x80u,0x6cu)==0){
         static const uint8_t exact_empty_system[20]={
             0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
@@ -176,7 +180,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         if(body_end<=SIZE_MAX&&body_end<=n&&
            n-(size_t)body_end>=20u+108u&&
            body_end+20u==n-108u&&
-           body_end+22u==pos&&
+           (body_end+21u==pos||body_end+22u==pos)&&
            memcmp(file+(size_t)body_end,exact_empty_system,
                   sizeof(exact_empty_system))==0)
            verified_secondary_header=2;
@@ -185,7 +189,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
        actual!=h.page_count||!found_map||!found_section||
        (pos<n&&
         !((verified_secondary_header==1&&n-(size_t)pos==110u)||
-          (verified_secondary_header==2&&n-(size_t)pos==106u)))){
+          (verified_secondary_header==2&&
+           (n-(size_t)pos==106u||n-(size_t)pos==107u))))){
         free(plain);return 0;
     }
     /* To uphold atomic publication, validate without writing entries
