@@ -26,6 +26,10 @@ static int load(const char *path,uint8_t **dst,size_t *length){
 static int eq(double x,double y){
     return isfinite(x)&&isfinite(y)&&fabs(x-y)<1e-7;
 }
+/* Independent AutoCAD .txt reference rounds original binary coordinates. */
+static int eq_export(double x,double y){
+    return isfinite(x)&&fabs(x-y)<=0.0001;
+}
 int main(int argc,char **argv){
     if(argc!=2)return 2;
     uint8_t *original=NULL,*source_copy=NULL;
@@ -68,10 +72,10 @@ int main(int argc,char **argv){
         for(unsigned j=0u;j<3u&&ok;j++)
             ok=eq(actual[i].point[j],expected[i].point[j]);
     }
-    if(ok)ok=eq(actual[0].point[0],21.4409)&&
-             eq(actual[0].point[1],14.6498)&&
-             eq(actual[1].point[0],20.8962)&&
-             eq(actual[1].point[1],5.65378);
+    if(ok)ok=eq_export(actual[0].point[0],21.4409)&&
+             eq_export(actual[0].point[1],14.6498)&&
+             eq_export(actual[1].point[0],20.8962)&&
+             eq_export(actual[1].point[1],5.65378);
     if(ok){
         const MusaDwgAc1032Polyline3DOrdered saved=cached;
         MusaDwgAc1032Polyline3DOrderedVertex saved_verts[8];
