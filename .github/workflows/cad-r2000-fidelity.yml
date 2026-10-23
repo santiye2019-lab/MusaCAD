@@ -261,21 +261,25 @@ jobs:
           test "$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")" = "$before"
           echo "PASS original 6-fixture indexed geometry acceptance vs explicit opaque/rejected counts"
 
-      - name: P0 original R2018 LINE POINT entity H5 to LAYER OT51 authenticated graph
+      - name: P0 original R2018 five 2D entities H5 to real LAYER OT51 graph
         run: |
           set -euo pipefail
           directory=third_party/libredwg/test/test-data/2018
-          test -s "$directory/Line.dwg"
-          test -s "$directory/Point.dwg"
-          before="$(sha256sum "$directory/Line.dwg" "$directory/Point.dwg")"
+          for name in Line Point Arc circle Polyline; do
+            test -s "$directory/$name.dwg"
+          done
+          before="$(sha256sum "$directory/Line.dwg" "$directory/Point.dwg" \
+            "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Polyline.dwg")"
           cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
             core/native/tests/core_dwg_ac1032_original_entity_layer_ref_test.c \
             /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
             -o /tmp/musa-original-r2018-layer-edge
           timeout 120s /tmp/musa-original-r2018-layer-edge \
-            "$directory/Line.dwg" "$directory/Point.dwg"
-          test "$(sha256sum "$directory/Line.dwg" "$directory/Point.dwg")" = "$before"
-          echo "PASS genuine original source R2018 H-code5 referenced LAYER, not BYLAYER color"
+            "$directory/Line.dwg" "$directory/Point.dwg" \
+            "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Polyline.dwg"
+          test "$(sha256sum "$directory/Line.dwg" "$directory/Point.dwg" \
+            "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Polyline.dwg")" = "$before"
+          echo "PASS five genuine original source R2018 H5->LAYER edges, not BYLAYER color"
 
       - name: P0 original R2018 indexed LINE POINT direct ACI color source and provisional BYLAYER v6
         run: |
