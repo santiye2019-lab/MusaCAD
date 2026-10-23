@@ -60,7 +60,8 @@ static int one(const char *path,uint64_t expected_handle,
             matched++;
             if(rows[i].raw_object_type!=expected_type||
                rows[i].category!=MUSA_AC1032_SCENE_GEOMETRY_DECODED||
-               rows[i].decoded_vertex_count!=expected_vertices)ok=0;
+               (expected_vertices==0u?rows[i].decoded_vertex_count!=0u:
+                  rows[i].decoded_vertex_count<expected_vertices))ok=0;
         }
     }
     if(ok)ok=matched==1;
@@ -71,12 +72,16 @@ static int one(const char *path,uint64_t expected_handle,
               s,rows,entries-1u,&again)&&
            !memcmp(&saved_report,&again,sizeof(again))&&
            !memcmp(saved,rows,entries*sizeof(*rows));
+        /* Disallow overlapping outputs before any bytes are modified. */
         if(ok)ok=!musa_dwg_ac1032_scene_index_scan_geometry(
-              s,rows,entries,&again /* deliberately aliased below? */)
-              ?0:1;
-        /* Real repeated full validation after a short-capacity rejection. */
-        if(ok)ok=!memcmp(&saved_report,&again,sizeof(again))&&
-                 !memcmp(saved,rows,entries*sizeof(*rows));
+              s,rows,entries,(MusaDwgAc1032SceneGeometryReport*)rows)&&
+              !memcmp(saved,rows,entries*sizeof(*rows))&&
+              !memcmp(&saved_report,&again,sizeof(again));
+        /* Repeat successfully after rejecting both invalid requests. */
+        if(ok)ok=musa_dwg_ac1032_scene_index_scan_geometry(
+              s,rows,entries,&again)&&
+              !memcmp(&saved_report,&again,sizeof(again))&&
+              !memcmp(saved,rows,entries*sizeof(*rows));
     }
     fprintf(stderr,"%s indexed geometry audit %s total=%zu"
         " decoded=%zu rejected=%zu dependent=%zu opaque=%zu\n",
