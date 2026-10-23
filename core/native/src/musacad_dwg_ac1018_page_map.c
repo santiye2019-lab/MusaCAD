@@ -118,7 +118,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
             if(gap||id!=h.page_map_id||available<20u){
                 valid=0;break;
             }
-            if(available>size){
+            if(available>size&&available-size!=106u){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -136,6 +136,9 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                 }
                 verified_secondary_header=1;
             }
+            /* Only the exact R2018 106-byte terminal form is allowed to
+             * reach the authenticated empty-SYSTEM-footer validation
+             * below; no unindexed trailer is accepted by itself. */
         }else if(available<size){
             valid=0;break;
         }
