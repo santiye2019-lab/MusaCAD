@@ -44,6 +44,16 @@ int musa_dwg_ac1032_preview_v6_line_point(
 int musa_dwg_ac1032_preview_v6_planar_curves(
     const MusaDwgAc1032SceneIndex *scene,
     float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* Source-authenticated planar original R2018 LWPOLYLINE preview:
+ * exact straight segments and signed bulge circular arcs, including final
+ * closed edge only when source CLOSED. Reject all widths, thickness, elevation
+ * and unsupported OCS planes rather than drawing a visibly wrong line.
+ * Version 6 POLY for all-straight paths, or LINE/CURVE segments if any bulge.
+ * Source-indexed original H/CRC, always explicitly partial while unsupported
+ * object/layer classes remain; NOT connected to Android JNI first paint. */
+int musa_dwg_ac1032_preview_v6_planar_polylines(
+    const MusaDwgAc1032SceneIndex *scene,
+    float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
 #ifdef __cplusplus
 }
 #endif
