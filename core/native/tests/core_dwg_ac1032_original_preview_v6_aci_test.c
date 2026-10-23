@@ -183,5 +183,5 @@ int main(int argc,char **argv){
     }
     if(argc!=3)return 2;
     return original(argv[1],UINT64_C(0x1ca),1u,21.6078,2.81192)&&
-           original(argv[2],UINT64_C(0x1bd),3u,27.928,8.65308)?0:1;
+           original(argv[2],UINT64_C(0x1c0),3u,27.928,8.65308)?0:1;
 }
