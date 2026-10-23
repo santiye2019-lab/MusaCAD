@@ -10,6 +10,7 @@
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_sections.h"
+#include "musacad_dwg_ac1018_lz.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,6 +45,56 @@ static void stage_diagnostics(const uint8_t *file,size_t n,
       " page_map=%d pages=%zu sections_ok=%d sections=%zu"
       " handle_index_ok=%d handles=%zu\n",
       n,header,map,map_n,sections,section_n,handles,handle_n);
+    if(header){
+        fprintf(stderr,"Point physical header: count=%u map_id=%u"
+            " secmap_id=%u map_offset=%llu pack=%u expanded=%u\n",
+            hdr.page_count,hdr.page_map_id,hdr.section_map_id,
+            (unsigned long long)hdr.page_map_offset,
+            hdr.map_compressed_bytes,hdr.map_decoded_bytes);
+        if(hdr.map_decoded_bytes>0u&&hdr.map_decoded_bytes<=65536u&&
+           hdr.page_map_offset+20u+hdr.map_compressed_bytes<=n){
+           uint8_t *plain=(uint8_t*)malloc(hdr.map_decoded_bytes);
+           size_t read=0u;
+           int decoded=plain&&musa_dwg_ac1018_lz_decode(
+              file+(size_t)hdr.page_map_offset+20u,
+              hdr.map_compressed_bytes,plain,hdr.map_decoded_bytes,&read);
+           fprintf(stderr,"Point physical map: LZ=%d consumed=%zu\n",
+              decoded,read);
+           if(decoded){
+             size_t at=0u;uint64_t pos=256u;
+             while(at+8u<=hdr.map_decoded_bytes){
+                uint32_t raw=(uint32_t)plain[at]|
+                    ((uint32_t)plain[at+1u]<<8u)|
+                    ((uint32_t)plain[at+2u]<<16u)|
+                    ((uint32_t)plain[at+3u]<<24u);
+                uint32_t span=(uint32_t)plain[at+4u]|
+                    ((uint32_t)plain[at+5u]<<8u)|
+                    ((uint32_t)plain[at+6u]<<16u)|
+                    ((uint32_t)plain[at+7u]<<24u);
+                int gap=(raw&UINT32_C(0x80000000))!=0;
+                size_t stride=gap?24u:8u;
+                fprintf(stderr,"Point physical idx: raw_id=%08X"
+                    " span=%u from=%llu gap=%d last=%d\n",
+                    raw,span,(unsigned long long)pos,gap,
+                    (at+stride==hdr.map_decoded_bytes));
+                if(hdr.map_decoded_bytes-at<stride)break;
+                pos+=span;at+=stride;
+             }
+             fprintf(stderr,"Point physical end=%llu size=%zu"
+                 " delta=%lld copy108_at_end=%d\n",
+                 (unsigned long long)pos,n,
+                 (long long)n-(long long)pos,
+                 n>=108u&&memcmp(file+0x80u,file+n-108u,108u)==0);
+             if(n>=128u){
+                fprintf(stderr,"Point original last 128 bytes:");
+                for(size_t i=n-128u;i<n;i++)
+                   fprintf(stderr," %02X",file[i]);
+                fputc('\n',stderr);
+             }
+           }
+           free(plain);
+        }
+    }
     if(handles&&handle_n>0u&&handle_n<=100000u){
         MusaDwgAc1032HandleEntry *entries=calloc(handle_n,sizeof(*entries));
         size_t got=0u;
