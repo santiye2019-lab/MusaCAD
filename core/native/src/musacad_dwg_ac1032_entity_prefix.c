@@ -18,7 +18,8 @@ int musa_dwg_ac1032_entity_prefix_bytes(
        overlap(raw,bytes,out,sizeof(*out))||
        overlap(layout,sizeof(*layout),out,sizeof(*out))||
        !layout->original_record_crc_verified||
-       !layout->indexed_handle||expected_type<17u||expected_type>19u||
+       !layout->indexed_handle||(expected_type!=17u&&expected_type!=18u&&
+        expected_type!=19u&&expected_type!=27u)||
        layout->raw_object_type!=expected_type||
        layout->object_type_field_bits!=10u||
        layout->total_payload_bits!=(uint64_t)bytes*8u||
