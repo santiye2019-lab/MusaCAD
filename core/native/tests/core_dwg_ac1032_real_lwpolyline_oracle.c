@@ -8,6 +8,8 @@
 #include "musacad_dwg_ac1032_object_type.h"
 #include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1032_object_streams.h"
+#include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1018_lz.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -33,6 +35,54 @@ static int near(double a,double b){
     return isfinite(a)&&fabs(a-b)<=0.0001;
 }
 static void diagnose(const uint8_t *file,size_t n,uint64_t h){
+    MusaDwgAc1032FileMapHeader hdr={0};
+    size_t physical_count=0u;
+    int header=musa_dwg_ac1032_page_map_header(file,n,&hdr);
+    int pages=musa_dwg_ac1032_page_locations(
+          file,n,NULL,0u,&physical_count);
+    fprintf(stderr,"Polyline physical source n=%zu header=%d"
+       " pages=%d count=%zu mapid=%u sectionid=%u"
+       " offset=%llu packed=%u expanded=%u\n",
+       n,header,pages,physical_count,hdr.page_map_id,
+       hdr.section_map_id,(unsigned long long)hdr.page_map_offset,
+       hdr.map_compressed_bytes,hdr.map_decoded_bytes);
+    if(header&&hdr.map_decoded_bytes&&
+       hdr.map_decoded_bytes<65536u&&
+       hdr.page_map_offset+20u+hdr.map_compressed_bytes<=n){
+       uint8_t *plain=malloc(hdr.map_decoded_bytes);
+       size_t used=0u;
+       int decompressed=plain&&musa_dwg_ac1018_lz_decode(
+           file+(size_t)hdr.page_map_offset+20u,
+           hdr.map_compressed_bytes,plain,hdr.map_decoded_bytes,&used);
+       fprintf(stderr,"Polyline physical map decompress=%d used=%zu\n",
+          decompressed,used);
+       if(decompressed){
+           uint64_t offset=256u;
+           for(size_t i=0u;i+8u<=hdr.map_decoded_bytes;){
+               uint32_t raw=(uint32_t)plain[i]|
+                  ((uint32_t)plain[i+1u]<<8u)|
+                  ((uint32_t)plain[i+2u]<<16u)|
+                  ((uint32_t)plain[i+3u]<<24u);
+               uint32_t span=(uint32_t)plain[i+4u]|
+                  ((uint32_t)plain[i+5u]<<8u)|
+                  ((uint32_t)plain[i+6u]<<16u)|
+                  ((uint32_t)plain[i+7u]<<24u);
+               size_t stride=(raw&0x80000000u)?24u:8u;
+               fprintf(stderr,"Polyline page id=%08X span=%u"
+                  " offset=%llu final=%d\n",raw,span,
+                  (unsigned long long)offset,
+                  i+stride==hdr.map_decoded_bytes);
+               if(hdr.map_decoded_bytes-i<stride)break;
+               offset+=span;i+=stride;
+           }
+           fprintf(stderr,"Polyline physical end=%llu n=%zu delta=%lld"
+              " encrypted108_copy=%d\n",
+              (unsigned long long)offset,n,
+              (long long)n-(long long)offset,
+              n>=108u&&memcmp(file+0x80u,file+n-108u,108u)==0);
+       }
+       free(plain);
+    }
     MusaDwgAc1032ObjectType ot={0};
     MusaDwgAc1032ObjectStreams l={0};
     MusaDwgAc1032PayloadInfo meta={0};
