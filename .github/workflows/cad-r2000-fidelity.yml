@@ -176,6 +176,27 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS real original AC1032 LWPOLYLINE OCS vertex XYZ oracle"
 
+      - name: P0 genuine AutoCAD R2018 POLYLINE3D header and independent vertex oracles
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          oracle=third_party/libredwg/test/test-data/2018/PolyLine3D.txt
+          test -s "$file"
+          test -s "$oracle"
+          test "$(head -c 6 "$file")" = AC1032
+          grep -F 'Handle (RO) = "1C1"' "$oracle"
+          grep -F 'ObjectName (RO) = "AcDb3dPolyline"' "$oracle"
+          grep -F 'Closed = 0' "$oracle"
+          grep -F 'Coordinates = (21.4409 14.6498 0.0 20.8962 5.65378 0.0' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_polyline3d_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-polyline3d
+          timeout 60s /tmp/musa-original-ac1032-polyline3d "$file"
+          test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
+          echo "PASS original R2018 3D POLYLINE header and individual vertex records"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
