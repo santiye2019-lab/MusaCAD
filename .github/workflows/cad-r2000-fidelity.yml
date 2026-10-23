@@ -226,6 +226,27 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS original R2018 3D POLYLINE six ordered vertices with reverse owner graph"
 
+      - name: P0 original AC1032 one-open scene indexed cached geometry parity
+        run: |
+          set -euo pipefail
+          directory=third_party/libredwg/test/test-data/2018
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_scene_index_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-scene-index
+          for descriptor in \
+            '19:1CA:Line.dwg' '17:1BD:Arc.dwg' \
+            '18:1BD:circle.dwg' '27:1C0:Point.dwg' \
+            '77:1BD:Polyline.dwg' '11:1C3:PolyLine3D.dwg'; do
+            IFS=: read -r type handle filename <<< "$descriptor"
+            test -s "$directory/$filename"
+            before="$(sha256sum "$directory/$filename" | cut -d ' ' -f1)"
+            timeout 90s /tmp/musa-original-scene-index \
+              "$type" "$handle" "$directory/$filename"
+            test "$(sha256sum "$directory/$filename" | cut -d ' ' -f1)" = "$before"
+          done
+          echo "PASS genuine original indexed 6-type source-free repeated geometry read"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
