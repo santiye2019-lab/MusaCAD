@@ -156,6 +156,26 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS real first-party POINT XYZ from unchanged DWG"
 
+      - name: P0 original AC1032 AutoCAD LWPOLYLINE OCS vertex oracle
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/Polyline.dwg
+          oracle=third_party/libredwg/test/test-data/2018/Polyline.txt
+          test -s "$file"
+          test -s "$oracle"
+          test "$(head -c 6 "$file")" = AC1032
+          grep -F 'Handle (RO) = "1BD"' "$oracle"
+          grep -F 'ObjectName (RO) = "AcDbPolyline"' "$oracle"
+          grep -F 'Coordinates = (9.00535 12.2913 17.1819 14.7267 20.7826 8.24476' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_lwpolyline_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-lwpolyline
+          timeout 60s /tmp/musa-original-ac1032-lwpolyline "$file"
+          test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
+          echo "PASS real original AC1032 LWPOLYLINE OCS vertex XYZ oracle"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
