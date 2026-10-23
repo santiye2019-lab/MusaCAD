@@ -3,9 +3,11 @@
  * First-party Android transition barrier.
  * No LibreDWG / ODA / external CAD SDK is loaded or called here.
  *
- * The FIRST-PARTY AC1032 binary decoder does not exist yet. A source-safe
- * explicit IOException is mandatory. Never claim full DWG support by
- * parsing six magic bytes or creating a fake DXF/mesh.
+ * An INCOMPLETE original AC1032 primitive reader now exists as a
+ * separate opt-in diagnostic preview; the full DWG document/owner/block
+ * codec needed by the normal editor remains UNAVAILABLE. Keep ordinary
+ * file-open and DXF export fail-closed: never substitute an incomplete
+ * preview or create fake geometry from a six-byte DWG signature.
  */
 #include <jni.h>
 
