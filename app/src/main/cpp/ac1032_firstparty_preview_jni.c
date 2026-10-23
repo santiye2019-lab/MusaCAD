@@ -62,7 +62,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         return NULL;
     }
     MusaAc1032PreviewV6Stats needed={0},copied={0};
-    ok=musa_dwg_ac1032_preview_v6_planar_polylines(
+    ok=musa_dwg_ac1032_preview_v6_planar_source_aci(
         scene,NULL,0u,&needed)&&
         needed.rendered_primitives>0u&&
         needed.required_float_words>=7u&&
@@ -75,7 +75,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         words=(float*)malloc(needed.required_float_words*sizeof(float));
         if(!words)ok=0;
     }
-    if(ok)ok=musa_dwg_ac1032_preview_v6_planar_polylines(
+    if(ok)ok=musa_dwg_ac1032_preview_v6_planar_source_aci(
          scene,words,needed.required_float_words,&copied)&&
          copied.required_float_words==needed.required_float_words&&
          copied.rendered_primitives==needed.rendered_primitives&&
