@@ -1188,7 +1188,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/cpp/ac1032_firstparty_preview_jni.c
           grep -F 'ac1032_firstparty_preview_jni.c' app/src/main/cpp/CMakeLists.txt
-          grep -F 'musa_dwg_ac1032_preview_v6_planar_polylines(' app/src/main/cpp/ac1032_firstparty_preview_jni.c
+          grep -F 'musa_dwg_ac1032_preview_v6_planar_source_aci(' app/src/main/cpp/ac1032_firstparty_preview_jni.c
           cmake -S core/native -B /tmp/musacad-r2018-android-jni-core \
             -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/musacad-r2018-android-jni-core --parallel 2
