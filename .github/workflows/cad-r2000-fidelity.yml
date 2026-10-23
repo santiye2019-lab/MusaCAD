@@ -259,6 +259,36 @@ jobs:
           test "$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")" = "$before"
           echo "PASS original 6-fixture indexed geometry acceptance vs explicit opaque/rejected counts"
 
+      - name: P0 original R2018 ARC CIRCLE to MusaCAD independent v6 preview geometry
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Arc.dwg" "$folder/circle.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_preview_v6_curve_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-ac1032-original-preview-v6-curves
+          timeout 120s /tmp/musa-ac1032-original-preview-v6-curves \
+            "$folder/Arc.dwg" "$folder/circle.dwg"
+          test "$(sha256sum "$folder/Arc.dwg" "$folder/circle.dwg")" = "$before"
+          echo "PASS original source ARC + CIRCLE to exact v6 curve words"
+
+      - name: P0 original R2018 LINE POINT to MusaCAD independent v6 preview geometry
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          test -s "$folder/Line.dwg"
+          test -s "$folder/Point.dwg"
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_preview_v6_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-ac1032-original-preview-v6
+          timeout 120s /tmp/musa-ac1032-original-preview-v6 \
+            "$folder/Line.dwg" "$folder/Point.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")" = "$before"
+          echo "PASS original source LINE + POINT exact-to-float v6 scene, explicit partial flag"
+
       - name: P0 original AC1032 one-open scene indexed cached geometry parity
         run: |
           set -euo pipefail
