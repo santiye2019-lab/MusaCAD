@@ -261,6 +261,20 @@ jobs:
           test "$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")" = "$before"
           echo "PASS original 6-fixture indexed geometry acceptance vs explicit opaque/rejected counts"
 
+      - name: P0 original R2018 owned flat POLYLINE3D exact XY to native v6
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          test -s "$folder/PolyLine3D.dwg"
+          before="$(sha256sum "$folder/PolyLine3D.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_preview_v6_flat_polyline3d_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-flat-polyline3d-v6
+          timeout 120s /tmp/musa-original-r2018-flat-polyline3d-v6 "$folder/PolyLine3D.dwg"
+          test "$(sha256sum "$folder/PolyLine3D.dwg")" = "$before"
+          echo "PASS source-graph-verified original planar POLYLINE3D to native v6"
+          
       - name: P0 original R2018 LWPOLYLINE planar poly and authentic geometry to v6
         run: |
           set -euo pipefail
