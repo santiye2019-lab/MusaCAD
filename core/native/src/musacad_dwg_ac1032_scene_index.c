@@ -276,3 +276,114 @@ int musa_dwg_ac1032_scene_index_read_vertex3d(
     if(ok){*out=value;}
     return ok;
 }
+
+/* Independent cached R2018 parent/child graph; original source file is
+ * deliberately not needed and no guessed H-order shortcut is accepted. */
+#include "musacad_dwg_ac1015_handle_refs.h"
+#include "musacad_dwg_ac1015_values.h"
+static int cached_graph_ref(MusaDwgAc1015Bits *bits,uint64_t base,
+                            uint8_t expected,uint64_t *h){
+    MusaDwgAc1015HandleRef ref={0};
+    if(!musa_dwg_ac1015_read_handle_ref(bits,base,&ref)||
+       ref.code!=expected||!ref.target)return 0;
+    *h=ref.target;return 1;
+}
+static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
+    if(!bits||bits->bit_pos>bits->bit_end||
+       bits->bit_end-bits->bit_pos>7u)return 0;
+    while(bits->bit_pos<bits->bit_end){
+        uint32_t bit=1u;
+        if(!musa_dwg_ac1015_bits_read_u(bits,1u,&bit)||bit)return 0;
+    }
+    return 1;
+}
+static int cached_reverse_owner(const Payload *p,
+     uint64_t child,uint64_t parent,uint64_t layer){
+    if(!p||p->layout.data_stream_bits>SIZE_MAX||
+       p->layout.total_payload_bits>SIZE_MAX||
+       p->layout.raw_object_type!=11u)return 0;
+    MusaDwgAc1015Bits bits={0};
+    if(!musa_dwg_ac1015_bits_init(&bits,p->raw,p->bytes,
+           (size_t)p->layout.data_stream_bits,
+           (size_t)p->layout.total_payload_bits))return 0;
+    uint64_t got_owner=0u,got_layer=0u;
+    return cached_graph_ref(&bits,child,4u,&got_owner)&&
+           got_owner==parent&&
+           cached_graph_ref(&bits,child,5u,&got_layer)&&
+           got_layer==layer&&cached_graph_zero_padding(&bits);
+}
+int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
+    MusaDwgAc1032Polyline3DOrdered *out){
+    if(!s||!h||!vertices||!out||capacity<2u||
+       capacity>100000u||
+       capacity>SIZE_MAX/sizeof(*vertices)||
+       !check_output(s,vertices,capacity*sizeof(*vertices))||
+       !check_output(s,out,sizeof(*out))||
+       overlap(vertices,capacity*sizeof(*vertices),
+               out,sizeof(*out)))return 0;
+    Payload parent={0};
+    if(!fetch(s,h,16u,&parent))return 0;
+    MusaDwgAc1032Polyline3DHeader header={0};
+    int ok=musa_dwg_ac1032_polyline3d_header_fields_at(
+          parent.raw,parent.bytes,&parent.layout,
+          parent.common.geometry_start_bit,&header)&&
+          header.header_decoded&&header.indexed_handle==h&&
+          header.geometry_end_bit<=parent.layout.data_stream_bits&&
+          header.owned_object_count>=2u&&
+          header.owned_object_count<=capacity&&
+          header.owned_object_count<=100000u;
+    header.common=parent.common;
+    uint64_t *owned=NULL;
+    MusaDwgAc1032Polyline3DOrderedVertex *stage=NULL;
+    size_t count=ok?(size_t)header.owned_object_count:0u;
+    if(ok){
+        owned=(uint64_t*)calloc(count,sizeof(*owned));
+        stage=(MusaDwgAc1032Polyline3DOrderedVertex*)
+              calloc(count,sizeof(*stage));
+        if(!owned||!stage)ok=0;
+    }
+    uint64_t layer=0u,seqend=0u;
+    if(ok)ok=musa_dwg_ac1032_polyline3d_handle_fields_at(
+         parent.raw,parent.bytes,&parent.layout,&header,
+         owned,count,&layer,&seqend);
+    free(parent.raw);
+    uint16_t seqtype=0u;
+    if(ok)ok=musa_dwg_ac1032_scene_index_object_type(
+          s,seqend,&seqtype)&&seqtype==6u;
+    for(size_t i=0u;ok&&i<count;i++){
+        Payload child={0};
+        if(!fetch(s,owned[i],11u,&child)){ok=0;break;}
+        MusaDwgAc1032Vertex3D point={0};
+        ok=musa_dwg_ac1032_vertex3d_fields_at(
+             child.raw,child.bytes,&child.layout,
+             child.common.geometry_start_bit,&point)&&
+             point.coordinates_decoded&&
+             point.indexed_handle==owned[i]&&
+             child.common.prefix.indexed_handle==owned[i]&&
+             child.common.prefix.raw_object_type==11u&&
+             cached_reverse_owner(&child,owned[i],h,layer);
+        if(ok){
+            stage[i].indexed_handle=owned[i];
+            stage[i].flags=point.flags;
+            memcpy(stage[i].point,point.point,sizeof(point.point));
+        }
+        free(child.raw);
+    }
+    if(ok){
+        MusaDwgAc1032Polyline3DOrdered result={0};
+        result.header=header;
+        result.layer_handle=layer;
+        result.seqend_handle=seqend;
+        result.vertex_count=(uint32_t)count;
+        result.hard_owner_links_verified=1u;
+        result.reverse_vertex_owners_verified=1u;
+        result.seqend_type_verified=1u;
+        memcpy(vertices,stage,count*sizeof(*stage));
+        *out=result;
+    }
+    free(stage);
+    free(owned);
+    return ok;
+}
