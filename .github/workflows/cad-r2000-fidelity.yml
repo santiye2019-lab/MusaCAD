@@ -261,6 +261,22 @@ jobs:
           test "$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")" = "$before"
           echo "PASS original 6-fixture indexed geometry acceptance vs explicit opaque/rejected counts"
 
+      - name: P0 original R2018 indexed LINE POINT direct ACI color source and provisional BYLAYER v6
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          test -s "$folder/Line.dwg"
+          test -s "$folder/Point.dwg"
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_preview_v6_aci_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-aci-v6
+          timeout 120s /tmp/musa-original-r2018-aci-v6 \
+            "$folder/Line.dwg" "$folder/Point.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")" = "$before"
+          echo "PASS genuine R2018 source per-entity direct ACI + explicit incomplete BYLAYER"
+
       - name: P0 original R2018 owned flat POLYLINE3D exact XY to native v6
         run: |
           set -euo pipefail

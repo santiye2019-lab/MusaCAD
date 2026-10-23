@@ -31,11 +31,29 @@ static void bounds(double x,double y,double b[4],int *has){
     if(x<b[0])b[0]=x;if(x>b[2])b[2]=x;
     if(y<b[1])b[1]=y;if(y>b[3])b[3]=y;
 }
+/* Native v6 can preserve only source-assigned ACI 1..255 without a layer
+ * graph. RGB, BYLAYER/BYBLOCK and transparency are unresolved style and
+ * retain an explicitly provisional ACI 7, never fake exact colors. */
+static float original_direct_aci(const MusaDwgAc1032EntityCommon *common,
+                                 unsigned type,int colors,
+                                 uint8_t *unresolved){
+    uint16_t aci=7u;
+    if(colors){
+        if(common&&common->common_decoded&&
+           !common->has_rgb&&!common->has_color_reference&&
+           !common->has_transparency&&common->invisibility==0u&&
+           common->color_index>=1u&&common->color_index<=255u)
+            aci=common->color_index;
+        else *unresolved=1u;
+    }
+    return (float)(type*256u+(unsigned)aci);
+}
 /* LWPOLYLINE is validated as ONE geometry before emission. No straight
  * approximation for source bulges, no arbitrary OCS->WCS assumption. */
 static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                   MusaDwgAc1032LWVertex *vertices,float *dst,size_t cap,
-                  size_t *w,size_t *primitive_count,double ext[4],int *has){
+                  size_t *w,size_t *primitive_count,double ext[4],int *has,
+                  int colors,uint8_t *unresolved){
     MusaDwgAc1032NativeLWPolyline poly={0};
     if(!musa_dwg_ac1032_scene_index_read_lwpolyline(
          s,h,vertices,100000u,&poly)||
@@ -48,6 +66,13 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        !isfinite(poly.extrusion[1])||poly.extrusion[1]!=0.0||
        !isfinite(poly.extrusion[2])||poly.extrusion[2]!=1.0)
        return 0;
+    if(colors&&poly.common.invisibility!=0u)return 0;
+    const float poly_code=original_direct_aci(
+        &poly.common,2u,colors,unresolved);
+    const float line_code=original_direct_aci(
+        &poly.common,1u,colors,unresolved);
+    const float arc_code=original_direct_aci(
+        &poly.common,4u,colors,unresolved);
     const size_t n=(size_t)poly.vertex_count;
     const size_t segments=n-(poly.closed?0u:1u);
     int has_bulge=0;
@@ -78,7 +103,7 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
         const size_t need=2u+2u*n;
         if(dst){
             if(*w>cap||need>cap-*w)return -1;
-            dst[*w]=519.0f;
+            dst[*w]=poly_code;
             dst[*w+1u]=(float)(poly.closed?-(int)n:(int)n);
             for(size_t i=0;i<n;i++){
                 dst[*w+2u+2u*i]=(float)vertices[i].x;
@@ -106,7 +131,7 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                                    *z=&vertices[(i+1u)%n];
         if(a->bulge==0.0){
             if(dst){
-                dst[pos]=263.0f;dst[pos+1u]=(float)a->x;
+                dst[pos]=line_code;dst[pos+1u]=(float)a->x;
                 dst[pos+2u]=(float)a->y;
                 dst[pos+3u]=(float)z->x;
                 dst[pos+4u]=(float)z->y;
@@ -119,7 +144,7 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
             if(!musa_core_bulge_to_arc(
                 a->x,a->y,z->x,z->y,a->bulge,&arc))return -1;
             if(dst){
-                dst[pos]=1031.0f;dst[pos+1u]=(float)arc.cx;
+                dst[pos]=arc_code;dst[pos+1u]=(float)arc.cx;
                 dst[pos+2u]=(float)arc.cy;
                 dst[pos+3u]=(float)arc.radius;dst[pos+4u]=0.0f;
                 dst[pos+5u]=0.0f;dst[pos+6u]=(float)arc.radius;
@@ -140,7 +165,8 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
 static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                     MusaDwgAc1032Polyline3DOrderedVertex *vertices,
                     float *dst,size_t cap,size_t *w,
-                    size_t *primitive_count,double ext[4],int *has){
+                    size_t *primitive_count,double ext[4],int *has,
+                  int colors,uint8_t *unresolved){
     MusaDwgAc1032Polyline3DOrdered poly={0};
     if(!musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
           s,h,vertices,100000u,&poly)||
@@ -153,6 +179,9 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        poly.header.closed>1u||
        poly.header.polyline_flags!=(uint8_t)poly.header.closed)
         return 0;
+    if(colors&&poly.header.common.invisibility!=0u)return 0;
+    const float poly_code=original_direct_aci(
+         &poly.header.common,2u,colors,unresolved);
     const size_t count=poly.vertex_count;
     for(size_t i=0;i<count;i++){
         const MusaDwgAc1032Polyline3DOrderedVertex *v=&vertices[i];
@@ -169,7 +198,7 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
     const size_t needed=2u+count*2u;
     if(dst){
         if(*w>cap||needed>cap-*w)return -1;
-        dst[*w]=519.0f;
+        dst[*w]=poly_code;
         dst[*w+1u]=(float)(poly.header.closed?-(int)count:(int)count);
         for(size_t i=0;i<count;i++){
             dst[*w+2u+2u*i]=(float)vertices[i].point[0];
@@ -188,13 +217,14 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
  */
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
-                   MusaAc1032PreviewV6Stats *stats,int curves,int polylines){
+                   MusaAc1032PreviewV6Stats *stats,int curves,int polylines,
+                   int colors){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
     MusaAc1032PreviewV6Stats v={0};
     v.total_indexed_records=n;
     v.required_float_words=7u;
-    v.provisional_aci_style=1u;
+    v.provisional_aci_style=colors?0u:1u;
     MusaDwgAc1032LWVertex *lw=NULL;
     MusaDwgAc1032Polyline3DOrderedVertex *poly3d=NULL;
     double ext[4]={0};int has=0;
@@ -210,6 +240,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         if(t==19u){
             MusaDwgAc1032NativeLine line={0};
             if(musa_dwg_ac1032_scene_index_read_line(s,e.handle,&line)&&
+               (!colors||line.common.invisibility==0u)&&
                planar3(line.geometry.start,line.geometry.thickness,
                        line.geometry.extrusion)&&
                planar3(line.geometry.end,line.geometry.thickness,
@@ -217,12 +248,15 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 if(w>SIZE_MAX-5u)return 0;
                 if(dst){
                     if(w+5u>cap)return 0;
-                    dst[w]=263.0f;
+                    dst[w]=original_direct_aci(
+                          &line.common,1u,colors,&v.provisional_aci_style);
                     dst[w+1u]=(float)line.geometry.start[0];
                     dst[w+2u]=(float)line.geometry.start[1];
                     dst[w+3u]=(float)line.geometry.end[0];
                     dst[w+4u]=(float)line.geometry.end[1];
                 }
+                if(colors)(void)original_direct_aci(
+                    &line.common,1u,colors,&v.provisional_aci_style);
                 w+=5u;
                 bounds(line.geometry.start[0],line.geometry.start[1],ext,&has);
                 bounds(line.geometry.end[0],line.geometry.end[1],ext,&has);
@@ -233,6 +267,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             int supported=musa_dwg_ac1032_scene_index_read_curve(
                  s,e.handle,&curve)&&
                  planar3(curve.center,curve.thickness,curve.extrusion)&&
+                 (!colors||curve.common.invisibility==0u)&&
                  valid(curve.radius)&&curve.radius>0.0&&
                  valid(curve.center[0]-curve.radius)&&
                  valid(curve.center[0]+curve.radius)&&
@@ -254,7 +289,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 if(w>SIZE_MAX-9u)return 0;
                 if(dst){
                     if(w+9u>cap)return 0;
-                    dst[w]=1031.0f;
+                    dst[w]=original_direct_aci(
+                          &curve.common,4u,colors,&v.provisional_aci_style);
                     dst[w+1u]=(float)curve.center[0];
                     dst[w+2u]=(float)curve.center[1];
                     dst[w+3u]=(float)curve.radius;
@@ -264,6 +300,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                     dst[w+7u]=(float)start;
                     dst[w+8u]=(float)sweep;
                 }
+                if(colors)(void)original_direct_aci(
+                    &curve.common,4u,colors,&v.provisional_aci_style);
                 w+=9u;
                 /* Conservative complete-circle bounds avoid clipped arcs;
                  * an exact ARC-specific bounding box follows separately. */
@@ -281,7 +319,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             }
             const int handled=flat_polyline3d(
                  s,e.handle,poly3d,dst,cap,&w,
-                 &v.rendered_primitives,ext,&has);
+                 &v.rendered_primitives,ext,&has,
+                 colors,&v.provisional_aci_style);
             if(handled<0){free(poly3d);free(lw);return 0;}
             if(!handled)v.omitted_records++;
         }else if(t==77u&&polylines){
@@ -292,20 +331,25 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             }
             const int handled=lwpoly(
                  s,e.handle,lw,dst,cap,&w,
-                 &v.rendered_primitives,ext,&has);
+                 &v.rendered_primitives,ext,&has,
+                 colors,&v.provisional_aci_style);
             if(handled<0){free(poly3d);free(lw);return 0;}
             if(!handled)v.omitted_records++;
         }else if(t==27u){
             MusaDwgAc1032NativePoint point={0};
             if(musa_dwg_ac1032_scene_index_read_point(s,e.handle,&point)&&
+               (!colors||point.common.invisibility==0u)&&
                planar3(point.point,point.thickness,point.extrusion)){
                 if(w>SIZE_MAX-3u)return 0;
                 if(dst){
                     if(w+3u>cap)return 0;
-                    dst[w]=775.0f;
+                    dst[w]=original_direct_aci(
+                          &point.common,3u,colors,&v.provisional_aci_style);
                     dst[w+1u]=(float)point.point[0];
                     dst[w+2u]=(float)point.point[1];
                 }
+                if(colors)(void)original_direct_aci(
+                    &point.common,3u,colors,&v.provisional_aci_style);
                 w+=3u;
                 bounds(point.point[0],point.point[1],ext,&has);
                 v.rendered_primitives++;
@@ -315,7 +359,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
     if(v.rendered_primitives>16777215u||v.required_float_words>SIZE_MAX-w)
         return 0;
     v.required_float_words=w;
-    v.partial_geometry=(uint8_t)(v.omitted_records>0u);
+    v.partial_geometry=(uint8_t)(v.omitted_records>0u||
+                                (colors&&v.provisional_aci_style));
     if(dst){
         if(w>cap)return 0;
         dst[0]=6.0f;dst[1]=(float)v.rendered_primitives;
@@ -332,13 +377,14 @@ static int process(const MusaDwgAc1032SceneIndex *s,
 }
 static int preview(const MusaDwgAc1032SceneIndex *s,
                   float *words,size_t capacity,
-                  MusaAc1032PreviewV6Stats *out,int curves,int polylines){
+                  MusaAc1032PreviewV6Stats *out,int curves,int polylines,
+                  int colors){
     if(!s||!out||(!words&&capacity)||
        capacity>SIZE_MAX/sizeof(float)||
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before,curves,polylines))return 0;
+    if(!process(s,NULL,0u,&before,curves,polylines,colors))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -346,7 +392,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
@@ -357,16 +403,37 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
 int musa_dwg_ac1032_preview_v6_line_point(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,0,0);
+    return preview(s,words,capacity,out,0,0,0);
 }
 int musa_dwg_ac1032_preview_v6_planar_curves(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,0);
+    return preview(s,words,capacity,out,1,0,0);
 }
 
 int musa_dwg_ac1032_preview_v6_planar_polylines(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,1);
+    return preview(s,words,capacity,out,1,1,0);
+}
+
+/* Source-assigned direct ACI where verifiably present. No layer colors. */
+int musa_dwg_ac1032_preview_v6_planar_source_aci(
+    const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(scene,words,cap,out,1,1,1);
+}
+
+int musa_dwg_ac1032_preview_v6_entity_aci_code(
+    const MusaDwgAc1032EntityCommon *source,
+    uint8_t kind,float *code,uint8_t *exact){
+    if(!source||!code||!exact||!source->common_decoded||
+       kind<1u||kind>4u||overlaps(code,sizeof(*code),exact,sizeof(*exact))||
+       overlaps(source,sizeof(*source),code,sizeof(*code))||
+       overlaps(source,sizeof(*source),exact,sizeof(*exact)))return 0;
+    uint8_t unresolved=0u;
+    const float value=original_direct_aci(source,kind,1,&unresolved);
+    *code=value;
+    *exact=(uint8_t)!unresolved;
+    return 1;
 }

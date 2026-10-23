@@ -57,6 +57,25 @@ int musa_dwg_ac1032_preview_v6_planar_curves(
 int musa_dwg_ac1032_preview_v6_planar_polylines(
     const MusaDwgAc1032SceneIndex *scene,
     float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* NEW opt-in original-entity ACI path on the same binary source/H/CRC.
+ * Emits v6 primitive code = (kind<<8) | original ACI for independently
+ * decoded 1..255 direct colors only; BYLAYER/BYBLOCK, TrueColor, and
+ * transparency remain PROVISIONAL ACI7 and mark partial_geometry=1.
+ * Invisible entities are not emitted in this mode, preserving caution.
+ * Does NOT resolve layer table visibility/style, block insert ancestry
+ * or actual Android full drawing appearance. Original APIs unchanged. */
+int musa_dwg_ac1032_preview_v6_planar_source_aci(
+    const MusaDwgAc1032SceneIndex *scene,float *words,
+    size_t capacity,MusaAc1032PreviewV6Stats *out);
+
+/* Portable pure selector for an already independently source-authenticated
+ * common entity; returns exact=1 for direct ACI, exact=0 for provisional
+ * fallback. Returns failure without touching outputs for invalid requests.
+ * 1 LINE, 2 POLYLINE, 3 POINT, 4 CURVE v6 kinds only. */
+int musa_dwg_ac1032_preview_v6_entity_aci_code(
+    const MusaDwgAc1032EntityCommon *source,
+    uint8_t v6_kind,float *code,uint8_t *exact);
+
 #ifdef __cplusplus
 }
 #endif

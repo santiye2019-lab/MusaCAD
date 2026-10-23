@@ -29,17 +29,20 @@ final class FirstPartyDwgPreview {
         boolean found=false;
         for(int i=7;i<words.length;){
             int code=Math.round(words[i++]);
-            if(code==263){
+            require(code>0&&(code&255)>=1&&(code&255)<=255,
+                    "Invalid directly encoded or provisional ACI");
+            int type=code>>>8;
+            if(type==1){
                 require(i+4<=words.length,"Truncated LINE");
                 if(near(words[i],21.6078)&&near(words[i+1],2.81192)&&
                    near(words[i+2],11.0307)&&near(words[i+3],16.6375))
                     found=true;
                 i+=4;
-            }else if(code==775){
+            }else if(type==3){
                 require(i+2<=words.length,"Truncated POINT");i+=2;
-            }else if(code==1031){
+            }else if(type==4){
                 require(i+8<=words.length,"Truncated CURVE");i+=8;
-            }else if(code==519){
+            }else if(type==2){
                 require(i<words.length,"Truncated POLY count");
                 int n=Math.abs(Math.round(words[i++]));
                 require(n>=2&&n<100001&&i+2*n<=words.length,"Bad POLY");
@@ -52,16 +55,19 @@ final class FirstPartyDwgPreview {
         boolean found=false;
         for(int i=7;i<words.length;){
             int code=Math.round(words[i++]);
-            if(code==263){
+            require(code>0&&(code&255)>=1&&(code&255)<=255,
+                    "Invalid directly encoded or provisional ACI");
+            int type=code>>>8;
+            if(type==1){
                 require(i+4<=words.length,"Truncated LINE");i+=4;
-            }else if(code==775){
+            }else if(type==3){
                 require(i+2<=words.length,"Truncated POINT");
                 if(near(words[i],27.928)&&near(words[i+1],8.65308))
                     found=true;
                 i+=2;
-            }else if(code==1031){
+            }else if(type==4){
                 require(i+8<=words.length,"Truncated CURVE");i+=8;
-            }else if(code==519){
+            }else if(type==2){
                 require(i<words.length,"Truncated POLY count");
                 int n=Math.abs(Math.round(words[i++]));
                 require(n>=2&&n<100001&&i+2*n<=words.length,"Bad POLY");
@@ -88,6 +94,6 @@ final class FirstPartyDwgPreview {
         require(rejected,"Unknown file must fail closed");
         System.out.println("PASS FIRST-PARTY Android-signature JNI:"
                 +" original R2018 LINE and POINT XYZ, partial flag,"
-                +" file and capacity refusal");
+                +" original ACI record framing, file and capacity refusal");
     }
 }
