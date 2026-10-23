@@ -386,3 +386,131 @@ int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     free(owned);
     return ok;
 }
+/* Whole-index geometry evidence, built from the SAME cached original
+ * indexed binary section, not a guessed model-space entity iterator.
+ * Every entry, even proxy/nonentity, gets a CRC-backed raw type.
+ * Partial accepted geometry is never promoted to a full-scene claim. */
+int musa_dwg_ac1032_scene_index_scan_geometry(
+    const MusaDwgAc1032SceneIndex *s,
+    MusaDwgAc1032SceneGeometryRecord *rows,size_t capacity,
+    MusaDwgAc1032SceneGeometryReport *out){
+    if(!s||!out||!s->handles||!s->objects||
+       !s->count||s->count>MAX_INDEX||
+       (!rows&&capacity)||
+       capacity>SIZE_MAX/sizeof(*rows)||
+       (rows&&capacity<s->count)||
+       !check_output(s,out,sizeof(*out))||
+       (rows&&(!check_output(s,rows,capacity*sizeof(*rows))||
+           overlap(rows,capacity*sizeof(*rows),out,sizeof(*out)))))
+        return 0;
+    MusaDwgAc1032SceneGeometryRecord *stage=NULL;
+    MusaDwgAc1032LWVertex *lw=NULL;
+    MusaDwgAc1032Polyline3DOrderedVertex *poly3d=NULL;
+    int ok=1;
+    if(rows){
+        stage=(MusaDwgAc1032SceneGeometryRecord*)
+              calloc(s->count,sizeof(*stage));
+        if(!stage)return 0;
+    }
+    MusaDwgAc1032SceneGeometryReport report={0};
+    report.indexed_records=s->count;
+    uint64_t previous=0u;
+    for(size_t i=0u;i<s->count&&ok;i++){
+        MusaDwgAc1032HandleEntry entry={0};
+        uint16_t type=0u;
+        if(!musa_dwg_ac1032_scene_index_entry(s,i,&entry)||
+           !entry.handle||entry.handle<=previous||
+           !musa_dwg_ac1032_scene_index_object_type(
+               s,entry.handle,&type)){
+            ok=0;break;
+        }
+        previous=entry.handle;
+        uint8_t category=MUSA_AC1032_SCENE_OPAQUE;
+        uint32_t vertices=0u;
+        int geometry=0;
+        switch(type){
+        case 19u: {
+            MusaDwgAc1032NativeLine line={0};
+            geometry=musa_dwg_ac1032_scene_index_read_line(
+               s,entry.handle,&line);
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 17u: case 18u: {
+            MusaDwgAc1032NativeCurve curve={0};
+            geometry=musa_dwg_ac1032_scene_index_read_curve(
+                 s,entry.handle,&curve);
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 27u: {
+            MusaDwgAc1032NativePoint point={0};
+            geometry=musa_dwg_ac1032_scene_index_read_point(
+                s,entry.handle,&point);
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 77u: {
+            if(!lw){
+                lw=(MusaDwgAc1032LWVertex*)
+                   malloc(MAX_LW_VERTICES*sizeof(*lw));
+                if(!lw){ok=0;break;}
+            }
+            MusaDwgAc1032NativeLWPolyline pline={0};
+            geometry=musa_dwg_ac1032_scene_index_read_lwpolyline(
+                   s,entry.handle,lw,MAX_LW_VERTICES,&pline);
+            if(geometry)vertices=pline.vertex_count;
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 16u: {
+            if(!poly3d){
+                poly3d=(MusaDwgAc1032Polyline3DOrderedVertex*)
+                       malloc(100000u*sizeof(*poly3d));
+                if(!poly3d){ok=0;break;}
+            }
+            MusaDwgAc1032Polyline3DOrdered value={0};
+            geometry=musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
+                s,entry.handle,poly3d,100000u,&value);
+            if(geometry)vertices=value.vertex_count;
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 6u: case 11u:
+            category=MUSA_AC1032_SCENE_DEPENDENT;
+            break;
+        default:
+            category=MUSA_AC1032_SCENE_OPAQUE;
+            break;
+        }
+        if(!ok)break;
+        if(category==MUSA_AC1032_SCENE_GEOMETRY_DECODED)
+            report.decoded_geometry_objects++;
+        else if(category==MUSA_AC1032_SCENE_GEOMETRY_REJECTED)
+            report.rejected_supported_geometry++;
+        else if(category==MUSA_AC1032_SCENE_DEPENDENT)
+            report.dependent_objects++;
+        else report.opaque_objects++;
+        if(stage){
+            stage[i].indexed_handle=entry.handle;
+            stage[i].raw_object_type=type;
+            stage[i].category=category;
+            stage[i].original_record_crc_verified=1u;
+            stage[i].decoded_vertex_count=vertices;
+        }
+    }
+    if(ok){
+        report.all_indexed_raw_types_crc_verified=1u;
+        if(rows)memcpy(rows,stage,s->count*sizeof(*stage));
+        *out=report;
+    }
+    free(poly3d);
+    free(lw);
+    free(stage);
+    return ok;
+}

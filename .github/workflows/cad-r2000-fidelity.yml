@@ -244,6 +244,21 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS source-free cached AC1032 OT16 original H-ordered 3D geometry"
 
+      - name: P0 original full indexed R2018 cached geometry coverage without opaque omission
+        run: |
+          set -euo pipefail
+          directory=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_scene_geometry_scan_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-full-geometry-index-audit
+          timeout 120s /tmp/musa-original-r2018-full-geometry-index-audit \
+            "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" \
+            "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg"
+          test "$(sha256sum "$directory/Line.dwg" "$directory/Arc.dwg" "$directory/circle.dwg" "$directory/Point.dwg" "$directory/Polyline.dwg" "$directory/PolyLine3D.dwg")" = "$before"
+          echo "PASS original 6-fixture indexed geometry acceptance vs explicit opaque/rejected counts"
+
       - name: P0 original AC1032 one-open scene indexed cached geometry parity
         run: |
           set -euo pipefail
