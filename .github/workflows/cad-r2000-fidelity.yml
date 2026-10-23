@@ -197,6 +197,35 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS original R2018 3D POLYLINE header and individual vertex records"
 
+      - name: P0 diagnose original 3D POLYLINE and VERTEX handle stream before owner-graph implementation
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          test -s "$file"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_polyline3d_handles_probe.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-polyline3d-handle-probe
+          timeout 60s /tmp/musa-polyline3d-handle-probe "$file"
+
+      - name: P0 original R2018 ordered POLYLINE3D hard-owner graph and XYZ
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          oracle=third_party/libredwg/test/test-data/2018/PolyLine3D.txt
+          test -s "$file"
+          test -s "$oracle"
+          grep -F 'Handle (RO) = "1C1"' "$oracle"
+          grep -F 'Coordinates = (21.4409 14.6498 0.0 20.8962 5.65378 0.0' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_polyline3d_graph_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-polyline3d-graph
+          timeout 60s /tmp/musa-original-polyline3d-graph "$file"
+          test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
+          echo "PASS original R2018 3D POLYLINE six ordered vertices with reverse owner graph"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
