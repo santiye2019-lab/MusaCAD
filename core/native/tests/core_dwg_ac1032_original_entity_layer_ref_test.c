@@ -61,10 +61,15 @@ static int check(const char *path,uint64_t entity,uint16_t type){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc!=3)return argc==1?0:2;
+    if(argc!=6)return argc==1?0:2;
     const int line=check(argv[1],UINT64_C(0x1ca),19u);
     const int point=check(argv[2],UINT64_C(0x1c0),27u);
-    fprintf(stderr,"%s authentic R2018 LINE+POINT source H5->OT51 LAYER"
-       " (not resolved color)\n",line&&point?"PASS":"FAIL");
-    return line&&point?0:1;
+    const int arc=check(argv[3],UINT64_C(0x1bd),17u);
+    const int circle=check(argv[4],UINT64_C(0x1bd),18u);
+    const int lwpoly=check(argv[5],UINT64_C(0x1bd),77u);
+    const int ok=line&&point&&arc&&circle&&lwpoly;
+    fprintf(stderr,"%s authentic R2018 LINE POINT ARC CIRCLE "
+       "LWPOLYLINE source H5->OT51 LAYER (not resolved color)\n",
+       ok?"PASS":"FAIL");
+    return ok?0:1;
 }
