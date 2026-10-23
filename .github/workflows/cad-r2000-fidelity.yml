@@ -244,6 +244,20 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS source-free cached AC1032 OT16 original H-ordered 3D geometry"
 
+      - name: P0 original R2018 ARC CIRCLE to MusaCAD independent v6 preview geometry
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Arc.dwg" "$folder/circle.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_preview_v6_curve_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-ac1032-original-preview-v6-curves
+          timeout 120s /tmp/musa-ac1032-original-preview-v6-curves \
+            "$folder/Arc.dwg" "$folder/circle.dwg"
+          test "$(sha256sum "$folder/Arc.dwg" "$folder/circle.dwg")" = "$before"
+          echo "PASS original source ARC + CIRCLE to exact v6 curve words"
+
       - name: P0 original R2018 LINE POINT to MusaCAD independent v6 preview geometry
         run: |
           set -euo pipefail
