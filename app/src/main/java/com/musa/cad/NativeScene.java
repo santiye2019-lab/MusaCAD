@@ -33,8 +33,13 @@ public final class NativeScene {
         int version=Math.round(values[0]);
         if(version!=1&&version!=2&&version!=3&&version!=4&&version!=5&&version!=6)throw new IOException("Native sahne sürümü desteklenmiyor");
         int expected=Math.max(0,Math.round(values[1]));
-        RectF wb=new RectF(values[2],values[3],values[4],values[5]);
-        if(!finite(wb.left)||!finite(wb.top)||!finite(wb.right)||!finite(wb.bottom)||wb.width()<=0||wb.height()<=0)throw new IOException("Native çizim sınırları geçersiz");
+        // A real original DWG consisting of POINT or horizontal/vertical
+        // geometry has a zero-area extent. Expand only viewport framing,
+        // never its original primitive XY or native source packet.
+        float[] frame=NativeSceneViewportBounds.forScene(
+                values[2],values[3],values[4],values[5]);
+        if(frame==null)throw new IOException("Native çizim sınırları geçersiz");
+        RectF wb=new RectF(frame[0],frame[1],frame[2],frame[3]);
         boolean truncated=version>=2&&values.length>=7&&values[6]!=0f;
         int p=version>=2?7:6;
         int maxPossible=Math.max(1,(values.length-p)/(version>=3?3:4));
