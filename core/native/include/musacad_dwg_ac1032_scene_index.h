@@ -63,6 +63,44 @@ int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     const MusaDwgAc1032SceneIndex *index,uint64_t polyline_handle,
     MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
     MusaDwgAc1032Polyline3DOrdered *out);
+/* Original indexed R2018 source inventory/geometry evidence. Every
+ * indexed H is CRC-checked for type. Native geometry claims require the
+ * actual first-party type-specific decoder, not just a matching raw OT.
+ * VERTEX3D and SEQEND are DEPENDENT; unknown/proxy/nonentity remains
+ * OPAQUE rather than silently disappearing from a drawing. */
+#define MUSA_AC1032_SCENE_OPAQUE 0u
+#define MUSA_AC1032_SCENE_GEOMETRY_DECODED 1u
+#define MUSA_AC1032_SCENE_GEOMETRY_REJECTED 2u
+#define MUSA_AC1032_SCENE_DEPENDENT 3u
+typedef struct MusaDwgAc1032SceneGeometryRecord {
+    uint64_t indexed_handle;
+    uint16_t raw_object_type;
+    uint8_t category;
+    uint8_t original_record_crc_verified;
+    uint32_t decoded_vertex_count; /* LWPLINE / 3D POLYLINE only */
+} MusaDwgAc1032SceneGeometryRecord;
+typedef struct MusaDwgAc1032SceneGeometryReport {
+    size_t indexed_records;
+    size_t decoded_geometry_objects;
+    size_t rejected_supported_geometry;
+    size_t dependent_objects;
+    size_t opaque_objects;
+    uint8_t all_indexed_raw_types_crc_verified;
+} MusaDwgAc1032SceneGeometryReport;
+/* Full validated read-only cached scene scan: all original numeric H entries,
+ * no guessed offsets, no silently skipped unknown object types. This is a
+ * diagnostic completeness EVIDENCE report, NOT renderable full drawing,
+ * complete owner/layer graph or AutoCAD 2027 equivalence. Decodable entity
+ * subset includes LINE/ARC/CIRCLE/POINT/LWPOLYLINE/ordered POLYLINE3D.
+ * A supported-type payload rejected by its decoder is reported explicitly
+ * as GEOMETRY_REJECTED, not treated as complete. Unknown types are opaque.
+ * rows=NULL/capacity=0 performs a complete count-only scan.
+ * All outputs fail-atomic on any fatal corrupt indexed record, alias, or
+ * insufficient destination. Exact source file bytes need not remain live. */
+int musa_dwg_ac1032_scene_index_scan_geometry(
+    const MusaDwgAc1032SceneIndex *index,
+    MusaDwgAc1032SceneGeometryRecord *rows,size_t capacity,
+    MusaDwgAc1032SceneGeometryReport *out);
 #ifdef __cplusplus
 }
 #endif
