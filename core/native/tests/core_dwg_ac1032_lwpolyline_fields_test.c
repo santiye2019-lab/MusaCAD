@@ -30,7 +30,14 @@ static void make(Writer *w,unsigned flags){
     bits(w,8u,0u);bits(w,1u,0u);bits(w,1u,0u);bits(w,1u,0u);
     bits(w,2u,2u);bits(w,8u,29u);
     assert(w->at==74u);
-    bits(w,2u,1u);bits(w,8u,flags); /* BS flags */
+    if(flags>255u){
+        /* BS opcode 00: original 16-bit little-endian integer.
+         * A one-byte stand-in would silently lose closed flag 0x200. */
+        bits(w,2u,0u);
+        bits(w,8u,flags&255u);bits(w,8u,(flags>>8u)&255u);
+    }else{
+        bits(w,2u,1u);bits(w,8u,flags);
+    }
     if(flags&4u){bits(w,2u,0u);rd(w,1.25);}
     if(flags&8u){bits(w,2u,0u);rd(w,2.5);}
     if(flags&2u){bits(w,2u,2u);}
