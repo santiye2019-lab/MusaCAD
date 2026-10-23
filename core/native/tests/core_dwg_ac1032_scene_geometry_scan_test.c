@@ -99,6 +99,10 @@ int main(int argc,char **argv){
        rep.indexed_records=123u;
        if(musa_dwg_ac1032_scene_index_scan_geometry(
             NULL,NULL,0u,&rep)||rep.indexed_records!=123u)return 1;
+       if(musa_dwg_ac1032_scene_index_scan_geometry(
+            NULL,NULL,1u,&rep)||rep.indexed_records!=123u)return 1;
+       if(musa_dwg_ac1032_scene_index_scan_geometry(
+            NULL,NULL,0u,NULL)||rep.indexed_records!=123u)return 1;
        puts("PASS bounded scene geometry scan negative smoke");
        return 0;
     }
