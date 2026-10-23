@@ -105,6 +105,37 @@ jobs:
           test "$before" = "$after"
           echo "PASS genuine original AC1032 LINE XYZ compared with AutoCAD oracle"
 
+      - name: P0 original AC1032 AutoCAD ARC and CIRCLE geometry reference
+        run: |
+          set -euo pipefail
+          arc=third_party/libredwg/test/test-data/2018/Arc.dwg
+          circle=third_party/libredwg/test/test-data/2018/circle.dwg
+          arcref=third_party/libredwg/test/test-data/2018/Arc.txt
+          circleref=third_party/libredwg/test/test-data/2018/circle.txt
+          for f in "$arc" "$circle" "$arcref" "$circleref"; do
+            test -s "$f"
+          done
+          test "$(head -c 6 "$arc")" = AC1032
+          test "$(head -c 6 "$circle")" = AC1032
+          grep -F 'Handle (RO) = "1BD"' "$arcref"
+          grep -F 'Center = (-18.1933 6.68652 0.0)' "$arcref"
+          grep -F 'Radius = 8.2931' "$arcref"
+          grep -F 'StartAngle = 2.00242' "$arcref"
+          grep -F 'EndAngle = 1.51876' "$arcref"
+          grep -F 'Handle (RO) = "1BD"' "$circleref"
+          grep -F 'Center = (23.4493 -1.09239 0.0)' "$circleref"
+          grep -F 'Radius = 13.5304' "$circleref"
+          a_before="$(sha256sum "$arc" | cut -d ' ' -f1)"
+          c_before="$(sha256sum "$circle" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_curve_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-curves
+          timeout 60s /tmp/musa-original-ac1032-curves "$arc" "$circle"
+          test "$(sha256sum "$arc" | cut -d ' ' -f1)" = "$a_before"
+          test "$(sha256sum "$circle" | cut -d ' ' -f1)" = "$c_before"
+          echo "PASS real ARC/CIRCLE source geometry and immutable DWG"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
