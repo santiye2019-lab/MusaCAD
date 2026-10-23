@@ -197,6 +197,17 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS original R2018 3D POLYLINE header and individual vertex records"
 
+      - name: P0 diagnose original 3D POLYLINE and VERTEX handle stream before owner-graph implementation
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          test -s "$file"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_polyline3d_handles_probe.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-polyline3d-handle-probe
+          timeout 60s /tmp/musa-polyline3d-handle-probe "$file"
+
       - name: P0 genuine AC1015 original-byte header and section CRC acceptance
         run: |
           set -euo pipefail
