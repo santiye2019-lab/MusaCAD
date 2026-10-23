@@ -36,7 +36,7 @@ static void bounds(double x,double y,double b[4],int *has){
  */
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
-                   MusaAc1032PreviewV6Stats *stats){
+                   MusaAc1032PreviewV6Stats *stats,int curves){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
     MusaAc1032PreviewV6Stats v={0};
@@ -74,6 +74,51 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 bounds(line.geometry.end[0],line.geometry.end[1],ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
+        }else if((t==17u||t==18u)&&curves){
+            MusaDwgAc1032NativeCurve curve={0};
+            int supported=musa_dwg_ac1032_scene_index_read_curve(
+                 s,e.handle,&curve)&&
+                 planar3(curve.center,curve.thickness,curve.extrusion)&&
+                 valid(curve.radius)&&curve.radius>0.0&&
+                 valid(curve.center[0]-curve.radius)&&
+                 valid(curve.center[0]+curve.radius)&&
+                 valid(curve.center[1]-curve.radius)&&
+                 valid(curve.center[1]+curve.radius);
+            const double tau=6.283185307179586476925286766559;
+            double start=0.0,sweep=tau;
+            if(supported&&t==17u){
+                start=curve.start_angle;
+                sweep=curve.end_angle-start;
+                if(!isfinite(start)||!isfinite(sweep)||
+                   fabs(start)>8.0*tau||fabs(sweep)>8.0*tau)
+                    supported=0;
+                else if(sweep<=0.0)sweep+=tau;
+                if(sweep<=0.0||sweep>tau+1e-10)supported=0;
+            }
+            if(supported&&!valid(sweep))supported=0;
+            if(supported){
+                if(w>SIZE_MAX-9u)return 0;
+                if(dst){
+                    if(w+9u>cap)return 0;
+                    dst[w]=1031.0f;
+                    dst[w+1u]=(float)curve.center[0];
+                    dst[w+2u]=(float)curve.center[1];
+                    dst[w+3u]=(float)curve.radius;
+                    dst[w+4u]=0.0f;
+                    dst[w+5u]=0.0f;
+                    dst[w+6u]=(float)curve.radius;
+                    dst[w+7u]=(float)start;
+                    dst[w+8u]=(float)sweep;
+                }
+                w+=9u;
+                /* Conservative complete-circle bounds avoid clipped arcs;
+                 * an exact ARC-specific bounding box follows separately. */
+                bounds(curve.center[0]-curve.radius,
+                       curve.center[1]-curve.radius,ext,&has);
+                bounds(curve.center[0]+curve.radius,
+                       curve.center[1]+curve.radius,ext,&has);
+                v.rendered_primitives++;
+            }else v.omitted_records++;
         }else if(t==27u){
             MusaDwgAc1032NativePoint point={0};
             if(musa_dwg_ac1032_scene_index_read_point(s,e.handle,&point)&&
@@ -107,7 +152,9 @@ static int process(const MusaDwgAc1032SceneIndex *s,
     *stats=v;
     return 1;
 }
-int musa_dwg_ac1032_preview_v6_line_point(
+static int preview(const MusaDwgAc1032SceneIndex *s,
+                  float *words,size_t capacity,
+                  MusaAc1032PreviewV6Stats *out,int curves){
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
     if(!s||!out||(!words&&capacity)||
@@ -115,7 +162,7 @@ int musa_dwg_ac1032_preview_v6_line_point(
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before))return 0;
+    if(!process(s,NULL,0u,&before,curves))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -123,11 +170,21 @@ int musa_dwg_ac1032_preview_v6_line_point(
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
         *out=after;
     }
     free(scratch);return ok;
+}
+int musa_dwg_ac1032_preview_v6_line_point(
+    const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(s,words,capacity,out,0);
+}
+int musa_dwg_ac1032_preview_v6_planar_curves(
+    const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(s,words,capacity,out,1);
 }
