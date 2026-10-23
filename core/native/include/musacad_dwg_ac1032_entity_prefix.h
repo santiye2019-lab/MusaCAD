@@ -9,7 +9,8 @@ extern "C" {
 #endif
 /* ORIGINAL R2018 LINE entity prefix, authenticated DATA payload precondition.
  * Parses ONLY OT followed by H self, EED size, preview flag, entity
- * mode, reactor BL, XDic and DS bit. R2018 has no serialized\n * previous/next link bit (links are implicitly absent). R2010+ separate MC
+ * mode, reactor BL, XDic and DS bit. R2018 has no serialized
+ * previous/next link bit (links are implicitly absent). R2010+ separate MC
  * handle-stream bits REPLACE the obsolete in-payload R2000 RL length
  * assumption, demonstrated by real R2018 2018/Line.dwg.
  *
@@ -27,6 +28,15 @@ typedef struct MusaDwgAc1032LinePrefix {
     uint8_t no_prev_next_links;
     uint8_t prefix_decoded;
 } MusaDwgAc1032LinePrefix;
+
+/* Common R2018 fixed built-in entity type 17 ARC / 18 CIRCLE / 19 LINE.
+ * Verifies OT bits against the authenticated source/layout, then admits only
+ * supported no-EED/no-preview/no-reactors forms. Fail atomic. */
+typedef MusaDwgAc1032LinePrefix MusaDwgAc1032EntityPrefix;
+int musa_dwg_ac1032_entity_prefix_bytes(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,uint16_t expected_type,
+    MusaDwgAc1032EntityPrefix *out);
 
 /* Strict, deliberately LIMITED no-EED/no-graphics/no-reactors LINE
  * supported prefix. Fail-atomic, no source mutation, rejects aliases.
@@ -57,6 +67,12 @@ typedef struct MusaDwgAc1032LineCommon {
     uint8_t has_rgb,has_color_reference,has_transparency;
     uint8_t common_decoded;
 } MusaDwgAc1032LineCommon;
+
+typedef MusaDwgAc1032LineCommon MusaDwgAc1032EntityCommon;
+int musa_dwg_ac1032_entity_common_bytes(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,uint16_t expected_type,
+    MusaDwgAc1032EntityCommon *out);
 
 /* Does not itself claim that coordinates are decoded or a full DWG
  * document is readable; the independent LINE fields/oracle must pass. */
