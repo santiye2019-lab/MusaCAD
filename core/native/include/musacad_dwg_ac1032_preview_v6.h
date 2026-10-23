@@ -46,7 +46,10 @@ int musa_dwg_ac1032_preview_v6_planar_curves(
     float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
 /* Source-authenticated planar original R2018 LWPOLYLINE preview:
  * exact straight segments and signed bulge circular arcs, including final
- * closed edge only when source CLOSED. Reject all widths, thickness, elevation
+ * closed edge only when source CLOSED. Also admits genuine OT16 3D POLYLINE
+ * ONLY with verified ordered/reverse source owner graph, SEQEND and strictly
+ * planar Z=0 nonspline OT11 vertices. Never flatten real nonplanar/mesh paths.
+ * Reject all widths, thickness, elevation
  * and unsupported OCS planes rather than drawing a visibly wrong line.
  * Version 6 POLY for all-straight paths, or LINE/CURVE segments if any bulge.
  * Source-indexed original H/CRC, always explicitly partial while unsupported

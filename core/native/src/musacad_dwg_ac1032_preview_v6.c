@@ -133,6 +133,55 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
     }
     *w=pos;*primitive_count+=segments;return 1;
 }
+/* Flatten a GENUINELY planar 3D POLYLINE only after resolving the
+ * source's ordered hard-owner H references and reverse-owned children.
+ * 3D mesh, spline-fit, elevation and model-space graph uncertainty remain
+ * explicitly unrenderable: no guessed numeric H order or Z projection. */
+static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
+                    MusaDwgAc1032Polyline3DOrderedVertex *vertices,
+                    float *dst,size_t cap,size_t *w,
+                    size_t *primitive_count,double ext[4],int *has){
+    MusaDwgAc1032Polyline3DOrdered poly={0};
+    if(!musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
+          s,h,vertices,100000u,&poly)||
+       !poly.hard_owner_links_verified||
+       !poly.reverse_vertex_owners_verified||
+       !poly.seqend_type_verified||
+       !poly.header.header_decoded||
+       poly.header.spline_flags!=0u||
+       poly.vertex_count<2u||poly.vertex_count>100000u||
+       poly.header.closed>1u||
+       poly.header.polyline_flags!=(uint8_t)poly.header.closed)
+        return 0;
+    const size_t count=poly.vertex_count;
+    for(size_t i=0;i<count;i++){
+        const MusaDwgAc1032Polyline3DOrderedVertex *v=&vertices[i];
+        /* 0x20 is the standard 3D polyline vertex flag. Spline/mesh
+         * control vertices and transformed/nonplanar Z are unsupported. */
+        if((v->flags & (uint8_t)~32u)!=0u||
+           !valid(v->point[0])||!valid(v->point[1])||
+           !isfinite(v->point[2])||v->point[2]!=0.0)
+            return 0;
+    }
+    if(count>(SIZE_MAX-2u)/2u||*w>SIZE_MAX-2u-2u*count||
+       *primitive_count>=16777215u)
+        return -1;
+    const size_t needed=2u+count*2u;
+    if(dst){
+        if(*w>cap||needed>cap-*w)return -1;
+        dst[*w]=519.0f;
+        dst[*w+1u]=(float)(poly.header.closed?-(int)count:(int)count);
+        for(size_t i=0;i<count;i++){
+            dst[*w+2u+2u*i]=(float)vertices[i].point[0];
+            dst[*w+3u+2u*i]=(float)vertices[i].point[1];
+        }
+    }
+    for(size_t i=0;i<count;i++)
+        bounds(vertices[i].point[0],vertices[i].point[1],ext,has);
+    *w+=needed;
+    (*primitive_count)++;
+    return 1;
+}
 /* Probe/emit in the same immutable source-index order. All integrity
  * failures abort BEFORE touching output through a mandatory probe pass.
  * This transport deliberately leaves original color/layer unresolved.
@@ -147,6 +196,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
     v.required_float_words=7u;
     v.provisional_aci_style=1u;
     MusaDwgAc1032LWVertex *lw=NULL;
+    MusaDwgAc1032Polyline3DOrderedVertex *poly3d=NULL;
     double ext[4]={0};int has=0;
     size_t w=7u;uint64_t prev=0u;
     for(size_t i=0;i<n;i++){
@@ -223,16 +273,27 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                        curve.center[1]+curve.radius,ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
+        }else if(t==16u&&polylines){
+            if(!poly3d){
+                poly3d=(MusaDwgAc1032Polyline3DOrderedVertex*)
+                       malloc(100000u*sizeof(*poly3d));
+                if(!poly3d){free(lw);return 0;}
+            }
+            const int handled=flat_polyline3d(
+                 s,e.handle,poly3d,dst,cap,&w,
+                 &v.rendered_primitives,ext,&has);
+            if(handled<0){free(poly3d);free(lw);return 0;}
+            if(!handled)v.omitted_records++;
         }else if(t==77u&&polylines){
             if(!lw){
                 lw=(MusaDwgAc1032LWVertex*)malloc(
                      100000u*sizeof(*lw));
-                if(!lw){free(lw);return 0;}
+                if(!lw){free(poly3d);return 0;}
             }
             const int handled=lwpoly(
                  s,e.handle,lw,dst,cap,&w,
                  &v.rendered_primitives,ext,&has);
-            if(handled<0){free(lw);return 0;}
+            if(handled<0){free(poly3d);free(lw);return 0;}
             if(!handled)v.omitted_records++;
         }else if(t==27u){
             MusaDwgAc1032NativePoint point={0};
@@ -265,6 +326,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         dst[6]=v.partial_geometry?1.0f:0.0f;
     }
     *stats=v;
+    free(poly3d);
     free(lw);
     return 1;
 }
