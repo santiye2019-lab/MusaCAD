@@ -647,6 +647,16 @@ jobs:
           assert "return NativeSceneFingerprint.sha256(raw);" in scene
           PY
 
+      - name: P0 original DWG zero-area POINT and axis-line viewport scene safety
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d /tmp/musacad-tests \
+            app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
+            tests/NativeSceneViewportBoundsTest.java
+          java -cp /tmp/musacad-tests NativeSceneViewportBoundsTest
+          grep -F 'NativeSceneViewportBounds.forScene(' \
+            app/src/main/java/com/musa/cad/NativeScene.java
+
       - name: Test modern DWG scene record overflow and partial-data guard
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/NativeSceneRecordBounds.java tests/NativeSceneRecordBoundsTest.java
@@ -1204,6 +1214,7 @@ jobs:
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative'
           mkdir -p /tmp/musacad-r2018-preview-jni-java
           javac -encoding UTF-8 -d /tmp/musacad-r2018-preview-jni-java \
+            app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
             tests/FirstPartyAc1032JNIHostTest.java
           java -cp /tmp/musacad-r2018-preview-jni-java \
             com.musa.cad.FirstPartyDwgPreview \
