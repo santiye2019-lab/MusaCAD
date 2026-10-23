@@ -201,7 +201,8 @@ int musa_dwg_ac1032_scene_index_read_line(
         &value.geometry)&&value.geometry.coordinates_decoded&&
         value.geometry.indexed_handle==h;
     free(p.raw);
-    if(ok)*out=value;return ok;
+    if(ok){*out=value;}
+    return ok;
 }
 int musa_dwg_ac1032_scene_index_read_curve(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -219,7 +220,8 @@ int musa_dwg_ac1032_scene_index_read_curve(
           value.object_type==type;
     value.common=p.common;
     free(p.raw);
-    if(ok)*out=value;return ok;
+    if(ok){*out=value;}
+    return ok;
 }
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -233,7 +235,8 @@ int musa_dwg_ac1032_scene_index_read_point(
          value.geometry_decoded&&value.indexed_handle==h;
     value.common=p.common;
     free(p.raw);
-    if(ok)*out=value;return ok;
+    if(ok){*out=value;}
+    return ok;
 }
 int musa_dwg_ac1032_scene_index_read_lwpolyline(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -255,7 +258,8 @@ int musa_dwg_ac1032_scene_index_read_lwpolyline(
           value.indexed_handle==h;
     value.common=p.common;
     free(p.raw);
-    if(ok)*out=value;return ok;
+    if(ok){*out=value;}
+    return ok;
 }
 int musa_dwg_ac1032_scene_index_read_vertex3d(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -269,5 +273,6 @@ int musa_dwg_ac1032_scene_index_read_vertex3d(
            value.coordinates_decoded&&value.indexed_handle==h;
     value.common=p.common;
     free(p.raw);
-    if(ok)*out=value;return ok;
+    if(ok){*out=value;}
+    return ok;
 }
