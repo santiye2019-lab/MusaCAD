@@ -9,16 +9,17 @@ static int overlap(const void *a,size_t an,const void *b,size_t bn){
     const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
     return x<=y?y-x<an:x-y<bn;
 }
-int musa_dwg_ac1032_line_prefix_bytes(
+int musa_dwg_ac1032_entity_prefix_bytes(
     const uint8_t *raw,size_t bytes,
-    const MusaDwgAc1032ObjectStreams *layout,
-    MusaDwgAc1032LinePrefix *out){
+    const MusaDwgAc1032ObjectStreams *layout,uint16_t expected_type,
+    MusaDwgAc1032EntityPrefix *out){
     if(!raw||!layout||!out||!bytes||bytes>MAX_BYTES||
        overlap(raw,bytes,layout,sizeof(*layout))||
        overlap(raw,bytes,out,sizeof(*out))||
        overlap(layout,sizeof(*layout),out,sizeof(*out))||
        !layout->original_record_crc_verified||
-       !layout->indexed_handle||layout->raw_object_type!=19u||
+       !layout->indexed_handle||expected_type<17u||expected_type>19u||
+       layout->raw_object_type!=expected_type||
        layout->object_type_field_bits!=10u||
        layout->total_payload_bits!=(uint64_t)bytes*8u||
        layout->handle_stream_start_bit!=layout->data_stream_bits||
@@ -27,6 +28,12 @@ int musa_dwg_ac1032_line_prefix_bytes(
        layout->data_stream_bits>SIZE_MAX||
        layout->data_stream_bits<=layout->object_type_field_bits)
         return 0;
+    /* Confirm the 10 source OT bits actually encode the expected type. */
+    MusaDwgAc1015Bits ot={0};uint32_t code=0u,kind=0u;
+    if(!musa_dwg_ac1015_bits_init(&ot,raw,bytes,0u,10u)||
+       !musa_dwg_ac1015_bits_read_u(&ot,2u,&kind)||kind!=0u||
+       !musa_dwg_ac1015_bits_read_u(&ot,8u,&code)||
+       code!=expected_type)return 0;
     /* Full source bounds: DWG numeric readers cannot consume HANDLES. */
     MusaDwgAc1015Bits c={0};
     if(!musa_dwg_ac1015_bits_init(&c,raw,bytes,
@@ -58,7 +65,7 @@ int musa_dwg_ac1032_line_prefix_bytes(
        !xdic||ds)return 0;
     MusaDwgAc1032LinePrefix result={0};
     result.indexed_handle=self;
-    result.raw_object_type=19u;
+    result.raw_object_type=expected_type;
     result.entity_mode=(uint8_t)mode;
     result.reactor_count=reactors;
     result.xdictionary_missing=(uint8_t)xdic;
@@ -73,22 +80,31 @@ int musa_dwg_ac1032_line_prefix_bytes(
     return 1;
 }
 
+int musa_dwg_ac1032_line_prefix_bytes(
+    const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LinePrefix *out){
+    return musa_dwg_ac1032_entity_prefix_bytes(
+       raw,bytes,layout,19u,out);
+}
+
 /* Specification-derived AC1032 ENTITY common tail, after the independently
  * CRC/handle-authenticated OT/H/EED/flags early prefix. No LibreDWG runtime.
  * The common C11 source supports Android, Windows and iOS.
  */
 #include <math.h>
-int musa_dwg_ac1032_line_common_bytes(
+int musa_dwg_ac1032_entity_common_bytes(
     const uint8_t *raw,size_t bytes,
-    const MusaDwgAc1032ObjectStreams *layout,
-    MusaDwgAc1032LineCommon *out){
+    const MusaDwgAc1032ObjectStreams *layout,uint16_t expected_type,
+    MusaDwgAc1032EntityCommon *out){
     if(!raw||!layout||!out||!bytes||bytes>MAX_BYTES||
        overlap(raw,bytes,layout,sizeof(*layout))||
        overlap(raw,bytes,out,sizeof(*out))||
        overlap(layout,sizeof(*layout),out,sizeof(*out)))
         return 0;
     MusaDwgAc1032LinePrefix early={0};
-    if(!musa_dwg_ac1032_line_prefix_bytes(raw,bytes,layout,&early)||
+    if(!musa_dwg_ac1032_entity_prefix_bytes(
+         raw,bytes,layout,expected_type,&early)||
        !early.prefix_decoded||
        (uint64_t)early.next_color_bit>=layout->data_stream_bits||
        layout->data_stream_bits>SIZE_MAX)return 0;
@@ -144,4 +160,12 @@ int musa_dwg_ac1032_line_common_bytes(
     candidate.common_decoded=1u;
     *out=candidate;
     return 1;
+}
+
+int musa_dwg_ac1032_line_common_bytes(
+    const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LineCommon *out){
+    return musa_dwg_ac1032_entity_common_bytes(
+       raw,bytes,layout,19u,out);
 }
