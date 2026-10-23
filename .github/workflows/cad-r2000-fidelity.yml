@@ -226,6 +226,24 @@ jobs:
           test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
           echo "PASS original R2018 3D POLYLINE six ordered vertices with reverse owner graph"
 
+      - name: P0 original AC1032 source-free cached 3D POLYLINE ordered owner graph
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/PolyLine3D.dwg
+          oracle=third_party/libredwg/test/test-data/2018/PolyLine3D.txt
+          test -s "$file"
+          test -s "$oracle"
+          grep -F 'Handle (RO) = "1C1"' "$oracle"
+          grep -F 'Coordinates = (21.4409 14.6498 0.0 20.8962 5.65378 0.0' "$oracle"
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_real_scene_polyline3d_oracle.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-ac1032-cached-poly3d
+          timeout 90s /tmp/musa-original-ac1032-cached-poly3d "$file"
+          test "$(sha256sum "$file" | cut -d ' ' -f1)" = "$before"
+          echo "PASS source-free cached AC1032 OT16 original H-ordered 3D geometry"
+
       - name: P0 original AC1032 one-open scene indexed cached geometry parity
         run: |
           set -euo pipefail
