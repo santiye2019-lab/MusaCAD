@@ -196,6 +196,20 @@ int main(int argc,char **argv){
               !memcmp(&point,&saved,sizeof(point));
            file[n-1u]=last;
         }
+        /* The original empty SYSTEM footer introduced by this R2018
+         * sample is an exact 20-byte structural record, not padding.
+         * Tamper there must never be treated as valid geometry. */
+        if(ok&&n>=128u){
+           const uint8_t first_footer=file[n-128u];
+           file[n-128u]^=1u;
+           size_t old_count=43u;
+           ok=!musa_dwg_ac1032_page_locations(
+               file,n,NULL,0u,&old_count)&&old_count==43u&&
+              !musa_dwg_ac1032_read_point_file(
+               file,n,h,&point)&&
+              !memcmp(&point,&saved,sizeof(point));
+           file[n-128u]=first_footer;
+        }
         if(ok){
            ok=!musa_dwg_ac1032_read_point_file(
                file,n,UINT64_MAX,&point)&&
