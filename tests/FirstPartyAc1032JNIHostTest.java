@@ -83,6 +83,13 @@ final class FirstPartyDwgPreview {
         verifyLine(line);
         float[] point=read(args[2]);
         verifyPoint(point);
+        require(point[2]==point[4]&&point[3]==point[5],
+                "Original POINT.dwg geometry must report honest zero-area source bounds");
+        float[] pointFrame=NativeSceneViewportBounds.forScene(
+                point[2],point[3],point[4],point[5]);
+        require(pointFrame!=null&&pointFrame[2]>pointFrame[0]&&
+                pointFrame[3]>pointFrame[1],
+                "Android renderer must not reject source-verified POINT.dwg zero-area bounds");
         boolean rejected=false;
         try {readOriginalNative(args[1],7);}catch(IOException expected){
             rejected=true;
@@ -94,6 +101,6 @@ final class FirstPartyDwgPreview {
         require(rejected,"Unknown file must fail closed");
         System.out.println("PASS FIRST-PARTY Android-signature JNI:"
                 +" original R2018 LINE and POINT XYZ, partial flag,"
-                +" original ACI record framing, file and capacity refusal");
+                +" original ACI and POINT viewport framing, file and capacity refusal");
     }
 }
