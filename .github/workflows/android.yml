@@ -1202,7 +1202,15 @@ jobs:
             /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
           nm -D /tmp/musacad-r2018-preview-jni-host.so \
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative'
-          echo 'PASS source-authenticated original R2018 JNI linked without any external DWG engine'
+          mkdir -p /tmp/musacad-r2018-preview-jni-java
+          javac -encoding UTF-8 -d /tmp/musacad-r2018-preview-jni-java \
+            tests/FirstPartyAc1032JNIHostTest.java
+          java -cp /tmp/musacad-r2018-preview-jni-java \
+            com.musa.cad.FirstPartyDwgPreview \
+            /tmp/musacad-r2018-preview-jni-host.so \
+            third_party/libredwg/test/test-data/2018/Line.dwg \
+            third_party/libredwg/test/test-data/2018/Point.dwg
+          echo 'PASS source-authenticated original R2018 JNI linked and invoked with real drawing geometry, without APK'
 
       - name: Android lint and unit tests
         run: |
