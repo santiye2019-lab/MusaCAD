@@ -67,11 +67,11 @@ int main(void){
        w.data,sizeof(w.data),&l,&h,handles,6u,&layer,&seqend));
     w.data[35u]^=1u;
     assert(!memcmp(saved,handles,sizeof(saved)));
-    /* Exactly repeated ownership handles must never be published. */
-    w.data[8u]^=1u;
+    /* Illegal first child handle-code nibble must never be published. */
+    w.data[14u]^=2u;
     assert(!musa_dwg_ac1032_polyline3d_handle_fields_at(
        w.data,sizeof(w.data),&l,&h,handles,6u,&layer,&seqend));
-    w.data[8u]^=1u;
+    w.data[14u]^=2u;
     assert(!memcmp(saved,handles,sizeof(saved)));
     return 0;
 }
