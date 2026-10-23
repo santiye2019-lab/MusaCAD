@@ -7,6 +7,9 @@
 #include "musacad_dwg_ac1032_object_type.h"
 #include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1032_object_streams.h"
+#include "musacad_dwg_ac1032_handles.h"
+#include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1032_sections.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,6 +31,38 @@ static int load(const char *path,uint8_t **out,size_t *n){
 }
 static void stage_diagnostics(const uint8_t *file,size_t n,
                               uint64_t handle){
+    MusaDwgAc1032FileMapHeader hdr={0};
+    size_t map_n=0u,handle_n=0u,section_n=0u;
+    int header=musa_dwg_ac1032_page_map_header(file,n,&hdr);
+    int map=musa_dwg_ac1032_page_locations(
+        file,n,NULL,0u,&map_n);
+    int sections=musa_dwg_ac1032_section_catalog(
+        file,n,NULL,0u,&section_n);
+    int handles=musa_dwg_ac1032_handles_index(
+        file,n,NULL,0u,&handle_n);
+    fprintf(stderr,"Point native file levels: bytes=%zu header=%d"
+      " page_map=%d pages=%zu sections_ok=%d sections=%zu"
+      " handle_index_ok=%d handles=%zu\n",
+      n,header,map,map_n,sections,section_n,handles,handle_n);
+    if(handles&&handle_n>0u&&handle_n<=100000u){
+        MusaDwgAc1032HandleEntry *entries=calloc(handle_n,sizeof(*entries));
+        size_t got=0u;
+        if(entries&&musa_dwg_ac1032_handles_index(
+           file,n,entries,handle_n,&got)){
+            uint64_t closest=0u;
+            size_t matched=0u;
+            for(size_t i=0;i<got;i++){
+                if(entries[i].handle==handle)matched++;
+                if(entries[i].handle<=handle &&
+                   entries[i].handle>closest)closest=entries[i].handle;
+            }
+            fprintf(stderr,"Point native index: desired=%llX"
+                " matches=%zu closest_below=%llX count=%zu\n",
+                (unsigned long long)handle,matched,
+                (unsigned long long)closest,got);
+        }
+        free(entries);
+    }
     MusaDwgAc1032ObjectType ot={0};
     MusaDwgAc1032PayloadInfo info={0};
     MusaDwgAc1032ObjectStreams layout={0};
