@@ -21,6 +21,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_indexed_audit_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_indexed_audit_negative_smoke
                  COMMAND musacad_core_ac1032_indexed_audit_test)
+        # Whole indexed original AC1032 scene geometry vs opaque audit;
+        # synthetic hostile-interface smoke and independent real-source CI.
+        add_executable(musacad_core_ac1032_scene_geometry_scan_test tests/core_dwg_ac1032_scene_geometry_scan_test.c)
+        target_link_libraries(musacad_core_ac1032_scene_geometry_scan_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_scene_geometry_scan_atomic_smoke
+                 COMMAND musacad_core_ac1032_scene_geometry_scan_test)
         add_executable(musacad_core_portable_abi_smoke tests/core_portable_abi_smoke.c)
         target_link_libraries(musacad_core_portable_abi_smoke PRIVATE musacad_core)
         add_test(NAME musacad_core_one_engine_abi_smoke COMMAND musacad_core_portable_abi_smoke)
