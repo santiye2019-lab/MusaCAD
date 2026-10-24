@@ -98,6 +98,22 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     const MusaDwgAc1032SceneIndex *index,
     uint64_t entity_handle,MusaDwgAc1032EntityLayerRef *out);
 
+/* Single ORIGINAL indexed DWG graph walk from one geometry entity
+ * to its source-CRC-verified LAYER table record and bounded Unicode TU
+ * name. Built from separate first-party readers, never by guessing a
+ * default layer name/handle or using object H proximity. Colors and
+ * visibility are NOT yet read; BYLAYER rendering must not claim exactness
+ * based on a successfully decoded NAME alone.
+ * Fail-atomic, read-only, portable C11 across Android, iOS and Windows. */
+typedef struct MusaDwgAc1032EntityLayerName {
+    MusaDwgAc1032EntityLayerRef edge;
+    MusaDwgAc1032LayerName layer;
+    uint8_t source_graph_and_name_verified;
+} MusaDwgAc1032EntityLayerName;
+int musa_dwg_ac1032_scene_index_entity_layer_name(
+    const MusaDwgAc1032SceneIndex *index,
+    uint64_t entity_handle,MusaDwgAc1032EntityLayerName *out);
+
 /* Original indexed R2018 source inventory/geometry evidence. Every
  * indexed H is CRC-checked for type. Native geometry claims require the
  * actual first-party type-specific decoder, not just a matching raw OT.

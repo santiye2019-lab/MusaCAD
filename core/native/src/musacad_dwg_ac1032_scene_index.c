@@ -448,6 +448,42 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     *out=evidence;
     return 1;
 }
+/* No default '0' or palette guesses: the actual source entity H=5
+ * points at an original CRC-verified OT51, whose independently parsed TU
+ * name is returned with its original bit offset and Unicode evidence. */
+int musa_dwg_ac1032_scene_index_entity_layer_name(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032EntityLayerName *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032EntityLayerRef link={0};
+    MusaDwgAc1032LayerIdentity identity={0};
+    MusaDwgAc1032LayerName layer={0};
+    if(!musa_dwg_ac1032_scene_index_entity_layer_ref(s,h,&link)||
+       link.entity_handle!=h||!link.layer_handle||
+       link.raw_layer_type!=51u||
+       !link.source_handle_ref_verified||
+       !link.original_entity_crc_verified||
+       !link.original_layer_crc_verified||
+       !musa_dwg_ac1032_scene_index_read_layer_identity(
+             s,link.layer_handle,&identity)||
+       !identity.original_record_crc_verified||
+       !identity.embedded_self_handle_verified||
+       identity.indexed_handle!=link.layer_handle||
+       !musa_dwg_ac1032_scene_index_read_layer_name(
+             s,link.layer_handle,&layer)||
+       !layer.original_record_crc_verified||
+       layer.indexed_handle!=link.layer_handle||
+       !layer.utf16_code_units||!layer.utf8_bytes||
+       layer.utf8_bytes>=sizeof(layer.utf8)||
+       layer.utf8[layer.utf8_bytes]!='\0')
+        return 0;
+    MusaDwgAc1032EntityLayerName result={0};
+    result.edge=link;
+    result.layer=layer;
+    result.source_graph_and_name_verified=1u;
+    *out=result;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
