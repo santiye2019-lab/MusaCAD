@@ -16,8 +16,8 @@ static int load(const char *name,uint8_t **out,size_t *len){
        fseek(f,0,SEEK_SET)!=0){fclose(f);return 0;}
     uint8_t *raw=(uint8_t*)malloc((size_t)n);
     if(!raw){fclose(f);return 0;}
-    const int ok=fread(raw,1u,(size_t)n,f)==(size_t)n&&
-                 fclose(f)==0;
+    int ok=fread(raw,1u,(size_t)n,f)==(size_t)n;
+    if(fclose(f)!=0)ok=0;
     if(!ok){free(raw);return 0;}
     *out=raw;*len=(size_t)n;
     return 1;
