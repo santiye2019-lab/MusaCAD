@@ -9,7 +9,7 @@ import java.io.IOException;
 
 final class FirstPartyDwgPreview {
     private static native float[] readOriginalNative(
-            String inputPath,int maxFloatWords) throws IOException;
+            String inputPath,int maxFloatWords,long[] readiness) throws IOException;
 
     private static void require(boolean value,String label){
         if(!value)throw new AssertionError(label);
@@ -18,8 +18,17 @@ final class FirstPartyDwgPreview {
         return Float.isFinite(got)&&Math.abs(got-reference)<0.0002;
     }
     private static float[] read(String path)throws IOException{
-        float[] raw=readOriginalNative(path,1_048_576);
+        long[] report=new long[11];
+        float[] raw=readOriginalNative(path,1_048_576,report);
         require(raw!=null&&raw.length>=10,"Missing full JNI packet");
+        require(report[0]>0&&report[1]>=1&&report[2]>=1,
+                "Original indexed source and linked color/layer evidence absent");
+        require(report[1]+report[8]==report[0]&&
+                report[2]+report[7]==report[1]&&
+                report[3]+report[4]+report[5]+report[6]==report[2],
+                "Corrupt original DWG provenance count partition");
+        require(report[9]>=1&&report[9]<=report[2]&&report[10]==0L,
+                "Narrow LAYER CMC must NOT certify complete display");
         require(raw[0]==6f&&raw[1]>0f&&raw[6]==1f,
                 "Incomplete scene must be explicitly marked");
         for(float x:raw)require(Float.isFinite(x),"Invalid float");
@@ -91,14 +100,22 @@ final class FirstPartyDwgPreview {
                 pointFrame[3]>pointFrame[1],
                 "Android renderer must not reject source-verified POINT.dwg zero-area bounds");
         boolean rejected=false;
-        try {readOriginalNative(args[1],7);}catch(IOException expected){
+        long[] untouched=new long[11];
+        java.util.Arrays.fill(untouched,919L);
+        try {readOriginalNative(args[1],7,untouched);}catch(IOException expected){
             rejected=true;
         }
         require(rejected,"Insufficient float budget must fail closed");
+        for(long n:untouched)require(n==919L,"Failed read mutated caller audit");
         rejected=false;
-        try {readOriginalNative(args[1]+".missing",4096);}
+        try {readOriginalNative(args[1]+".missing",4096,untouched);}
         catch(IOException expected){rejected=true;}
         require(rejected,"Unknown file must fail closed");
+        for(long n:untouched)require(n==919L,"Missing source mutated audit");
+        rejected=false;
+        try {readOriginalNative(args[1],4096,new long[10]);}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Inconsistent audit array must fail closed");
         System.out.println("PASS FIRST-PARTY Android-signature JNI:"
                 +" original R2018 LINE and POINT XYZ, partial flag,"
                 +" original ACI and POINT viewport framing, file and capacity refusal");

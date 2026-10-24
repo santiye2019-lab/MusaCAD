@@ -5,6 +5,7 @@
  * model-space + graph + text + style acceptance reaches completeness. */
 #include <jni.h>
 #include "musacad_dwg_ac1032_preview_v6.h"
+#include "musacad_dwg_ac1032_display_readiness.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -22,9 +23,12 @@ static void throw_io(JNIEnv *env,const char *message){
 }
 JNIEXPORT jfloatArray JNICALL
 Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
-    JNIEnv *env,jclass klass,jstring original,jint maxWords){
+    JNIEnv *env,jclass klass,jstring original,jint maxWords,
+    jlongArray readinessOut){
     (void)klass;
-    if(!original||maxWords<256||maxWords>(jint)MAX_V6_FLOAT_WORDS){
+    if(!original||!readinessOut||
+       (*env)->GetArrayLength(env,readinessOut)!=11||
+       maxWords<256||maxWords>(jint)MAX_V6_FLOAT_WORDS){
         throw_io(env,"Gecersiz AC1032 dosyasi veya bellek siniri");
         return NULL;
     }
@@ -61,8 +65,10 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         throw_io(env,"Orijinal AC1032 DWG dogrulanamadi");
         return NULL;
     }
+    MusaAc1032DisplayReadiness ready={0};
     MusaAc1032PreviewV6Stats needed={0},copied={0};
-    ok=musa_dwg_ac1032_preview_v6_planar_source_aci(
+    ok=musa_dwg_ac1032_scene_display_readiness(scene,&ready)&&
+       musa_dwg_ac1032_preview_v6_planar_source_aci(
         scene,NULL,0u,&needed)&&
         needed.rendered_primitives>0u&&
         needed.required_float_words>=7u&&
@@ -80,7 +86,9 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
          copied.required_float_words==needed.required_float_words&&
          copied.rendered_primitives==needed.rendered_primitives&&
          copied.omitted_records==needed.omitted_records&&
-         copied.partial_geometry==needed.partial_geometry;
+         copied.partial_geometry==needed.partial_geometry&&
+         ready.indexed_records==needed.total_indexed_records&&
+         !ready.display_accepted;
     musa_dwg_ac1032_scene_index_close(scene);
     if(!ok){
         free(words);
@@ -92,6 +100,22 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
     if(output){
         (*env)->SetFloatArrayRegion(env,output,0,
                (jsize)needed.required_float_words,(const jfloat*)words);
+        if(!(*env)->ExceptionCheck(env)){
+            const jlong values[11]={
+                (jlong)ready.indexed_records,
+                (jlong)ready.known_planar_records,
+                (jlong)ready.source_style_joined,
+                (jlong)ready.source_direct_aci,
+                (jlong)ready.source_bylayer,
+                (jlong)ready.source_byblock,
+                (jlong)ready.source_complex_or_invisible,
+                (jlong)ready.known_style_rejected,
+                (jlong)ready.other_indexed_records,
+                (jlong)ready.narrow_layer_aci_available,
+                (jlong)ready.display_accepted
+            };
+            (*env)->SetLongArrayRegion(env,readinessOut,0,11,values);
+        }
     }
     free(words);
     return output;
