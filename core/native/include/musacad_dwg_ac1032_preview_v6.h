@@ -57,10 +57,13 @@ int musa_dwg_ac1032_preview_v6_planar_curves(
 int musa_dwg_ac1032_preview_v6_planar_polylines(
     const MusaDwgAc1032SceneIndex *scene,
     float *words,size_t capacity,MusaAc1032PreviewV6Stats *out);
-/* NEW opt-in original-entity ACI path on the same binary source/H/CRC.
- * Emits v6 primitive code = (kind<<8) | original ACI for independently
- * decoded 1..255 direct colors only; BYLAYER/BYBLOCK, TrueColor, and
- * transparency remain PROVISIONAL ACI7 and mark partial_geometry=1.
+/* Opt-in source-assigned ACI / direct RGB path on original H/CRC.
+ * ACI 1..255 uses v6 code (kind<<8)|ACI.
+ * Source DIRECT 24-bit RGB (no color-handle/reference or transparency)
+ * uses negative v6 code -(kind*256+2), followed by one exact float word
+ * holding RGB 0..0xFFFFFF. 32-bit ARGB MUST NOT be stored in float.
+ * BYLAYER/BYBLOCK, indexed color references, alpha/transparency
+ * and unsupported styles remain PROVISIONAL ACI7 and mark partial.
  * Invisible entities are not emitted in this mode, preserving caution.
  * Does NOT resolve layer table visibility/style, block insert ancestry
  * or actual Android full drawing appearance. Original APIs unchanged. */
@@ -75,6 +78,15 @@ int musa_dwg_ac1032_preview_v6_planar_source_aci(
 int musa_dwg_ac1032_preview_v6_entity_aci_code(
     const MusaDwgAc1032EntityCommon *source,
     uint8_t v6_kind,float *code,uint8_t *exact);
+/* A pure portable C11 source-style selector. Assumes caller supplied
+ * independently authenticated common entity bytes (including H/CRC).
+ * extra=1 means negative kind code and one extra exact 24-bit RGB float;
+ * extra=0 means positive ACI (direct or provisional 7). 'exact' is exact
+ * source-assigned color only, NOT final visibility/color inheritance.
+ * All four outputs fail-atomic on invalid/overlapping arguments. */
+int musa_dwg_ac1032_preview_v6_entity_source_style_code(
+    const MusaDwgAc1032EntityCommon *source,uint8_t v6_kind,
+    float *code,float *rgb,uint8_t *extra,uint8_t *exact);
 
 #ifdef __cplusplus
 }
