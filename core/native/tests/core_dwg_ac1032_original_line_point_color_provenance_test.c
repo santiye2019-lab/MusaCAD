@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Real AutoCAD R2018 LINE+POINT+ARC+CIRCLE original DWG full source-to-source
+/* Real AutoCAD R2018 LINE+POINT+ARC+CIRCLE+LWPOLYLINE genuine source
  * entity ENC color + LAYER0 CMC evidence. Never certifies visibility. */
 #include "musacad_dwg_ac1032_color_provenance.h"
 #include <stdint.h>
@@ -54,7 +54,7 @@ static int fixture(const char *file,uint64_t handle,uint16_t type){
     if(ok){
         const MusaAc1032ColorProvenance copy=p;
         MusaAc1032ColorProvenance legacy={0};
-        if(type==17u||type==18u){
+        if(type==17u||type==18u||type==77u){
             ok=!musa_dwg_ac1032_scene_line_point_color_provenance(
                  scene,handle,&p)&&!memcmp(&copy,&p,sizeof(p));
         }else{
@@ -92,10 +92,11 @@ int main(int argc,char **argv){
                  NULL,UINT64_C(0x1ca),&p)&&
                p.source_layer_aci==119u?0:1;
     }
-    if(argc!=5)return 2;
+    if(argc!=6)return 2;
     const int line=fixture(argv[1],UINT64_C(0x1ca),19u);
     const int point=fixture(argv[2],UINT64_C(0x1c0),27u);
     const int arc=fixture(argv[3],UINT64_C(0x1bd),17u);
     const int circle=fixture(argv[4],UINT64_C(0x1bd),18u);
-    return line&&point&&arc&&circle?0:1;
+    const int poly=fixture(argv[5],UINT64_C(0x1bd),77u);
+    return line&&point&&arc&&circle&&poly?0:1;
 }
