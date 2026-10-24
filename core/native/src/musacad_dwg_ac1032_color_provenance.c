@@ -2,6 +2,9 @@
 #include "musacad_dwg_ac1032_color_provenance.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#define MUSA_LWPROV_INLINE_VERTICES 128u
+#define MUSA_LWPROV_MAX_VERTICES 100000u
 /* Exact original source object is re-read here, so no caller-provided
  * "color_index" can be mistaken for an independently verified DWG value. */
 int musa_dwg_ac1032_scene_planar_color_provenance(
@@ -10,7 +13,8 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u))return 0;
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=77u))
+        return 0;
     MusaDwgAc1032EntityCommon common={0};
     if(type==19u){
         MusaDwgAc1032NativeLine line={0};
@@ -20,12 +24,32 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
         MusaDwgAc1032NativePoint point={0};
         if(!musa_dwg_ac1032_scene_index_read_point(s,h,&point))return 0;
         common=point.common;
-    }else{
+    }else if(type==17u||type==18u){
         MusaDwgAc1032NativeCurve curve={0};
         if(!musa_dwg_ac1032_scene_index_read_curve(s,h,&curve)||
            !curve.geometry_decoded||curve.object_type!=type||
            curve.indexed_handle!=h)return 0;
         common=curve.common;
+    }else{ /* OT77, source indexed REAL LWPOLYLINE geometry and ENC. */
+        MusaDwgAc1032NativeLWPolyline poly={0};
+        MusaDwgAc1032LWVertex local[MUSA_LWPROV_INLINE_VERTICES];
+        int decoded=musa_dwg_ac1032_scene_index_read_lwpolyline(
+            s,h,local,MUSA_LWPROV_INLINE_VERTICES,&poly);
+        if(!decoded){
+            /* A verified original polyline may have more than 128
+             * vertices. Retry up to the same strictly bounded scene
+             * geometry ceiling; malformed data still fails closed. */
+            MusaDwgAc1032LWVertex *large=(MusaDwgAc1032LWVertex*)
+                malloc(MUSA_LWPROV_MAX_VERTICES*sizeof(*large));
+            if(!large)return 0;
+            decoded=musa_dwg_ac1032_scene_index_read_lwpolyline(
+                s,h,large,MUSA_LWPROV_MAX_VERTICES,&poly);
+            free(large);
+        }
+        if(!decoded||!poly.geometry_decoded||poly.indexed_handle!=h||
+           poly.vertex_count<2u||
+           poly.vertex_count>MUSA_LWPROV_MAX_VERTICES)return 0;
+        common=poly.common;
     }
     if(!common.common_decoded||!common.prefix.prefix_decoded||
        common.prefix.indexed_handle!=h||
