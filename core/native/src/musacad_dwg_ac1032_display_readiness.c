@@ -46,7 +46,12 @@ int musa_dwg_ac1032_scene_display_readiness(
              (unsigned)p->entity_by_layer+
              (unsigned)p->entity_by_block+
              (unsigned)p->entity_complex_color_or_transparency;
-        if(classes!=1u)return 0;
+        if(classes!=1u){
+            /* Unmapped source color form is one unresolved entity, never
+             * an excuse to discard the entire authenticated scene. */
+            result.known_style_rejected++;
+            continue;
+        }
         result.source_style_joined++;
         if(p->entity_has_direct_aci)result.source_direct_aci++;
         if(p->entity_by_layer)result.source_bylayer++;
