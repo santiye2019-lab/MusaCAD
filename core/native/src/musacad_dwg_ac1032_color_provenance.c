@@ -2,17 +2,12 @@
 #include "musacad_dwg_ac1032_color_provenance.h"
 #include <stddef.h>
 #include <stdint.h>
-static int overlaps(const void *x,size_t xn,const void *y,size_t yn){
-    if(!xn||!yn)return 0;
-    const uintptr_t a=(uintptr_t)x,b=(uintptr_t)y;
-    return a<=b?b-a<xn:a-b<yn;
-}
 /* Exact original source object is re-read here, so no caller-provided
  * "color_index" can be mistaken for an independently verified DWG value. */
 int musa_dwg_ac1032_scene_line_point_color_provenance(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaAc1032ColorProvenance *out){
-    if(!s||!h||!out||overlaps(s,sizeof(*s),out,sizeof(*out)))return 0;
+    if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
        (type!=19u&&type!=27u))return 0;
