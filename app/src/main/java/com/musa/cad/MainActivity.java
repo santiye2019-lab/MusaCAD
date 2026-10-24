@@ -23,11 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39;
+    private static final int OPEN=20,SAVE_DXF=21,PICK_AUDIO=30,PICK_IMAGE=31,PICK_VIDEO=32,PICK_FONT=33,PICK_DOCUMENT=34,VIEW_DOCUMENT=35,PICK_BOQ=36,PICK_STRUCT_CALC=37,PICK_CSB_RATES=38,PICK_YFK_2025=39,PICK_ORIGINAL_DWG_2D=40;
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_ORIGINAL_DWG_2D_TEST=12;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -3520,6 +3520,52 @@ public class MainActivity extends AppCompatActivity {
         applyLayers(new HashSet<>(activeDxf.layerNames));
     }
 
+    /** Independent SAF picker: normal DWG open intentionally fails closed,
+     * so this diagnostic must NOT require an active editable DWG project.
+     * This method does not replace CadView, change currentProject or write
+     * to the user's original Content URI. */
+    private void showOriginalFirstPartyPreview(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(intent,PICK_ORIGINAL_DWG_2D);
+    }
+
+    private void previewStandaloneOriginalDwg(Uri uri){
+        Toast.makeText(this,"Bağımsız DWG test dosyası okunuyor",Toast.LENGTH_SHORT).show();
+        new Thread(()->{
+            File temporary=null;
+            try{
+                temporary=File.createTempFile(
+                    "MusaCAD_AC1032_2D_test_",".dwg",getCacheDir());
+                try(InputStream in=getContentResolver().openInputStream(uri);
+                    OutputStream out=new FileOutputStream(temporary)){
+                    FileTransfer.copy(in,out,64L*1024L*1024L,null);
+                }
+                final File copied=temporary;
+                runOnUiThread(()->{
+                    if(isFinishing()||isDestroyed()){
+                        copied.delete();
+                        return;
+                    }
+                    /* Dialog owns ONLY copied cache file and deletes it
+                     * after JNI input has been consumed. */
+                    FirstPartyDwgPreviewDialog.show(this,copied,true);
+                });
+            }catch(IOException | RuntimeException error){
+                if(temporary!=null)temporary.delete();
+                final String detail=error.getMessage();
+                runOnUiThread(()->{
+                    if(!isFinishing()&&!isDestroyed())
+                        Toast.makeText(this,"DWG test kopyası okunamadı: "+
+                            (detail==null?"Dosya hatası":detail),
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        },"MusaCAD-AC1032-2D-SAF-Copy").start();
+    }
+
     private void showNewProjectSheet(){
         showToolSheet("Yeni Proje",
             tool("Yeni Boş Çizim",R.drawable.ic_open_file,this::createBlankDrawing),
@@ -3964,8 +4010,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_ORIGINAL_DWG_2D_TEST,11,"Bağımsız DWG 2B test görünümü (kısmi)");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ORIGINAL_DWG_2D_TEST:showOriginalFirstPartyPreview();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4141,6 +4187,11 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onActivityResult(int r,int c,Intent data){
         super.onActivityResult(r,c,data);
         if(MusaAiVoiceInput.handleActivityResult(r,c,data))return;
+        if(r==PICK_ORIGINAL_DWG_2D){
+            if(c==RESULT_OK&&data!=null&&data.getData()!=null)
+                previewStandaloneOriginalDwg(data.getData());
+            return;
+        }
         if(r==SAVE_DXF&&c!=RESULT_OK){pendingCloseAfterSave=null;return;}
         if(r==PICK_YFK_2025&&c!=RESULT_OK){
             MusaAiPanel.Reply reply=pendingYfk2025Reply;
