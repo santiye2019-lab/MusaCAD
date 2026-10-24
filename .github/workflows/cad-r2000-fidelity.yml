@@ -275,20 +275,20 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
-      - name: P0 original R2018 LINE POINT independent entity ENC and source LAYER0 CMC provenance
+      - name: P0 original R2018 LINE POINT ARC CIRCLE independent ENC and linked LAYER0 CMC provenance
         run: |
           set -euo pipefail
           folder=third_party/libredwg/test/test-data/2018
-          for type in Line Point; do test -s "$folder/$type.dwg"; done
-          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")"
+          for type in Line Point Arc circle; do test -s "$folder/$type.dwg"; done
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg")"
           cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
             core/native/tests/core_dwg_ac1032_original_line_point_color_provenance_test.c \
             /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
             -o /tmp/musa-original-r2018-color-provenance
           timeout 120s /tmp/musa-original-r2018-color-provenance \
-            "$folder/Line.dwg" "$folder/Point.dwg"
-          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")" = "$before"
-          echo "PASS original R2018 source line point ENC and LAYER CMC provenance; not rendering"
+            "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg")" = "$before"
+          echo "PASS original R2018 LINE POINT ARC CIRCLE ENC + linked LAYER CMC provenance; not rendering"
 
       - name: P0 five original R2018 LAYER0 anchored CMC C3 ACI7 from CRC source
         run: |
