@@ -29,10 +29,13 @@ typedef struct MusaAc1032ColorProvenance {
     uint8_t entity_and_layer_crc_verified;
     uint8_t rendering_accepted; /* must remain 0 until style gates pass */
 } MusaAc1032ColorProvenance;
-/* Source-authenticated original AC1032 planar primitive color evidence for
- * ARC, CIRCLE, LINE and POINT. The extracted layer CMC remains narrow
- * evidence, NEVER a final render color (rendering_accepted=0). The
- * LINE/POINT-only ABI below is preserved for existing callers. */
+/* Source-authenticated original AC1032 planar entity color evidence for
+ * ARC, CIRCLE, LINE, POINT and LWPOLYLINE (OT77). The latter requires
+ * strict first-party full source geometry/vertex decoding; malformed,
+ * unbounded or unsupported vertices must not yield invented color.
+ * This API NEVER resolves display-ready layer visibility, inheritance,
+ * BYBLOCK context, transparency or TrueColor (rendering_accepted=0).
+ * LINE/POINT-only entry point below retains its earlier narrow contract. */
 int musa_dwg_ac1032_scene_planar_color_provenance(
     const MusaDwgAc1032SceneIndex *scene,
     uint64_t entity_handle,MusaAc1032ColorProvenance *out);
