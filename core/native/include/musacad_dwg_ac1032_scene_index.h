@@ -86,6 +86,13 @@ int musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
     const MusaDwgAc1032SceneIndex *scene,uint64_t layer_handle,
     MusaDwgAc1032LayerFlagsEvidence *out);
 
+/* Narrow original R2018 LAYER CMC evidence, CRC/H and exact string
+ * boundary validated. Not general BYLAYER rendering: opaque 7-bit
+ * source prefix is admitted only for explicitly tested default profile. */
+int musa_dwg_ac1032_scene_index_layer_anchored_cmc_evidence(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t layer_handle,
+    MusaDwgAc1032LayerCmcEvidence *out);
+
 /* First step toward REAL BYLAYER rendering: source-CRC/H-validated
  * common built-in entity -> original DWG LAYER record (OT=51).
  * Only strict simple no-owner/no-reactor/no-extra-H 2018 entities are
