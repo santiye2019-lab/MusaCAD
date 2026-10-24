@@ -84,11 +84,22 @@ public final class FirstPartyDwgPreviewDialog {
                 owner.runOnUiThread(()->{
                     if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())return;
                     sceneCanvas.setScene(preview.scene);
+                    FirstPartyDwgPreview.Readiness a=preview.readiness;
                     status.setText("Gerçek DWG • "+preview.scene.primitiveCount+
-                        " çizim öğesi • "+
-                        (preview.incomplete?"KISMİ — diğer nesneler atlandı":
-                        "önizleme tamamlandı (tüm DWG semantiği onaylı değil)")+
-                        " • yalnız okuma • renk mirası doğrulanmamış");
+                        " çizilen öğe • "+
+                        " Kaynak kayıt: "+a.indexed+
+                        " (tanınan 2B: "+a.planarRecognized+
+                        ", katman+renk kaynağı doğrulanan: "+a.sourceStyleLinked+
+                        ", çözülmeyen: "+a.sourceStyleUnresolved+
+                        ", diğer kayıt: "+a.otherRecords+")"+
+                        "\nDoğrudan renk: "+a.directAci+
+                        " • BYLAYER: "+a.byLayer+
+                        " • BYBLOCK: "+a.byBlock+
+                        " • karmaşık/görünmez: "+a.complex+
+                        " • sınırlı katman renk kanıtı: "+a.narrowLayerAciEvidence+
+                        "\nKISMİ GÖRÜNÜM • Katman açık/kapalı ve gerçek"+
+                        " son renkler doğrulanmadı; kayıt sayısı çizim öğesi"+
+                        " sayısı değildir.");
                 });
             }catch(IOException | RuntimeException ex){
                 final String message=ex.getMessage()==null?
