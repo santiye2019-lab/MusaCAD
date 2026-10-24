@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1032_point.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
+#include "musacad_dwg_ac1032_layer.h"
 #include <stddef.h>
 #include <stdint.h>
 #ifdef __cplusplus
@@ -63,6 +64,13 @@ int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     const MusaDwgAc1032SceneIndex *index,uint64_t polyline_handle,
     MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
     MusaDwgAc1032Polyline3DOrdered *out);
+/* R2018 original LAYER OT51 strict self-H/EED/reactor/XDic identity,
+ * CRC/H-backed cached source. Does not claim layer color, freeze, or off
+ * flags; source has already been indexed and verified at scene opening. */
+int musa_dwg_ac1032_scene_index_read_layer_identity(
+    const MusaDwgAc1032SceneIndex *scene,
+    uint64_t layer_handle,MusaDwgAc1032LayerIdentity *out);
+
 /* First step toward REAL BYLAYER rendering: source-CRC/H-validated
  * common built-in entity -> original DWG LAYER record (OT=51).
  * Only strict simple no-owner/no-reactor/no-extra-H 2018 entities are
