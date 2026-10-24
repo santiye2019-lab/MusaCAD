@@ -305,6 +305,16 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
+      - name: P0 exact 24-bit direct TrueColor packet and inherited style refusal
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_source_truecolor_v6_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-r2018-direct-rgb24-v6
+          timeout 60s /tmp/musa-r2018-direct-rgb24-v6
+          echo "PASS direct RGB24 lossless in v6 f32; BYLAYER/BYBLOCK/DBCOLOR/transparency provisional"
+
       - name: P0 original R2018 LINE POINT ARC CIRCLE LWPOLYLINE independent ENC and linked LAYER0 CMC provenance
         run: |
           set -euo pipefail
