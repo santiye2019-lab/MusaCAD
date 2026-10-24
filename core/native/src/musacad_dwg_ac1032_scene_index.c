@@ -311,6 +311,60 @@ static int cached_reverse_owner(const Payload *p,
            cached_graph_ref(&bits,child,5u,&got_layer)&&
            got_layer==layer&&cached_graph_zero_padding(&bits);
 }
+/* Source-backed R2018 simple entity H-tail, not a guessed owner/layer
+ * match based on nearby H or numerically small handles. The caller can
+ * later resolve the LAYER OT=51 DATA record; this API certifies only the
+ * entity-to-layer graph edge and both original indexed records' CRCs. */
+int musa_dwg_ac1032_scene_index_entity_layer_ref(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032EntityLayerRef *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    uint16_t type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=77u))
+        return 0;
+    Payload p={0};
+    if(!fetch(s,h,type,&p))return 0;
+    /* Source H stream grammar is unambiguous only in this restricted
+     * common-entity form; reject any owner, reactor or additional H
+     * attributes rather than guessing the layer position. */
+    const int simple=p.common.common_decoded&&
+        p.common.prefix.entity_mode==2u&&
+        p.common.prefix.reactor_count==0u&&
+        p.common.prefix.xdictionary_missing==1u&&
+        !p.common.has_color_reference&&
+        p.common.linetype_flags==0u&&
+        p.common.plotstyle_flags==0u&&
+        p.common.material_flags==0u&&
+        p.common.visualstyle_flags==0u&&
+        p.layout.data_stream_bits<=SIZE_MAX&&
+        p.layout.total_payload_bits<=SIZE_MAX;
+    uint64_t layer=0u;
+    int ok=0;
+    if(simple){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+              (size_t)p.layout.data_stream_bits,
+              (size_t)p.layout.total_payload_bits)&&
+           cached_graph_ref(&bits,h,5u,&layer)&&
+           layer!=h&&cached_graph_zero_padding(&bits);
+    }
+    free(p.raw);
+    uint16_t layer_type=0u;
+    if(!ok||
+       !musa_dwg_ac1032_scene_index_object_type(s,layer,&layer_type)||
+       layer_type!=51u)return 0;
+    MusaDwgAc1032EntityLayerRef evidence={0};
+    evidence.entity_handle=h;
+    evidence.layer_handle=layer;
+    evidence.raw_entity_type=type;
+    evidence.raw_layer_type=layer_type;
+    evidence.original_entity_crc_verified=1u;
+    evidence.original_layer_crc_verified=1u;
+    evidence.source_handle_ref_verified=1u;
+    *out=evidence;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,

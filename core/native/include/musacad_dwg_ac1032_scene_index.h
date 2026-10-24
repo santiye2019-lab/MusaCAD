@@ -63,6 +63,26 @@ int musa_dwg_ac1032_scene_index_read_polyline3d_vertices(
     const MusaDwgAc1032SceneIndex *index,uint64_t polyline_handle,
     MusaDwgAc1032Polyline3DOrderedVertex *vertices,size_t capacity,
     MusaDwgAc1032Polyline3DOrdered *out);
+/* First step toward REAL BYLAYER rendering: source-CRC/H-validated
+ * common built-in entity -> original DWG LAYER record (OT=51).
+ * Only strict simple no-owner/no-reactor/no-extra-H 2018 entities are
+ * accepted. The original LAYER record color/visibility has NOT been
+ * decoded by this operation; callers must NOT infer a default ACI7
+ * or claim fully resolved BYLAYER. This read-only graph evidence is
+ * common C11 code (Android, Windows, iOS) and fail-atomic. */
+typedef struct MusaDwgAc1032EntityLayerRef {
+    uint64_t entity_handle;
+    uint64_t layer_handle;
+    uint16_t raw_entity_type;
+    uint16_t raw_layer_type;
+    uint8_t original_entity_crc_verified;
+    uint8_t original_layer_crc_verified;
+    uint8_t source_handle_ref_verified;
+} MusaDwgAc1032EntityLayerRef;
+int musa_dwg_ac1032_scene_index_entity_layer_ref(
+    const MusaDwgAc1032SceneIndex *index,
+    uint64_t entity_handle,MusaDwgAc1032EntityLayerRef *out);
+
 /* Original indexed R2018 source inventory/geometry evidence. Every
  * indexed H is CRC-checked for type. Native geometry claims require the
  * actual first-party type-specific decoder, not just a matching raw OT.
