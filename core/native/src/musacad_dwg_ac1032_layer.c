@@ -146,3 +146,49 @@ int musa_dwg_ac1032_layer_ot51_name_at(
     *out=result;
     return 1;
 }
+
+/* R2000+ original LAYER table numeric-field grammar. DWG R2018's TU
+ * string lives separately and is verified before publishing the numeric
+ * values. This is an evidence reader, not a visibility/style resolver. */
+int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerFlagsEvidence *out){
+    if(!raw||!layout||!out||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1032LayerIdentity identity={0};
+    MusaDwgAc1032LayerName name={0};
+    if(!musa_dwg_ac1032_layer_ot51_identity_at(raw,n,layout,&identity)||
+       !musa_dwg_ac1032_layer_ot51_name_at(raw,n,layout,&name)||
+       identity.indexed_handle!=name.indexed_handle||
+       identity.data_fields_start_bit>=name.original_string_start_bit||
+       layout->data_stream_bits>SIZE_MAX)
+        return 0;
+    MusaDwgAc1015Bits bits={0};
+    if(!musa_dwg_ac1015_bits_init(&bits,raw,n,
+             identity.data_fields_start_bit,
+             name.original_string_start_bit))
+        return 0;
+    const size_t starting=bits.bit_pos;
+    uint32_t flag64=0u,dependent=0u;
+    uint16_t xref=0u,raw_values=0u;
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&flag64)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&xref)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&dependent)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&raw_values)||
+       bits.bit_pos>name.original_string_start_bit)
+        return 0;
+    MusaDwgAc1032LayerFlagsEvidence value={0};
+    value.indexed_handle=identity.indexed_handle;
+    value.numeric_flags_start_bit=starting;
+    value.numeric_flags_end_bit=bits.bit_pos;
+    value.xref_index_plus_one=xref;
+    value.raw_values_70_290_370=raw_values;
+    value.entry_64_flag=(uint8_t)flag64;
+    value.xref_dependent=(uint8_t)dependent;
+    value.source_crc_verified=1u;
+    *out=value;
+    return 1;
+}
