@@ -20,7 +20,7 @@
     "Selection",
     "Recovery"
   ],
-  "java_candidate_count": 111,
+  "java_candidate_count": 112,
   "remaining_migration_policy": "All CAD semantics in any Java or platform-specific code are migration debt until independently proven in shared core. Adapter candidates require manual audit too.",
   "java_modules": [
     {
@@ -685,6 +685,15 @@
       "migrated_verified": false
     },
     {
+      "path": "app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java",
+      "classification": "platform_adapter_candidate",
+      "family": "native_scene_and_platform_boundary",
+      "migrated_verified": false,
+      "audit_date": "2026-10-24",
+      "audit_status": "android_camera_viewport_adapter_only",
+      "reason": "Camera framing math for true source-certified zero-area DWG point or axis-aligned geometry, never CAD geometric semantics and not a substitute for shared native core."
+    },
+    {
       "path": "app/src/main/java/com/musa/cad/NativeViewportPageCache.java",
       "classification": "platform_adapter_candidate",
       "family": "native_scene_and_platform_boundary",
@@ -739,6 +748,6 @@
       "migrated_verified": false
     }
   ],
-  "last_incremental_audit": "2026-10-22",
+  "last_incremental_audit": "2026-10-24",
   "audit_method": "Migrations are not independently certified from code presence alone; Java host oracle retained until physically validated."
 }
