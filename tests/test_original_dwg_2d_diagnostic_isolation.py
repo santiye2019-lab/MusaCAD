@@ -19,7 +19,8 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertIn("Intent.CATEGORY_OPENABLE",main)
         self.assertIn("startActivityForResult(intent,PICK_ORIGINAL_DWG_2D)",main)
         self.assertIn("previewStandaloneOriginalDwg(data.getData())",main)
-        self.assertIn('menu.add(0,MENU_ORIGINAL_DWG_2D_TEST,9,',main)
+        self.assertIn('menu.add(0,MENU_ORIGINAL_DWG_2D_TEST,11,',main)
+        self.assertIn('menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim")',main)
         self.assertNotIn('"Bağımsız DWG 2B test görünümü (kısmi)").setEnabled(',main)
         method=main.split("private void showOriginalFirstPartyPreview(){",1)[1].split(
             "\n    private void ",1)[0]
