@@ -14,14 +14,44 @@ public final class FirstPartyDwgPreview {
     private FirstPartyDwgPreview() {}
 
     private static native float[] readOriginalNative(
-            String inputPath, int maxFloatWords) throws IOException;
+            String inputPath, int maxFloatWords,long[] audit) throws IOException;
+
+    /** Genuine source evidence, NOT display-ready color or visibility.
+     * Counts R2018 indexed OBJECT records, including non-entity records.
+     * The diagnostic deliberately does not infer model-space owners or XREF. */
+    public static final class Readiness {
+        public final long indexed,planarRecognized,sourceStyleLinked;
+        public final long directAci,byLayer,byBlock,complex;
+        public final long sourceStyleUnresolved,otherRecords,narrowLayerAciEvidence;
+        public final boolean colorAndVisibilityComplete;
+        private Readiness(long[] raw)throws IOException {
+            if(raw==null||raw.length!=11)
+                throw new IOException("DWG stil kanit sayaci eksik");
+            for(long n:raw)if(n<0L||n>1000000L)
+                throw new IOException("DWG kaynak nesne sayaci gecersiz");
+            indexed=raw[0];planarRecognized=raw[1];sourceStyleLinked=raw[2];
+            directAci=raw[3];byLayer=raw[4];byBlock=raw[5];
+            complex=raw[6];sourceStyleUnresolved=raw[7];
+            otherRecords=raw[8];narrowLayerAciEvidence=raw[9];
+            colorAndVisibilityComplete=raw[10]!=0L;
+            if(raw[10]!=0L||indexed<=0L||
+               planarRecognized+otherRecords!=indexed||
+               sourceStyleLinked+sourceStyleUnresolved!=planarRecognized||
+               directAci+byLayer+byBlock+complex!=sourceStyleLinked||
+               narrowLayerAciEvidence>sourceStyleLinked)
+                throw new IOException("DWG kaynak ve gorunurluk raporu tutarsiz");
+        }
+    }
 
     public static final class Result {
         public final NativeScene scene;
+        public final Readiness readiness;
         public final boolean incomplete;
-        private Result(NativeScene scene) {
-            this.scene = scene;
-            this.incomplete = scene.truncated;
+        private Result(NativeScene scene,Readiness readiness) {
+            this.scene=scene;
+            this.readiness=readiness;
+            /* Audit cannot establish full model space or display semantics. */
+            this.incomplete=true;
         }
     }
 
@@ -36,9 +66,11 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Kaynak DWG bulunamadi");
         if (maxFloatWords < 256 || maxFloatWords > 9 * 1024 * 1024)
             throw new IOException("DWG onizleme bellek siniri gecersiz");
-        float[] raw = readOriginalNative(
-                original.getAbsolutePath(), maxFloatWords);
-        NativeScene parsed = NativeScene.fromRaw(raw);
-        return new Result(parsed);
+        long[] report=new long[11];
+        float[] raw=readOriginalNative(
+                original.getAbsolutePath(),maxFloatWords,report);
+        NativeScene parsed=NativeScene.fromRaw(raw);
+        Readiness readiness=new Readiness(report);
+        return new Result(parsed,readiness);
     }
 }
