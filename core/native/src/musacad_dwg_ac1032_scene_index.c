@@ -352,6 +352,48 @@ int musa_dwg_ac1032_scene_index_read_layer_identity(
     if(ok)*out=found;
     return ok;
 }
+/* Source-CRC authenticated cached LAYER TU name, never a substitute
+ * for actual layer style/visibility or content Unicode outside the
+ * bounded R2018 string stream grammar supported by layer.c. */
+int musa_dwg_ac1032_scene_index_read_layer_name(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032LayerName *out){
+    if(!h||!check_output(scene,out,sizeof(*out)))return 0;
+    uint64_t off=0u;size_t needed=0u,copied=0u;
+    MusaDwgAc1032PayloadInfo meta={0},again={0};
+    MusaDwgAc1032ObjectStreams layout={0};
+    if(!find(scene,h,&off)||
+       !musa_dwg_ac1032_object_payload_bytes(
+         scene->objects,scene->object_bytes,h,off,
+         NULL,0u,&needed,&meta)||
+       !meta.original_record_crc_verified||
+       meta.raw_object_type!=51u||
+       meta.indexed_handle!=h||meta.payload_bytes!=needed||
+       !needed||needed>MAX_OBJECT_SECTION||
+       !musa_dwg_ac1032_stream_layout_bytes(
+         scene->objects,scene->object_bytes,h,off,&layout)||
+       !layout.original_record_crc_verified||
+       layout.indexed_handle!=h||layout.raw_object_type!=51u||
+       layout.object_section_offset!=off||
+       layout.total_payload_bits!=(uint64_t)needed*8u||
+       layout.handle_stream_bits!=meta.handle_stream_bits)
+        return 0;
+    uint8_t *raw=(uint8_t*)malloc(needed);
+    if(!raw)return 0;
+    MusaDwgAc1032LayerName value={0};
+    int ok=musa_dwg_ac1032_object_payload_bytes(
+         scene->objects,scene->object_bytes,h,off,
+         raw,needed,&copied,&again)&&
+       copied==needed&&again.original_record_crc_verified&&
+       again.raw_object_type==51u&&again.indexed_handle==h&&
+       again.object_section_offset==meta.object_section_offset&&
+       musa_dwg_ac1032_layer_ot51_name_at(
+         raw,needed,&layout,&value)&&
+       value.indexed_handle==h;
+    free(raw);
+    if(ok)*out=value;
+    return ok;
+}
 /* Source-backed R2018 simple entity H-tail, not a guessed owner/layer
  * match based on nearby H or numerically small handles. The caller can
  * later resolve the LAYER OT=51 DATA record; this API certifies only the
