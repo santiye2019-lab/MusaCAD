@@ -82,6 +82,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_entity_layer_name_chain_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_entity_layer_name_chain_atomic_smoke
                  COMMAND musacad_core_ac1032_entity_layer_name_chain_test)
+        # Original R2018 OT51 source raw numeric flags; no color/visibility shortcut.
+        add_executable(musacad_core_ac1032_original_layer_flags_evidence_test
+                tests/core_dwg_ac1032_original_layer_flags_evidence_test.c)
+        target_link_libraries(musacad_core_ac1032_original_layer_flags_evidence_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_raw_layer_flags_evidence_atomic_smoke
+                 COMMAND musacad_core_ac1032_original_layer_flags_evidence_test)
         add_executable(musacad_core_portable_abi_smoke tests/core_portable_abi_smoke.c)
         target_link_libraries(musacad_core_portable_abi_smoke PRIVATE musacad_core)
         add_test(NAME musacad_core_one_engine_abi_smoke COMMAND musacad_core_portable_abi_smoke)
