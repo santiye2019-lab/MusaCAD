@@ -71,6 +71,13 @@ int musa_dwg_ac1032_scene_index_read_layer_identity(
     const MusaDwgAc1032SceneIndex *scene,
     uint64_t layer_handle,MusaDwgAc1032LayerIdentity *out);
 
+/* Extract the original indexed R2018 LAYER name, not a guessed
+ * palette/style. TU Unicode is converted into bounded UTF8 directly from
+ * the source-authenticated cached object STRING stream. */
+int musa_dwg_ac1032_scene_index_read_layer_name(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t layer_handle,
+    MusaDwgAc1032LayerName *out);
+
 /* First step toward REAL BYLAYER rendering: source-CRC/H-validated
  * common built-in entity -> original DWG LAYER record (OT=51).
  * Only strict simple no-owner/no-reactor/no-extra-H 2018 entities are

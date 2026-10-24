@@ -56,3 +56,93 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
     *out=value;
     return 1;
 }
+
+/* Original R2007+ TU strings live in a separate object STRING stream,
+ * not inline among the data fields. Its final one-bit presence marker
+ * precedes a 16-bit little-endian bit length. This bounded v1 accepts
+ * the ordinary single-short form and rejects extended-length strings.
+ * Reference grammar: ODA .dwg object stream specification (not code). */
+static int read_u8(MusaDwgAc1015Bits *b,uint32_t *out){
+    return musa_dwg_ac1015_bits_read_u(b,8u,out);
+}
+static int utf8_append(char *dst,size_t *used,uint32_t cp){
+    unsigned needed=(cp<0x80u)?1u:(cp<0x800u)?2u:
+                    (cp<0x10000u)?3u:4u;
+    if(cp<0x20u||cp>0x10ffffu||
+       (cp>=0xd800u&&cp<=0xdfffu)||
+       *used>511u-needed)return 0;
+    if(needed==1u)dst[(*used)++]=(char)cp;
+    else{
+        for(unsigned n=needed;n>1u;n--){
+            dst[*used+n-1u]=(char)(0x80u|(cp&0x3fu));
+            cp>>=6u;
+        }
+        dst[*used]=(char)(((0xf0u<<(4u-needed))&0xffu)|cp);
+        *used+=needed;
+    }
+    return 1;
+}
+int musa_dwg_ac1032_layer_ot51_name_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerName *out){
+    if(!raw||!layout||!out||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out)))return 0;
+    MusaDwgAc1032LayerIdentity id={0};
+    if(!musa_dwg_ac1032_layer_ot51_identity_at(raw,n,layout,&id)||
+       layout->data_stream_bits>SIZE_MAX||
+       layout->data_stream_bits<id.data_fields_start_bit+18u)
+       return 0;
+    const size_t end=(size_t)layout->data_stream_bits;
+    MusaDwgAc1015Bits present={0};
+    uint32_t yes=0u,low=0u,high=0u;
+    if(!musa_dwg_ac1015_bits_init(&present,raw,n,end-1u,end)||
+       !musa_dwg_ac1015_bits_read_u(&present,1u,&yes)||
+       yes!=1u)return 0;
+    MusaDwgAc1015Bits size={0};
+    if(!musa_dwg_ac1015_bits_init(&size,raw,n,end-17u,end-1u)||
+       !read_u8(&size,&low)||!read_u8(&size,&high))return 0;
+    const uint32_t count_bits=low|(high<<8u);
+    if(!count_bits||(count_bits&0x8000u)||
+       (size_t)count_bits>end-17u-id.data_fields_start_bit)
+        return 0;
+    const size_t start=end-17u-(size_t)count_bits;
+    MusaDwgAc1015Bits text={0};
+    uint16_t units=0u;
+    if(!musa_dwg_ac1015_bits_init(&text,raw,n,start,end-17u)||
+       !musa_dwg_ac1015_bits_read_bs(&text,&units)||
+       !units||units>255u||
+       text.bit_end-text.bit_pos!=(size_t)units*16u)
+        return 0;
+    MusaDwgAc1032LayerName result={0};
+    size_t used=0u;
+    uint32_t pending_high=0u;
+    for(uint16_t i=0;i<units;i++){
+        uint32_t lo=0u,hi=0u,cp=0u;
+        if(!read_u8(&text,&lo)||!read_u8(&text,&hi))return 0;
+        const uint32_t value=lo|(hi<<8u);
+        if(pending_high){
+            if(value<0xdc00u||value>0xdfffu)return 0;
+            cp=0x10000u+((pending_high-0xd800u)<<10u)+
+               (value-0xdc00u);
+            pending_high=0u;
+        }else if(value>=0xd800u&&value<=0xdbffu){
+            pending_high=value;
+            continue;
+        }else if(value>=0xdc00u&&value<=0xdfffu)
+            return 0;
+        else cp=value;
+        if(!utf8_append(result.utf8,&used,cp))return 0;
+    }
+    if(pending_high||text.bit_pos!=text.bit_end||
+       used>=sizeof(result.utf8))return 0;
+    result.utf8[used]='\0';
+    result.indexed_handle=id.indexed_handle;
+    result.original_string_start_bit=start;
+    result.utf16_code_units=units;
+    result.utf8_bytes=(uint32_t)used;
+    result.original_record_crc_verified=1u;
+    *out=result;
+    return 1;
+}
