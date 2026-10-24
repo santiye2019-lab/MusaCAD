@@ -275,6 +275,20 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
+      - name: P0 original R2018 LAYER OT51 strict self-H common prefix from real source
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/Line.dwg
+          test -s "$file"
+          original="$(sha256sum "$file")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_layer_identity_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-layer-identity
+          timeout 120s /tmp/musa-original-r2018-layer-identity "$file"
+          test "$(sha256sum "$file")" = "$original"
+          echo "PASS original R2018 H10 layer self-H/OT/EED/reactors/XDic, color not claimed"
+
       - name: P0 original R2018 five 2D entities H5 to real LAYER OT51 graph
         run: |
           set -euo pipefail
