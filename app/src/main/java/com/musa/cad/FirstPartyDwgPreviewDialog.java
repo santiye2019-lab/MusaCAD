@@ -8,7 +8,6 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.File;
@@ -26,7 +25,17 @@ public final class FirstPartyDwgPreviewDialog {
     private FirstPartyDwgPreviewDialog(){}
 
     public static void show(Activity owner,File original){
-        if(owner==null||original==null||!original.isFile())return;
+        show(owner,original,false);
+    }
+
+    /** Optional temporary cache ownership for the standalone SAF picker.
+     * The source copy is deleted AFTER JNI has finished its read-only scan;
+     * an already-open project source is never removed. */
+    public static void show(Activity owner,File original,boolean temporaryCopy){
+        if(owner==null||original==null||!original.isFile()){
+            if(temporaryCopy&&original!=null)original.delete();
+            return;
+        }
         final AtomicBoolean dismissed=new AtomicBoolean(false);
         final LinearLayout layout=new LinearLayout(owner);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -89,6 +98,10 @@ public final class FirstPartyDwgPreviewDialog {
                     status.setText("Bağımsız DWG önizleme açılamadı: "+message+
                                    " • Ana çizim ve kaynak dosya değiştirilmedi.");
                 });
+            }finally{
+                /* Only the temporary cache copy is owned by this diagnostic.
+                 * Never delete a caller-owned project/original DWG. */
+                if(temporaryCopy)source.delete();
             }
         },"MusaCAD-OriginalDWG-2D-Diagnostic");
         task.setDaemon(true);
