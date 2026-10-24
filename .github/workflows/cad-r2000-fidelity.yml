@@ -275,6 +275,21 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
+      - name: P0 original R2018 LAYER 0 real Unicode TU string stream proof
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          for type in Line Point; do test -s "$folder/$type.dwg"; done
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_layer_name_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-layer-name
+          timeout 120s /tmp/musa-original-r2018-layer-name \
+            "$folder/Line.dwg" "$folder/Point.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")" = "$before"
+          echo "PASS real R2018 original LAYER '0' TU Unicode text, no guessed BYLAYER"
+
       - name: P0 original R2018 LAYER OT51 strict self-H common prefix from real source
         run: |
           set -euo pipefail
