@@ -58,6 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_android_firstparty_runtime.py' -v
+          python3 -m unittest discover -s tests -p 'test_original_dwg_2d_diagnostic_isolation.py' -v
       - name: MC1032 own-engine v1-v2 lossless migration JNI and no-core proof
         run: |
           set -euo pipefail
