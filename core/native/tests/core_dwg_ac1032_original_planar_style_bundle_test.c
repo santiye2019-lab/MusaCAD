@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Immutable original AutoCAD R2018 files: source joined H/CRC layer
+/* Five immutable original AutoCAD R2018 files: source joined H/CRC layer
  * color+raw flags+name for 2D entities, NEVER certified display styles. */
 #include "musacad_dwg_ac1032_style_evidence.h"
 #include <stdint.h>
@@ -71,7 +71,7 @@ static int check(const char *file,uint64_t entity,uint16_t type){
                scene,entity,NULL);
     }
     fprintf(stderr,"%s R2018 original OT%u H=%llX LAYER0:"
-        " Unicode=0 raw-flag=224 source-ACI=7; display NOT accepted\\n",
+        " Unicode=0 raw-flag=224 source-ACI=7; display NOT accepted\n",
         ok?"PASS":"FAIL",(unsigned)type,(unsigned long long)entity);
     musa_dwg_ac1032_scene_index_close(scene);
     return ok;
@@ -84,11 +84,14 @@ int main(int argc,char **argv){
              NULL,UINT64_C(0x1ca),&sentinel)&&
              sentinel.raw_layer_status.raw_values_70_290_370==321u?0:1;
     }
-    if(argc!=5)return 2;
+    if(argc!=6)return 2;
     int ok=1;
     ok=check(argv[1],UINT64_C(0x1ca),19u)&&ok;
     ok=check(argv[2],UINT64_C(0x1c0),27u)&&ok;
     ok=check(argv[3],UINT64_C(0x1bd),17u)&&ok;
     ok=check(argv[4],UINT64_C(0x1bd),18u)&&ok;
+    /* OT77 must agree with the same independent H/CRC layer proof.
+     * No ABI promotion into renderer visibility or palette selection. */
+    ok=check(argv[5],UINT64_C(0x1bd),77u)&&ok;
     return ok?0:1;
 }
