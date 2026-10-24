@@ -72,6 +72,32 @@ int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
     const MusaDwgAc1032ObjectStreams *layout,
     MusaDwgAc1032LayerFlagsEvidence *out);
 
+/* Narrow source-evidence profile for ORIGINAL R2018 LAYER CMC:
+ * authenticated H/CRC layer identity+name+numeric status, exactly 7 opaque
+ * bits between status and the CMC, then one complete numeric CMC ending
+ * exactly at the independently authenticated STRING stream start.
+ *
+ * The 7 bits are NOT yet independently assigned DWG semantics. We only
+ * accept the observed default-layer profile (value=3) with packed CMC
+ * method 0xC3 / ACI 1..255. All other profiles fail CLOSED, not
+ * fallback to white. No truecolor, per-viewport override, BYBLOCK or
+ * final visibility/palette conversion claim. This is evidence, not a
+ * general solution to BYLAYER rendering. */
+typedef struct MusaDwgAc1032LayerCmcEvidence {
+    uint64_t indexed_handle;
+    uint32_t packed_color_method;
+    size_t opaque_field_start_bit;
+    size_t cmc_start_bit;
+    size_t cmc_end_bit;
+    uint8_t opaque_field_bits;
+    uint8_t aci_index;
+    uint8_t original_record_crc_verified;
+} MusaDwgAc1032LayerCmcEvidence;
+int musa_dwg_ac1032_layer_ot51_anchored_cmc_evidence_at(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerCmcEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
