@@ -46,6 +46,32 @@ int musa_dwg_ac1032_layer_ot51_name_at(
     const uint8_t *payload,size_t bytes,
     const MusaDwgAc1032ObjectStreams *layout,
     MusaDwgAc1032LayerName *out);
+/* SOURCE-LITERAL R2018 LAYER numeric flag region (after proven
+ * self-H/EED/reactor/XDict identity, before the independent TU NAME).
+ * The R2000+ LAYER grammar carries 64-bit, xref-index+1, xref-dependent,
+ * then one BS values group containing 70/290/370 information.
+ *
+ * IMPORTANT: An original record may express viewport-specific overrides,
+ * xrefs and other style semantics. This structure deliberately exposes
+ * the SOURCE bitfield with bit positions, NOT an independently certified
+ * visible/frozen/locked state or a BYLAYER color. No rendering code may
+ * use it to hide or recolor geometry until semantic/override tests pass.
+ * All caller outputs are fail-atomic, all source data stays unchanged. */
+typedef struct MusaDwgAc1032LayerFlagsEvidence {
+    uint64_t indexed_handle;
+    size_t numeric_flags_start_bit;
+    size_t numeric_flags_end_bit;
+    uint16_t xref_index_plus_one;
+    uint16_t raw_values_70_290_370;
+    uint8_t entry_64_flag;
+    uint8_t xref_dependent;
+    uint8_t source_crc_verified;
+} MusaDwgAc1032LayerFlagsEvidence;
+int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerFlagsEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
