@@ -58,6 +58,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_preview_v6_aci_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_v6_aci_provenance_smoke
                  COMMAND musacad_core_ac1032_original_preview_v6_aci_test)
+        # Exact 24-bit first-party source RGB v6 encoded in one f32 word,
+        # inherited/ref/transparent cases remain explicitly provisional.
+        add_executable(musacad_core_ac1032_source_truecolor_v6_test
+                tests/core_dwg_ac1032_source_truecolor_v6_test.c)
+        target_link_libraries(musacad_core_ac1032_source_truecolor_v6_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_source_truecolor_lossless_v6
+                 COMMAND musacad_core_ac1032_source_truecolor_v6_test)
         # R2018 source edge: built-in entity's H stream -> exact LAYER OT51.
         add_executable(musacad_core_ac1032_original_entity_layer_ref_test
                 tests/core_dwg_ac1032_original_entity_layer_ref_test.c)

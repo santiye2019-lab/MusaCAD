@@ -48,6 +48,33 @@ static float original_direct_aci(const MusaDwgAc1032EntityCommon *common,
     }
     return (float)(type*256u+(unsigned)aci);
 }
+/* v6 style grammar already consumes a NEGATIVE primitive code followed
+ * by one exactly representable 24-bit RGB float. Do NOT encode packed
+ * 32-bit ARGB in float: low-order color bits would be silently lost.
+ * An unambiguous DWG ENC direct RGB with no color-handle or transparency
+ * can retain the original source RGB even while full scene/layer
+ * visibility remains unproved. Other forms stay provisional ACI7. */
+typedef struct MusaPreviewV6SourceStyle {
+    float code;
+    float rgb;
+    size_t extra_words;
+} MusaPreviewV6SourceStyle;
+static MusaPreviewV6SourceStyle source_style(
+    const MusaDwgAc1032EntityCommon *common,
+    unsigned kind,int colors,uint8_t *unresolved){
+    MusaPreviewV6SourceStyle result={0};
+    if(colors&&common&&common->common_decoded&&
+       common->has_rgb&&!common->has_color_reference&&
+       !common->has_transparency&&common->invisibility==0u&&
+       common->rgb<=0xffffffu){
+        result.code=-(float)(kind*256u+2u);
+        result.rgb=(float)common->rgb; /* integer <= 2^24-1, exact in f32 */
+        result.extra_words=1u;
+        return result;
+    }
+    result.code=original_direct_aci(common,kind,colors,unresolved);
+    return result;
+}
 /* LWPOLYLINE is validated as ONE geometry before emission. No straight
  * approximation for source bulges, no arbitrary OCS->WCS assumption. */
 static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -67,11 +94,11 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        !isfinite(poly.extrusion[2])||poly.extrusion[2]!=1.0)
        return 0;
     if(colors&&poly.common.invisibility!=0u)return 0;
-    const float poly_code=original_direct_aci(
+    const MusaPreviewV6SourceStyle poly_style=source_style(
         &poly.common,2u,colors,unresolved);
-    const float line_code=original_direct_aci(
+    const MusaPreviewV6SourceStyle line_style=source_style(
         &poly.common,1u,colors,unresolved);
-    const float arc_code=original_direct_aci(
+    const MusaPreviewV6SourceStyle arc_style=source_style(
         &poly.common,4u,colors,unresolved);
     const size_t n=(size_t)poly.vertex_count;
     const size_t segments=n-(poly.closed?0u:1u);
@@ -98,16 +125,20 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
         }
     }
     if(!has_bulge){
-        if(n>(SIZE_MAX-2u)/2u||*w>SIZE_MAX-(2u+2u*n))
+        if(n>(SIZE_MAX-3u)/2u||
+           2u+2u*n>SIZE_MAX-poly_style.extra_words||
+           *w>SIZE_MAX-(2u+2u*n+poly_style.extra_words))
             return -1;
-        const size_t need=2u+2u*n;
+        const size_t need=2u+2u*n+poly_style.extra_words;
         if(dst){
             if(*w>cap||need>cap-*w)return -1;
-            dst[*w]=poly_code;
-            dst[*w+1u]=(float)(poly.closed?-(int)n:(int)n);
+            dst[*w]=poly_style.code;
+            if(poly_style.extra_words)dst[*w+1u]=poly_style.rgb;
+            const size_t at=*w+1u+poly_style.extra_words;
+            dst[at]=(float)(poly.closed?-(int)n:(int)n);
             for(size_t i=0;i<n;i++){
-                dst[*w+2u+2u*i]=(float)vertices[i].x;
-                dst[*w+3u+2u*i]=(float)vertices[i].y;
+                dst[at+1u+2u*i]=(float)vertices[i].x;
+                dst[at+2u+2u*i]=(float)vertices[i].y;
             }
         }
         for(size_t i=0;i<n;i++)
@@ -118,7 +149,8 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
      * segments, retaining source ordering including final CLOSED edge. */
     size_t required=0u;
     for(size_t i=0;i<segments;i++){
-        const size_t extra=vertices[i].bulge==0.0?5u:9u;
+        const size_t extra=vertices[i].bulge==0.0?
+            5u+line_style.extra_words:9u+arc_style.extra_words;
         if(required>SIZE_MAX-extra)return -1;
         required+=extra;
     }
@@ -131,29 +163,35 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                                    *z=&vertices[(i+1u)%n];
         if(a->bulge==0.0){
             if(dst){
-                dst[pos]=line_code;dst[pos+1u]=(float)a->x;
-                dst[pos+2u]=(float)a->y;
-                dst[pos+3u]=(float)z->x;
-                dst[pos+4u]=(float)z->y;
+                dst[pos]=line_style.code;
+                if(line_style.extra_words)dst[pos+1u]=line_style.rgb;
+                const size_t at=pos+line_style.extra_words;
+                dst[at+1u]=(float)a->x;
+                dst[at+2u]=(float)a->y;
+                dst[at+3u]=(float)z->x;
+                dst[at+4u]=(float)z->y;
             }
             bounds(a->x,a->y,ext,has);bounds(z->x,z->y,ext,has);
-            pos+=5u;
+            pos+=5u+line_style.extra_words;
         }else{
             MusaCoreBulgeArc arc={0};
             /* Same verified, deterministic arithmetic as validation. */
             if(!musa_core_bulge_to_arc(
                 a->x,a->y,z->x,z->y,a->bulge,&arc))return -1;
             if(dst){
-                dst[pos]=arc_code;dst[pos+1u]=(float)arc.cx;
-                dst[pos+2u]=(float)arc.cy;
-                dst[pos+3u]=(float)arc.radius;dst[pos+4u]=0.0f;
-                dst[pos+5u]=0.0f;dst[pos+6u]=(float)arc.radius;
-                dst[pos+7u]=(float)arc.start;
-                dst[pos+8u]=(float)arc.sweep;
+                dst[pos]=arc_style.code;
+                if(arc_style.extra_words)dst[pos+1u]=arc_style.rgb;
+                const size_t at=pos+arc_style.extra_words;
+                dst[at+1u]=(float)arc.cx;
+                dst[at+2u]=(float)arc.cy;
+                dst[at+3u]=(float)arc.radius;dst[at+4u]=0.0f;
+                dst[at+5u]=0.0f;dst[at+6u]=(float)arc.radius;
+                dst[at+7u]=(float)arc.start;
+                dst[at+8u]=(float)arc.sweep;
             }
             bounds(arc.cx-arc.radius,arc.cy-arc.radius,ext,has);
             bounds(arc.cx+arc.radius,arc.cy+arc.radius,ext,has);
-            pos+=9u;
+            pos+=9u+arc_style.extra_words;
         }
     }
     *w=pos;*primitive_count+=segments;return 1;
@@ -180,7 +218,7 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        poly.header.polyline_flags!=(uint8_t)poly.header.closed)
         return 0;
     if(colors&&poly.header.common.invisibility!=0u)return 0;
-    const float poly_code=original_direct_aci(
+    const MusaPreviewV6SourceStyle poly_style=source_style(
          &poly.header.common,2u,colors,unresolved);
     const size_t count=poly.vertex_count;
     for(size_t i=0;i<count;i++){
@@ -192,17 +230,21 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
            !isfinite(v->point[2])||v->point[2]!=0.0)
             return 0;
     }
-    if(count>(SIZE_MAX-2u)/2u||*w>SIZE_MAX-2u-2u*count||
+    if(count>(SIZE_MAX-3u)/2u||
+       2u+2u*count>SIZE_MAX-poly_style.extra_words||
+       *w>SIZE_MAX-(2u+2u*count+poly_style.extra_words)||
        *primitive_count>=16777215u)
         return -1;
-    const size_t needed=2u+count*2u;
+    const size_t needed=2u+count*2u+poly_style.extra_words;
     if(dst){
         if(*w>cap||needed>cap-*w)return -1;
-        dst[*w]=poly_code;
-        dst[*w+1u]=(float)(poly.header.closed?-(int)count:(int)count);
+        dst[*w]=poly_style.code;
+        if(poly_style.extra_words)dst[*w+1u]=poly_style.rgb;
+        const size_t at=*w+1u+poly_style.extra_words;
+        dst[at]=(float)(poly.header.closed?-(int)count:(int)count);
         for(size_t i=0;i<count;i++){
-            dst[*w+2u+2u*i]=(float)vertices[i].point[0];
-            dst[*w+3u+2u*i]=(float)vertices[i].point[1];
+            dst[at+1u+2u*i]=(float)vertices[i].point[0];
+            dst[at+2u+2u*i]=(float)vertices[i].point[1];
         }
     }
     for(size_t i=0;i<count;i++)
@@ -245,19 +287,20 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                        line.geometry.extrusion)&&
                planar3(line.geometry.end,line.geometry.thickness,
                        line.geometry.extrusion)){
-                if(w>SIZE_MAX-5u)return 0;
-                if(dst){
-                    if(w+5u>cap)return 0;
-                    dst[w]=original_direct_aci(
-                          &line.common,1u,colors,&v.provisional_aci_style);
-                    dst[w+1u]=(float)line.geometry.start[0];
-                    dst[w+2u]=(float)line.geometry.start[1];
-                    dst[w+3u]=(float)line.geometry.end[0];
-                    dst[w+4u]=(float)line.geometry.end[1];
-                }
-                if(colors)(void)original_direct_aci(
+                const MusaPreviewV6SourceStyle style=source_style(
                     &line.common,1u,colors,&v.provisional_aci_style);
-                w+=5u;
+                if(w>SIZE_MAX-5u-style.extra_words)return 0;
+                if(dst){
+                    if(5u+style.extra_words>cap-w)return 0;
+                    dst[w]=style.code;
+                    if(style.extra_words)dst[w+1u]=style.rgb;
+                    const size_t at=w+style.extra_words;
+                    dst[at+1u]=(float)line.geometry.start[0];
+                    dst[at+2u]=(float)line.geometry.start[1];
+                    dst[at+3u]=(float)line.geometry.end[0];
+                    dst[at+4u]=(float)line.geometry.end[1];
+                }
+                w+=5u+style.extra_words;
                 bounds(line.geometry.start[0],line.geometry.start[1],ext,&has);
                 bounds(line.geometry.end[0],line.geometry.end[1],ext,&has);
                 v.rendered_primitives++;
@@ -286,23 +329,24 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             }
             if(supported&&!valid(sweep))supported=0;
             if(supported){
-                if(w>SIZE_MAX-9u)return 0;
-                if(dst){
-                    if(w+9u>cap)return 0;
-                    dst[w]=original_direct_aci(
-                          &curve.common,4u,colors,&v.provisional_aci_style);
-                    dst[w+1u]=(float)curve.center[0];
-                    dst[w+2u]=(float)curve.center[1];
-                    dst[w+3u]=(float)curve.radius;
-                    dst[w+4u]=0.0f;
-                    dst[w+5u]=0.0f;
-                    dst[w+6u]=(float)curve.radius;
-                    dst[w+7u]=(float)start;
-                    dst[w+8u]=(float)sweep;
-                }
-                if(colors)(void)original_direct_aci(
+                const MusaPreviewV6SourceStyle style=source_style(
                     &curve.common,4u,colors,&v.provisional_aci_style);
-                w+=9u;
+                if(w>SIZE_MAX-9u-style.extra_words)return 0;
+                if(dst){
+                    if(9u+style.extra_words>cap-w)return 0;
+                    dst[w]=style.code;
+                    if(style.extra_words)dst[w+1u]=style.rgb;
+                    const size_t at=w+style.extra_words;
+                    dst[at+1u]=(float)curve.center[0];
+                    dst[at+2u]=(float)curve.center[1];
+                    dst[at+3u]=(float)curve.radius;
+                    dst[at+4u]=0.0f;
+                    dst[at+5u]=0.0f;
+                    dst[at+6u]=(float)curve.radius;
+                    dst[at+7u]=(float)start;
+                    dst[at+8u]=(float)sweep;
+                }
+                w+=9u+style.extra_words;
                 /* Conservative complete-circle bounds avoid clipped arcs;
                  * an exact ARC-specific bounding box follows separately. */
                 bounds(curve.center[0]-curve.radius,
@@ -340,17 +384,18 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             if(musa_dwg_ac1032_scene_index_read_point(s,e.handle,&point)&&
                (!colors||point.common.invisibility==0u)&&
                planar3(point.point,point.thickness,point.extrusion)){
-                if(w>SIZE_MAX-3u)return 0;
-                if(dst){
-                    if(w+3u>cap)return 0;
-                    dst[w]=original_direct_aci(
-                          &point.common,3u,colors,&v.provisional_aci_style);
-                    dst[w+1u]=(float)point.point[0];
-                    dst[w+2u]=(float)point.point[1];
-                }
-                if(colors)(void)original_direct_aci(
+                const MusaPreviewV6SourceStyle style=source_style(
                     &point.common,3u,colors,&v.provisional_aci_style);
-                w+=3u;
+                if(w>SIZE_MAX-3u-style.extra_words)return 0;
+                if(dst){
+                    if(3u+style.extra_words>cap-w)return 0;
+                    dst[w]=style.code;
+                    if(style.extra_words)dst[w+1u]=style.rgb;
+                    const size_t at=w+style.extra_words;
+                    dst[at+1u]=(float)point.point[0];
+                    dst[at+2u]=(float)point.point[1];
+                }
+                w+=3u+style.extra_words;
                 bounds(point.point[0],point.point[1],ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
@@ -435,5 +480,34 @@ int musa_dwg_ac1032_preview_v6_entity_aci_code(
     const float value=original_direct_aci(source,kind,1,&unresolved);
     *code=value;
     *exact=(uint8_t)!unresolved;
+    return 1;
+}
+
+/* Source-only selector for deterministic direct RGB v6 transport.
+ * A 24bit RGB integer is exactly representable by float. Its negative
+ * primitive code needs one extra word; provisional ACI7 needs none.
+ * No layer/viewport visibility is certified by source RGB alone. */
+int musa_dwg_ac1032_preview_v6_entity_source_style_code(
+    const MusaDwgAc1032EntityCommon *source,uint8_t kind,
+    float *code,float *rgb,uint8_t *extra,uint8_t *exact){
+    if(!source||!code||!rgb||!extra||!exact||
+       !source->common_decoded||kind<1u||kind>4u||
+       overlaps(source,sizeof(*source),code,sizeof(*code))||
+       overlaps(source,sizeof(*source),rgb,sizeof(*rgb))||
+       overlaps(source,sizeof(*source),extra,sizeof(*extra))||
+       overlaps(source,sizeof(*source),exact,sizeof(*exact))||
+       overlaps(code,sizeof(*code),rgb,sizeof(*rgb))||
+       overlaps(code,sizeof(*code),extra,sizeof(*extra))||
+       overlaps(code,sizeof(*code),exact,sizeof(*exact))||
+       overlaps(rgb,sizeof(*rgb),extra,sizeof(*extra))||
+       overlaps(rgb,sizeof(*rgb),exact,sizeof(*exact))||
+       overlaps(extra,sizeof(*extra),exact,sizeof(*exact)))return 0;
+    uint8_t provisional=0u;
+    const MusaPreviewV6SourceStyle style=
+        source_style(source,kind,1,&provisional);
+    *code=style.code;
+    *rgb=style.rgb;
+    *extra=(uint8_t)style.extra_words;
+    *exact=(uint8_t)!provisional;
     return 1;
 }
