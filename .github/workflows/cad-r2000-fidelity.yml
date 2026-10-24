@@ -275,6 +275,22 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
+      - name: P0 original R2018 LAYER numeric status flags evidence from authentic source
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          test -s "$folder/Line.dwg"
+          test -s "$folder/Point.dwg"
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_layer_flags_evidence_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-r2018-layer-raw-flags
+          timeout 120s /tmp/musa-original-r2018-layer-raw-flags \
+            "$folder/Line.dwg" "$folder/Point.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg")" = "$before"
+          echo "PASS original R2018 LAYER raw values/bit positions; BYLAYER unproven"
+
       - name: P0 five original R2018 entities source H5 to verified LAYER Unicode name
         run: |
           set -euo pipefail

@@ -78,6 +78,14 @@ int musa_dwg_ac1032_scene_index_read_layer_name(
     const MusaDwgAc1032SceneIndex *scene,uint64_t layer_handle,
     MusaDwgAc1032LayerName *out);
 
+/* Read authenticated LAYER OT51 raw numerical status flags from
+ * original source H. Not a resolved layer visibility or BYLAYER ACI:
+ * rendering must remain provisional until status/color semantics pass
+ * independent original-file and per-viewport/XREF override tests. */
+int musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t layer_handle,
+    MusaDwgAc1032LayerFlagsEvidence *out);
+
 /* First step toward REAL BYLAYER rendering: source-CRC/H-validated
  * common built-in entity -> original DWG LAYER record (OT=51).
  * Only strict simple no-owner/no-reactor/no-extra-H 2018 entities are
