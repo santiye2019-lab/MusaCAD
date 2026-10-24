@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_layer.h"
+#include "musacad_dwg_cmc.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include <stdint.h>
@@ -190,5 +191,68 @@ int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
     value.xref_dependent=(uint8_t)dependent;
     value.source_crc_verified=1u;
     *out=value;
+    return 1;
+}
+
+/* This narrow original-source profile has one specifically *unexplained*
+ * seven-bit segment. We verify it instead of assuming it is padding.
+ * Full R2018 LAYER semantic parsing must replace this profile before
+ * CMC information controls actual Android/Windows/iOS palette rendering. */
+int musa_dwg_ac1032_layer_ot51_anchored_cmc_evidence_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerCmcEvidence *out){
+    if(!raw||!layout||!out||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1032LayerIdentity identity={0};
+    MusaDwgAc1032LayerName name={0};
+    MusaDwgAc1032LayerFlagsEvidence flags={0};
+    if(!musa_dwg_ac1032_layer_ot51_identity_at(
+          raw,n,layout,&identity)||
+       !musa_dwg_ac1032_layer_ot51_name_at(
+          raw,n,layout,&name)||
+       !musa_dwg_ac1032_layer_ot51_flags_evidence_at(
+          raw,n,layout,&flags)||
+       identity.indexed_handle!=name.indexed_handle||
+       identity.indexed_handle!=flags.indexed_handle||
+       !identity.original_record_crc_verified||
+       !flags.source_crc_verified||!name.original_record_crc_verified||
+       !name.utf8_bytes||!flags.numeric_flags_end_bit||
+       flags.numeric_flags_end_bit>SIZE_MAX-7u||
+       flags.numeric_flags_end_bit+7u>=name.original_string_start_bit)
+        return 0;
+    MusaDwgAc1015Bits prefix={0};
+    uint32_t unexplained=0u;
+    if(!musa_dwg_ac1015_bits_init(
+             &prefix,raw,n,flags.numeric_flags_end_bit,
+             flags.numeric_flags_end_bit+7u)||
+       !musa_dwg_ac1015_bits_read_u(&prefix,7u,&unexplained)||
+       unexplained!=3u)
+        return 0;
+    MusaDwgCmcField cmc={0};
+    if(!musa_dwg_cmc_read_numeric_field(
+          raw,n,flags.numeric_flags_end_bit+7u,
+          name.original_string_start_bit,&cmc)||
+       cmc.end_bit!=name.original_string_start_bit||
+       cmc.start_bit!=flags.numeric_flags_end_bit+7u||
+       !cmc.supported_numeric_only||
+       cmc.indexed_color!=0u||
+       (cmc.packed_rgb>>24u)!=0xc3u||
+       (cmc.packed_rgb&0x00ffff00u)!=0u||
+       (cmc.packed_rgb&0xffu)<1u||
+       !flags.raw_values_70_290_370)
+        return 0;
+    MusaDwgAc1032LayerCmcEvidence result={0};
+    result.indexed_handle=identity.indexed_handle;
+    result.packed_color_method=cmc.packed_rgb;
+    result.opaque_field_start_bit=flags.numeric_flags_end_bit;
+    result.cmc_start_bit=cmc.start_bit;
+    result.cmc_end_bit=cmc.end_bit;
+    result.opaque_field_bits=7u;
+    result.aci_index=(uint8_t)(cmc.packed_rgb&0xffu);
+    result.original_record_crc_verified=1u;
+    *out=result;
     return 1;
 }

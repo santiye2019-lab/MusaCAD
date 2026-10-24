@@ -275,6 +275,24 @@ jobs:
           test "$(sha256sum "$file")" = "$before"
           echo "PASS original R2018 authenticated LAYER OT51 raw partition, no fake ACI semantics"
 
+      - name: P0 five original R2018 LAYER0 anchored CMC C3 ACI7 from CRC source
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          for type in Line Point Arc circle Polyline; do test -s "$folder/$type.dwg"; done
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" \
+            "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_layer_anchored_cmc_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-original-layer0-anchored-cmc
+          timeout 120s /tmp/musa-original-layer0-anchored-cmc \
+            "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" \
+            "$folder/circle.dwg" "$folder/Polyline.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" \
+            "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg")" = "$before"
+          echo "PASS original R2018 LAYER0 anchored CMC evidence only, BYLAYER not generalized"
+
       - name: P0 original R2018 fail closed CMC color offset and pure C11 color forms
         run: |
           set -euo pipefail
