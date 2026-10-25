@@ -32,6 +32,24 @@ int musa_dwg_ac1032_curve_fields_at(
 int musa_dwg_ac1032_read_curve_file(
     const uint8_t *file,size_t file_bytes,uint64_t indexed_handle,
     MusaDwgAc1032NativeCurve *out);
+/* Source-authenticated ORIGINAL 2018 ELLIPSE (OT35).
+ * All vectors in WCS; no guessed OCS or block transformation. */
+typedef struct MusaDwgAc1032NativeEllipse {
+    MusaDwgAc1032EntityCommon common;
+    uint64_t indexed_handle;
+    uint64_t geometry_end_bit;
+    double center[3];
+    double semi_major[3];
+    double extrusion[3];
+    double ratio;
+    double start_angle;
+    double end_angle;
+    uint8_t geometry_decoded;
+} MusaDwgAc1032NativeEllipse;
+int musa_dwg_ac1032_ellipse_fields_at(
+    const uint8_t *payload,size_t payload_bytes,
+    const MusaDwgAc1032ObjectStreams *layout,size_t geometry_start_bit,
+    MusaDwgAc1032NativeEllipse *out);
 #ifdef __cplusplus
 }
 #endif
