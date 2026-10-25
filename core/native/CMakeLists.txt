@@ -27,6 +27,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_scene_geometry_scan_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_scene_geometry_scan_atomic_smoke
                  COMMAND musacad_core_ac1032_scene_geometry_scan_test)
+        # Original R2018 TEXT TU Unicode extraction; source-only, not glyphs.
+        add_executable(musacad_core_ac1032_real_text_tu_test
+                tests/core_dwg_ac1032_original_text_content_test.c)
+        target_link_libraries(musacad_core_ac1032_real_text_tu_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_source_text_tu_smoke
+                 COMMAND musacad_core_ac1032_real_text_tu_test)
         # Portable real AC1032 original LINE/POINT -> existing v6 float first-paint protocol.
         add_executable(musacad_core_ac1032_original_preview_v6_test
                 tests/core_dwg_ac1032_original_preview_v6_test.c)
