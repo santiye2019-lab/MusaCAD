@@ -71,6 +71,30 @@ int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,
     size_t capacity,MusaAc1032PreviewV6Stats *out);
 
+/* Verified AC1032 source-record accounting for the actual v6 native
+ * read-only preview admission path, NOT a percentage of full AutoCAD 2D
+ * equivalence and NOT final visible-entity/viewport/model-space coverage.
+ * A bulged LWPOLYLINE can emit MANY primitives but remains ONE source
+ * record. Other indexed records include tables, dependent objects,
+ * and unknown/unsupported types, NOT necessarily missing 2D geometry.
+ *
+ * Counts originate from the SAME CRC/H-validated source record scan as
+ * the preview, without assuming that a matching object type is displayable.
+ * All caller-owned output remains unchanged on error. */
+typedef struct MusaAc1032PreviewV6SourceCensus {
+    size_t total_indexed_records;
+    size_t candidate_source_records;
+    size_t packet_admitted_source_records;
+    size_t candidate_not_admitted_records;
+    size_t other_indexed_records;
+    size_t emitted_v6_primitives;
+    size_t omitted_v6_records;
+    uint8_t complete_dwg_display_accepted; /* ALWAYS 0 */
+} MusaAc1032PreviewV6SourceCensus;
+int musa_dwg_ac1032_preview_v6_source_census(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out);
+
 /* Exact arc and signed-bulge XY bounds, with source-only provenance.
  * No layer/style/viewport semantic acceptance. Invalid inputs fail-atomic. */
 int musa_dwg_ac1032_preview_v6_arc_bounds(
