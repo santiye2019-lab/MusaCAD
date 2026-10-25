@@ -374,8 +374,17 @@ int musa_dwg_ac1032_scene_index_mtext_graph(
         if(ok)ok=cached_graph_ref(&bits,h,5u,&value.layer_handle)&&
                  cached_graph_ref(&bits,h,5u,&value.style_handle)&&
                  value.layer_handle!=h&&value.style_handle!=h&&
-                 value.layer_handle!=value.style_handle&&
-                 cached_graph_zero_padding(&bits);
+                 value.layer_handle!=value.style_handle;
+        /* Original R2018 Text.dwg H1C0 has two valid H5 targets,
+         * followed by one exact 0x50 null H5 optional reference and
+         * six zero end-padding bits. Never interpret the null as a
+         * third target, and never accept arbitrary unparsed H data. */
+        if(ok&&bits.bit_end-bits.bit_pos>=8u){
+            uint32_t null_ref=0u;
+            ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
+               null_ref==0x50u;
+        }
+        if(ok)ok=cached_graph_zero_padding(&bits);
     }
     free(p.raw);
     if(!ok)return 0;
