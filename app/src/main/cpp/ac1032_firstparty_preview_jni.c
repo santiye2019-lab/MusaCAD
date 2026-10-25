@@ -27,7 +27,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
     jlongArray readinessOut){
     (void)klass;
     if(!original||!readinessOut||
-       (*env)->GetArrayLength(env,readinessOut)!=11||
+       (*env)->GetArrayLength(env,readinessOut)!=12||
        maxWords<256||maxWords>(jint)MAX_V6_FLOAT_WORDS){
         throw_io(env,"Gecersiz AC1032 dosyasi veya bellek siniri");
         return NULL;
@@ -101,7 +101,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         (*env)->SetFloatArrayRegion(env,output,0,
                (jsize)needed.required_float_words,(const jfloat*)words);
         if(!(*env)->ExceptionCheck(env)){
-            const jlong values[11]={
+            const jlong values[12]={
                 (jlong)ready.indexed_records,
                 (jlong)ready.known_planar_records,
                 (jlong)ready.source_style_joined,
@@ -112,9 +112,10 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
                 (jlong)ready.known_style_rejected,
                 (jlong)ready.other_indexed_records,
                 (jlong)ready.narrow_layer_aci_available,
-                (jlong)ready.display_accepted
+                (jlong)ready.display_accepted,
+                (jlong)ready.source_direct_rgb24
             };
-            (*env)->SetLongArrayRegion(env,readinessOut,0,11,values);
+            (*env)->SetLongArrayRegion(env,readinessOut,0,12,values);
         }
     }
     free(words);
