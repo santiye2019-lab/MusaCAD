@@ -36,7 +36,18 @@ static void diagnose(const uint8_t *file,size_t n){
              (size_t)l.data_stream_bits,(size_t)l.total_payload_bits)){
             for(unsigned i=0;i<6u&&b.bit_end-b.bit_pos>=8u;i++){
                 MusaDwgAc1015HandleRef ref={0};
-                if(!musa_dwg_ac1015_read_handle_ref(&b,h,&ref))break;
+                if(!musa_dwg_ac1015_read_handle_ref(&b,h,&ref)){
+                    fprintf(stderr,"MTEXT H tail remaining=%zu bits: ",
+                        b.bit_end-b.bit_pos);
+                    MusaDwgAc1015Bits copy=b;
+                    while(copy.bit_pos<copy.bit_end){
+                        uint32_t bit=0u;
+                        if(!musa_dwg_ac1015_bits_read_u(&copy,1u,&bit))break;
+                        fputc(bit?'1':'0',stderr);
+                    }
+                    fputc('\\n',stderr);
+                    break;
+                }
                 fprintf(stderr,"MTEXT H ref[%u] code=%u target=%llX\n",
                    i,(unsigned)ref.code,(unsigned long long)ref.target);
             }
