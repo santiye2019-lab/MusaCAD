@@ -51,6 +51,9 @@ public final class NativeScene {
         RectF b=new RectF();
         Paint textMetrics=new Paint(Paint.ANTI_ALIAS_FLAG);
         textMetrics.setTextSize(1f);
+        // One reusable rectangle for all curve culling checks; NO
+        // per-entity allocation, no change to source v6 curve payloads.
+        final float[] arcBounds=new float[4];
         while(p<values.length){
             int start=p,encoded=Math.round(values[p++]),type;String parsedText=null;
             if(version>=4&&encoded<0){
@@ -68,8 +71,21 @@ public final class NativeScene {
             }else if(type==3){
                 if(p+2>values.length)break;add(b,values[p++],values[p++]);
             }else if(type==4){
-                if(p+8>values.length)break;float cx=values[p++],cy=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];p+=2;
-                float rx=(float)Math.hypot(ux,vx),ry=(float)Math.hypot(uy,vy);add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
+                if(p+8>values.length)break;
+                float cx=values[p++],cy=values[p++];
+                float ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];
+                float angleStart=values[p++],sweep=values[p++];
+                if(NativeSceneViewportBounds.arcCullingBounds(
+                        cx,cy,ux,uy,vx,vy,angleStart,sweep,arcBounds)){
+                    b.set(arcBounds[0],arcBounds[1],
+                          arcBounds[2],arcBounds[3]);
+                }else{
+                    // Unknown/corrupt sweep: keep prior FULL-ellipse
+                    // conservative bounds, never cull uncertain geometry.
+                    float rx=(float)Math.hypot(ux,vx);
+                    float ry=(float)Math.hypot(uy,vy);
+                    add(b,cx-rx,cy-ry);add(b,cx+rx,cy+ry);
+                }
             }else if(type==6){
                 if(p+9>values.length)break;float x=values[p++],y=values[p++],ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];int ha=Math.round(values[p++]);p++;int bytes=Math.round(values[p++]);int words=NativeSceneRecordBounds.packedTextWords(bytes,values.length-p);if(words<0)break;
                 byte[] utf8=new byte[bytes];int at=0;for(int wi=0;wi<words;wi++){int packed=Math.round(values[p++]);for(int k=0;k<3&&at<bytes;k++,at++)utf8[at]=(byte)((packed>>(k*8))&255);}
