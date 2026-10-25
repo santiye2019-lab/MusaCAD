@@ -58,6 +58,15 @@ int musa_dwg_ac1032_scene_display_readiness(
         if(p->entity_by_block)result.source_byblock++;
         if(p->entity_complex_color_or_transparency)
             result.source_complex_or_invisible++;
+        if(p->source_entity_invisible){
+            /* A source-hidden entity must never be counted as resolved
+             * direct RGB or reported as proof of visible layer state. */
+            if(!p->entity_complex_color_or_transparency||
+               p->entity_has_direct_rgb24||
+               p->entity_has_direct_aci||p->entity_by_layer||
+               p->entity_by_block)return 0;
+            result.source_entity_invisible++;
+        }
         if(p->entity_has_direct_rgb24){
             /* Direct source RGB is already in the original preview code;
              * remains one complex category for backwards accounting. */
@@ -79,7 +88,10 @@ int musa_dwg_ac1032_scene_display_readiness(
            result.source_byblock+
            result.source_complex_or_invisible!=result.source_style_joined||
        result.narrow_layer_aci_available>result.source_style_joined||
-       result.source_direct_rgb24>result.source_complex_or_invisible)
+       result.source_direct_rgb24>result.source_complex_or_invisible||
+       result.source_entity_invisible>result.source_complex_or_invisible||
+       result.source_entity_invisible>
+          result.source_complex_or_invisible-result.source_direct_rgb24)
         return 0;
     result.display_accepted=0u; /* Full scene, layer and model-state unmet. */
     *out=result;
