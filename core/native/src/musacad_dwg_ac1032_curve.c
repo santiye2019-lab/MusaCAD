@@ -123,3 +123,49 @@ int musa_dwg_ac1032_read_curve_file(
     *out=candidate;
     return 1;
 }
+
+/* Original AC1032 ELLIPSE OT35: six 3BD vectors' raw source components
+ * (center, semi-major, extrusion) followed by BD ratio/start/end.
+ * Common prefix, OT, H-index, CRC and DATA/H partitions prevalidated. */
+int musa_dwg_ac1032_ellipse_fields_at(
+    const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,size_t geom,
+    MusaDwgAc1032NativeEllipse *out){
+    if(!raw||!layout||!out||!bytes||bytes>MAX_OBJECT_BYTES||
+       overlap(raw,bytes,layout,sizeof(*layout))||
+       overlap(raw,bytes,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out))||
+       !layout->original_record_crc_verified||!layout->indexed_handle||
+       layout->raw_object_type!=35u||layout->object_type_field_bits!=10u||
+       layout->total_payload_bits!=(uint64_t)bytes*8u||
+       layout->handle_stream_start_bit!=layout->data_stream_bits||
+       !layout->handle_stream_bits||
+       layout->handle_stream_bits!=layout->total_payload_bits-layout->data_stream_bits||
+       layout->data_stream_bits>SIZE_MAX||
+       geom<layout->object_type_field_bits||
+       (uint64_t)geom>=layout->data_stream_bits)return 0;
+    MusaDwgAc1015Bits b={0};
+    if(!musa_dwg_ac1015_bits_init(
+        &b,raw,bytes,geom,(size_t)layout->data_stream_bits))return 0;
+    MusaDwgAc1032NativeEllipse value={0};
+    value.indexed_handle=layout->indexed_handle;
+    for(unsigned k=0;k<3u;k++)
+        if(!musa_dwg_ac1015_bits_read_bd(&b,&value.center[k])||
+           !isfinite(value.center[k]))return 0;
+    for(unsigned k=0;k<3u;k++)
+        if(!musa_dwg_ac1015_bits_read_bd(&b,&value.semi_major[k])||
+           !isfinite(value.semi_major[k]))return 0;
+    for(unsigned k=0;k<3u;k++)
+        if(!musa_dwg_ac1015_bits_read_bd(&b,&value.extrusion[k])||
+           !isfinite(value.extrusion[k]))return 0;
+    if(!musa_dwg_ac1015_bits_read_bd(&b,&value.ratio)||
+       !musa_dwg_ac1015_bits_read_bd(&b,&value.start_angle)||
+       !musa_dwg_ac1015_bits_read_bd(&b,&value.end_angle)||
+       !isfinite(value.ratio)||value.ratio<=0.0||value.ratio>1.0||
+       !isfinite(value.start_angle)||!isfinite(value.end_angle)||
+       hypot(value.semi_major[0],value.semi_major[1])<=0.0||
+       b.bit_pos>layout->data_stream_bits)return 0;
+    value.geometry_end_bit=b.bit_pos;
+    value.geometry_decoded=1u;
+    *out=value;return 1;
+}
