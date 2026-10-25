@@ -40,6 +40,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_real_ellipse_style_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_ellipse_style_smoke
                  COMMAND musacad_core_ac1032_real_ellipse_style_test)
+        # Real R2018 MTEXT H1C0 original H5 source LAYER and color evidence.
+        add_executable(musacad_core_ac1032_original_mtext_color_test
+                tests/core_dwg_ac1032_original_mtext_layer_color_test.c)
+        target_link_libraries(musacad_core_ac1032_original_mtext_color_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_mtext_color_smoke
+                 COMMAND musacad_core_ac1032_original_mtext_color_test)
         # Original R2018 OT44 MTEXT H1C0 point, axis and text size.
         # Host smoke compiles API; original fixture is required in CI.
         add_executable(musacad_core_ac1032_original_mtext_placement_test
