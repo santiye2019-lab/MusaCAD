@@ -21,7 +21,7 @@ int musa_dwg_ac1032_entity_prefix_bytes(
        !layout->indexed_handle||(expected_type!=17u&&expected_type!=18u&&
         expected_type!=19u&&expected_type!=27u&&
         expected_type!=77u&&expected_type!=35u&&expected_type!=16u&&
-        expected_type!=11u)||
+        expected_type!=11u&&expected_type!=44u)||
        layout->raw_object_type!=expected_type||
        layout->object_type_field_bits!=10u||
        layout->total_payload_bits!=(uint64_t)bytes*8u||
