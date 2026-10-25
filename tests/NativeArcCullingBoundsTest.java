@@ -9,7 +9,7 @@ public final class NativeArcCullingBoundsTest {
     private static void oracle(float cx,float cy,float ux,float uy,
                                float vx,float vy,float start,float sweep){
         float[] b={-7,-8,-9,-10};
-        require(NativeArcCullingBounds.compute(
+        require(NativeSceneViewportBounds.arcCullingBounds(
                 cx,cy,ux,uy,vx,vy,start,sweep,b),"ARC bounds rejected");
         require(b[0]<=b[2]&&b[1]<=b[3]&&
             Float.isFinite(b[0])&&Float.isFinite(b[1])&&
@@ -30,7 +30,7 @@ public final class NativeArcCullingBoundsTest {
         final float tau=(float)(2*Math.PI);
         // First-quadrant sweep spans only 25% of the circle box.
         float[] quarter=new float[4];
-        require(NativeArcCullingBounds.compute(0,0,4,0,0,4,
+        require(NativeSceneViewportBounds.arcCullingBounds(0,0,4,0,0,4,
                   0,pi/2f,quarter),"quarter not bounded");
         require(quarter[0]>-0.01f&&quarter[1]>-0.01f&&
                 quarter[2]>=4f&&quarter[3]>=4f,
@@ -52,18 +52,18 @@ public final class NativeArcCullingBoundsTest {
             oracle(i-50,i/2f,2.5f+(i%7),-3f,i%5-.5f,2f,start,sweep);
         }
         float[] unchanged={42,43,44,45};
-        require(!NativeArcCullingBounds.compute(
+        require(!NativeSceneViewportBounds.arcCullingBounds(
             0,0,4,0,0,4,0,0,unchanged),"zero-sweep accepted");
-        require(!NativeArcCullingBounds.compute(
+        require(!NativeSceneViewportBounds.arcCullingBounds(
             Float.NaN,0,4,0,0,4,0,1,unchanged),"NaN accepted");
-        require(!NativeArcCullingBounds.compute(
+        require(!NativeSceneViewportBounds.arcCullingBounds(
             0,0,4,0,0,4,0,1,null),"null accepted");
         require(unchanged[0]==42&&unchanged[1]==43&&
                 unchanged[2]==44&&unchanged[3]==45,
                 "fail-atomic culling array overwritten");
         // A multi-turn/invalid geometry never narrows the culling box.
         float[] whole=new float[4];
-        require(NativeArcCullingBounds.compute(
+        require(NativeSceneViewportBounds.arcCullingBounds(
             0,0,2,0,0,2,0,8*tau,whole),"multi-turn fallback missing");
         require(whole[0]<-1.99&&whole[2]>1.99&&
                 whole[1]<-1.99&&whole[3]>1.99,
