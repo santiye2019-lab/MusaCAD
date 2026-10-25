@@ -333,7 +333,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
             return 0;
         prev=e.handle;
         const int candidate=t==19u||t==27u||
-              (curves&&(t==17u||t==18u))||
+              (curves&&(t==17u||t==18u||t==35u))||
               (polylines&&(t==16u||t==77u));
         const size_t prior_primitives=v.rendered_primitives;
         if(candidate)ledger.candidate_source_records++;
@@ -413,6 +413,74 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 /* True ARC/whole CIRCLE bounds, no fake full-circle extents. */
                 bounds(ab[0],ab[1],ext,&has);
                 bounds(ab[2],ab[3],ext,&has);
+                v.rendered_primitives++;
+            }else v.omitted_records++;
+        }else if(t==35u&&curves){
+            /* Real AC1032 ELLIPSE: direct WCS semi-major vector, CCW
+             * minor axis ratio, source eccentric-anomaly parameter arc.
+             * Strictly planar only; no fake projection of a 3D ellipse.
+             * v6 type 4 already supports arbitrary affine ellipse axes. */
+            MusaDwgAc1032NativeEllipse ellipse={0};
+            int supported=musa_dwg_ac1032_scene_index_read_ellipse(
+                s,e.handle,&ellipse)&&
+                (!colors||ellipse.common.invisibility==0u)&&
+                valid(ellipse.center[0])&&valid(ellipse.center[1])&&
+                ellipse.center[2]==0.0&&
+                ellipse.semi_major[2]==0.0&&
+                ellipse.extrusion[0]==0.0&&
+                ellipse.extrusion[1]==0.0&&
+                ellipse.extrusion[2]==1.0&&
+                valid(ellipse.semi_major[0])&&
+                valid(ellipse.semi_major[1])&&
+                isfinite(ellipse.ratio)&&ellipse.ratio>0.0&&
+                ellipse.ratio<=1.0;
+            const double tau=6.283185307179586476925286766559;
+            double ax=0.0,ay=0.0,bx=0.0,by=0.0;
+            double start=0.0,sweep=0.0,extent_x=0.0,extent_y=0.0;
+            if(supported){
+                ax=ellipse.semi_major[0];ay=ellipse.semi_major[1];
+                bx=-ay*ellipse.ratio;by=ax*ellipse.ratio;
+                start=ellipse.start_angle;
+                sweep=ellipse.end_angle-start;
+                if(!isfinite(start)||!isfinite(sweep)||
+                   fabs(start)>8.0*tau||fabs(sweep)>8.0*tau)
+                    supported=0;
+                else if(sweep<0.0)sweep+=tau;
+                if(!valid(bx)||!valid(by)||sweep<=0.0||
+                   sweep>tau+1e-10)supported=0;
+                extent_x=hypot(ax,bx);extent_y=hypot(ay,by);
+                if(!valid(extent_x)||!valid(extent_y)||
+                   !valid(ellipse.center[0]-extent_x)||
+                   !valid(ellipse.center[0]+extent_x)||
+                   !valid(ellipse.center[1]-extent_y)||
+                   !valid(ellipse.center[1]+extent_y))
+                   supported=0;
+            }
+            if(supported){
+                const MusaPreviewV6SourceStyle style=source_style(
+                    &ellipse.common,4u,colors,&v.provisional_aci_style);
+                if(w>SIZE_MAX-9u-style.extra_words)return 0;
+                if(dst){
+                    if(9u+style.extra_words>cap-w)return 0;
+                    dst[w]=style.code;
+                    if(style.extra_words)dst[w+1u]=style.rgb;
+                    const size_t at=w+style.extra_words;
+                    dst[at+1u]=(float)ellipse.center[0];
+                    dst[at+2u]=(float)ellipse.center[1];
+                    dst[at+3u]=(float)ax;
+                    dst[at+4u]=(float)ay;
+                    dst[at+5u]=(float)bx;
+                    dst[at+6u]=(float)by;
+                    dst[at+7u]=(float)start;
+                    dst[at+8u]=(float)sweep;
+                }
+                w+=9u+style.extra_words;
+                /* Whole rotated-ellipse bounds conservatively include
+                 * partial elliptical arcs; never clip source geometry. */
+                bounds(ellipse.center[0]-extent_x,
+                       ellipse.center[1]-extent_y,ext,&has);
+                bounds(ellipse.center[0]+extent_x,
+                       ellipse.center[1]+extent_y,ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
         }else if(t==16u&&polylines){
