@@ -84,6 +84,23 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 original R2018 Text DWG exact 108-byte physical footer and genuine MTEXT H1C0
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg")"
+          test "$(head -c 6 "$folder/Text.dwg")" = AC1032
+          grep -F 'ObjectName (RO) = "AcDbMText"' "$folder/Text.txt"
+          grep -F 'Handle (RO) = "1C0"' "$folder/Text.txt"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_text_footer_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-original-text-physical
+          timeout 120s /tmp/musacad-original-text-physical \
+            "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg"
+          test "$before" = "$(sha256sum "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg")"
+          echo "PASS original R2018 physical Text/Line/Ellipse; Text is MTEXT, no glyph render claim"
+
       - name: P0 original R2018 ELLIPSE H1BE verified LAYER0 and entity-color evidence
         run: |
           set -euo pipefail
