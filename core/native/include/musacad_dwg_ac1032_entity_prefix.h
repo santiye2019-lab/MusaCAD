@@ -30,7 +30,7 @@ typedef struct MusaDwgAc1032LinePrefix {
 } MusaDwgAc1032LinePrefix;
 
 /* Common R2018 built-in entity type 17 ARC / 18 CIRCLE / 19 LINE / 27 POINT / 77 LWPOLYLINE.
- * Also exact OT=16 POLYLINE3D and OT=11 VERTEX3D from an authenticated source.
+ * Also exact OT=35 ELLIPSE, OT=16 POLYLINE3D and OT=11 VERTEX3D from an authenticated source.
  * Verifies OT bits against the authenticated source/layout, then admits only
  * supported no-EED/no-preview/no-reactors forms. Fail atomic. */
 typedef MusaDwgAc1032LinePrefix MusaDwgAc1032EntityPrefix;
