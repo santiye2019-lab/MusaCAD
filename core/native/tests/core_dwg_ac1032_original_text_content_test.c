@@ -72,15 +72,15 @@ static int load(const char *name,uint8_t **out,size_t *length){
 }
 static int genuine(const char *path){
     uint8_t *file=NULL,*copy=NULL;size_t len=0u;
-    if(!load(path,&file,&len))return 0;
+    if(!load(path,&file,&len)){fprintf(stderr,"TEXT_FIXTURE_LOAD_FAIL: %s\n",path);return 0;}
     copy=(uint8_t*)malloc(len);
-    if(!copy){free(file);return 0;}
+    if(!copy){free(file);fprintf(stderr,"TEXT_FIXTURE_ALLOC_FAIL\n");return 0;}
     memcpy(copy,file,len);
     MusaDwgAc1032SceneIndex *scene=NULL;
     int ok=musa_dwg_ac1032_scene_index_open(file,len,&scene)&&
            memcmp(file,copy,len)==0;
     free(copy);free(file);
-    if(!ok)return 0;
+    if(!ok){fprintf(stderr,"TEXT_SCENE_OPEN_FAIL: verified R2018 source unsupported, bytes=%zu\n",len);return 0;}
     const size_t n=musa_dwg_ac1032_scene_index_count(scene);
     size_t text_records=0u,valid_strings=0u;
     for(size_t i=0u;i<n&&ok;i++){
