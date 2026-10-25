@@ -12,6 +12,7 @@ extern "C" {
  * non-entity table, block and dependent records count as other_records.
  * Every known planar object is source-decoded and joined to the real layer
  * before it is marked as independently style-evidenced.
+ * Includes original ELLIPSE OT35 strict source evidence where verified.
  * No complete model-space/INSERT/text/viewport/layer-off interpretation is
  * established by these fields. display_accepted MUST remain zero. */
 typedef struct MusaAc1032DisplayReadiness {
