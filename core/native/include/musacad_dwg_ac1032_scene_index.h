@@ -43,6 +43,9 @@ int musa_dwg_ac1032_scene_index_read_line(
 int musa_dwg_ac1032_scene_index_read_curve(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeCurve *out);
+int musa_dwg_ac1032_scene_index_read_ellipse(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032NativeEllipse *out);
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativePoint *out);
