@@ -12,7 +12,9 @@ extern "C" {
  * color display, frozen/off/locked, XREF, per-viewport and BYBLOCK
  * inheritance are explicitly NOT decided by this function.
  * Independently tested with genuine AC1032 LINE, POINT, ARC, CIRCLE, ELLIPSE
- * and OT77 LWPOLYLINE; never infer an OT77 display color from the layer
+ * and OT77 LWPOLYLINE. OT44 MTEXT additionally requires source Unicode
+ * and verified numeric placement; glyph, wrapping and owner remain unknown.
+ * Never infer an OT77 display color from the layer
  * ACI alone. Every entity's source geometry must first decode. Supports
  * the exact subset admitted by musa_dwg_ac1032_scene_planar_color_provenance.
  * Fail-atomic output. */
