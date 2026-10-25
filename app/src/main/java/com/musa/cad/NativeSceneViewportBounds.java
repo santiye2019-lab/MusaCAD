@@ -49,7 +49,6 @@ public final class NativeSceneViewportBounds {
      * On failure the Android renderer keeps whole-ellipse safe bounds. */
     private static final double TAU=2.0*Math.PI;
     private static final double MEMBERSHIP_TOLERANCE=1e-6;
-    private NativeArcCullingBounds() {}
 
     private static boolean contains(double start,double sweep,double t){
         double delta=(sweep>0.0?t-start:start-t)%TAU;
