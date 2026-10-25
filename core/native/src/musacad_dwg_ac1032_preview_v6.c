@@ -311,12 +311,14 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
                    MusaAc1032PreviewV6Stats *stats,int curves,int polylines,
-                   int colors){
+                   int colors,MusaAc1032PreviewV6SourceCensus *census){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
     MusaAc1032PreviewV6Stats v={0};
     v.total_indexed_records=n;
     v.required_float_words=7u;
+    MusaAc1032PreviewV6SourceCensus ledger={0};
+    ledger.total_indexed_records=n;
     v.provisional_aci_style=colors?0u:1u;
     MusaDwgAc1032LWVertex *lw=NULL;
     MusaDwgAc1032Polyline3DOrderedVertex *poly3d=NULL;
@@ -330,6 +332,12 @@ static int process(const MusaDwgAc1032SceneIndex *s,
            !musa_dwg_ac1032_scene_index_object_type(s,e.handle,&t))
             return 0;
         prev=e.handle;
+        const int candidate=t==19u||t==27u||
+              (curves&&(t==17u||t==18u))||
+              (polylines&&(t==16u||t==77u));
+        const size_t prior_primitives=v.rendered_primitives;
+        if(candidate)ledger.candidate_source_records++;
+        else ledger.other_indexed_records++;
         if(t==19u){
             MusaDwgAc1032NativeLine line={0};
             if(musa_dwg_ac1032_scene_index_read_line(s,e.handle,&line)&&
@@ -452,7 +460,27 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 v.rendered_primitives++;
             }else v.omitted_records++;
         }else v.omitted_records++;
+        /* The v6 primitive count can exceed source-record count when one
+         * LWPOLYLINE expands to multiple bulged segments. Never label
+         * all of those primitives as distinct decoded DWG objects. */
+        if(candidate){
+            if(v.rendered_primitives>prior_primitives)
+                ledger.packet_admitted_source_records++;
+            else ledger.candidate_not_admitted_records++;
+        }
     }
+    if(ledger.candidate_source_records+
+           ledger.other_indexed_records!=ledger.total_indexed_records||
+       ledger.packet_admitted_source_records+
+           ledger.candidate_not_admitted_records!=
+              ledger.candidate_source_records||
+       ledger.candidate_not_admitted_records+
+           ledger.other_indexed_records!=v.omitted_records||
+       ledger.packet_admitted_source_records>v.rendered_primitives)
+        return 0;
+    ledger.emitted_v6_primitives=v.rendered_primitives;
+    ledger.omitted_v6_records=v.omitted_records;
+    ledger.complete_dwg_display_accepted=0u;
     if(v.rendered_primitives>16777215u||v.required_float_words>SIZE_MAX-w)
         return 0;
     v.required_float_words=w;
@@ -474,6 +502,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         dst[6]=v.partial_geometry?1.0f:0.0f;
     }
     *stats=v;
+    if(census)*census=ledger;
     free(poly3d);
     free(lw);
     return 1;
@@ -487,7 +516,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before,curves,polylines,colors))return 0;
+    if(!process(s,NULL,0u,&before,curves,polylines,colors,NULL))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -495,7 +524,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors,NULL)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
@@ -520,6 +549,27 @@ int musa_dwg_ac1032_preview_v6_planar_polylines(
     return preview(s,words,capacity,out,1,1,0);
 }
 
+/* Diagnostic census over the EXACT preview admission path; caller ABI
+ * unchanged for every previously published preview function. A candidate
+ * is a source numeric type 19/27/17/18/16/77. 3D POLYLINE only counts
+ * as packet-admitted if independently proven flat with verified child
+ * owner graph. All original data stays read-only. */
+int musa_dwg_ac1032_preview_v6_source_census(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out){
+    if(!scene||!out||(const void*)scene==(const void*)out)
+        return 0;
+    MusaAc1032PreviewV6Stats stats={0};
+    MusaAc1032PreviewV6SourceCensus local={0};
+    if(!process(scene,NULL,0u,&stats,1,1,1,&local)||
+       !stats.partial_geometry&&stats.omitted_records||
+       local.emitted_v6_primitives!=stats.rendered_primitives||
+       local.omitted_v6_records!=stats.omitted_records||
+       local.total_indexed_records!=stats.total_indexed_records||
+       local.complete_dwg_display_accepted)return 0;
+    *out=local;
+    return 1;
+}
 /* Source-assigned direct ACI where verifiably present. No layer colors. */
 int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
