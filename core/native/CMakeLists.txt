@@ -95,6 +95,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_layer_flags_evidence_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_raw_layer_flags_evidence_atomic_smoke
                  COMMAND musacad_core_ac1032_original_layer_flags_evidence_test)
+        # Source-verified R2018 LAYER OT51 independent bit decomposition;
+        # never elevate base ON-bit evidence to final viewport visibility.
+        add_executable(musacad_core_ac1032_layer_base_bits_preflight_test
+                tests/core_dwg_ac1032_layer_base_bits_preflight_test.c)
+        target_link_libraries(musacad_core_ac1032_layer_base_bits_preflight_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_layer_base_bit_preflight_smoke
+                 COMMAND musacad_core_ac1032_layer_base_bits_preflight_test)
         # First-party R2004+ CMC fields, hostile bitstream bounds and source refusal.
         add_executable(musacad_core_cmc_numeric_field_test
                 tests/core_dwg_cmc_numeric_field_test.c)
