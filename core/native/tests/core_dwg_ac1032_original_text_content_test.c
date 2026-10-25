@@ -2,6 +2,7 @@
 /* Source-only real AC1032 TEXT Unicode content, not glyph placement.
  * Independent synthetic bit-level TU profile + genuine immutable R2018 DWG. */
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_sections.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,8 +80,18 @@ static int genuine(const char *path){
     MusaDwgAc1032SceneIndex *scene=NULL;
     int ok=musa_dwg_ac1032_scene_index_open(file,len,&scene)&&
            memcmp(file,copy,len)==0;
+    if(!ok){
+        size_t catalog_count=0u,handles_count=0u;
+        int cat=musa_dwg_ac1032_section_catalog(
+            file,len,NULL,0u,&catalog_count);
+        int handles=musa_dwg_ac1032_handles_index(
+            file,len,NULL,0u,&handles_count);
+        fprintf(stderr,"TEXT_SCENE_OPEN_FAIL: source bytes=%zu "
+           "catalog=%d count=%zu H-index=%d handles=%zu\n",
+           len,cat,catalog_count,handles,handles_count);
+    }
     free(copy);free(file);
-    if(!ok){fprintf(stderr,"TEXT_SCENE_OPEN_FAIL: verified R2018 source unsupported, bytes=%zu\n",len);return 0;}
+    if(!ok)return 0;
     const size_t n=musa_dwg_ac1032_scene_index_count(scene);
     size_t text_records=0u,valid_strings=0u;
     for(size_t i=0u;i<n&&ok;i++){
