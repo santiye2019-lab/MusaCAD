@@ -92,11 +92,11 @@ jobs:
           test "$(head -c 6 "$folder/Text.dwg")" = AC1032
           grep -F 'ObjectName (RO) = "AcDbMText"' "$folder/Text.txt"
           grep -F 'Handle (RO) = "1C0"' "$folder/Text.txt"
-          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \\
-            core/native/tests/core_dwg_ac1032_original_text_footer_test.c \\
-            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \\
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_text_footer_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
             -o /tmp/musacad-original-text-physical
-          timeout 120s /tmp/musacad-original-text-physical \\
+          timeout 120s /tmp/musacad-original-text-physical \
             "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg"
           test "$before" = "$(sha256sum "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg")"
           echo "PASS original R2018 physical Text/Line/Ellipse; Text is MTEXT, no glyph render claim"
