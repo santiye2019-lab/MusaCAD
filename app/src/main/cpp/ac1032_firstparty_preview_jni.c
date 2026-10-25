@@ -27,7 +27,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
     jlongArray readinessOut){
     (void)klass;
     if(!original||!readinessOut||
-       (*env)->GetArrayLength(env,readinessOut)!=20||
+       (*env)->GetArrayLength(env,readinessOut)!=25||
        maxWords<256||maxWords>(jint)MAX_V6_FLOAT_WORDS){
         throw_io(env,"Gecersiz AC1032 dosyasi veya bellek siniri");
         return NULL;
@@ -68,6 +68,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
     MusaAc1032DisplayReadiness ready={0};
     MusaAc1032PreviewV6Stats needed={0},copied={0};
     MusaAc1032PreviewV6SourceCensus census={0};
+    MusaDwgAc1032Unrendered2dInventory missing2d={0};
     /* All three views of this scene use the SAME CRC/H-verified original
      * source-index, not a guessed object count or file expansion. This
      * diagnostic counts v6 admitted source records separately from
@@ -76,6 +77,16 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
        musa_dwg_ac1032_preview_v6_planar_source_aci(
         scene,NULL,0u,&needed)&&
        musa_dwg_ac1032_preview_v6_source_census(scene,&census)&&
+       musa_dwg_ac1032_scene_index_unrendered_2d_inventory(
+           scene,&missing2d)&&
+       missing2d.original_types_crc_verified==1u&&
+       missing2d.complete_2d_display_accepted==0u&&
+       missing2d.indexed_records==ready.indexed_records&&
+       missing2d.text_records+missing2d.mtext_records+
+       missing2d.attrib_records+missing2d.attdef_records+
+       missing2d.block_begin_records+missing2d.block_end_records+
+       missing2d.insert_records+missing2d.minsert_records<=
+           census.other_indexed_records&&
         census.total_indexed_records==needed.total_indexed_records&&
         census.emitted_v6_primitives==needed.rendered_primitives&&
         census.omitted_v6_records==needed.omitted_records&&
@@ -116,7 +127,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         (*env)->SetFloatArrayRegion(env,output,0,
                (jsize)needed.required_float_words,(const jfloat*)words);
         if(!(*env)->ExceptionCheck(env)){
-            const jlong values[20]={
+            const jlong values[25]={
                 (jlong)ready.indexed_records,
                 (jlong)ready.known_planar_records,
                 (jlong)ready.source_style_joined,
@@ -136,9 +147,15 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
                 (jlong)census.other_indexed_records,
                 (jlong)census.emitted_v6_primitives,
                 (jlong)census.omitted_v6_records,
-                (jlong)census.complete_dwg_display_accepted
+                (jlong)census.complete_dwg_display_accepted,
+                (jlong)(missing2d.text_records+missing2d.mtext_records),
+                (jlong)(missing2d.attrib_records+missing2d.attdef_records),
+                (jlong)(missing2d.block_begin_records+
+                        missing2d.block_end_records),
+                (jlong)(missing2d.insert_records+missing2d.minsert_records),
+                (jlong)missing2d.other_indexed_records
             };
-            (*env)->SetLongArrayRegion(env,readinessOut,0,20,values);
+            (*env)->SetLongArrayRegion(env,readinessOut,0,25,values);
         }
     }
     free(words);
