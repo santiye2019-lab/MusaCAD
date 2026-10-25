@@ -562,7 +562,7 @@ int musa_dwg_ac1032_preview_v6_source_census(
     MusaAc1032PreviewV6Stats stats={0};
     MusaAc1032PreviewV6SourceCensus local={0};
     if(!process(scene,NULL,0u,&stats,1,1,1,&local)||
-       !stats.partial_geometry&&stats.omitted_records||
+       (stats.omitted_records>0u&&stats.partial_geometry==0u)||
        local.emitted_v6_primitives!=stats.rendered_primitives||
        local.omitted_v6_records!=stats.omitted_records||
        local.total_indexed_records!=stats.total_indexed_records||
