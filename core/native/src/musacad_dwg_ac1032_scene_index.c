@@ -564,7 +564,7 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
         p.common.visualstyle_flags==0u&&
         p.layout.data_stream_bits<=SIZE_MAX&&
         p.layout.total_payload_bits<=SIZE_MAX;
-    uint64_t layer=0u;
+    uint64_t layer=0u,tail_handle=0u;
     int ok=0;
     if(simple){
         MusaDwgAc1015Bits bits={0};
@@ -572,7 +572,21 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits)&&
            cached_graph_ref(&bits,h,5u,&layer)&&
-           layer!=h&&cached_graph_zero_padding(&bits);
+           layer!=h;
+        /* Unlike LINE/POINT/ARC, original MTEXT has a second H entry
+         * for its source text-style reference. Never accept the first
+         * H as the whole record and silently discard source references.
+         * Require exactly two independently bounded H entries and
+         * source-verified target object membership for the extra handle.
+         * No font, model-space owner or final display claim here. */
+        if(ok&&type==44u){
+            uint16_t tail_type=0u;
+            ok=cached_graph_ref(&bits,h,5u,&tail_handle)&&
+               tail_handle!=h&&tail_handle!=layer&&
+               musa_dwg_ac1032_scene_index_object_type(
+                   s,tail_handle,&tail_type)&&tail_type!=51u;
+        }
+        if(ok)ok=cached_graph_zero_padding(&bits);
     }
     free(p.raw);
     uint16_t layer_type=0u;
