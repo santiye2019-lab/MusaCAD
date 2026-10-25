@@ -40,6 +40,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_real_ellipse_style_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_ellipse_style_smoke
                  COMMAND musacad_core_ac1032_real_ellipse_style_test)
+        # Verified original R2018 MTEXT Unicode/placement -> explicitly
+        # provisional existing native v6 type 6; not glyph equivalence.
+        add_executable(musacad_core_ac1032_original_mtext_v6_test
+                tests/core_dwg_ac1032_original_mtext_preview_v6_test.c)
+        target_link_libraries(musacad_core_ac1032_original_mtext_v6_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_mtext_v6_smoke
+                 COMMAND musacad_core_ac1032_original_mtext_v6_test)
         # Original R2018 OT44 MTEXT H1C0 point, axis and text size.
         # Host smoke compiles API; original fixture is required in CI.
         add_executable(musacad_core_ac1032_original_mtext_placement_test

@@ -311,7 +311,8 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
                    MusaAc1032PreviewV6Stats *stats,int curves,int polylines,
-                   int colors,MusaAc1032PreviewV6SourceCensus *census){
+                   int colors,int with_mtext,
+                   MusaAc1032PreviewV6SourceCensus *census){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
     MusaAc1032PreviewV6Stats v={0};
@@ -334,7 +335,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         prev=e.handle;
         const int candidate=t==19u||t==27u||
               (curves&&(t==17u||t==18u||t==35u))||
-              (polylines&&(t==16u||t==77u));
+              (polylines&&(t==16u||t==77u))||
+              (with_mtext&&t==44u);
         const size_t prior_primitives=v.rendered_primitives;
         if(candidate)ledger.candidate_source_records++;
         else ledger.other_indexed_records++;
@@ -483,6 +485,105 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                        ellipse.center[1]+extent_y,ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
+        }else if(t==44u&&with_mtext){
+            /* Genuine original source MTEXT: provisional 1-line Android
+             * v6 text glyph proxy, NOT its authentic formatted paragraph
+             * layout. Encoded UTF-8 bytes are identical to verified source.
+             * Only strictly planar non-tilted WCS and drawing-direction
+             * left-to-right are admitted. Unsupported text is omitted,
+             * never replaced by guessed object coordinates.
+             *
+             * v6 type 6 packet:
+             * [6*256+7, x,y, ux,uy, vx,vy, hAlign,vAlign,
+             *  utf8_bytes, ceil(utf8_bytes/3) packed 24-bit words].
+             * Canvas glyph metrics may differ from the original TEXTSTYLE.
+             */
+            MusaDwgAc1032MTextSource source={0};
+            MusaDwgAc1032MTextPlacement place={0};
+            int supported=
+                musa_dwg_ac1032_scene_index_read_mtext_source(
+                    s,e.handle,&source)&&
+                musa_dwg_ac1032_scene_index_read_mtext_placement(
+                    s,e.handle,&place)&&
+                source.indexed_handle==e.handle&&
+                place.indexed_handle==e.handle&&
+                source.original_record_crc_verified&&
+                place.original_record_crc_verified&&
+                place.geometry_fields_decoded&&
+                !source.geometry_style_and_glyphs_accepted&&
+                !place.glyph_layout_and_display_accepted&&
+                source.utf8_bytes>0u&&
+                source.utf8_bytes<=sizeof(source.utf8)-1u&&
+                source.utf8[source.utf8_bytes]=='\0'&&
+                strlen(source.utf8)==source.utf8_bytes&&
+                place.insertion[2]==0.0&&
+                place.x_axis[2]==0.0&&
+                place.extrusion[0]==0.0&&
+                place.extrusion[1]==0.0&&
+                place.extrusion[2]==1.0&&
+                place.drawing_direction==5u&&
+                place.attachment>=1u&&place.attachment<=9u&&
+                valid(place.insertion[0])&&
+                valid(place.insertion[1])&&
+                valid(place.text_height)&&
+                place.text_height>0.0&&
+                valid(place.rect_width)&&place.rect_width>0.0&&
+                valid(place.rect_height)&&place.rect_height>=0.0&&
+                isfinite(place.x_axis[0])&&
+                isfinite(place.x_axis[1])&&
+                fabs(hypot(place.x_axis[0],place.x_axis[1])-1.0)<1e-6;
+            const double ux=place.x_axis[0]*place.text_height;
+            const double uy=place.x_axis[1]*place.text_height;
+            /* Android Canvas y+ points DOWN, while source world y+ UP.
+             * Negate the local text v-axis before world->screen flip. */
+            const double vx=place.x_axis[1]*place.text_height;
+            const double vy=-place.x_axis[0]*place.text_height;
+            const double x=place.insertion[0],y=place.insertion[1];
+            const double width=place.rect_width;
+            const double height=fmax(place.text_height,place.rect_height);
+            if(supported&&(!valid(ux)||!valid(uy)||!valid(vx)||
+                !valid(vy)||!valid(x+place.x_axis[0]*width)||
+                !valid(y+place.x_axis[1]*width)||
+                !valid(x-place.x_axis[1]*height)||
+                !valid(y+place.x_axis[0]*height)))supported=0;
+            if(supported){
+                const size_t packed=(source.utf8_bytes+2u)/3u;
+                if(packed>SIZE_MAX-10u||
+                   w>SIZE_MAX-10u-packed)return 0;
+                if(dst){
+                    if(10u+packed>cap-w)return 0;
+                    dst[w]=(float)(6u*256u+7u); /* unresolved BYLAYER */
+                    dst[w+1u]=(float)x;dst[w+2u]=(float)y;
+                    dst[w+3u]=(float)ux;dst[w+4u]=(float)uy;
+                    dst[w+5u]=(float)vx;dst[w+6u]=(float)vy;
+                    dst[w+7u]=(float)((place.attachment-1u)%3u);
+                    dst[w+8u]=(float)(3u-(place.attachment-1u)/3u);
+                    dst[w+9u]=(float)source.utf8_bytes;
+                    for(size_t b=0u;b<packed;b++){
+                        uint32_t packed_word=0u;
+                        for(size_t k=0u;k<3u;k++){
+                            const size_t off=b*3u+k;
+                            if(off<source.utf8_bytes)
+                                packed_word|=(uint32_t)
+                                  (uint8_t)source.utf8[off]<<(8u*k);
+                        }
+                        dst[w+10u+b]=(float)packed_word;
+                    }
+                }
+                w+=10u+packed;
+                /* World-space source rectangle is a conservative bound
+                 * for possible wrapped text. Viewport glyph fidelity is
+                 * NOT certified by this envelope. */
+                for(unsigned i=0u;i<4u;i++){
+                    const double a=(i&1u)?width:0.0;
+                    const double b=(i&2u)?height:0.0;
+                    bounds(x+place.x_axis[0]*a-place.x_axis[1]*b,
+                           y+place.x_axis[1]*a+place.x_axis[0]*b,
+                           ext,&has);
+                }
+                v.rendered_primitives++;
+                v.provisional_aci_style=1u; /* unresolved actual glyphs */
+            }else v.omitted_records++;
         }else if(t==16u&&polylines){
             if(!poly3d){
                 poly3d=(MusaDwgAc1032Polyline3DOrderedVertex*)
@@ -578,13 +679,13 @@ static int process(const MusaDwgAc1032SceneIndex *s,
 static int preview(const MusaDwgAc1032SceneIndex *s,
                   float *words,size_t capacity,
                   MusaAc1032PreviewV6Stats *out,int curves,int polylines,
-                  int colors){
+                  int colors,int with_mtext){
     if(!s||!out||(!words&&capacity)||
        capacity>SIZE_MAX/sizeof(float)||
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before,curves,polylines,colors,NULL))return 0;
+    if(!process(s,NULL,0u,&before,curves,polylines,colors,with_mtext,NULL))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -592,7 +693,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors,NULL)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors,with_mtext,NULL)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
@@ -603,18 +704,18 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
 int musa_dwg_ac1032_preview_v6_line_point(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,0,0,0);
+    return preview(s,words,capacity,out,0,0,0,0);
 }
 int musa_dwg_ac1032_preview_v6_planar_curves(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,0,0);
+    return preview(s,words,capacity,out,1,0,0,0);
 }
 
 int musa_dwg_ac1032_preview_v6_planar_polylines(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,1,0);
+    return preview(s,words,capacity,out,1,1,0,0);
 }
 
 /* Diagnostic census over the EXACT preview admission path; caller ABI
@@ -629,7 +730,7 @@ int musa_dwg_ac1032_preview_v6_source_census(
         return 0;
     MusaAc1032PreviewV6Stats stats={0};
     MusaAc1032PreviewV6SourceCensus local={0};
-    if(!process(scene,NULL,0u,&stats,1,1,1,&local)||
+    if(!process(scene,NULL,0u,&stats,1,1,1,0,&local)||
        (stats.omitted_records>0u&&stats.partial_geometry==0u)||
        local.emitted_v6_primitives!=stats.rendered_primitives||
        local.omitted_v6_records!=stats.omitted_records||
@@ -642,7 +743,7 @@ int musa_dwg_ac1032_preview_v6_source_census(
 int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
     MusaAc1032PreviewV6Stats *out){
-    return preview(scene,words,cap,out,1,1,1);
+    return preview(scene,words,cap,out,1,1,1,0);
 }
 
 int musa_dwg_ac1032_preview_v6_entity_aci_code(
@@ -686,4 +787,26 @@ int musa_dwg_ac1032_preview_v6_entity_source_style_code(
     *extra=(uint8_t)style.extra_words;
     *exact=(uint8_t)!provisional;
     return 1;
+}
+
+/* Opt-in genuine CRC/H source MTEXT to v6 TEXT primitive; source Unicode
+ * bytes and insertion/axes survive, original font/paragraph layout does
+ * not. No final display acceptance and no changes to old v6 callers. */
+int musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
+    const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(scene,words,cap,out,1,1,1,1);
+}
+int musa_dwg_ac1032_preview_v6_source_census_with_mtext(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out){
+    if(!scene||!out||(const void*)scene==(const void*)out)return 0;
+    MusaAc1032PreviewV6Stats stats={0};
+    MusaAc1032PreviewV6SourceCensus local={0};
+    if(!process(scene,NULL,0u,&stats,1,1,1,1,&local)||
+       local.emitted_v6_primitives!=stats.rendered_primitives||
+       local.omitted_v6_records!=stats.omitted_records||
+       local.total_indexed_records!=stats.total_indexed_records||
+       local.complete_dwg_display_accepted)return 0;
+    *out=local;return 1;
 }

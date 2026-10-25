@@ -97,15 +97,21 @@ public final class FirstPartyDwgPreviewDialog {
                         "\nDİKKAT: Diğer kayıtlar 2B dışı, tablo veya henüz"+
                         " tanınmamış geometri olabilir; bunlardan toplam 2B"+
                         " başarı yüzdesi hesaplanamaz."+
-                        "\nÖZGÜN DWG'DE HENÜZ ÇÖZÜLMEYEN NESNE TÜRLERİ:"+
-                        "\nTEXT/MTEXT: "+a.undecodedTextMtext+
+                        "\nÖZGÜN DWG METİN ÖNİZLEMESİ (DENEYSEL):"+
+                        "\nMTEXT kaynak Unicode/metin yönü/konumu okunabiliyorsa"+
+                        " mevcut Android metin motorunda fontu yaklaşık çizilir."+
+                        " Kaynaktaki paragraf satırları, yazı tipi ve sarmalama"+
+                        " birebir doğrulanmadı; katman görünürlüğü ve renkler kesin değil."+
+                        "\nTAM OLARAK GÖSTERİLEMEYEN KAYNAK AİLELERİ:"+
+                        "\nTEXT/MTEXT kaynak kayıt toplamı: "+a.undecodedTextMtext+
                         " • ATTRIB/ATTDEF: "+a.undecodedAttribAttdef+
                         " • BLOCK/ENDBLK kayıtları: "+a.undecodedBlockMarkers+
                         " • INSERT/MINSERT: "+a.undecodedInsertMinsert+
                         "\nDiğer kaynak tipleri: "+a.otherOriginalTypeRecords+
                         " (bunlarda da çözülemeyen 2B nesneler bulunabilir)."+
-                        "\nDURUM: Metin/blok çözme YOK; katman görünürlüğü ve"+
-                        " BYLAYER/BYBLOCK nihai renk hesabı TAMAMLANMADI."+
+                        "\nDURUM: MTEXT yalnızca düz yazı önizlemesi;"+
+                        " TEXT/MTEXT tam font, paragraf, katman ve blok çözümü"+
+                        " YOK. BYLAYER/BYBLOCK nihai renk hesabı TAMAMLANMADI."+
                         "\nKaynak stil özeti: "+a.indexed+
                         " (tanınan 2B: "+a.planarRecognized+
                         ", katman+renk kaynağı doğrulanan: "+a.sourceStyleLinked+

@@ -1206,7 +1206,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/cpp/ac1032_firstparty_preview_jni.c
           grep -F 'ac1032_firstparty_preview_jni.c' app/src/main/cpp/CMakeLists.txt
-          grep -F 'musa_dwg_ac1032_preview_v6_planar_source_aci(' app/src/main/cpp/ac1032_firstparty_preview_jni.c
+          grep -F 'musa_dwg_ac1032_preview_v6_planar_source_with_mtext(' app/src/main/cpp/ac1032_firstparty_preview_jni.c
           cmake -S core/native -B /tmp/musacad-r2018-android-jni-core \
             -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/musacad-r2018-android-jni-core --parallel 2
@@ -1228,8 +1228,9 @@ jobs:
             com.musa.cad.FirstPartyDwgPreview \
             /tmp/musacad-r2018-preview-jni-host.so \
             third_party/libredwg/test/test-data/2018/Line.dwg \
-            third_party/libredwg/test/test-data/2018/Point.dwg
-          echo 'PASS source-authenticated original R2018 JNI linked and invoked with real drawing geometry, without APK'
+            third_party/libredwg/test/test-data/2018/Point.dwg \
+            third_party/libredwg/test/test-data/2018/Text.dwg
+          echo 'PASS source-authenticated R2018 original LINE POINT and MTEXT-only native JNI first-paint, incomplete and no APK'
 
       - name: Android lint and unit tests
         run: |
