@@ -71,6 +71,11 @@ int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,
     size_t capacity,MusaAc1032PreviewV6Stats *out);
 
+/* Exact arc and signed-bulge XY bounds, with source-only provenance.
+ * No layer/style/viewport semantic acceptance. Invalid inputs fail-atomic. */
+int musa_dwg_ac1032_preview_v6_arc_bounds(
+    double cx,double cy,double radius,double start,double sweep,
+    double out_xyxy[4]);
 /* Portable pure selector for an already independently source-authenticated
  * common entity; returns exact=1 for direct ACI, exact=0 for provisional
  * fallback. Returns failure without touching outputs for invalid requests.
