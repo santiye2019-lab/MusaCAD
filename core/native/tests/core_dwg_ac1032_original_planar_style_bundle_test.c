@@ -45,6 +45,11 @@ static int check(const char *file,uint64_t entity,uint16_t type){
            bundle.color.source_layer_aci_supported==1u&&
            bundle.color.source_layer_aci==7u&&
            bundle.color.rendering_accepted==0u&&
+           (!bundle.color.entity_has_direct_rgb24||
+             (bundle.color.entity_complex_color_or_transparency&&
+              bundle.color.entity_source_rgb24<=UINT32_C(0x00ffffff)))&&
+           (bundle.color.entity_has_direct_rgb24||
+             bundle.color.entity_source_rgb24==0u)&&
            bundle.raw_layer_status.indexed_handle==UINT64_C(0x10)&&
            bundle.raw_layer_status.source_crc_verified==1u&&
            bundle.raw_layer_status.numeric_flags_start_bit==31u&&
