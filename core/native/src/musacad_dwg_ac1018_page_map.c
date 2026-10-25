@@ -118,8 +118,34 @@ static int shared_page_locations(const uint8_t *file,size_t n,
             if(gap||id!=h.page_map_id||available<20u){
                 valid=0;break;
             }
+            /* Original AutoCAD 2018/Text.dwg: the final map allocation
+             * ends EXACTLY at the start of the authenticated duplicate
+             * 108-byte encrypted header. The compressed page-map body is
+             * followed by the genuine empty 20-byte SYSTEM marker, not
+             * arbitrary bytes. Line.dwg instead has two zero alignment
+             * bytes (110-byte remainder); Ellipse.dwg uses 107 bytes.
+             * Admit this third physical form only with both exact proofs. */
+            if(available>size&&available-size==108u){
+                static const uint8_t empty_system[20]={
+                    0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+                    0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+                };
+                const uint64_t end=pos+(uint64_t)size;
+                const uint64_t body_end=h.page_map_offset+20u+
+                                        (uint64_t)h.map_compressed_bytes;
+                if(memcmp(required_signature,"AC1032",6u)!=0||
+                   end>SIZE_MAX||body_end>SIZE_MAX||
+                   end!=(uint64_t)n-108u||
+                   body_end+20u!=end||
+                   memcmp(file+(size_t)body_end,empty_system,
+                          sizeof(empty_system))!=0||
+                   memcmp(file+(size_t)end,file+0x80u,0x6cu)!=0){
+                    valid=0;break;
+                }
+                verified_secondary_header=3;
+            }
             if(available>size&&available-size!=106u&&
-               available-size!=107u){
+               available-size!=107u&&available-size!=108u){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -190,7 +216,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
        (pos<n&&
         !((verified_secondary_header==1&&n-(size_t)pos==110u)||
           (verified_secondary_header==2&&
-           (n-(size_t)pos==106u||n-(size_t)pos==107u))))){
+           (n-(size_t)pos==106u||n-(size_t)pos==107u))||
+          (verified_secondary_header==3&&n-(size_t)pos==108u)))){
         free(plain);return 0;
     }
     /* To uphold atomic publication, validate without writing entries
