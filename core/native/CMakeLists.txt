@@ -41,6 +41,11 @@ if(PROJECT_IS_TOP_LEVEL)
                  COMMAND musacad_core_ac1032_preview_v6_arc_bounds_test)
         # One CRC/H-verified DWG source record != one emitted v6 primitive:
         # original source 2D admission census with atomic output checks.
+        add_executable(musacad_core_ac1032_unrendered_2d_inventory_test
+                tests/core_dwg_ac1032_unrendered_2d_inventory_test.c)
+        target_link_libraries(musacad_core_ac1032_unrendered_2d_inventory_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_unrendered_2d_inventory_smoke
+                 COMMAND musacad_core_ac1032_unrendered_2d_inventory_test)
         add_executable(musacad_core_ac1032_v6_source_census_test
                 tests/core_dwg_ac1032_preview_v6_source_census_test.c)
         target_link_libraries(musacad_core_ac1032_v6_source_census_test PRIVATE musacad_core)

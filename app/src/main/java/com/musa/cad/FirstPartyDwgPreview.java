@@ -29,9 +29,12 @@ public final class FirstPartyDwgPreview {
         public final long previewCandidateRecords,previewAdmittedRecords;
         public final long previewRejectedCandidates,previewOtherIndexedRecords;
         public final long previewPrimitives,previewOmittedRecords;
+        public final long undecodedTextMtext,undecodedAttribAttdef;
+        public final long undecodedBlockMarkers,undecodedInsertMinsert;
+        public final long otherOriginalTypeRecords;
         public final boolean colorAndVisibilityComplete;
         private Readiness(long[] raw)throws IOException {
-            if(raw==null||raw.length!=20)
+            if(raw==null||raw.length!=25)
                 throw new IOException("DWG stil ve onizleme sayaci eksik");
             for(int i=0;i<raw.length;i++){
                 long maximum=i==17?9L*1024*1024:1000000L;
@@ -51,6 +54,11 @@ public final class FirstPartyDwgPreview {
             previewOtherIndexedRecords=raw[16];
             previewPrimitives=raw[17];
             previewOmittedRecords=raw[18];
+            undecodedTextMtext=raw[20];
+            undecodedAttribAttdef=raw[21];
+            undecodedBlockMarkers=raw[22];
+            undecodedInsertMinsert=raw[23];
+            otherOriginalTypeRecords=raw[24];
             complexUnresolved=complex-directRgb24;
             otherComplex=complexUnresolved-sourceEntityHidden;
             if(raw[10]!=0L||indexed<=0L||
@@ -67,7 +75,13 @@ public final class FirstPartyDwgPreview {
                previewRejectedCandidates+previewOtherIndexedRecords!=
                    previewOmittedRecords||
                previewAdmittedRecords>previewPrimitives||
-               previewPrimitives<=0L)
+               previewPrimitives<=0L||
+               undecodedTextMtext+undecodedAttribAttdef+
+                   undecodedBlockMarkers+undecodedInsertMinsert+
+                   otherOriginalTypeRecords!=indexed||
+               undecodedTextMtext+undecodedAttribAttdef+
+                   undecodedBlockMarkers+undecodedInsertMinsert>
+                       previewOtherIndexedRecords) 
                 throw new IOException("DWG kaynak ve gorunurluk raporu tutarsiz");
         }
     }
@@ -95,7 +109,7 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Kaynak DWG bulunamadi");
         if (maxFloatWords < 256 || maxFloatWords > 9 * 1024 * 1024)
             throw new IOException("DWG onizleme bellek siniri gecersiz");
-        long[] report=new long[20];
+        long[] report=new long[25];
         float[] raw=readOriginalNative(
                 original.getAbsolutePath(),maxFloatWords,report);
         NativeScene parsed=NativeScene.fromRaw(raw);
