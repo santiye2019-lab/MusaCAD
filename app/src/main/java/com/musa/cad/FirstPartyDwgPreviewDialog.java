@@ -95,7 +95,8 @@ public final class FirstPartyDwgPreviewDialog {
                         "\nDoğrudan renk: "+a.directAci+
                         " • BYLAYER: "+a.byLayer+
                         " • BYBLOCK: "+a.byBlock+
-                        " • karmaşık/görünmez: "+a.complex+
+                        " • doğrulanmış doğrudan RGB24: "+a.directRgb24+
+                        " • kalan karmaşık/görünmez: "+a.complexUnresolved+
                         " • sınırlı katman renk kanıtı: "+a.narrowLayerAciEvidence+
                         "\nKISMİ GÖRÜNÜM • Katman açık/kapalı ve gerçek"+
                         " son renkler doğrulanmadı; kayıt sayısı çizim öğesi"+
