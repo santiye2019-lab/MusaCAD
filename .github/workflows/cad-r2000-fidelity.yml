@@ -115,6 +115,22 @@ jobs:
           test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
           echo "PASS original MTEXT H1C0 exact source Unicode TU; geometry/font/glyphs remain unresolved"
 
+      - name: P0 genuine original R2018 MTEXT source Unicode and WCS -> provisional native v6 glyphs
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$folder/Text.dwg")" = AC1032
+          grep -F 'ObjectName (RO) = "AcDbMText"' "$folder/Text.txt"
+          grep -F 'Handle (RO) = "1C0"' "$folder/Text.txt"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_mtext_preview_v6_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-real-mtext-native-v6
+          timeout 120s /tmp/musacad-r2018-real-mtext-native-v6 "$folder/Text.dwg"
+          test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          echo "PASS genuine MTEXT Unicode and WCS to source-only v6 glyph proxy, NOT native AutoCAD layout"
+
       - name: P0 original R2018 MTEXT H1C0 genuine insertion axis and text height
         run: |
           set -euo pipefail
