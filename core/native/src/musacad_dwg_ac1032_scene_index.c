@@ -238,6 +238,20 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
     if(ok)*out=value;
     return ok;
 }
+int musa_dwg_ac1032_scene_index_read_mtext_common(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032EntityCommon *out){
+    if(!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,44u,&p))return 0;
+    const MusaDwgAc1032EntityCommon value=p.common;
+    free(p.raw);
+    if(!value.common_decoded||!value.prefix.prefix_decoded||
+       value.prefix.indexed_handle!=h||
+       value.prefix.raw_object_type!=44u)return 0;
+    *out=value;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_mtext_source(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032MTextSource *out){
@@ -531,7 +545,8 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     if(!h||!check_output(s,out,sizeof(*out)))return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&type!=77u))
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&
+         type!=44u&&type!=77u))
         return 0;
     Payload p={0};
     if(!fetch(s,h,type,&p))return 0;
