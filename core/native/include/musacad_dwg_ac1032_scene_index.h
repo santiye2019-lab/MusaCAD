@@ -43,6 +43,9 @@ int musa_dwg_ac1032_scene_index_read_line(
 int musa_dwg_ac1032_scene_index_read_curve(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeCurve *out);
+int musa_dwg_ac1032_scene_index_read_ellipse(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032NativeEllipse *out);
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativePoint *out);
@@ -157,7 +160,7 @@ typedef struct MusaDwgAc1032SceneGeometryReport {
  * no guessed offsets, no silently skipped unknown object types. This is a
  * diagnostic completeness EVIDENCE report, NOT renderable full drawing,
  * complete owner/layer graph or AutoCAD 2027 equivalence. Decodable entity
- * subset includes LINE/ARC/CIRCLE/POINT/LWPOLYLINE/ordered POLYLINE3D.
+ * subset includes LINE/ARC/CIRCLE/ELLIPSE/POINT/LWPOLYLINE/ordered POLYLINE3D.
  * A supported-type payload rejected by its decoder is reported explicitly
  * as GEOMETRY_REJECTED, not treated as complete. Unknown types are opaque.
  * rows=NULL/capacity=0 performs a complete count-only scan.

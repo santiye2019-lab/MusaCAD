@@ -84,6 +84,28 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 real original AC1032 ELLIPSE H1BE WCS geometry and v6 Android curve
+        run: |
+          set -euo pipefail
+          directory=third_party/libredwg/test/test-data/2018
+          file="$directory/Ellipse.dwg"
+          oracle="$directory/Ellipse.txt"
+          test -s "$file"
+          test -s "$oracle"
+          test "$(head -c 6 "$file")" = AC1032
+          grep -F 'Handle (RO) = "1BE"' "$oracle"
+          grep -F 'Center = (11.1433 9.5374 0.0)' "$oracle"
+          grep -F 'MajorAxis = (-8.7508 -8.03465 0.0)' "$oracle"
+          grep -F 'RadiusRatio = 0.336109' "$oracle"
+          checksum="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_ellipse_v6_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-real-ellipse-v6
+          timeout 90s /tmp/musacad-r2018-real-ellipse-v6 "$file"
+          test "$checksum" = "$(sha256sum "$file" | cut -d ' ' -f1)"
+          echo "PASS original WCS ELLIPSE source geometry and rotated v6; full scene visibility remains unknown"
+
       - name: P0 original AC1032 exact ARC and signed bulge viewport-fit bounds
         run: |
           set -euo pipefail

@@ -223,6 +223,21 @@ int musa_dwg_ac1032_scene_index_read_curve(
     if(ok){*out=value;}
     return ok;
 }
+int musa_dwg_ac1032_scene_index_read_ellipse(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032NativeEllipse *out){
+    if(!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,35u,&p))return 0;
+    MusaDwgAc1032NativeEllipse value={0};
+    int ok=musa_dwg_ac1032_ellipse_fields_at(
+        p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&value)&&
+        value.geometry_decoded&&value.indexed_handle==h;
+    value.common=p.common;
+    free(p.raw);
+    if(ok)*out=value;
+    return ok;
+}
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032NativePoint *out){
@@ -694,6 +709,14 @@ int musa_dwg_ac1032_scene_index_scan_geometry(
             MusaDwgAc1032NativeCurve curve={0};
             geometry=musa_dwg_ac1032_scene_index_read_curve(
                  s,entry.handle,&curve);
+            category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
+                              MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
+            break;
+        }
+        case 35u: {
+            MusaDwgAc1032NativeEllipse ellipse={0};
+            geometry=musa_dwg_ac1032_scene_index_read_ellipse(
+                 s,entry.handle,&ellipse);
             category=geometry?MUSA_AC1032_SCENE_GEOMETRY_DECODED:
                               MUSA_AC1032_SCENE_GEOMETRY_REJECTED;
             break;
