@@ -134,6 +134,13 @@ jobs:
           java -cp /tmp/musacad-stream-seek-native DxfStreamMissingCoreTest
           bash tests/build_dxf_handle_jni_host.sh
           java -Djava.library.path=/tmp/musacad-dxf-handle-host -cp /tmp/musacad-stream-seek-native DxfStreamNativeSeekTest
+      - name: Native ARC culling uses exact bounded sub-arc envelopes (Android UI only)
+        run: |
+          javac -encoding UTF-8 -d /tmp/musacad-native-arc-cull \
+            app/src/main/java/com/musa/cad/NativeArcCullingBounds.java \
+            tests/NativeArcCullingBoundsTest.java
+          java -cp /tmp/musacad-native-arc-cull com.musa.cad.NativeArcCullingBoundsTest
+          grep -q 'NativeArcCullingBounds.compute(' app/src/main/java/com/musa/cad/NativeScene.java
       - name: Test DXF attribute visibility
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfAttributeVisibility.java tests/DxfAttributeVisibilityTest.java
