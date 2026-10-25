@@ -25,6 +25,9 @@ typedef struct MusaAc1032DisplayReadiness {
     size_t known_style_rejected;
     size_t other_indexed_records;
     size_t narrow_layer_aci_available;
+    /* Exact direct RGB24 source subset OF source_complex_or_invisible.
+     * Remaining complex colors need more resolution/viewport semantics. */
+    size_t source_direct_rgb24;
     uint8_t display_accepted;
 } MusaAc1032DisplayReadiness;
 /* Bounded 1M record diagnostic. Caller output is fail-atomic.
