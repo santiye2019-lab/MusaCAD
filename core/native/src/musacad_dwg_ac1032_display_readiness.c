@@ -58,6 +58,16 @@ int musa_dwg_ac1032_scene_display_readiness(
         if(p->entity_by_block)result.source_byblock++;
         if(p->entity_complex_color_or_transparency)
             result.source_complex_or_invisible++;
+        if(p->entity_has_direct_rgb24){
+            /* Direct source RGB is already in the original preview code;
+             * remains one complex category for backwards accounting. */
+            if(!p->entity_complex_color_or_transparency||
+               p->entity_has_direct_aci||p->entity_by_layer||
+               p->entity_by_block||
+               p->entity_source_rgb24>UINT32_C(0x00ffffff))
+                return 0;
+            result.source_direct_rgb24++;
+        }else if(p->entity_source_rgb24)return 0;
         if(p->source_layer_aci_supported)
             result.narrow_layer_aci_available++;
     }
@@ -68,7 +78,8 @@ int musa_dwg_ac1032_scene_display_readiness(
        result.source_direct_aci+result.source_bylayer+
            result.source_byblock+
            result.source_complex_or_invisible!=result.source_style_joined||
-       result.narrow_layer_aci_available>result.source_style_joined)
+       result.narrow_layer_aci_available>result.source_style_joined||
+       result.source_direct_rgb24>result.source_complex_or_invisible)
         return 0;
     result.display_accepted=0u; /* Full scene, layer and model-state unmet. */
     *out=result;
