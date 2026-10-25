@@ -167,6 +167,33 @@ int musa_dwg_ac1032_scene_index_scan_geometry(
     const MusaDwgAc1032SceneIndex *index,
     MusaDwgAc1032SceneGeometryRecord *rows,size_t capacity,
     MusaDwgAc1032SceneGeometryReport *out);
+/* Original R2018 indexed raw OT inventory for the *currently UNDECODED*
+ * TEXT, MTEXT, ATTRIB, ATTDEF, BLOCK, ENDBLK, INSERT and MINSERT families.
+ * Source-only H/CRC type evidence, NOT parsed text/block geometry or an
+ * exact visible-count: model-space, block graph, viewport are unproved.
+ * Block definition markers are not in themselves drawn objects.
+ * 'other_indexed_records' can contain unsupported 2B/3B/proxy classes.
+ * Never infer a successful 2B render from a raw type count. */
+typedef struct MusaDwgAc1032Unrendered2dInventory {
+    size_t indexed_records;
+    size_t text_records;          /* OT 1 */
+    size_t mtext_records;         /* OT 44 */
+    size_t attrib_records;        /* OT 2 */
+    size_t attdef_records;        /* OT 3 */
+    size_t block_begin_records;   /* OT 4 */
+    size_t block_end_records;     /* OT 5 */
+    size_t insert_records;        /* OT 7 */
+    size_t minsert_records;       /* OT 8 */
+    size_t other_indexed_records; /* every other raw type */
+    uint8_t original_types_crc_verified;
+    uint8_t complete_2d_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032Unrendered2dInventory;
+/* Read-only, portable C11. One source-authenticated pass with strict
+ * index ordering. All outputs remain unchanged if the request fails. */
+int musa_dwg_ac1032_scene_index_unrendered_2d_inventory(
+    const MusaDwgAc1032SceneIndex *index,
+    MusaDwgAc1032Unrendered2dInventory *out);
+
 #ifdef __cplusplus
 }
 #endif
