@@ -24,12 +24,20 @@ public final class FirstPartyDwgPreview {
         public final long directAci,byLayer,byBlock,complex;
         public final long sourceStyleUnresolved,otherRecords,narrowLayerAciEvidence;
         public final long directRgb24,complexUnresolved,sourceEntityHidden,otherComplex;
+        // v6 packet admission ONLY: one DWG source object may render many
+        // primitives, and unrecognized indexed types may include non-entities.
+        public final long previewCandidateRecords,previewAdmittedRecords;
+        public final long previewRejectedCandidates,previewOtherIndexedRecords;
+        public final long previewPrimitives,previewOmittedRecords;
         public final boolean colorAndVisibilityComplete;
         private Readiness(long[] raw)throws IOException {
-            if(raw==null||raw.length!=13)
-                throw new IOException("DWG stil kanit sayaci eksik");
-            for(long n:raw)if(n<0L||n>1000000L)
-                throw new IOException("DWG kaynak nesne sayaci gecersiz");
+            if(raw==null||raw.length!=20)
+                throw new IOException("DWG stil ve onizleme sayaci eksik");
+            for(int i=0;i<raw.length;i++){
+                long maximum=i==17?9L*1024*1024:1000000L;
+                if(raw[i]<0L||raw[i]>maximum)
+                    throw new IOException("DWG kaynak/ilkel sayaci gecersiz");
+            }
             indexed=raw[0];planarRecognized=raw[1];sourceStyleLinked=raw[2];
             directAci=raw[3];byLayer=raw[4];byBlock=raw[5];
             complex=raw[6];sourceStyleUnresolved=raw[7];
@@ -37,6 +45,12 @@ public final class FirstPartyDwgPreview {
             colorAndVisibilityComplete=raw[10]!=0L;
             directRgb24=raw[11];
             sourceEntityHidden=raw[12];
+            previewCandidateRecords=raw[13];
+            previewAdmittedRecords=raw[14];
+            previewRejectedCandidates=raw[15];
+            previewOtherIndexedRecords=raw[16];
+            previewPrimitives=raw[17];
+            previewOmittedRecords=raw[18];
             complexUnresolved=complex-directRgb24;
             otherComplex=complexUnresolved-sourceEntityHidden;
             if(raw[10]!=0L||indexed<=0L||
@@ -45,7 +59,15 @@ public final class FirstPartyDwgPreview {
                directAci+byLayer+byBlock+complex!=sourceStyleLinked||
                narrowLayerAciEvidence>sourceStyleLinked||
                directRgb24>complex||
-               sourceEntityHidden>complex-directRgb24)
+               sourceEntityHidden>complex-directRgb24||
+               raw[19]!=0L||
+               previewCandidateRecords+previewOtherIndexedRecords!=indexed||
+               previewAdmittedRecords+previewRejectedCandidates!=
+                   previewCandidateRecords||
+               previewRejectedCandidates+previewOtherIndexedRecords!=
+                   previewOmittedRecords||
+               previewAdmittedRecords>previewPrimitives||
+               previewPrimitives<=0L)
                 throw new IOException("DWG kaynak ve gorunurluk raporu tutarsiz");
         }
     }
@@ -73,11 +95,13 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Kaynak DWG bulunamadi");
         if (maxFloatWords < 256 || maxFloatWords > 9 * 1024 * 1024)
             throw new IOException("DWG onizleme bellek siniri gecersiz");
-        long[] report=new long[13];
+        long[] report=new long[20];
         float[] raw=readOriginalNative(
                 original.getAbsolutePath(),maxFloatWords,report);
         NativeScene parsed=NativeScene.fromRaw(raw);
         Readiness readiness=new Readiness(report);
+        if(readiness.previewPrimitives!=parsed.primitiveCount)
+            throw new IOException("DWG onizleme nesne/ilkel sayaclari tutarsiz");
         return new Result(parsed,readiness);
     }
 }
