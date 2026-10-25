@@ -98,6 +98,25 @@ jobs:
           test "$before" = "$(sha256sum "$arc" "$circle")"
           echo "PASS first-party exact native v6 ARC bounds and unchanged real DWG"
 
+      - name: P0 authentic MC1032 missing TEXT MTEXT BLOCK INSERT source types remain unresolved
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          for type in Line Point Arc circle Polyline PolyLine3D; do
+            test -s "$folder/$type.dwg"
+          done
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg" "$folder/PolyLine3D.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_unrendered_2d_inventory_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-missing-2d-families
+          timeout 120s /tmp/musacad-r2018-missing-2d-families \
+            "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" \
+            "$folder/circle.dwg" "$folder/Polyline.dwg" \
+            "$folder/PolyLine3D.dwg"
+          test "$before" = "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg" "$folder/PolyLine3D.dwg")"
+          echo "PASS missing text/insert/block source records separately classified, NO false render claim"
+
       - name: P0 six original R2018 files C11 source-record vs v6 primitives census
         run: |
           set -euo pipefail
