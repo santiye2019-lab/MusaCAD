@@ -35,6 +35,13 @@ int musa_dwg_ac1032_scene_planar_style_evidence(
     MusaAc1032PlanarStyleEvidence result={0};
     result.color=color;
     result.raw_layer_status=flags;
+    /* Parse source field semantics without asserting that layer's
+     * model/viewport appearance has been independently established. */
+    if(!musa_dwg_ac1032_layer_base_bits_decode(
+           flags.raw_values_70_290_370,&result.base_bit_preflight))return 0;
+    result.base_bit_preflight.layer_handle=flags.indexed_handle;
+    result.base_bit_preflight.source_crc_verified=flags.source_crc_verified;
+    if(result.base_bit_preflight.display_accepted)return 0;
     result.original_layer_name=join.layer;
     result.source_layer_join_verified=1u;
     /* Raw numeric flags must NOT become guessed on/off/locked state. */

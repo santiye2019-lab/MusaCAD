@@ -72,6 +72,38 @@ int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
     const MusaDwgAc1032ObjectStreams *layout,
     MusaDwgAc1032LayerFlagsEvidence *out);
 
+/* DWG R2000+ numeric VALUES(70,290,370) bit decomposition per ODA
+ * published on-disk format. Separate FROM DXF LAYER group 70 flags:
+ * bit 0 frozen, 1 on, 2 frozen in new viewports, 3 locked, 4 plot,
+ * bits [9:5] lineweight. This reads source bits, NOT actual viewport
+ * or full-layer visibility. R2018 original Layer0 evidence yields 0xE0
+ * (on bit clear); without independent rendering-state cross-check, using
+ * that bit to hide objects would be unsafe. display_accepted is ALWAYS 0.
+ * Unknown high bits are reported rather than masked away. */
+typedef struct MusaDwgAc1032LayerBaseBitPreflight {
+    uint64_t layer_handle;
+    uint16_t raw_values;
+    uint16_t unmapped_bits;
+    uint8_t frozen_bit;
+    uint8_t on_bit;
+    uint8_t frozen_in_new_viewports_bit;
+    uint8_t locked_bit;
+    uint8_t plotting_bit;
+    uint8_t lineweight_field;
+    uint8_t source_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1032LayerBaseBitPreflight;
+/* From a plain numeric value; useful for independent bit-order tests,
+ * produces no CRC/source claim. */
+int musa_dwg_ac1032_layer_base_bits_decode(
+    uint16_t raw_values,MusaDwgAc1032LayerBaseBitPreflight *out);
+/* Original strict OT51 H/CRC record with field/bit bounds. Fail atomic. */
+int musa_dwg_ac1032_layer_ot51_base_bits_at(
+    const uint8_t *payload,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerBaseBitPreflight *out);
+
+
 /* Narrow source-evidence profile for ORIGINAL R2018 LAYER CMC:
  * authenticated H/CRC layer identity+name+numeric status, exactly 7 opaque
  * bits between status and the CMC, then one complete numeric CMC ending

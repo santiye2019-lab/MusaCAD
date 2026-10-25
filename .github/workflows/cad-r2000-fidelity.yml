@@ -330,6 +330,21 @@ jobs:
           test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg")" = "$before"
           echo "PASS original R2018 LINE POINT ARC CIRCLE LWPOLYLINE ENC and linked LAYER CMC provenance; not rendering"
 
+      - name: P0 verified R2018 LAYER OT51 numeric bit preflight (no false layer visibility)
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          for type in Line Point Arc circle Polyline; do test -s "$folder/$type.dwg"; done
+          before="$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_layer_base_bits_preflight_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musa-r2018-layer-base-bits
+          timeout 120s /tmp/musa-r2018-layer-base-bits \
+            "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg"
+          test "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg")" = "$before"
+          echo "PASS immutable R2018 on/frozen/plot base bits; display NOT accepted"
+
       - name: P0 five original R2018 LAYER0 anchored CMC C3 ACI7 from CRC source
         run: |
           set -euo pipefail
