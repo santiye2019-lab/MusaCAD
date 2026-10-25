@@ -31,6 +31,53 @@ static void bounds(double x,double y,double b[4],int *has){
     if(x<b[0])b[0]=x;if(x>b[2])b[2]=x;
     if(y<b[1])b[1]=y;if(y>b[3])b[3]=y;
 }
+
+/* Tight bounds of a finite circular arc, including both signed sweep
+ * directions, the 0-degree wrap, all extrema and the full circle. */
+int musa_dwg_ac1032_preview_v6_arc_bounds(
+    double cx,double cy,double r,double start,double sweep,double out[4]){
+    const double tau=6.283185307179586476925286766559;
+    if(!out||!valid(cx)||!valid(cy)||!valid(r)||r<=0.0||
+       !isfinite(start)||!isfinite(sweep)||fabs(start)>8.0*tau||
+       sweep==0.0||fabs(sweep)>tau+1e-12||
+       !valid(cx-r)||!valid(cx+r)||!valid(cy-r)||!valid(cy+r))
+        return 0;
+    double b[4]={0};
+    if(fabs(sweep)>=tau-1e-12){
+        b[0]=cx-r;b[1]=cy-r;b[2]=cx+r;b[3]=cy+r;
+    }else{
+        const double s=fmod(start,tau),e=s+sweep;
+        const double x0=cx+r*cos(s),y0=cy+r*sin(s);
+        const double x1=cx+r*cos(e),y1=cy+r*sin(e);
+        if(!valid(x0)||!valid(y0)||!valid(x1)||!valid(y1))
+            return 0;
+        b[0]=fmin(x0,x1);b[1]=fmin(y0,y1);
+        b[2]=fmax(x0,x1);b[3]=fmax(y0,y1);
+        for(unsigned k=0;k<4u;k++){
+            const double a=(double)k*tau/4.0;
+            double d=fmod(sweep>0.0?a-s:s-a,tau);
+            if(d<0.0)d+=tau;
+            if(d<=fabs(sweep)+1e-12){
+                const double x=k==0u?cx+r:k==2u?cx-r:cx;
+                const double y=k==1u?cy+r:k==3u?cy-r:cy;
+                if(x<b[0])b[0]=x;
+                if(y<b[1])b[1]=y;
+                if(x>b[2])b[2]=x;
+                if(y>b[3])b[3]=y;
+            }
+        }
+    }
+    if(!valid(b[0])||!valid(b[1])||!valid(b[2])||!valid(b[3]))
+        return 0;
+    memcpy(out,b,sizeof(b));return 1;
+}
+/* Outward-rounded float32 viewport bounds prevent edge clipping. */
+static float outer_bound(double x,int lower){
+    float f=(float)x;
+    if(lower?(double)f>x:(double)f<x)
+        f=nextafterf(f,lower?-INFINITY:INFINITY);
+    return f;
+}
 /* Native v6 can preserve only source-assigned ACI 1..255 without a layer
  * graph. RGB, BYLAYER/BYBLOCK and transparency are unresolved style and
  * retain an explicitly provisional ACI 7, never fake exact colors. */
@@ -189,8 +236,12 @@ static int lwpoly(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                 dst[at+7u]=(float)arc.start;
                 dst[at+8u]=(float)arc.sweep;
             }
-            bounds(arc.cx-arc.radius,arc.cy-arc.radius,ext,has);
-            bounds(arc.cx+arc.radius,arc.cy+arc.radius,ext,has);
+            double ab[4]={0};
+            if(!musa_dwg_ac1032_preview_v6_arc_bounds(
+                 arc.cx,arc.cy,arc.radius,arc.start,arc.sweep,ab))
+                return -1;
+            bounds(ab[0],ab[1],ext,has);
+            bounds(ab[2],ab[3],ext,has);
             pos+=9u+arc_style.extra_words;
         }
     }
@@ -327,7 +378,11 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 else if(sweep<=0.0)sweep+=tau;
                 if(sweep<=0.0||sweep>tau+1e-10)supported=0;
             }
-            if(supported&&!valid(sweep))supported=0;
+            double ab[4]={0};
+            if(supported&&(!valid(sweep)||
+                !musa_dwg_ac1032_preview_v6_arc_bounds(
+                   curve.center[0],curve.center[1],
+                   curve.radius,start,sweep,ab)))supported=0;
             if(supported){
                 const MusaPreviewV6SourceStyle style=source_style(
                     &curve.common,4u,colors,&v.provisional_aci_style);
@@ -347,12 +402,9 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                     dst[at+8u]=(float)sweep;
                 }
                 w+=9u+style.extra_words;
-                /* Conservative complete-circle bounds avoid clipped arcs;
-                 * an exact ARC-specific bounding box follows separately. */
-                bounds(curve.center[0]-curve.radius,
-                       curve.center[1]-curve.radius,ext,&has);
-                bounds(curve.center[0]+curve.radius,
-                       curve.center[1]+curve.radius,ext,&has);
+                /* True ARC/whole CIRCLE bounds, no fake full-circle extents. */
+                bounds(ab[0],ab[1],ext,&has);
+                bounds(ab[2],ab[3],ext,&has);
                 v.rendered_primitives++;
             }else v.omitted_records++;
         }else if(t==16u&&polylines){
@@ -409,10 +461,10 @@ static int process(const MusaDwgAc1032SceneIndex *s,
     if(dst){
         if(w>cap)return 0;
         dst[0]=6.0f;dst[1]=(float)v.rendered_primitives;
-        dst[2]=has?(float)ext[0]:0.0f;
-        dst[3]=has?(float)ext[1]:0.0f;
-        dst[4]=has?(float)ext[2]:0.0f;
-        dst[5]=has?(float)ext[3]:0.0f;
+        dst[2]=has?outer_bound(ext[0],1):0.0f;
+        dst[3]=has?outer_bound(ext[1],1):0.0f;
+        dst[4]=has?outer_bound(ext[2],0):0.0f;
+        dst[5]=has?outer_bound(ext[3],0):0.0f;
         dst[6]=v.partial_geometry?1.0f:0.0f;
     }
     *stats=v;
