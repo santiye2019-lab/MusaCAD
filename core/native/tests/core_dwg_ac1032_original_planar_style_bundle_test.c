@@ -58,6 +58,17 @@ static int check(const char *file,uint64_t entity,uint16_t type){
            bundle.raw_layer_status.numeric_flags_start_bit==31u&&
            bundle.raw_layer_status.numeric_flags_end_bit==45u&&
            bundle.raw_layer_status.raw_values_70_290_370==224u&&
+           bundle.base_bit_preflight.source_crc_verified==1u&&
+           bundle.base_bit_preflight.layer_handle==UINT64_C(0x10)&&
+           bundle.base_bit_preflight.raw_values==224u&&
+           bundle.base_bit_preflight.frozen_bit==0u&&
+           bundle.base_bit_preflight.on_bit==0u&&
+           bundle.base_bit_preflight.frozen_in_new_viewports_bit==0u&&
+           bundle.base_bit_preflight.locked_bit==0u&&
+           bundle.base_bit_preflight.plotting_bit==0u&&
+           bundle.base_bit_preflight.lineweight_field==7u&&
+           bundle.base_bit_preflight.unmapped_bits==0u&&
+           bundle.base_bit_preflight.display_accepted==0u&&
            bundle.raw_layer_status.xref_index_plus_one==0u&&
            bundle.raw_layer_status.xref_dependent==0u&&
            bundle.original_layer_name.indexed_handle==UINT64_C(0x10)&&
