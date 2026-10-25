@@ -56,8 +56,37 @@ static int sample(const char *filename){
        linked.edge.original_layer_crc_verified&&
        linked.layer.original_record_crc_verified&&
        !strcmp(linked.layer.utf8,"0");
-    if(!ok)fprintf(stderr,
-       "FAIL genuine MTEXT H1C0 -> strict original Unicode LAYER0 H5 graph\n");
+    if(!ok){
+        MusaDwgAc1032EntityLayerRef edge={0};
+        MusaDwgAc1032EntityLayerName raw_name={0};
+        uint16_t type=0u;
+        int typed=musa_dwg_ac1032_scene_index_object_type(
+            scene,h,&type);
+        int ref=musa_dwg_ac1032_scene_index_entity_layer_ref(
+            scene,h,&edge);
+        int named=musa_dwg_ac1032_scene_index_entity_layer_name(
+            scene,h,&raw_name);
+        fprintf(stderr,
+         "MTEXT_SOURCE_LAYER_DEBUG: typed=%d OT=%u common=%u "
+         "entity_mode=%u reactors=%u xdic_missing=%u "
+         "has_color_ref=%u LT=%u PS=%u MAT=%u VS=%u "
+         "layer_ref=%d target=%llX layer_name=%d "
+         "text=%u placement=%u\n",
+         typed,(unsigned)type,(unsigned)common.common_decoded,
+         (unsigned)common.prefix.entity_mode,
+         (unsigned)common.prefix.reactor_count,
+         (unsigned)common.prefix.xdictionary_missing,
+         (unsigned)common.has_color_reference,
+         (unsigned)common.linetype_flags,
+         (unsigned)common.plotstyle_flags,
+         (unsigned)common.material_flags,
+         (unsigned)common.visualstyle_flags,
+         ref,(unsigned long long)edge.layer_handle,named,
+         (unsigned)content.original_record_crc_verified,
+         (unsigned)place.geometry_fields_decoded);
+        fprintf(stderr,
+         "FAIL genuine MTEXT H1C0 -> strict original Unicode LAYER0 H5 graph\n");
+    }
     if(ok)ok=musa_dwg_ac1032_scene_planar_color_provenance(
        scene,h,&color)&&color.entity_handle==h&&
        color.raw_entity_type==44u&&
