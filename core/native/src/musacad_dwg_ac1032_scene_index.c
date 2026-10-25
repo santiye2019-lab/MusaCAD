@@ -767,3 +767,50 @@ int musa_dwg_ac1032_scene_index_scan_geometry(
     free(stage);
     return ok;
 }
+
+/* Explicit ORIGINAL 2018 raw types currently missing full text/block
+ * geometry support in the native MC1032 preview. Counts are source
+ * record evidence only, not visible-entity totals. No external codec. */
+int musa_dwg_ac1032_scene_index_unrendered_2d_inventory(
+    const MusaDwgAc1032SceneIndex *index,
+    MusaDwgAc1032Unrendered2dInventory *out){
+    if(!index||!out||!index->handles||!index->objects||
+       !index->count||index->count>MAX_INDEX||
+       !check_output(index,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1032Unrendered2dInventory local={0};
+    local.indexed_records=index->count;
+    uint64_t previous=0u;
+    for(size_t i=0u;i<index->count;i++){
+        MusaDwgAc1032HandleEntry entry={0};
+        uint16_t type=0u;
+        if(!musa_dwg_ac1032_scene_index_entry(index,i,&entry)||
+           !entry.handle||entry.handle<=previous||
+           !musa_dwg_ac1032_scene_index_object_type(
+             index,entry.handle,&type))
+            return 0;
+        previous=entry.handle;
+        switch(type){
+        case 1u:local.text_records++;break;
+        case 44u:local.mtext_records++;break;
+        case 2u:local.attrib_records++;break;
+        case 3u:local.attdef_records++;break;
+        case 4u:local.block_begin_records++;break;
+        case 5u:local.block_end_records++;break;
+        case 7u:local.insert_records++;break;
+        case 8u:local.minsert_records++;break;
+        default:local.other_indexed_records++;break;
+        }
+    }
+    if(local.indexed_records!=
+       local.text_records+local.mtext_records+
+       local.attrib_records+local.attdef_records+
+       local.block_begin_records+local.block_end_records+
+       local.insert_records+local.minsert_records+
+       local.other_indexed_records)
+        return 0;
+    local.original_types_crc_verified=1u;
+    local.complete_2d_display_accepted=0u;
+    *out=local;
+    return 1;
+}
