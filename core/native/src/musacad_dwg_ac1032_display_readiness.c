@@ -35,6 +35,12 @@ int musa_dwg_ac1032_scene_display_readiness(
                evidence.color.layer_handle||
            evidence.original_layer_name.indexed_handle!=
                evidence.color.layer_handle||
+           !evidence.base_bit_preflight.source_crc_verified||
+           evidence.base_bit_preflight.layer_handle!=
+               evidence.color.layer_handle||
+           evidence.base_bit_preflight.raw_values!=
+               evidence.raw_layer_status.raw_values_70_290_370||
+           evidence.base_bit_preflight.display_accepted||
            evidence.visibility_resolved||
            evidence.display_style_resolved||
            evidence.color.rendering_accepted){
