@@ -33,6 +33,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_preview_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_native_v6_preview_atomic_smoke
                  COMMAND musacad_core_ac1032_original_preview_v6_test)
+        # Genuine R2018 OT35 ellipse -> independently verified source H5
+        # LAYER, Unicode name, encoded style and conservative screen readiness.
+        add_executable(musacad_core_ac1032_real_ellipse_style_test
+                tests/core_dwg_ac1032_original_ellipse_color_provenance_test.c)
+        target_link_libraries(musacad_core_ac1032_real_ellipse_style_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ellipse_style_smoke
+                 COMMAND musacad_core_ac1032_real_ellipse_style_test)
         # Real R2018 OT35 ELLIPSE original CRC/H source -> actual v6 curve.
         add_executable(musacad_core_ac1032_real_ellipse_test
                 tests/core_dwg_ac1032_original_ellipse_v6_test.c)
