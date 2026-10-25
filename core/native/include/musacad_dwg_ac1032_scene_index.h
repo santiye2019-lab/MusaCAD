@@ -53,6 +53,11 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
 int musa_dwg_ac1032_scene_index_read_mtext_source(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032MTextSource *out);
+/* Authenticated original OT44 MTEXT position/axes/text height and width;
+ * NOT a glyph/font renderer or final 2D display acceptance. */
+int musa_dwg_ac1032_scene_index_read_mtext_placement(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032MTextPlacement *out);
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativePoint *out);

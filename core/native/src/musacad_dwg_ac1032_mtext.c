@@ -95,3 +95,66 @@ int musa_dwg_ac1032_mtext_single_tu_at(
     *out=result;
     return 1;
 }
+
+/* Read actual MTEXT geometric DATA prefix, bounded before the independent
+ * STRING frame. No scan for plausible coordinates and no glyph acceptance.
+ * All numeric fields use first-party bounded C11 bit grammar. */
+#include <math.h>
+int musa_dwg_ac1032_mtext_placement_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *l,
+    size_t geom,MusaDwgAc1032MTextPlacement *out){
+    if(!raw||!l||!out||!n||n>MAX_SOURCE_BYTES||
+       overlap(raw,n,l,sizeof(*l))||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(l,sizeof(*l),out,sizeof(*out))||
+       !l->original_record_crc_verified||!l->indexed_handle||
+       l->raw_object_type!=44u||l->object_type_field_bits!=10u||
+       geom<l->object_type_field_bits||
+       l->total_payload_bits!=(uint64_t)n*8u||
+       l->handle_stream_start_bit!=l->data_stream_bits||
+       !l->handle_stream_bits||
+       l->handle_stream_bits!=l->total_payload_bits-l->data_stream_bits)
+        return 0;
+    MusaDwgAc1032MTextSource source={0};
+    if(!musa_dwg_ac1032_mtext_single_tu_at(
+          raw,n,l,geom,&source)||
+       !source.original_record_crc_verified||
+       source.indexed_handle!=l->indexed_handle||
+       source.original_string_start_bit<=geom)return 0;
+    MusaDwgAc1015Bits bits={0};
+    if(!musa_dwg_ac1015_bits_init(&bits,raw,n,geom,
+          source.original_string_start_bit))return 0;
+    MusaDwgAc1032MTextPlacement v={0};
+    v.indexed_handle=l->indexed_handle;
+    v.original_string_start_bit=source.original_string_start_bit;
+    for(unsigned i=0u;i<3u;i++)
+        if(!musa_dwg_ac1015_bits_read_bd(&bits,&v.insertion[i])||
+           !isfinite(v.insertion[i]))return 0;
+    for(unsigned i=0u;i<3u;i++)
+        if(!musa_dwg_ac1015_bits_read_bd(&bits,&v.extrusion[i])||
+           !isfinite(v.extrusion[i]))return 0;
+    for(unsigned i=0u;i<3u;i++)
+        if(!musa_dwg_ac1015_bits_read_bd(&bits,&v.x_axis[i])||
+           !isfinite(v.x_axis[i]))return 0;
+    if(!musa_dwg_ac1015_bits_read_bd(&bits,&v.rect_width)||
+       !musa_dwg_ac1015_bits_read_bd(&bits,&v.rect_height)||
+       !musa_dwg_ac1015_bits_read_bd(&bits,&v.text_height)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&v.attachment)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&v.drawing_direction)||
+       !isfinite(v.rect_width)||v.rect_width<=0.0||
+       !isfinite(v.rect_height)||v.rect_height<0.0||
+       !isfinite(v.text_height)||v.text_height<=0.0||
+       v.attachment<1u||v.attachment>9u||
+       (v.drawing_direction!=1u&&v.drawing_direction!=3u&&
+        v.drawing_direction!=5u)||
+       hypot(hypot(v.extrusion[0],v.extrusion[1]),v.extrusion[2])<0.5||
+       hypot(hypot(v.x_axis[0],v.x_axis[1]),v.x_axis[2])<0.5||
+       bits.bit_pos>source.original_string_start_bit)return 0;
+    v.geometry_end_bit=bits.bit_pos;
+    v.original_record_crc_verified=1u;
+    v.geometry_fields_decoded=1u;
+    v.glyph_layout_and_display_accepted=0u;
+    *out=v;
+    return 1;
+}
