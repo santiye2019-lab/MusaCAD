@@ -140,7 +140,7 @@ jobs:
             app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
             tests/NativeArcCullingBoundsTest.java
           java -cp /tmp/musacad-native-arc-cull com.musa.cad.NativeArcCullingBoundsTest
-          grep -q 'NativeArcCullingBounds.compute(' app/src/main/java/com/musa/cad/NativeScene.java
+          grep -q 'NativeSceneViewportBounds.arcCullingBounds(' app/src/main/java/com/musa/cad/NativeScene.java
       - name: Test DXF attribute visibility
         run: |
           javac -d /tmp/musacad-tests app/src/main/java/com/musa/cad/DxfAttributeVisibility.java tests/DxfAttributeVisibilityTest.java
