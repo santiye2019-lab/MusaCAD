@@ -35,6 +35,11 @@ typedef struct MusaAc1032ColorProvenance {
      * compatibility. It does not establish viewport/layer visibility. */
     uint32_t entity_source_rgb24;
     uint8_t entity_has_direct_rgb24;
+    /* DWG common entity's own independently decoded invisibility field.
+     * Set only if source says hidden; 0 does NOT mean the layer or viewport
+     * is visible. Subset of complex_or_invisible, mutually exclusive with
+     * directly resolved RGB24, never a final scene visibility claim. */
+    uint8_t source_entity_invisible;
 } MusaAc1032ColorProvenance;
 /* Source-authenticated original AC1032 planar entity color evidence for
  * ARC, CIRCLE, LINE, POINT and LWPOLYLINE (OT77). The latter requires
