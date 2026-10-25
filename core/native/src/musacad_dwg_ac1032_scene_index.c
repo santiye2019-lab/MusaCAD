@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h> /* temporary strict H-stream diagnostic, remove after proof */
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -581,38 +580,26 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
          * source-verified target object membership for the extra handle.
          * No font, model-space owner or final display claim here. */
         if(ok&&type==44u){
-            uint16_t tail_type=0u;
+            uint16_t tail_type=0u;uint32_t null_ref=1u;
+            /* A genuine R2018 original MTEXT source H1C0 has:
+             *  - H5 layer (0x10)
+             *  - H5 text-style (0x11)
+             *  - one byte of explicit null H field (00), then <=7
+             *    zero end-alignment bits. The third field is not a
+             *    canonical nonzero H reference: do NOT abuse
+             *    musa_dwg_ac1015_read_handle_ref() on its 00 sentinel.
+             * Require this exact source-tested narrow MTEXT layout;
+             * reject optional/unknown references without guessing. */
             ok=cached_graph_ref(&bits,h,5u,&tail_handle)&&
                tail_handle!=h&&tail_handle!=layer&&
                musa_dwg_ac1032_scene_index_object_type(
-                   s,tail_handle,&tail_type)&&tail_type!=51u;
+                   s,tail_handle,&tail_type)&&tail_type!=51u&&
+               bits.bit_end-bits.bit_pos>=8u&&
+               bits.bit_end-bits.bit_pos<=15u&&
+               musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
+               null_ref==0u;
         }
         if(ok)ok=cached_graph_zero_padding(&bits);
-    }
-    if(type==44u&&!ok){
-        /* TEMPORARY original untrusted source H diagnostic ONLY; to be
-         * removed before merge. Decode at most three bounded H tokens. */
-        MusaDwgAc1015Bits probe={0};
-        MusaDwgAc1015HandleRef one={0},two={0},three={0};
-        int init=musa_dwg_ac1015_bits_init(
-            &probe,p.raw,p.bytes,(size_t)p.layout.data_stream_bits,
-            (size_t)p.layout.total_payload_bits);
-        const size_t start=probe.bit_pos;
-        int first=init&&musa_dwg_ac1015_read_handle_ref(&probe,h,&one);
-        const size_t after_first=probe.bit_pos;
-        int second=first&&musa_dwg_ac1015_read_handle_ref(&probe,h,&two);
-        const size_t after_second=probe.bit_pos;
-        int third=second&&musa_dwg_ac1015_read_handle_ref(&probe,h,&three);
-        fprintf(stderr,
-         "MTEXT_H_RAW: bits=%llu first=%d code=%u target=%llX "
-         "start=%zu first_at=%zu second=%d code=%u target=%llX "
-         "second_at=%zu third=%d code=%u target=%llX pad=%zu\n",
-         (unsigned long long)p.layout.handle_stream_bits,
-         first,(unsigned)one.code,(unsigned long long)one.target,
-         start,after_first,second,(unsigned)two.code,
-         (unsigned long long)two.target,after_second,
-         third,(unsigned)three.code,(unsigned long long)three.target,
-         probe.bit_end-probe.bit_pos);
     }
     free(p.raw);
     uint16_t layer_type=0u;
