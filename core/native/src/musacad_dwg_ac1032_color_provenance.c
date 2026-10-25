@@ -13,7 +13,7 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=77u))
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&type!=77u))
         return 0;
     MusaDwgAc1032EntityCommon common={0};
     if(type==19u){
@@ -30,6 +30,15 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
            !curve.geometry_decoded||curve.object_type!=type||
            curve.indexed_handle!=h)return 0;
         common=curve.common;
+    }else if(type==35u){
+        /* Same original, CRC/H authenticated numeric ellipse as preview.
+         * Do not fabricate its ENC, layer handle or display visibility.
+         * Refuse corrupt/unsupported ellipses before exposing color. */
+        MusaDwgAc1032NativeEllipse ellipse={0};
+        if(!musa_dwg_ac1032_scene_index_read_ellipse(s,h,&ellipse)||
+           !ellipse.geometry_decoded||ellipse.indexed_handle!=h)
+            return 0;
+        common=ellipse.common;
     }else{ /* OT77, source indexed REAL LWPOLYLINE geometry and ENC. */
         MusaDwgAc1032NativeLWPolyline poly={0};
         MusaDwgAc1032LWVertex local[MUSA_LWPROV_INLINE_VERTICES];

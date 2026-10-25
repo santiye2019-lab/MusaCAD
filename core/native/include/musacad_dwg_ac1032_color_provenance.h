@@ -42,7 +42,9 @@ typedef struct MusaAc1032ColorProvenance {
     uint8_t source_entity_invisible;
 } MusaAc1032ColorProvenance;
 /* Source-authenticated original AC1032 planar entity color evidence for
- * ARC, CIRCLE, LINE, POINT and LWPOLYLINE (OT77). The latter requires
+ * ARC, CIRCLE, LINE, POINT, ELLIPSE (OT35) and LWPOLYLINE (OT77).
+ * ELLIPSE requires real CRC/H source geometry and the same restricted
+ * strict entity-to-layer graph as other supported primitives. The latter requires
  * strict first-party full source geometry/vertex decoding; malformed,
  * unbounded or unsupported vertices must not yield invented color.
  * This API NEVER resolves display-ready layer visibility, inheritance,
