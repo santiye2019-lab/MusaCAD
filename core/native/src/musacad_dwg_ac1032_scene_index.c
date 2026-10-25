@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h> /* temporary CI diagnostic, remove before merge */
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -240,18 +239,17 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
     return ok;
 }
 int musa_dwg_ac1032_scene_index_read_mtext_common(
-    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032EntityCommon *out){
-    if(!check_output(s,out,sizeof(*out)))return 0;
-    Payload p={0};
-    if(!fetch(s,h,44u,&p))return 0;
-    const MusaDwgAc1032EntityCommon value=p.common;
-    free(p.raw);
-    if(!value.common_decoded||!value.prefix.prefix_decoded||
-       value.prefix.indexed_handle!=h||
-       value.prefix.raw_object_type!=44u)return 0;
-    *out=value;
-    return 1;
+    if(!check_output(scene,out,sizeof(*out)))return 0;
+    Payload payload={0};
+    if(!fetch(scene,h,44u,&payload))return 0;
+    const MusaDwgAc1032EntityCommon common=payload.common;
+    free(payload.raw);
+    if(!common.common_decoded||!common.prefix.prefix_decoded||
+       common.prefix.indexed_handle!=h||
+       common.prefix.raw_object_type!=44u)return 0;
+    *out=common;return 1;
 }
 int musa_dwg_ac1032_scene_index_read_mtext_source(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
@@ -356,6 +354,66 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
         uint32_t bit=1u;
         if(!musa_dwg_ac1015_bits_read_u(bits,1u,&bit)||bit)return 0;
     }
+    return 1;
+}
+/* Original MTEXT H tail: optional hard owner, entity layer H5 and
+ * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
+int musa_dwg_ac1032_scene_index_mtext_graph(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032MTextGraph *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,44u,&p))return 0;
+    MusaDwgAc1032MTextGraph value={0};
+    value.indexed_handle=h;
+    int ok=p.common.common_decoded&&
+       p.common.prefix.reactor_count==0u&&
+       p.common.prefix.xdictionary_missing==1u&&
+       !p.common.has_color_reference&&
+       p.common.linetype_flags==0u&&
+       p.common.plotstyle_flags==0u&&
+       p.common.material_flags==0u&&
+       p.common.visualstyle_flags==0u&&
+       p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX;
+    if(ok){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+            (size_t)p.layout.data_stream_bits,
+            (size_t)p.layout.total_payload_bits);
+        if(ok&&p.common.prefix.entity_mode==0u)
+            ok=cached_graph_ref(&bits,h,4u,&value.owner_handle);
+        else if(ok&&p.common.prefix.entity_mode!=2u)ok=0;
+        if(ok)ok=cached_graph_ref(&bits,h,5u,&value.layer_handle)&&
+                 cached_graph_ref(&bits,h,5u,&value.style_handle)&&
+                 value.layer_handle!=h&&value.style_handle!=h&&
+                 value.layer_handle!=value.style_handle;
+        /* Original R2018 Text.dwg H1C0 has two valid H5 targets,
+         * followed by one exact 0x50 null H5 optional reference and
+         * six zero end-padding bits. Never interpret the null as a
+         * third target, and never accept arbitrary unparsed H data. */
+        if(ok&&bits.bit_end-bits.bit_pos>=8u){
+            uint32_t null_ref=0u;
+            ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
+               null_ref==0x50u;
+        }
+        if(ok)ok=cached_graph_zero_padding(&bits);
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    uint16_t layer_type=0u,style_type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+          s,value.layer_handle,&layer_type)||layer_type!=51u||
+       !musa_dwg_ac1032_scene_index_object_type(
+          s,value.style_handle,&style_type))return 0;
+    value.layer_object_type=layer_type;
+    value.style_object_type=style_type;
+    value.original_entity_crc_verified=1u;
+    value.original_layer_crc_verified=1u;
+    value.original_style_crc_verified=1u;
+    value.graph_edges_verified=1u;
+    value.font_and_display_accepted=0u;
+    *out=value;
     return 1;
 }
 static int cached_reverse_owner(const Payload *p,
@@ -546,9 +604,35 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     if(!h||!check_output(s,out,sizeof(*out)))return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&
-         type!=44u&&type!=77u))
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&
+         type!=35u&&type!=44u&&type!=77u))
         return 0;
+    /* MTEXT uses its own already original-H/CRC verified owner/layer/
+     * text-style graph, including the exact optional 0x50 null handle.
+     * Reuse it instead of incorrectly applying the LINE single-H tail. */
+    if(type==44u){
+        MusaDwgAc1032MTextGraph graph={0};
+        if(!musa_dwg_ac1032_scene_index_mtext_graph(
+              s,h,&graph)||
+           !graph.graph_edges_verified||
+           !graph.original_entity_crc_verified||
+           !graph.original_layer_crc_verified||
+           !graph.original_style_crc_verified||
+           graph.font_and_display_accepted||
+           graph.indexed_handle!=h||
+           !graph.layer_handle||
+           graph.layer_object_type!=51u)return 0;
+        MusaDwgAc1032EntityLayerRef linked={0};
+        linked.entity_handle=h;
+        linked.layer_handle=graph.layer_handle;
+        linked.raw_entity_type=type;
+        linked.raw_layer_type=51u;
+        linked.original_entity_crc_verified=1u;
+        linked.original_layer_crc_verified=1u;
+        linked.source_handle_ref_verified=1u;
+        *out=linked;
+        return 1;
+    }
     Payload p={0};
     if(!fetch(s,h,type,&p))return 0;
     /* Source H stream grammar is unambiguous only in this restricted
@@ -565,7 +649,7 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
         p.common.visualstyle_flags==0u&&
         p.layout.data_stream_bits<=SIZE_MAX&&
         p.layout.total_payload_bits<=SIZE_MAX;
-    uint64_t layer=0u,tail_handle=0u;
+    uint64_t layer=0u;
     int ok=0;
     if(simple){
         MusaDwgAc1015Bits bits={0};
@@ -573,60 +657,7 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits)&&
            cached_graph_ref(&bits,h,5u,&layer)&&
-           layer!=h;
-        /* Unlike LINE/POINT/ARC, original MTEXT has a second H entry
-         * for its source text-style reference. Never accept the first
-         * H as the whole record and silently discard source references.
-         * Require exactly two independently bounded H entries and
-         * source-verified target object membership for the extra handle.
-         * No font, model-space owner or final display claim here. */
-        if(ok&&type==44u){
-            uint16_t tail_type=0u;uint32_t null_ref=1u;
-            /* A genuine R2018 original MTEXT source H1C0 has:
-             *  - H5 layer (0x10)
-             *  - H5 text-style (0x11)
-             *  - one byte of explicit null H field (00), then <=7
-             *    zero end-alignment bits. The third field is not a
-             *    canonical nonzero H reference: do NOT abuse
-             *    musa_dwg_ac1015_read_handle_ref() on its 00 sentinel.
-             * Require this exact source-tested narrow MTEXT layout;
-             * reject optional/unknown references without guessing. */
-            ok=cached_graph_ref(&bits,h,5u,&tail_handle)&&
-               tail_handle!=h&&tail_handle!=layer&&
-               musa_dwg_ac1032_scene_index_object_type(
-                   s,tail_handle,&tail_type)&&tail_type!=51u&&
-               bits.bit_end-bits.bit_pos>=8u&&
-               bits.bit_end-bits.bit_pos<=15u&&
-               musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
-               null_ref==0u;
-        }
-        if(ok)ok=cached_graph_zero_padding(&bits);
-    }
-    if(type==44u&&!ok){
-        MusaDwgAc1015Bits probe={0};
-        MusaDwgAc1015HandleRef a={0},b={0};
-        int init=musa_dwg_ac1015_bits_init(
-            &probe,p.raw,p.bytes,(size_t)p.layout.data_stream_bits,
-            (size_t)p.layout.total_payload_bits);
-        int first=init&&musa_dwg_ac1015_read_handle_ref(&probe,h,&a);
-        int second=first&&musa_dwg_ac1015_read_handle_ref(&probe,h,&b);
-        const size_t remaining=probe.bit_end-probe.bit_pos;
-        uint32_t null_octet=~0u,tail_padding=~0u;
-        int oct=second&&remaining>=8u&&
-             musa_dwg_ac1015_bits_read_u(&probe,8u,&null_octet);
-        int pad=oct&&probe.bit_end-probe.bit_pos<=7u&&
-             musa_dwg_ac1015_bits_read_u(&probe,
-                  (unsigned)(probe.bit_end-probe.bit_pos),
-                  &tail_padding);
-        uint16_t subtype=0u;int found=0;
-        if(second)found=musa_dwg_ac1032_scene_index_object_type(
-             s,b.target,&subtype);
-        fprintf(stderr,"MTEXT_H_STEP: init=%d first=%d codeA=%u targetA=%llX "
-            "second=%d codeB=%u targetB=%llX typeB=%d/%u "
-            "remain=%zu oct=%d value=%u tailPad=%d value=%u\n",
-            init,first,(unsigned)a.code,(unsigned long long)a.target,
-            second,(unsigned)b.code,(unsigned long long)b.target,
-            found,(unsigned)subtype,remaining,oct,null_octet,pad,tail_padding);
+           layer!=h&&cached_graph_zero_padding(&bits);
     }
     free(p.raw);
     uint16_t layer_type=0u;
