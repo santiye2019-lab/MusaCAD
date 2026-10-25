@@ -238,6 +238,22 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
     if(ok)*out=value;
     return ok;
 }
+int musa_dwg_ac1032_scene_index_read_text_content(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032NativeTextContent *out){
+    if(!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,1u,&p))return 0;
+    MusaDwgAc1032NativeTextContent content={0};
+    const int ok=musa_dwg_ac1032_text_content_at(
+        p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&content)&&
+        content.indexed_handle==h&&
+        content.original_record_crc_verified&&
+        !content.geometry_and_style_accepted;
+    free(p.raw);
+    if(ok)*out=content;
+    return ok;
+}
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032NativePoint *out){
