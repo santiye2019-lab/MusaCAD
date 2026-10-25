@@ -84,6 +84,20 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 original AC1032 exact ARC and signed bulge viewport-fit bounds
+        run: |
+          set -euo pipefail
+          arc=third_party/libredwg/test/test-data/2018/Arc.dwg
+          circle=third_party/libredwg/test/test-data/2018/circle.dwg
+          before="$(sha256sum "$arc" "$circle")"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_preview_v6_arc_bounds_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-arc-fit
+          timeout 60s /tmp/musacad-r2018-arc-fit "$arc" "$circle"
+          test "$before" = "$(sha256sum "$arc" "$circle")"
+          echo "PASS first-party exact native v6 ARC bounds and unchanged real DWG"
+
       - name: P0 original AC1032 AutoCAD LINE indexed source + reference provenance
         run: |
           set -euo pipefail
