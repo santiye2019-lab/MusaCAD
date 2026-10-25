@@ -40,7 +40,12 @@ static int fixture(const char *file,uint64_t handle,uint16_t type){
          p.entity_and_layer_crc_verified&&
          p.source_layer_aci_supported==1u&&
          p.source_layer_aci==7u&&
-         p.rendering_accepted==0u;
+         p.rendering_accepted==0u&&
+         (!p.source_entity_invisible||
+            (p.entity_complex_color_or_transparency&&
+             !p.entity_has_direct_rgb24&&
+             !p.entity_has_direct_aci&&
+             !p.entity_by_layer&&!p.entity_by_block));
     if(ok){
         const unsigned classes=(unsigned)p.entity_has_direct_aci+
           (unsigned)p.entity_by_layer+(unsigned)p.entity_by_block+
