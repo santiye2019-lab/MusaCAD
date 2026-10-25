@@ -5,6 +5,7 @@
 #include "musacad_dwg_ac1032_line_file.h"
 #include "musacad_dwg_ac1032_curve.h"
 #include "musacad_dwg_ac1032_point.h"
+#include "musacad_dwg_ac1032_text.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
 #include "musacad_dwg_ac1032_layer.h"
@@ -46,6 +47,12 @@ int musa_dwg_ac1032_scene_index_read_curve(
 int musa_dwg_ac1032_scene_index_read_ellipse(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeEllipse *out);
+/* CRC/H authenticated original binary TEXT single Unicode string.
+ * Text placement, style handle, glyphs, and visibility remain unverified;
+ * this only extracts the actual TU value, never counts as drawn text. */
+int musa_dwg_ac1032_scene_index_read_text_content(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032NativeTextContent *out);
 int musa_dwg_ac1032_scene_index_read_point(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativePoint *out);

@@ -139,6 +139,30 @@ jobs:
           test "$before" = "$(sha256sum "$folder/Line.dwg" "$folder/Point.dwg" "$folder/Arc.dwg" "$folder/circle.dwg" "$folder/Polyline.dwg" "$folder/PolyLine3D.dwg")"
           echo "PASS missing text/insert/block source records separately classified, NO false render claim"
 
+      - name: P0 authentic AC1032 TEXT TU Unicode actual content (not type count)
+        run: |
+          set -euo pipefail
+          file=third_party/libredwg/test/test-data/2018/Text.dwg
+          if [ ! -s "$file" ]; then
+            echo "ORIGINAL_TEXT_FIXTURE_MISSING: $file"
+            ls -la third_party/libredwg/test/test-data/2018/ | head -45 || true
+            exit 1
+          fi
+          magic="$(head -c 6 "$file")"
+          echo "Original TEXT DWG magic: $magic"
+          if [ "$magic" != AC1032 ]; then
+            echo "ORIGINAL_TEXT_FIXTURE_NOT_R2018: $file, magic=$magic"
+            exit 1
+          fi
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_text_content_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-native-source-text-tu
+          timeout 120s /tmp/musacad-r2018-native-source-text-tu "$file"
+          test "$before" = "$(sha256sum "$file" | cut -d ' ' -f1)"
+          echo "PASS original R2018 TEXT exact Unicode string source read; glyph layout and style not yet admitted"
+
       - name: P0 six original R2018 files C11 source-record vs v6 primitives census
         run: |
           set -euo pipefail
