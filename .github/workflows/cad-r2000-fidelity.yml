@@ -143,8 +143,17 @@ jobs:
         run: |
           set -euo pipefail
           file=third_party/libredwg/test/test-data/2018/Text.dwg
-          test -s "$file"
-          test "$(head -c 6 "$file")" = AC1032
+          if [ ! -s "$file" ]; then
+            echo "ORIGINAL_TEXT_FIXTURE_MISSING: $file"
+            ls -la third_party/libredwg/test/test-data/2018/ | head -45 || true
+            exit 1
+          fi
+          magic="$(head -c 6 "$file")"
+          echo "Original TEXT DWG magic: $magic"
+          if [ "$magic" != AC1032 ]; then
+            echo "ORIGINAL_TEXT_FIXTURE_NOT_R2018: $file, magic=$magic"
+            exit 1
+          fi
           before="$(sha256sum "$file" | cut -d ' ' -f1)"
           cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
             core/native/tests/core_dwg_ac1032_original_text_content_test.c \
