@@ -113,7 +113,7 @@ jobs:
             -o /tmp/musacad-r2018-mtext-prefix
           timeout 120s /tmp/musacad-r2018-mtext-prefix "$folder/Text.dwg"
           test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
-          echo "PASS original MTEXT source common prefix only; Unicode/glyphs remain unresolved"
+          echo "PASS original MTEXT H1C0 exact source Unicode TU; geometry/font/glyphs remain unresolved"
 
       - name: P0 original R2018 ELLIPSE H1BE verified LAYER0 and entity-color evidence
         run: |
