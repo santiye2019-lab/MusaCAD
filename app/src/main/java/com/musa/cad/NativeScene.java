@@ -74,9 +74,9 @@ public final class NativeScene {
                 if(p+8>values.length)break;
                 float cx=values[p++],cy=values[p++];
                 float ux=values[p++],uy=values[p++],vx=values[p++],vy=values[p++];
-                float start=values[p++],sweep=values[p++];
+                float angleStart=values[p++],sweep=values[p++];
                 if(NativeSceneViewportBounds.arcCullingBounds(
-                        cx,cy,ux,uy,vx,vy,start,sweep,arcBounds)){
+                        cx,cy,ux,uy,vx,vy,angleStart,sweep,arcBounds)){
                     b.set(arcBounds[0],arcBounds[1],
                           arcBounds[2],arcBounds[3]);
                 }else{
