@@ -11,7 +11,7 @@ extern "C" {
  * These are inputs to a future renderer, NOT permission to render:
  * color display, frozen/off/locked, XREF, per-viewport and BYBLOCK
  * inheritance are explicitly NOT decided by this function.
- * Independently tested with genuine AC1032 LINE, POINT, ARC, CIRCLE
+ * Independently tested with genuine AC1032 LINE, POINT, ARC, CIRCLE, ELLIPSE
  * and OT77 LWPOLYLINE; never infer an OT77 display color from the layer
  * ACI alone. Every entity's source geometry must first decode. Supports
  * the exact subset admitted by musa_dwg_ac1032_scene_planar_color_provenance.
