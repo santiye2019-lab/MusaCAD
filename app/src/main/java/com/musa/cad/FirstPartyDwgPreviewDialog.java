@@ -101,7 +101,7 @@ public final class FirstPartyDwgPreviewDialog {
                         "\nMTEXT kaynak Unicode/metin yönü/konumu okunabiliyorsa"+
                         " mevcut Android metin motorunda fontu yaklaşık çizilir."+
                         " Kaynaktaki paragraf satırları, yazı tipi ve sarmalama"+
-                        " birebir doğrulanmadı; görünürlük ve renkler kesin değil."+
+                        " birebir doğrulanmadı; katman görünürlüğü ve renkler kesin değil."+
                         "\nTAM OLARAK GÖSTERİLEMEYEN KAYNAK AİLELERİ:"+
                         "\nTEXT/MTEXT kaynak kayıt toplamı: "+a.undecodedTextMtext+
                         " • ATTRIB/ATTDEF: "+a.undecodedAttribAttdef+
