@@ -461,10 +461,16 @@ static int process(const MusaDwgAc1032SceneIndex *s,
     if(dst){
         if(w>cap)return 0;
         dst[0]=6.0f;dst[1]=(float)v.rendered_primitives;
-        dst[2]=has?outer_bound(ext[0],1):0.0f;
-        dst[3]=has?outer_bound(ext[1],1):0.0f;
-        dst[4]=has?outer_bound(ext[2],0):0.0f;
-        dst[5]=has?outer_bound(ext[3],0):0.0f;
+        /* A zero-width source axis maps to one identical float32 value
+         * (e.g. real POINT.dwg). Outward expansion is only necessary for
+         * NON-DEGENERATE arcs/lines; otherwise zero-area geometry becomes
+         * a fake nonzero rectangle. */
+        const int zero_x=ext[0]==ext[2];
+        const int zero_y=ext[1]==ext[3];
+        dst[2]=has?(zero_x?(float)ext[0]:outer_bound(ext[0],1)):0.0f;
+        dst[3]=has?(zero_y?(float)ext[1]:outer_bound(ext[1],1)):0.0f;
+        dst[4]=has?(zero_x?(float)ext[2]:outer_bound(ext[2],0)):0.0f;
+        dst[5]=has?(zero_y?(float)ext[3]:outer_bound(ext[3],0)):0.0f;
         dst[6]=v.partial_geometry?1.0f:0.0f;
     }
     *stats=v;
