@@ -4,6 +4,8 @@
 #include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1032_object_streams.h"
 #include "musacad_dwg_ac1032_entity_prefix.h"
+#include "musacad_dwg_ac1032_mtext.h"
+#include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1015_values.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -60,13 +62,43 @@ int main(int argc,char **argv){
          need,(unsigned long long)layout.data_stream_bits,
          (unsigned long long)layout.handle_stream_bits,
          common_ok,common.geometry_start_bit,tu_frame,flag,bits);
-    /* The raw MTEXT entity-common decoder is only admitted if its own
-     * CRC/H-authenticated real-file preflight actually succeeds. */
+    static const char expected[]=
+       "This a multiline text to check if libredwg is able to read this in the current file format version";
+    MusaDwgAc1032MTextSource source={0};
+    MusaDwgAc1032SceneIndex *scene=NULL;
     ok=ok&&common_ok&&common.common_decoded&&
        common.prefix.raw_object_type==44u&&
        common.prefix.indexed_handle==h&&
        common.geometry_start_bit<end&&
-       !memcmp(file,"AC1032",6u);
+       tu_frame&&flag==1u&&bits==1578u&&
+       musa_dwg_ac1032_mtext_single_tu_at(
+          raw,need,&layout,common.geometry_start_bit,&source)&&
+       source.indexed_handle==h&&
+       source.utf16_code_units==98u&&
+       source.utf8_bytes==strlen(expected)&&
+       !strcmp(source.utf8,expected)&&
+       source.original_record_crc_verified&&
+       !source.geometry_style_and_glyphs_accepted&&
+       musa_dwg_ac1032_scene_index_open(file,n,&scene);
+    if(ok){
+        MusaDwgAc1032MTextSource cached={0};
+        ok=musa_dwg_ac1032_scene_index_read_mtext_source(
+               scene,h,&cached)&&
+           !memcmp(&source,&cached,sizeof(source));
+        const MusaDwgAc1032MTextSource saved=source;
+        const size_t bit=end-1u;
+        raw[bit/8u]^=(uint8_t)(1u<<(7u-bit%8u));
+        if(musa_dwg_ac1032_mtext_single_tu_at(
+               raw,need,&layout,common.geometry_start_bit,&source)||
+           memcmp(&source,&saved,sizeof(source))!=0)ok=0;
+        raw[bit/8u]^=(uint8_t)(1u<<(7u-bit%8u));
+        layout.raw_object_type=1u; /* OT1 TEXT is a DIFFERENT decoder */
+        if(musa_dwg_ac1032_mtext_single_tu_at(
+               raw,need,&layout,common.geometry_start_bit,&source)||
+           memcmp(&source,&saved,sizeof(source))!=0)ok=0;
+    }
+    fprintf(stderr,"%s original MTEXT TU source Unicode H1C0 exact oracle; NOT full MTEXT glyph/format/placement\\n",ok?"PASS":"FAIL");
+    musa_dwg_ac1032_scene_index_close(scene);
     free(raw);free(file);
     return ok?0:1;
 }
