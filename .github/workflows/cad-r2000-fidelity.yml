@@ -133,6 +133,22 @@ jobs:
           test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
           echo "PASS source MTEXT numeric position/axes/size; glyph/font/visibility unresolved"
 
+      - name: P0 original R2018 MTEXT H1C0 layer and style H graph evidence
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          grep -F 'ObjectName (RO) = "AcDbMText"' "$folder/Text.txt"
+          grep -F 'Layer = "0"' "$folder/Text.txt"
+          grep -F 'StyleName = "Standard"' "$folder/Text.txt"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_mtext_graph_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-mtext-graph
+          timeout 120s /tmp/musacad-r2018-mtext-graph "$folder/Text.dwg"
+          test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          echo "PASS original MTEXT H graph; font and final display unresolved"
+
       - name: P0 original R2018 ELLIPSE H1BE verified LAYER0 and entity-color evidence
         run: |
           set -euo pipefail
