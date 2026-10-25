@@ -70,6 +70,21 @@ int musa_dwg_ac1032_preview_v6_planar_polylines(
 int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,
     size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* Experimental source-authenticated R2018 MTEXT (OT44) optional visual
+ * bridge: original UTF-8 content and planar position/axes/text size are
+ * transported as native v6 type 6 glyph proxy. Android uses generic font
+ * and a single line: paragraphs, font metrics, line wrapping, layer
+ * visibility, owner graph and final colors are NOT equivalent to AutoCAD.
+ * Always explicitly partial; no guarantee of exact glyph placement.
+ * Legacy preview functions remain unaffected. */
+int musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
+    const MusaDwgAc1032SceneIndex *scene,float *words,
+    size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* Same exact optional MTEXT-admitting source census, preserving the
+ * existing source_census API's proven no-MTEXT contract. */
+int musa_dwg_ac1032_preview_v6_source_census_with_mtext(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out);
 
 /* Verified AC1032 source-record accounting for the actual v6 native
  * read-only preview admission path, NOT a percentage of full AutoCAD 2D
