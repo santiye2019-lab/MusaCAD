@@ -23,10 +23,10 @@ public final class FirstPartyDwgPreview {
         public final long indexed,planarRecognized,sourceStyleLinked;
         public final long directAci,byLayer,byBlock,complex;
         public final long sourceStyleUnresolved,otherRecords,narrowLayerAciEvidence;
-        public final long directRgb24,complexUnresolved;
+        public final long directRgb24,complexUnresolved,sourceEntityHidden,otherComplex;
         public final boolean colorAndVisibilityComplete;
         private Readiness(long[] raw)throws IOException {
-            if(raw==null||raw.length!=12)
+            if(raw==null||raw.length!=13)
                 throw new IOException("DWG stil kanit sayaci eksik");
             for(long n:raw)if(n<0L||n>1000000L)
                 throw new IOException("DWG kaynak nesne sayaci gecersiz");
@@ -36,13 +36,16 @@ public final class FirstPartyDwgPreview {
             otherRecords=raw[8];narrowLayerAciEvidence=raw[9];
             colorAndVisibilityComplete=raw[10]!=0L;
             directRgb24=raw[11];
+            sourceEntityHidden=raw[12];
             complexUnresolved=complex-directRgb24;
+            otherComplex=complexUnresolved-sourceEntityHidden;
             if(raw[10]!=0L||indexed<=0L||
                planarRecognized+otherRecords!=indexed||
                sourceStyleLinked+sourceStyleUnresolved!=planarRecognized||
                directAci+byLayer+byBlock+complex!=sourceStyleLinked||
                narrowLayerAciEvidence>sourceStyleLinked||
-               directRgb24>complex)
+               directRgb24>complex||
+               sourceEntityHidden>complex-directRgb24)
                 throw new IOException("DWG kaynak ve gorunurluk raporu tutarsiz");
         }
     }
@@ -70,7 +73,7 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Kaynak DWG bulunamadi");
         if (maxFloatWords < 256 || maxFloatWords > 9 * 1024 * 1024)
             throw new IOException("DWG onizleme bellek siniri gecersiz");
-        long[] report=new long[12];
+        long[] report=new long[13];
         float[] raw=readOriginalNative(
                 original.getAbsolutePath(),maxFloatWords,report);
         NativeScene parsed=NativeScene.fromRaw(raw);
