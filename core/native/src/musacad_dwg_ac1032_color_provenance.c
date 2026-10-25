@@ -13,7 +13,8 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&type!=77u))
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&
+        type!=44u&&type!=77u))
         return 0;
     MusaDwgAc1032EntityCommon common={0};
     if(type==19u){
@@ -30,6 +31,22 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
            !curve.geometry_decoded||curve.object_type!=type||
            curve.indexed_handle!=h)return 0;
         common=curve.common;
+    }else if(type==44u){
+        /* Do not mistake mere type ID for authenticated MTEXT content.
+         * Require both original source Unicode TU and numeric placement
+         * from the same verified H before admitting style provenance. */
+        MusaDwgAc1032MTextSource content={0};
+        MusaDwgAc1032MTextPlacement place={0};
+        if(!musa_dwg_ac1032_scene_index_read_mtext_source(
+               s,h,&content)||
+           !musa_dwg_ac1032_scene_index_read_mtext_placement(
+               s,h,&place)||
+           !content.original_record_crc_verified||
+           !place.original_record_crc_verified||
+           !place.geometry_fields_decoded||
+           content.indexed_handle!=h||place.indexed_handle!=h||
+           !musa_dwg_ac1032_scene_index_read_mtext_common(
+               s,h,&common))return 0;
     }else if(type==35u){
         /* Same original, CRC/H authenticated numeric ellipse as preview.
          * Do not fabricate its ENC, layer handle or display visibility.
