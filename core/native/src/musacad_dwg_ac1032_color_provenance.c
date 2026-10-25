@@ -73,6 +73,16 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     result.entity_complex_color_or_transparency=(uint8_t)
         (common.has_rgb||common.has_color_reference||
          common.has_transparency||common.invisibility!=0u);
+    /* Source-authenticated direct ENC RGB (0..0xFFFFFF): this is the
+     * same narrow no-DBCOLOR/no-alpha/no-invisibility acceptance predicate
+     * as the shared-C11 v6 preview source_style(). Do not confuse with
+     * final resolved BYLAYER, BYBLOCK or viewport rendering. */
+    if(common.has_rgb&&!common.has_color_reference&&
+       !common.has_transparency&&common.invisibility==0u&&
+       common.rgb<=UINT32_C(0x00ffffff)){
+        result.entity_has_direct_rgb24=1u;
+        result.entity_source_rgb24=common.rgb;
+    }
     if(!result.entity_complex_color_or_transparency){
         result.entity_has_direct_aci=(uint8_t)(
             common.color_index>=1u&&common.color_index<=255u);
