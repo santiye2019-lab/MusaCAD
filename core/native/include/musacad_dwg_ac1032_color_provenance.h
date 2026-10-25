@@ -13,7 +13,9 @@ extern "C" {
  *
  * IMPORTANT: Layer0 CMC C3 ACI7 is a narrow source evidence profile only.
  * Frozen/off, viewport overrides, transparency, BYBLOCK ancestry and
- * full TrueColor are NOT authenticated, so rendering_accepted is always 0.
+ * full context-dependent TrueColor display is NOT authenticated, so
+ * rendering_accepted is always 0. Standalone direct RGB24 source bytes
+ * may be authenticated without establishing final viewport style.
  * Never silently promote 'source_layer_aci' to a final visible color. */
 typedef struct MusaAc1032ColorProvenance {
     uint64_t entity_handle;
@@ -28,13 +30,18 @@ typedef struct MusaAc1032ColorProvenance {
     uint8_t source_layer_aci;
     uint8_t entity_and_layer_crc_verified;
     uint8_t rendering_accepted; /* must remain 0 until style gates pass */
+    /* Independently decoded direct ENC RGB24, as-is, not ARGB32.
+     * This is a SUBSET of entity_complex_color_or_transparency for ABI
+     * compatibility. It does not establish viewport/layer visibility. */
+    uint32_t entity_source_rgb24;
+    uint8_t entity_has_direct_rgb24;
 } MusaAc1032ColorProvenance;
 /* Source-authenticated original AC1032 planar entity color evidence for
  * ARC, CIRCLE, LINE, POINT and LWPOLYLINE (OT77). The latter requires
  * strict first-party full source geometry/vertex decoding; malformed,
  * unbounded or unsupported vertices must not yield invented color.
  * This API NEVER resolves display-ready layer visibility, inheritance,
- * BYBLOCK context, transparency or TrueColor (rendering_accepted=0).
+ * BYBLOCK context, transparency or final visible color (rendering_accepted=0).
  * LINE/POINT-only entry point below retains its earlier narrow contract. */
 int musa_dwg_ac1032_scene_planar_color_provenance(
     const MusaDwgAc1032SceneIndex *scene,
