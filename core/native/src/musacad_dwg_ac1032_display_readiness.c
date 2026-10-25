@@ -20,7 +20,7 @@ int musa_dwg_ac1032_scene_display_readiness(
                 scene,entry.handle,&type))return 0;
         previous=entry.handle;
         if(type!=17u&&type!=18u&&type!=19u&&type!=27u&&
-           type!=35u&&type!=77u){
+           type!=35u&&type!=44u&&type!=77u){
             result.other_indexed_records++;
             continue;
         }
