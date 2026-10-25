@@ -194,6 +194,43 @@ int musa_dwg_ac1032_layer_ot51_flags_evidence_at(
     return 1;
 }
 
+/* R2000+ LAYER numeric VALUES field: independent bit decomposition.
+ * Always preliminary: actual layer visibility depends on model/viewport
+ * and unvalidated flags; do not use this to hide or recolor geometry. */
+int musa_dwg_ac1032_layer_base_bits_decode(
+    uint16_t raw_values,MusaDwgAc1032LayerBaseBitPreflight *out){
+    if(!out)return 0;
+    MusaDwgAc1032LayerBaseBitPreflight v={0};
+    v.raw_values=raw_values;
+    v.unmapped_bits=(uint16_t)(raw_values & (uint16_t)~UINT16_C(0x03ff));
+    v.frozen_bit=(uint8_t)((raw_values>>0u)&1u);
+    v.on_bit=(uint8_t)((raw_values>>1u)&1u);
+    v.frozen_in_new_viewports_bit=(uint8_t)((raw_values>>2u)&1u);
+    v.locked_bit=(uint8_t)((raw_values>>3u)&1u);
+    v.plotting_bit=(uint8_t)((raw_values>>4u)&1u);
+    v.lineweight_field=(uint8_t)((raw_values>>5u)&31u);
+    v.source_crc_verified=0u;  /* Numeric-only call has NO source proof. */
+    v.display_accepted=0u; /* Per-viewport/full scene acceptance pending. */
+    *out=v;return 1;
+}
+int musa_dwg_ac1032_layer_ot51_base_bits_at(
+    const uint8_t *raw,size_t n,const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032LayerBaseBitPreflight *out){
+    if(!raw||!layout||!out||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(layout,sizeof(*layout),out,sizeof(*out)))return 0;
+    MusaDwgAc1032LayerFlagsEvidence evidence={0};
+    if(!musa_dwg_ac1032_layer_ot51_flags_evidence_at(
+          raw,n,layout,&evidence)||
+       !evidence.indexed_handle||!evidence.source_crc_verified)return 0;
+    MusaDwgAc1032LayerBaseBitPreflight v={0};
+    if(!musa_dwg_ac1032_layer_base_bits_decode(
+            evidence.raw_values_70_290_370,&v))return 0;
+    v.layer_handle=evidence.indexed_handle;
+    v.source_crc_verified=1u;
+    *out=v;return 1;
+}
+
 /* This narrow original-source profile has one specifically *unexplained*
  * seven-bit segment. We verify it instead of assuming it is padding.
  * Full R2018 LAYER semantic parsing must replace this profile before
