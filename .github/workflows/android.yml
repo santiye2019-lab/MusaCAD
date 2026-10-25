@@ -137,7 +137,7 @@ jobs:
       - name: Native ARC culling uses exact bounded sub-arc envelopes (Android UI only)
         run: |
           javac -encoding UTF-8 -d /tmp/musacad-native-arc-cull \
-            app/src/main/java/com/musa/cad/NativeArcCullingBounds.java \
+            app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
             tests/NativeArcCullingBoundsTest.java
           java -cp /tmp/musacad-native-arc-cull com.musa.cad.NativeArcCullingBoundsTest
           grep -q 'NativeArcCullingBounds.compute(' app/src/main/java/com/musa/cad/NativeScene.java
