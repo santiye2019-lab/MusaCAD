@@ -88,6 +88,16 @@ public final class FirstPartyDwgPreviewDialog {
                     status.setText("Gerçek DWG • "+preview.scene.primitiveCount+
                         " çizilen öğe • "+
                         " Kaynak kayıt: "+a.indexed+
+                        "\n2B önizleme türü adayı: "+a.previewCandidateRecords+
+                        " • gerçekten önizlemeye alınan kaynak nesne: "+a.previewAdmittedRecords+
+                        " • reddedilen aday: "+a.previewRejectedCandidates+
+                        " • diğer indeksli kayıt: "+a.previewOtherIndexedRecords+
+                        "\nÜretilen çizim öğesi: "+a.previewPrimitives+
+                        " • önizlemeye alınmayan kayıt: "+a.previewOmittedRecords+
+                        "\nDİKKAT: Diğer kayıtlar 2B dışı, tablo veya henüz"+
+                        " tanınmamış geometri olabilir; bunlardan toplam 2B"+
+                        " başarı yüzdesi hesaplanamaz."+
+                        "\nKaynak stil özeti: "+a.indexed+
                         " (tanınan 2B: "+a.planarRecognized+
                         ", katman+renk kaynağı doğrulanan: "+a.sourceStyleLinked+
                         ", çözülmeyen: "+a.sourceStyleUnresolved+

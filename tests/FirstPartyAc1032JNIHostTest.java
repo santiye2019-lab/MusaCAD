@@ -18,7 +18,7 @@ final class FirstPartyDwgPreview {
         return Float.isFinite(got)&&Math.abs(got-reference)<0.0002;
     }
     private static float[] read(String path)throws IOException{
-        long[] report=new long[13];
+        long[] report=new long[20];
         float[] raw=readOriginalNative(path,1_048_576,report);
         require(raw!=null&&raw.length>=10,"Missing full JNI packet");
         require(report[0]>0&&report[1]>=1&&report[2]>=1,
@@ -33,6 +33,14 @@ final class FirstPartyDwgPreview {
                 "Verified direct RGB must be a subset of source complex styles");
         require(report[12]>=0L&&report[12]<=report[6]-report[11],
                 "Source entity-hidden evidence must exclude direct RGB source");
+        require(report[13]+report[16]==report[0]&&
+                report[14]+report[15]==report[13]&&
+                report[15]+report[16]==report[18]&&
+                report[14]>=1L&&report[14]<=report[17]&&
+                report[17]==(long)raw[1]&&
+                report[19]==0L,
+                "Native v6 source record census must match one signed-off"
+                +" preview packet and MUST NOT certify full DWG display");
         require(raw[0]==6f&&raw[1]>0f&&raw[6]==1f,
                 "Incomplete scene must be explicitly marked");
         for(float x:raw)require(Float.isFinite(x),"Invalid float");
@@ -120,8 +128,15 @@ final class FirstPartyDwgPreview {
         try {readOriginalNative(args[1],4096,new long[11]);}
         catch(IOException expected){rejected=true;}
         require(rejected,"Inconsistent audit array must fail closed");
+        // Old 13-field adapter must not silently receive an incomplete
+        // subset of the now mandatory 20-slot original-source census.
+        rejected=false;
+        try {readOriginalNative(args[1],4096,new long[13]);}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Legacy audit shape must fail closed, not truncate");
         System.out.println("PASS FIRST-PARTY Android-signature JNI:"
                 +" original R2018 LINE and POINT XYZ, partial flag,"
-                +" original ACI and POINT viewport framing, file and capacity refusal");
+                +" original ACI, source-record vs emitted-primitive census,"
+                +" zero-area POINT framing, file and capacity refusal");
     }
 }
