@@ -45,7 +45,7 @@ static void diagnose(const uint8_t *file,size_t n){
                         if(!musa_dwg_ac1015_bits_read_u(&copy,1u,&bit))break;
                         fputc(bit?'1':'0',stderr);
                     }
-                    fputc('\\n',stderr);
+                    fputc('\n',stderr);
                     break;
                 }
                 fprintf(stderr,"MTEXT H ref[%u] code=%u target=%llX\n",
