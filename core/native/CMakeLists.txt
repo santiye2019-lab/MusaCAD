@@ -47,6 +47,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_mtext_placement_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_mtext_source_placement_smoke
                  COMMAND musacad_core_ac1032_original_mtext_placement_test)
+        # Source MTEXT layer/style H graph, fail-closed on extra H references.
+        add_executable(musacad_core_ac1032_original_mtext_graph_test
+                tests/core_dwg_ac1032_original_mtext_graph_test.c)
+        target_link_libraries(musacad_core_ac1032_original_mtext_graph_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_mtext_source_graph_smoke
+                 COMMAND musacad_core_ac1032_original_mtext_graph_test)
         # Real R2018 OT35 ELLIPSE original CRC/H source -> actual v6 curve.
         add_executable(musacad_core_ac1032_real_ellipse_test
                 tests/core_dwg_ac1032_original_ellipse_v6_test.c)
