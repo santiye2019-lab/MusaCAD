@@ -70,6 +70,10 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     result.raw_entity_type=type;
     result.entity_aci=common.color_index;
     result.entity_and_layer_crc_verified=1u;
+    /* DWG common entity field (not the unproved LAYER OT51 flags).
+     * Never conclude 'visible' from zero: owner, layer, layout and
+     * viewport decisions still require their own authenticated graph. */
+    result.source_entity_invisible=(uint8_t)(common.invisibility!=0u);
     result.entity_complex_color_or_transparency=(uint8_t)
         (common.has_rgb||common.has_color_reference||
          common.has_transparency||common.invisibility!=0u);

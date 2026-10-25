@@ -45,6 +45,9 @@ static int check(const char *file,uint64_t entity,uint16_t type){
            bundle.color.source_layer_aci_supported==1u&&
            bundle.color.source_layer_aci==7u&&
            bundle.color.rendering_accepted==0u&&
+           (!bundle.color.source_entity_invisible||
+              (bundle.color.entity_complex_color_or_transparency&&
+               !bundle.color.entity_has_direct_rgb24))&&
            (!bundle.color.entity_has_direct_rgb24||
              (bundle.color.entity_complex_color_or_transparency&&
               bundle.color.entity_source_rgb24<=UINT32_C(0x00ffffff)))&&

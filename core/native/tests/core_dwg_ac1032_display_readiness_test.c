@@ -50,6 +50,8 @@ static int run(const char *file,uint64_t handle,uint16_t type){
            report.narrow_layer_aci_available>=1u&&
            report.narrow_layer_aci_available<=report.source_style_joined&&
            report.source_direct_rgb24<=report.source_complex_or_invisible&&
+           report.source_entity_invisible<=
+               report.source_complex_or_invisible-report.source_direct_rgb24&&
            report.display_accepted==0u;
     }
     if(ok){

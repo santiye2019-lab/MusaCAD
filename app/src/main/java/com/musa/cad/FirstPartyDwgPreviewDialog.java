@@ -96,10 +96,12 @@ public final class FirstPartyDwgPreviewDialog {
                         " • BYLAYER: "+a.byLayer+
                         " • BYBLOCK: "+a.byBlock+
                         " • doğrulanmış doğrudan RGB24: "+a.directRgb24+
-                        " • kalan karmaşık/görünmez: "+a.complexUnresolved+
+                        " • kaynakta gizli nesne: "+a.sourceEntityHidden+
+                        " • diğer karmaşık stil: "+a.otherComplex+
                         " • sınırlı katman renk kanıtı: "+a.narrowLayerAciEvidence+
-                        "\nKISMİ GÖRÜNÜM • Katman açık/kapalı ve gerçek"+
-                        " son renkler doğrulanmadı; kayıt sayısı çizim öğesi"+
+                        "\nKISMİ GÖRÜNÜM • Gizli nesne işareti kaynaktan"+
+                        " okunur; katman açık/kapalı, donmuş, viewport durumu"+
+                        " ve son renkler hâlâ doğrulanmadı. Kayıt sayısı çizim öğesi"+
                         " sayısı değildir.");
                 });
             }catch(IOException | RuntimeException ex){

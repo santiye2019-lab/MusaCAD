@@ -28,6 +28,10 @@ typedef struct MusaAc1032DisplayReadiness {
     /* Exact direct RGB24 source subset OF source_complex_or_invisible.
      * Remaining complex colors need more resolution/viewport semantics. */
     size_t source_direct_rgb24;
+    /* Subset of source_complex_or_invisible. Indicates that the ENTITY's
+     * own invisibility bits were source-authenticated, not that a whole
+     * drawing or layer state can be certified. */
+    size_t source_entity_invisible;
     uint8_t display_accepted;
 } MusaAc1032DisplayReadiness;
 /* Bounded 1M record diagnostic. Caller output is fail-atomic.
