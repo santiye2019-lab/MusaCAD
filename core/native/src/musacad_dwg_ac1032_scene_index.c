@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h> /* temporary CI diagnostic, remove before merge */
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -600,6 +601,32 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
                null_ref==0u;
         }
         if(ok)ok=cached_graph_zero_padding(&bits);
+    }
+    if(type==44u&&!ok){
+        MusaDwgAc1015Bits probe={0};
+        MusaDwgAc1015HandleRef a={0},b={0};
+        int init=musa_dwg_ac1015_bits_init(
+            &probe,p.raw,p.bytes,(size_t)p.layout.data_stream_bits,
+            (size_t)p.layout.total_payload_bits);
+        int first=init&&musa_dwg_ac1015_read_handle_ref(&probe,h,&a);
+        int second=first&&musa_dwg_ac1015_read_handle_ref(&probe,h,&b);
+        const size_t remaining=probe.bit_end-probe.bit_pos;
+        uint32_t null_octet=~0u,tail_padding=~0u;
+        int oct=second&&remaining>=8u&&
+             musa_dwg_ac1015_bits_read_u(&probe,8u,&null_octet);
+        int pad=oct&&probe.bit_end-probe.bit_pos<=7u&&
+             musa_dwg_ac1015_bits_read_u(&probe,
+                  (unsigned)(probe.bit_end-probe.bit_pos),
+                  &tail_padding);
+        uint16_t subtype=0u;int found=0;
+        if(second)found=musa_dwg_ac1032_scene_index_object_type(
+             s,b.target,&subtype);
+        fprintf(stderr,"MTEXT_H_STEP: init=%d first=%d codeA=%u targetA=%llX "
+            "second=%d codeB=%u targetB=%llX typeB=%d/%u "
+            "remain=%zu oct=%d value=%u tailPad=%d value=%u\n",
+            init,first,(unsigned)a.code,(unsigned long long)a.target,
+            second,(unsigned)b.code,(unsigned long long)b.target,
+            found,(unsigned)subtype,remaining,oct,null_octet,pad,tail_padding);
     }
     free(p.raw);
     uint16_t layer_type=0u;
