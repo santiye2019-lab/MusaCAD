@@ -84,6 +84,22 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 original R2018 ELLIPSE H1BE verified LAYER0 and entity-color evidence
+        run: |
+          set -euo pipefail
+          directory=third_party/libredwg/test/test-data/2018
+          file="$directory/Ellipse.dwg"
+          test -s "$file"
+          test "$(head -c 6 "$file")" = AC1032
+          before="$(sha256sum "$file" | cut -d ' ' -f1)"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_ellipse_color_provenance_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-ellipse-original-style
+          timeout 120s /tmp/musacad-r2018-ellipse-original-style "$file"
+          test "$before" = "$(sha256sum "$file" | cut -d ' ' -f1)"
+          echo "PASS original ELLIPSE source-layer edge, Unicode and ENC CRC; NOT final visibility/viewport color"
+
       - name: P0 real original AC1032 ELLIPSE H1BE WCS geometry and v6 Android curve
         run: |
           set -euo pipefail
