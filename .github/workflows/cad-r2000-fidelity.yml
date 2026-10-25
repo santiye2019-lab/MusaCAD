@@ -101,6 +101,20 @@ jobs:
           test "$before" = "$(sha256sum "$folder/Text.dwg" "$folder/Line.dwg" "$folder/Ellipse.dwg")"
           echo "PASS original R2018 physical Text/Line/Ellipse; Text is MTEXT, no glyph render claim"
 
+      - name: P0 original R2018 MTEXT H1C0 strict entity-common source preflight
+        run: |
+          set -euo pipefail
+          folder=third_party/libredwg/test/test-data/2018
+          before="$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          grep -F 'ObjectName (RO) = "AcDbMText"' "$folder/Text.txt"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_mtext_prefix_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-mtext-prefix
+          timeout 120s /tmp/musacad-r2018-mtext-prefix "$folder/Text.dwg"
+          test "$before" = "$(sha256sum "$folder/Text.dwg" | cut -d ' ' -f1)"
+          echo "PASS original MTEXT source common prefix only; Unicode/glyphs remain unresolved"
+
       - name: P0 original R2018 ELLIPSE H1BE verified LAYER0 and entity-color evidence
         run: |
           set -euo pipefail
