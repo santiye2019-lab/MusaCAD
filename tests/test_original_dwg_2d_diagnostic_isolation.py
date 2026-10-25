@@ -93,7 +93,7 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertIn("musa_dwg_ac1032_scene_index_unrendered_2d_inventory",native)
         self.assertIn("undecodedTextMtext",source)
         self.assertIn("undecodedInsertMinsert",source)
-        self.assertIn("TEXT/MTEXT:",dialog)
+        self.assertIn("TEXT/MTEXT kaynak kayıt toplamı:",dialog)
         self.assertIn("INSERT/MINSERT:",dialog)
         self.assertIn("katman görünürlüğü",dialog)
         self.assertIn("fopen(path,\"rb\")",native)
