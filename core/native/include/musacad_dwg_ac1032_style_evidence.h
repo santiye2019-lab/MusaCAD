@@ -19,6 +19,9 @@ extern "C" {
 typedef struct MusaAc1032PlanarStyleEvidence {
     MusaAc1032ColorProvenance color;
     MusaDwgAc1032LayerFlagsEvidence raw_layer_status;
+    /* Source-verified R2000+ bit decomposition; NOT certified on-screen
+     * visibility. Shared with C11 style resolver as a future input. */
+    MusaDwgAc1032LayerBaseBitPreflight base_bit_preflight;
     MusaDwgAc1032LayerName original_layer_name;
     uint8_t source_layer_join_verified;
     uint8_t visibility_resolved; /* ALWAYS zero until semantic acceptance */
