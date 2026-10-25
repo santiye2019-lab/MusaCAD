@@ -343,6 +343,66 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
     }
     return 1;
 }
+/* Original MTEXT H tail: optional hard owner, entity layer H5 and
+ * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
+int musa_dwg_ac1032_scene_index_mtext_graph(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032MTextGraph *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,44u,&p))return 0;
+    MusaDwgAc1032MTextGraph value={0};
+    value.indexed_handle=h;
+    int ok=p.common.common_decoded&&
+       p.common.prefix.reactor_count==0u&&
+       p.common.prefix.xdictionary_missing==1u&&
+       !p.common.has_color_reference&&
+       p.common.linetype_flags==0u&&
+       p.common.plotstyle_flags==0u&&
+       p.common.material_flags==0u&&
+       p.common.visualstyle_flags==0u&&
+       p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX;
+    if(ok){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+            (size_t)p.layout.data_stream_bits,
+            (size_t)p.layout.total_payload_bits);
+        if(ok&&p.common.prefix.entity_mode==0u)
+            ok=cached_graph_ref(&bits,h,4u,&value.owner_handle);
+        else if(ok&&p.common.prefix.entity_mode!=2u)ok=0;
+        if(ok)ok=cached_graph_ref(&bits,h,5u,&value.layer_handle)&&
+                 cached_graph_ref(&bits,h,5u,&value.style_handle)&&
+                 value.layer_handle!=h&&value.style_handle!=h&&
+                 value.layer_handle!=value.style_handle;
+        /* Original R2018 Text.dwg H1C0 has two valid H5 targets,
+         * followed by one exact 0x50 null H5 optional reference and
+         * six zero end-padding bits. Never interpret the null as a
+         * third target, and never accept arbitrary unparsed H data. */
+        if(ok&&bits.bit_end-bits.bit_pos>=8u){
+            uint32_t null_ref=0u;
+            ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
+               null_ref==0x50u;
+        }
+        if(ok)ok=cached_graph_zero_padding(&bits);
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    uint16_t layer_type=0u,style_type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+          s,value.layer_handle,&layer_type)||layer_type!=51u||
+       !musa_dwg_ac1032_scene_index_object_type(
+          s,value.style_handle,&style_type))return 0;
+    value.layer_object_type=layer_type;
+    value.style_object_type=style_type;
+    value.original_entity_crc_verified=1u;
+    value.original_layer_crc_verified=1u;
+    value.original_style_crc_verified=1u;
+    value.graph_edges_verified=1u;
+    value.font_and_display_accepted=0u;
+    *out=value;
+    return 1;
+}
 static int cached_reverse_owner(const Payload *p,
      uint64_t child,uint64_t parent,uint64_t layer){
     if(!p||p->layout.data_stream_bits>SIZE_MAX||
