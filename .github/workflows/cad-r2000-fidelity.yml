@@ -84,6 +84,24 @@ jobs:
           source_after="$(sha256sum "$file" | cut -d ' ' -f1)"
           test "$source_before" = "$source_after"
 
+      - name: P0 genuine R2018 BLOCK INSERT ATTRIB indexed original H CRC oracle
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbBlockReference' "$oracle"
+          grep -F 'AcDbAttribute' "$oracle"
+          grep -F 'AcDbBlockBegin' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_block_family_oracle_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-block-family
+          timeout 120s /tmp/musacad-r2018-original-block-family "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS genuine R2018 source OT7 INSERT OT2 ATTRIB OT4 BLOCK; numeric geometry still missing"
+
       - name: P0 original R2018 Text DWG exact 108-byte physical footer and genuine MTEXT H1C0
         run: |
           set -euo pipefail
