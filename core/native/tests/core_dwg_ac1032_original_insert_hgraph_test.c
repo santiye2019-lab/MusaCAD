@@ -145,6 +145,18 @@ static int genuine(const char *file){
                     fake,sizeof(fake),&layout,&identity)&&
                   !memcmp(&identity,&saved_identity,sizeof(identity));
         layout.raw_object_type=49u;
+        /* Aliased output/payload is never accepted, even with a CRC
+         * claim, and no bytes of the original buffer may be changed. */
+        {
+            uint8_t shared[sizeof(MusaDwgAc1032BlockHeaderIdentity)+2u];
+            memset(shared,0x3c,sizeof(shared));
+            uint8_t saved_shared[sizeof(shared)];
+            memcpy(saved_shared,shared,sizeof(shared));
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                 shared,sizeof(shared),&layout,
+                 (MusaDwgAc1032BlockHeaderIdentity *)(void *)shared)&&
+                 !memcmp(shared,saved_shared,sizeof(shared));
+        }
         layout.handle_stream_start_bit=11u;
         if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
                     fake,sizeof(fake),&layout,&identity)&&
