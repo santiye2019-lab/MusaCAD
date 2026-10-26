@@ -190,7 +190,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_copy_field_bits(
 }
 /* Original R2018 BLOCK_HEADER (OT49) base coordinates, decoded from
  * published ODA on-disk field order: 64 B, xrefindex+1 BS, Xdep B,
- * anonymous/hasattrs/isxref/overlaid B, loaded B, owned BL, base 3BD.
+ * anonymous/hasattrs/isxref/overlaid B, conditional XREF loaded B,\n * owned BL, base 3BD.
  * A separate string stream holds names; it must not be consumed as DATA.
  * Source H/CRC is mandatory. This is not child expansion or paint. */
 typedef struct MusaDwgAc1032BlockHeaderBase {
@@ -230,7 +230,9 @@ static inline int musa_dwg_ac1032_block_header_ot49_base_at(
        !musa_dwg_ac1015_bits_read_u(&bits,1u,&atts)||
        !musa_dwg_ac1015_bits_read_u(&bits,1u,&isxref)||
        !musa_dwg_ac1015_bits_read_u(&bits,1u,&overlay)||
-       !musa_dwg_ac1015_bits_read_u(&bits,1u,&loaded)||
+       /* Original R2018 non-XREF blocks omit the loaded bit. */
+       ((isxref||overlay)&&
+        !musa_dwg_ac1015_bits_read_u(&bits,1u,&loaded))||
        !musa_dwg_ac1015_bits_read_bl(&bits,&owned)||
        owned>1000000u||
        !musa_dwg_ac1015_bits_read_bd(&bits,&xyz[0])||
