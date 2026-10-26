@@ -68,6 +68,10 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
     MusaDwgAc1032EntityCommon *out);
 /* Original R2018 OT7 INSERT OCS numeric placement; no block expansion,
  * owner/model-space or final rendering acceptance. */
+/* Authenticated original INSERT H edges only. No block expansion or paint. */
+int musa_dwg_ac1032_scene_index_insert_source_graph(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertSourceGraph *out);
 int musa_dwg_ac1032_scene_index_read_insert_placement(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertPlacement *out);
