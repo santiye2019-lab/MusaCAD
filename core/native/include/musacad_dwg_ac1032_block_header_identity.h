@@ -102,4 +102,32 @@ static inline int musa_dwg_ac1032_block_header_ot49_field_span(
     v.original_record_crc_verified=1u;
     *out=v;return 1;
 }
+/* Copy a caller-selected bit window from the authenticated OT49 field
+ * region. This is raw evidence, NOT interpretation of base coordinates.
+ * Output is unchanged on any invalid request. Bits are packed LSB-first. */
+static inline int musa_dwg_ac1032_block_header_ot49_copy_field_bits(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    size_t start_bit,size_t bit_count,
+    uint8_t *out,size_t out_bytes){
+    if(!raw||!layout||!out||!bit_count||
+       bit_count>SIZE_MAX-7u||
+       out_bytes<(bit_count+7u)/8u||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,out_bytes)||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,out_bytes))return 0;
+    MusaDwgAc1032BlockHeaderFieldSpan span={0};
+    if(!musa_dwg_ac1032_block_header_ot49_field_span(
+           raw,n,layout,&span)||
+       start_bit<span.first_bit||start_bit>span.end_bit||
+       bit_count>span.end_bit-start_bit)return 0;
+    const size_t bytes=(bit_count+7u)/8u;
+    for(size_t i=0;i<bytes;i++)out[i]=0u;
+    for(size_t i=0;i<bit_count;i++){
+        const size_t src=start_bit+i;
+        const uint8_t bit=(uint8_t)((raw[src/8u]>>(src%8u))&1u);
+        out[i/8u]|=(uint8_t)(bit<<(i%8u));
+    }
+    return 1;
+}
 #endif
