@@ -48,7 +48,7 @@ class MultiInsertVisibleDiagnostic(unittest.TestCase):
         self.assertIn("inspectAllBlocks.setOnClickListener(view->{",source)
         self.assertIn("FirstPartyDwgPreview.readAllInsertLinesDiagnostic(",source)
         self.assertIn("sceneCanvas.setScene(result.scene)",source)
-        self.assertIn("readCombinedSourceDiagnostic(",source)
+        self.assertIn("readCombinedWithNumericCirclesDiagnostic(",source)
         self.assertIn("readCircleGeometryEvidence(",source)
         self.assertIn("MOR ÇİZGİLER KAYNAK DWG RENGİ DEĞİLDİR",source)
         self.assertIn("inspectCombined.setEnabled(false)",source)

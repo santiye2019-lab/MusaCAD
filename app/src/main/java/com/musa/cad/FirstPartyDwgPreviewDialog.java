@@ -80,7 +80,7 @@ public final class FirstPartyDwgPreviewDialog {
         inspectAllBlocks.setEnabled(false);
         layout.addView(inspectAllBlocks);
         final Button inspectCombined=new Button(owner);
-        inspectCombined.setText("2B çizim + tüm blokları birlikte göster (deneysel)");
+        inspectCombined.setText("2B + INSERT LINE + CIRCLE birlikte (MOR orijinal renk DEĞİL)");
         inspectCombined.setEnabled(false);
         layout.addView(inspectCombined);
         final Button inspectNumericCircle=new Button(owner);
@@ -247,21 +247,23 @@ public final class FirstPartyDwgPreviewDialog {
             activeReaders.incrementAndGet();
             Thread combinedTask=new Thread(()->{
                 try{
-                    FirstPartyDwgPreview.CombinedSourcesDiagnostic result=
-                        FirstPartyDwgPreview.readCombinedSourceDiagnostic(
+                    FirstPartyDwgPreview.CombinedNumericCircleDiagnostic result=
+                        FirstPartyDwgPreview.readCombinedWithNumericCirclesDiagnostic(
                             source,MAX_FLOAT_WORDS);
                     owner.runOnUiThread(()->{
                         if(dismissed.get()||owner.isFinishing()||
                            owner.isDestroyed())return;
                         sceneCanvas.setScene(result.scene);
-                        status.setText("2B + TÜM INSERT ÇİZGİLERİ • TEK SAHNE • KISMİ"+
+                        status.setText("2B + INSERT LINE + SAYISAL CIRCLE • TEK SAHNE • KISMİ"+
                             "\nBirlikte çizilen kaynak ilkel: "+result.shownPrimitiveCount+
                             " • doğrudan DWG ilkel: "+result.original.previewPrimitives+
                             " • doğrulanmış INSERT LINE: "+result.admittedInsertLines+
-                            "\nINSERT doğrulanan: "+result.verifiedInsertInstances+
-                            " • kaynağı belirsiz: "+result.unsupportedInsertInstances+
-                            " • elenen LINE: "+result.omittedInsertLines+
-                            "\nUYARI: Blok tanımı nesneleri iki kez görünebilir. "+
+                            " • sayısal CIRCLE: "+result.numericCircles+
+                            "\nElenen INSERT LINE: "+result.omittedInsertLines+
+                            " • CIRCLE H4/H5 belirsiz: "+
+                            result.unresolvedCircleOwnerOrLayer+
+                            "\nMOR CIRCLE ÇİZGİLERİ KAYNAK DWG RENGİ DEĞİLDİR. "+
+                            "Blok tanımı nesneleri iki kez görünebilir. "+
                             "MODEL/PAFTA ve katman kapalı/donmuş durumu doğrulanmadı. "+
                             "BYLAYER/BYBLOCK ve TEXT/MTEXT font/yerleşimi birebir değildir.");
                     });

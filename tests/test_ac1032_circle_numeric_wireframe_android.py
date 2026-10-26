@@ -27,6 +27,27 @@ class CircleNumericSourceOnly(unittest.TestCase):
             self.assertNotIn(word,native)
         for word in ("NativeCadEngine.open(","setNativeDrawing(","replaceVisibleDrawing("):
             self.assertNotIn(word,dialog)
+    def test_three_source_scene_keeps_magenta_non_source(self):
+        java=(ROOT/"app/src/main/java/com/musa/cad/FirstPartyDwgPreview.java").read_text()
+        native_scene=(ROOT/"app/src/main/java/com/musa/cad/NativeScene.java").read_text()
+        merger=(ROOT/"app/src/main/java/com/musa/cad/OriginalSourceV6Merge.java").read_text()
+        dialog=(ROOT/"app/src/main/java/com/musa/cad/FirstPartyDwgPreviewDialog.java").read_text()
+        host=(ROOT/"tests/OriginalSourceV6MergeTest.java").read_text()
+        self.assertIn("readCombinedWithNumericCirclesDiagnostic(",java)
+        self.assertIn("readCircleGeometryEvidence(",java)
+        self.assertIn("sourceCircleColorAccepted=false",java)
+        self.assertIn("joinPartialOriginalSourceScenesWithDiagnosticCircles(",native_scene)
+        self.assertIn("joinWithDiagnosticCircles(",merger)
+        self.assertIn("numericCircles[at]!=518f",merger)
+        self.assertIn("numericCircles[at+1]!=65f",merger)
+        self.assertIn("CIRCLE WCS noktasi kaynak sinirini asti",merger)
+        self.assertIn("MOR CIRCLE ÇİZGİLERİ KAYNAK DWG RENGİ DEĞİLDİR",dialog)
+        self.assertIn("readCombinedWithNumericCirclesDiagnostic(",dialog)
+        self.assertIn("Fake original CIRCLE ACI accepted",host)
+        self.assertIn("Open numeric CIRCLE accepted",host)
+        self.assertIn("Over-budget 3-source packet accepted",host)
+        self.assertNotIn("sourceCircleColorAccepted=true",java)
+
     def test_real_r2018_positive_numeric_not_full_display(self):
         header=(ROOT/"core/native/include/musacad_dwg_ac1032_insert_circle_numeric_wireframe_v6.h").read_text()
         self.assertIn("MUSACAD_AC1032_CIRCLE_DIAGNOSTIC_ACI 6u",header)
