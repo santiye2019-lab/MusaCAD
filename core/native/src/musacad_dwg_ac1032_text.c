@@ -98,3 +98,87 @@ int musa_dwg_ac1032_text_single_tu_at(
     *out=value;
     return 1;
 }
+
+/* First-party R2000+ TEXT numeric grammar (ODA on-disk field order,
+ * not LibreDWG source). Reject all unconsumed DATA bits before TU STRING. */
+#include <math.h>
+int musa_dwg_ac1032_text_placement_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *l,
+    size_t geom,MusaDwgAc1032TextPlacement *out){
+    if(!raw||!l||!out||!n||n>LIMIT||n>SIZE_MAX/8u||
+       overlap(raw,n,l,sizeof(*l))||
+       overlap(raw,n,out,sizeof(*out))||
+       overlap(l,sizeof(*l),out,sizeof(*out))||
+       !l->original_record_crc_verified||l->raw_object_type!=1u||
+       !l->indexed_handle||l->object_type_field_bits!=10u||
+       l->total_payload_bits!=(uint64_t)n*8u||
+       l->data_stream_bits>SIZE_MAX||
+       l->handle_stream_start_bit!=l->data_stream_bits||
+       !l->handle_stream_bits||
+       l->handle_stream_bits!=l->total_payload_bits-l->data_stream_bits)
+        return 0;
+    MusaDwgAc1032TextSource source={0};
+    if(!musa_dwg_ac1032_text_single_tu_at(raw,n,l,geom,&source)||
+       !source.original_record_crc_verified||
+       source.indexed_handle!=l->indexed_handle||
+       source.original_string_start_bit<=geom)return 0;
+    MusaDwgAc1015Bits b={0};
+    if(!musa_dwg_ac1015_bits_init(
+          &b,raw,n,geom,source.original_string_start_bit))return 0;
+    MusaDwgAc1032TextPlacement v={0};
+    v.indexed_handle=l->indexed_handle;
+    v.original_string_start_bit=source.original_string_start_bit;
+    uint32_t flags=0u;
+    if(!musa_dwg_ac1015_bits_read_u(&b,8u,&flags))return 0;
+    v.data_flags=(uint8_t)flags;
+    double elevation=0.0;
+    if(!(flags&1u)&&!musa_dwg_ac1015_bits_read_rd(&b,&elevation))
+        return 0;
+    if(!musa_dwg_ac1015_bits_read_rd(&b,&v.insertion[0])||
+       !musa_dwg_ac1015_bits_read_rd(&b,&v.insertion[1]))
+        return 0;
+    v.insertion[2]=elevation;
+    v.alignment[0]=v.insertion[0];
+    v.alignment[1]=v.insertion[1];
+    v.alignment[2]=elevation;
+    if(!(flags&2u)){
+        if(!musa_dwg_ac1015_bits_read_dd(
+             &b,v.insertion[0],&v.alignment[0])||
+           !musa_dwg_ac1015_bits_read_dd(
+             &b,v.insertion[1],&v.alignment[1]))return 0;
+    }
+    if(!musa_dwg_ac1015_bits_read_be(&b,v.extrusion)||
+       !musa_dwg_ac1015_bits_read_bt(&b,&v.thickness))
+        return 0;
+    if(!(flags&4u)&&!musa_dwg_ac1015_bits_read_rd(&b,&v.oblique))
+        return 0;
+    if(!(flags&8u)&&!musa_dwg_ac1015_bits_read_rd(&b,&v.rotation))
+        return 0;
+    if(!musa_dwg_ac1015_bits_read_rd(&b,&v.height))return 0;
+    v.width_factor=1.0;
+    if(!(flags&16u)&&!musa_dwg_ac1015_bits_read_rd(&b,&v.width_factor))
+        return 0;
+    if(!(flags&32u)&&!musa_dwg_ac1015_bits_read_bs(&b,&v.generation))
+        return 0;
+    if(!(flags&64u)&&!musa_dwg_ac1015_bits_read_bs(
+         &b,&v.horizontal_alignment))return 0;
+    if(!(flags&128u)&&!musa_dwg_ac1015_bits_read_bs(
+         &b,&v.vertical_alignment))return 0;
+    if(b.bit_pos!=source.original_string_start_bit||
+       !isfinite(elevation)||!isfinite(v.insertion[0])||
+       !isfinite(v.insertion[1])||
+       !isfinite(v.alignment[0])||!isfinite(v.alignment[1])||
+       !isfinite(v.thickness)||!isfinite(v.oblique)||
+       !isfinite(v.rotation)||!isfinite(v.height)||v.height<=0.0||
+       !isfinite(v.width_factor)||v.width_factor<=0.0||
+       v.horizontal_alignment>5u||v.vertical_alignment>3u||
+       hypot(hypot(v.extrusion[0],v.extrusion[1]),v.extrusion[2])<0.5)
+        return 0;
+    v.geometry_end_bit=b.bit_pos;
+    v.original_record_crc_verified=1u;
+    v.numeric_fields_decoded=1u;
+    v.wcs_font_and_display_accepted=0u;
+    *out=v;
+    return 1;
+}

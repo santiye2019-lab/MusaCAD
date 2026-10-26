@@ -24,6 +24,24 @@ int musa_dwg_ac1032_text_single_tu_at(
     const uint8_t *payload,size_t payload_bytes,
     const MusaDwgAc1032ObjectStreams *layout,
     size_t geometry_start_bit,MusaDwgAc1032TextSource *out);
+
+/* Authenticated OT1 TEXT numeric DATA only, independent of MTEXT. The
+ * coordinates are OCS values, NOT yet WCS screen placement. Rotation,
+ * alignment and font metrics must be applied before any real glyph paint. */
+typedef struct MusaDwgAc1032TextPlacement {
+    uint64_t indexed_handle;
+    double insertion[3],alignment[3],extrusion[3];
+    double thickness,oblique,rotation,height,width_factor;
+    size_t geometry_end_bit,original_string_start_bit;
+    uint16_t generation,horizontal_alignment,vertical_alignment;
+    uint8_t data_flags,original_record_crc_verified;
+    uint8_t numeric_fields_decoded;
+    uint8_t wcs_font_and_display_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032TextPlacement;
+int musa_dwg_ac1032_text_placement_at(
+    const uint8_t *payload,size_t payload_bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    size_t geometry_start_bit,MusaDwgAc1032TextPlacement *out);
 #ifdef __cplusplus
 }
 #endif

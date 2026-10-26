@@ -256,6 +256,21 @@ int musa_dwg_ac1032_scene_index_read_text_source(
     if(ok)*out=value;
     return ok;
 }
+int musa_dwg_ac1032_scene_index_read_text_placement(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032TextPlacement *out){
+    if(!h||!check_output(scene,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(scene,h,1u,&p))return 0;
+    MusaDwgAc1032TextPlacement value={0};
+    const int ok=musa_dwg_ac1032_text_placement_at(
+       p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&value)&&
+       value.indexed_handle==h&&value.original_record_crc_verified&&
+       value.numeric_fields_decoded&&!value.wcs_font_and_display_accepted;
+    free(p.raw);
+    if(ok)*out=value;
+    return ok;
+}
 int musa_dwg_ac1032_scene_index_read_text_common(
     const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032EntityCommon *out){

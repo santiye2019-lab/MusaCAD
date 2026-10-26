@@ -60,6 +60,10 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
 int musa_dwg_ac1032_scene_index_read_text_source(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032TextSource *out);
+/* Original OT1 TEXT OCS numeric placement, not font/WCS or glyph paint. */
+int musa_dwg_ac1032_scene_index_read_text_placement(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032TextPlacement *out);
 int musa_dwg_ac1032_scene_index_read_text_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
