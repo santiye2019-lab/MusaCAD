@@ -1748,17 +1748,17 @@ static int genuine(const char *file){
            circle.unverified_circle_count==0u&&
            circle.non_circle_child_count==12u&&
            circle.original_numeric_source_circle_axes_verified&&
-           circle.h4_h5_source_verified_count==0u&&
-           circle.h4_h5_unresolved_count==1u&&
+           circle.h4_h5_source_verified_count==1u&&
+           circle.h4_h5_unresolved_count==0u&&
            !circle.final_visibility_and_paint_accepted;
         if(ok){
             const MusaDwgAc1032InsertCircleSourceAxesRow *c=&circle.rows[0];
             const double radius=130.0490046078758;
             ok=c->child_handle==UINT64_C(0x1bb)&&
-               c->verified_block_owner_handle==0u&&
-               c->source_layer_handle==0u&&
+               c->verified_block_owner_handle==UINT64_C(0x1b8)&&
+               c->source_layer_handle==UINT64_C(0x8a)&&
                c->original_numeric_affine_axes_verified&&
-               !c->original_h4_h5_source_verified&&
+               c->original_h4_h5_source_verified&&
                !c->final_visibility_and_paint_accepted&&
                fabs(c->source_radius-radius)<1e-6&&
                fabs(c->world_center[0]-8482.030567364651)<1e-6&&
@@ -1773,16 +1773,18 @@ static int genuine(const char *file){
                 if(source.rows[i].raw_object_type!=18u)continue;
                 source_circles++;
                 ok=source.rows[i].child_handle==c->child_handle&&
-                   !source.rows[i].original_common_verified&&
-                   source.rows[i].source_layer_handle==0u&&
-                   c->source_style_class==0u&&
-                   c->source_color_status==0u&&
-                   c->source_aci==0u&&c->source_rgb24==0u;
+                   source.rows[i].original_common_verified&&
+                   source.rows[i].source_layer_handle==UINT64_C(0x8a)&&
+                   c->source_style_class==source.rows[i].source_style_class&&
+                   c->source_color_status==source.rows[i].source_color_status&&
+                   c->source_aci==source.rows[i].raw_color_index&&
+                   c->source_rgb24==source.rows[i].raw_rgb;
             }
             ok=ok&&source_circles==1u;
         }
-        /* Authentic H1BB numeric DATA is independently verified;
-         * its H4/H5 tail is unsupported and must stay unresolved. */
+        /* Genuine original H1BB numeric DATA and CRC-indexed relative H12
+         * block owner H1B8 + H5 layer H8A are now individually verified.
+         * Complete scene/visibility, viewport, final paint remain UNKNOWN. */
         /* The independently known H17D block contains four LINEs and
          * one ATTDEF, not a CIRCLE. Do not invent a radius or origin. */
         const uint64_t empty_inserts[]={
@@ -1835,7 +1837,7 @@ static int genuine(const char *file){
            envelope.circle_candidates==1u&&
            envelope.verified_circles==1u&&
            envelope.unverified_circles==0u&&
-           envelope.h4_h5_unresolved_circles==1u&&
+           envelope.h4_h5_unresolved_circles==0u&&
            envelope.has_numeric_bounds&&
            envelope.original_numeric_source_bounds_verified&&
            !envelope.final_visibility_and_paint_accepted;
@@ -1843,7 +1845,7 @@ static int genuine(const char *file){
             const MusaDwgAc1032InsertCircleEnvelopeRow *row=
                 &envelope.rows[0];
             ok=row->child_handle==UINT64_C(0x1bb)&&
-               !row->original_h4_h5_source_verified&&
+               row->original_h4_h5_source_verified&&
                !row->final_visibility_and_paint_accepted&&
                fabs(row->min_xy[0]-(center_x-radius))<1e-6&&
                fabs(row->max_xy[0]-(center_x+radius))<1e-6&&
@@ -1910,7 +1912,7 @@ static int genuine(const char *file){
            all.verified_circle_records>=1u&&
            all.circle_candidate_records==
                all.verified_circle_records+all.unverified_circle_records&&
-           all.h4_h5_unresolved_circle_records>=1u&&
+           all.h4_h5_unresolved_circle_records==0u&&
            all.has_numeric_bounds&&all.source_only_partial&&
            !all.final_visibility_and_paint_accepted&&
            all.combined_min_xy[0]<=cx-radius+1e-6&&
