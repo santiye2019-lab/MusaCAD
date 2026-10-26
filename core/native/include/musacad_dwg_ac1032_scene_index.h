@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1032_point.h"
 #include "musacad_dwg_ac1032_text.h"
 #include "musacad_dwg_ac1032_insert.h"
+#include "musacad_dwg_ac1032_block_header_identity.h"
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
@@ -37,6 +38,10 @@ int musa_dwg_ac1032_scene_index_entry(
  * access; O(log N) index lookup, independent of original file size.
  * Does not claim all indexed objects have decoded geometry.
  */
+/* CRC/H authenticated OT49 identity only; base-point remains undecoded. */
+int musa_dwg_ac1032_scene_index_read_block_header_identity(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderIdentity *out);
 int musa_dwg_ac1032_scene_index_object_type(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     uint16_t *out_type);
