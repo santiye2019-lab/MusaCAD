@@ -495,6 +495,81 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
     }
     return 1;
 }
+/* Authentic R2018 INSERT handle tails end with one-bits (not zero
+ * padding). Do not generalize this narrow verified profile to other OT. */
+static int insert_one_padding(MusaDwgAc1015Bits *bits){
+    if(!bits||bits->bit_pos>bits->bit_end||
+       bits->bit_end-bits->bit_pos>7u)return 0;
+    while(bits->bit_pos<bits->bit_end){
+        uint32_t bit=0u;
+        if(!musa_dwg_ac1015_bits_read_u(bits,1u,&bit)||bit!=1u)
+            return 0;
+    }
+    return 1;
+}
+/* Source-only original INSERT H graph: H5 LAYER, H5 BLOCK_HEADER,
+ * optional H3 ATTRIB + H3 SEQEND for the independently verified one-
+ * attribute profile. All targets require their own indexed CRC/OT proof.
+ * No block name, nested transforms, owner, viewport or drawing acceptance. */
+int musa_dwg_ac1032_scene_index_insert_source_graph(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertSourceGraph *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,7u,&p))return 0;
+    MusaDwgAc1032InsertPlacement place={0};
+    MusaDwgAc1032InsertSourceGraph v={0};
+    v.indexed_handle=h;
+    int ok=p.common.common_decoded&&
+       p.common.prefix.entity_mode==2u&&
+       p.common.prefix.reactor_count==0u&&
+       p.common.prefix.xdictionary_missing==1u&&
+       !p.common.has_color_reference&&
+       p.common.linetype_flags==0u&&
+       p.common.plotstyle_flags==0u&&
+       p.common.material_flags==0u&&
+       p.common.visualstyle_flags==0u&&
+       p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX&&
+       musa_dwg_ac1032_insert_placement_at(
+          p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&place)&&
+       place.original_record_crc_verified&&place.numeric_fields_decoded&&
+       place.indexed_handle==h&&!place.block_graph_and_display_accepted&&
+       place.owned_attrib_count<=1u&&
+       (place.has_attribs==(uint8_t)(place.owned_attrib_count==1u));
+    if(ok){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+              (size_t)p.layout.data_stream_bits,
+              (size_t)p.layout.total_payload_bits)&&
+           cached_graph_ref(&bits,h,5u,&v.layer_handle)&&
+           cached_graph_ref(&bits,h,5u,&v.block_header_handle)&&
+           v.layer_handle!=h&&v.block_header_handle!=h&&
+           v.layer_handle!=v.block_header_handle;
+        if(ok&&place.has_attribs)
+            ok=cached_graph_ref(&bits,h,3u,&v.attrib_handle)&&
+               cached_graph_ref(&bits,h,3u,&v.seqend_handle)&&
+               v.attrib_handle!=h&&v.seqend_handle!=h&&
+               v.attrib_handle!=v.seqend_handle;
+        if(ok)ok=insert_one_padding(&bits);
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    uint16_t kind=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+            s,v.layer_handle,&kind)||kind!=51u||
+       !musa_dwg_ac1032_scene_index_object_type(
+            s,v.block_header_handle,&kind)||kind!=49u)return 0;
+    if(place.has_attribs&&
+       (!musa_dwg_ac1032_scene_index_object_type(
+           s,v.attrib_handle,&kind)||kind!=2u||
+        !musa_dwg_ac1032_scene_index_object_type(
+           s,v.seqend_handle,&kind)||kind!=6u))return 0;
+    v.owned_attrib_count=place.owned_attrib_count;
+    v.original_entity_and_targets_crc_verified=1u;
+    v.source_edges_verified=1u;
+    *out=v;return 1;
+}
 /* Original MTEXT H tail: optional hard owner, entity layer H5 and
  * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
 /* Source OT1 TEXT H tail is NOT MTEXT's H graph. For this narrow
