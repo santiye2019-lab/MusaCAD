@@ -20,6 +20,20 @@ typedef struct MusaDwgAc1032InsertPlacement {
     uint8_t numeric_fields_decoded;
     uint8_t block_graph_and_display_accepted; /* ALWAYS 0 */
 } MusaDwgAc1032InsertPlacement;
+/* Source-only original R2018 INSERT H graph: first H5 LAYER, next H5
+ * BLOCK_HEADER, optional one H3 ATTRIB and H3 SEQEND. No block name,
+ * owner/model-space display, recursion or attribute text is resolved. */
+typedef struct MusaDwgAc1032InsertSourceGraph {
+    uint64_t indexed_handle;
+    uint64_t layer_handle;
+    uint64_t block_header_handle;
+    uint64_t attrib_handle;
+    uint64_t seqend_handle;
+    uint32_t owned_attrib_count;
+    uint8_t original_entity_and_targets_crc_verified;
+    uint8_t source_edges_verified;
+    uint8_t block_expansion_and_display_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032InsertSourceGraph;
 /* The caller must supply an independently CRC/H-authenticated original
  * payload and the corresponding common-entity DATA start. Any unsupported
  * tail, malformed numeric field, alias or unconsumed bit fails atomically. */
