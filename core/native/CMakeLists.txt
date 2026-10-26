@@ -82,6 +82,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_preview_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_native_v6_preview_atomic_smoke
                  COMMAND musacad_core_ac1032_original_preview_v6_test)
+        # Original R2018 OT18 H-tail forensic profile; no owner/layer guessing.
+        add_executable(musacad_core_ac1032_circle_h_tail_profile_test
+                tests/core_dwg_ac1032_circle_h_tail_profile_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_h_tail_profile_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_h_tail_profile_abi_smoke
+                 COMMAND musacad_core_ac1032_circle_h_tail_profile_test)
         # Genuine R2018 OT35 ellipse -> independently verified source H5
         # LAYER, Unicode name, encoded style and conservative screen readiness.
         add_executable(musacad_core_ac1032_real_ellipse_style_test

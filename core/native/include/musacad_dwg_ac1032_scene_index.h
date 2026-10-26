@@ -308,6 +308,40 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     const MusaDwgAc1032SceneIndex *scene,uint64_t child_handle,
     MusaDwgAc1032EntityBlockOwnerLayerSource *out);
 
+
+/* R2018 OT18 original CRC/H forensic probe. first_raw_target and
+ * second_raw_target are untrusted H references, NOT certified owner/layer.
+ * MSB prefix is copied from the authenticated original HANDLE bitstream.
+ * No diagnostic status (even EXACT_EDGE) certifies model-space, XREF,
+ * frozen/off/viewport state, BYLAYER/BYBLOCK or final drawing. */
+#define MUSACAD_AC1032_CIRCLE_H_COMMON_UNSUPPORTED 1u
+#define MUSACAD_AC1032_CIRCLE_H_FIRST_UNREADABLE 2u
+#define MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4 3u
+#define MUSACAD_AC1032_CIRCLE_H_SECOND_UNREADABLE 4u
+#define MUSACAD_AC1032_CIRCLE_H_SECOND_NOT_H5 5u
+#define MUSACAD_AC1032_CIRCLE_H_TAIL_NONCANONICAL 6u
+#define MUSACAD_AC1032_CIRCLE_H_TARGET_TYPES_REJECTED 7u
+#define MUSACAD_AC1032_CIRCLE_H_GRAPH_REJECTED 8u
+#define MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE 9u
+typedef struct MusaDwgAc1032CircleHTailProfile {
+    uint64_t indexed_handle,handle_start_bit,handle_end_bit;
+    uint64_t first_raw_target,second_raw_target;
+    uint64_t residual_bits_after_two_refs;
+    uint32_t reactor_count;
+    uint16_t raw_object_type;
+    uint8_t prefix_msb[8],prefix_bit_count;
+    uint8_t entity_mode,xdictionary_missing,has_color_reference;
+    uint8_t linetype_flags,plotstyle_flags,material_flags,visualstyle_flags;
+    uint8_t first_ref_decoded,first_ref_code,first_ref_count;
+    uint8_t second_ref_decoded,second_ref_code,second_ref_count;
+    uint8_t profile_status,original_record_crc_verified;
+    uint8_t exact_h4_h5_source_verified;
+    uint8_t final_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleHTailProfile;
+int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleHTailProfile *out);
+
 /* Single ORIGINAL indexed DWG graph walk from one geometry entity
  * to its source-CRC-verified LAYER table record and bounded Unicode TU
  * name. Built from separate first-party readers, never by guessing a

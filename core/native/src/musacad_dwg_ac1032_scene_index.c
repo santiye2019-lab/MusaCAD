@@ -1361,6 +1361,118 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     *out=result;
     return 1;
 }
+
+/* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
+ * decoded H references are RAW observations, NOT owner/layer assignments.
+ * This records precisely which strict H4/H5 assumption failed, without
+ * allowing any original color, visibility, viewport or final paint. */
+int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleHTailProfile *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,18u,&p))return 0;
+    if(p.layout.data_stream_bits>SIZE_MAX||
+       p.layout.total_payload_bits>SIZE_MAX||
+       p.layout.data_stream_bits>=p.layout.total_payload_bits){
+        free(p.raw);return 0;
+    }
+    MusaDwgAc1032CircleHTailProfile v={0};
+    v.indexed_handle=h;
+    v.raw_object_type=18u;
+    v.original_record_crc_verified=1u;
+    v.handle_start_bit=p.layout.data_stream_bits;
+    v.handle_end_bit=p.layout.total_payload_bits;
+    v.entity_mode=p.common.prefix.entity_mode;
+    v.reactor_count=p.common.prefix.reactor_count;
+    v.xdictionary_missing=p.common.prefix.xdictionary_missing;
+    v.has_color_reference=p.common.has_color_reference;
+    v.linetype_flags=p.common.linetype_flags;
+    v.plotstyle_flags=p.common.plotstyle_flags;
+    v.material_flags=p.common.material_flags;
+    v.visualstyle_flags=p.common.visualstyle_flags;
+    const size_t available=(size_t)(p.layout.total_payload_bits-
+                                   p.layout.data_stream_bits);
+    const size_t sample=available<64u?available:64u;
+    MusaDwgAc1015Bits peek={0};
+    int ok=musa_dwg_ac1015_bits_init(&peek,p.raw,p.bytes,
+        (size_t)p.layout.data_stream_bits,
+        (size_t)p.layout.total_payload_bits);
+    for(size_t i=0u;ok&&i<sample;i++){
+        uint32_t bit=0u;
+        ok=musa_dwg_ac1015_bits_read_u(&peek,1u,&bit);
+        if(ok)v.prefix_msb[i/8u]|=(uint8_t)(bit<<(7u-(i%8u)));
+    }
+    v.prefix_bit_count=(uint8_t)sample;
+    const int common=p.common.common_decoded&&
+        p.common.prefix.prefix_decoded&&
+        p.common.prefix.indexed_handle==h&&
+        p.common.prefix.raw_object_type==18u&&
+        v.entity_mode==0u&&v.reactor_count==0u&&
+        v.xdictionary_missing==1u&&!v.has_color_reference&&
+        !v.linetype_flags&&!v.plotstyle_flags&&
+        !v.material_flags&&!v.visualstyle_flags;
+    MusaDwgAc1015HandleRef first={0},second={0};
+    MusaDwgAc1015Bits bits={0};
+    int first_ok=0,second_ok=0,padding_ok=0;
+    if(ok){
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+            (size_t)p.layout.data_stream_bits,
+            (size_t)p.layout.total_payload_bits);
+    }
+    if(ok){
+        first_ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&first);
+        if(first_ok){
+            v.first_ref_decoded=1u;
+            v.first_ref_code=first.code;
+            v.first_ref_count=first.count;
+            v.first_raw_target=first.target;
+            second_ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&second);
+            if(second_ok){
+                v.second_ref_decoded=1u;
+                v.second_ref_code=second.code;
+                v.second_ref_count=second.count;
+                v.second_raw_target=second.target;
+                v.residual_bits_after_two_refs=bits.bit_end-bits.bit_pos;
+                MusaDwgAc1015Bits tail=bits;
+                padding_ok=cached_graph_zero_padding(&tail);
+            }
+        }
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    if(!common)v.profile_status=MUSACAD_AC1032_CIRCLE_H_COMMON_UNSUPPORTED;
+    else if(!first_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_FIRST_UNREADABLE;
+    else if(first.code!=4u)v.profile_status=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4;
+    else if(!second_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_SECOND_UNREADABLE;
+    else if(second.code!=5u)v.profile_status=MUSACAD_AC1032_CIRCLE_H_SECOND_NOT_H5;
+    else if(!padding_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_TAIL_NONCANONICAL;
+    else{
+        uint16_t owner_type=0u,layer_type=0u;
+        if(!first.target||!second.target||
+           first.target==second.target||first.target==h||
+           second.target==h||
+           !musa_dwg_ac1032_scene_index_object_type(
+                s,first.target,&owner_type)||owner_type!=49u||
+           !musa_dwg_ac1032_scene_index_object_type(
+                s,second.target,&layer_type)||layer_type!=51u)
+            v.profile_status=MUSACAD_AC1032_CIRCLE_H_TARGET_TYPES_REJECTED;
+        else{
+            MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+            if(musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                   s,h,&edge)&&
+               edge.exact_h4_owner_and_h5_layer_source_verified&&
+               edge.owner_block_header_handle==first.target&&
+               edge.layer_handle==second.target){
+                v.profile_status=MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE;
+                v.exact_h4_h5_source_verified=1u;
+            }else v.profile_status=MUSACAD_AC1032_CIRCLE_H_GRAPH_REJECTED;
+        }
+    }
+    *out=v;
+    return 1;
+}
+
 /* No default '0' or palette guesses: the actual source entity H=5
  * points at an original CRC-verified OT51, whose independently parsed TU
  * name is returned with its original bit offset and Unicode evidence. */
