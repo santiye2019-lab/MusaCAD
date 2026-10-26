@@ -60,6 +60,15 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_android_firstparty_runtime.py' -v
           python3 -m unittest discover -s tests -p 'test_original_dwg_2d_diagnostic_isolation.py' -v
           python3 -m unittest discover -s tests -p 'test_ac1032_all_insert_android_bridge.py' -v
+          # Actual pure-Java packet merger used by NativeScene, not just
+          # source-text assertions. Includes mixed LINE/RGB/TEXT/curve and
+          # corruption/overflow/fail-atomic negative acceptance.
+          mkdir -p /tmp/musacad-original-combined-v6
+          javac -encoding UTF-8 -d /tmp/musacad-original-combined-v6 \
+            app/src/main/java/com/musa/cad/OriginalSourceV6Merge.java \
+            tests/OriginalSourceV6MergeTest.java
+          java -cp /tmp/musacad-original-combined-v6 \
+            com.musa.cad.OriginalSourceV6MergeTest
       - name: MC1032 own-engine v1-v2 lossless migration JNI and no-core proof
         run: |
           set -euo pipefail
