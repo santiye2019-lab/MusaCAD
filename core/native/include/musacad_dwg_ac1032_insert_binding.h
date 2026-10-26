@@ -37,4 +37,33 @@ static inline int musa_dwg_ac1032_insert_bind_source(
     *out=v;
     return 1;
 }
+/* A caller must supply a separately CRC/H-authenticated BLOCK_HEADER
+ * base point matching this INSERT's exact referenced BLOCK_HEADER H.
+ * No implicit zero origin is permitted. A future OT49 parser must
+ * populate this evidence; this API does not manufacture such evidence. */
+typedef struct MusaDwgAc1032BlockBaseEvidence {
+    uint64_t block_header_handle;
+    double base[3];
+    uint8_t original_block_header_crc_verified;
+    uint8_t base_point_decoded;
+} MusaDwgAc1032BlockBaseEvidence;
+static inline int musa_dwg_ac1032_insert_map_verified_base(
+    const MusaDwgAc1032InsertBinding *binding,
+    const MusaDwgAc1032BlockBaseEvidence *base,
+    const double local[3],double world[3]){
+    if(!binding||!base||!local||!world||
+       !binding->source_binding_verified||
+       binding->block_expansion_accepted||
+       !binding->graph.original_entity_and_targets_crc_verified||
+       !binding->graph.source_edges_verified||
+       !base->original_block_header_crc_verified||
+       !base->base_point_decoded||
+       !base->block_header_handle||
+       base->block_header_handle!=binding->graph.block_header_handle||
+       binding->placement.indexed_handle!=binding->graph.indexed_handle)
+        return 0;
+    return musa_dwg_ac1032_insert_xy_world_z(
+        &binding->placement,base->base,local,world);
+}
+
 #endif
