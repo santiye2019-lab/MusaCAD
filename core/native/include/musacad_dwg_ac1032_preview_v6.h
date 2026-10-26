@@ -76,6 +76,10 @@ int musa_dwg_ac1032_preview_v6_planar_source_aci(
  * and a single line: paragraphs, font metrics, line wrapping, layer
  * visibility, owner graph and final colors are NOT equivalent to AutoCAD.
  * Always explicitly partial; no guarantee of exact glyph placement.
+ * Source-only exact direct ACI/RGB24 may be transported when both original
+ * entity common ENC and its OT51 layer H graph authenticate. Source-invisible
+ * MTEXT is omitted. BYLAYER/BYBLOCK/alpha/color-reference remain provisional
+ * ACI7, NEVER inferred from LAYER0 or owner. Font and viewport remain unknown.
  * Legacy preview functions remain unaffected. */
 int musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
     const MusaDwgAc1032SceneIndex *scene,float *words,
