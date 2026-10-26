@@ -890,6 +890,58 @@ int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
     free(raw);
     return ok;
 }
+int musa_dwg_ac1032_scene_index_block_header_child_prefix(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032BlockHeaderChildPrefix *out){
+    if(!h||!check_output(scene,out,sizeof(*out)))return 0;
+    uint64_t off=0u;size_t needed=0u,copied=0u;
+    MusaDwgAc1032PayloadInfo meta={0},again={0};
+    MusaDwgAc1032ObjectStreams layout={0};
+    if(!find(scene,h,&off)||
+       !musa_dwg_ac1032_object_payload_bytes(
+           scene->objects,scene->object_bytes,h,off,
+           NULL,0u,&needed,&meta)||
+       !meta.original_record_crc_verified||
+       meta.raw_object_type!=49u||meta.indexed_handle!=h||
+       !needed||needed>MAX_OBJECT_SECTION||
+       meta.payload_bytes!=needed||
+       !musa_dwg_ac1032_stream_layout_bytes(
+           scene->objects,scene->object_bytes,h,off,&layout)||
+       !layout.original_record_crc_verified||
+       layout.indexed_handle!=h||layout.raw_object_type!=49u||
+       layout.object_section_offset!=off||
+       layout.total_payload_bits!=(uint64_t)needed*8u||
+       layout.handle_stream_bits!=meta.handle_stream_bits)return 0;
+    uint8_t *raw=(uint8_t*)malloc(needed);
+    if(!raw)return 0;
+    MusaDwgAc1032BlockHeaderChildPrefix value={0};
+    int ok=musa_dwg_ac1032_object_payload_bytes(
+           scene->objects,scene->object_bytes,h,off,
+           raw,needed,&copied,&again)&&
+       copied==needed&&again.original_record_crc_verified&&
+       again.raw_object_type==49u&&again.indexed_handle==h&&
+       again.object_section_offset==off&&
+       musa_dwg_ac1032_block_header_ot49_child_prefix_at(
+           raw,needed,&layout,&value);
+    free(raw);
+    if(!ok)return 0;
+    /* Resolve every proposed edge against the original independently
+     * CRC-verified H map. This is not reverse-owner authentication. */
+    uint16_t kind=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+           scene,value.block_control_handle,&kind)||
+       kind==4u||kind==5u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           scene,value.block_begin_handle,&kind)||kind!=4u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           scene,value.endblk_handle,&kind)||kind!=5u)return 0;
+    for(uint32_t i=0u;i<value.child_count;i++){
+        if(!musa_dwg_ac1032_scene_index_object_type(
+               scene,value.child_handles[i],&kind)||
+           kind==4u||kind==5u)return 0;
+    }
+    *out=value;return 1;
+}
 int musa_dwg_ac1032_scene_index_read_block_header_base(
     const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032BlockHeaderBase *out){

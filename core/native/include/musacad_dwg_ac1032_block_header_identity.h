@@ -259,4 +259,86 @@ static inline int musa_dwg_ac1032_block_header_ot49_base_at(
     *out=value;return 1;
 }
 
+
+/* R2018 local OT49 H prefix. For the currently supported no-reactor,
+ * missing-xdictionary, non-XREF profile, the source H stream begins with
+ * block-control, a null pointer, BLOCK, owned entities and ENDBLK.
+ * Later INSERT/layout references are NOT parsed. No child may be painted
+ * until entity ownership and layer/visibility are independently proven.
+ * Bounded at 64 children; larger definitions fail closed. */
+#define MUSACAD_AC1032_OT49_CHILD_LIMIT 64u
+typedef struct MusaDwgAc1032BlockHeaderChildPrefix {
+    uint64_t indexed_handle;
+    uint64_t block_control_handle;
+    uint64_t block_begin_handle;
+    uint64_t endblk_handle;
+    uint64_t child_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint32_t child_count;
+    size_t next_handle_bit;
+    uint8_t original_record_crc_verified;
+    uint8_t h_prefix_decoded;
+    uint8_t full_handle_tail_verified; /* ALWAYS zero */
+    uint8_t final_child_ownership_and_paint_accepted; /* ALWAYS zero */
+} MusaDwgAc1032BlockHeaderChildPrefix;
+static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032BlockHeaderChildPrefix *out){
+    if(!raw||!layout||!out||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderBase base={0};
+    if(!musa_dwg_ac1032_block_header_ot49_base_at(
+           raw,n,layout,&base)||
+       !base.original_record_crc_verified||!base.base_point_decoded||
+       base.block_children_and_display_accepted||
+       base.owned_object_count>MUSACAD_AC1032_OT49_CHILD_LIMIT||
+       layout->total_payload_bits>SIZE_MAX||
+       layout->data_stream_bits>=layout->total_payload_bits)return 0;
+    MusaDwgAc1015Bits bits={0};
+    MusaDwgAc1015HandleRef ref={0};
+    uint32_t null_pointer=0u;
+    MusaDwgAc1032BlockHeaderChildPrefix value={0};
+    value.indexed_handle=base.indexed_handle;
+    value.child_count=base.owned_object_count;
+    if(!musa_dwg_ac1015_bits_init(
+           &bits,raw,n,(size_t)layout->data_stream_bits,
+           (size_t)layout->total_payload_bits)||
+       !musa_dwg_ac1015_read_handle_ref(
+           &bits,base.indexed_handle,&ref)||
+       !ref.target||ref.target==base.indexed_handle)return 0;
+    value.block_control_handle=ref.target;
+    /* Original R2018 H stream has an explicit null H pointer 0x50:
+     * code=5, count=0. It is NOT an 0x00 byte; do not shift later
+     * BLOCK/child/ENDBLK references by treating it as empty padding. */
+    if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&null_pointer)||
+       null_pointer!=0x50u||
+       !musa_dwg_ac1015_read_handle_ref(
+           &bits,base.indexed_handle,&ref)||
+       !ref.target||ref.target==base.indexed_handle)return 0;
+    value.block_begin_handle=ref.target;
+    for(uint32_t i=0u;i<value.child_count;i++){
+        if(!musa_dwg_ac1015_read_handle_ref(
+               &bits,base.indexed_handle,&ref)||
+           !ref.target||ref.target==base.indexed_handle||
+           ref.target==value.block_begin_handle||
+           ref.target==value.block_control_handle)return 0;
+        for(uint32_t j=0u;j<i;j++)
+            if(value.child_handles[j]==ref.target)return 0;
+        value.child_handles[i]=ref.target;
+    }
+    if(!musa_dwg_ac1015_read_handle_ref(
+           &bits,base.indexed_handle,&ref)||
+       !ref.target||ref.target==base.indexed_handle||
+       ref.target==value.block_begin_handle||
+       ref.target==value.block_control_handle)return 0;
+    value.endblk_handle=ref.target;
+    for(uint32_t i=0u;i<value.child_count;i++)
+        if(value.child_handles[i]==value.endblk_handle)return 0;
+    value.next_handle_bit=bits.bit_pos;
+    value.original_record_crc_verified=1u;
+    value.h_prefix_decoded=1u;
+    *out=value;return 1;
+}
 #endif

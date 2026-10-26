@@ -242,6 +242,42 @@ static int genuine(const char *file){
             }
         }
         if(ok){
+            /* Independent companion example_2018.dxf defines 13 and 5
+             * entities in these local blocks. H candidates are decoded
+             * from the unchanged binary DWG, not generated from DXF. */
+            MusaDwgAc1032BlockHeaderChildPrefix prefix={0};
+            const uint32_t expected_children=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_scene_index_block_header_child_prefix(
+                   scene,e->block,&prefix)&&
+               prefix.indexed_handle==e->block&&
+               prefix.original_record_crc_verified&&
+               prefix.h_prefix_decoded&&
+               !prefix.full_handle_tail_verified&&
+               !prefix.final_child_ownership_and_paint_accepted&&
+               prefix.child_count==expected_children&&
+               prefix.block_control_handle&&
+               prefix.block_begin_handle&&prefix.endblk_handle&&
+               prefix.block_begin_handle!=prefix.endblk_handle;
+            if(ok){
+                uint16_t type=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                       scene,prefix.block_begin_handle,&type)&&type==4u&&
+                   musa_dwg_ac1032_scene_index_object_type(
+                       scene,prefix.endblk_handle,&type)&&type==5u;
+                for(uint32_t j=0u;ok&&j<prefix.child_count;j++)
+                    ok=musa_dwg_ac1032_scene_index_object_type(
+                           scene,prefix.child_handles[j],&type)&&
+                       type!=4u&&type!=5u;
+            }
+            if(ok){
+                const MusaDwgAc1032BlockHeaderChildPrefix before=prefix;
+                ok=!musa_dwg_ac1032_scene_index_block_header_child_prefix(
+                       scene,e->h,&prefix)&&
+                   !memcmp(&before,&prefix,sizeof(prefix));
+            }
+        }
+        if(ok){
             /* The independent companion DXF says both referenced BLOCK
              * origins are (0,0,0). Use the actual OT49 base reader and
              * original INSERT placement; do not inject a synthetic base. */

@@ -50,6 +50,12 @@ int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
     size_t start_bit,size_t bit_count,uint8_t *out,size_t out_bytes);
 /* Original CRC/H authenticated OT49 base XYZ and owned count. These
  * numeric fields are NOT proof of child H ownership, model space or paint. */
+/* CRC/H-verified R2018 local BLOCK_HEADER H prefix only: BLOCK marker,
+ * bounded candidate owned entity handles and ENDBLK. Full tail, owner
+ * reverse links, visibility and paint are NOT accepted. */
+int musa_dwg_ac1032_scene_index_block_header_child_prefix(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderChildPrefix *out);
 int musa_dwg_ac1032_scene_index_read_block_header_base(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderBase *out);
