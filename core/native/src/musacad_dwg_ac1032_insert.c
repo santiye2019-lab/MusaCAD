@@ -64,6 +64,7 @@ int musa_dwg_ac1032_insert_placement_at(
         return 0;
     v.has_attribs=(uint8_t)attribs;
     fprintf(stderr,"OT7 trace rotation=%.12g extrusion=%.12g %.12g %.12g attrib=%u count=%u bit=%zu end=%zu\\n",v.rotation,v.extrusion[0],v.extrusion[1],v.extrusion[2],attribs,v.owned_attrib_count,b.bit_pos,b.bit_end);
+    {MusaDwgAc1015Bits trace=b;fprintf(stderr,"OT7 trace trailing DATA bits:");while(trace.bit_pos<trace.bit_end){uint32_t x=0;if(!musa_dwg_ac1015_bits_read_u(&trace,1u,&x))break;fprintf(stderr,"%u",x);}fprintf(stderr,"\\n");}
     if(b.bit_pos!=b.bit_end||
        (!v.has_attribs&&v.owned_attrib_count!=0u)||
        v.owned_attrib_count>100000u||
