@@ -942,6 +942,30 @@ int musa_dwg_ac1032_scene_index_block_header_child_prefix(
     }
     *out=value;return 1;
 }
+int musa_dwg_ac1032_scene_index_block_header_typed_children(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032BlockHeaderTypedChildren *out){
+    if(!h||!check_output(scene,out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderTypedChildren value={0};
+    if(!musa_dwg_ac1032_scene_index_block_header_child_prefix(
+           scene,h,&value.prefix)||
+       value.prefix.indexed_handle!=h||
+       !value.prefix.original_record_crc_verified||
+       !value.prefix.h_prefix_decoded||
+       !value.prefix.canonical_h_roles_verified||
+       value.prefix.full_handle_tail_verified||
+       value.prefix.final_child_ownership_and_paint_accepted||
+       value.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    for(uint32_t i=0u;i<value.prefix.child_count;i++){
+        uint16_t type=0u;
+        if(!musa_dwg_ac1032_scene_index_object_type(
+               scene,value.prefix.child_handles[i],&type)||
+           !type||type==4u||type==5u)return 0;
+        value.child_object_types[i]=type;
+    }
+    value.all_child_record_types_crc_verified=1u;
+    *out=value;return 1;
+}
 int musa_dwg_ac1032_scene_index_read_block_header_base(
     const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032BlockHeaderBase *out){
