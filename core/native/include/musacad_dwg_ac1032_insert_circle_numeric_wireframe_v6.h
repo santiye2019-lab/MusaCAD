@@ -21,7 +21,7 @@
  */
 #define MUSACAD_AC1032_CIRCLE_WIRE_SAMPLES 64u
 #define MUSACAD_AC1032_CIRCLE_WIRE_LIMIT 1024u
-#define MUSACAD_AC1032_CIRCLE_WIRE_WORDS (7u+MUSACAD_AC1032_CIRCLE_WIRE_LIMIT*(3u+2u*MUSACAD_AC1032_CIRCLE_WIRE_SAMPLES))
+#define MUSACAD_AC1032_CIRCLE_WIRE_WORDS (7u+MUSACAD_AC1032_CIRCLE_WIRE_LIMIT*(2u+2u*(MUSACAD_AC1032_CIRCLE_WIRE_SAMPLES+1u)))
 #define MUSACAD_AC1032_CIRCLE_DIAGNOSTIC_ACI 6u
 
 typedef struct MusaDwgAc1032CircleWireframeEvidence {
@@ -91,7 +91,7 @@ static inline int musa_dwg_ac1032_circle_wireframe_v6_walk(
                 return 0;
             if(v.emitted_numeric_wireframes>=
                MUSACAD_AC1032_CIRCLE_WIRE_LIMIT)return 0;
-            const size_t need=3u+2u*MUSACAD_AC1032_CIRCLE_WIRE_SAMPLES;
+            const size_t need=2u+2u*(MUSACAD_AC1032_CIRCLE_WIRE_SAMPLES+1u);
             if(v.required_float_words>
                MUSACAD_AC1032_CIRCLE_WIRE_WORDS-need)return 0;
             const double cx=row->world_center[0],cy=row->world_center[1];
@@ -170,6 +170,11 @@ static inline int musa_dwg_ac1032_circle_wireframe_v6_diagnostic(
     MusaDwgAc1032CircleWireframeEvidence *out){
     if(!scene||!out||(!words&&capacity)||
        capacity>MUSACAD_AC1032_CIRCLE_WIRE_WORDS)return 0;
+    if(words){
+        const uintptr_t a=(uintptr_t)words,b=(uintptr_t)out;
+        const size_t bytes=capacity*sizeof(float),meta=sizeof(*out);
+        if((a<=b&&b-a<bytes)||(b<a&&a-b<meta))return 0;
+    }
     MusaDwgAc1032CircleWireframeEvidence before={0},after={0};
     if(!musa_dwg_ac1032_circle_wireframe_v6_walk(
            scene,NULL,0u,&before))return 0;
