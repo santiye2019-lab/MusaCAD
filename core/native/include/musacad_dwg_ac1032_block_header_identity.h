@@ -104,7 +104,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_prefix_evidence(
         hash*=UINT64_C(1099511628211);
     }
     if(rem){
-        const uint8_t mask=(uint8_t)((1u<<rem)-1u);
+        const uint8_t mask=(uint8_t)(0xffu<<(8u-rem));
         hash^=(uint64_t)(raw[whole]&mask);
         hash*=UINT64_C(1099511628211);
     }
