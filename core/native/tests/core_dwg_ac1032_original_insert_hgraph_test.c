@@ -23,6 +23,7 @@
 #include "musacad_dwg_ac1032_insert_line_source_bounds.h"
 #include "musacad_dwg_ac1032_insert_line_v6_diagnostic.h"
 #include "musacad_dwg_ac1032_insert_circle_source_axes.h"
+#include "musacad_dwg_ac1032_insert_circle_source_envelope.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1811,6 +1812,77 @@ static int genuine(const char *file){
                !musa_dwg_ac1032_insert_circle_source_axes(
                    scene,UINT64_C(0x1c8),NULL)&&
                !memcmp(&circle,&prior,sizeof(circle));
+        }
+    }
+    if(ok){
+        /* Independent original example_2018.dxf oracle: INSERT H1C8
+         * CIRCLE H1BB, center (8482.030567364651,-1381.341268226861),
+         * radius 130.0490046078758, unrotated unit scale.
+         * Exact WCS bounds are center +/- radius, NOT an assumed
+         * layer, final color, model-space or visible scene. */
+        MusaDwgAc1032InsertCircleEnvelope envelope={0},again={0};
+        const double radius=130.0490046078758;
+        const double center_x=8482.030567364651;
+        const double center_y=-1381.341268226861;
+        ok=musa_dwg_ac1032_insert_circle_source_envelope(
+               scene,UINT64_C(0x1c8),&envelope)&&
+           musa_dwg_ac1032_insert_circle_source_envelope(
+               scene,UINT64_C(0x1c8),&again)&&
+           !memcmp(&envelope,&again,sizeof(envelope))&&
+           envelope.insert_handle==UINT64_C(0x1c8)&&
+           envelope.block_header_handle==UINT64_C(0x1b8)&&
+           envelope.circle_candidates==1u&&
+           envelope.verified_circles==1u&&
+           envelope.unverified_circles==0u&&
+           envelope.h4_h5_unresolved_circles==1u&&
+           envelope.has_numeric_bounds&&
+           envelope.original_numeric_source_bounds_verified&&
+           !envelope.final_visibility_and_paint_accepted;
+        if(ok){
+            const MusaDwgAc1032InsertCircleEnvelopeRow *row=
+                &envelope.rows[0];
+            ok=row->child_handle==UINT64_C(0x1bb)&&
+               !row->original_h4_h5_source_verified&&
+               !row->final_visibility_and_paint_accepted&&
+               fabs(row->min_xy[0]-(center_x-radius))<1e-6&&
+               fabs(row->max_xy[0]-(center_x+radius))<1e-6&&
+               fabs(row->min_xy[1]-(center_y-radius))<1e-6&&
+               fabs(row->max_xy[1]-(center_y+radius))<1e-6&&
+               row->outward_float_xy[0]<=row->min_xy[0]&&
+               row->outward_float_xy[1]<=row->min_xy[1]&&
+               row->outward_float_xy[2]>=row->max_xy[0]&&
+               row->outward_float_xy[3]>=row->max_xy[1]&&
+               envelope.combined_min_xy[0]==row->min_xy[0]&&
+               envelope.combined_max_xy[0]==row->max_xy[0]&&
+               envelope.combined_min_xy[1]==row->min_xy[1]&&
+               envelope.combined_max_xy[1]==row->max_xy[1];
+        }
+        const uint64_t without_circle[]={
+            UINT64_C(0x190),UINT64_C(0x756)};
+        for(size_t i=0u;ok&&i<2u;i++){
+            MusaDwgAc1032InsertCircleEnvelope empty={0};
+            ok=musa_dwg_ac1032_insert_circle_source_envelope(
+                   scene,without_circle[i],&empty)&&
+               empty.circle_candidates==0u&&
+               empty.verified_circles==0u&&
+               !empty.has_numeric_bounds&&
+               empty.original_numeric_source_bounds_verified&&
+               !empty.final_visibility_and_paint_accepted;
+        }
+        if(ok){
+            const MusaDwgAc1032InsertCircleEnvelope prior=envelope;
+            ok=!musa_dwg_ac1032_insert_circle_source_envelope(
+                   scene,UINT64_C(0x1b8),&envelope)&&
+               !memcmp(&envelope,&prior,sizeof(envelope))&&
+               !musa_dwg_ac1032_insert_circle_source_envelope(
+                   scene,UINT64_MAX,&envelope)&&
+               !memcmp(&envelope,&prior,sizeof(envelope))&&
+               !musa_dwg_ac1032_insert_circle_source_envelope(
+                   NULL,UINT64_C(0x1c8),&envelope)&&
+               !memcmp(&envelope,&prior,sizeof(envelope))&&
+               !musa_dwg_ac1032_insert_circle_source_envelope(
+                   scene,UINT64_C(0x1c8),NULL)&&
+               !memcmp(&envelope,&prior,sizeof(envelope));
         }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
