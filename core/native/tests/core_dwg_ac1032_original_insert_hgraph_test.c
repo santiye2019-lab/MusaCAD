@@ -1745,15 +1745,18 @@ static int genuine(const char *file){
            circle.verified_circle_count==1u&&
            circle.unverified_circle_count==0u&&
            circle.non_circle_child_count==12u&&
-           circle.original_source_circle_axes_verified&&
+           circle.original_numeric_source_circle_axes_verified&&
+           circle.h4_h5_source_verified_count==0u&&
+           circle.h4_h5_unresolved_count==1u&&
            !circle.final_visibility_and_paint_accepted;
         if(ok){
             const MusaDwgAc1032InsertCircleSourceAxesRow *c=&circle.rows[0];
             const double radius=130.0490046078758;
             ok=c->child_handle==UINT64_C(0x1bb)&&
-               c->verified_block_owner_handle==UINT64_C(0x1b8)&&
-               c->source_layer_handle!=0u&&
-               c->original_circle_h4_h5_affine_axes_verified&&
+               c->verified_block_owner_handle==0u&&
+               c->source_layer_handle==0u&&
+               c->original_numeric_affine_axes_verified&&
+               !c->original_h4_h5_source_verified&&
                !c->final_visibility_and_paint_accepted&&
                fabs(c->source_radius-radius)<1e-6&&
                fabs(c->world_center[0]-8482.030567364651)<1e-6&&
@@ -1768,63 +1771,16 @@ static int genuine(const char *file){
                 if(source.rows[i].raw_object_type!=18u)continue;
                 source_circles++;
                 ok=source.rows[i].child_handle==c->child_handle&&
-                   source.rows[i].source_layer_handle==
-                       c->source_layer_handle&&
-                   source.rows[i].source_style_class==
-                       c->source_style_class&&
-                   source.rows[i].source_color_status==
-                       c->source_color_status&&
-                   source.rows[i].raw_color_index==c->source_aci&&
-                   source.rows[i].raw_rgb==c->source_rgb24;
+                   !source.rows[i].original_common_verified&&
+                   source.rows[i].source_layer_handle==0u&&
+                   c->source_style_class==0u&&
+                   c->source_color_status==0u&&
+                   c->source_aci==0u&&c->source_rgb24==0u;
             }
             ok=ok&&source_circles==1u;
         }
-        fprintf(stderr,
-            "R2018 INSERT CIRCLE audit: ok=%d child=%u candidate=%u "
-            "verified=%u rejected=%u H=%llX owner=%llX layer=%llX "
-            "center=(%.10g,%.10g) axes=(%.10g,%.10g)/(%.10g,%.10g) "
-            "radius=%.10g\\n",
-            ok,(unsigned)circle.child_count,
-            (unsigned)circle.circle_candidate_count,
-            (unsigned)circle.verified_circle_count,
-            (unsigned)circle.unverified_circle_count,
-            (unsigned long long)circle.rows[0].child_handle,
-            (unsigned long long)circle.rows[0].verified_block_owner_handle,
-            (unsigned long long)circle.rows[0].source_layer_handle,
-            circle.rows[0].world_center[0],circle.rows[0].world_center[1],
-            circle.rows[0].world_axis_u[0],circle.rows[0].world_axis_u[1],
-            circle.rows[0].world_axis_v[0],circle.rows[0].world_axis_v[1],
-            circle.rows[0].source_radius);
-        if(circle.circle_candidate_count&&
-           !circle.verified_circle_count){
-            MusaDwgAc1032InsertReverseOwnerJoin reverse={0};
-            MusaDwgAc1032NativeCurve native={0};
-            int reverse_ok=musa_dwg_ac1032_insert_reverse_owner_source_join(
-                scene,UINT64_C(0x1c8),&reverse);
-            int curve_ok=musa_dwg_ac1032_scene_index_read_curve(
-                scene,UINT64_C(0x1bb),&native);
-            for(uint32_t i=0u;i<source.child_count;i++){
-                if(source.rows[i].raw_object_type!=18u)continue;
-                const MusaDwgAc1032InsertChildSourceRow *sr=&source.rows[i];
-                const MusaDwgAc1032InsertReverseOwnerRow *rr=&reverse.rows[i];
-                fprintf(stderr,
-                    "CIRCLE reject: source H=%llX mapped=%u common=%u "
-                    "layer=%llX reverse_ok=%d reverse_status=%u "
-                    "reverse_H=%llX verified_edge=%u "
-                    "curve_ok=%d radius=%.17g thickness=%.17g "
-                    "extrusion=(%.9g,%.9g,%.9g)\\n",
-                    (unsigned long long)sr->child_handle,
-                    (unsigned)sr->coordinate_mapped,
-                    (unsigned)sr->original_common_verified,
-                    (unsigned long long)sr->source_layer_handle,
-                    reverse_ok,(unsigned)rr->reverse_owner_status,
-                    (unsigned long long)rr->verified_owner_handle,
-                    (unsigned)rr->original_reverse_source_edge_verified,
-                    curve_ok,native.radius,native.thickness,
-                    native.extrusion[0],native.extrusion[1],
-                    native.extrusion[2]);
-            }
-        }
+        /* Authentic H1BB numeric DATA is independently verified;
+         * its H4/H5 tail is unsupported and must stay unresolved. */
         /* The independently known H17D block contains four LINEs and
          * one ATTDEF, not a CIRCLE. Do not invent a radius or origin. */
         const uint64_t empty_inserts[]={
@@ -1839,7 +1795,9 @@ static int genuine(const char *file){
                empty.verified_circle_count==0u&&
                empty.unverified_circle_count==0u&&
                empty.non_circle_child_count==5u&&
-               empty.original_source_circle_axes_verified&&
+               empty.original_numeric_source_circle_axes_verified&&
+               empty.h4_h5_source_verified_count==0u&&
+               empty.h4_h5_unresolved_count==0u&&
                !empty.final_visibility_and_paint_accepted;
         }
         if(ok){
