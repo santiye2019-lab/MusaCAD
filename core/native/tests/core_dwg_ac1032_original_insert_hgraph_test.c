@@ -8,6 +8,7 @@
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include "musacad_dwg_ac1032_insert_original_base_map.h"
 #include "musacad_dwg_ac1032_block_marker_commons.h"
+#include "musacad_dwg_ac1032_block_child_geometry_audit.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -351,6 +352,48 @@ static int genuine(const char *file){
                    !musa_dwg_ac1032_block_marker_commons(
                        scene,before.endblk_handle,&markers)&&
                    !memcmp(&before,&markers,sizeof(markers));
+            }
+        }
+        if(ok){
+            /* Genuine unchanged example_2018.dwg H1B8/H17D. Independent
+             * example_2018.dxf has exactly 13/5 block child objects.
+             * A native numeric decode is counted ONLY when the exact
+             * source H/CRC/type and geometry parser agree; other types
+             * remain explicitly unrendered and never gain ownership. */
+            MusaDwgAc1032BlockChildGeometryAudit audit={0};
+            const uint32_t expected_count=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_block_child_geometry_audit(
+                   scene,e->block,&audit)&&
+               audit.block_header_handle==e->block&&
+               audit.child_count==expected_count&&
+               audit.original_h_crc_type_verified&&
+               !audit.reverse_ownership_verified&&
+               !audit.visibility_and_paint_accepted&&
+               audit.numeric_geometry_verified+
+               audit.numeric_geometry_rejected+
+               audit.unsupported_object_types==expected_count;
+            for(uint32_t j=0u;ok&&j<audit.child_count;j++){
+                uint16_t actual=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                       scene,audit.child_handles[j],&actual)&&
+                   actual==audit.child_types[j]&&
+                   audit.numeric_geometry_ok[j]<=1u;
+            }
+            if(ok){
+                MusaDwgAc1032BlockChildGeometryAudit repeated={0};
+                ok=musa_dwg_ac1032_block_child_geometry_audit(
+                       scene,e->block,&repeated)&&
+                   !memcmp(&repeated,&audit,sizeof(audit));
+            }
+            if(ok){
+                const MusaDwgAc1032BlockChildGeometryAudit before=audit;
+                ok=!musa_dwg_ac1032_block_child_geometry_audit(
+                        scene,e->h,&audit)&&
+                   !memcmp(&before,&audit,sizeof(audit))&&
+                   !musa_dwg_ac1032_block_child_geometry_audit(
+                        scene,UINT64_MAX,&audit)&&
+                   !memcmp(&before,&audit,sizeof(audit));
             }
         }
         if(ok){
