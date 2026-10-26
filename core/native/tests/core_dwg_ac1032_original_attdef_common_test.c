@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Independent unchanged R2018 example_2018.dwg, DXF AcDbAttribute
+/* Independent unchanged R2018 example_2018.dwg, DXF AcDbAttributeDefinition
  * group-5 H18F. Admit ONLY source CRC/H authenticated OT3 entity
- * common, never string content, INSERT ownership, model-space or display. */
+ * common, never default tag/text, BLOCK ownership, model-space or display. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include <stdint.h>
 #include <stdio.h>
