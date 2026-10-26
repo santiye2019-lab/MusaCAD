@@ -379,6 +379,22 @@ int musa_dwg_ac1032_scene_index_circle_layer_provenance(
     const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
     MusaDwgAc1032CircleLayerProvenance *out);
 
+
+/* Original R2018 OT18 CIRCLE H(C relative owner) -> H5 OT51 Unicode
+ * LAYER -> strictly anchored numeric CMC source ACI. A successful
+ * source ACI is NOT a resolved BYLAYER display color: off/frozen, block
+ * ancestry, model/paper, viewport/XREF and overrides remain unknown.
+ * Missing or unsupported original source rejects atomically. */
+typedef struct MusaDwgAc1032CircleLayerCmcSource {
+    MusaDwgAc1032CircleLayerProvenance source;
+    MusaDwgAc1032LayerCmcEvidence layer_cmc;
+    uint8_t original_layer_cmc_aci_verified;
+    uint8_t final_visible_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleLayerCmcSource;
+int musa_dwg_ac1032_scene_index_circle_layer_cmc_source(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleLayerCmcSource *out);
+
 /* Single ORIGINAL indexed DWG graph walk from one geometry entity
  * to its source-CRC-verified LAYER table record and bounded Unicode TU
  * name. Built from separate first-party readers, never by guessing a
