@@ -238,6 +238,23 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
     if(ok)*out=value;
     return ok;
 }
+/* OT1 TEXT is not OT44 MTEXT. Source-authenticate the common entity
+ * fields only; no TU/string/layout or owner/style inference is permitted. */
+int musa_dwg_ac1032_scene_index_read_text_common(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032EntityCommon *out){
+    if(!h||!check_output(scene,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(scene,h,1u,&p))return 0;
+    const MusaDwgAc1032EntityCommon common=p.common;
+    free(p.raw);
+    if(!common.common_decoded||!common.prefix.prefix_decoded||
+       common.prefix.indexed_handle!=h||
+       common.prefix.raw_object_type!=1u||
+       !common.geometry_start_bit)return 0;
+    *out=common;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_mtext_common(
     const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032EntityCommon *out){
