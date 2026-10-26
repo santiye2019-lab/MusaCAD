@@ -4,6 +4,7 @@
  * Source H/CRC and insertion-point math only. No nested block expansion or visible scene claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_insert_binding.h"
+#include "musacad_dwg_ac1032_block_header_identity.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include <stdint.h>
 #include <math.h>
@@ -103,6 +104,25 @@ static int genuine(const char *file){
                 scene,UINT64_C(0x1b8),&unchanged_binding)&&
            !memcmp(&unchanged_binding,&original_binding,
                    sizeof(unchanged_binding));
+    }
+    /* An OT49 parser must reject an unauthenticated payload before
+     * attempting any BLOCK_HEADER base-point interpretation. */
+    if(ok){
+        const uint8_t fake[2]={0,0};
+        MusaDwgAc1032ObjectStreams layout={0};
+        MusaDwgAc1032BlockHeaderIdentity identity;
+        memset(&identity,0x5a,sizeof(identity));
+        const MusaDwgAc1032BlockHeaderIdentity saved_identity=identity;
+        layout.indexed_handle=UINT64_C(0x1b8);
+        layout.raw_object_type=49u;
+        layout.object_type_field_bits=10u;
+        layout.total_payload_bits=16u;
+        layout.data_stream_bits=12u;
+        layout.handle_stream_start_bit=12u;
+        layout.handle_stream_bits=4u;
+        ok=!musa_dwg_ac1032_block_header_ot49_identity(
+              fake,sizeof(fake),&layout,&identity)&&
+           !memcmp(&identity,&saved_identity,sizeof(identity));
     }
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
