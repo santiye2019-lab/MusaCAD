@@ -22,6 +22,7 @@
 #include "musacad_dwg_ac1032_insert_line_style_risk_evidence.h"
 #include "musacad_dwg_ac1032_insert_line_source_bounds.h"
 #include "musacad_dwg_ac1032_insert_line_v6_diagnostic.h"
+#include "musacad_dwg_ac1032_insert_circle_source_axes.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1719,6 +1720,93 @@ static int genuine(const char *file){
                        sizeof(packet)/sizeof(packet[0]),NULL)&&
                    !memcmp(&info,&prior,sizeof(info));
             }
+        }
+    }
+    if(ok){
+        /* Independent example_2018.dxf BLOCK CIRKLO_PUNKTOJ:
+         * H1B8 owns exactly one CIRCLE H1BB, local center (0,0,0),
+         * radius 130.0490046078758. INSERT H1C8 is unrotated unit
+         * scale at (8482.030567364651,-1381.341268226861,0).
+         * The source circle must become TWO WCS basis axes; no final
+         * layer visibility, viewport or resolved color is claimed. */
+        MusaDwgAc1032InsertCircleSourceAxes circle={0},again={0};
+        MusaDwgAc1032InsertChildSourceJoin source={0};
+        ok=musa_dwg_ac1032_insert_circle_source_axes(
+               scene,UINT64_C(0x1c8),&circle)&&
+           musa_dwg_ac1032_insert_circle_source_axes(
+               scene,UINT64_C(0x1c8),&again)&&
+           !memcmp(&circle,&again,sizeof(circle))&&
+           musa_dwg_ac1032_insert_child_source_join(
+               scene,UINT64_C(0x1c8),&source)&&
+           circle.insert_handle==UINT64_C(0x1c8)&&
+           circle.block_header_handle==UINT64_C(0x1b8)&&
+           circle.child_count==13u&&
+           circle.circle_candidate_count==1u&&
+           circle.verified_circle_count==1u&&
+           circle.unverified_circle_count==0u&&
+           circle.non_circle_child_count==12u&&
+           circle.original_source_circle_axes_verified&&
+           !circle.final_visibility_and_paint_accepted;
+        if(ok){
+            const MusaDwgAc1032InsertCircleSourceAxesRow *c=&circle.rows[0];
+            const double radius=130.0490046078758;
+            ok=c->child_handle==UINT64_C(0x1bb)&&
+               c->verified_block_owner_handle==UINT64_C(0x1b8)&&
+               c->source_layer_handle!=0u&&
+               c->original_circle_h4_h5_affine_axes_verified&&
+               !c->final_visibility_and_paint_accepted&&
+               fabs(c->source_radius-radius)<1e-6&&
+               fabs(c->world_center[0]-8482.030567364651)<1e-6&&
+               fabs(c->world_center[1]+1381.341268226861)<1e-6&&
+               fabs(c->world_center[2])<1e-9&&
+               fabs(c->world_axis_u[0]-radius)<1e-6&&
+               fabs(c->world_axis_u[1])<1e-6&&
+               fabs(c->world_axis_v[0])<1e-6&&
+               fabs(c->world_axis_v[1]-radius)<1e-6;
+            uint32_t source_circles=0u;
+            for(uint32_t i=0u;ok&&i<source.child_count;i++){
+                if(source.rows[i].raw_object_type!=18u)continue;
+                source_circles++;
+                ok=source.rows[i].child_handle==c->child_handle&&
+                   source.rows[i].source_layer_handle==
+                       c->source_layer_handle&&
+                   source.rows[i].source_style_class==
+                       c->source_style_class&&
+                   source.rows[i].source_color_status==
+                       c->source_color_status&&
+                   source.rows[i].raw_color_index==c->source_aci&&
+                   source.rows[i].raw_rgb==c->source_rgb24;
+            }
+            ok=ok&&source_circles==1u;
+        }
+        /* The independently known H17D block contains four LINEs and
+         * one ATTDEF, not a CIRCLE. Do not invent a radius or origin. */
+        const uint64_t empty_inserts[]={
+            UINT64_C(0x190),UINT64_C(0x756)};
+        for(size_t i=0u;ok&&i<2u;i++){
+            MusaDwgAc1032InsertCircleSourceAxes empty={0};
+            ok=musa_dwg_ac1032_insert_circle_source_axes(
+                   scene,empty_inserts[i],&empty)&&
+               empty.block_header_handle==UINT64_C(0x17d)&&
+               empty.child_count==5u&&
+               empty.circle_candidate_count==0u&&
+               empty.verified_circle_count==0u&&
+               empty.unverified_circle_count==0u&&
+               empty.non_circle_child_count==5u&&
+               empty.original_source_circle_axes_verified&&
+               !empty.final_visibility_and_paint_accepted;
+        }
+        if(ok){
+            const MusaDwgAc1032InsertCircleSourceAxes prior=circle;
+            ok=!musa_dwg_ac1032_insert_circle_source_axes(
+                   scene,UINT64_C(0x1b8),&circle)&&
+               !memcmp(&circle,&prior,sizeof(circle))&&
+               !musa_dwg_ac1032_insert_circle_source_axes(
+                   scene,UINT64_MAX,&circle)&&
+               !memcmp(&circle,&prior,sizeof(circle))&&
+               !musa_dwg_ac1032_insert_circle_source_axes(
+                   scene,UINT64_C(0x1c8),NULL)&&
+               !memcmp(&circle,&prior,sizeof(circle));
         }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
