@@ -85,7 +85,7 @@ static int genuine(const char *dwg,const char *dxf){
            !v.source.final_visibility_color_and_paint_accepted&&
            v.cmc.indexed_handle==UINT64_C(0x8a)&&
            v.cmc.original_record_crc_verified&&
-           v.cmc.packed_color_method==0xc3u&&
+           (v.cmc.packed_color_method>>24u)==0xc3u&&
            v.cmc.aci_index==(uint8_t)expected_aci&&
            v.source_aci_verified&&!v.resolved_color_and_paint_accepted;
         if(!ok)fprintf(stderr,
