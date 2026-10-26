@@ -18,6 +18,7 @@
 #include "musacad_dwg_ac1032_insert_instance_source_pair.h"
 #include "musacad_dwg_ac1032_block_reverse_owner_source_audit.h"
 #include "musacad_dwg_ac1032_insert_reverse_owner_source_join.h"
+#include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1341,6 +1342,94 @@ static int genuine(const char *file){
                !musa_dwg_ac1032_insert_reverse_owner_source_pair(
                     scene,UINT64_C(0x190),UINT64_C(0x756),NULL)&&
                !memcmp(&pair,&before,sizeof(pair));
+        }
+    }
+    if(ok){
+        /* Real unchanged R2018/DXF handles: 13/5/5 source block
+         * children. Only actual reverse-H4-owned, 2D-mapped LINE H
+         * segments enter the proposed packet. Nothing becomes paintable. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        const uint32_t child_counts[]={13u,5u,5u};
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertLineSourceSegments lines={0},again={0};
+            MusaDwgAc1032InsertChildSourceJoin source={0};
+            MusaDwgAc1032InsertReverseOwnerJoin owners={0};
+            ok=musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&lines)&&
+               musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&again)&&
+               !memcmp(&lines,&again,sizeof(lines))&&
+               musa_dwg_ac1032_insert_child_source_join(
+                   scene,inserts[b],&source)&&
+               musa_dwg_ac1032_insert_reverse_owner_source_join(
+                   scene,inserts[b],&owners)&&
+               lines.insert_handle==inserts[b]&&
+               lines.block_header_handle==blocks[b]&&
+               lines.child_count==child_counts[b]&&
+               lines.original_source_line_packet_verified&&
+               !lines.model_viewport_layer_visibility_and_paint_accepted&&
+               lines.line_candidate_count+lines.non_line_child_count==
+                   child_counts[b]&&
+               lines.verified_planar_line_count+
+                   lines.unadmitted_line_count==lines.line_candidate_count;
+            uint32_t inspected_line_children=0u;
+            uint32_t accepted=0u;
+            for(uint32_t i=0u;ok&&i<source.child_count;i++){
+                const MusaDwgAc1032InsertChildSourceRow *sr=
+                    &source.rows[i];
+                const MusaDwgAc1032InsertReverseOwnerRow *orow=
+                    &owners.rows[i];
+                if(sr->raw_object_type!=19u)continue;
+                inspected_line_children++;
+                if(!sr->coordinate_mapped||!sr->line_end_mapped||
+                   !sr->original_common_verified||!sr->source_layer_handle||
+                   !orow->original_reverse_source_edge_verified||
+                   orow->reverse_owner_status!=
+                        MUSACAD_AC1032_INSERT_OWNER_MATCH||
+                   orow->verified_owner_handle!=blocks[b])continue;
+                int planar=1;
+                for(unsigned k=0u;k<3u;k++){
+                    if(!isfinite(sr->world_anchor[k])||
+                       !isfinite(sr->world_line_end[k]))planar=0;
+                    if(k<2u&&(fabs(sr->world_anchor[k])>FLT_MAX||
+                               fabs(sr->world_line_end[k])>FLT_MAX))planar=0;
+                }
+                if(fabs(sr->world_anchor[2])>1e-9||
+                   fabs(sr->world_line_end[2])>1e-9)planar=0;
+                if(!planar)continue;
+                ok=accepted<lines.verified_planar_line_count;
+                if(!ok)break;
+                const MusaDwgAc1032InsertLineSourceRow *r=&lines.rows[accepted++];
+                ok=r->child_handle==sr->child_handle&&
+                   r->verified_block_owner_handle==blocks[b]&&
+                   r->source_layer_handle==sr->source_layer_handle&&
+                   r->source_style_class==sr->source_style_class&&
+                   r->source_color_index==sr->raw_color_index&&
+                   r->source_rgb24==sr->raw_rgb&&
+                   !memcmp(r->world_start,sr->world_anchor,
+                           sizeof(r->world_start))&&
+                   !memcmp(r->world_end,sr->world_line_end,
+                           sizeof(r->world_end))&&
+                   r->original_line_h4_h5_and_world_xy_verified&&
+                   !r->final_visibility_and_paint_accepted;
+            }
+            if(ok)ok=inspected_line_children==lines.line_candidate_count&&
+                     accepted==lines.verified_planar_line_count;
+            if(ok){
+                MusaDwgAc1032InsertLineSourceSegments prior=lines;
+                ok=!musa_dwg_ac1032_insert_line_source_segments(
+                       scene,blocks[b],&lines)&&
+                   !memcmp(&lines,&prior,sizeof(lines))&&
+                   !musa_dwg_ac1032_insert_line_source_segments(
+                       scene,UINT64_MAX,&lines)&&
+                   !memcmp(&lines,&prior,sizeof(lines))&&
+                   !musa_dwg_ac1032_insert_line_source_segments(
+                       scene,inserts[b],NULL)&&
+                   !memcmp(&lines,&prior,sizeof(lines));
+            }
         }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
