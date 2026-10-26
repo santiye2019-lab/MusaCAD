@@ -1795,6 +1795,36 @@ static int genuine(const char *file){
             circle.rows[0].world_axis_u[0],circle.rows[0].world_axis_u[1],
             circle.rows[0].world_axis_v[0],circle.rows[0].world_axis_v[1],
             circle.rows[0].source_radius);
+        if(circle.circle_candidate_count&&
+           !circle.verified_circle_count){
+            MusaDwgAc1032InsertReverseOwnerJoin reverse={0};
+            MusaDwgAc1032NativeCurve native={0};
+            int reverse_ok=musa_dwg_ac1032_insert_reverse_owner_source_join(
+                scene,UINT64_C(0x1c8),&reverse);
+            int curve_ok=musa_dwg_ac1032_scene_index_read_curve(
+                scene,UINT64_C(0x1bb),&native);
+            for(uint32_t i=0u;i<source.child_count;i++){
+                if(source.rows[i].raw_object_type!=18u)continue;
+                const MusaDwgAc1032InsertChildSourceRow *sr=&source.rows[i];
+                const MusaDwgAc1032InsertReverseOwnerRow *rr=&reverse.rows[i];
+                fprintf(stderr,
+                    "CIRCLE reject: source H=%llX mapped=%u common=%u "
+                    "layer=%llX reverse_ok=%d reverse_status=%u "
+                    "reverse_H=%llX verified_edge=%u "
+                    "curve_ok=%d radius=%.17g thickness=%.17g "
+                    "extrusion=(%.9g,%.9g,%.9g)\\n",
+                    (unsigned long long)sr->child_handle,
+                    (unsigned)sr->coordinate_mapped,
+                    (unsigned)sr->original_common_verified,
+                    (unsigned long long)sr->source_layer_handle,
+                    reverse_ok,(unsigned)rr->reverse_owner_status,
+                    (unsigned long long)rr->verified_owner_handle,
+                    (unsigned)rr->original_reverse_source_edge_verified,
+                    curve_ok,native.radius,native.thickness,
+                    native.extrusion[0],native.extrusion[1],
+                    native.extrusion[2]);
+            }
+        }
         /* The independently known H17D block contains four LINEs and
          * one ATTDEF, not a CIRCLE. Do not invent a radius or origin. */
         const uint64_t empty_inserts[]={
