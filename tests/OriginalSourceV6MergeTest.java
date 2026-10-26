@@ -64,7 +64,7 @@ public final class OriginalSourceV6MergeTest {
         invalid[1]=3f;
         reject(direct,invalid,256,"missing source primitive");
         float[] brokenRgb=Arrays.copyOf(block,block.length);
-        brokenRgb[14]=16777216f;
+        brokenRgb[13]=16777216f;
         reject(direct,brokenRgb,256,"unrepresentable RGB24");
         float[] badCoords=Arrays.copyOf(block,block.length);
         badCoords[8]=Float.NaN;
