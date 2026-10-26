@@ -60,8 +60,25 @@ public final class FirstPartyDwgPreviewDialog {
         layout.addView(warning,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        final TextView blockHelp=new TextView(owner);
+        blockHelp.setText("BLOK LINE TANI TESTİ • Sadece belirtilen özgün " +
+            "INSERT H bloğunun doğrulanmış çizgilerini ayrı gösterir. " +
+            "Katman görünürlüğü, tam blok açılımı ve proje bütünlüğü doğrulanmış değildir.");
+        layout.addView(blockHelp);
+        final EditText insertHandleInput=new EditText(owner);
+        insertHandleInput.setSingleLine(true);
+        insertHandleInput.setHint("INSERT H (onaltılık, örn. 1C8)");
+        insertHandleInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        layout.addView(insertHandleInput);
+        final Button inspectBlock=new Button(owner);
+        inspectBlock.setText("Seçilen blok çizgilerini test et");
+        inspectBlock.setEnabled(false);
+        layout.addView(inspectBlock);
         final TextView status=new TextView(owner);
         status.setPadding(0,pad/2,0,pad/2);
+        status.setMaxLines(8);
+        status.setVerticalScrollBarEnabled(true);
+        status.setMovementMethod(new android.text.method.ScrollingMovementMethod());
         status.setText("Gerçek AC1032 kaynağı doğrulanıyor…");
         layout.addView(status,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -77,20 +94,6 @@ public final class FirstPartyDwgPreviewDialog {
         layout.addView(help,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        final TextView blockHelp=new TextView(owner);
-        blockHelp.setText("BLOK LINE TANI TESTİ • Sadece belirtilen özgün " +
-            "INSERT H bloğunun doğrulanmış çizgilerini ayrı gösterir. " +
-            "Katman görünürlüğü, tam blok açılımı ve proje bütünlüğü doğrulanmış değildir.");
-        layout.addView(blockHelp);
-        final EditText insertHandleInput=new EditText(owner);
-        insertHandleInput.setSingleLine(true);
-        insertHandleInput.setHint("INSERT H (onaltılık, örn. 1C8)");
-        insertHandleInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        layout.addView(insertHandleInput);
-        final Button inspectBlock=new Button(owner);
-        inspectBlock.setText("Seçilen blok çizgilerini test et");
-        inspectBlock.setEnabled(false);
-        layout.addView(inspectBlock);
         final AlertDialog dialog=new AlertDialog.Builder(owner)
             .setTitle("MusaCAD • Bağımsız 2B DWG Test Görünümü")
             .setView(layout)
