@@ -238,6 +238,19 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
     if(ok)*out=value;
     return ok;
 }
+int musa_dwg_ac1032_scene_index_read_mtext_common(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    MusaDwgAc1032EntityCommon *out){
+    if(!check_output(scene,out,sizeof(*out)))return 0;
+    Payload payload={0};
+    if(!fetch(scene,h,44u,&payload))return 0;
+    const MusaDwgAc1032EntityCommon common=payload.common;
+    free(payload.raw);
+    if(!common.common_decoded||!common.prefix.prefix_decoded||
+       common.prefix.indexed_handle!=h||
+       common.prefix.raw_object_type!=44u)return 0;
+    *out=common;return 1;
+}
 int musa_dwg_ac1032_scene_index_read_mtext_source(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032MTextSource *out){
@@ -591,8 +604,35 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     if(!h||!check_output(s,out,sizeof(*out)))return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&type!=77u))
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&
+         type!=35u&&type!=44u&&type!=77u))
         return 0;
+    /* MTEXT uses its own already original-H/CRC verified owner/layer/
+     * text-style graph, including the exact optional 0x50 null handle.
+     * Reuse it instead of incorrectly applying the LINE single-H tail. */
+    if(type==44u){
+        MusaDwgAc1032MTextGraph graph={0};
+        if(!musa_dwg_ac1032_scene_index_mtext_graph(
+              s,h,&graph)||
+           !graph.graph_edges_verified||
+           !graph.original_entity_crc_verified||
+           !graph.original_layer_crc_verified||
+           !graph.original_style_crc_verified||
+           graph.font_and_display_accepted||
+           graph.indexed_handle!=h||
+           !graph.layer_handle||
+           graph.layer_object_type!=51u)return 0;
+        MusaDwgAc1032EntityLayerRef linked={0};
+        linked.entity_handle=h;
+        linked.layer_handle=graph.layer_handle;
+        linked.raw_entity_type=type;
+        linked.raw_layer_type=51u;
+        linked.original_entity_crc_verified=1u;
+        linked.original_layer_crc_verified=1u;
+        linked.source_handle_ref_verified=1u;
+        *out=linked;
+        return 1;
+    }
     Payload p={0};
     if(!fetch(s,h,type,&p))return 0;
     /* Source H stream grammar is unambiguous only in this restricted
