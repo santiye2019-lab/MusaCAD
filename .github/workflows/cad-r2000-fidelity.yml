@@ -1,4 +1,5 @@
 name: Modern DWG AC1032 reader and legacy writer proof
+# Re-evaluate PR #567 after conditional INSERT attribute-count decoder correction.
 on:
   pull_request:
     branches: [main]
