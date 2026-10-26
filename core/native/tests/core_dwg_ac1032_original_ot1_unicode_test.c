@@ -34,8 +34,8 @@ static int sample(const char *filename){
        text.original_record_crc_verified&&
        !text.geometry_font_and_display_accepted&&
        text.indexed_handle==h&&
-       text.utf16_code_units==27u&&
-       text.utf8_bytes==27u&&
+       text.utf16_code_units==26u&&
+       text.utf8_bytes==26u&&
        !strcmp(text.utf8,"Jen teksto simpla, cxu ne?");
     if(ok){
         MusaDwgAc1032TextSource sentinel;
