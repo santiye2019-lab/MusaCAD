@@ -9,6 +9,8 @@
 #include "musacad_dwg_ac1032_insert_original_base_map.h"
 #include "musacad_dwg_ac1032_block_marker_commons.h"
 #include "musacad_dwg_ac1032_block_child_layer_evidence.h"
+#include "musacad_dwg_ac1032_block_child_geometry_audit.h"
+#include "musacad_dwg_ac1032_insert_child_coordinate_probe.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -409,6 +411,126 @@ static int genuine(const char *file){
                    !musa_dwg_ac1032_block_child_layer_evidence(
                        scene,UINT64_MAX,&inv)&&
                    !memcmp(&before,&inv,sizeof(inv));
+            }
+        }
+        if(ok){
+            /* Genuine unchanged example_2018.dwg H1B8/H17D. Independent
+             * example_2018.dxf has exactly 13/5 block child objects.
+             * A native numeric decode is counted ONLY when the exact
+             * source H/CRC/type and geometry parser agree; other types
+             * remain explicitly unrendered and never gain ownership. */
+            MusaDwgAc1032BlockChildGeometryAudit audit={0};
+            const uint32_t expected_count=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_block_child_geometry_audit(
+                   scene,e->block,&audit)&&
+               audit.block_header_handle==e->block&&
+               audit.child_count==expected_count&&
+               audit.original_h_crc_type_verified&&
+               !audit.reverse_ownership_verified&&
+               !audit.visibility_and_paint_accepted&&
+               audit.numeric_geometry_verified+
+               audit.numeric_geometry_rejected+
+               audit.unsupported_object_types==expected_count;
+            for(uint32_t j=0u;ok&&j<audit.child_count;j++){
+                uint16_t actual=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                       scene,audit.child_handles[j],&actual)&&
+                   actual==audit.child_types[j]&&
+                   audit.numeric_geometry_ok[j]<=1u;
+            }
+            if(ok){
+                MusaDwgAc1032BlockChildGeometryAudit repeated={0};
+                ok=musa_dwg_ac1032_block_child_geometry_audit(
+                       scene,e->block,&repeated)&&
+                   !memcmp(&repeated,&audit,sizeof(audit));
+            }
+            if(ok){
+                const MusaDwgAc1032BlockChildGeometryAudit before=audit;
+                ok=!musa_dwg_ac1032_block_child_geometry_audit(
+                        scene,e->h,&audit)&&
+                   !memcmp(&before,&audit,sizeof(audit))&&
+                   !musa_dwg_ac1032_block_child_geometry_audit(
+                        scene,UINT64_MAX,&audit)&&
+                   !memcmp(&before,&audit,sizeof(audit));
+            }
+        }
+        if(ok){
+            /* Original INSERT H1C8/H190/H756 and DXF-independent
+             * BLOCK_RECORD H1B8/H17D. Coordinates are candidate numeric
+             * probes only, not reverse-owned child paint or a scene. */
+            MusaDwgAc1032InsertChildCoordinateProbe probe={0};
+            const uint32_t expected_count=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_insert_child_coordinate_probe(
+                   scene,e->h,&probe)&&
+               probe.insert_handle==e->h&&
+               probe.block_header_handle==e->block&&
+               probe.child_count==expected_count&&
+               probe.original_source_graph_verified&&
+               !probe.reverse_child_owner_verified&&
+               !probe.display_accepted&&
+               probe.mapped_candidates+probe.unmapped_candidates==
+                   expected_count;
+            for(uint32_t j=0u;ok&&j<probe.child_count;j++){
+                uint16_t type=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                       scene,probe.child_handles[j],&type)&&
+                   type==probe.child_types[j]&&
+                   (!probe.line_end_mapped[j]||
+                     (probe.anchor_mapped[j]&&type==19u));
+                if(ok&&probe.anchor_mapped[j])
+                    for(unsigned k=0u;k<3u;k++)
+                        if(!isfinite(probe.world_anchor[j][k]))ok=0;
+            }
+            if(ok){
+                MusaDwgAc1032InsertChildCoordinateProbe repeat={0};
+                ok=musa_dwg_ac1032_insert_child_coordinate_probe(
+                       scene,e->h,&repeat)&&
+                   !memcmp(&repeat,&probe,sizeof(probe));
+            }
+            if(ok){
+                const MusaDwgAc1032InsertChildCoordinateProbe before=probe;
+                ok=!musa_dwg_ac1032_insert_child_coordinate_probe(
+                        scene,e->block,&probe)&&
+                   !memcmp(&before,&probe,sizeof(probe))&&
+                   !musa_dwg_ac1032_insert_child_coordinate_probe(
+                        scene,UINT64_MAX,&probe)&&
+                   !memcmp(&before,&probe,sizeof(probe));
+            }
+        }
+        if(ok){
+            /* New native numeric decoding must refer to the SAME ordered
+             * source H/OT candidates that the already merged #597 layer
+             * evidence uses. Independent source provenance is mandatory;
+             * neither subsystem may silently invent layer/paint/owner. */
+            MusaDwgAc1032BlockChildLayerInventory layers={0};
+            MusaDwgAc1032BlockChildGeometryAudit geo={0};
+            MusaDwgAc1032InsertChildCoordinateProbe probe={0};
+            ok=musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,e->block,&layers)&&
+               musa_dwg_ac1032_block_child_geometry_audit(
+                   scene,e->block,&geo)&&
+               musa_dwg_ac1032_insert_child_coordinate_probe(
+                   scene,e->h,&probe)&&
+               layers.marker_and_child_source_crc_verified&&
+               geo.original_h_crc_type_verified&&
+               probe.original_source_graph_verified&&
+               layers.child_count==geo.child_count&&
+               geo.child_count==probe.child_count&&
+               !layers.reverse_child_owner_links_verified&&
+               !geo.reverse_ownership_verified&&
+               !probe.reverse_child_owner_verified&&
+               !layers.layer_visibility_color_and_paint_accepted&&
+               !geo.visibility_and_paint_accepted&&
+               !probe.display_accepted;
+            for(uint32_t j=0u;ok&&j<geo.child_count;j++){
+                ok=layers.children[j].child_handle==geo.child_handles[j]&&
+                   layers.children[j].raw_object_type==geo.child_types[j]&&
+                   geo.child_handles[j]==probe.child_handles[j]&&
+                   geo.child_types[j]==probe.child_types[j]&&
+                   (!probe.anchor_mapped[j]||geo.numeric_geometry_ok[j])&&
+                   (!probe.line_end_mapped[j]||probe.anchor_mapped[j]);
             }
         }
         if(ok){
