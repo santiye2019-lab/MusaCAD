@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -394,8 +393,10 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
  * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
 /* Source OT1 TEXT H tail is NOT MTEXT's H graph. For this narrow
  * genuine R2018 profile require explicit layer H5 and style H5, with
- * only an optional null 0x50 H reference and terminal zero padding.
- * Any other H shape is unsupported and cannot affect drawing. */
+ * only an optional null 0x50 H reference. The independently CRC-checked
+ * R2018 sample_2018.dwg OT1 H8E has two H5 refs (81, 11) followed by
+ * exactly three one-bits (111), not zero padding. Accept this exact
+ * terminal profile only; other trailing H layouts fail closed. */
 int musa_dwg_ac1032_scene_index_text_graph(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032TextGraph *out){
@@ -414,41 +415,6 @@ int musa_dwg_ac1032_scene_index_text_graph(
        p.common.visualstyle_flags==0u&&
        p.layout.data_stream_bits<=SIZE_MAX&&
        p.layout.total_payload_bits<=SIZE_MAX;
-    /* TEMP CI-only OT1 source H diagnostic; remove before merge. */
-    if(h==UINT64_C(0x8e)){
-        fprintf(stderr,"OT1_DIAG common=%u mode=%u reactors=%u xdict=%u colorref=%u ltype=%u plot=%u material=%u visual=%u data_bits=%llu total_bits=%llu\\n",
-          (unsigned)p.common.common_decoded,(unsigned)p.common.prefix.entity_mode,
-          (unsigned)p.common.prefix.reactor_count,(unsigned)p.common.prefix.xdictionary_missing,
-          (unsigned)p.common.has_color_reference,(unsigned)p.common.linetype_flags,
-          (unsigned)p.common.plotstyle_flags,(unsigned)p.common.material_flags,
-          (unsigned)p.common.visualstyle_flags,
-          (unsigned long long)p.layout.data_stream_bits,
-          (unsigned long long)p.layout.total_payload_bits);
-        MusaDwgAc1015Bits db={0};
-        if(musa_dwg_ac1015_bits_init(&db,p.raw,p.bytes,
-          (size_t)p.layout.data_stream_bits,(size_t)p.layout.total_payload_bits)){
-            fprintf(stderr,"OT1_DIAG H bytes:");
-            for(size_t i=0;i<40u && db.bit_end-db.bit_pos>=8u;i++){
-                uint32_t b=0u;
-                if(!musa_dwg_ac1015_bits_read_u(&db,8u,&b))break;
-                fprintf(stderr," %02X",(unsigned)b);
-            }
-            fprintf(stderr," remaining_bits=%zu\\n",db.bit_end-db.bit_pos);
-            MusaDwgAc1015Bits d2={0};
-            musa_dwg_ac1015_bits_init(&d2,p.raw,p.bytes,
-              (size_t)p.layout.data_stream_bits,(size_t)p.layout.total_payload_bits);
-            for(size_t i=0;i<8u && d2.bit_end-d2.bit_pos>=8u;i++){
-                MusaDwgAc1015HandleRef rr={0};
-                if(!musa_dwg_ac1015_read_handle_ref(&d2,h,&rr)){
-                    fprintf(stderr,"OT1_DIAG ref[%zu] rejected at bit=%zu\\n",i,d2.bit_pos);
-                    break;
-                }
-                fprintf(stderr,"OT1_DIAG ref[%zu] code=%u count=%u target=%llX\\n",
-                    i,(unsigned)rr.code,(unsigned)rr.count,
-                    (unsigned long long)rr.target);
-            }
-        }
-    }
     if(ok){
         MusaDwgAc1015Bits bits={0};
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
@@ -466,22 +432,15 @@ int musa_dwg_ac1032_scene_index_text_graph(
             ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
                null_ref==0x50u;
         }
-        if(h==UINT64_C(0x8e) && ok){
-            MusaDwgAc1015Bits probe=bits;
-            uint32_t tail=0u;
-            unsigned n=(unsigned)(probe.bit_end-probe.bit_pos);
-            if(n && n<=7u && musa_dwg_ac1015_bits_read_u(&probe,n,&tail))
-                fprintf(stderr,"OT1_DIAG tail_bits=%u value=%u\\n",n,(unsigned)tail);
+        if(ok){
+            /* Genuine OT1 H8E ends at bit 888: 853 data bits,
+             * 32 H-reference bits, 3 terminal one-bits. Do not
+             * generalize this narrow profile to other TEXT objects. */
+            uint32_t terminal=0u;
+            ok=bits.bit_end-bits.bit_pos==3u&&
+               musa_dwg_ac1015_bits_read_u(&bits,3u,&terminal)&&
+               terminal==7u&&bits.bit_pos==bits.bit_end;
         }
-        if(ok)ok=cached_graph_zero_padding(&bits);
-    }
-    if(h==UINT64_C(0x8e)){
-        uint16_t lt_dbg=0u,st_dbg=0u;
-        int l_ok=musa_dwg_ac1032_scene_index_object_type(s,v.layer_handle,&lt_dbg);
-        int st_ok=musa_dwg_ac1032_scene_index_object_type(s,v.style_handle,&st_dbg);
-        fprintf(stderr,"OT1_DIAG parsed=%d layer=%llX layer_type_ok=%d layer_type=%u style=%llX style_type_ok=%d style_type=%u\\n",
-           ok,(unsigned long long)v.layer_handle,l_ok,(unsigned)lt_dbg,
-           (unsigned long long)v.style_handle,st_ok,(unsigned)st_dbg);
     }
     free(p.raw);
     if(!ok)return 0;
@@ -489,7 +448,7 @@ int musa_dwg_ac1032_scene_index_text_graph(
     if(!musa_dwg_ac1032_scene_index_object_type(
            s,v.layer_handle,&lt)||lt!=51u||
        !musa_dwg_ac1032_scene_index_object_type(
-           s,v.style_handle,&st))return 0;
+           s,v.style_handle,&st)||st!=53u)return 0;
     v.layer_object_type=lt;
     v.style_object_type=st;
     v.original_entity_crc_verified=1u;
