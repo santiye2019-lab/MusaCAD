@@ -47,6 +47,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_mtext_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_mtext_v6_smoke
                  COMMAND musacad_core_ac1032_original_mtext_v6_test)
+        # Only genuine plain MTEXT is admitted to provisional native v6;
+        # rich formatting, paragraphs and invalid UTF-8 fail closed.
+        add_executable(musacad_core_ac1032_original_mtext_plain_guard_test
+                tests/core_dwg_ac1032_original_mtext_plain_guard_test.c)
+        target_link_libraries(musacad_core_ac1032_original_mtext_plain_guard_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_mtext_plain_guard_smoke
+                 COMMAND musacad_core_ac1032_original_mtext_plain_guard_test)
         # Independent real R2018 OT44 H1C0 BYLAYER v6 color refusal
         # and pure synthetic direct ACI/RGB type-6 transport contracts.
         add_executable(musacad_core_ac1032_mtext_v6_color_test
