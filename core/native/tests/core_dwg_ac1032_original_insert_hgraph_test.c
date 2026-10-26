@@ -1779,6 +1779,22 @@ static int genuine(const char *file){
             }
             ok=ok&&source_circles==1u;
         }
+        fprintf(stderr,
+            "R2018 INSERT CIRCLE audit: ok=%d child=%u candidate=%u "
+            "verified=%u rejected=%u H=%llX owner=%llX layer=%llX "
+            "center=(%.10g,%.10g) axes=(%.10g,%.10g)/(%.10g,%.10g) "
+            "radius=%.10g\\n",
+            ok,(unsigned)circle.child_count,
+            (unsigned)circle.circle_candidate_count,
+            (unsigned)circle.verified_circle_count,
+            (unsigned)circle.unverified_circle_count,
+            (unsigned long long)circle.rows[0].child_handle,
+            (unsigned long long)circle.rows[0].verified_block_owner_handle,
+            (unsigned long long)circle.rows[0].source_layer_handle,
+            circle.rows[0].world_center[0],circle.rows[0].world_center[1],
+            circle.rows[0].world_axis_u[0],circle.rows[0].world_axis_u[1],
+            circle.rows[0].world_axis_v[0],circle.rows[0].world_axis_v[1],
+            circle.rows[0].source_radius);
         /* The independently known H17D block contains four LINEs and
          * one ATTDEF, not a CIRCLE. Do not invent a radius or origin. */
         const uint64_t empty_inserts[]={
