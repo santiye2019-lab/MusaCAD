@@ -47,7 +47,7 @@ static inline int musa_dwg_ac1032_insert_circle_layer_cmc_chain(
        !color.source.edge.layer_handle||
        color.layer_cmc.indexed_handle!=color.source.edge.layer_handle||
        !color.layer_cmc.original_record_crc_verified||
-       color.layer_cmc.aci_index<1u||color.layer_cmc.aci_index>255u||
+       color.layer_cmc.aci_index==0u||
        color.layer_cmc.packed_color_method!=
           (UINT32_C(0xC3000000)|(uint32_t)color.layer_cmc.aci_index)||
        !isfinite(color.source.circle.radius)||
