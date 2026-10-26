@@ -29,6 +29,11 @@ static int genuine(const char *file){
         src,(size_t)n,&scene)&&!memcmp(src,saved,(size_t)n);
     free(src);free(saved);
     if(!ok)return 0;
+    {const uint64_t probes[]={UINT64_C(0x190),UINT64_C(0x756)};
+     for(size_t i=0;i<2u;i++){MusaDwgAc1032InsertPlacement diagnostic={0};
+       int passed=musa_dwg_ac1032_scene_index_read_insert_placement(scene,probes[i],&diagnostic);
+       fprintf(stderr,"OT7 DIAG H=%llx decode=%d\\n",(unsigned long long)probes[i],passed);
+     }}
     const uint64_t h=UINT64_C(0x1c8);
     MusaDwgAc1032InsertPlacement p={0};
     ok=musa_dwg_ac1032_scene_index_read_insert_placement(scene,h,&p)&&
