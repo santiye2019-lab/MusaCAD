@@ -113,7 +113,10 @@ public final class FirstPartyDwgPreviewDialog {
             if(text.startsWith("0x")||text.startsWith("0X"))text=text.substring(2);
             final long handle;
             try{
-                handle=Long.parseUnsignedLong(text,16);
+                /* JNI accepts only positive signed jlong handles. Use the
+                 * API-24-safe parser rather than parseUnsignedLong
+                 * (not present on all supported Android releases). */
+                handle=Long.parseLong(text,16);
                 if(handle<=0L)throw new NumberFormatException();
             }catch(NumberFormatException ex){
                 status.setText("Geçerli bir onaltılık INSERT H yazılmalı.");
