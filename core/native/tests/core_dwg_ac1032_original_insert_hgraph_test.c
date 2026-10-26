@@ -1771,6 +1771,25 @@ static int genuine(const char *file){
            circle.h4_h5_source_verified_count==1u&&
            circle.h4_h5_unresolved_count==0u&&
            !circle.final_visibility_and_paint_accepted;
+        MusaDwgAc1032CircleHTailProfile forensic={0};
+        MusaDwgAc1032EntityBlockOwnerLayerSource egraph={0};
+        MusaDwgAc1032EntityLayerRef layerprobe={0};
+        const int forensic_ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+                scene,UINT64_C(0x1bb),&forensic);
+        const int owner_ok=musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                scene,UINT64_C(0x1bb),&egraph);
+        const int layer_ok=musa_dwg_ac1032_scene_index_entity_layer_ref(
+                scene,UINT64_C(0x1bb),&layerprobe);
+        fprintf(stderr,"CIRCLE RAW: profileok=%d status=%u prefix=%02X%02X%02X%02X%02X bits=%llu refs=%u/%u padding=%llu ownerok=%d owner=H%llX layer=H%llX layerok=%d\\n",
+            forensic_ok,(unsigned)forensic.profile_status,
+            (unsigned)forensic.prefix_msb[0],(unsigned)forensic.prefix_msb[1],
+            (unsigned)forensic.prefix_msb[2],(unsigned)forensic.prefix_msb[3],
+            (unsigned)forensic.prefix_msb[4],
+            (unsigned long long)(forensic.handle_end_bit-forensic.handle_start_bit),
+            (unsigned)forensic.first_ref_code,(unsigned)forensic.second_ref_code,
+            (unsigned long long)forensic.residual_bits_after_two_refs,
+            owner_ok,(unsigned long long)egraph.owner_block_header_handle,
+            (unsigned long long)egraph.layer_handle,layer_ok);
         fprintf(stderr,"REL_CIRCLE first ok=%d verified=%u unresolved=%u mapped=%u sourceChildren=%u style=%u owner=H%llX layer=H%llX\n",
             ok,(unsigned)circle.h4_h5_source_verified_count,
             (unsigned)circle.h4_h5_unresolved_count,
