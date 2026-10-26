@@ -39,6 +39,18 @@ int musa_dwg_ac1032_scene_index_entry(
  * Does not claim all indexed objects have decoded geometry.
  */
 /* CRC/H authenticated OT49 identity only; base-point remains undecoded. */
+int musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderPrefixEvidence *out);
+/* Extract verified OT49 DATA bits after the identity prefix, packed MSB-first.
+ * This is opaque source evidence, not BLOCK_HEADER base-point decoding.
+ * Unsupported handles/ranges leave caller bytes unchanged. */
+int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    size_t start_bit,size_t bit_count,uint8_t *out,size_t out_bytes);
+int musa_dwg_ac1032_scene_index_read_block_header_field_span(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderFieldSpan *out);
 int musa_dwg_ac1032_scene_index_read_block_header_identity(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderIdentity *out);

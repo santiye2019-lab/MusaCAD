@@ -15,6 +15,19 @@ typedef struct Expected {
     uint64_t h,layer,block,attrib,seqend;
     uint32_t count;
 } Expected;
+/* Independent fixed binary oracle: 0xB2 0x6D 0xE0 at bit 3 for
+ * 10 bits is 0x93 0x40, not the LSB-first 0x46-style packing. */
+static int bit_order_oracle(void){
+    const uint8_t source[3]={0xb2u,0x6du,0xe0u};
+    uint8_t out[2]={0xa5u,0x5au};
+    if(!musa_dwg_ac1032_ot49_copy_msb_bits(
+          source,sizeof(source),3u,10u,out,sizeof(out))||
+       out[0]!=0x93u||out[1]!=0x40u)return 0;
+    const uint8_t before[2]={out[0],out[1]};
+    return !musa_dwg_ac1032_ot49_copy_msb_bits(
+                source,sizeof(source),20u,10u,out,sizeof(out))&&
+           !memcmp(out,before,sizeof(out));
+}
 static int genuine(const char *file){
     FILE *f=fopen(file,"rb");
     if(!f)return 0;
@@ -111,6 +124,94 @@ static int genuine(const char *file){
                    !memcmp(&before,&joined,sizeof(joined));
             }
         }
+        if(ok){
+            MusaDwgAc1032BlockHeaderPrefixEvidence prefix={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+                   scene,e->block,&prefix)&&
+               prefix.indexed_handle==e->block&&
+               prefix.original_record_crc_verified&&
+               prefix.fields_start_bit>10u&&
+               prefix.prefix_fnv1a64!=0u&&
+               !prefix.base_point_decoded;
+            /* Repeated extraction from immutable original bytes is
+             * deterministic, with the same verified handle and prefix. */
+            if(ok){
+                MusaDwgAc1032BlockHeaderPrefixEvidence repeat={0};
+                ok=musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+                       scene,e->block,&repeat)&&
+                   repeat.indexed_handle==prefix.indexed_handle&&
+                   repeat.fields_start_bit==prefix.fields_start_bit&&
+                   repeat.prefix_fnv1a64==prefix.prefix_fnv1a64&&
+                   repeat.original_record_crc_verified&&
+                   !repeat.base_point_decoded;
+            }
+            if(ok){
+                const MusaDwgAc1032BlockHeaderPrefixEvidence before=prefix;
+                ok=!musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+                        scene,e->h,&prefix)&&
+                   !memcmp(&prefix,&before,sizeof(prefix));
+            }
+        }
+        if(ok){
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span)&&
+               span.indexed_handle==e->block&&
+               span.original_record_crc_verified&&
+               span.first_bit>10u&&
+               span.first_bit<span.end_bit&&
+               !span.base_point_decoded;
+            if(ok){
+                const MusaDwgAc1032BlockHeaderFieldSpan before=span;
+                ok=!musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                        scene,e->h,&span)&&
+                   !memcmp(&before,&span,sizeof(span));
+            }
+        }
+        if(ok){
+            /* Genuine R2018: first authenticated field bits must be
+             * reproducible, without claiming that they encode XYZ. */
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            if(ok)ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span);
+            if(ok){
+                MusaDwgAc1032BlockHeaderFieldSpan repeat={0};
+                ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                       scene,e->block,&repeat)&&
+                   repeat.indexed_handle==span.indexed_handle&&
+                   repeat.first_bit==span.first_bit&&
+                   repeat.end_bit==span.end_bit&&
+                   repeat.original_record_crc_verified&&
+                   !repeat.base_point_decoded;
+            }
+        }
+        if(ok){
+            /* Original R2018 H1B8/H17D: the same source DATA bits must
+             * agree for 16-bit and two 8-bit reads. This is an exact
+             * binary extraction oracle, NOT a decoded block base. */
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            uint8_t pair[2]={0xa5u,0x5au};
+            uint8_t hi=0u,lo=0u;
+            ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span)&&
+               span.end_bit-span.first_bit>=16u&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit,16u,pair,sizeof(pair))&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit,8u,&hi,1u)&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit+8u,8u,&lo,1u)&&
+               pair[0]==hi&&pair[1]==lo;
+            if(ok){
+                const uint8_t before[2]={pair[0],pair[1]};
+                ok=!musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                       scene,e->h,span.first_bit,16u,pair,sizeof(pair))&&
+                   !memcmp(pair,before,sizeof(pair))&&
+                   !musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                       scene,e->block,span.end_bit,16u,pair,sizeof(pair))&&
+                   !memcmp(pair,before,sizeof(pair));
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
@@ -195,6 +296,33 @@ static int genuine(const char *file){
                  (MusaDwgAc1032BlockHeaderIdentity *)(void *)shared)&&
                  !memcmp(shared,saved_shared,sizeof(shared));
         }
+        {
+            MusaDwgAc1032BlockHeaderPrefixEvidence prefix;
+            memset(&prefix,0x5a,sizeof(prefix));
+            const MusaDwgAc1032BlockHeaderPrefixEvidence original=prefix;
+            layout.original_record_crc_verified=0u;
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_prefix_evidence(
+                  fake,sizeof(fake),&layout,&prefix)&&
+                  !memcmp(&prefix,&original,sizeof(prefix));
+            layout.original_record_crc_verified=1u;
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_prefix_evidence(
+                  fake,sizeof(fake),&layout,&prefix)&&
+                  !memcmp(&prefix,&original,sizeof(prefix));
+        }
+        {
+            MusaDwgAc1032BlockHeaderFieldSpan span;
+            memset(&span,0x5a,sizeof(span));
+            const MusaDwgAc1032BlockHeaderFieldSpan before=span;
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_field_span(
+                  fake,sizeof(fake),&layout,&span)&&
+                  !memcmp(&span,&before,sizeof(span));
+        }
+        {
+            uint8_t output[2]={0xa5u,0x5au};
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_copy_field_bits(
+                   fake,sizeof(fake),&layout,10u,8u,output,sizeof(output))&&
+                   output[0]==0xa5u&&output[1]==0x5au;
+        }
         layout.handle_stream_start_bit=11u;
         if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
                     fake,sizeof(fake),&layout,&identity)&&
@@ -229,7 +357,7 @@ static int genuine(const char *file){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc==1)return 0;
+    if(argc==1)return bit_order_oracle()?0:1;
     if(argc!=2)return 2;
-    return genuine(argv[1])?0:1;
+    return bit_order_oracle()&&genuine(argv[1])?0:1;
 }
