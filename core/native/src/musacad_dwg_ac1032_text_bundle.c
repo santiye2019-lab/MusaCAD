@@ -21,6 +21,10 @@ int musa_dwg_ac1032_scene_text_bundle(
            scene,indexed_handle,&v.graph)||
        !musa_dwg_ac1032_scene_index_read_layer_name(
            scene,v.graph.layer_handle,&v.layer)||
+       !musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+           scene,v.graph.layer_handle,&v.layer_flags)||
+       !musa_dwg_ac1032_layer_base_bits_decode(
+           v.layer_flags.raw_values_70_290_370,&v.layer_bits)||
        !musa_dwg_ac1032_scene_planar_color_provenance(
            scene,indexed_handle,&v.color))return 0;
     const unsigned classes=(unsigned)v.color.entity_has_direct_aci+
@@ -46,7 +50,13 @@ int musa_dwg_ac1032_scene_text_bundle(
        v.graph.style_object_type!=53u||
        v.graph.font_and_display_accepted||
        !v.layer.original_record_crc_verified||
+       v.layer.indexed_handle!=v.graph.layer_handle||
        !v.layer.utf8[0]||
+       !v.layer_flags.source_crc_verified||
+       v.layer_flags.indexed_handle!=v.graph.layer_handle||
+       v.layer_bits.raw_values!=v.layer_flags.raw_values_70_290_370||
+       v.layer_bits.display_accepted||
+       v.layer_bits.source_crc_verified||
        !common.common_decoded||
        common.prefix.indexed_handle!=indexed_handle||
        common.prefix.raw_object_type!=1u||
@@ -61,6 +71,10 @@ int musa_dwg_ac1032_scene_text_bundle(
        classes!=1u||
        (v.color.entity_has_direct_rgb24&&
         v.color.entity_source_rgb24>UINT32_C(0x00ffffff)))return 0;
+    /* Status bits are source-authenticated but their interpretation is
+     * not a certified viewport visibility state. Keep admission closed. */
+    v.layer_bits.layer_handle=v.graph.layer_handle;
+    v.layer_bits.source_crc_verified=1u;
     v.source_join_verified=1u;
     /* Fail-closed: even a source-direct RGB is NOT final display color.
      * No viewport/owner/font acceptance is inferred from source joins. */

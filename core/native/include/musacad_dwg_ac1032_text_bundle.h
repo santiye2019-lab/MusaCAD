@@ -14,6 +14,9 @@ typedef struct MusaDwgAc1032TextBundle {
     MusaDwgAc1032TextWorldPlacement world;
     MusaDwgAc1032TextGraph graph;
     MusaDwgAc1032LayerName layer;
+    /* Raw source OT51 status, NOT viewport-resolved visibility. */
+    MusaDwgAc1032LayerFlagsEvidence layer_flags;
+    MusaDwgAc1032LayerBaseBitPreflight layer_bits;
     MusaAc1032ColorProvenance color;
     uint8_t source_join_verified;
     uint8_t font_glyph_layout_accepted; /* ALWAYS 0 */
