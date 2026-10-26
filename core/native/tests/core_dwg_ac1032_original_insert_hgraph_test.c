@@ -253,6 +253,7 @@ static int genuine(const char *file){
                prefix.indexed_handle==e->block&&
                prefix.original_record_crc_verified&&
                prefix.h_prefix_decoded&&
+               prefix.canonical_h_roles_verified&&
                !prefix.full_handle_tail_verified&&
                !prefix.final_child_ownership_and_paint_accepted&&
                prefix.child_count==expected_children&&
