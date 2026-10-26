@@ -13,6 +13,7 @@
 #include "musacad_dwg_ac1032_insert_child_coordinate_probe.h"
 #include "musacad_dwg_ac1032_block_child_color_evidence.h"
 #include "musacad_dwg_ac1032_block_child_layer_style_provenance.h"
+#include "musacad_dwg_ac1032_block_pair_source_isolation.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -971,6 +972,46 @@ static int genuine(const char *file){
         c.source_common_verified=1u;c.source_layer_handle=0u;
         if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
                      MUSACAD_AC1032_SOURCE_STYLE_UNRESOLVED;
+    }
+    if(ok){
+        /* Independent original example_2018.dwg / companion DXF:
+         * OT49 H1B8 has 13 children, H17D has 5. Their separately
+         * authenticated header, BLOCK, ENDBLK and candidate child Hs
+         * must not alias. The shared BLOCK_CONTROL is not an entity. */
+        MusaDwgAc1032BlockPairSourceIsolation pair={0},reverse={0};
+        ok=musa_dwg_ac1032_block_pair_source_isolation(
+               scene,UINT64_C(0x1b8),UINT64_C(0x17d),&pair)&&
+           musa_dwg_ac1032_block_pair_source_isolation(
+               scene,UINT64_C(0x17d),UINT64_C(0x1b8),&reverse)&&
+           pair.first_block_header==UINT64_C(0x1b8)&&
+           pair.second_block_header==UINT64_C(0x17d)&&
+           pair.first_children==13u&&pair.second_children==5u&&
+           reverse.first_children==5u&&reverse.second_children==13u&&
+           pair.original_records_crc_and_types_verified&&
+           pair.cross_block_source_handles_disjoint&&
+           reverse.original_records_crc_and_types_verified&&
+           reverse.cross_block_source_handles_disjoint&&
+           !pair.reverse_ownership_verified&&!pair.display_accepted&&
+           !reverse.reverse_ownership_verified&&!reverse.display_accepted&&
+           pair.first_begin==reverse.second_begin&&
+           pair.first_end==reverse.second_end&&
+           pair.second_begin==reverse.first_begin&&
+           pair.second_end==reverse.first_end;
+        if(ok){
+            const MusaDwgAc1032BlockPairSourceIsolation before=pair;
+            ok=!musa_dwg_ac1032_block_pair_source_isolation(
+                    scene,UINT64_C(0x1b8),UINT64_C(0x1b8),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_block_pair_source_isolation(
+                    scene,UINT64_C(0x1b8),UINT64_C(0x1c8),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_block_pair_source_isolation(
+                    scene,UINT64_C(0x1b8),UINT64_MAX,&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_block_pair_source_isolation(
+                    scene,UINT64_C(0x1b8),UINT64_C(0x17d),NULL)&&
+               !memcmp(&pair,&before,sizeof(pair));
+        }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
