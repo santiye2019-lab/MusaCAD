@@ -29,4 +29,40 @@ static inline int musa_dwg_ac1032_insert_xy_world_z(
     for(unsigned k=0;k<3;k++)world[k]=a[k];
     return 1;
 }
+
+/* Compose a child INSERT's local placement through a verified parent
+ * placement. Only world-Z, finite and nonzero scales are supported.
+ * This is arithmetic, NOT proof of DWG child membership or BLOCK_HEADER
+ * base points. All output fields are committed atomically. */
+static inline int musa_dwg_ac1032_insert_compose_world_z(
+    const MusaDwgAc1032InsertPlacement *parent,
+    const double parent_block_base[3],
+    const MusaDwgAc1032InsertPlacement *child,
+    MusaDwgAc1032InsertPlacement *out){
+    if(!parent||!parent_block_base||!child||!out||
+       !child->numeric_fields_decoded||
+       !child->original_record_crc_verified||
+       !isfinite(child->rotation)||
+       fabs(child->extrusion[0])>1e-12||
+       fabs(child->extrusion[1])>1e-12||
+       fabs(child->extrusion[2]-1.0)>1e-12)return 0;
+    MusaDwgAc1032InsertPlacement v=*child;
+    if(!musa_dwg_ac1032_insert_xy_world_z(
+           parent,parent_block_base,child->insertion,v.insertion))return 0;
+    for(unsigned k=0;k<3;k++){
+        if(!isfinite(child->scale[k])||child->scale[k]==0.0||
+           !isfinite(parent->scale[k]))return 0;
+        v.scale[k]=parent->scale[k]*child->scale[k];
+        if(!isfinite(v.scale[k])||v.scale[k]==0.0)return 0;
+    }
+    /* Nonuniform XY parent scale and rotated child introduce shear.
+     * Such transforms cannot be represented by this placement struct. */
+    if(fabs(parent->scale[0]-parent->scale[1])>1e-12&&
+       fabs(sin(child->rotation))>1e-12)return 0;
+    v.rotation=parent->rotation+child->rotation;
+    if(!isfinite(v.rotation))return 0;
+    *out=v;
+    return 1;
+}
+
 #endif
