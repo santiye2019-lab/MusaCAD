@@ -297,6 +297,55 @@ public final class FirstPartyDwgPreview {
                 unified,direct.readiness,inserts);
     }
 
+    /** A single deliberately INCOMPLETE original 2B diagnostic scene:
+     * direct source primitives + authenticated INSERT LINE + WCS CIRCLE
+     * numeric wireframes. CIRCLE ACI6 is NOT the source DWG color.
+     * No owner, visibility, viewport, layer or font parity is inferred. */
+    public static final class CombinedNumericCircleDiagnostic {
+        public final NativeScene scene;
+        public final Readiness original;
+        public final long admittedInsertLines,omittedInsertLines;
+        public final long numericCircles,unresolvedCircleOwnerOrLayer;
+        public final int shownPrimitiveCount;
+        public final boolean incomplete,sourceCircleColorAccepted;
+        private CombinedNumericCircleDiagnostic(
+                NativeScene value,Readiness readiness,
+                AllInsertLinesDiagnostic lines,CircleGeometryEvidence circles){
+            scene=value;original=readiness;
+            admittedInsertLines=lines.admittedLines;
+            omittedInsertLines=lines.omittedLines;
+            numericCircles=circles.verifiedNumericCircles;
+            unresolvedCircleOwnerOrLayer=circles.unresolvedOwnerOrLayer;
+            shownPrimitiveCount=value.primitiveCount;
+            incomplete=true;
+            sourceCircleColorAccepted=false;
+        }
+    }
+    public static CombinedNumericCircleDiagnostic
+    readCombinedWithNumericCirclesDiagnostic(
+            File original,int maxFloatWords)throws IOException{
+        if(original==null||!original.isFile()||
+           maxFloatWords<256||maxFloatWords>9*1024*1024)
+            throw new IOException("Uc kaynakli DWG tani girisi gecersiz");
+        Result direct=read(original,maxFloatWords);
+        AllInsertLinesDiagnostic lines=readAllInsertLinesDiagnostic(
+                original,maxFloatWords);
+        CircleGeometryEvidence circles=readCircleGeometryEvidence(
+                original,maxFloatWords);
+        if(!direct.incomplete||!lines.incomplete||
+           circles.complete||circles.sourceColorKnown)
+            throw new IOException("CIRCLE kaynak renk/visibility iddiasi");
+        NativeScene joined=
+            NativeScene.joinPartialOriginalSourceScenesWithDiagnosticCircles(
+                direct.scene,lines.scene,circles.scene,maxFloatWords);
+        long expected=(long)direct.scene.primitiveCount+
+            lines.admittedLines+circles.verifiedNumericCircles;
+        if(!joined.truncated||joined.primitiveCount!=expected)
+            throw new IOException("Uc kaynakli DWG sayisal sahnesi tutarsiz");
+        return new CombinedNumericCircleDiagnostic(
+                joined,direct.readiness,lines,circles);
+    }
+
     /** Separate diagnostic of original transformed CIRCLE numeric geometry.
      * ACI6 outlines are a non-source warning color: owners, H4/H5, layer
      * visibility, BYLAYER/BYBLOCK and actual paint remain UNKNOWN. */
