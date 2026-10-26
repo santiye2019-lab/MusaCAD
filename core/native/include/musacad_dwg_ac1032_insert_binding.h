@@ -37,6 +37,34 @@ static inline int musa_dwg_ac1032_insert_bind_source(
     *out=v;
     return 1;
 }
+/* Authenticate the referenced original OT49 record in the same scene.
+ * This join proves source identity, NOT base point or child ownership.
+ * A wrong type, invalid source graph or bad OT49 CRC fails atomically. */
+typedef struct MusaDwgAc1032InsertBlockHeaderSource {
+    MusaDwgAc1032InsertBinding insert;
+    MusaDwgAc1032BlockHeaderIdentity block_header;
+    uint8_t source_join_verified;
+    uint8_t block_base_decoded; /* ALWAYS zero */
+} MusaDwgAc1032InsertBlockHeaderSource;
+static inline int musa_dwg_ac1032_insert_bind_block_header_source(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockHeaderSource *out){
+    if(!scene||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockHeaderSource v={0};
+    if(!musa_dwg_ac1032_insert_bind_source(
+           scene,insert_handle,&v.insert)||
+       !musa_dwg_ac1032_scene_index_read_block_header_identity(
+           scene,v.insert.graph.block_header_handle,&v.block_header)||
+       !v.block_header.original_record_crc_verified||
+       !v.block_header.embedded_self_handle_verified||
+       !v.block_header.empty_eed_verified||
+       !v.block_header.no_reactors_verified||
+       v.block_header.base_point_decoded||
+       v.block_header.indexed_handle!=v.insert.graph.block_header_handle)
+        return 0;
+    v.source_join_verified=1u;
+    *out=v;return 1;
+}
 /* A caller must supply a separately CRC/H-authenticated BLOCK_HEADER
  * base point matching this INSERT's exact referenced BLOCK_HEADER H.
  * No implicit zero origin is permitted. A future OT49 parser must
