@@ -560,6 +560,8 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 source.utf8_bytes<=sizeof(source.utf8)-1u&&
                 source.utf8[source.utf8_bytes]=='\0'&&
                 strlen(source.utf8)==source.utf8_bytes&&
+                musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                    source.utf8,source.utf8_bytes)&&
                 place.insertion[2]==0.0&&
                 place.x_axis[2]==0.0&&
                 place.extrusion[0]==0.0&&
