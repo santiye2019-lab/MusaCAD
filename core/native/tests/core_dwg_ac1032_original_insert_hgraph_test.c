@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Genuine unchanged R2018 example_2018.dwg vs independent companion DXF:
  * INSERT H1C8/H190/H756, LAYER/BLOCK_RECORD, ATTRIB and SEQEND handles.
- * Source H/CRC only. No nested block expansion or visible scene claim. */
+ * Source H/CRC and insertion-point math only. No nested block expansion or visible scene claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include <stdint.h>
@@ -99,7 +99,7 @@ static int genuine(const char *file){
              scene,UINT64_C(0x191),&unchanged)&&
            !memcmp(&unchanged,&saved,sizeof(unchanged));
     }
-    fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph; "
+    fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
         ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
