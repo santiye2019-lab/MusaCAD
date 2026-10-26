@@ -47,6 +47,12 @@ int musa_dwg_ac1032_scene_index_object_type(
  * viewport visibility or rendering. Fail-atomic on unsupported source. */
 /* Authenticated original R2018 OT3 ATTDEF entity-common only. No tag,
  * text value, default attribute, INSERT binding, owner or final paint. */
+/* Authenticated original R2018 OT4 BLOCK begin entity-common only.
+ * BLOCK_HEADER owner, child sequence, names, nested INSERT and display
+ * remain UNVERIFIED; BLOCK marker itself is never painted. */
+int musa_dwg_ac1032_scene_index_read_block_common(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032EntityCommon *out);
 int musa_dwg_ac1032_scene_index_read_attdef_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
