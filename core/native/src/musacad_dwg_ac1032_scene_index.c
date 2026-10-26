@@ -1493,7 +1493,11 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
     if(!ok)return 0;
     if(!common)v.profile_status=MUSACAD_AC1032_CIRCLE_H_COMMON_UNSUPPORTED;
     else if(!first_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_FIRST_UNREADABLE;
-    else if(first.code!=4u)v.profile_status=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4;
+    else if(first.code!=4u&&
+            !(first.code==12u&&first.relative&&
+              first.encoded_value>0u&&first.target<h&&
+              h-first.target==first.encoded_value))
+        v.profile_status=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4;
     else if(!second_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_SECOND_UNREADABLE;
     else if(second.code!=5u)v.profile_status=MUSACAD_AC1032_CIRCLE_H_SECOND_NOT_H5;
     else if(!padding_ok)v.profile_status=MUSACAD_AC1032_CIRCLE_H_TAIL_NONCANONICAL;
@@ -1514,8 +1518,14 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
                edge.exact_h4_owner_and_h5_layer_source_verified&&
                edge.owner_block_header_handle==first.target&&
                edge.layer_handle==second.target){
-                v.profile_status=MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE;
-                v.exact_h4_h5_source_verified=1u;
+                if(first.code==12u){
+                    v.profile_status=
+                      MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE;
+                    v.verified_relative_h12_owner_h5_layer_source=1u;
+                }else{
+                    v.profile_status=MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE;
+                    v.exact_h4_h5_source_verified=1u;
+                }
             }else v.profile_status=MUSACAD_AC1032_CIRCLE_H_GRAPH_REJECTED;
         }
     }
