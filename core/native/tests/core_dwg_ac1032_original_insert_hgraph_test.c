@@ -62,6 +62,17 @@ static int genuine(const char *file){
                binding.graph.layer_handle==e->layer&&
                binding.placement.indexed_handle==e->h;
         }
+        if(ok){
+            MusaDwgAc1032BlockHeaderIdentity block={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_identity(
+                   scene,e->block,&block)&&
+               block.indexed_handle==e->block&&
+               block.original_record_crc_verified&&
+               block.embedded_self_handle_verified&&
+               block.empty_eed_verified&&
+               block.no_reactors_verified&&
+               !block.base_point_decoded;
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
