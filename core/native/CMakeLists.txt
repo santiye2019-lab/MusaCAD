@@ -51,6 +51,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_attrib_common_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_attrib_common_smoke
                  COMMAND musacad_core_ac1032_original_attrib_common_test)
+        # Authenticated original R2018 INSERT LAYER/BLOCK_HEADER/ATTRIB H graph.
+        add_executable(musacad_core_ac1032_original_insert_hgraph_test
+                tests/core_dwg_ac1032_original_insert_hgraph_test.c)
+        target_link_libraries(musacad_core_ac1032_original_insert_hgraph_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_insert_hgraph_smoke
+                 COMMAND musacad_core_ac1032_original_insert_hgraph_test)
         # Original R2018 OT7 INSERT numeric OCS against independent DXF.
         add_executable(musacad_core_ac1032_original_insert_placement_test
                 tests/core_dwg_ac1032_original_insert_placement_test.c)
