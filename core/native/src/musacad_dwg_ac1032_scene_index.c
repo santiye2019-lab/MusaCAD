@@ -1569,6 +1569,45 @@ int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
     return 1;
 }
 
+/* Source-only CIRCLE provenance. A verified relative owner and H5 layer
+ * are necessary but NEVER sufficient to authorize an actual paint. The
+ * name/status/ENC/geometry all come from the same immutable original
+ * CRC/H-indexed scene; missing evidence rejects atomically. */
+int musa_dwg_ac1032_scene_index_circle_layer_provenance(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleLayerProvenance *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032CircleLayerProvenance v={0};
+    if(!musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
+            s,h,&v.edge)||
+       !v.edge.original_circle_and_targets_crc_verified||
+       !v.edge.original_forward_block_child_membership_verified||
+       !v.edge.exact_relative_owner_and_layer_source_verified||
+       v.edge.model_space_viewport_and_paint_accepted||
+       v.edge.circle_handle!=h||!v.edge.layer_handle||
+       !musa_dwg_ac1032_scene_index_read_layer_name(
+            s,v.edge.layer_handle,&v.layer_name)||
+       !v.layer_name.original_record_crc_verified||
+       v.layer_name.indexed_handle!=v.edge.layer_handle||
+       !v.layer_name.utf8_bytes||!v.layer_name.utf8[0]||
+       !musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+            s,v.edge.layer_handle,&v.raw_layer_flags)||
+       !v.raw_layer_flags.source_crc_verified||
+       v.raw_layer_flags.indexed_handle!=v.edge.layer_handle||
+       v.raw_layer_flags.numeric_flags_end_bit<=
+            v.raw_layer_flags.numeric_flags_start_bit||
+       !musa_dwg_ac1032_scene_index_read_curve(s,h,&v.circle)||
+       !v.circle.geometry_decoded||v.circle.object_type!=18u||
+       v.circle.indexed_handle!=h||
+       !v.circle.common.common_decoded||
+       !v.circle.common.prefix.prefix_decoded||
+       v.circle.common.prefix.indexed_handle!=h||
+       v.circle.common.prefix.raw_object_type!=18u)return 0;
+    v.source_geometry_and_layer_verified=1u;
+    *out=v;
+    return 1;
+}
+
 /* No default '0' or palette guesses: the actual source entity H=5
  * points at an original CRC-verified OT51, whose independently parsed TU
  * name is returned with its original bit offset and Unicode evidence. */

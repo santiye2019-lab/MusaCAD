@@ -94,6 +94,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_circle_relative_owner_layer_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_circle_relative_owner_layer_abi_smoke
                  COMMAND musacad_core_ac1032_circle_relative_owner_layer_test)
+        # Source-only original R2018 CIRCLE Unicode LAYER/flags/ENC.
+        add_executable(musacad_core_ac1032_circle_layer_provenance_test
+                tests/core_dwg_ac1032_circle_layer_provenance_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_layer_provenance_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_layer_provenance_abi_smoke
+                 COMMAND musacad_core_ac1032_circle_layer_provenance_test)
         # Genuine R2018 OT35 ellipse -> independently verified source H5
         # LAYER, Unicode name, encoded style and conservative screen readiness.
         add_executable(musacad_core_ac1032_real_ellipse_style_test
