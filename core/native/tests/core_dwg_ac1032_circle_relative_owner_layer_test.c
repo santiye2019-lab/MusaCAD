@@ -63,6 +63,31 @@ static int genuine(const char *dwg,const char *dxf){
     if(!ok){musa_dwg_ac1032_scene_index_close(scene);return 0;}
     MusaDwgAc1032CircleHTailProfile raw={0};
     MusaDwgAc1032CircleRelativeOwnerLayerSource edge={0};
+    /* CI-only forensic output: preserve strict rejection while identifying
+     * whether original target types or the BLOCK_HEADER forward H list
+     * are the source of the current authenticated-edge mismatch. */
+    {
+        uint16_t ot_owner=0u,ot_layer=0u;
+        MusaDwgAc1032BlockHeaderTypedChildren children={0};
+        const int owner_type_ok=musa_dwg_ac1032_scene_index_object_type(
+            scene,UINT64_C(0x1b8),&ot_owner);
+        const int layer_type_ok=musa_dwg_ac1032_scene_index_object_type(
+            scene,UINT64_C(0x8a),&ot_layer);
+        const int children_ok=musa_dwg_ac1032_scene_index_block_header_typed_children(
+            scene,UINT64_C(0x1b8),&children);
+        unsigned hits=0u;
+        if(children_ok){
+            for(uint32_t i=0u;i<children.prefix.child_count;i++){
+                if(children.prefix.child_handles[i]==UINT64_C(0x1bb))hits++;
+            }
+        }
+        fprintf(stderr,"DIAG CIRCLE H1BB targets owner_type=%d/%u layer_type=%d/%u "
+            "children=%d count=%u H1BB_membership=%u canonical=%u typed=%u\\n",
+            owner_type_ok,(unsigned)ot_owner,layer_type_ok,(unsigned)ot_layer,
+            children_ok,children_ok?children.prefix.child_count:0u,hits,
+            children_ok?children.prefix.canonical_h_roles_verified:0u,
+            children_ok?children.all_child_record_types_crc_verified:0u);
+    }
     ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
            scene,UINT64_C(0x1bb),&raw)&&
        raw.profile_status==MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4&&
