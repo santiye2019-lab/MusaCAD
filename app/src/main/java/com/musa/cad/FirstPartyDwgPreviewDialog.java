@@ -98,7 +98,7 @@ public final class FirstPartyDwgPreviewDialog {
                         " tanınmamış geometri olabilir; bunlardan toplam 2B"+
                         " başarı yüzdesi hesaplanamaz."+
                         "\nÖZGÜN DWG METİN ÖNİZLEMESİ (DENEYSEL):"+
-                        "\nMTEXT kaynak Unicode/metin yönü/konumu okunabiliyorsa"+
+                        "\nTEXT ve MTEXT kaynak Unicode/metin yönü/konumu okunabiliyorsa"+
                         " mevcut Android metin motorunda fontu yaklaşık çizilir."+
                         " Kaynaktaki paragraf satırları, yazı tipi ve sarmalama"+
                         " birebir doğrulanmadı; katman görünürlüğü ve renkler kesin değil."+
@@ -109,7 +109,7 @@ public final class FirstPartyDwgPreviewDialog {
                         " • INSERT/MINSERT: "+a.undecodedInsertMinsert+
                         "\nDiğer kaynak tipleri: "+a.otherOriginalTypeRecords+
                         " (bunlarda da çözülemeyen 2B nesneler bulunabilir)."+
-                        "\nDURUM: MTEXT yalnızca düz yazı önizlemesi;"+
+                        "\nDURUM: TEXT ve MTEXT yalnızca yaklaşık yazı önizlemesi;"+
                         " TEXT/MTEXT tam font, paragraf, katman ve blok çözümü"+
                         " YOK. BYLAYER/BYBLOCK nihai renk hesabı TAMAMLANMADI."+
                         "\nKaynak stil özeti: "+a.indexed+
