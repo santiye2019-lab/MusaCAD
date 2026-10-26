@@ -72,4 +72,34 @@ static inline int musa_dwg_ac1032_block_header_ot49_identity(
     v.xdictionary_missing=(uint8_t)xdic;
     *out=v;return 1;
 }
+/* Precisely bound the original OT49 field region after the verified
+ * identity prefix and before the independent handle stream. This does
+ * not interpret field bits or infer a BLOCK_HEADER base point. */
+typedef struct MusaDwgAc1032BlockHeaderFieldSpan {
+    uint64_t indexed_handle;
+    size_t first_bit;
+    size_t end_bit; /* exclusive */
+    uint8_t original_record_crc_verified;
+    uint8_t base_point_decoded; /* ALWAYS zero */
+} MusaDwgAc1032BlockHeaderFieldSpan;
+static inline int musa_dwg_ac1032_block_header_ot49_field_span(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032BlockHeaderFieldSpan *out){
+    if(!out||!raw||!layout||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderIdentity id={0};
+    if(!musa_dwg_ac1032_block_header_ot49_identity(
+           raw,n,layout,&id)||
+       layout->data_stream_bits>SIZE_MAX||
+       id.fields_start_bit>=(size_t)layout->data_stream_bits)return 0;
+    MusaDwgAc1032BlockHeaderFieldSpan v={0};
+    v.indexed_handle=id.indexed_handle;
+    v.first_bit=id.fields_start_bit;
+    v.end_bit=(size_t)layout->data_stream_bits;
+    v.original_record_crc_verified=1u;
+    *out=v;return 1;
+}
 #endif
