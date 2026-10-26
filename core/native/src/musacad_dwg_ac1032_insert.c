@@ -86,7 +86,7 @@ int musa_dwg_ac1032_insert_placement_at(
             const uint8_t octet=raw[bit/8u];
             fputc((octet & (uint8_t)(1u << (bit%8u)))?'1':'0',stderr);
         }
-        fputc('\\n',stderr);
+        fputc('\n',stderr);
         fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\n",
             (unsigned long long)v.indexed_handle,geom,(size_t)l->data_stream_bits,
             b.bit_pos,b.bit_end-b.bit_pos,(unsigned)v.scale_data_flags,
