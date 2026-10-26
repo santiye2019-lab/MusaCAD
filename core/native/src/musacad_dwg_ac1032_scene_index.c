@@ -188,6 +188,21 @@ static int check_output(const MusaDwgAc1032SceneIndex *s,
        !overlap(s->objects,s->object_bytes,out,n)&&
        !overlap(s->handles,s->count*sizeof(*s->handles),out,n);
 }
+int musa_dwg_ac1032_scene_index_read_insert_placement(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertPlacement *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,7u,&p))return 0;
+    MusaDwgAc1032InsertPlacement value={0};
+    int ok=musa_dwg_ac1032_insert_placement_at(
+        p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&value)&&
+        value.indexed_handle==h&&value.original_record_crc_verified&&
+        value.numeric_fields_decoded&&!value.block_graph_and_display_accepted;
+    free(p.raw);
+    if(ok)*out=value;
+    return ok;
+}
 int musa_dwg_ac1032_scene_index_read_line(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032NativeLine *out){
