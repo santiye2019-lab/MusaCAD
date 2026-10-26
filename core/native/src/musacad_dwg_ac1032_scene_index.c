@@ -1234,6 +1234,31 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
         *out=linked;
         return 1;
     }
+    /* Some real R2018 OT18 CIRCLEs use entity_mode 0 and relative H12
+     * owner + H5 LAYER. A strict independently CRC-checked OT49/OT51
+     * graph is required; do not misread H12 as the single H5 mode-2 form.
+     * Still not a claim of final layer visibility or effective paint. */
+    if(type==18u){
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        if(musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               s,h,&edge)&&
+           edge.exact_h4_owner_and_h5_layer_source_verified&&
+           edge.owner_block_header_handle&&edge.layer_handle&&
+           (edge.original_owner_wire_code==4u||
+            (edge.original_owner_wire_code==12u&&
+             edge.original_relative_h12_owner_verified))){
+            MusaDwgAc1032EntityLayerRef linked={0};
+            linked.entity_handle=h;
+            linked.layer_handle=edge.layer_handle;
+            linked.raw_entity_type=18u;
+            linked.raw_layer_type=51u;
+            linked.original_entity_crc_verified=1u;
+            linked.original_layer_crc_verified=1u;
+            linked.source_handle_ref_verified=1u;
+            *out=linked;
+            return 1;
+        }
+    }
     /* MTEXT uses its own already original-H/CRC verified owner/layer/
      * text-style graph, including the exact optional 0x50 null handle.
      * Reuse it instead of incorrectly applying the LINE single-H tail. */
@@ -1332,16 +1357,38 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         p.layout.data_stream_bits<=SIZE_MAX&&
         p.layout.total_payload_bits<=SIZE_MAX;
     uint64_t owner=0u,layer=0u;
+    uint8_t owner_wire_code=0u;
     int ok=0;
     if(admissible){
         MusaDwgAc1015Bits bits={0};
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
-               (size_t)p.layout.data_stream_bits,
-               (size_t)p.layout.total_payload_bits)&&
-           cached_graph_ref(&bits,h,4u,&owner)&&
-           cached_graph_ref(&bits,h,5u,&layer)&&
-           owner!=h&&layer!=h&&owner!=layer&&
-           cached_graph_zero_padding(&bits);
+              (size_t)p.layout.data_stream_bits,
+              (size_t)p.layout.total_payload_bits);
+        if(ok&&type==18u){
+            MusaDwgAc1015HandleRef owner_ref={0};
+            ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&owner_ref)&&
+               owner_ref.target!=0u&&
+               (owner_ref.code==4u||
+                /* Original R2018 CIRCLE H1BB stores its block owner as
+                 * the genuine canonical relative H12=H1BB-3 -> H1B8.
+                 * Other types retain the exact H4-only profile.
+                 * Check real OT49/OT51 CRC/index below as well. */
+                (owner_ref.code==12u&&owner_ref.relative&&
+                 owner_ref.encoded_value>0u&&
+                 owner_ref.target<h&&
+                 h-owner_ref.target==owner_ref.encoded_value));
+            if(ok){
+                owner=owner_ref.target;
+                owner_wire_code=owner_ref.code;
+            }
+        }else if(ok){
+            ok=cached_graph_ref(&bits,h,4u,&owner);
+            if(ok)owner_wire_code=4u;
+        }
+        if(ok)
+            ok=cached_graph_ref(&bits,h,5u,&layer)&&
+               owner!=h&&layer!=h&&owner!=layer&&
+               cached_graph_zero_padding(&bits);
     }
     free(p.raw);
     uint16_t owner_type=0u,layer_type=0u;
@@ -1358,6 +1405,9 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     result.original_child_record_crc_verified=1u;
     result.original_owner_and_layer_records_crc_verified=1u;
     result.exact_h4_owner_and_h5_layer_source_verified=1u;
+    result.original_owner_wire_code=owner_wire_code;
+    result.original_relative_h12_owner_verified=
+        (uint8_t)(type==18u&&owner_wire_code==12u);
     *out=result;
     return 1;
 }
