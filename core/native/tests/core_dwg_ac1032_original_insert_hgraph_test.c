@@ -172,6 +172,33 @@ static int genuine(const char *file){
                    !repeat.base_point_decoded;
             }
         }
+        if(ok){
+            /* Original R2018 H1B8/H17D: the same source DATA bits must
+             * agree for 16-bit and two 8-bit reads. This is an exact
+             * binary extraction oracle, NOT a decoded block base. */
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            uint8_t pair[2]={0xa5u,0x5au};
+            uint8_t hi=0u,lo=0u;
+            ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span)&&
+               span.end_bit-span.first_bit>=16u&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit,16u,pair,sizeof(pair))&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit,8u,&hi,1u)&&
+               musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                   scene,e->block,span.first_bit+8u,8u,&lo,1u)&&
+               pair[0]==hi&&pair[1]==lo;
+            if(ok){
+                const uint8_t before[2]={pair[0],pair[1]};
+                ok=!musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                       scene,e->h,span.first_bit,16u,pair,sizeof(pair))&&
+                   !memcmp(pair,before,sizeof(pair))&&
+                   !musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+                       scene,e->block,span.end_bit,16u,pair,sizeof(pair))&&
+                   !memcmp(pair,before,sizeof(pair));
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
