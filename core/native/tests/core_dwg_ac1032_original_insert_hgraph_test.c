@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1032_block_header_identity.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include "musacad_dwg_ac1032_insert_original_base_map.h"
+#include "musacad_dwg_ac1032_block_marker_commons.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -305,6 +306,51 @@ static int genuine(const char *file){
                 ok=!musa_dwg_ac1032_scene_index_block_header_typed_children(
                         scene,e->h,&typed)&&
                    !memcmp(&before,&typed,sizeof(typed));
+            }
+        }
+        if(ok){
+            /* Unchanged original example_2018.dwg H1B8/H17D; independent
+             * companion example_2018.dxf counts 13/5.  Read actual OT4
+             * BLOCK and OT5 ENDBLK common prefixes at source H targets.
+             * This is marker authentication, never an owner/paint claim. */
+            MusaDwgAc1032BlockMarkerCommons markers={0};
+            const uint32_t expected_children=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_block_marker_commons(
+                   scene,e->block,&markers)&&
+               markers.block_header_handle==e->block&&
+               markers.child_count==expected_children&&
+               markers.block_begin_handle!=markers.endblk_handle&&
+               markers.marker_records_crc_verified&&
+               markers.unique_prefix_handles_verified&&
+               markers.begin_common.prefix.raw_object_type==4u&&
+               markers.end_common.prefix.raw_object_type==5u&&
+               !markers.reverse_owner_links_verified&&
+               !markers.final_display_accepted;
+            if(ok){
+                MusaDwgAc1032BlockMarkerCommons repeated={0};
+                ok=musa_dwg_ac1032_block_marker_commons(
+                       scene,e->block,&repeated)&&
+                   repeated.block_begin_handle==markers.block_begin_handle&&
+                   repeated.endblk_handle==markers.endblk_handle&&
+                   repeated.child_count==markers.child_count&&
+                   repeated.marker_records_crc_verified&&
+                   repeated.unique_prefix_handles_verified;
+            }
+            if(ok){
+                const MusaDwgAc1032BlockMarkerCommons before=markers;
+                ok=!musa_dwg_ac1032_block_marker_commons(
+                       scene,e->h,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers))&&
+                   !musa_dwg_ac1032_block_marker_commons(
+                       scene,UINT64_MAX,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers))&&
+                   !musa_dwg_ac1032_block_marker_commons(
+                       scene,before.block_begin_handle,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers))&&
+                   !musa_dwg_ac1032_block_marker_commons(
+                       scene,before.endblk_handle,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers));
             }
         }
         if(ok){
