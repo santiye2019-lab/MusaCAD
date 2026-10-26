@@ -3,6 +3,7 @@
  * INSERT H1C8/H190/H756, LAYER/BLOCK_RECORD, ATTRIB and SEQEND handles.
  * Source H/CRC and insertion-point math only. No nested block expansion or visible scene claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_insert_binding.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include <stdint.h>
 #include <math.h>
@@ -51,6 +52,15 @@ static int genuine(const char *file){
             g.owned_attrib_count==e->count&&
             g.original_entity_and_targets_crc_verified&&
             g.source_edges_verified&&!g.block_expansion_and_display_accepted;
+        if(ok){
+            MusaDwgAc1032InsertBinding binding={0};
+            ok=musa_dwg_ac1032_insert_bind_source(scene,e->h,&binding)&&
+               binding.source_binding_verified&&
+               !binding.block_expansion_accepted&&
+               binding.graph.block_header_handle==e->block&&
+               binding.graph.layer_handle==e->layer&&
+               binding.placement.indexed_handle==e->h;
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
@@ -76,6 +86,23 @@ static int genuine(const char *file){
                     fabs(mapped[2]-p.insertion[2])<1e-9;
             }
         }
+    }
+    if(ok){
+        MusaDwgAc1032InsertBinding unchanged_binding;
+        memset(&unchanged_binding,0x5a,sizeof(unchanged_binding));
+        const MusaDwgAc1032InsertBinding original_binding=unchanged_binding;
+        ok=!musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_MAX,&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding))&&
+           !musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_C(0x192),&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding))&&
+           !musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_C(0x1b8),&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding));
     }
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
