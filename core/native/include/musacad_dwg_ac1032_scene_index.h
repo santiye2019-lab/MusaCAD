@@ -5,6 +5,7 @@
 #include "musacad_dwg_ac1032_line_file.h"
 #include "musacad_dwg_ac1032_curve.h"
 #include "musacad_dwg_ac1032_point.h"
+#include "musacad_dwg_ac1032_text.h"
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
@@ -55,6 +56,10 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
 /* Genuine R2018 OT1 TEXT entity-common source only. Strict OT/H/CRC and
  * ENC/visibility fields, no claim of TEXT TU, WCS, font, owner or glyphs.
  * Deliberately distinct from OT44 MTEXT and its string grammar. */
+/* OT1 TEXT Unicode source only; NOT OT44 MTEXT, font or geometry. */
+int musa_dwg_ac1032_scene_index_read_text_source(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032TextSource *out);
 int musa_dwg_ac1032_scene_index_read_text_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
