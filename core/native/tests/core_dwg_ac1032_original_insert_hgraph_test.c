@@ -88,6 +88,23 @@ static int genuine(const char *file){
         }
     }
     if(ok){
+        MusaDwgAc1032InsertBinding unchanged_binding;
+        memset(&unchanged_binding,0x5a,sizeof(unchanged_binding));
+        const MusaDwgAc1032InsertBinding original_binding=unchanged_binding;
+        ok=!musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_MAX,&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding))&&
+           !musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_C(0x192),&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding))&&
+           !musa_dwg_ac1032_insert_bind_source(
+                scene,UINT64_C(0x1b8),&unchanged_binding)&&
+           !memcmp(&unchanged_binding,&original_binding,
+                   sizeof(unchanged_binding));
+    }
+    if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
         memset(&unchanged,0x5a,sizeof(unchanged));
         const MusaDwgAc1032InsertSourceGraph saved=unchanged;
