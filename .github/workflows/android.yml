@@ -1234,6 +1234,13 @@ jobs:
             /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
           nm -D /tmp/musacad-r2018-all-insert-jni-host.so \
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readAllInsertLinesNative'
+          mkdir -p /tmp/musacad-r2018-all-insert-jni-java
+          javac -encoding UTF-8 -d /tmp/musacad-r2018-all-insert-jni-java \
+            tests/FirstPartyAc1032AllInsertJNIHostTest.java
+          java -cp /tmp/musacad-r2018-all-insert-jni-java \
+            com.musa.cad.FirstPartyDwgPreview \
+            /tmp/musacad-r2018-all-insert-jni-host.so \
+            third_party/libredwg/test/test-data/example_2018.dwg
           mkdir -p /tmp/musacad-r2018-preview-jni-java
           javac -encoding UTF-8 -d /tmp/musacad-r2018-preview-jni-java \
             app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
