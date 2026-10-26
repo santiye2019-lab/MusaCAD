@@ -16,6 +16,7 @@
 #include "musacad_dwg_ac1032_block_pair_source_isolation.h"
 #include "musacad_dwg_ac1032_insert_child_source_join.h"
 #include "musacad_dwg_ac1032_insert_instance_source_pair.h"
+#include "musacad_dwg_ac1032_block_reverse_owner_source_audit.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1139,6 +1140,96 @@ static int genuine(const char *file){
                     scene,UINT64_C(0x190),UINT64_C(0x756),NULL)&&
                !memcmp(&pair,&before,sizeof(pair));
         }
+    }
+    if(ok){
+        /* Independently sourced example_2018.dxf counts for the original
+         * untouched R2018 DWG OT49 block candidate child H inventory.
+         * Only an actual verified H4 child->OT49 owner counts, never H
+         * prefix position or guessed group adjacency. Unsupported H
+         * profiles remain explicitly unresolved, not "owned". */
+        const uint64_t blocks[]={UINT64_C(0x1b8),UINT64_C(0x17d)};
+        const uint32_t counts[]={13u,5u};
+        for(size_t b=0u;ok&&b<2u;b++){
+            MusaDwgAc1032BlockReverseOwnerSourceAudit owned={0};
+            MusaDwgAc1032BlockReverseOwnerSourceAudit again={0};
+            MusaDwgAc1032BlockHeaderTypedChildren typed={0};
+            ok=musa_dwg_ac1032_block_reverse_owner_source_audit(
+                   scene,blocks[b],&owned)&&
+               musa_dwg_ac1032_block_reverse_owner_source_audit(
+                   scene,blocks[b],&again)&&
+               !memcmp(&owned,&again,sizeof(owned))&&
+               musa_dwg_ac1032_scene_index_block_header_typed_children(
+                   scene,blocks[b],&typed)&&
+               owned.block_header_handle==blocks[b]&&
+               owned.child_count==counts[b]&&
+               owned.block_child_h_crc_types_verified&&
+               !owned.full_block_reverse_ownership_accepted&&
+               !owned.layout_visibility_and_paint_accepted&&
+               owned.verified_reverse_source_count+
+                 owned.unresolved_owner_count==counts[b]&&
+               owned.matching_reverse_owner_count+
+                 owned.foreign_owner_count==owned.verified_reverse_source_count;
+            for(uint32_t j=0u;ok&&j<owned.child_count;j++){
+                const MusaDwgAc1032BlockReverseOwnerSourceRow *r=
+                    &owned.rows[j];
+                uint16_t raw_type=0u;
+                ok=r->child_handle==typed.prefix.child_handles[j]&&
+                   r->raw_object_type==typed.child_object_types[j]&&
+                   musa_dwg_ac1032_scene_index_object_type(
+                     scene,r->child_handle,&raw_type)&&
+                   raw_type==r->raw_object_type&&
+                   !r->child_visible_and_paint_accepted;
+                if(!ok)break;
+                if(r->strict_reverse_edge_source_verified){
+                    uint16_t owner_type=0u,layer_type=0u;
+                    ok=r->verified_source_owner_handle&&
+                       r->verified_source_layer_handle&&
+                       musa_dwg_ac1032_scene_index_object_type(
+                         scene,r->verified_source_owner_handle,&owner_type)&&
+                       owner_type==49u&&
+                       musa_dwg_ac1032_scene_index_object_type(
+                         scene,r->verified_source_layer_handle,&layer_type)&&
+                       layer_type==51u&&
+                       r->reverse_owner_matches_block+
+                       r->reverse_owner_conflicts_block==1u&&
+                       r->reverse_owner_matches_block==
+                         (uint8_t)(r->verified_source_owner_handle==blocks[b]);
+                }else{
+                    ok=!r->verified_source_owner_handle&&
+                       !r->verified_source_layer_handle&&
+                       !r->reverse_owner_matches_block&&
+                       !r->reverse_owner_conflicts_block;
+                }
+            }
+            if(ok){
+                const MusaDwgAc1032BlockReverseOwnerSourceAudit before=owned;
+                ok=!musa_dwg_ac1032_block_reverse_owner_source_audit(
+                        scene,UINT64_C(0x1c8),&owned)&&
+                   !memcmp(&before,&owned,sizeof(before))&&
+                   !musa_dwg_ac1032_block_reverse_owner_source_audit(
+                        scene,UINT64_MAX,&owned)&&
+                   !memcmp(&before,&owned,sizeof(before))&&
+                   !musa_dwg_ac1032_block_reverse_owner_source_audit(
+                        scene,blocks[b],NULL)&&
+                   !memcmp(&before,&owned,sizeof(before));
+            }
+        }
+    }
+    if(ok){
+        /* Exact geometry entity-mode/H4/H5 reader must fail atomic for
+         * valid non-geometry OT49 and unrelated source H values. */
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge;
+        memset(&edge,0x5a,sizeof(edge));
+        const MusaDwgAc1032EntityBlockOwnerLayerSource before=edge;
+        ok=!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               scene,UINT64_C(0x1b8),&edge)&&
+           !memcmp(&before,&edge,sizeof(edge))&&
+           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               scene,UINT64_C(0x190),&edge)&&
+           !memcmp(&before,&edge,sizeof(edge))&&
+           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               scene,UINT64_MAX,&edge)&&
+           !memcmp(&before,&edge,sizeof(edge));
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
