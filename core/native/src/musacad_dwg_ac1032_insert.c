@@ -78,6 +78,15 @@ int musa_dwg_ac1032_insert_placement_at(
        !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
         return reject_field("owned_attrib_count",&b,v.indexed_handle);
     if(b.bit_pos!=b.bit_end){
+        /* Preserve strict rejection while recording exact unparsed source bits.
+         * This is evidence for the remaining INSERT grammar, not padding. */
+        fprintf(stderr,"MC1032 INSERT trailing DATA H%llx bits=",
+                (unsigned long long)v.indexed_handle);
+        for(size_t bit=b.bit_pos;bit<b.bit_end;bit++){
+            const uint8_t octet=raw[bit/8u];
+            fputc((octet & (uint8_t)(1u << (bit%8u)))?'1':'0',stderr);
+        }
+        fputc('\\n',stderr);
         fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\n",
             (unsigned long long)v.indexed_handle,geom,(size_t)l->data_stream_bits,
             b.bit_pos,b.bit_end-b.bit_pos,(unsigned)v.scale_data_flags,
