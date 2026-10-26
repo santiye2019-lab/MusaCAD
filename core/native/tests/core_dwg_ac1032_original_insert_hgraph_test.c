@@ -232,11 +232,11 @@ static int genuine(const char *file){
                     (unsigned long long)e->block,field.first_bit);
                 for(size_t z=0u;z<sizeof(source_window);z++)
                     fprintf(stderr,"%02x",(unsigned)source_window[z]);
-                fputc('\\n',stderr);
+                fputc('\n',stderr);
             }
             const int decoded=musa_dwg_ac1032_scene_index_read_block_header_base(
                    scene,e->block,&base);
-            fprintf(stderr,"OT49 source H%llx decoded=%d owned=%u base=(%.9g,%.9g,%.9g) att=%u xref=%u\\n",
+            fprintf(stderr,"OT49 source H%llx decoded=%d owned=%u base=(%.9g,%.9g,%.9g) att=%u xref=%u\n",
                 (unsigned long long)e->block,decoded,base.owned_object_count,
                 base.base_xyz[0],base.base_xyz[1],base.base_xyz[2],
                 (unsigned)base.has_attdefs,(unsigned)base.is_xref);
