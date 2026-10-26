@@ -88,6 +88,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_circle_h_tail_profile_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_circle_h_tail_profile_abi_smoke
                  COMMAND musacad_core_ac1032_circle_h_tail_profile_test)
+        # Original R2018 CIRCLE H(C-relative owner) -> OT49 and H5 -> OT51.
+        add_executable(musacad_core_ac1032_circle_relative_owner_layer_test
+                tests/core_dwg_ac1032_circle_relative_owner_layer_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_relative_owner_layer_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_relative_owner_layer_abi_smoke
+                 COMMAND musacad_core_ac1032_circle_relative_owner_layer_test)
         # Genuine R2018 OT35 ellipse -> independently verified source H5
         # LAYER, Unicode name, encoded style and conservative screen readiness.
         add_executable(musacad_core_ac1032_real_ellipse_style_test

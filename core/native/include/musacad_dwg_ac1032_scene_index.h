@@ -342,6 +342,25 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
     const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
     MusaDwgAc1032CircleHTailProfile *out);
 
+
+/* Narrow source-authenticated R2018 OT18 H(C relative owner) + H5 layer.
+ * Both referenced original OT49/OT51 records are independently CRC/OT
+ * checked and the OT49 forward child list must contain the same OT18 H.
+ * This does NOT prove complete block ownership, scene/viewport visibility,
+ * layer flags, resolved BYLAYER/BYBLOCK color or any final drawing. */
+typedef struct MusaDwgAc1032CircleRelativeOwnerLayerSource {
+    uint64_t circle_handle,owner_block_header_handle,layer_handle;
+    uint16_t raw_circle_object_type;
+    uint8_t first_source_handle_code,second_source_handle_code;
+    uint8_t original_circle_and_targets_crc_verified;
+    uint8_t original_forward_block_child_membership_verified;
+    uint8_t exact_relative_owner_and_layer_source_verified;
+    uint8_t model_space_viewport_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleRelativeOwnerLayerSource;
+int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleRelativeOwnerLayerSource *out);
+
 /* Single ORIGINAL indexed DWG graph walk from one geometry entity
  * to its source-CRC-verified LAYER table record and bounded Unicode TU
  * name. Built from separate first-party readers, never by guessing a

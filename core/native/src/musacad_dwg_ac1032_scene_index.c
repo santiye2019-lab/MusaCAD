@@ -1473,6 +1473,96 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
     return 1;
 }
 
+
+/* Exact ORIGINAL OT18 H(C-relative owner),H5(layer) source edge.  This
+ * grammar is deliberately limited to an R2018 CIRCLE whose authenticated
+ * first handle is relative code 0xC and whose second is code 5.  It is
+ * NOT a generic H4 substitution: owner membership is independently
+ * cross-checked against the CRC-indexed BLOCK_HEADER forward child list.
+ * No XREF, nested INSERT, space, viewport, layer on/off or paint proof. */
+int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleRelativeOwnerLayerSource *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032CircleHTailProfile profile={0};
+    if(!musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+           s,h,&profile)||
+       !profile.original_record_crc_verified||
+       profile.raw_object_type!=18u||
+       profile.profile_status!=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4||
+       profile.entity_mode!=0u||profile.reactor_count!=0u||
+       profile.xdictionary_missing!=1u||
+       profile.has_color_reference||profile.linetype_flags||
+       profile.plotstyle_flags||profile.material_flags||
+       profile.visualstyle_flags||
+       !profile.first_ref_decoded||!profile.second_ref_decoded||
+       profile.first_ref_code!=12u||profile.second_ref_code!=5u||
+       !profile.first_raw_target||!profile.second_raw_target||
+       profile.first_raw_target==h||profile.second_raw_target==h||
+       profile.first_raw_target==profile.second_raw_target)return 0;
+    Payload p={0};
+    if(!fetch(s,h,18u,&p))return 0;
+    MusaDwgAc1015Bits bits={0};
+    MusaDwgAc1015HandleRef first={0},second={0};
+    const int strict=p.common.common_decoded&&
+       p.common.prefix.prefix_decoded&&
+       p.common.prefix.indexed_handle==h&&
+       p.common.prefix.raw_object_type==18u&&
+       p.common.prefix.entity_mode==0u&&
+       p.common.prefix.reactor_count==0u&&
+       p.common.prefix.xdictionary_missing==1u&&
+       !p.common.has_color_reference&&
+       !p.common.linetype_flags&&!p.common.plotstyle_flags&&
+       !p.common.material_flags&&!p.common.visualstyle_flags&&
+       p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX&&
+       musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+           (size_t)p.layout.data_stream_bits,
+           (size_t)p.layout.total_payload_bits)&&
+       musa_dwg_ac1015_read_handle_ref(&bits,h,&first)&&
+       musa_dwg_ac1015_read_handle_ref(&bits,h,&second)&&
+       first.code==12u&&second.code==5u&&
+       first.target==profile.first_raw_target&&
+       second.target==profile.second_raw_target&&
+       cached_graph_zero_padding(&bits);
+    free(p.raw);
+    if(!strict)return 0;
+    uint16_t owner_type=0u,layer_type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+           s,first.target,&owner_type)||owner_type!=49u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           s,second.target,&layer_type)||layer_type!=51u)return 0;
+    MusaDwgAc1032BlockHeaderTypedChildren block={0};
+    if(!musa_dwg_ac1032_scene_index_block_header_typed_children(
+           s,first.target,&block)||
+       !block.all_child_record_types_crc_verified||
+       !block.prefix.original_record_crc_verified||
+       !block.prefix.h_prefix_decoded||
+       !block.prefix.canonical_h_roles_verified||
+       block.prefix.indexed_handle!=first.target||
+       block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    unsigned matches=0u;
+    for(uint32_t i=0u;i<block.prefix.child_count;i++){
+        if(block.prefix.child_handles[i]==h){
+            if(block.child_object_types[i]!=18u)return 0;
+            matches++;
+        }
+    }
+    if(matches!=1u)return 0;
+    MusaDwgAc1032CircleRelativeOwnerLayerSource v={0};
+    v.circle_handle=h;
+    v.owner_block_header_handle=first.target;
+    v.layer_handle=second.target;
+    v.raw_circle_object_type=18u;
+    v.first_source_handle_code=12u;
+    v.second_source_handle_code=5u;
+    v.original_circle_and_targets_crc_verified=1u;
+    v.original_forward_block_child_membership_verified=1u;
+    v.exact_relative_owner_and_layer_source_verified=1u;
+    *out=v;
+    return 1;
+}
+
 /* No default '0' or palette guesses: the actual source entity H=5
  * points at an original CRC-verified OT51, whose independently parsed TU
  * name is returned with its original bit offset and Unicode evidence. */
