@@ -925,6 +925,21 @@ int musa_dwg_ac1032_scene_index_block_header_child_prefix(
            raw,needed,&layout,&value);
     free(raw);
     if(!ok)return 0;
+    /* Resolve every proposed edge against the original independently
+     * CRC-verified H map. This is not reverse-owner authentication. */
+    uint16_t kind=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+           scene,value.block_control_handle,&kind)||
+       kind==4u||kind==5u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           scene,value.block_begin_handle,&kind)||kind!=4u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           scene,value.endblk_handle,&kind)||kind!=5u)return 0;
+    for(uint32_t i=0u;i<value.child_count;i++){
+        if(!musa_dwg_ac1032_scene_index_object_type(
+               scene,value.child_handles[i],&kind)||
+           kind==4u||kind==5u)return 0;
+    }
     *out=value;return 1;
 }
 int musa_dwg_ac1032_scene_index_read_block_header_base(
