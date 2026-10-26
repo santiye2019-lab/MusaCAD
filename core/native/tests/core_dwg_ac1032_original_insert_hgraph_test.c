@@ -17,6 +17,7 @@
 #include "musacad_dwg_ac1032_insert_child_source_join.h"
 #include "musacad_dwg_ac1032_insert_instance_source_pair.h"
 #include "musacad_dwg_ac1032_block_reverse_owner_source_audit.h"
+#include "musacad_dwg_ac1032_insert_reverse_owner_source_join.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1230,6 +1231,78 @@ static int genuine(const char *file){
            !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                scene,UINT64_MAX,&edge)&&
            !memcmp(&before,&edge,sizeof(edge));
+    }
+    if(ok){
+        /* Independent original R2018 example_2018.dwg + DXF oracle:
+         * INSERT H1C8 -> OT49 H1B8 (13 children); H190/H756 ->
+         * OT49 H17D (5 each). Joining the exact original child H/OT
+         * must preserve every verified H4 owner edge and H5 layer,
+         * including FOREIGN and UNRESOLVED, without authorizing paint. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        const uint32_t counts[]={13u,5u,5u};
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertReverseOwnerJoin joined={0},again={0};
+            MusaDwgAc1032InsertChildSourceJoin source={0};
+            MusaDwgAc1032BlockReverseOwnerSourceAudit audit={0};
+            ok=musa_dwg_ac1032_insert_reverse_owner_source_join(
+                   scene,inserts[b],&joined)&&
+               musa_dwg_ac1032_insert_reverse_owner_source_join(
+                   scene,inserts[b],&again)&&
+               !memcmp(&joined,&again,sizeof(joined))&&
+               musa_dwg_ac1032_insert_child_source_join(
+                   scene,inserts[b],&source)&&
+               musa_dwg_ac1032_block_reverse_owner_source_audit(
+                   scene,blocks[b],&audit)&&
+               joined.insert_handle==inserts[b]&&
+               joined.block_header_handle==blocks[b]&&
+               joined.child_count==counts[b]&&
+               joined.mapped_candidate_count==source.mapped_count&&
+               joined.matched_owner_count==audit.matching_reverse_owner_count&&
+               joined.foreign_owner_count==audit.foreign_owner_count&&
+               joined.unresolved_owner_count==audit.unresolved_owner_count&&
+               joined.original_insert_and_reverse_source_join_verified&&
+               !joined.complete_block_ownership_verified&&
+               !joined.space_visibility_and_paint_accepted;
+            for(uint32_t i=0u;ok&&i<joined.child_count;i++){
+                const MusaDwgAc1032InsertReverseOwnerRow *r=&joined.rows[i];
+                const MusaDwgAc1032BlockReverseOwnerSourceRow *o=
+                    &audit.rows[i];
+                const MusaDwgAc1032InsertChildSourceRow *s=&source.rows[i];
+                ok=r->child_handle==o->child_handle&&
+                   r->child_handle==s->child_handle&&
+                   r->raw_object_type==o->raw_object_type&&
+                   r->raw_object_type==s->raw_object_type&&
+                   r->source_layer_handle==s->source_layer_handle&&
+                   r->source_coordinate_mapped==s->coordinate_mapped&&
+                   r->source_style_class==s->source_style_class&&
+                   r->original_reverse_source_edge_verified==
+                       o->strict_reverse_edge_source_verified&&
+                   r->verified_owner_handle==
+                       o->verified_source_owner_handle&&
+                   r->reverse_owner_status==
+                       (o->reverse_owner_matches_block?
+                        MUSACAD_AC1032_INSERT_OWNER_MATCH:
+                        o->reverse_owner_conflicts_block?
+                        MUSACAD_AC1032_INSERT_OWNER_FOREIGN:
+                        MUSACAD_AC1032_INSERT_OWNER_UNRESOLVED)&&
+                   !r->final_paint_accepted;
+            }
+            if(ok){
+                const MusaDwgAc1032InsertReverseOwnerJoin before=joined;
+                ok=!musa_dwg_ac1032_insert_reverse_owner_source_join(
+                        scene,blocks[b],&joined)&&
+                   !memcmp(&joined,&before,sizeof(joined))&&
+                   !musa_dwg_ac1032_insert_reverse_owner_source_join(
+                        scene,UINT64_MAX,&joined)&&
+                   !memcmp(&joined,&before,sizeof(joined))&&
+                   !musa_dwg_ac1032_insert_reverse_owner_source_join(
+                        scene,inserts[b],NULL)&&
+                   !memcmp(&joined,&before,sizeof(joined));
+            }
+        }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
