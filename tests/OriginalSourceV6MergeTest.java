@@ -86,6 +86,63 @@ public final class OriginalSourceV6MergeTest {
         float[] mix=OriginalSourceV6Merge.join(circle,direct,256);
         require(mix[1]==3f&&OriginalSourceV6Merge.count(mix,256)==3,
                 "Curves, lines and bounds remain source-intact");
+        // Three independently read partial streams: direct, source INSERT
+        // LINE and numeric CIRCLE. Magenta ACI6 is a diagnostic warning.
+        float[] ellipseWords=new float[132];
+        ellipseWords[0]=518f;ellipseWords[1]=65f;
+        for(int i=0;i<65;i++){
+            double t=2.0*Math.PI*i/64.0;
+            ellipseWords[2+2*i]=(float)(10.0+3.0*Math.cos(t));
+            ellipseWords[3+2*i]=(float)(20.0+2.0*Math.sin(t));
+        }
+        ellipseWords[130]=ellipseWords[2];
+        ellipseWords[131]=ellipseWords[3];
+        float[] numericCircle=packet(1,7f,18f,13f,22f,ellipseWords);
+        float[] savedCircle=Arrays.copyOf(numericCircle,numericCircle.length);
+        float[] three=OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                direct,block,numericCircle,512);
+        require(three[1]==5f&&OriginalSourceV6Merge.count(three,512)==5,
+                "All three partial streams must survive");
+        require(three[6]==1f&&three[2]==-20f&&three[3]==-10f&&
+                three[4]==100f&&three[5]==80f,
+                "Three-source union is partial with original bounds");
+        require(three[direct.length+block.length-7]==518f,
+                "CIRCLE warning color is not inherited DWG paint");
+        require(Arrays.equals(numericCircle,savedCircle)&&
+                Arrays.equals(direct,originalDirect)&&
+                Arrays.equals(block,originalBlock),
+                "Three-source merge mutated original source");
+        float[] tampered=Arrays.copyOf(numericCircle,numericCircle.length);
+        tampered[7]=519f;
+        try{
+            OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                    direct,block,tampered,512);
+            throw new AssertionError("Fake original CIRCLE ACI accepted");
+        }catch(IOException expected){}
+        tampered=Arrays.copyOf(numericCircle,numericCircle.length);
+        tampered[tampered.length-1]+=1f;
+        try{
+            OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                    direct,block,tampered,512);
+            throw new AssertionError("Open numeric CIRCLE accepted");
+        }catch(IOException expected){}
+        tampered=Arrays.copyOf(numericCircle,numericCircle.length);
+        tampered[9]=10000f;
+        try{
+            OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                    direct,block,tampered,512);
+            throw new AssertionError("Out-of-bounds CIRCLE accepted");
+        }catch(IOException expected){}
+        try{
+            OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                    direct,block,numericCircle,three.length-1);
+            throw new AssertionError("Over-budget 3-source packet accepted");
+        }catch(IOException expected){}
+        float[] noCircles=packet(0,0f,0f,0f,0f);
+        float[] noCircleResult=OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                direct,block,noCircles,512);
+        require(Arrays.equals(noCircleResult,merged),
+                "Empty CIRCLE stream must not invent geometry");
         System.out.println("PASS lossless partial v6 combined source UI stream"
             +" ACI RGB TEXT curve bounds fail atomic, no full DWG claim");
     }
