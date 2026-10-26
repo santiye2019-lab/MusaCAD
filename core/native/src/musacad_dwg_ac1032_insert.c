@@ -55,10 +55,14 @@ int musa_dwg_ac1032_insert_placement_at(
     uint32_t attribs=0u;
     if(!musa_dwg_ac1015_bits_read_bd(&b,&v.rotation)||
        !musa_dwg_ac1015_bits_read_be(&b,v.extrusion)||
-       !musa_dwg_ac1015_bits_read_u(&b,1u,&attribs)||
-       !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
         return 0;
     v.has_attribs=(uint8_t)attribs;
+    /* R2004+ INSERT stores owned-object count only when attributes exist.
+     * Never consume a BL from the next field for an attribute-free INSERT. */
+    if(v.has_attribs &&
+       !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
+        return 0;
     if(b.bit_pos!=b.bit_end||
        (!v.has_attribs&&v.owned_attrib_count!=0u)||
        v.owned_attrib_count>100000u||
