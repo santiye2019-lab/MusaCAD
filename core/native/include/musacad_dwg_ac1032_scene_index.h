@@ -48,6 +48,11 @@ int musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
 int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     size_t start_bit,size_t bit_count,uint8_t *out,size_t out_bytes);
+/* Original CRC/H authenticated OT49 base XYZ and owned count. These
+ * numeric fields are NOT proof of child H ownership, model space or paint. */
+int musa_dwg_ac1032_scene_index_read_block_header_base(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderBase *out);
 int musa_dwg_ac1032_scene_index_read_block_header_field_span(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderFieldSpan *out);
