@@ -39,6 +39,9 @@ int musa_dwg_ac1032_scene_index_entry(
  * Does not claim all indexed objects have decoded geometry.
  */
 /* CRC/H authenticated OT49 identity only; base-point remains undecoded. */
+int musa_dwg_ac1032_scene_index_read_block_header_field_span(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderFieldSpan *out);
 int musa_dwg_ac1032_scene_index_read_block_header_identity(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderIdentity *out);
