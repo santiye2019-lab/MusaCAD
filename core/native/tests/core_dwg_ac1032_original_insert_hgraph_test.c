@@ -19,6 +19,7 @@
 #include "musacad_dwg_ac1032_block_reverse_owner_source_audit.h"
 #include "musacad_dwg_ac1032_insert_reverse_owner_source_join.h"
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
+#include "musacad_dwg_ac1032_insert_line_style_risk_evidence.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1431,6 +1432,114 @@ static int genuine(const char *file){
                    !memcmp(&lines,&prior,sizeof(lines));
             }
         }
+    }
+    if(ok){
+        /* Authentic unchanged R2018 + independent DXF H1C8/H190/H756
+         * anchors: source style risks must preserve exact LINE H order
+         * and never manufacture visibility from raw 70/290/370 flags. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertLineStyleRiskEvidence a={0},again={0};
+            MusaDwgAc1032InsertLineSourceSegments lines={0};
+            MusaDwgAc1032InsertChildSourceJoin source={0};
+            MusaDwgAc1032BlockChildLayerStyleProvenance layer={0};
+            ok=musa_dwg_ac1032_insert_line_style_risk_evidence(
+                   scene,inserts[b],&a)&&
+               musa_dwg_ac1032_insert_line_style_risk_evidence(
+                   scene,inserts[b],&again)&&
+               !memcmp(&a,&again,sizeof(a))&&
+               musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&lines)&&
+               musa_dwg_ac1032_insert_child_source_join(
+                   scene,inserts[b],&source)&&
+               musa_dwg_ac1032_block_child_layer_style_provenance(
+                   scene,blocks[b],&layer)&&
+               a.insert_handle==inserts[b]&&
+               a.block_header_handle==blocks[b]&&
+               a.source_line_count==lines.verified_planar_line_count&&
+               a.original_source_style_join_verified&&
+               !a.final_visibility_and_paint_accepted;
+            uint32_t found=0u,direct=0u,hidden=0u,inherited=0u;
+            for(uint32_t i=0u;ok&&i<source.child_count;i++){
+                if(found>=a.source_line_count||
+                   source.rows[i].child_handle!=a.rows[found].child_handle)
+                    continue;
+                const MusaDwgAc1032InsertChildSourceRow *s=&source.rows[i];
+                const MusaDwgAc1032BlockChildLayerStyleRow *l=&layer.rows[i];
+                const MusaDwgAc1032InsertLineStyleRiskRow *r=&a.rows[found];
+                ok=r->child_handle==lines.rows[found].child_handle&&
+                   r->source_layer_handle==s->source_layer_handle&&
+                   r->source_aci==s->raw_color_index&&
+                   r->source_rgb24==s->raw_rgb&&
+                   r->source_style_class==s->source_style_class&&
+                   r->source_color_status==s->source_color_status&&
+                   r->original_layer_flags_verified==
+                     l->original_layer_flags_verified&&
+                   r->raw_layer_flags_70_290_370==l->source_layer_raw_flags&&
+                   r->original_layer_cmc_verified==
+                     l->original_layer_cmc_aci_verified&&
+                   r->original_layer_cmc_aci==l->original_layer_cmc_aci&&
+                   r->source_xref_dependent==l->source_layer_xref_dependent&&
+                   r->risk_mask==musa_dwg_ac1032_line_source_risk_mask(s,l)&&
+                   (r->risk_mask&MUSACAD_AC1032_LINE_RISK_LAYER_VISIBILITY)&&
+                   (r->risk_mask&MUSACAD_AC1032_LINE_RISK_SPACE_VIEWPORT)&&
+                   !r->final_visibility_and_paint_accepted;
+                direct+=r->direct_encoded_color_source_only;
+                hidden+=(r->risk_mask&MUSACAD_AC1032_LINE_RISK_HIDDEN)!=0u;
+                inherited+=(r->risk_mask&
+                    (MUSACAD_AC1032_LINE_RISK_INHERITED_COLOR|
+                     MUSACAD_AC1032_LINE_RISK_UNRESOLVED_COLOR))!=0u;
+                found++;
+            }
+            if(ok)ok=found==a.source_line_count&&
+                     direct==a.direct_encoded_color_source_count&&
+                     hidden==a.hidden_source_count&&
+                     inherited==a.inherited_or_unresolved_color_count;
+            if(ok){
+                MusaDwgAc1032InsertLineStyleRiskEvidence prior=a;
+                ok=!musa_dwg_ac1032_insert_line_style_risk_evidence(
+                       scene,blocks[b],&a)&&
+                   !memcmp(&a,&prior,sizeof(a))&&
+                   !musa_dwg_ac1032_insert_line_style_risk_evidence(
+                       scene,UINT64_MAX,&a)&&
+                   !memcmp(&a,&prior,sizeof(a))&&
+                   !musa_dwg_ac1032_insert_line_style_risk_evidence(
+                       scene,inserts[b],NULL)&&
+                   !memcmp(&a,&prior,sizeof(a));
+            }
+        }
+    }
+    if(ok){
+        /* Deterministic negative classification; these synthetic
+         * combinations do not replace the real-file gold above. */
+        MusaDwgAc1032InsertChildSourceRow s={0};
+        MusaDwgAc1032BlockChildLayerStyleRow l={0};
+        s.source_style_class=MUSACAD_AC1032_SOURCE_STYLE_EXPLICIT_ACI;
+        l.original_layer_flags_verified=1u;
+        uint32_t risk=musa_dwg_ac1032_line_source_risk_mask(&s,&l);
+        ok=risk==(MUSACAD_AC1032_LINE_RISK_LAYER_VISIBILITY|
+                   MUSACAD_AC1032_LINE_RISK_SPACE_VIEWPORT);
+        s.source_style_class=MUSACAD_AC1032_SOURCE_STYLE_BYBLOCK;
+        s.raw_invisibility=1u;
+        s.raw_has_transparency=1u;
+        s.raw_has_color_reference=1u;
+        l.original_layer_flags_verified=0u;
+        l.source_layer_xref_dependent=1u;
+        risk=musa_dwg_ac1032_line_source_risk_mask(&s,&l);
+        ok=ok&&(risk&MUSACAD_AC1032_LINE_RISK_HIDDEN)&&
+           (risk&MUSACAD_AC1032_LINE_RISK_INHERITED_COLOR)&&
+           (risk&MUSACAD_AC1032_LINE_RISK_TRANSPARENCY)&&
+           (risk&MUSACAD_AC1032_LINE_RISK_COLOR_REFERENCE)&&
+           (risk&MUSACAD_AC1032_LINE_RISK_XREF)&&
+           (risk&MUSACAD_AC1032_LINE_RISK_LAYER_FLAGS_UNKNOWN);
+        s.source_style_class=MUSACAD_AC1032_SOURCE_STYLE_EXPLICIT_RGB;
+        s.raw_has_rgb=1u;
+        s.raw_rgb=UINT32_C(0xff010203);
+        risk=musa_dwg_ac1032_line_source_risk_mask(&s,&l);
+        ok=ok&&(risk&MUSACAD_AC1032_LINE_RISK_RGB_PROFILE);
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
