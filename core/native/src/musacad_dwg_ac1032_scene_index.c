@@ -5,6 +5,7 @@
 #include "musacad_dwg_ac1032_object_payload.h"
 #include "musacad_dwg_ac1032_object_streams.h"
 #include <stdint.h>
+#include <stdio.h> /* TEMPORARY OT7 diagnostic; remove before merge */
 #include <stdlib.h>
 #include <string.h>
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
@@ -178,7 +179,12 @@ static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        common.common_decoded&&
        common.prefix.indexed_handle==h&&
        common.prefix.raw_object_type==type;
-    if(!ok){free(raw);return 0;}
+    if(!ok){
+       if(type==7u){MusaDwgAc1032EntityPrefix early={0};
+         int a=musa_dwg_ac1032_entity_prefix_bytes(raw,needed,&layout,type,&early);
+         fprintf(stderr,"OT7 DIAG fetch common failed: early=%d mode=%u colorbit=%zu data=%llu handlebits=%llu\\n",a,(unsigned)early.entity_mode,early.next_color_bit,(unsigned long long)layout.data_stream_bits,(unsigned long long)layout.handle_stream_bits);
+       }
+       free(raw);return 0;}
     const Payload valid={raw,needed,layout,common};
     *out=valid;return 1;
 }
@@ -193,12 +199,13 @@ int musa_dwg_ac1032_scene_index_read_insert_placement(
     MusaDwgAc1032InsertPlacement *out){
     if(!h||!check_output(s,out,sizeof(*out)))return 0;
     Payload p={0};
-    if(!fetch(s,h,7u,&p))return 0;
+    if(!fetch(s,h,7u,&p)){fprintf(stderr,"OT7 DIAG fetch failed H=%llx\\n",(unsigned long long)h);return 0;}
     MusaDwgAc1032InsertPlacement value={0};
     int ok=musa_dwg_ac1032_insert_placement_at(
         p.raw,p.bytes,&p.layout,p.common.geometry_start_bit,&value)&&
         value.indexed_handle==h&&value.original_record_crc_verified&&
         value.numeric_fields_decoded&&!value.block_graph_and_display_accepted;
+    if(!ok)fprintf(stderr,"OT7 DIAG numeric failed geom=%zu data=%llu total=%llu\\n",p.common.geometry_start_bit,(unsigned long long)p.layout.data_stream_bits,(unsigned long long)p.layout.total_payload_bits);
     free(p.raw);
     if(ok)*out=value;
     return ok;
