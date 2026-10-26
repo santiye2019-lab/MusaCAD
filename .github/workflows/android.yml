@@ -1243,6 +1243,26 @@ jobs:
             /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
           nm -D /tmp/musacad-r2018-all-insert-jni-host.so \
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readAllInsertLinesNative'
+          # Actual independent original DWG -> two JNI readers -> exact
+          # Android Java source v6 merge on the SAME original bytes.
+          cc -shared -o /tmp/musacad-r2018-combined-jni-host.so \
+            /tmp/musacad-r2018-android-jni.o \
+            /tmp/musacad-r2018-all-insert-jni.o \
+            /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
+          mkdir -p /tmp/musacad-r2018-combined-jni-java
+          javac -encoding UTF-8 -d /tmp/musacad-r2018-combined-jni-java \
+            app/src/main/java/com/musa/cad/OriginalSourceV6Merge.java \
+            tests/FirstPartyAc1032CombinedJNIHostTest.java
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          timeout 120s java -Xmx256m \
+            -cp /tmp/musacad-r2018-combined-jni-java \
+            com.musa.cad.FirstPartyDwgPreview \
+            /tmp/musacad-r2018-combined-jni-host.so \
+            "$original" \
+            third_party/libredwg/test/test-data/2018/LiveSection1.dwg \
+            third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           mkdir -p /tmp/musacad-r2018-all-insert-jni-java
           javac -encoding UTF-8 -d /tmp/musacad-r2018-all-insert-jni-java \
             tests/FirstPartyAc1032AllInsertJNIHostTest.java
