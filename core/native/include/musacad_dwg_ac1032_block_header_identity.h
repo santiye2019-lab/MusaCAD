@@ -188,4 +188,73 @@ static inline int musa_dwg_ac1032_block_header_ot49_copy_field_bits(
     return musa_dwg_ac1032_ot49_copy_msb_bits(
         raw,n,start_bit,bit_count,out,out_bytes);
 }
+/* Original R2018 BLOCK_HEADER (OT49) base coordinates, decoded from
+ * published ODA on-disk field order: 64 B, xrefindex+1 BS, Xdep B,
+ * anonymous/hasattrs/isxref/overlaid B, loaded B, owned BL, base 3BD.
+ * A separate string stream holds names; it must not be consumed as DATA.
+ * Source H/CRC is mandatory. This is not child expansion or paint. */
+typedef struct MusaDwgAc1032BlockHeaderBase {
+    uint64_t indexed_handle;
+    size_t base_end_bit;
+    double base_xyz[3];
+    uint32_t owned_object_count;
+    uint16_t xref_index_plus_one;
+    uint8_t flag64,xref_dependent,anonymous,has_attdefs;
+    uint8_t is_xref,xref_overlaid,xref_loaded;
+    uint8_t original_record_crc_verified;
+    uint8_t base_point_decoded;
+    uint8_t block_children_and_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032BlockHeaderBase;
+static inline int musa_dwg_ac1032_block_header_ot49_base_at(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032BlockHeaderBase *out){
+    if(!raw||!layout||!out||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderFieldSpan span={0};
+    if(!musa_dwg_ac1032_block_header_ot49_field_span(
+           raw,n,layout,&span))return 0;
+    MusaDwgAc1015Bits bits={0};
+    uint32_t f64=0u,dep=0u,anon=0u,atts=0u,isxref=0u;
+    uint32_t overlay=0u,loaded=0u,owned=0u;
+    uint16_t xrefindex=0u;
+    double xyz[3]={0.0,0.0,0.0};
+    if(!musa_dwg_ac1015_bits_init(
+           &bits,raw,n,span.first_bit,span.end_bit)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&f64)||
+       !musa_dwg_ac1015_bits_read_bs(&bits,&xrefindex)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&dep)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&anon)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&atts)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&isxref)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&overlay)||
+       !musa_dwg_ac1015_bits_read_u(&bits,1u,&loaded)||
+       !musa_dwg_ac1015_bits_read_bl(&bits,&owned)||
+       owned>1000000u||
+       !musa_dwg_ac1015_bits_read_bd(&bits,&xyz[0])||
+       !musa_dwg_ac1015_bits_read_bd(&bits,&xyz[1])||
+       !musa_dwg_ac1015_bits_read_bd(&bits,&xyz[2])||
+       bits.bit_pos>=span.end_bit)return 0;
+    MusaDwgAc1032BlockHeaderBase value={0};
+    value.indexed_handle=span.indexed_handle;
+    value.base_end_bit=bits.bit_pos;
+    value.base_xyz[0]=xyz[0];
+    value.base_xyz[1]=xyz[1];
+    value.base_xyz[2]=xyz[2];
+    value.owned_object_count=owned;
+    value.xref_index_plus_one=xrefindex;
+    value.flag64=(uint8_t)f64;
+    value.xref_dependent=(uint8_t)dep;
+    value.anonymous=(uint8_t)anon;
+    value.has_attdefs=(uint8_t)atts;
+    value.is_xref=(uint8_t)isxref;
+    value.xref_overlaid=(uint8_t)overlay;
+    value.xref_loaded=(uint8_t)loaded;
+    value.original_record_crc_verified=1u;
+    value.base_point_decoded=1u;
+    *out=value;return 1;
+}
+
 #endif
