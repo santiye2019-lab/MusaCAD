@@ -21,6 +21,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_indexed_audit_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_indexed_audit_negative_smoke
                  COMMAND musacad_core_ac1032_indexed_audit_test)
+        # Genuine R2018 OT7 INSERT common source only; geometry remains blocked.
+        add_executable(musacad_core_ac1032_original_insert_common_test
+                tests/core_dwg_ac1032_original_insert_common_test.c)
+        target_link_libraries(musacad_core_ac1032_original_insert_common_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_insert_common_smoke
+                 COMMAND musacad_core_ac1032_original_insert_common_test)
         # New genuine R2018 BLOCK/INSERT/ATTRIB/ATTDEF source type oracle;
         # only original CRC/H raw types, no block transforms or glyphs.
         add_executable(musacad_core_ac1032_original_block_family_oracle_test

@@ -39,6 +39,12 @@ int musa_dwg_ac1032_scene_index_entry(
 int musa_dwg_ac1032_scene_index_object_type(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     uint16_t *out_type);
+/* CRC/H authenticated original R2018 OT7 INSERT common entity prefix, ENC
+ * color and raw invisibility only. Numeric placement, BLOCK_HEADER H graph,
+ * owner/model-space, viewport and final display remain UNVERIFIED. */
+int musa_dwg_ac1032_scene_index_read_insert_common(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032EntityCommon *out);
 int musa_dwg_ac1032_scene_index_read_line(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeLine *out);

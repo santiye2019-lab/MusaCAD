@@ -102,6 +102,22 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS genuine R2018 source OT7 INSERT OT2 ATTRIB OT4 BLOCK; numeric geometry still missing"
 
+      - name: P0 original R2018 OT7 INSERT H190 H1C8 H756 authenticated common only
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbBlockReference' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_insert_common_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-insert-common
+          timeout 120s /tmp/musacad-r2018-original-insert-common "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT7 INSERT common; numeric DATA and BLOCK graph unverified"
+
       - name: P0 original R2018 Text DWG exact 108-byte physical footer and genuine MTEXT H1C0
         run: |
           set -euo pipefail
