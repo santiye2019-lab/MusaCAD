@@ -6,6 +6,14 @@
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include <stdint.h>
 #include <stddef.h>
+/* Reject overlapping buffers: the parser must never overwrite its own
+ * authenticated input, metadata or output while decoding. */
+static inline int musa_dwg_ac1032_ot49_overlap(
+    const void *a,size_t an,const void *b,size_t bn){
+    if(!an||!bn)return 0;
+    const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
+    return x<=y?y-x<an:x-y<bn;
+}
 /* Strict original OT49 object identity, preceding the as-yet undecoded
  * BLOCK_HEADER base-point. A verified OT49 is NOT a decoded block base. */
 typedef struct MusaDwgAc1032BlockHeaderIdentity {
@@ -23,7 +31,12 @@ static inline int musa_dwg_ac1032_block_header_ot49_identity(
     const MusaDwgAc1032ObjectStreams *layout,
     MusaDwgAc1032BlockHeaderIdentity *out){
     if(!raw||!layout||!out||!n||n>64u*1024u*1024u||
-       n>SIZE_MAX/8u||!layout->original_record_crc_verified||
+       n>SIZE_MAX/8u||
+       musa_dwg_ac1032_ot49_overlap(raw,n,layout,sizeof(*layout))||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out))||
+       !layout->original_record_crc_verified||
        !layout->indexed_handle||layout->raw_object_type!=49u||
        layout->object_type_field_bits!=10u||
        layout->total_payload_bits!=(uint64_t)n*8u||
