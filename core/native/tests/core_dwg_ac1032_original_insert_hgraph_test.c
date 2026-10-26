@@ -24,6 +24,7 @@
 #include "musacad_dwg_ac1032_insert_line_v6_diagnostic.h"
 #include "musacad_dwg_ac1032_insert_circle_source_axes.h"
 #include "musacad_dwg_ac1032_insert_circle_source_envelope.h"
+#include "musacad_dwg_ac1032_all_insert_circle_envelope.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1883,6 +1884,73 @@ static int genuine(const char *file){
                !musa_dwg_ac1032_insert_circle_source_envelope(
                    scene,UINT64_C(0x1c8),NULL)&&
                !memcmp(&envelope,&prior,sizeof(envelope));
+        }
+    }
+    if(ok){
+        /* Genuine original example_2018.dwg: enumerate every indexed
+         * INSERT instance, not just one BLOCK_HEADER definition.
+         * Independent example_2018.dxf H1C8 -> H1BB CIRCLE at
+         * (8482.030567364651,-1381.341268226861), radius
+         * 130.0490046078758 MUST be included in the numeric union.
+         * Owner/layer/color/visibility are still unresolved. */
+        MusaDwgAc1032AllInsertCircleEnvelope all={0},again={0};
+        const double cx=8482.030567364651;
+        const double cy=-1381.341268226861;
+        const double radius=130.0490046078758;
+        ok=musa_dwg_ac1032_all_insert_circle_envelope(scene,&all)&&
+           musa_dwg_ac1032_all_insert_circle_envelope(scene,&again)&&
+           !memcmp(&all,&again,sizeof(all))&&
+           all.total_indexed_records==
+               musa_dwg_ac1032_scene_index_count(scene)&&
+           all.candidate_insert_records>=3u&&
+           all.verified_insert_records>=3u&&
+           all.candidate_insert_records==
+               all.verified_insert_records+all.unsupported_insert_records&&
+           all.circle_candidate_records>=1u&&
+           all.verified_circle_records>=1u&&
+           all.circle_candidate_records==
+               all.verified_circle_records+all.unverified_circle_records&&
+           all.h4_h5_unresolved_circle_records>=1u&&
+           all.has_numeric_bounds&&all.source_only_partial&&
+           !all.final_visibility_and_paint_accepted&&
+           all.combined_min_xy[0]<=cx-radius+1e-6&&
+           all.combined_max_xy[0]>=cx+radius-1e-6&&
+           all.combined_min_xy[1]<=cy-radius+1e-6&&
+           all.combined_max_xy[1]>=cy+radius-1e-6;
+        size_t candidates=0u,verified=0u,unsupported=0u;
+        size_t circles=0u,admitted=0u,unverified=0u,unresolved=0u;
+        for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
+            MusaDwgAc1032HandleEntry e={0};
+            uint16_t type=0u;
+            ok=musa_dwg_ac1032_scene_index_entry(scene,i,&e)&&
+               musa_dwg_ac1032_scene_index_object_type(
+                   scene,e.handle,&type);
+            if(!ok||type!=7u)continue;
+            candidates++;
+            MusaDwgAc1032InsertCircleEnvelope one={0};
+            if(!musa_dwg_ac1032_insert_circle_source_envelope(
+                   scene,e.handle,&one)){
+                unsupported++;continue;
+            }
+            verified++;
+            circles+=one.circle_candidates;
+            admitted+=one.verified_circles;
+            unverified+=one.unverified_circles;
+            unresolved+=one.h4_h5_unresolved_circles;
+        }
+        if(ok)ok=candidates==all.candidate_insert_records&&
+            verified==all.verified_insert_records&&
+            unsupported==all.unsupported_insert_records&&
+            circles==all.circle_candidate_records&&
+            admitted==all.verified_circle_records&&
+            unverified==all.unverified_circle_records&&
+            unresolved==all.h4_h5_unresolved_circle_records;
+        if(ok){
+            const MusaDwgAc1032AllInsertCircleEnvelope previous=all;
+            ok=!musa_dwg_ac1032_all_insert_circle_envelope(NULL,&all)&&
+               !memcmp(&all,&previous,sizeof(all))&&
+               !musa_dwg_ac1032_all_insert_circle_envelope(scene,NULL)&&
+               !memcmp(&all,&previous,sizeof(all));
         }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
