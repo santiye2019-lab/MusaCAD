@@ -40,6 +40,11 @@ int musa_dwg_ac1032_scene_index_entry(
 int musa_dwg_ac1032_scene_index_object_type(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     uint16_t *out_type);
+/* Original R2018 OT7 INSERT numeric OCS insertion/scale/rotation only.
+ * Does not authenticate BLOCK_HEADER H, ATTRIB graph or actual display. */
+int musa_dwg_ac1032_scene_index_read_insert_placement(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertPlacement *out);
 int musa_dwg_ac1032_scene_index_read_line(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeLine *out);
