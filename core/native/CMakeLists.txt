@@ -61,6 +61,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_ot1_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_ot1_color_smoke
                  COMMAND musacad_core_ac1032_original_ot1_color_test)
+        # Genuine OT1 TEXT H8E WCS anchors plus synthetic arbitrary-axis
+        # orientation. Font/justification and display remain unresolved.
+        add_executable(musacad_core_ac1032_original_ot1_wcs_test
+                tests/core_dwg_ac1032_original_ot1_wcs_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_wcs_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_wcs_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_wcs_test)
         # Genuine OT1 TEXT R2018 numeric OCS placement (not MTEXT).
         add_executable(musacad_core_ac1032_original_ot1_placement_test
                 tests/core_dwg_ac1032_original_ot1_placement_test.c)
