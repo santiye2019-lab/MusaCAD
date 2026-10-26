@@ -216,24 +216,18 @@ static int genuine(const char *file){
             /* Independent example_2018.dxf BLOCK/ENDBLK ownership oracle:
              * H1B8 CIRKLO_PUNKTOJ has 13 children, H17D bloko has 5;
              * both BLOCK group 10/20/30 origins are (0,0,0).
-             * These expectations do not come from our binary decoder. */
+             * These expectations do not come from our binary decoder.\n             * Do NOT equate the unverified DWG raw has-ATTDEF bit with\n             * the DXF BLOCK 70 attribute-presence flag. */
             MusaDwgAc1032BlockHeaderBase base={0};
             const uint32_t expected_owned=
                 e->block==UINT64_C(0x1b8)?13u:5u;
             const int decoded=musa_dwg_ac1032_scene_index_read_block_header_base(
                    scene,e->block,&base);
-            fprintf(stderr,"OT49 H%llx decoded=%d owned=%u xyz=(%.8g,%.8g,%.8g) att=%u dep=%u xref=%u\n",
-                    (unsigned long long)e->block,decoded,base.owned_object_count,
-                    base.base_xyz[0],base.base_xyz[1],base.base_xyz[2],
-                    (unsigned)base.has_attdefs,(unsigned)base.xref_dependent,
-                    (unsigned)base.is_xref);
             ok=decoded&&
                base.indexed_handle==e->block&&
                base.original_record_crc_verified&&
                base.base_point_decoded&&
                !base.block_children_and_display_accepted&&
                base.owned_object_count==expected_owned&&
-               base.has_attdefs==(uint8_t)(e->block==UINT64_C(0x17d))&&
                !base.is_xref&&!base.xref_overlaid&&
                !base.xref_dependent&&
                fabs(base.base_xyz[0])<1e-12&&
