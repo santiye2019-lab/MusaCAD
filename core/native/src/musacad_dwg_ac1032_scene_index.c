@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -923,8 +924,30 @@ int musa_dwg_ac1032_scene_index_block_header_child_prefix(
        again.object_section_offset==off&&
        musa_dwg_ac1032_block_header_ot49_child_prefix_at(
            raw,needed,&layout,&value);
+    if(!ok&&(h==UINT64_C(0x1b8)||h==UINT64_C(0x17d))){
+        /* TEMPORARY source-level diagnostic; remove before merge. */
+        fprintf(stderr,"OT49 H prefix diagnostic h=%llx payload=%zu Hstart=%llu Hbits=%llu\\n",
+            (unsigned long long)h,needed,
+            (unsigned long long)layout.data_stream_bits,
+            (unsigned long long)layout.handle_stream_bits);
+        MusaDwgAc1015Bits dbg={0};
+        if(musa_dwg_ac1015_bits_init(&dbg,raw,needed,
+             (size_t)layout.data_stream_bits,(size_t)layout.total_payload_bits)){
+            for(unsigned j=0;j<48u&&dbg.bit_pos+8u<=dbg.bit_end;j++){
+                uint32_t v=0;
+                if(!musa_dwg_ac1015_bits_read_u(&dbg,8u,&v))break;
+                fprintf(stderr,"%02x%s",v,j%16u==15u?"\\n":" ");
+            }
+            fprintf(stderr,"\\n");
+        }
+    }
     free(raw);
     if(!ok)return 0;
+    if(h==UINT64_C(0x1b8)||h==UINT64_C(0x17d))
+        fprintf(stderr,"OT49 H decoded h=%llx control=%llx begin=%llx end=%llx count=%u\\n",
+            (unsigned long long)h,(unsigned long long)value.block_control_handle,
+            (unsigned long long)value.block_begin_handle,
+            (unsigned long long)value.endblk_handle,value.child_count);
     /* Resolve every proposed edge against the original independently
      * CRC-verified H map. This is not reverse-owner authentication. */
     uint16_t kind=0u;
