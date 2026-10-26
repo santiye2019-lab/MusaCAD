@@ -220,8 +220,13 @@ static int genuine(const char *file){
             MusaDwgAc1032BlockHeaderBase base={0};
             const uint32_t expected_owned=
                 e->block==UINT64_C(0x1b8)?13u:5u;
-            ok=musa_dwg_ac1032_scene_index_read_block_header_base(
-                   scene,e->block,&base)&&
+            const int decoded=musa_dwg_ac1032_scene_index_read_block_header_base(
+                   scene,e->block,&base);
+            fprintf(stderr,"OT49 source H%llx decoded=%d owned=%u base=(%.9g,%.9g,%.9g) att=%u xref=%u\\n",
+                (unsigned long long)e->block,decoded,base.owned_object_count,
+                base.base_xyz[0],base.base_xyz[1],base.base_xyz[2],
+                (unsigned)base.has_attdefs,(unsigned)base.is_xref);
+            ok=decoded&&
                base.indexed_handle==e->block&&
                base.original_record_crc_verified&&
                base.base_point_decoded&&
