@@ -184,6 +184,23 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS genuine separate OT1 TEXT H8E type preflight; Unicode and geometry NOT decoded"
 
+      - name: P0 original R2018 OT1 TEXT entity common ENC and fail-atomic oracle
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/sample_2018.dwg
+          oracle=third_party/libredwg/test/test-data/sample_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbText' "$oracle"
+          grep -F 'Jen teksto simpla, cxu ne?' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_ot1_common_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-ot1-common
+          timeout 120s /tmp/musacad-r2018-original-ot1-common "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT1 TEXT common source; Unicode and geometry not decoded"
+
       - name: P0 original R2018 MTEXT H1C0 genuine insertion axis and text height
         run: |
           set -euo pipefail
