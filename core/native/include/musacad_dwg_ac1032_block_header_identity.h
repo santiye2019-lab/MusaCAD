@@ -298,7 +298,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
        layout->data_stream_bits>=layout->total_payload_bits)return 0;
     MusaDwgAc1015Bits bits={0};
     MusaDwgAc1015HandleRef ref={0};
-    uint32_t null_pointer=1u;
+    uint32_t null_pointer=0u;
     MusaDwgAc1032BlockHeaderChildPrefix value={0};
     value.indexed_handle=base.indexed_handle;
     value.child_count=base.owned_object_count;
@@ -309,10 +309,11 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
            &bits,base.indexed_handle,&ref)||
        !ref.target||ref.target==base.indexed_handle)return 0;
     value.block_control_handle=ref.target;
-    /* The original no-xdictionary local profile has a null H slot.
-     * A zero code/length is not a valid ordinary handle reference. */
+    /* Original R2018 H stream has an explicit null H pointer 0x50:
+     * code=5, count=0. It is NOT an 0x00 byte; do not shift later
+     * BLOCK/child/ENDBLK references by treating it as empty padding. */
     if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&null_pointer)||
-       null_pointer!=0u||
+       null_pointer!=0x50u||
        !musa_dwg_ac1015_read_handle_ref(
            &bits,base.indexed_handle,&ref)||
        !ref.target||ref.target==base.indexed_handle)return 0;
