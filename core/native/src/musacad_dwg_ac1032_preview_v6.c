@@ -16,12 +16,12 @@
  * Never claim a valid plain string proves font or viewport equivalence. */
 int musa_dwg_ac1032_mtext_v6_plain_source_preflight(
     const char *utf8,size_t bytes){
-    if(!utf8||bytes==0u||bytes>2047u||utf8[bytes]!='\\0')return 0;
+    if(!utf8||bytes==0u||bytes>2047u||utf8[bytes]!='\0')return 0;
     size_t i=0u;
     while(i<bytes){
         const unsigned char c=(unsigned char)utf8[i];
         if(c<0x80u){
-            if(c<0x20u||c==0x7fu||c=='\\\\'||c=='{'||c=='}')
+            if(c<0x20u||c==0x7fu||c=='\\'||c=='{'||c=='}')
                 return 0;
             i++;continue;
         }
