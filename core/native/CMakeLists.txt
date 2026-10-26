@@ -54,6 +54,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_mtext_v6_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_mtext_v6_color_smoke
                  COMMAND musacad_core_ac1032_mtext_v6_color_test)
+        # Strict source H5 OT1 TEXT layer/style graph, original fixture CI.
+        add_executable(musacad_core_ac1032_original_ot1_graph_test
+                tests/core_dwg_ac1032_original_ot1_graph_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_graph_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_graph_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_graph_test)
         # Original R2018 OT1 TEXT Unicode separate from OT44 MTEXT.
         add_executable(musacad_core_ac1032_original_ot1_unicode_test
                 tests/core_dwg_ac1032_original_ot1_unicode_test.c)
