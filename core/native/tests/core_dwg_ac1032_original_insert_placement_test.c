@@ -36,7 +36,7 @@ static int genuine(const char *file){
         MusaDwgAc1032InsertPlacement probe={0};
         const int parsed=musa_dwg_ac1032_scene_index_read_insert_placement(
             scene,diagnostic_handles[i],&probe);
-        fprintf(stderr,"MC1032 INSERT original H%llx accepted=%d attrib=%u count=%u\\n",
+        fprintf(stderr,"MC1032 INSERT original H%llx accepted=%d attrib=%u count=%u\n",
             (unsigned long long)diagnostic_handles[i],parsed,
             (unsigned)probe.has_attribs,(unsigned)probe.owned_attrib_count);
     }
