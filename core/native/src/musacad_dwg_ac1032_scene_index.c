@@ -495,9 +495,10 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
     }
     return 1;
 }
-/* Authentic R2018 INSERT handle tails end with one-bits (not zero
- * padding). Do not generalize this narrow verified profile to other OT. */
-static int insert_one_padding(MusaDwgAc1015Bits *bits){
+/* Only explicitly authenticated R2018 source profiles may use
+ * one-bit tail padding (INSERT and the original OT18 H1BB). Never
+ * substitute this for generic zero-padding or unknown handle tails. */
+static int cached_graph_one_padding(MusaDwgAc1015Bits *bits){
     if(!bits||bits->bit_pos>bits->bit_end||
        bits->bit_end-bits->bit_pos>7u)return 0;
     while(bits->bit_pos<bits->bit_end){
@@ -551,7 +552,7 @@ int musa_dwg_ac1032_scene_index_insert_source_graph(
                cached_graph_ref(&bits,h,3u,&v.seqend_handle)&&
                v.attrib_handle!=h&&v.seqend_handle!=h&&
                v.attrib_handle!=v.seqend_handle;
-        if(ok)ok=insert_one_padding(&bits);
+        if(ok)ok=cached_graph_one_padding(&bits);
     }
     free(p.raw);
     if(!ok)return 0;
@@ -1524,7 +1525,12 @@ int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
        first.code==12u&&second.code==5u&&
        first.target==profile.first_raw_target&&
        second.target==profile.second_raw_target&&
-       cached_graph_zero_padding(&bits);
+       /* Original H1BB carries precisely three ONE tail bits (111).
+        * The earlier zero-padding assumption rejected a valid CRC/H
+        * owner/layer edge; do not accept any other tail profile. */
+       bits.bit_end>=bits.bit_pos&&
+       bits.bit_end-bits.bit_pos==3u&&
+       cached_graph_one_padding(&bits);
     free(p.raw);
     if(!strict)return 0;
     uint16_t owner_type=0u,layer_type=0u;
