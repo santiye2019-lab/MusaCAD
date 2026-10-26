@@ -135,7 +135,7 @@ static inline int musa_dwg_ac1032_block_child_layer_style_provenance(
                    scene,r->layer_handle,&cmc)&&
                cmc.original_record_crc_verified&&
                cmc.indexed_handle==r->layer_handle&&
-               cmc.aci_index>=1u&&cmc.aci_index<=255u){
+               cmc.aci_index!=0u){
                 r->original_layer_cmc_aci_verified=1u;
                 r->original_layer_cmc_aci=cmc.aci_index;
                 v.layer_cmc_source_count++;
