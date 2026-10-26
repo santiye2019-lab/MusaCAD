@@ -669,6 +669,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_1 ok=%d\n",ok);
     if(ok){
         MusaDwgAc1032InsertBinding unchanged_binding;
         memset(&unchanged_binding,0x5a,sizeof(unchanged_binding));
@@ -688,6 +689,7 @@ static int genuine(const char *file){
     }
     /* An OT49 parser must reject an unauthenticated payload before
      * attempting any BLOCK_HEADER base-point interpretation. */
+    fprintf(stderr,"HGRAPH_GATE_2 ok=%d\n",ok);
     if(ok){
         const uint8_t fake[2]={0,0};
         MusaDwgAc1032ObjectStreams layout={0};
@@ -767,6 +769,7 @@ static int genuine(const char *file){
                     fake,sizeof(fake),&layout,&identity)&&
                   !memcmp(&identity,&saved_identity,sizeof(identity));
     }
+    fprintf(stderr,"HGRAPH_GATE_3 ok=%d\n",ok);
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
         memset(&unchanged,0x5a,sizeof(unchanged));
@@ -789,6 +792,7 @@ static int genuine(const char *file){
              scene,UINT64_C(0x191),&unchanged)&&
            !memcmp(&unchanged,&saved,sizeof(unchanged));
     }
+    fprintf(stderr,"HGRAPH_GATE_4 ok=%d\n",ok);
     if(ok){
         /* Unmodified R2018 example_2018.dwg, with independent DXF
          * BLOCK_RECORD child counts: H1B8=13 and H17D=5.
@@ -850,6 +854,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_5 ok=%d\n",ok);
     if(ok){
         /* Deterministic standalone color semantics: never turn hidden,
          * BYLAYER/BYBLOCK or transparency into a direct drawable color. */
@@ -877,6 +882,7 @@ static int genuine(const char *file){
         if(ok)ok=musa_dwg_ac1032_block_child_direct_color_class(&c)==
                  MUSACAD_AC1032_CHILD_COLOR_UNRESOLVED;
     }
+    fprintf(stderr,"HGRAPH_GATE_6 ok=%d\n",ok);
     if(ok){
         /* Authentic R2018 source OT49 child H -> original OT51 LAYER
          * numeric flags + anchored default-profile CMC. This is NOT a
@@ -950,6 +956,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_7 ok=%d\n",ok);
     if(ok){
         /* One original inherited status is NOT enough to choose color.
          * Index 0 is BYBLOCK; 256 is BYLAYER, never direct ACI7.
@@ -984,6 +991,7 @@ static int genuine(const char *file){
         if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
                      MUSACAD_AC1032_SOURCE_STYLE_UNRESOLVED;
     }
+    fprintf(stderr,"HGRAPH_GATE_8 ok=%d\n",ok);
     if(ok){
         /* Independent original example_2018.dwg / companion DXF:
          * OT49 H1B8 has 13 children, H17D has 5. Their separately
@@ -1024,6 +1032,7 @@ static int genuine(const char *file){
                !memcmp(&pair,&before,sizeof(pair));
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_9 ok=%d\n",ok);
     if(ok){
         /* Independent original example_2018.dwg + companion DXF oracle:
          * INSERT H1C8->H1B8 (13), H190/H756->H17D (5).
@@ -1109,6 +1118,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_10 ok=%d\n",ok);
     if(ok){
         /* Independent original example_2018.dwg/DXF: two distinct INSERTs
          * H190 and H756 target the SAME OT49 H17D with five children.
@@ -1149,6 +1159,7 @@ static int genuine(const char *file){
                !memcmp(&pair,&before,sizeof(pair));
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_11 ok=%d\n",ok);
     if(ok){
         /* Independently sourced example_2018.dxf counts for the original
          * untouched R2018 DWG OT49 block candidate child H inventory.
@@ -1223,6 +1234,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_12 ok=%d\n",ok);
     if(ok){
         /* Exact geometry entity-mode/H4/H5 reader must fail atomic for
          * valid non-geometry OT49 and unrelated source H values. */
@@ -1239,6 +1251,7 @@ static int genuine(const char *file){
                scene,UINT64_MAX,&edge)&&
            !memcmp(&before,&edge,sizeof(edge));
     }
+    fprintf(stderr,"HGRAPH_GATE_13 ok=%d\n",ok);
     if(ok){
         /* Independent original R2018 example_2018.dwg + DXF oracle:
          * INSERT H1C8 -> OT49 H1B8 (13 children); H190/H756 ->
@@ -1311,6 +1324,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_14 ok=%d\n",ok);
     if(ok){
         /* The independent R2018 DXF oracle has two INSERTs H190/H756
          * of the SAME H17D source block. Reverse H4 source ownership
@@ -1350,6 +1364,7 @@ static int genuine(const char *file){
                !memcmp(&pair,&before,sizeof(pair));
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_15 ok=%d\n",ok);
     if(ok){
         /* Real unchanged R2018/DXF handles: 13/5/5 source block
          * children. Only actual reverse-H4-owned, 2D-mapped LINE H
@@ -1438,6 +1453,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_16 ok=%d\n",ok);
     if(ok){
         /* Authentic unchanged R2018 + independent DXF H1C8/H190/H756
          * anchors: source style risks must preserve exact LINE H order
@@ -1517,6 +1533,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_17 ok=%d\n",ok);
     if(ok){
         /* Deterministic negative classification; these synthetic
          * combinations do not replace the real-file gold above. */
@@ -1546,6 +1563,7 @@ static int genuine(const char *file){
         risk=musa_dwg_ac1032_line_source_risk_mask(&s,&l);
         ok=ok&&(risk&MUSACAD_AC1032_LINE_RISK_RGB_PROFILE);
     }
+    fprintf(stderr,"HGRAPH_GATE_18 ok=%d\n",ok);
     if(ok){
         /* Genuine R2018 original/DXF handles, no invented origin when
          * there are zero accepted source LINEs. Float projection must
@@ -1621,6 +1639,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_19 ok=%d\n",ok);
     if(ok){
         /* New source-only v6 geometry BRIDGE, not a user-visible
          * display guarantee. Genuine unchanged R2018 INSERT gold:
@@ -1724,6 +1743,7 @@ static int genuine(const char *file){
             }
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_20 ok=%d\n",ok);
     if(ok){
         /* Independent example_2018.dxf BLOCK CIRKLO_PUNKTOJ:
          * H1B8 owns exactly one CIRCLE H1BB, local center (0,0,0),
@@ -1817,6 +1837,7 @@ static int genuine(const char *file){
                !memcmp(&circle,&prior,sizeof(circle));
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_21 ok=%d\n",ok);
     if(ok){
         /* Independent original example_2018.dxf oracle: INSERT H1C8
          * CIRCLE H1BB, center (8482.030567364651,-1381.341268226861),
@@ -1888,6 +1909,7 @@ static int genuine(const char *file){
                !memcmp(&envelope,&prior,sizeof(envelope));
         }
     }
+    fprintf(stderr,"HGRAPH_GATE_22 ok=%d\n",ok);
     if(ok){
         /* Genuine original example_2018.dwg: enumerate every indexed
          * INSERT instance, not just one BLOCK_HEADER definition.
