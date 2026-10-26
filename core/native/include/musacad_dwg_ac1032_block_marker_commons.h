@@ -37,11 +37,14 @@ static inline int musa_dwg_ac1032_block_marker_commons(
        typed.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
     const uint64_t begin=typed.prefix.block_begin_handle;
     const uint64_t end=typed.prefix.endblk_handle;
-    if(!begin||!end||begin==end||
+    const uint64_t control=typed.prefix.block_control_handle;
+    if(!control||!begin||!end||begin==end||
+       control==begin||control==end||control==block_header_handle||
        begin==block_header_handle||end==block_header_handle)return 0;
     for(uint32_t i=0u;i<typed.prefix.child_count;i++){
         const uint64_t h=typed.prefix.child_handles[i];
-        if(!h||h==begin||h==end||h==block_header_handle)return 0;
+        if(!h||h==control||h==begin||h==end||
+           h==block_header_handle)return 0;
         for(uint32_t j=0u;j<i;j++)
             if(h==typed.prefix.child_handles[j])return 0;
     }
