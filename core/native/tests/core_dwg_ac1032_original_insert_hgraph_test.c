@@ -9,6 +9,7 @@
 #include "musacad_dwg_ac1032_insert_original_base_map.h"
 #include "musacad_dwg_ac1032_block_marker_commons.h"
 #include "musacad_dwg_ac1032_block_child_geometry_audit.h"
+#include "musacad_dwg_ac1032_insert_child_coordinate_probe.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -394,6 +395,50 @@ static int genuine(const char *file){
                    !musa_dwg_ac1032_block_child_geometry_audit(
                         scene,UINT64_MAX,&audit)&&
                    !memcmp(&before,&audit,sizeof(audit));
+            }
+        }
+        if(ok){
+            /* Original INSERT H1C8/H190/H756 and DXF-independent
+             * BLOCK_RECORD H1B8/H17D. Coordinates are candidate numeric
+             * probes only, not reverse-owned child paint or a scene. */
+            MusaDwgAc1032InsertChildCoordinateProbe probe={0};
+            const uint32_t expected_count=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_insert_child_coordinate_probe(
+                   scene,e->h,&probe)&&
+               probe.insert_handle==e->h&&
+               probe.block_header_handle==e->block&&
+               probe.child_count==expected_count&&
+               probe.original_source_graph_verified&&
+               !probe.reverse_child_owner_verified&&
+               !probe.display_accepted&&
+               probe.mapped_candidates+probe.unmapped_candidates==
+                   expected_count;
+            for(uint32_t j=0u;ok&&j<probe.child_count;j++){
+                uint16_t type=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                       scene,probe.child_handles[j],&type)&&
+                   type==probe.child_types[j]&&
+                   (!probe.line_end_mapped[j]||
+                     (probe.anchor_mapped[j]&&type==19u));
+                if(ok&&probe.anchor_mapped[j])
+                    for(unsigned k=0u;k<3u;k++)
+                        if(!isfinite(probe.world_anchor[j][k]))ok=0;
+            }
+            if(ok){
+                MusaDwgAc1032InsertChildCoordinateProbe repeat={0};
+                ok=musa_dwg_ac1032_insert_child_coordinate_probe(
+                       scene,e->h,&repeat)&&
+                   !memcmp(&repeat,&probe,sizeof(probe));
+            }
+            if(ok){
+                const MusaDwgAc1032InsertChildCoordinateProbe before=probe;
+                ok=!musa_dwg_ac1032_insert_child_coordinate_probe(
+                        scene,e->block,&probe)&&
+                   !memcmp(&before,&probe,sizeof(probe))&&
+                   !musa_dwg_ac1032_insert_child_coordinate_probe(
+                        scene,UINT64_MAX,&probe)&&
+                   !memcmp(&before,&probe,sizeof(probe));
             }
         }
         if(ok){
