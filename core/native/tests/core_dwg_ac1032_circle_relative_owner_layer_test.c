@@ -88,6 +88,21 @@ static int genuine(const char *dwg,const char *dxf){
             children_ok?children.prefix.canonical_h_roles_verified:0u,
             children_ok?children.all_child_record_types_crc_verified:0u);
     }
+    {
+        MusaDwgAc1032CircleHTailProfile trace={0};
+        const int got=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+            scene,UINT64_C(0x1bb),&trace);
+        fprintf(stderr,"DIAG Htail got=%d status=%u refs=%u/%u targets=%llu/%llu "
+            "bits=%u residual=%llu byte4=0x%02x last3=0x%02x\\n",
+            got,(unsigned)trace.profile_status,
+            (unsigned)trace.first_ref_code,(unsigned)trace.second_ref_code,
+            (unsigned long long)trace.first_raw_target,
+            (unsigned long long)trace.second_raw_target,
+            (unsigned)trace.prefix_bit_count,
+            (unsigned long long)trace.residual_bits_after_two_refs,
+            (unsigned)trace.prefix_msb[4],
+            (unsigned)(trace.prefix_msb[4]&0xe0u));
+    }
     ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
            scene,UINT64_C(0x1bb),&raw)&&
        raw.profile_status==MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4&&
