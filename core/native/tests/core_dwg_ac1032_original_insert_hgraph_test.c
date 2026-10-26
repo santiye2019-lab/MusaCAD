@@ -8,6 +8,7 @@
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include "musacad_dwg_ac1032_insert_original_base_map.h"
 #include "musacad_dwg_ac1032_block_marker_commons.h"
+#include "musacad_dwg_ac1032_block_child_layer_evidence.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -351,6 +352,63 @@ static int genuine(const char *file){
                    !musa_dwg_ac1032_block_marker_commons(
                        scene,before.endblk_handle,&markers)&&
                    !memcmp(&before,&markers,sizeof(markers));
+            }
+        }
+        if(ok){
+            /* Original R2018 local BLOCK candidates: never treat a raw
+             * H/OT match as ownership or fabricate layer 0 / ACI 7.
+             * Independently read an actual OT51 + TU Unicode layer for
+             * only the exact child profiles understood by this reader. */
+            MusaDwgAc1032BlockChildLayerInventory inv={0};
+            const uint32_t expected_children=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,e->block,&inv)&&
+               inv.block_header_handle==e->block&&
+               inv.child_count==expected_children&&
+               inv.marker_and_child_source_crc_verified&&
+               !inv.reverse_child_owner_links_verified&&
+               !inv.layer_visibility_color_and_paint_accepted&&
+               inv.verified_layer_count+inv.unresolved_profile_count+
+               inv.unsupported_type_count==expected_children;
+            if(ok){
+                MusaDwgAc1032BlockHeaderTypedChildren typed={0};
+                ok=musa_dwg_ac1032_scene_index_block_header_typed_children(
+                       scene,e->block,&typed);
+                for(uint32_t j=0u;ok&&j<inv.child_count;j++){
+                    const MusaDwgAc1032BlockChildLayerRow *row=&inv.children[j];
+                    ok=row->child_handle==typed.prefix.child_handles[j]&&
+                       row->raw_object_type==typed.child_object_types[j];
+                    if(!ok)break;
+                    if(row->layer_evidence_status==
+                       MUSACAD_AC1032_BLOCK_LAYER_VERIFIED){
+                        uint16_t t=0u;
+                        ok=row->layer_handle&&
+                           musa_dwg_ac1032_scene_index_object_type(
+                              scene,row->layer_handle,&t)&&t==51u;
+                    }else{
+                        ok=!row->layer_handle&&
+                           (row->layer_evidence_status==
+                              MUSACAD_AC1032_BLOCK_LAYER_PROFILE_UNRESOLVED||
+                            row->layer_evidence_status==
+                              MUSACAD_AC1032_BLOCK_LAYER_TYPE_UNSUPPORTED);
+                    }
+                }
+            }
+            if(ok){
+                MusaDwgAc1032BlockChildLayerInventory repeated={0};
+                ok=musa_dwg_ac1032_block_child_layer_evidence(
+                       scene,e->block,&repeated)&&
+                   !memcmp(&inv,&repeated,sizeof(inv));
+            }
+            if(ok){
+                const MusaDwgAc1032BlockChildLayerInventory before=inv;
+                ok=!musa_dwg_ac1032_block_child_layer_evidence(
+                       scene,e->h,&inv)&&
+                   !memcmp(&before,&inv,sizeof(inv))&&
+                   !musa_dwg_ac1032_block_child_layer_evidence(
+                       scene,UINT64_MAX,&inv)&&
+                   !memcmp(&before,&inv,sizeof(inv));
             }
         }
         if(ok){
