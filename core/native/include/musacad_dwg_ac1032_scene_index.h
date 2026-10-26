@@ -289,6 +289,25 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     const MusaDwgAc1032SceneIndex *index,
     uint64_t entity_handle,MusaDwgAc1032EntityLayerRef *out);
 
+/* Narrow original R2018 geometry ENTITY H4 owner -> OT49 BLOCK_HEADER
+ * and H5 layer -> OT51 LAYER proof. Unlike the no-owner entity-layer
+ * reader, this admits ONLY entity_mode=0 and exactly those TWO source H
+ * references plus <=7 zero padding bits. Optional handles, other modes
+ * and unknown layouts fail closed. Every target is independently indexed
+ * and CRC/type checked. A verified edge is a single-child source claim,
+ * not complete BLOCK ownership, space/viewport or visible geometry. */
+typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
+    uint64_t child_handle,owner_block_header_handle,layer_handle;
+    uint16_t raw_entity_type;
+    uint8_t original_child_record_crc_verified;
+    uint8_t original_owner_and_layer_records_crc_verified;
+    uint8_t exact_h4_owner_and_h5_layer_source_verified;
+    uint8_t visible_scene_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032EntityBlockOwnerLayerSource;
+int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t child_handle,
+    MusaDwgAc1032EntityBlockOwnerLayerSource *out);
+
 /* Single ORIGINAL indexed DWG graph walk from one geometry entity
  * to its source-CRC-verified LAYER table record and bounded Unicode TU
  * name. Built from separate first-party readers, never by guessing a

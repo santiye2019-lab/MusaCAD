@@ -1302,6 +1302,65 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     *out=evidence;
     return 1;
 }
+/* Strict ORIGINAL R2018 reverse child-owner H graph for a LIMITED
+ * built-in geometry profile: H4 -> CRC-indexed OT49, H5 -> OT51.
+ * No guessed H-order, optional-tail fallback or unverified owner claim.
+ * An H4 edge to a valid OT49 is individual source evidence only; never
+ * authorize complete expansion, visibility, color or final paint. */
+int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032EntityBlockOwnerLayerSource *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    uint16_t type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
+       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&
+        type!=35u&&type!=77u))return 0;
+    Payload p={0};
+    if(!fetch(s,h,type,&p))return 0;
+    const int admissible=p.common.common_decoded&&
+        p.common.prefix.prefix_decoded&&
+        p.common.prefix.indexed_handle==h&&
+        p.common.prefix.raw_object_type==type&&
+        p.common.prefix.entity_mode==0u&&
+        p.common.prefix.reactor_count==0u&&
+        p.common.prefix.xdictionary_missing==1u&&
+        !p.common.has_color_reference&&
+        p.common.linetype_flags==0u&&
+        p.common.plotstyle_flags==0u&&
+        p.common.material_flags==0u&&
+        p.common.visualstyle_flags==0u&&
+        p.layout.data_stream_bits<=SIZE_MAX&&
+        p.layout.total_payload_bits<=SIZE_MAX;
+    uint64_t owner=0u,layer=0u;
+    int ok=0;
+    if(admissible){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+               (size_t)p.layout.data_stream_bits,
+               (size_t)p.layout.total_payload_bits)&&
+           cached_graph_ref(&bits,h,4u,&owner)&&
+           cached_graph_ref(&bits,h,5u,&layer)&&
+           owner!=h&&layer!=h&&owner!=layer&&
+           cached_graph_zero_padding(&bits);
+    }
+    free(p.raw);
+    uint16_t owner_type=0u,layer_type=0u;
+    if(!ok||
+       !musa_dwg_ac1032_scene_index_object_type(
+          s,owner,&owner_type)||owner_type!=49u||
+       !musa_dwg_ac1032_scene_index_object_type(
+          s,layer,&layer_type)||layer_type!=51u)return 0;
+    MusaDwgAc1032EntityBlockOwnerLayerSource result={0};
+    result.child_handle=h;
+    result.owner_block_header_handle=owner;
+    result.layer_handle=layer;
+    result.raw_entity_type=type;
+    result.original_child_record_crc_verified=1u;
+    result.original_owner_and_layer_records_crc_verified=1u;
+    result.exact_h4_owner_and_h5_layer_source_verified=1u;
+    *out=result;
+    return 1;
+}
 /* No default '0' or palette guesses: the actual source entity H=5
  * points at an original CRC-verified OT51, whose independently parsed TU
  * name is returned with its original bit offset and Unicode evidence. */
