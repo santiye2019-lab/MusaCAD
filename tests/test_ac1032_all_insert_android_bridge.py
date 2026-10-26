@@ -59,7 +59,7 @@ class MultiInsertVisibleDiagnostic(unittest.TestCase):
         self.assertIn("BYLAYER/BYBLOCK",source)
         self.assertIn("YALNIZCA BLOK LINE KAYNAK TESTİ",source)
         self.assertIn("AtomicInteger activeReaders=new AtomicInteger(1)",source)
-        self.assertEqual(source.count("activeReaders.incrementAndGet()"),3)
+        self.assertEqual(source.count("activeReaders.incrementAndGet()"),4)
         self.assertEqual(source.count("activeReaders.decrementAndGet()"),5)
         self.assertIn("if(temporaryCopy&&dismissed.get()&&activeReaders.get()==0)",source)
         for forbidden in ("NativeCadEngine.open(","exportDxf(","setNativeDrawing(",
