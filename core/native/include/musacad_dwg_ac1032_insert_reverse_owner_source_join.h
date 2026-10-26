@@ -114,4 +114,60 @@ static inline int musa_dwg_ac1032_insert_reverse_owner_source_join(
     *out=v;
     return 1;
 }
+
+/* Original H4 owner evidence is a BLOCK-SOURCE property: two INSERTs
+ * referring to the same block must agree on each child edge regardless
+ * of instance placement. This is NOT a transform/visibility proof. */
+typedef struct MusaDwgAc1032InsertReverseOwnerPair {
+    uint64_t first_insert,second_insert,shared_block_header;
+    uint32_t matched_child_sources,matched_reverse_edges;
+    uint32_t foreign_reverse_edges,unresolved_reverse_edges;
+    uint8_t original_reverse_owner_provenance_instance_invariant;
+    uint8_t visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertReverseOwnerPair;
+static inline int musa_dwg_ac1032_insert_reverse_owner_source_pair(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t first,uint64_t second,
+    MusaDwgAc1032InsertReverseOwnerPair *out){
+    if(!scene||!out||!first||!second||first==second)return 0;
+    MusaDwgAc1032InsertReverseOwnerJoin a={0},b={0};
+    if(!musa_dwg_ac1032_insert_reverse_owner_source_join(
+           scene,first,&a)||
+       !musa_dwg_ac1032_insert_reverse_owner_source_join(
+           scene,second,&b)||
+       !a.original_insert_and_reverse_source_join_verified||
+       !b.original_insert_and_reverse_source_join_verified||
+       a.complete_block_ownership_verified||
+       b.complete_block_ownership_verified||
+       a.space_visibility_and_paint_accepted||
+       b.space_visibility_and_paint_accepted||
+       !a.block_header_handle||
+       a.block_header_handle!=b.block_header_handle||
+       a.child_count!=b.child_count||
+       a.matched_owner_count!=b.matched_owner_count||
+       a.foreign_owner_count!=b.foreign_owner_count||
+       a.unresolved_owner_count!=b.unresolved_owner_count)return 0;
+    for(uint32_t i=0u;i<a.child_count;i++){
+        const MusaDwgAc1032InsertReverseOwnerRow *x=&a.rows[i];
+        const MusaDwgAc1032InsertReverseOwnerRow *y=&b.rows[i];
+        if(!x->child_handle||x->child_handle!=y->child_handle||
+           x->raw_object_type!=y->raw_object_type||
+           x->source_layer_handle!=y->source_layer_handle||
+           x->verified_owner_handle!=y->verified_owner_handle||
+           x->source_style_class!=y->source_style_class||
+           x->reverse_owner_status!=y->reverse_owner_status||
+           x->original_reverse_source_edge_verified!=
+             y->original_reverse_source_edge_verified||
+           x->final_paint_accepted||y->final_paint_accepted)return 0;
+    }
+    MusaDwgAc1032InsertReverseOwnerPair v={0};
+    v.first_insert=first;
+    v.second_insert=second;
+    v.shared_block_header=a.block_header_handle;
+    v.matched_child_sources=a.child_count;
+    v.matched_reverse_edges=a.matched_owner_count;
+    v.foreign_reverse_edges=a.foreign_owner_count;
+    v.unresolved_reverse_edges=a.unresolved_owner_count;
+    v.original_reverse_owner_provenance_instance_invariant=1u;
+    *out=v;return 1;
+}
 #endif
