@@ -7,6 +7,14 @@
 #include <stdio.h>
 #include <stdint.h>
 #define LIMIT (64u*1024u*1024u)
+/* Diagnostics are emitted only on rejection; no source bytes are modified. */
+static int reject_field(const char *field,const MusaDwgAc1015Bits *b,
+                        uint64_t handle){
+    fprintf(stderr,"MC1032 INSERT reject H%llx field=%s bit=%zu end=%zu remaining=%zu\n",
+            (unsigned long long)handle,field,b->bit_pos,b->bit_end,
+            b->bit_pos<=b->bit_end?b->bit_end-b->bit_pos:0u);
+    return 0;
+}
 static int overlaps(const void *a,size_t n,const void *b,size_t m){
     if(!n||!m)return 0;
     uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
@@ -35,42 +43,47 @@ int musa_dwg_ac1032_insert_placement_at(
     MusaDwgAc1032InsertPlacement v={0};
     v.indexed_handle=l->indexed_handle;
     for(unsigned k=0u;k<3u;k++)
-        if(!musa_dwg_ac1015_bits_read_bd(&b,&v.insertion[k]))return 0;
+        if(!musa_dwg_ac1015_bits_read_bd(&b,&v.insertion[k]))
+            return reject_field("insertion",&b,v.indexed_handle);
     uint32_t flags=0u;
-    if(!musa_dwg_ac1015_bits_read_u(&b,2u,&flags))return 0;
+    if(!musa_dwg_ac1015_bits_read_u(&b,2u,&flags))
+        return reject_field("scale_flags",&b,v.indexed_handle);
     v.scale_data_flags=(uint8_t)flags;
     v.scale[0]=v.scale[1]=v.scale[2]=1.0;
     if(flags==0u){
         if(!musa_dwg_ac1015_bits_read_rd(&b,&v.scale[0])||
            !musa_dwg_ac1015_bits_read_dd(&b,v.scale[0],&v.scale[1])||
            !musa_dwg_ac1015_bits_read_dd(&b,v.scale[0],&v.scale[2]))
-            return 0;
+            return reject_field("scale_xyz",&b,v.indexed_handle);
     }else if(flags==1u){
         if(!musa_dwg_ac1015_bits_read_dd(&b,1.0,&v.scale[1])||
            !musa_dwg_ac1015_bits_read_dd(&b,1.0,&v.scale[2]))
-            return 0;
+            return reject_field("scale_yz",&b,v.indexed_handle);
     }else if(flags==2u){
-        if(!musa_dwg_ac1015_bits_read_rd(&b,&v.scale[0]))return 0;
+        if(!musa_dwg_ac1015_bits_read_rd(&b,&v.scale[0]))
+            return reject_field("scale_x",&b,v.indexed_handle);
         v.scale[1]=v.scale[2]=v.scale[0];
-    }else if(flags!=3u)return 0;
+    }else if(flags!=3u)return reject_field("scale_flags_invalid",&b,v.indexed_handle);
     uint32_t attribs=0u;
-    if(!musa_dwg_ac1015_bits_read_bd(&b,&v.rotation)||
-       !musa_dwg_ac1015_bits_read_be(&b,v.extrusion)||
-       !musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
-        return 0;
+    if(!musa_dwg_ac1015_bits_read_bd(&b,&v.rotation))
+        return reject_field("rotation",&b,v.indexed_handle);
+    if(!musa_dwg_ac1015_bits_read_be(&b,v.extrusion))
+        return reject_field("extrusion",&b,v.indexed_handle);
+    if(!musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
+        return reject_field("has_attribs",&b,v.indexed_handle);
     v.has_attribs=(uint8_t)attribs;
     /* R2004+ INSERT stores owned-object count only when attributes exist.
      * Never consume a BL from the next field for an attribute-free INSERT. */
     if(v.has_attribs &&
        !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
-        return 0;
+        return reject_field("owned_attrib_count",&b,v.indexed_handle);
     if(b.bit_pos!=b.bit_end){
-        fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\\n",
+        fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\n",
             (unsigned long long)v.indexed_handle,geom,(size_t)l->data_stream_bits,
             b.bit_pos,b.bit_end-b.bit_pos,(unsigned)v.scale_data_flags,
             (unsigned)v.has_attribs,(unsigned)v.owned_attrib_count,
             v.insertion[0],v.insertion[1],v.insertion[2]);
-        return 0;
+        return reject_field("trailing_data",&b,v.indexed_handle);
     }
     if((!v.has_attribs&&v.owned_attrib_count!=0u)||
        v.owned_attrib_count>100000u||
@@ -78,9 +91,10 @@ int musa_dwg_ac1032_insert_placement_at(
     for(unsigned k=0u;k<3u;k++)
         if(!isfinite(v.insertion[k])||!isfinite(v.scale[k])||
            v.scale[k]==0.0||!isfinite(v.extrusion[k]))
-            return 0;
+            return reject_field("coordinate_validation",&b,v.indexed_handle);
     if(hypot(hypot(v.extrusion[0],v.extrusion[1]),
-             v.extrusion[2])<0.5)return 0;
+             v.extrusion[2])<0.5)
+        return reject_field("extrusion_norm",&b,v.indexed_handle);
     v.original_record_crc_verified=1u;
     v.numeric_fields_decoded=1u;
     *out=v;return 1;
