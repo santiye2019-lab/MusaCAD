@@ -48,7 +48,23 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertIn("DENEYSEL",source)
         self.assertIn("sceneCanvas.setScene(preview.scene)",source)
         self.assertIn("dismissed.get()",source)
-        self.assertIn("if(temporaryCopy)source.delete()",source)
+        # A manually requested INSERT read may outlive the initial JNI scan.
+        # The SAF-owned copy must survive until dialog dismissal AND the
+        # last worker exits. The old unconditional worker-finally deletion
+        # would race the INSERT reader and truncate its input.
+        self.assertIn("final AtomicInteger activeReaders=new AtomicInteger(1)",source)
+        self.assertIn("if(temporaryCopy&&dismissed.get()&&activeReaders.get()==0)",source)
+        self.assertIn("activeReaders.incrementAndGet()",source)
+        self.assertEqual(source.count("activeReaders.decrementAndGet()"),2)
+        self.assertIn("dialog.setOnDismissListener(ignored->{",source)
+        self.assertIn("cleanup.run()",source)
+        self.assertNotIn("if(temporaryCopy)source.delete()",source)
+        self.assertIn("FirstPartyDwgPreview.readInsertLineDiagnostic(",source)
+        self.assertIn("Long.parseLong(text,16)",source)
+        self.assertNotIn("Long.parseUnsignedLong(",source)
+        self.assertIn("inspectBlock.setEnabled(false)",source)
+        self.assertIn("result.omittedSourceLines",source)
+        self.assertIn("YALNIZCA BLOK LINE KAYNAK TESTİ",source)
         self.assertIn("show(owner,original,false)",source)
         self.assertIn("ScaleGestureDetector",source)
         self.assertIn("scene.draw(canvas,contentToScreen)",source)
