@@ -192,14 +192,14 @@ static inline int musa_dwg_ac1032_block_header_ot49_copy_field_bits(
  * published ODA on-disk field order: 64 B, xrefindex+1 BS, Xdep B,
  * anonymous/hasattrs/isxref/overlaid B, local non-XREF owned BL,\n * base 3BD. XREF/dependent profiles are explicitly unsupported.
  * A separate string stream holds names; it must not be consumed as DATA.
- * Source H/CRC is mandatory. This is not child expansion or paint. */
+ * Source H/CRC is mandatory. Raw has-ATTDEF bit is not yet a verified\n * semantic attribute inventory. This is not child expansion or paint. */
 typedef struct MusaDwgAc1032BlockHeaderBase {
     uint64_t indexed_handle;
     size_t base_end_bit;
     double base_xyz[3];
     uint32_t owned_object_count;
     uint16_t xref_index_plus_one;
-    uint8_t flag64,xref_dependent,anonymous,has_attdefs;
+    uint8_t flag64,xref_dependent,anonymous,raw_has_attdefs_bit;
     uint8_t is_xref,xref_overlaid,xref_loaded;
     uint8_t original_record_crc_verified;
     uint8_t base_point_decoded;
@@ -250,7 +250,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_base_at(
     value.flag64=(uint8_t)f64;
     value.xref_dependent=(uint8_t)dep;
     value.anonymous=(uint8_t)anon;
-    value.has_attdefs=(uint8_t)atts;
+    value.raw_has_attdefs_bit=(uint8_t)atts;
     value.is_xref=(uint8_t)isxref;
     value.xref_overlaid=(uint8_t)overlay;
     value.xref_loaded=(uint8_t)loaded;
