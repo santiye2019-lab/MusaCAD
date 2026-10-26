@@ -96,6 +96,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_insert_circle_layer_cmc_chain_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_insert_circle_layer_cmc_chain_abi_smoke
                  COMMAND musacad_core_ac1032_insert_circle_layer_cmc_chain_test)
+        # Original R2018 INSERT CIRCLE ENC BYLAYER + LAYER CMC source-only
+        # crosscheck; never promotes unknown viewport/layer state to paint.
+        add_executable(musacad_core_ac1032_insert_circle_bylayer_crosscheck_test
+                tests/core_dwg_ac1032_insert_circle_bylayer_crosscheck_test.c)
+        target_link_libraries(musacad_core_ac1032_insert_circle_bylayer_crosscheck_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_insert_circle_bylayer_crosscheck_smoke
+                 COMMAND musacad_core_ac1032_insert_circle_bylayer_crosscheck_test)
         # Original R2018 OT18 H-tail forensic profile; no owner/layer guessing.
         add_executable(musacad_core_ac1032_circle_h_tail_profile_test
                 tests/core_dwg_ac1032_circle_h_tail_profile_test.c)
