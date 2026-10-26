@@ -87,7 +87,7 @@ int musa_dwg_ac1032_insert_placement_at(
                 (unsigned long long)l->handle_stream_bits);
         for(size_t byte=0u;byte<n&&byte<64u;byte++)
             fprintf(stderr,"%02x",(unsigned)raw[byte]);
-        fputc('\\n',stderr);
+        fputc('\n',stderr);
         fprintf(stderr,"MC1032 INSERT trailing DATA H%llx bits=",
                 (unsigned long long)v.indexed_handle);
         for(size_t bit=b.bit_pos;bit<b.bit_end;bit++){
