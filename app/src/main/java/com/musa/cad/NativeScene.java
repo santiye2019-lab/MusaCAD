@@ -138,6 +138,29 @@ public final class NativeScene {
         return parsed;
     }
 
+    /** Three independent read-only source diagnostics in one INCOMPLETE
+     * scene. The CIRCLE ACI6 strokes are conspicuous NON-SOURCE color;
+     * this is never an editable DWG or proof of layer/owner visibility. */
+    static NativeScene joinPartialOriginalSourceScenesWithDiagnosticCircles(
+            NativeScene direct,NativeScene lines,NativeScene circles,
+            int maxWords)throws IOException {
+        if(direct==null||direct.streamVersion!=6||!direct.truncated||
+           (lines!=null&&(lines.streamVersion!=6||!lines.truncated))||
+           (circles!=null&&(circles.streamVersion!=6||!circles.truncated)))
+            throw new IOException("Uc kaynakli DWG tani sahnesi kismi degil");
+        float[] empty={6f,0f,0f,0f,0f,0f,1f};
+        float[] merged=OriginalSourceV6Merge.joinWithDiagnosticCircles(
+                direct.raw,lines==null?empty:lines.raw,
+                circles==null?empty:circles.raw,maxWords);
+        NativeScene parsed=fromRaw(merged);
+        long expected=(long)direct.primitiveCount+
+                (lines==null?0:lines.primitiveCount)+
+                (circles==null?0:circles.primitiveCount);
+        if(!parsed.truncated||parsed.primitiveCount!=expected)
+            throw new IOException("Uc kaynakli DWG tani sayaci uyusmuyor");
+        return parsed;
+    }
+
     private final int streamVersion;
     private NativeScene(float[] raw,int[] offsets,float[] bounds,String[] textValues,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
         this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.textValues=textValues;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);
