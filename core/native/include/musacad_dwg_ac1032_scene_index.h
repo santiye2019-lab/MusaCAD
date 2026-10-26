@@ -56,6 +56,20 @@ int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
 int musa_dwg_ac1032_scene_index_block_header_child_prefix(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderChildPrefix *out);
+/* Typed original child H inventory, for future entity-specific decoders.
+ * Each OT is read from its own CRC-authenticated indexed DWG record.
+ * This does NOT prove reverse ownership, model-space visibility, XREF
+ * overrides, nested INSERT transforms, or permission to paint. */
+typedef struct MusaDwgAc1032BlockHeaderTypedChildren {
+    MusaDwgAc1032BlockHeaderChildPrefix prefix;
+    uint16_t child_object_types[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint8_t all_child_record_types_crc_verified;
+    uint8_t reverse_owner_links_verified; /* ALWAYS ZERO */
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032BlockHeaderTypedChildren;
+int musa_dwg_ac1032_scene_index_block_header_typed_children(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032BlockHeaderTypedChildren *out);
 int musa_dwg_ac1032_scene_index_read_block_header_base(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderBase *out);
