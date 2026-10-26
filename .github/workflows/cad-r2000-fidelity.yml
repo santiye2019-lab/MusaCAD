@@ -118,6 +118,22 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS original OT7 INSERT common; numeric DATA and BLOCK graph unverified"
 
+      - name: P0 original R2018 OT3 ATTDEF H18F authenticated entity common
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbAttributeDefinition' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_attdef_common_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-attdef-common
+          timeout 120s /tmp/musacad-r2018-original-attdef-common "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT3 ATTDEF CRC/H/ENC; tag, owner and rendering unverified"
+
       - name: P0 original R2018 OT2 ATTRIB H192 H757 authenticated entity common
         run: |
           set -euo pipefail
