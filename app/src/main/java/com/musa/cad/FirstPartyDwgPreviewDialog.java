@@ -9,10 +9,13 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.EditText;
+import android.widget.Button;
 import android.widget.TextView;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * EXPLICIT read-only diagnostic for authentic AC1032/R2018 2D geometry.
@@ -37,6 +40,14 @@ public final class FirstPartyDwgPreviewDialog {
             return;
         }
         final AtomicBoolean dismissed=new AtomicBoolean(false);
+        /* Initial worker plus any user-requested INSERT worker keep a
+         * temporary SAF copy alive until every read completes AND the
+         * dialog is dismissed. Never remove caller-owned DWG files. */
+        final AtomicInteger activeReaders=new AtomicInteger(1);
+        final Runnable cleanup=()->{
+            if(temporaryCopy&&dismissed.get()&&activeReaders.get()==0)
+                original.delete();
+        };
         final LinearLayout layout=new LinearLayout(owner);
         layout.setOrientation(LinearLayout.VERTICAL);
         final int pad=Math.round(12f*owner.getResources().getDisplayMetrics().density);
@@ -49,14 +60,32 @@ public final class FirstPartyDwgPreviewDialog {
         layout.addView(warning,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        final TextView blockHelp=new TextView(owner);
+        blockHelp.setText("BLOK LINE TANI TESTİ • Sadece belirtilen özgün " +
+            "INSERT H bloğunun doğrulanmış çizgilerini ayrı gösterir. " +
+            "Katman görünürlüğü, tam blok açılımı ve proje bütünlüğü doğrulanmış değildir.");
+        layout.addView(blockHelp);
+        final EditText insertHandleInput=new EditText(owner);
+        insertHandleInput.setSingleLine(true);
+        insertHandleInput.setHint("INSERT H (onaltılık, örn. 1C8)");
+        insertHandleInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        layout.addView(insertHandleInput);
+        final Button inspectBlock=new Button(owner);
+        inspectBlock.setText("Seçilen blok çizgilerini test et");
+        inspectBlock.setEnabled(false);
+        layout.addView(inspectBlock);
         final TextView status=new TextView(owner);
         status.setPadding(0,pad/2,0,pad/2);
+        status.setMaxLines(5);
+        status.setVerticalScrollBarEnabled(true);
+        status.setMovementMethod(new android.text.method.ScrollingMovementMethod());
         status.setText("Gerçek AC1032 kaynağı doğrulanıyor…");
         layout.addView(status,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
 
         final SceneCanvas sceneCanvas=new SceneCanvas(owner);
-        int height=Math.round(380f*owner.getResources().getDisplayMetrics().density);
+        int height=Math.round(Math.min(280f*owner.getResources().getDisplayMetrics().density,
+                0.38f*owner.getResources().getDisplayMetrics().heightPixels));
         layout.addView(sceneCanvas,new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,height));
 
@@ -71,9 +100,64 @@ public final class FirstPartyDwgPreviewDialog {
             .setView(layout)
             .setPositiveButton("KAPAT",null)
             .create();
-        dialog.setOnDismissListener(ignored->dismissed.set(true));
+        dialog.setOnDismissListener(ignored->{
+            dismissed.set(true);
+            cleanup.run();
+        });
         dialog.show();
         final File source=original;
+        inspectBlock.setOnClickListener(view->{
+            if(dismissed.get())return;
+            String text=insertHandleInput.getText().toString().trim();
+            if(text.startsWith("H")||text.startsWith("h"))text=text.substring(1);
+            if(text.startsWith("0x")||text.startsWith("0X"))text=text.substring(2);
+            final long handle;
+            try{
+                handle=Long.parseUnsignedLong(text,16);
+                if(handle<=0L)throw new NumberFormatException();
+            }catch(NumberFormatException ex){
+                status.setText("Geçerli bir onaltılık INSERT H yazılmalı.");
+                return;
+            }
+            inspectBlock.setEnabled(false);
+            activeReaders.incrementAndGet();
+            new Thread(()->{
+                try{
+                    FirstPartyDwgPreview.InsertLineDiagnostic result=
+                        FirstPartyDwgPreview.readInsertLineDiagnostic(
+                            source,handle,MAX_FLOAT_WORDS);
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())
+                            return;
+                        sceneCanvas.setScene(result.scene);
+                        status.setText("YALNIZCA BLOK LINE KAYNAK TESTİ • H="+
+                            Long.toHexString(result.insertHandle).toUpperCase(
+                                java.util.Locale.ROOT)+
+                            "\nDoğrulanmış kaynak LINE: "+result.originalSourceLines+
+                            " • Deneysel gösterilen: "+result.admittedSourceLines+
+                            " • elenen: "+result.omittedSourceLines+
+                            "\nBu sahne kasıtlı olarak eksiktir; nihai katman"+
+                            " görünürlüğü ve BYLAYER/BYBLOCK renkleri çözülmedi.");
+                    });
+                }catch(IOException | RuntimeException ex){
+                    final String message=ex.getMessage()==null?
+                        "Kaynak INSERT H desteklenmiyor":ex.getMessage();
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())
+                            return;
+                        status.setText("INSERT LINE kaynağı gösterilemedi: "+
+                            message+" • Orijinal DWG değiştirilmedi.");
+                    });
+                }finally{
+                    activeReaders.decrementAndGet();
+                    cleanup.run();
+                    owner.runOnUiThread(()->{
+                        if(!dismissed.get()&&!owner.isFinishing()&&
+                           !owner.isDestroyed())inspectBlock.setEnabled(true);
+                    });
+                }
+            },"MusaCAD-OriginalINSERT-SourceOnly").start();
+        });
         Thread task=new Thread(()->{
             try{
                 /* JNI checks original AC1032, all cached handle/CRC records,
@@ -84,6 +168,7 @@ public final class FirstPartyDwgPreviewDialog {
                 owner.runOnUiThread(()->{
                     if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())return;
                     sceneCanvas.setScene(preview.scene);
+                    inspectBlock.setEnabled(true);
                     FirstPartyDwgPreview.Readiness a=preview.readiness;
                     status.setText("Gerçek DWG • "+preview.scene.primitiveCount+
                         " çizilen öğe • "+
@@ -134,13 +219,14 @@ public final class FirstPartyDwgPreviewDialog {
                     "Bilinmeyen DWG doğrulama hatası":ex.getMessage();
                 owner.runOnUiThread(()->{
                     if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())return;
+                    inspectBlock.setEnabled(true);
                     status.setText("Bağımsız DWG önizleme açılamadı: "+message+
                                    " • Ana çizim ve kaynak dosya değiştirilmedi.");
                 });
             }finally{
-                /* Only the temporary cache copy is owned by this diagnostic.
-                 * Never delete a caller-owned project/original DWG. */
-                if(temporaryCopy)source.delete();
+                /* The copy stays until dialog dismiss + all diagnostics end. */
+                activeReaders.decrementAndGet();
+                cleanup.run();
             }
         },"MusaCAD-OriginalDWG-2D-Diagnostic");
         task.setDaemon(true);
