@@ -258,8 +258,12 @@ static int genuine(const char *file){
             }
             if(ok){
                 const double before[3]={mapped[0],mapped[1],mapped[2]};
+                const double bad_local[3]={NAN,0.0,0.0};
                 ok=!musa_dwg_ac1032_insert_map_original_block_base(
                        scene,e->block,local,mapped)&&
+                   !memcmp(mapped,before,sizeof(mapped))&&
+                   !musa_dwg_ac1032_insert_map_original_block_base(
+                       scene,e->h,bad_local,mapped)&&
                    !memcmp(mapped,before,sizeof(mapped));
             }
         }
