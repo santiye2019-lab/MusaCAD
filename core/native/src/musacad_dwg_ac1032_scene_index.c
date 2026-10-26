@@ -622,8 +622,9 @@ int musa_dwg_ac1032_scene_index_insert_layer_cmc_source(
            s,v.source.graph.layer_handle,&v.cmc)||
        v.cmc.indexed_handle!=v.source.graph.layer_handle||
        !v.cmc.original_record_crc_verified||
-       v.cmc.packed_color_method!=0xc3u||
+       (v.cmc.packed_color_method>>24u)!=0xc3u||
        !v.cmc.aci_index||
+       (v.cmc.packed_color_method&0xffu)!=v.cmc.aci_index||
        v.cmc.cmc_end_bit<=v.cmc.cmc_start_bit)return 0;
     v.source_aci_verified=1u;
     *out=v;return 1;
