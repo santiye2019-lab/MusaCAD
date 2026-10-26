@@ -82,6 +82,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_preview_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_native_v6_preview_atomic_smoke
                  COMMAND musacad_core_ac1032_original_preview_v6_test)
+        # Source-CRC/H verified original H1BB CIRCLE -> H8A LAYER
+        # numeric CMC ACI4 versus independent R2018 DXF, no final paint.
+        add_executable(musacad_core_ac1032_circle_layer_cmc_test
+                tests/core_dwg_ac1032_circle_layer_cmc_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_layer_cmc_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_layer_cmc_abi_smoke
+                 COMMAND musacad_core_ac1032_circle_layer_cmc_test)
         # Original R2018 OT18 H-tail forensic profile; no owner/layer guessing.
         add_executable(musacad_core_ac1032_circle_h_tail_profile_test
                 tests/core_dwg_ac1032_circle_h_tail_profile_test.c)

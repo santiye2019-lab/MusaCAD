@@ -1608,6 +1608,39 @@ int musa_dwg_ac1032_scene_index_circle_layer_provenance(
     return 1;
 }
 
+
+/* CIRCLE H(C) ownership is already independently source-CRC/H checked.
+ * Require the narrow anchored original OT51 CMC profile; never guess
+ * palette ACI from a Unicode layer name or DXF-derived expected value. */
+int musa_dwg_ac1032_scene_index_circle_layer_cmc_source(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleLayerCmcSource *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032CircleLayerCmcSource v={0};
+    if(!musa_dwg_ac1032_scene_index_circle_layer_provenance(
+            s,h,&v.source)||
+       !v.source.source_geometry_and_layer_verified||
+       v.source.final_visibility_color_and_paint_accepted||
+       v.source.edge.circle_handle!=h||
+       !v.source.edge.exact_relative_owner_and_layer_source_verified||
+       !v.source.edge.original_forward_block_child_membership_verified||
+       v.source.edge.model_space_viewport_and_paint_accepted||
+       v.source.layer_name.indexed_handle!=v.source.edge.layer_handle||
+       v.source.raw_layer_flags.indexed_handle!=v.source.edge.layer_handle||
+       !v.source.raw_layer_flags.source_crc_verified||
+       !musa_dwg_ac1032_scene_index_layer_anchored_cmc_evidence(
+           s,v.source.edge.layer_handle,&v.layer_cmc)||
+       !v.layer_cmc.original_record_crc_verified||
+       v.layer_cmc.indexed_handle!=v.source.edge.layer_handle||
+       v.layer_cmc.aci_index<1u||v.layer_cmc.aci_index>255u||
+       v.layer_cmc.packed_color_method!=
+          (UINT32_C(0xC3000000)|(uint32_t)v.layer_cmc.aci_index))
+        return 0;
+    v.original_layer_cmc_aci_verified=1u;
+    *out=v;
+    return 1;
+}
+
 /* No default '0' or palette guesses: the actual source entity H=5
  * points at an original CRC-verified OT51, whose independently parsed TU
  * name is returned with its original bit offset and Unicode evidence. */
