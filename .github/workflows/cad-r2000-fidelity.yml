@@ -112,6 +112,24 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS original CIRCLE relative owner -> LAYER source CMC ACI4, paint blocked"
 
+      - name: P0 R2018 INSERT CIRCLE relative-owner H chain to LAYER CMC oracle
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          test -s "$oracle"
+          cmake -S core/native -B /tmp/musacad-insert-circle-cmc -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build /tmp/musacad-insert-circle-cmc --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_insert_circle_layer_cmc_chain_test.c \
+            /tmp/musacad-insert-circle-cmc/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-insert-circle-cmc
+          timeout 120s /tmp/musacad-r2018-insert-circle-cmc "$original" "$oracle"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original R2018 INSERT-CIRCLE-LAYER CMC ACI source, paint blocked"
+
       - name: P0 genuine R2018 BLOCK INSERT ATTRIB indexed original H CRC oracle
         run: |
           set -euo pipefail
