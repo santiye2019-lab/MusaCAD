@@ -54,7 +54,7 @@ static int genuine(const char *file){
                  scene,UINT64_C(0x21),NULL);
     }
     fprintf(stderr,"%s original R2018 ENDBLK OT5 H21/H17F/H1BA "
-        "CRC/H/common; owner/sequence/paint UNVERIFIED\\n",ok?"PASS":"FAIL");
+        "CRC/H/common; owner/sequence/paint UNVERIFIED\n",ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
     return ok;
 }
