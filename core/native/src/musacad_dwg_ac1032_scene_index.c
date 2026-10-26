@@ -466,6 +466,13 @@ int musa_dwg_ac1032_scene_index_text_graph(
             ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
                null_ref==0x50u;
         }
+        if(h==UINT64_C(0x8e) && ok){
+            MusaDwgAc1015Bits probe=bits;
+            uint32_t tail=0u;
+            unsigned n=(unsigned)(probe.bit_end-probe.bit_pos);
+            if(n && n<=7u && musa_dwg_ac1015_bits_read_u(&probe,n,&tail))
+                fprintf(stderr,"OT1_DIAG tail_bits=%u value=%u\\n",n,(unsigned)tail);
+        }
         if(ok)ok=cached_graph_zero_padding(&bits);
     }
     if(h==UINT64_C(0x8e)){
