@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1032_curve.h"
 #include "musacad_dwg_ac1032_point.h"
 #include "musacad_dwg_ac1032_text.h"
+#include "musacad_dwg_ac1032_insert.h"
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
@@ -65,6 +66,11 @@ int musa_dwg_ac1032_scene_index_read_attdef_common(
 int musa_dwg_ac1032_scene_index_read_attrib_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
+/* Original R2018 OT7 INSERT OCS numeric placement; no block expansion,
+ * owner/model-space or final rendering acceptance. */
+int musa_dwg_ac1032_scene_index_read_insert_placement(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertPlacement *out);
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
