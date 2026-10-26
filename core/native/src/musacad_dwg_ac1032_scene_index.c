@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #define MAX_ORIGINAL_DWG (64u*1024u*1024u)
 #define MAX_OBJECT_SECTION (64u*1024u*1024u)
 #define MAX_INDEX (1000000u)
@@ -413,6 +414,41 @@ int musa_dwg_ac1032_scene_index_text_graph(
        p.common.visualstyle_flags==0u&&
        p.layout.data_stream_bits<=SIZE_MAX&&
        p.layout.total_payload_bits<=SIZE_MAX;
+    /* TEMP CI-only OT1 source H diagnostic; remove before merge. */
+    if(h==UINT64_C(0x8e)){
+        fprintf(stderr,"OT1_DIAG common=%u mode=%u reactors=%u xdict=%u colorref=%u ltype=%u plot=%u material=%u visual=%u data_bits=%llu total_bits=%llu\\n",
+          (unsigned)p.common.common_decoded,(unsigned)p.common.prefix.entity_mode,
+          (unsigned)p.common.prefix.reactor_count,(unsigned)p.common.prefix.xdictionary_missing,
+          (unsigned)p.common.has_color_reference,(unsigned)p.common.linetype_flags,
+          (unsigned)p.common.plotstyle_flags,(unsigned)p.common.material_flags,
+          (unsigned)p.common.visualstyle_flags,
+          (unsigned long long)p.layout.data_stream_bits,
+          (unsigned long long)p.layout.total_payload_bits);
+        MusaDwgAc1015Bits db={0};
+        if(musa_dwg_ac1015_bits_init(&db,p.raw,p.bytes,
+          (size_t)p.layout.data_stream_bits,(size_t)p.layout.total_payload_bits)){
+            fprintf(stderr,"OT1_DIAG H bytes:");
+            for(size_t i=0;i<40u && db.bit_end-db.bit_pos>=8u;i++){
+                uint32_t b=0u;
+                if(!musa_dwg_ac1015_bits_read_u(&db,8u,&b))break;
+                fprintf(stderr," %02X",(unsigned)b);
+            }
+            fprintf(stderr," remaining_bits=%zu\\n",db.bit_end-db.bit_pos);
+            MusaDwgAc1015Bits d2={0};
+            musa_dwg_ac1015_bits_init(&d2,p.raw,p.bytes,
+              (size_t)p.layout.data_stream_bits,(size_t)p.layout.total_payload_bits);
+            for(size_t i=0;i<8u && d2.bit_end-d2.bit_pos>=8u;i++){
+                MusaDwgAc1015HandleRef rr={0};
+                if(!musa_dwg_ac1015_read_handle_ref(&d2,h,&rr)){
+                    fprintf(stderr,"OT1_DIAG ref[%zu] rejected at bit=%zu\\n",i,d2.bit_pos);
+                    break;
+                }
+                fprintf(stderr,"OT1_DIAG ref[%zu] code=%u count=%u target=%llX\\n",
+                    i,(unsigned)rr.code,(unsigned)rr.count,
+                    (unsigned long long)rr.target);
+            }
+        }
+    }
     if(ok){
         MusaDwgAc1015Bits bits={0};
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
