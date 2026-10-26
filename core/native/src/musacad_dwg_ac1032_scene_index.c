@@ -570,6 +570,42 @@ int musa_dwg_ac1032_scene_index_insert_source_graph(
     v.source_edges_verified=1u;
     *out=v;return 1;
 }
+/* Strict original R2018 INSERT layer provenance, not a style resolver.
+ * Reuse the independently authenticated INSERT H graph rather than
+ * guessing layer by numeric H adjacency or a default palette. */
+int musa_dwg_ac1032_scene_index_insert_layer_provenance(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertLayerProvenance *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032InsertLayerProvenance v={0};
+    if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+           s,h,&v.graph)||
+       !v.graph.original_entity_and_targets_crc_verified||
+       !v.graph.source_edges_verified||
+       v.graph.block_expansion_and_display_accepted||
+       v.graph.indexed_handle!=h||!v.graph.layer_handle||
+       !musa_dwg_ac1032_scene_index_read_layer_name(
+           s,v.graph.layer_handle,&v.layer_name)||
+       !musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+           s,v.graph.layer_handle,&v.raw_layer_flags)||
+       !musa_dwg_ac1032_scene_index_read_insert_common(
+           s,h,&v.insert_common)||
+       v.layer_name.indexed_handle!=v.graph.layer_handle||
+       !v.layer_name.original_record_crc_verified||
+       !v.layer_name.utf8_bytes||
+       v.layer_name.utf8_bytes>=sizeof(v.layer_name.utf8)||
+       v.layer_name.utf8[v.layer_name.utf8_bytes]!='\0'||
+       v.raw_layer_flags.indexed_handle!=v.graph.layer_handle||
+       !v.raw_layer_flags.source_crc_verified||
+       v.raw_layer_flags.numeric_flags_end_bit<=
+           v.raw_layer_flags.numeric_flags_start_bit||
+       !v.insert_common.common_decoded||
+       !v.insert_common.prefix.prefix_decoded||
+       v.insert_common.prefix.indexed_handle!=h||
+       v.insert_common.prefix.raw_object_type!=7u)return 0;
+    v.source_layer_and_entity_verified=1u;
+    *out=v;return 1;
+}
 /* Original MTEXT H tail: optional hard owner, entity layer H5 and
  * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
 /* Source OT1 TEXT H tail is NOT MTEXT's H graph. For this narrow
