@@ -43,6 +43,9 @@ static inline int musa_dwg_ac1032_insert_compose_world_z(
        !child->numeric_fields_decoded||
        !child->original_record_crc_verified||
        !isfinite(child->rotation)||
+       !isfinite(child->extrusion[0])||
+       !isfinite(child->extrusion[1])||
+       !isfinite(child->extrusion[2])||
        fabs(child->extrusion[0])>1e-12||
        fabs(child->extrusion[1])>1e-12||
        fabs(child->extrusion[2]-1.0)>1e-12)return 0;
