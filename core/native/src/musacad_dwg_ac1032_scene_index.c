@@ -468,6 +468,14 @@ int musa_dwg_ac1032_scene_index_text_graph(
         }
         if(ok)ok=cached_graph_zero_padding(&bits);
     }
+    if(h==UINT64_C(0x8e)){
+        uint16_t lt_dbg=0u,st_dbg=0u;
+        int l_ok=musa_dwg_ac1032_scene_index_object_type(s,v.layer_handle,&lt_dbg);
+        int st_ok=musa_dwg_ac1032_scene_index_object_type(s,v.style_handle,&st_dbg);
+        fprintf(stderr,"OT1_DIAG parsed=%d layer=%llX layer_type_ok=%d layer_type=%u style=%llX style_type_ok=%d style_type=%u\\n",
+           ok,(unsigned long long)v.layer_handle,l_ok,(unsigned)lt_dbg,
+           (unsigned long long)v.style_handle,st_ok,(unsigned)st_dbg);
+    }
     free(p.raw);
     if(!ok)return 0;
     uint16_t lt=0u,st=0u;
