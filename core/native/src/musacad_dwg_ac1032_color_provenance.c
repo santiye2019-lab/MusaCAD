@@ -153,6 +153,77 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     return 1;
 }
 
+
+/* The genuine R2018 H1BB CIRCLE uses relative owner H(C), not the
+ * simple no-owner entity H4 path. Never relax the generic planar reader
+ * for every entity: authenticate this narrower reverse BLOCK membership
+ * and layer graph, then report source ENC without claiming visible paint. */
+int musa_dwg_ac1032_scene_circle_owned_color_provenance(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaAc1032ColorProvenance *out){
+    if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
+    MusaDwgAc1032CircleLayerProvenance source={0};
+    if(!musa_dwg_ac1032_scene_index_circle_layer_provenance(
+            s,h,&source)||
+       !source.source_geometry_and_layer_verified||
+       source.final_visibility_color_and_paint_accepted||
+       source.edge.circle_handle!=h||
+       source.edge.raw_circle_object_type!=18u||
+       !source.edge.exact_relative_owner_and_layer_source_verified||
+       !source.edge.original_forward_block_child_membership_verified||
+       source.edge.model_space_viewport_and_paint_accepted||
+       !source.edge.layer_handle||
+       source.layer_name.indexed_handle!=source.edge.layer_handle||
+       !source.layer_name.original_record_crc_verified||
+       source.raw_layer_flags.indexed_handle!=source.edge.layer_handle||
+       !source.raw_layer_flags.source_crc_verified||
+       source.circle.indexed_handle!=h||
+       source.circle.object_type!=18u||
+       !source.circle.geometry_decoded)return 0;
+    const MusaDwgAc1032EntityCommon *common=&source.circle.common;
+    if(!common->common_decoded||!common->prefix.prefix_decoded||
+       common->prefix.indexed_handle!=h||
+       common->prefix.raw_object_type!=18u)return 0;
+    MusaAc1032ColorProvenance result={0};
+    result.entity_handle=h;
+    result.layer_handle=source.edge.layer_handle;
+    result.raw_entity_type=18u;
+    result.entity_aci=common->color_index;
+    result.entity_and_layer_crc_verified=1u;
+    result.source_entity_invisible=(uint8_t)(common->invisibility!=0u);
+    result.entity_complex_color_or_transparency=(uint8_t)(
+        common->has_rgb||common->has_color_reference||
+        common->has_transparency||common->invisibility!=0u);
+    if(common->has_rgb&&!common->has_color_reference&&
+       !common->has_transparency&&common->invisibility==0u&&
+       common->rgb<=UINT32_C(0x00ffffff)){
+        result.entity_has_direct_rgb24=1u;
+        result.entity_source_rgb24=common->rgb;
+    }
+    if(!result.entity_complex_color_or_transparency){
+        result.entity_has_direct_aci=(uint8_t)(
+            common->color_index>=1u&&common->color_index<=255u);
+        result.entity_by_layer=(uint8_t)(common->color_index==256u);
+        result.entity_by_block=(uint8_t)(common->color_index==0u);
+    }
+    /* A verified LAYER record is not proof of effective BYLAYER color.
+     * Only the existing exact C3 CMC source profile may be exposed. */
+    MusaDwgAc1032LayerCmcEvidence cmc={0};
+    if(musa_dwg_ac1032_scene_index_layer_anchored_cmc_evidence(
+          s,source.edge.layer_handle,&cmc)&&
+       cmc.indexed_handle==source.edge.layer_handle&&
+       cmc.original_record_crc_verified&&
+       cmc.aci_index>=1u&&cmc.aci_index<=255u&&
+       cmc.packed_color_method==
+          (UINT32_C(0xC3000000)|(uint32_t)cmc.aci_index)){
+        result.source_layer_aci_supported=1u;
+        result.source_layer_aci=cmc.aci_index;
+    }
+    result.rendering_accepted=0u;
+    *out=result;
+    return 1;
+}
+
 /* Compatibility entry point: preserves the original LINE/POINT-only
  * public contract, including atomic refusal for ARC/CIRCLE handles. */
 int musa_dwg_ac1032_scene_line_point_color_provenance(

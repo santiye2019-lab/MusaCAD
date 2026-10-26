@@ -100,6 +100,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_circle_layer_provenance_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_circle_layer_provenance_abi_smoke
                  COMMAND musacad_core_ac1032_circle_layer_provenance_test)
+        # Authentic relative-owner H(C) CIRCLE source ENC vs independent
+        # upstream R2018 DXF BYLAYER oracle, never final visible paint.
+        add_executable(musacad_core_ac1032_circle_owned_color_test
+                tests/core_dwg_ac1032_circle_owned_color_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_owned_color_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_owned_color_abi_smoke
+                 COMMAND musacad_core_ac1032_circle_owned_color_test)
         # Genuine R2018 OT35 ellipse -> independently verified source H5
         # LAYER, Unicode name, encoded style and conservative screen readiness.
         add_executable(musacad_core_ac1032_real_ellipse_style_test
