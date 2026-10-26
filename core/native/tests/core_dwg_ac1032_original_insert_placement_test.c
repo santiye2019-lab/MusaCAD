@@ -29,20 +29,28 @@ static int genuine(const char *file){
         src,(size_t)n,&scene)&&!memcmp(src,saved,(size_t)n);
     free(src);free(saved);
     if(!ok)return 0;
-    /* Independent DXF-listed OT7 handles: collect strict parser diagnostics
-     * for other genuine source objects without treating failures as passes. */
+    /* Two additional unchanged R2018 OT7 sources with an ATTRIB count.
+     * Only source DATA is accepted, not the child H/owner relationship. */
+    int probe_ok=1;
     const uint64_t diagnostic_handles[]={UINT64_C(0x190),UINT64_C(0x756)};
     for(size_t i=0u;i<sizeof(diagnostic_handles)/sizeof(diagnostic_handles[0]);i++){
         MusaDwgAc1032InsertPlacement probe={0};
         const int parsed=musa_dwg_ac1032_scene_index_read_insert_placement(
             scene,diagnostic_handles[i],&probe);
+        probe_ok=probe_ok&&parsed&&probe.original_record_crc_verified&&
+            probe.numeric_fields_decoded&&!probe.block_graph_and_display_accepted&&
+            probe.indexed_handle==diagnostic_handles[i]&&
+            probe.has_attribs==1u&&probe.owned_attrib_count==1u&&
+            near(probe.extrusion[0],0.0)&&near(probe.extrusion[1],0.0)&&
+            near(probe.extrusion[2],1.0);
         fprintf(stderr,"MC1032 INSERT original H%llx accepted=%d attrib=%u count=%u\n",
             (unsigned long long)diagnostic_handles[i],parsed,
             (unsigned)probe.has_attribs,(unsigned)probe.owned_attrib_count);
     }
     const uint64_t h=UINT64_C(0x1c8);
     MusaDwgAc1032InsertPlacement p={0};
-    ok=musa_dwg_ac1032_scene_index_read_insert_placement(scene,h,&p)&&
+    ok=probe_ok&&
+       musa_dwg_ac1032_scene_index_read_insert_placement(scene,h,&p)&&
        p.indexed_handle==h&&p.original_record_crc_verified&&
        p.numeric_fields_decoded&&!p.block_graph_and_display_accepted&&
        near(p.insertion[0],8482.030567364651)&&
