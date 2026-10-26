@@ -14,6 +14,16 @@ static inline int musa_dwg_ac1032_ot49_overlap(
     const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
     return x<=y?y-x<an:x-y<bn;
 }
+/* A bounded source fingerprint of the OT49 identity prefix, intended
+ * for regression comparison only. It does not attest to base-point data
+ * or to complete BLOCK_HEADER grammar. */
+typedef struct MusaDwgAc1032BlockHeaderPrefixEvidence {
+    uint64_t indexed_handle;
+    size_t fields_start_bit;
+    uint64_t prefix_fnv1a64;
+    uint8_t original_record_crc_verified;
+    uint8_t base_point_decoded; /* ALWAYS zero */
+} MusaDwgAc1032BlockHeaderPrefixEvidence;
 /* Strict original OT49 object identity, preceding the as-yet undecoded
  * BLOCK_HEADER base-point. A verified OT49 is NOT a decoded block base. */
 typedef struct MusaDwgAc1032BlockHeaderIdentity {
@@ -71,5 +81,97 @@ static inline int musa_dwg_ac1032_block_header_ot49_identity(
     v.no_reactors_verified=1u;
     v.xdictionary_missing=(uint8_t)xdic;
     *out=v;return 1;
+}
+/* Fingerprint only authenticated prefix bits, masking unused bits of
+ * the final byte. This is an observation, never a DWG semantic decoder. */
+static inline int musa_dwg_ac1032_block_header_ot49_prefix_evidence(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032BlockHeaderPrefixEvidence *out){
+    if(!out||!raw||!layout||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderIdentity id={0};
+    if(!musa_dwg_ac1032_block_header_ot49_identity(
+           raw,n,layout,&id))return 0;
+    const size_t whole=id.fields_start_bit/8u;
+    const unsigned rem=(unsigned)(id.fields_start_bit%8u);
+    if(whole>n||(whole==n&&rem))return 0;
+    uint64_t hash=UINT64_C(14695981039346656037);
+    for(size_t i=0;i<whole;i++){
+        hash^=(uint64_t)raw[i];
+        hash*=UINT64_C(1099511628211);
+    }
+    if(rem){
+        const uint8_t mask=(uint8_t)((1u<<rem)-1u);
+        hash^=(uint64_t)(raw[whole]&mask);
+        hash*=UINT64_C(1099511628211);
+    }
+    MusaDwgAc1032BlockHeaderPrefixEvidence v={0};
+    v.indexed_handle=id.indexed_handle;
+    v.fields_start_bit=id.fields_start_bit;
+    v.prefix_fnv1a64=hash;
+    v.original_record_crc_verified=1u;
+    *out=v;return 1;
+}
+
+/* Precisely bound the original OT49 field region after the verified
+ * identity prefix and before the independent handle stream. This does
+ * not interpret field bits or infer a BLOCK_HEADER base point. */
+typedef struct MusaDwgAc1032BlockHeaderFieldSpan {
+    uint64_t indexed_handle;
+    size_t first_bit;
+    size_t end_bit; /* exclusive */
+    uint8_t original_record_crc_verified;
+    uint8_t base_point_decoded; /* ALWAYS zero */
+} MusaDwgAc1032BlockHeaderFieldSpan;
+static inline int musa_dwg_ac1032_block_header_ot49_field_span(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032BlockHeaderFieldSpan *out){
+    if(!out||!raw||!layout||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,sizeof(*out))||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,sizeof(*out)))return 0;
+    MusaDwgAc1032BlockHeaderIdentity id={0};
+    if(!musa_dwg_ac1032_block_header_ot49_identity(
+           raw,n,layout,&id)||
+       layout->data_stream_bits>SIZE_MAX||
+       id.fields_start_bit>=(size_t)layout->data_stream_bits)return 0;
+    MusaDwgAc1032BlockHeaderFieldSpan v={0};
+    v.indexed_handle=id.indexed_handle;
+    v.first_bit=id.fields_start_bit;
+    v.end_bit=(size_t)layout->data_stream_bits;
+    v.original_record_crc_verified=1u;
+    *out=v;return 1;
+}
+/* Copy a caller-selected bit window from the authenticated OT49 field
+ * region. This is raw evidence, NOT interpretation of base coordinates.
+ * Output is unchanged on any invalid request. Bits are packed MSB-first, matching the DWG bit cursor. */
+static inline int musa_dwg_ac1032_block_header_ot49_copy_field_bits(
+    const uint8_t *raw,size_t n,
+    const MusaDwgAc1032ObjectStreams *layout,
+    size_t start_bit,size_t bit_count,
+    uint8_t *out,size_t out_bytes){
+    if(!raw||!layout||!out||!bit_count||
+       bit_count>SIZE_MAX-7u||
+       out_bytes<(bit_count+7u)/8u||
+       musa_dwg_ac1032_ot49_overlap(raw,n,out,out_bytes)||
+       musa_dwg_ac1032_ot49_overlap(layout,sizeof(*layout),
+                                    out,out_bytes))return 0;
+    MusaDwgAc1032BlockHeaderFieldSpan span={0};
+    if(!musa_dwg_ac1032_block_header_ot49_field_span(
+           raw,n,layout,&span)||
+       start_bit<span.first_bit||start_bit>span.end_bit||
+       bit_count>span.end_bit-start_bit)return 0;
+    const size_t bytes=(bit_count+7u)/8u;
+    for(size_t i=0;i<bytes;i++)out[i]=0u;
+    for(size_t i=0;i<bit_count;i++){
+        const size_t src=start_bit+i;
+        const uint8_t bit=(uint8_t)((raw[src/8u]>>(7u-(src%8u)))&1u);
+        out[i/8u]|=(uint8_t)(bit<<(7u-(i%8u)));
+    }
+    return 1;
 }
 #endif
