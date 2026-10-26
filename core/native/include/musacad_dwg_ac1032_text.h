@@ -42,6 +42,21 @@ int musa_dwg_ac1032_text_placement_at(
     const uint8_t *payload,size_t payload_bytes,
     const MusaDwgAc1032ObjectStreams *layout,
     size_t geometry_start_bit,MusaDwgAc1032TextPlacement *out);
+/* Pure first-party OCS -> WCS transform of authenticated OT1 TEXT
+ * numeric placement. Anchors and rotation basis only, NOT glyph origin,
+ * font metrics, justification, owner/model-space or viewport visibility. */
+typedef struct MusaDwgAc1032TextWorldPlacement {
+    uint64_t indexed_handle;
+    double insertion[3],alignment[3];
+    double baseline_unit[3],up_unit[3];
+    double height,width_factor;
+    uint16_t horizontal_alignment,vertical_alignment;
+    uint8_t original_record_crc_verified,wcs_math_decoded;
+    uint8_t font_and_display_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032TextWorldPlacement;
+int musa_dwg_ac1032_text_placement_world(
+    const MusaDwgAc1032TextPlacement *source,
+    MusaDwgAc1032TextWorldPlacement *out);
 #ifdef __cplusplus
 }
 #endif

@@ -182,3 +182,50 @@ int musa_dwg_ac1032_text_placement_at(
     *out=v;
     return 1;
 }
+
+/* Original OT1 TEXT OCS anchors and rotation axes in WCS. This only
+ * composes the existing independent C11 arbitrary-axis math with the
+ * authenticated source numeric placement. Never treats alignment anchor
+ * as a glyph baseline without the original text style/font metrics. */
+#include "musacad_ocs.h"
+int musa_dwg_ac1032_text_placement_world(
+    const MusaDwgAc1032TextPlacement *source,
+    MusaDwgAc1032TextWorldPlacement *out){
+    if(!source||!out||(const void*)source==(const void*)out||
+       !source->indexed_handle||!source->original_record_crc_verified||
+       !source->numeric_fields_decoded||
+       source->wcs_font_and_display_accepted||
+       !isfinite(source->rotation)||!isfinite(source->height)||
+       source->height<=0.0||!isfinite(source->width_factor)||
+       source->width_factor<=0.0||
+       source->horizontal_alignment>5u||
+       source->vertical_alignment>3u)return 0;
+    MusaCoreOcsBasis basis={0};
+    if(!musa_core_ocs_basis(source->extrusion,&basis))return 0;
+    MusaDwgAc1032TextWorldPlacement value={0};
+    const double ins[2]={source->insertion[0],source->insertion[1]};
+    const double aln[2]={source->alignment[0],source->alignment[1]};
+    if(!musa_core_ocs_to_world(
+           &basis,ins,source->insertion[2],value.insertion)||
+       !musa_core_ocs_to_world(
+           &basis,aln,source->alignment[2],value.alignment))
+        return 0;
+    const double c=cos(source->rotation),s=sin(source->rotation);
+    if(!isfinite(c)||!isfinite(s))return 0;
+    for(size_t i=0u;i<3u;i++){
+        value.baseline_unit[i]=c*basis.x[i]+s*basis.y[i];
+        value.up_unit[i]=-s*basis.x[i]+c*basis.y[i];
+        if(!isfinite(value.baseline_unit[i])||
+           !isfinite(value.up_unit[i]))return 0;
+    }
+    value.indexed_handle=source->indexed_handle;
+    value.height=source->height;
+    value.width_factor=source->width_factor;
+    value.horizontal_alignment=source->horizontal_alignment;
+    value.vertical_alignment=source->vertical_alignment;
+    value.original_record_crc_verified=1u;
+    value.wcs_math_decoded=1u;
+    value.font_and_display_accepted=0u;
+    *out=value;
+    return 1;
+}
