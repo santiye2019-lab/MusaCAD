@@ -16,6 +16,12 @@ public final class FirstPartyDwgPreview {
     private static native float[] readOriginalNative(
             String inputPath, int maxFloatWords,long[] audit) throws IOException;
 
+    /* Explicit opt-in ONE-INSERT source packet; not a normal CAD open.
+     * Source is read-only and remains on the caller's disk. */
+    private static native float[] readInsertLineNative(
+            String inputPath,long insertHandle,int maxFloatWords,long[] audit)
+            throws IOException;
+
     /** Genuine source evidence, NOT display-ready color or visibility.
      * Counts R2018 indexed OBJECT records, including non-entity records.
      * The diagnostic deliberately does not infer model-space owners or XREF. */
@@ -118,4 +124,55 @@ public final class FirstPartyDwgPreview {
             throw new IOException("DWG onizleme nesne/ilkel sayaclari tutarsiz");
         return new Result(parsed,readiness);
     }
+    /** One strict R2018 INSERT's original source-owned planar LINE evidence.
+     * This is NOT a model-space, layer-visible or AutoCAD-equivalent scene.
+     * scene is null when every original source LINE is deliberately excluded
+     * by a color/visibility/precision diagnostic gate. */
+    public static final class InsertLineDiagnostic {
+        public final NativeScene scene;
+        public final long insertHandle;
+        public final long originalSourceLines,admittedSourceLines,omittedSourceLines;
+        public final boolean incomplete;
+        private InsertLineDiagnostic(NativeScene preview,long[] audit) {
+            scene=preview;
+            insertHandle=audit[0];
+            originalSourceLines=audit[1];
+            admittedSourceLines=audit[2];
+            omittedSourceLines=audit[3];
+            incomplete=true;
+        }
+    }
+
+    /** Diagnostic adapter for a source-verified DWG INSERT H handle.
+     * Never defaults to ACI7 or claims BYLAYER/BYBLOCK effective colors.
+     * The production editor, JNI scene and original DWG stay untouched. */
+    public static InsertLineDiagnostic readInsertLineDiagnostic(
+            File original,long insertHandle,int maxFloatWords)throws IOException {
+        if(original==null||!original.isFile())
+            throw new IOException("Kaynak DWG bulunamadi");
+        if(insertHandle<=0L||maxFloatWords<7||maxFloatWords>9*1024*1024)
+            throw new IOException("Gecersiz INSERT H veya kaynak bellek siniri");
+        long[] evidence=new long[8];
+        float[] v6=readInsertLineNative(
+                original.getAbsolutePath(),insertHandle,maxFloatWords,evidence);
+        if(v6==null||v6.length<7||v6.length>7+6*64||
+           evidence[0]!=insertHandle||
+           evidence[1]<0||evidence[1]>64||
+           evidence[2]<0||evidence[2]>evidence[1]||
+           evidence[3]!=evidence[1]-evidence[2]||
+           evidence[4]!=v6.length||
+           evidence[5]!=1||evidence[6]!=1||evidence[7]!=0||
+           v6[0]!=6f||v6[1]!=(float)evidence[2]||v6[6]!=1f)
+            throw new IOException("Orijinal INSERT geometri raporu tutarsiz");
+        NativeScene parsed=null;
+        if(evidence[2]!=0L){
+            parsed=NativeScene.fromRaw(v6);
+            if(parsed.primitiveCount!=evidence[2]||!parsed.truncated)
+                throw new IOException("Eksik DWG blok onizlemesi tam gibi isaretlendi");
+        }else if(v6.length!=7) {
+            throw new IOException("Bos INSERT icin sahte geometri paketi");
+        }
+        return new InsertLineDiagnostic(parsed,evidence);
+    }
+
 }
