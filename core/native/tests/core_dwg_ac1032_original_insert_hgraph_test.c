@@ -93,6 +93,22 @@ static int genuine(const char *file){
                block.no_reactors_verified&&
                !block.base_point_decoded;
         }
+        if(ok){
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span)&&
+               span.indexed_handle==e->block&&
+               span.original_record_crc_verified&&
+               span.first_bit>10u&&
+               span.first_bit<span.end_bit&&
+               !span.base_point_decoded;
+            if(ok){
+                const MusaDwgAc1032BlockHeaderFieldSpan before=span;
+                ok=!musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                        scene,e->h,&span)&&
+                   !memcmp(&before,&span,sizeof(span));
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
