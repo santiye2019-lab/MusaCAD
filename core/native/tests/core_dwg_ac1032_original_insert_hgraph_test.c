@@ -15,6 +15,19 @@ typedef struct Expected {
     uint64_t h,layer,block,attrib,seqend;
     uint32_t count;
 } Expected;
+/* Independent fixed binary oracle: 0xB2 0x6D 0xE0 at bit 3 for
+ * 10 bits is 0x93 0x40, not the LSB-first 0x46-style packing. */
+static int bit_order_oracle(void){
+    const uint8_t source[3]={0xb2u,0x6du,0xe0u};
+    uint8_t out[2]={0xa5u,0x5au};
+    if(!musa_dwg_ac1032_ot49_copy_msb_bits(
+          source,sizeof(source),3u,10u,out,sizeof(out))||
+       out[0]!=0x93u||out[1]!=0x40u)return 0;
+    const uint8_t before[2]={out[0],out[1]};
+    return !musa_dwg_ac1032_ot49_copy_msb_bits(
+                source,sizeof(source),20u,10u,out,sizeof(out))&&
+           !memcmp(out,before,sizeof(out));
+}
 static int genuine(const char *file){
     FILE *f=fopen(file,"rb");
     if(!f)return 0;
@@ -344,7 +357,7 @@ static int genuine(const char *file){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc==1)return 0;
+    if(argc==1)return bit_order_oracle()?0:1;
     if(argc!=2)return 2;
-    return genuine(argv[1])?0:1;
+    return bit_order_oracle()&&genuine(argv[1])?0:1;
 }
