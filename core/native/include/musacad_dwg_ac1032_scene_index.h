@@ -301,7 +301,13 @@ typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
     uint16_t raw_entity_type;
     uint8_t original_child_record_crc_verified;
     uint8_t original_owner_and_layer_records_crc_verified;
+    /* Historical name: verified exact owner + layer graph role. The
+     * canonical original handle stream may encode OT18's owner as absolute
+     * H4 or the independently verified H12 base-relative reference.
+     * Explicitly retain its raw wire code instead of claiming both H4. */
     uint8_t exact_h4_owner_and_h5_layer_source_verified;
+    uint8_t original_owner_wire_code; /* original 4 or OT18-only 12 */
+    uint8_t original_relative_h12_owner_verified;
     uint8_t visible_scene_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032EntityBlockOwnerLayerSource;
 int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
