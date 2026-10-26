@@ -72,7 +72,7 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertNotIn("Long.parseUnsignedLong(",source)
         self.assertIn("inspectBlock.setEnabled(false)",source)
         self.assertIn("result.omittedSourceLines",source)
-        self.assertIn("readCombinedSourceDiagnostic(",source)
+        self.assertIn("readCombinedWithNumericCirclesDiagnostic(",source)
         self.assertIn("readCircleGeometryEvidence(",source)
         self.assertIn("MOR ÇİZGİLER KAYNAK DWG RENGİ DEĞİLDİR",source)
         self.assertIn("Birlikte çizilen kaynak ilkel",source)
