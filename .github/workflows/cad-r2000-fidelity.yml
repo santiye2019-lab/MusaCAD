@@ -192,9 +192,9 @@ jobs:
           grep -F 'AcDbBlockReference' "$oracle"
           grep -F '8482.030567364651' "$oracle"
           grep -F -- '-1381.341268226861' "$oracle"
-          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \\
-            core/native/tests/core_dwg_ac1032_original_insert_placement_test.c \\
-            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \\
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_insert_placement_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
             -o /tmp/musacad-r2018-original-insert-placement
           timeout 120s /tmp/musacad-r2018-original-insert-placement "$original"
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
