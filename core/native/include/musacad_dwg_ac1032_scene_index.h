@@ -72,6 +72,23 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
 int musa_dwg_ac1032_scene_index_insert_source_graph(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertSourceGraph *out);
+/* Genuine R2018 OT7 INSERT -> authenticated LAYER OT51 source evidence.
+ * The INSERT H graph, Unicode layer name, raw numeric layer status and
+ * entity common ENC are all read from the same immutable CRC/H scene.
+ * Source evidence only: NOT block expansion, owner/model-space,
+ * viewport/XREF overrides, final visibility, BYLAYER/BYBLOCK or paint.
+ * Unsupported/missing evidence rejects without touching caller output. */
+typedef struct MusaDwgAc1032InsertLayerProvenance {
+    MusaDwgAc1032InsertSourceGraph graph;
+    MusaDwgAc1032LayerName layer_name;
+    MusaDwgAc1032LayerFlagsEvidence raw_layer_flags;
+    MusaDwgAc1032EntityCommon insert_common;
+    uint8_t source_layer_and_entity_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032InsertLayerProvenance;
+int musa_dwg_ac1032_scene_index_insert_layer_provenance(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertLayerProvenance *out);
 int musa_dwg_ac1032_scene_index_read_insert_placement(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertPlacement *out);
