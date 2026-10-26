@@ -22,8 +22,10 @@ typedef struct MusaDwgAc1032LayerIdentity {
     uint8_t no_reactors_verified;
     uint8_t xdictionary_missing;
 } MusaDwgAc1032LayerIdentity;
-/* Strict no-EED/no-reactors/missing-XDictionary subset. All outputs
- * fail-atomic and source unchanged, even if bitstream is corrupt. */
+/* Strict no-EED/no-reactors source identity; XDictionary presence bit
+ * is preserved as observed (0 = present, 1 = absent). A present
+ * XDictionary's H target is NOT resolved by this identity API. All
+ * outputs are fail-atomic and source bytes remain unchanged. */
 int musa_dwg_ac1032_layer_ot51_identity_at(
     const uint8_t *payload,size_t bytes,
     const MusaDwgAc1032ObjectStreams *layout,

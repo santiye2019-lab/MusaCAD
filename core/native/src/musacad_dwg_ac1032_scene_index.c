@@ -391,6 +391,73 @@ static int cached_graph_zero_padding(MusaDwgAc1015Bits *bits){
 }
 /* Original MTEXT H tail: optional hard owner, entity layer H5 and
  * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
+/* Source OT1 TEXT H tail is NOT MTEXT's H graph. For this narrow
+ * genuine R2018 profile require explicit layer H5 and style H5, with
+ * only an optional null 0x50 H reference. The independently CRC-checked
+ * R2018 sample_2018.dwg OT1 H8E has two H5 refs (81, 11) followed by
+ * exactly three one-bits (111), not zero padding. Accept this exact
+ * terminal profile only; other trailing H layouts fail closed. */
+int musa_dwg_ac1032_scene_index_text_graph(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032TextGraph *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,1u,&p))return 0;
+    MusaDwgAc1032TextGraph v={0};
+    v.indexed_handle=h;
+    int ok=p.common.common_decoded&&
+       p.common.prefix.reactor_count==0u&&
+       p.common.prefix.xdictionary_missing==1u&&
+       !p.common.has_color_reference&&
+       p.common.linetype_flags==0u&&
+       p.common.plotstyle_flags==0u&&
+       p.common.material_flags==0u&&
+       p.common.visualstyle_flags==0u&&
+       p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX;
+    if(ok){
+        MusaDwgAc1015Bits bits={0};
+        ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+            (size_t)p.layout.data_stream_bits,
+            (size_t)p.layout.total_payload_bits);
+        if(ok&&p.common.prefix.entity_mode==0u)
+            ok=cached_graph_ref(&bits,h,4u,&v.owner_handle);
+        else if(ok&&p.common.prefix.entity_mode!=2u)ok=0;
+        if(ok)ok=cached_graph_ref(&bits,h,5u,&v.layer_handle)&&
+                 cached_graph_ref(&bits,h,5u,&v.style_handle)&&
+                 v.layer_handle!=h&&v.style_handle!=h&&
+                 v.layer_handle!=v.style_handle;
+        if(ok&&bits.bit_end-bits.bit_pos>=8u){
+            uint32_t null_ref=0u;
+            ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&null_ref)&&
+               null_ref==0x50u;
+        }
+        if(ok){
+            /* Genuine OT1 H8E ends at bit 888: 853 data bits,
+             * 32 H-reference bits, 3 terminal one-bits. Do not
+             * generalize this narrow profile to other TEXT objects. */
+            uint32_t terminal=0u;
+            ok=bits.bit_end-bits.bit_pos==3u&&
+               musa_dwg_ac1015_bits_read_u(&bits,3u,&terminal)&&
+               terminal==7u&&bits.bit_pos==bits.bit_end;
+        }
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    uint16_t lt=0u,st=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(
+           s,v.layer_handle,&lt)||lt!=51u||
+       !musa_dwg_ac1032_scene_index_object_type(
+           s,v.style_handle,&st)||st!=53u)return 0;
+    v.layer_object_type=lt;
+    v.style_object_type=st;
+    v.original_entity_crc_verified=1u;
+    v.original_layer_crc_verified=1u;
+    v.original_style_crc_verified=1u;
+    v.graph_edges_verified=1u;
+    v.font_and_display_accepted=0u;
+    *out=v;return 1;
+}
 int musa_dwg_ac1032_scene_index_mtext_graph(
     const MusaDwgAc1032SceneIndex *s,uint64_t h,
     MusaDwgAc1032MTextGraph *out){

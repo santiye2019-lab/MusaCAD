@@ -42,7 +42,7 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
        self.code!=0u||self.relative||self.target!=l->indexed_handle||
        !musa_dwg_ac1015_bits_read_bs(&b,&eed)||eed!=0u||
        !musa_dwg_ac1015_bits_read_bl(&b,&reactors)||reactors!=0u||
-       !musa_dwg_ac1015_bits_read_u(&b,1u,&xdic)||xdic!=1u||
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&xdic)||
        b.bit_pos>=b.bit_end)
         return 0;
     MusaDwgAc1032LayerIdentity value={0};
@@ -53,7 +53,8 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
     value.embedded_self_handle_verified=1u;
     value.empty_eed_verified=1u;
     value.no_reactors_verified=1u;
-    value.xdictionary_missing=1u;
+    /* Source bit is preserved. A present XDictionary is NOT resolved. */
+    value.xdictionary_missing=(uint8_t)xdic;
     *out=value;
     return 1;
 }
