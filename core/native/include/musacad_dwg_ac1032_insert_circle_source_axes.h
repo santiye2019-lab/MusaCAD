@@ -6,34 +6,40 @@
 #include <math.h>
 #include <stdint.h>
 
-/* ORIGINAL R2018 CIRCLE (OT18) inside a verified INSERT/BLOCK source.
- * Two mapped radius basis vectors preserve an anisotropically scaled or
- * reflected circle as an affine ellipse; do not emit a fake circle radius.
- * H4 reverse owner and H5 OT51 layer are separately CRC authenticated.
- * This is source geometry ONLY: no layer on/off/frozen, viewport, model/
- * paper-space, XREF, inherited color, nested INSERT or final paint proof. */
+/* Original R2018 CIRCLE OT18 numeric geometry inside an INSERT's
+ * CRC-indexed BLOCK_HEADER candidate list. Map center and TWO radius
+ * basis points through genuine INSERT placement/base to preserve
+ * anisotropic/reflected affine ellipse axes. This is NOT block expansion.
+ *
+ * Crucial: some original CIRCLEs have independently readable numeric
+ * DATA but an unsupported entity-common/H4/H5 tail. Preserve that as
+ * UNKNOWN OWNER/LAYER/COLOR, never invent source layer 0, ACI7 or paint.
+ * Even an exact reverse H4/H5 would not prove model-space, layer state,
+ * viewport, XREF, nested blocks or final visibility. */
 typedef struct MusaDwgAc1032InsertCircleSourceAxesRow {
     uint64_t child_handle,verified_block_owner_handle,source_layer_handle;
     double world_center[3],world_axis_u[3],world_axis_v[3],source_radius;
     uint32_t source_rgb24;
     uint16_t source_aci;
     uint8_t source_style_class,source_color_status;
-    uint8_t original_circle_h4_h5_affine_axes_verified;
+    uint8_t original_numeric_affine_axes_verified;
+    uint8_t original_h4_h5_source_verified;
     uint8_t final_visibility_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032InsertCircleSourceAxesRow;
 typedef struct MusaDwgAc1032InsertCircleSourceAxes {
     uint64_t insert_handle,block_header_handle;
     uint32_t child_count,circle_candidate_count,verified_circle_count;
     uint32_t unverified_circle_count,non_circle_child_count;
+    uint32_t h4_h5_source_verified_count,h4_h5_unresolved_count;
     MusaDwgAc1032InsertCircleSourceAxesRow
         rows[MUSACAD_AC1032_OT49_CHILD_LIMIT];
-    uint8_t original_source_circle_axes_verified;
+    uint8_t original_numeric_source_circle_axes_verified;
     uint8_t final_visibility_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032InsertCircleSourceAxes;
 
-/* Fail atomic. A rejected candidate contributes to the audit counts,
- * never to drawable geometry. Local XY basis points are mapped through
- * the actual original BLOCK_HEADER base and original INSERT placement. */
+/* Fail atomic. A FOREIGN H4 owner rejects a candidate; an UNRESOLVED
+ * H4/H5 does not become an owner/layer claim. Numeric axes are still
+ * useful read-only evidence, but no row is authorized for final paint. */
 static inline int musa_dwg_ac1032_insert_circle_source_axes(
     const MusaDwgAc1032SceneIndex *scene,uint64_t insert_handle,
     MusaDwgAc1032InsertCircleSourceAxes *out){
@@ -72,10 +78,8 @@ static inline int musa_dwg_ac1032_insert_circle_source_axes(
             continue;
         }
         v.circle_candidate_count++;
-        if(!s->coordinate_mapped||!s->original_common_verified||
-           !s->source_layer_handle||!o->original_reverse_source_edge_verified||
-           o->reverse_owner_status!=MUSACAD_AC1032_INSERT_OWNER_MATCH||
-           o->verified_owner_handle!=v.block_header_handle){
+        if(!s->coordinate_mapped||
+           o->reverse_owner_status==MUSACAD_AC1032_INSERT_OWNER_FOREIGN){
             v.unverified_circle_count++;
             continue;
         }
@@ -143,24 +147,38 @@ static inline int musa_dwg_ac1032_insert_circle_source_axes(
         MusaDwgAc1032InsertCircleSourceAxesRow *row=
             &v.rows[v.verified_circle_count++];
         row->child_handle=s->child_handle;
-        row->verified_block_owner_handle=o->verified_owner_handle;
-        row->source_layer_handle=s->source_layer_handle;
         row->source_radius=curve.radius;
-        row->source_aci=s->raw_color_index;
-        row->source_rgb24=s->raw_rgb;
-        row->source_style_class=s->source_style_class;
-        row->source_color_status=s->source_color_status;
         for(unsigned k=0u;k<3u;k++){
             row->world_center[k]=center[k];
             row->world_axis_u[k]=axis_u[k];
             row->world_axis_v[k]=axis_v[k];
         }
-        row->original_circle_h4_h5_affine_axes_verified=1u;
+        row->original_numeric_affine_axes_verified=1u;
+        const int exact_h4_h5=s->original_common_verified&&
+            s->source_layer_handle&&
+            o->original_reverse_source_edge_verified&&
+            o->reverse_owner_status==MUSACAD_AC1032_INSERT_OWNER_MATCH&&
+            o->verified_owner_handle==v.block_header_handle;
+        if(exact_h4_h5){
+            row->verified_block_owner_handle=o->verified_owner_handle;
+            row->source_layer_handle=s->source_layer_handle;
+            row->source_aci=s->raw_color_index;
+            row->source_rgb24=s->raw_rgb;
+            row->source_style_class=s->source_style_class;
+            row->source_color_status=s->source_color_status;
+            row->original_h4_h5_source_verified=1u;
+            v.h4_h5_source_verified_count++;
+        }else{
+            /* Unknown owner/layer/color is NOT a fallback to layer 0. */
+            v.h4_h5_unresolved_count++;
+        }
     }
     if(v.circle_candidate_count+v.non_circle_child_count!=v.child_count||
        v.verified_circle_count+v.unverified_circle_count!=
-           v.circle_candidate_count)return 0;
-    v.original_source_circle_axes_verified=1u;
+           v.circle_candidate_count||
+       v.h4_h5_source_verified_count+v.h4_h5_unresolved_count!=
+           v.verified_circle_count)return 0;
+    v.original_numeric_source_circle_axes_verified=1u;
     *out=v;return 1;
 }
 #endif
