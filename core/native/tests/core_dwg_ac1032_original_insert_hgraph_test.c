@@ -62,7 +62,7 @@ static int genuine(const char *file){
            !memcmp(&unchanged,&saved,sizeof(unchanged));
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph; "
-        "block expansion, owner, viewport, final paint UNVERIFIED\\n",
+        "block expansion, owner, viewport, final paint UNVERIFIED\n",
         ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
     return ok;
