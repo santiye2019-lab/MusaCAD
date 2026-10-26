@@ -47,6 +47,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_mtext_v6_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_mtext_v6_smoke
                  COMMAND musacad_core_ac1032_original_mtext_v6_test)
+        # Independent real R2018 OT44 H1C0 BYLAYER v6 color refusal
+        # and pure synthetic direct ACI/RGB type-6 transport contracts.
+        add_executable(musacad_core_ac1032_mtext_v6_color_test
+                tests/core_dwg_ac1032_original_mtext_v6_color_test.c)
+        target_link_libraries(musacad_core_ac1032_mtext_v6_color_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_mtext_v6_color_smoke
+                 COMMAND musacad_core_ac1032_mtext_v6_color_test)
         # Real R2018 MTEXT H1C0 original H5 source LAYER and color evidence.
         add_executable(musacad_core_ac1032_original_mtext_color_test
                 tests/core_dwg_ac1032_original_mtext_layer_color_test.c)

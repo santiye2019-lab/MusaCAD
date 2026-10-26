@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_preview_v6.h"
+#include "musacad_dwg_ac1032_color_provenance.h"
 #include "musacad_bulge.h"
 #include <float.h>
 #include <math.h>
@@ -494,12 +495,16 @@ static int process(const MusaDwgAc1032SceneIndex *s,
              * never replaced by guessed object coordinates.
              *
              * v6 type 6 packet:
-             * [6*256+7, x,y, ux,uy, vx,vy, hAlign,vAlign,
-             *  utf8_bytes, ceil(utf8_bytes/3) packed 24-bit words].
+             * [styleCode, optionalExactRGB24, x,y, ux,uy, vx,vy,
+             *  hAlign,vAlign, utf8_bytes, packed UTF-8 words].
+             * Only direct authenticated ENC ACI/RGB can be source-exact;
+             * BYLAYER/BYBLOCK/alpha/unknown are provisional ACI7.
              * Canvas glyph metrics may differ from the original TEXTSTYLE.
              */
             MusaDwgAc1032MTextSource source={0};
             MusaDwgAc1032MTextPlacement place={0};
+            MusaDwgAc1032EntityCommon common={0};
+            MusaAc1032ColorProvenance provenance={0};
             int supported=
                 musa_dwg_ac1032_scene_index_read_mtext_source(
                     s,e.handle,&source)&&
@@ -532,6 +537,29 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 isfinite(place.x_axis[0])&&
                 isfinite(place.x_axis[1])&&
                 fabs(hypot(place.x_axis[0],place.x_axis[1])-1.0)<1e-6;
+            /* A type ID or unverified common ENC cannot determine color.
+             * Require the independently CRC/H-verified OT44->OT51 graph
+             * before admitting this original source's style evidence.
+             * Entity invisibility is a HARD omission, not provisional
+             * white text. Layer/owner/viewport visibility remains unknown
+             * even when a direct entity color is source-authenticated. */
+            if(supported&&colors){
+                supported=musa_dwg_ac1032_scene_index_read_mtext_common(
+                    s,e.handle,&common)&&
+                    musa_dwg_ac1032_scene_planar_color_provenance(
+                    s,e.handle,&provenance)&&
+                    common.common_decoded&&
+                    common.prefix.indexed_handle==e.handle&&
+                    common.prefix.raw_object_type==44u&&
+                    provenance.entity_and_layer_crc_verified&&
+                    provenance.entity_handle==e.handle&&
+                    provenance.raw_entity_type==44u&&
+                    provenance.layer_handle!=0u&&
+                    provenance.entity_aci==common.color_index&&
+                    !provenance.rendering_accepted&&
+                    common.invisibility==0u&&
+                    !provenance.source_entity_invisible;
+            }
             const double ux=place.x_axis[0]*place.text_height;
             const double uy=place.x_axis[1]*place.text_height;
             /* Android Canvas y+ points DOWN, while source world y+ UP.
@@ -547,18 +575,23 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 !valid(x-place.x_axis[1]*height)||
                 !valid(y+place.x_axis[0]*height)))supported=0;
             if(supported){
+                const MusaPreviewV6SourceStyle style=source_style(
+                    &common,6u,colors,&v.provisional_aci_style);
                 const size_t packed=(source.utf8_bytes+2u)/3u;
-                if(packed>SIZE_MAX-10u||
-                   w>SIZE_MAX-10u-packed)return 0;
+                if(packed>SIZE_MAX-10u-style.extra_words||
+                   w>SIZE_MAX-(10u+packed+style.extra_words))return 0;
+                const size_t needed=10u+packed+style.extra_words;
                 if(dst){
-                    if(10u+packed>cap-w)return 0;
-                    dst[w]=(float)(6u*256u+7u); /* unresolved BYLAYER */
-                    dst[w+1u]=(float)x;dst[w+2u]=(float)y;
-                    dst[w+3u]=(float)ux;dst[w+4u]=(float)uy;
-                    dst[w+5u]=(float)vx;dst[w+6u]=(float)vy;
-                    dst[w+7u]=(float)((place.attachment-1u)%3u);
-                    dst[w+8u]=(float)(3u-(place.attachment-1u)/3u);
-                    dst[w+9u]=(float)source.utf8_bytes;
+                    if(w>cap||needed>cap-w)return 0;
+                    dst[w]=style.code;
+                    if(style.extra_words)dst[w+1u]=style.rgb;
+                    const size_t at=w+style.extra_words;
+                    dst[at+1u]=(float)x;dst[at+2u]=(float)y;
+                    dst[at+3u]=(float)ux;dst[at+4u]=(float)uy;
+                    dst[at+5u]=(float)vx;dst[at+6u]=(float)vy;
+                    dst[at+7u]=(float)((place.attachment-1u)%3u);
+                    dst[at+8u]=(float)(3u-(place.attachment-1u)/3u);
+                    dst[at+9u]=(float)source.utf8_bytes;
                     for(size_t b=0u;b<packed;b++){
                         uint32_t packed_word=0u;
                         for(size_t k=0u;k<3u;k++){
@@ -567,10 +600,10 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                                 packed_word|=(uint32_t)
                                   (uint8_t)source.utf8[off]<<(8u*k);
                         }
-                        dst[w+10u+b]=(float)packed_word;
+                        dst[at+10u+b]=(float)packed_word;
                     }
                 }
-                w+=10u+packed;
+                w+=needed;
                 /* World-space source rectangle is a conservative bound
                  * for possible wrapped text. Viewport glyph fidelity is
                  * NOT certified by this envelope. */
@@ -768,7 +801,7 @@ int musa_dwg_ac1032_preview_v6_entity_source_style_code(
     const MusaDwgAc1032EntityCommon *source,uint8_t kind,
     float *code,float *rgb,uint8_t *extra,uint8_t *exact){
     if(!source||!code||!rgb||!extra||!exact||
-       !source->common_decoded||kind<1u||kind>4u||
+       !source->common_decoded||kind<1u||(kind>4u&&kind!=6u)||
        overlaps(source,sizeof(*source),code,sizeof(*code))||
        overlaps(source,sizeof(*source),rgb,sizeof(*rgb))||
        overlaps(source,sizeof(*source),extra,sizeof(*extra))||

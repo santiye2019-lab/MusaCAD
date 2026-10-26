@@ -156,6 +156,10 @@ final class FirstPartyDwgPreview {
                 }
                 String value=new String(utf8,java.nio.charset.StandardCharsets.UTF_8);
                 if(value.startsWith("This a multiline text")){
+                    // Authentic H1C0 is source BYLAYER: its ACI7 is only
+                    // a provisional preview fallback, not resolved layer color.
+                    require(code==6*256+7,
+                            "Real original MTEXT BYLAYER cannot claim direct RGB/ACI");
                     require(near(words[at],7.33298)&&
                             near(words[at+1],14.1158)&&
                             near(words[at+2],0.2)&&
