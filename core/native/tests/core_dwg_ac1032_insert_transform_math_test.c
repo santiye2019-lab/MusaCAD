@@ -35,6 +35,13 @@ int main(void){
     assert(!musa_dwg_ac1032_insert_xy_world_z(&p,base,local,out));
     assert(!memcmp(out,saved,sizeof(saved)));
     p.scale[0]=2;
+    /* Overflow is rejected without modifying the output. */
+    p.insertion[0]=1e308;
+    p.insertion[1]=1e308;
+    p.scale[0]=1e308;
+    assert(!musa_dwg_ac1032_insert_xy_world_z(&p,base,local,out));
+    assert(!memcmp(out,saved,sizeof(saved)));
+    p.insertion[0]=10;p.insertion[1]=20;p.scale[0]=2;
     p.numeric_fields_decoded=0;
     assert(!musa_dwg_ac1032_insert_xy_world_z(&p,base,local,out));
     assert(!memcmp(out,saved,sizeof(saved)));
