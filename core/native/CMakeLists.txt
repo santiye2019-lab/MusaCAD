@@ -61,6 +61,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_ot1_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_ot1_color_smoke
                  COMMAND musacad_core_ac1032_original_ot1_color_test)
+        # Original OT1 H8E appears once in explicit native v6 scene,
+        # without upgrading font, owner or viewport acceptance.
+        add_executable(musacad_core_ac1032_original_ot1_v6_scene_test
+                tests/core_dwg_ac1032_original_ot1_v6_scene_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_v6_scene_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_v6_scene_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_v6_scene_test)
         # Genuine original OT1 TEXT Unicode+WCS -> standalone provisional
         # native v6 type-6 packet, NOT final font/owner/viewport display.
         add_executable(musacad_core_ac1032_original_ot1_v6_packet_test

@@ -69,23 +69,22 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
     MusaAc1032PreviewV6Stats needed={0},copied={0};
     MusaAc1032PreviewV6SourceCensus census={0};
     MusaDwgAc1032Unrendered2dInventory missing2d={0};
-    /* Original OT44 MTEXT now produces a provisional font v6 TEXT packet
-     * with source-authenticated WCS, but no full MTEXT font/layout claim.
-     * Exclude MTEXT from still-unadmitted raw type inequality below. */
+    /* OT1 TEXT and OT44 MTEXT now emit distinct source-authenticated
+     * provisional v6 packets; neither proves font, owner or viewport.
+     * Both are candidates rather than unadmitted raw type families. */
     /* All three views of this scene use the SAME CRC/H-verified original
      * source-index, not a guessed object count or file expansion. This
      * diagnostic counts v6 admitted source records separately from
      * rendered primitives. Not a full AutoCAD visual fidelity claim. */
     ok=musa_dwg_ac1032_scene_display_readiness(scene,&ready)&&
-       musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
+       musa_dwg_ac1032_preview_v6_planar_source_with_text(
         scene,NULL,0u,&needed)&&
-       musa_dwg_ac1032_preview_v6_source_census_with_mtext(scene,&census)&&
+       musa_dwg_ac1032_preview_v6_source_census_with_text(scene,&census)&&
        musa_dwg_ac1032_scene_index_unrendered_2d_inventory(
            scene,&missing2d)&&
        missing2d.original_types_crc_verified==1u&&
        missing2d.complete_2d_display_accepted==0u&&
        missing2d.indexed_records==ready.indexed_records&&
-       missing2d.text_records+
        missing2d.attrib_records+missing2d.attdef_records+
        missing2d.block_begin_records+missing2d.block_end_records+
        missing2d.insert_records+missing2d.minsert_records<=
@@ -110,7 +109,7 @@ Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative(
         words=(float*)malloc(needed.required_float_words*sizeof(float));
         if(!words)ok=0;
     }
-    if(ok)ok=musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
+    if(ok)ok=musa_dwg_ac1032_preview_v6_planar_source_with_text(
          scene,words,needed.required_float_words,&copied)&&
          copied.required_float_words==needed.required_float_words&&
          copied.rendered_primitives==needed.rendered_primitives&&

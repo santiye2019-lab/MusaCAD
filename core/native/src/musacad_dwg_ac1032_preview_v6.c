@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_preview_v6.h"
+#include "musacad_dwg_ac1032_text_v6_packet.h"
 #include "musacad_dwg_ac1032_color_provenance.h"
 #include "musacad_bulge.h"
 #include <float.h>
@@ -312,7 +313,7 @@ static int flat_polyline3d(const MusaDwgAc1032SceneIndex *s,uint64_t h,
 static int process(const MusaDwgAc1032SceneIndex *s,
                    float *dst,size_t cap,
                    MusaAc1032PreviewV6Stats *stats,int curves,int polylines,
-                   int colors,int with_mtext,
+                   int colors,int with_mtext,int with_text,
                    MusaAc1032PreviewV6SourceCensus *census){
     size_t n=musa_dwg_ac1032_scene_index_count(s);
     if(!n||n>MAX_PREVIEW_RECORDS)return 0;
@@ -337,7 +338,7 @@ static int process(const MusaDwgAc1032SceneIndex *s,
         const int candidate=t==19u||t==27u||
               (curves&&(t==17u||t==18u||t==35u))||
               (polylines&&(t==16u||t==77u))||
-              (with_mtext&&t==44u);
+              (with_mtext&&t==44u)||(with_text&&t==1u);
         const size_t prior_primitives=v.rendered_primitives;
         if(candidate)ledger.candidate_source_records++;
         else ledger.other_indexed_records++;
@@ -617,6 +618,60 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                 v.rendered_primitives++;
                 v.provisional_aci_style=1u; /* unresolved actual glyphs */
             }else v.omitted_records++;
+        }else if(t==1u&&with_text){
+            /* Genuine OT1 TEXT, NEVER decoded as MTEXT. The separately
+             * authenticated standalone type-6 source packet preserves TU
+             * Unicode and WCS anchor/basis, but Canvas font metrics and
+             * layer/owner/viewport visibility are NOT equivalent.
+             * Any source-hidden/unsupported original is omitted. */
+            MusaAc1032TextV6PacketStats text={0};
+            MusaDwgAc1032TextBundle b={0};
+            int supported=musa_dwg_ac1032_text_v6_packet(
+                s,e.handle,NULL,0u,&text)&&
+                musa_dwg_ac1032_scene_text_bundle(s,e.handle,&b);
+            double x=0.0,y=0.0,h=0.0,reach=0.0;
+            const double *u=b.world.baseline_unit;
+            const double *vaxis=b.world.up_unit;
+            if(supported){
+                const double *a=(b.world.horizontal_alignment||
+                    b.world.vertical_alignment)?
+                    b.world.alignment:b.world.insertion;
+                x=a[0];y=a[1];h=b.world.height;
+                reach=h*(double)text.utf8_bytes*2.0;
+                supported=valid(x)&&valid(y)&&valid(h)&&h>0.0&&
+                    valid(reach)&&reach>0.0&&
+                    text.source_crc_and_graph_verified&&
+                    text.provisional_font_and_visibility&&
+                    !text.final_display_accepted&&
+                    text.source_handle==e.handle&&
+                    text.source_layer_handle==b.graph.layer_handle;
+                for(unsigned k=0u;supported&&k<4u;k++){
+                    const double along=(k&1u)?reach:-reach;
+                    const double across=(k&2u)?2.0*h:-2.0*h;
+                    if(!valid(x+along*u[0]+across*vaxis[0])||
+                       !valid(y+along*u[1]+across*vaxis[1]))
+                        supported=0;
+                }
+            }
+            if(supported){
+                if(w>SIZE_MAX-text.float_words)return 0;
+                if(dst){
+                    MusaAc1032TextV6PacketStats copied={0};
+                    if(w>cap||text.float_words>cap-w||
+                       !musa_dwg_ac1032_text_v6_packet(
+                         s,e.handle,dst+w,cap-w,&copied)||
+                       memcmp(&copied,&text,sizeof(text)))return 0;
+                }
+                w+=text.float_words;
+                for(unsigned k=0u;k<4u;k++){
+                    const double along=(k&1u)?reach:-reach;
+                    const double across=(k&2u)?2.0*h:-2.0*h;
+                    bounds(x+along*u[0]+across*vaxis[0],
+                           y+along*u[1]+across*vaxis[1],ext,&has);
+                }
+                v.rendered_primitives++;
+                v.provisional_aci_style=1u;
+            }else v.omitted_records++;
         }else if(t==16u&&polylines){
             if(!poly3d){
                 poly3d=(MusaDwgAc1032Polyline3DOrderedVertex*)
@@ -712,13 +767,13 @@ static int process(const MusaDwgAc1032SceneIndex *s,
 static int preview(const MusaDwgAc1032SceneIndex *s,
                   float *words,size_t capacity,
                   MusaAc1032PreviewV6Stats *out,int curves,int polylines,
-                  int colors,int with_mtext){
+                  int colors,int with_mtext,int with_text){
     if(!s||!out||(!words&&capacity)||
        capacity>SIZE_MAX/sizeof(float)||
        (words&&overlaps(words,capacity*sizeof(float),out,sizeof(*out))))
         return 0;
     MusaAc1032PreviewV6Stats before={0};
-    if(!process(s,NULL,0u,&before,curves,polylines,colors,with_mtext,NULL))return 0;
+    if(!process(s,NULL,0u,&before,curves,polylines,colors,with_mtext,with_text,NULL))return 0;
     if(!words){*out=before;return 1;}
     if(capacity<before.required_float_words)return 0;
     /* Build in scratch; malformed source or OOM cannot mutate the
@@ -726,7 +781,7 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
     float *scratch=(float*)malloc(before.required_float_words*sizeof(float));
     if(!scratch)return 0;
     MusaAc1032PreviewV6Stats after={0};
-    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors,with_mtext,NULL)&&
+    int ok=process(s,scratch,before.required_float_words,&after,curves,polylines,colors,with_mtext,with_text,NULL)&&
            !memcmp(&before,&after,sizeof(before));
     if(ok){
         memcpy(words,scratch,before.required_float_words*sizeof(float));
@@ -737,18 +792,18 @@ static int preview(const MusaDwgAc1032SceneIndex *s,
 int musa_dwg_ac1032_preview_v6_line_point(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,0,0,0,0);
+    return preview(s,words,capacity,out,0,0,0,0,0);
 }
 int musa_dwg_ac1032_preview_v6_planar_curves(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,0,0,0);
+    return preview(s,words,capacity,out,1,0,0,0,0);
 }
 
 int musa_dwg_ac1032_preview_v6_planar_polylines(
     const MusaDwgAc1032SceneIndex *s,float *words,size_t capacity,
     MusaAc1032PreviewV6Stats *out){
-    return preview(s,words,capacity,out,1,1,0,0);
+    return preview(s,words,capacity,out,1,1,0,0,0);
 }
 
 /* Diagnostic census over the EXACT preview admission path; caller ABI
@@ -763,7 +818,7 @@ int musa_dwg_ac1032_preview_v6_source_census(
         return 0;
     MusaAc1032PreviewV6Stats stats={0};
     MusaAc1032PreviewV6SourceCensus local={0};
-    if(!process(scene,NULL,0u,&stats,1,1,1,0,&local)||
+    if(!process(scene,NULL,0u,&stats,1,1,1,0,0,&local)||
        (stats.omitted_records>0u&&stats.partial_geometry==0u)||
        local.emitted_v6_primitives!=stats.rendered_primitives||
        local.omitted_v6_records!=stats.omitted_records||
@@ -776,7 +831,7 @@ int musa_dwg_ac1032_preview_v6_source_census(
 int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
     MusaAc1032PreviewV6Stats *out){
-    return preview(scene,words,cap,out,1,1,1,0);
+    return preview(scene,words,cap,out,1,1,1,0,0);
 }
 
 int musa_dwg_ac1032_preview_v6_entity_aci_code(
@@ -828,7 +883,7 @@ int musa_dwg_ac1032_preview_v6_entity_source_style_code(
 int musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
     const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
     MusaAc1032PreviewV6Stats *out){
-    return preview(scene,words,cap,out,1,1,1,1);
+    return preview(scene,words,cap,out,1,1,1,1,0);
 }
 int musa_dwg_ac1032_preview_v6_source_census_with_mtext(
     const MusaDwgAc1032SceneIndex *scene,
@@ -836,7 +891,28 @@ int musa_dwg_ac1032_preview_v6_source_census_with_mtext(
     if(!scene||!out||(const void*)scene==(const void*)out)return 0;
     MusaAc1032PreviewV6Stats stats={0};
     MusaAc1032PreviewV6SourceCensus local={0};
-    if(!process(scene,NULL,0u,&stats,1,1,1,1,&local)||
+    if(!process(scene,NULL,0u,&stats,1,1,1,1,0,&local)||
+       local.emitted_v6_primitives!=stats.rendered_primitives||
+       local.omitted_v6_records!=stats.omitted_records||
+       local.total_indexed_records!=stats.total_indexed_records||
+       local.complete_dwg_display_accepted)return 0;
+    *out=local;return 1;
+}
+
+/* Explicit opt-in original OT1 TEXT + OT44 MTEXT diagnostic preview.
+ * No final font, model-space, viewport, BYLAYER/BYBLOCK or block ancestry. */
+int musa_dwg_ac1032_preview_v6_planar_source_with_text(
+    const MusaDwgAc1032SceneIndex *scene,float *words,size_t cap,
+    MusaAc1032PreviewV6Stats *out){
+    return preview(scene,words,cap,out,1,1,1,1,1);
+}
+int musa_dwg_ac1032_preview_v6_source_census_with_text(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out){
+    if(!scene||!out||(const void*)scene==(const void*)out)return 0;
+    MusaAc1032PreviewV6Stats stats={0};
+    MusaAc1032PreviewV6SourceCensus local={0};
+    if(!process(scene,NULL,0u,&stats,1,1,1,1,1,&local)||
        local.emitted_v6_primitives!=stats.rendered_primitives||
        local.omitted_v6_records!=stats.omitted_records||
        local.total_indexed_records!=stats.total_indexed_records||
