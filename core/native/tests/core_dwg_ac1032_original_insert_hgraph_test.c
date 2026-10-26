@@ -14,6 +14,8 @@
 #include "musacad_dwg_ac1032_block_child_color_evidence.h"
 #include "musacad_dwg_ac1032_block_child_layer_style_provenance.h"
 #include "musacad_dwg_ac1032_block_pair_source_isolation.h"
+#include "musacad_dwg_ac1032_insert_child_source_join.h"
+#include "musacad_dwg_ac1032_insert_instance_source_pair.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1010,6 +1012,131 @@ static int genuine(const char *file){
                !memcmp(&pair,&before,sizeof(pair))&&
                !musa_dwg_ac1032_block_pair_source_isolation(
                     scene,UINT64_C(0x1b8),UINT64_C(0x17d),NULL)&&
+               !memcmp(&pair,&before,sizeof(pair));
+        }
+    }
+    if(ok){
+        /* Independent original example_2018.dwg + companion DXF oracle:
+         * INSERT H1C8->H1B8 (13), H190/H756->H17D (5).
+         * Every candidate coordinate, original OT51 layer and encoded
+         * source color must join on the EXACT child H/type and order.
+         * Neither a successful join nor explicit color permits paint. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        const uint32_t counts[]={13u,5u,5u};
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertChildSourceJoin joined={0},repeat={0};
+            MusaDwgAc1032InsertChildCoordinateProbe probe={0};
+            MusaDwgAc1032BlockChildLayerStyleProvenance styles={0};
+            MusaDwgAc1032BlockChildColorEvidence colors={0};
+            ok=musa_dwg_ac1032_insert_child_source_join(
+                   scene,inserts[b],&joined)&&
+               musa_dwg_ac1032_insert_child_source_join(
+                   scene,inserts[b],&repeat)&&
+               !memcmp(&joined,&repeat,sizeof(joined))&&
+               musa_dwg_ac1032_insert_child_coordinate_probe(
+                   scene,inserts[b],&probe)&&
+               musa_dwg_ac1032_block_child_layer_style_provenance(
+                   scene,blocks[b],&styles)&&
+               musa_dwg_ac1032_block_child_color_evidence(
+                   scene,blocks[b],&colors)&&
+               joined.insert_handle==inserts[b]&&
+               joined.block_header_handle==blocks[b]&&
+               joined.child_count==counts[b]&&
+               joined.mapped_count==probe.mapped_candidates&&
+               joined.unmapped_count==probe.unmapped_candidates&&
+               joined.original_insert_block_child_source_join_verified&&
+               !joined.reverse_ownership_verified&&
+               !joined.space_and_viewport_verified&&
+               !joined.final_paint_accepted;
+            for(uint32_t i=0u;ok&&i<joined.child_count;i++){
+                const MusaDwgAc1032InsertChildSourceRow *r=&joined.rows[i];
+                const MusaDwgAc1032BlockChildLayerStyleRow *st=&styles.rows[i];
+                const MusaDwgAc1032BlockChildColorRow *co=&colors.rows[i];
+                ok=r->child_handle==probe.child_handles[i]&&
+                   r->child_handle==st->child_handle&&
+                   r->child_handle==co->child_handle&&
+                   r->raw_object_type==probe.child_types[i]&&
+                   r->raw_object_type==st->raw_object_type&&
+                   r->raw_object_type==co->raw_object_type&&
+                   r->source_layer_handle==st->layer_handle&&
+                   r->source_layer_handle==co->source_layer_handle&&
+                   r->raw_color_index==co->raw_color_index&&
+                   r->raw_rgb==co->raw_rgb&&
+                   r->source_style_class==st->source_style_class&&
+                   r->source_color_status==co->source_color_status&&
+                   r->coordinate_mapped==probe.anchor_mapped[i]&&
+                   r->line_end_mapped==probe.line_end_mapped[i]&&
+                   !r->reverse_owner_verified&&
+                   !r->visibility_and_paint_accepted;
+                if(ok&&r->coordinate_mapped){
+                    ok=!memcmp(r->world_anchor,probe.world_anchor[i],
+                               sizeof(r->world_anchor));
+                    if(ok&&r->line_end_mapped)
+                        ok=!memcmp(r->world_line_end,probe.world_line_end[i],
+                                   sizeof(r->world_line_end));
+                }
+                if(ok&&(r->source_style_class==
+                           MUSACAD_AC1032_SOURCE_STYLE_BYLAYER||
+                        r->source_style_class==
+                           MUSACAD_AC1032_SOURCE_STYLE_BYBLOCK||
+                        r->source_style_class==
+                           MUSACAD_AC1032_SOURCE_STYLE_HIDDEN))
+                    ok=!r->visibility_and_paint_accepted;
+            }
+            if(ok){
+                const MusaDwgAc1032InsertChildSourceJoin before=joined;
+                ok=!musa_dwg_ac1032_insert_child_source_join(
+                        scene,blocks[b],&joined)&&
+                   !memcmp(&joined,&before,sizeof(joined))&&
+                   !musa_dwg_ac1032_insert_child_source_join(
+                        scene,UINT64_MAX,&joined)&&
+                   !memcmp(&joined,&before,sizeof(joined))&&
+                   !musa_dwg_ac1032_insert_child_source_join(
+                        scene,inserts[b],NULL)&&
+                   !memcmp(&joined,&before,sizeof(joined));
+            }
+        }
+    }
+    if(ok){
+        /* Independent original example_2018.dwg/DXF: two distinct INSERTs
+         * H190 and H756 target the SAME OT49 H17D with five children.
+         * Original layer/color provenance must not change with instance
+         * transform. H1C8 targets a DIFFERENT block and must be rejected. */
+        MusaDwgAc1032InsertInstanceSourcePair pair={0},reverse={0};
+        ok=musa_dwg_ac1032_insert_instance_source_pair(
+               scene,UINT64_C(0x190),UINT64_C(0x756),&pair)&&
+           musa_dwg_ac1032_insert_instance_source_pair(
+               scene,UINT64_C(0x756),UINT64_C(0x190),&reverse)&&
+           pair.first_insert==UINT64_C(0x190)&&
+           pair.second_insert==UINT64_C(0x756)&&
+           pair.shared_block_header==UINT64_C(0x17d)&&
+           pair.matched_child_sources==5u&&
+           pair.original_child_provenance_instance_invariant&&
+           !pair.distinct_transform_verified&&
+           !pair.owner_and_visibility_verified&&
+           !pair.final_paint_accepted&&
+           reverse.first_insert==pair.second_insert&&
+           reverse.second_insert==pair.first_insert&&
+           reverse.shared_block_header==pair.shared_block_header&&
+           reverse.matched_child_sources==pair.matched_child_sources&&
+           reverse.first_mapped==pair.second_mapped&&
+           reverse.second_mapped==pair.first_mapped;
+        if(ok){
+            const MusaDwgAc1032InsertInstanceSourcePair before=pair;
+            ok=!musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x1c8),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x190),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_MAX,&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x756),NULL)&&
                !memcmp(&pair,&before,sizeof(pair));
         }
     }
