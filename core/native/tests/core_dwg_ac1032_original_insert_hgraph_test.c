@@ -4,6 +4,7 @@
  * Source H/CRC and insertion-point math only. No nested block expansion or visible scene claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_insert_binding.h"
+#include "musacad_dwg_ac1032_block_header_identity.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
 #include <stdint.h>
 #include <math.h>
@@ -81,6 +82,17 @@ static int genuine(const char *file){
                          &binding,&missing,local,world)&&
                      !memcmp(world,original_world,sizeof(world));
         }
+        if(ok){
+            MusaDwgAc1032BlockHeaderIdentity block={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_identity(
+                   scene,e->block,&block)&&
+               block.indexed_handle==e->block&&
+               block.original_record_crc_verified&&
+               block.embedded_self_handle_verified&&
+               block.empty_eed_verified&&
+               block.no_reactors_verified&&
+               !block.base_point_decoded;
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
@@ -123,6 +135,52 @@ static int genuine(const char *file){
                 scene,UINT64_C(0x1b8),&unchanged_binding)&&
            !memcmp(&unchanged_binding,&original_binding,
                    sizeof(unchanged_binding));
+    }
+    /* An OT49 parser must reject an unauthenticated payload before
+     * attempting any BLOCK_HEADER base-point interpretation. */
+    if(ok){
+        const uint8_t fake[2]={0,0};
+        MusaDwgAc1032ObjectStreams layout={0};
+        MusaDwgAc1032BlockHeaderIdentity identity;
+        memset(&identity,0x5a,sizeof(identity));
+        const MusaDwgAc1032BlockHeaderIdentity saved_identity=identity;
+        layout.indexed_handle=UINT64_C(0x1b8);
+        layout.raw_object_type=49u;
+        layout.object_type_field_bits=10u;
+        layout.total_payload_bits=16u;
+        layout.data_stream_bits=12u;
+        layout.handle_stream_start_bit=12u;
+        layout.handle_stream_bits=4u;
+        ok=!musa_dwg_ac1032_block_header_ot49_identity(
+              fake,sizeof(fake),&layout,&identity)&&
+           !memcmp(&identity,&saved_identity,sizeof(identity));
+        /* A CRC bit alone must not authorize an OT49 identity: a
+         * mismatched object type and malformed prefix both fail closed. */
+        layout.original_record_crc_verified=1u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
+        layout.raw_object_type=51u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
+        layout.raw_object_type=49u;
+        /* Aliased output/payload is never accepted, even with a CRC
+         * claim, and no bytes of the original buffer may be changed. */
+        {
+            uint8_t shared[sizeof(MusaDwgAc1032BlockHeaderIdentity)+2u];
+            memset(shared,0x3c,sizeof(shared));
+            uint8_t saved_shared[sizeof(shared)];
+            memcpy(saved_shared,shared,sizeof(shared));
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                 shared,sizeof(shared),&layout,
+                 (MusaDwgAc1032BlockHeaderIdentity *)(void *)shared)&&
+                 !memcmp(shared,saved_shared,sizeof(shared));
+        }
+        layout.handle_stream_start_bit=11u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
     }
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
