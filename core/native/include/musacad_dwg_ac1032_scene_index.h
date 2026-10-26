@@ -50,6 +50,12 @@ int musa_dwg_ac1032_scene_index_object_type(
 /* Authenticated original R2018 OT4 BLOCK begin entity-common only.
  * BLOCK_HEADER owner, child sequence, names, nested INSERT and display
  * remain UNVERIFIED; BLOCK marker itself is never painted. */
+/* Authenticated original R2018 OT5 ENDBLK entity-common only.
+ * ENDBLK is a nonpaintable marker; BLOCK_HEADER ownership, sequence and
+ * final visibility remain UNVERIFIED. */
+int musa_dwg_ac1032_scene_index_read_endblk_common(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032EntityCommon *out);
 int musa_dwg_ac1032_scene_index_read_block_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
