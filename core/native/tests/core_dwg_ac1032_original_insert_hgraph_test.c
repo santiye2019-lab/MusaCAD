@@ -1771,6 +1771,14 @@ static int genuine(const char *file){
            circle.h4_h5_source_verified_count==1u&&
            circle.h4_h5_unresolved_count==0u&&
            !circle.final_visibility_and_paint_accepted;
+        fprintf(stderr,"REL_CIRCLE first ok=%d verified=%u unresolved=%u mapped=%u sourceChildren=%u style=%u owner=H%llX layer=H%llX\n",
+            ok,(unsigned)circle.h4_h5_source_verified_count,
+            (unsigned)circle.h4_h5_unresolved_count,
+            (unsigned)circle.verified_circle_count,
+            (unsigned)source.child_count,
+            (unsigned)circle.rows[0].source_style_class,
+            (unsigned long long)circle.rows[0].verified_block_owner_handle,
+            (unsigned long long)circle.rows[0].source_layer_handle);
         if(ok){
             const MusaDwgAc1032InsertCircleSourceAxesRow *c=&circle.rows[0];
             const double radius=130.0490046078758;
@@ -1788,6 +1796,9 @@ static int genuine(const char *file){
                fabs(c->world_axis_u[1])<1e-6&&
                fabs(c->world_axis_v[0])<1e-6&&
                fabs(c->world_axis_v[1]-radius)<1e-6;
+            fprintf(stderr,"REL_CIRCLE afterrow ok=%d, src_color=%u src_aci=%u src_rgb=%u\n",
+                ok,(unsigned)c->source_color_status,
+                (unsigned)c->source_aci,(unsigned)c->source_rgb24);
             uint32_t source_circles=0u;
             for(uint32_t i=0u;ok&&i<source.child_count;i++){
                 if(source.rows[i].raw_object_type!=18u)continue;
@@ -1800,6 +1811,11 @@ static int genuine(const char *file){
                    c->source_aci==source.rows[i].raw_color_index&&
                    c->source_rgb24==source.rows[i].raw_rgb;
             }
+            fprintf(stderr,"REL_CIRCLE source ok=%d count=%u common=%u color=%u layer=H%llX\n",
+                ok,(unsigned)source_circles,
+                (unsigned)source.rows[0].original_common_verified,
+                (unsigned)source.rows[0].source_color_status,
+                (unsigned long long)source.rows[0].source_layer_handle);
             ok=ok&&source_circles==1u;
         }
         /* Genuine original H1BB numeric DATA and CRC-indexed relative H12
