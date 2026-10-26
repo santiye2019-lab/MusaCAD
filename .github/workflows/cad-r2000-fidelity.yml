@@ -1,6 +1,12 @@
 name: Modern DWG AC1032 reader and legacy writer proof
-# Re-evaluate PR #567 after conditional INSERT attribute-count decoder correction.
+# Run genuine DWG proof on each PR #567 branch update as well as manual dispatch.
 on:
+  push:
+    branches:
+      - feature/ac1032-genuine-insert-ocs-placement-20261026
+    paths:
+      - 'core/native/**'
+      - '.github/workflows/cad-r2000-fidelity.yml'
   pull_request:
     branches: [main]
     paths:
