@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1032_insert_binding.h"
 #include "musacad_dwg_ac1032_block_header_identity.h"
 #include "musacad_dwg_ac1032_insert_transform.h"
+#include "musacad_dwg_ac1032_insert_original_base_map.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -238,6 +239,32 @@ static int genuine(const char *file){
                 ok=!musa_dwg_ac1032_scene_index_read_block_header_base(
                         scene,e->h,&base)&&
                    !memcmp(&before,&base,sizeof(base));
+            }
+        }
+        if(ok){
+            /* The independent companion DXF says both referenced BLOCK
+             * origins are (0,0,0). Use the actual OT49 base reader and
+             * original INSERT placement; do not inject a synthetic base. */
+            MusaDwgAc1032InsertPlacement placement={0};
+            const double local[3]={0.0,0.0,0.0};
+            double mapped[3]={NAN,NAN,NAN};
+            ok=musa_dwg_ac1032_scene_index_read_insert_placement(
+                   scene,e->h,&placement)&&
+               musa_dwg_ac1032_insert_map_original_block_base(
+                   scene,e->h,local,mapped);
+            if(ok){
+                for(unsigned k=0u;k<3u;k++)
+                    if(fabs(mapped[k]-placement.insertion[k])>1e-9)ok=0;
+            }
+            if(ok){
+                const double before[3]={mapped[0],mapped[1],mapped[2]};
+                const double bad_local[3]={NAN,0.0,0.0};
+                ok=!musa_dwg_ac1032_insert_map_original_block_base(
+                       scene,e->block,local,mapped)&&
+                   !memcmp(mapped,before,sizeof(mapped))&&
+                   !musa_dwg_ac1032_insert_map_original_block_base(
+                       scene,e->h,bad_local,mapped)&&
+                   !memcmp(mapped,before,sizeof(mapped));
             }
         }
         /* A verified source H graph must agree with the independently
