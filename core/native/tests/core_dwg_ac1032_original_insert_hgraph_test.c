@@ -61,6 +61,26 @@ static int genuine(const char *file){
                binding.graph.layer_handle==e->layer&&
                binding.placement.indexed_handle==e->h;
         }
+        if(ok){
+            MusaDwgAc1032InsertBinding binding={0};
+            MusaDwgAc1032BlockBaseEvidence missing={0};
+            double world[3]={123.0,456.0,789.0};
+            const double original_world[3]={123.0,456.0,789.0};
+            const double local[3]={0.0,0.0,0.0};
+            ok=musa_dwg_ac1032_insert_bind_source(
+                   scene,e->h,&binding)&&
+               !musa_dwg_ac1032_insert_map_verified_base(
+                   &binding,&missing,local,world)&&
+               !memcmp(world,original_world,sizeof(world));
+            /* A foreign BLOCK_HEADER H must never authorize geometry.
+             * This evidence is synthetic and deliberately not accepted. */
+            missing.block_header_handle=e->block+1u;
+            missing.original_block_header_crc_verified=1u;
+            missing.base_point_decoded=1u;
+            if(ok)ok=!musa_dwg_ac1032_insert_map_verified_base(
+                         &binding,&missing,local,world)&&
+                     !memcmp(world,original_world,sizeof(world));
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
