@@ -4,6 +4,7 @@
 #include "musacad_dwg_ac1032_insert.h"
 #include "musacad_dwg_ac1015_values.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #define LIMIT (64u*1024u*1024u)
 static int overlaps(const void *a,size_t n,const void *b,size_t m){
@@ -63,8 +64,15 @@ int musa_dwg_ac1032_insert_placement_at(
     if(v.has_attribs &&
        !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
         return 0;
-    if(b.bit_pos!=b.bit_end||
-       (!v.has_attribs&&v.owned_attrib_count!=0u)||
+    if(b.bit_pos!=b.bit_end){
+        fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\\n",
+            (unsigned long long)v.indexed_handle,geom,(size_t)l->data_stream_bits,
+            b.bit_pos,b.bit_end-b.bit_pos,(unsigned)v.scale_data_flags,
+            (unsigned)v.has_attribs,(unsigned)v.owned_attrib_count,
+            v.insertion[0],v.insertion[1],v.insertion[2]);
+        return 0;
+    }
+    if((!v.has_attribs&&v.owned_attrib_count!=0u)||
        v.owned_attrib_count>100000u||
        !isfinite(v.rotation))return 0;
     for(unsigned k=0u;k<3u;k++)
