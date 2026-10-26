@@ -42,6 +42,32 @@ int main(void){
     assert(!musa_dwg_ac1032_insert_xy_world_z(&p,base,local,out));
     assert(!memcmp(out,saved,sizeof(saved)));
     p.insertion[0]=10;p.insertion[1]=20;p.scale[0]=2;
+    /* Two-level INSERT composition: parent base is explicit synthetic
+     * input, not inferred from the original DWG BLOCK_HEADER. */
+    MusaDwgAc1032InsertPlacement child={0},composed={0};
+    child.numeric_fields_decoded=1;
+    child.original_record_crc_verified=1;
+    child.insertion[0]=3;child.insertion[1]=4;child.insertion[2]=5;
+    child.scale[0]=2;child.scale[1]=2;child.scale[2]=2;
+    child.extrusion[2]=1;
+    assert(musa_dwg_ac1032_insert_compose_world_z(
+        &p,base,&child,&composed));
+    assert(eq(composed.insertion[0],14)&&
+           eq(composed.insertion[1],26)&&
+           eq(composed.insertion[2],38));
+    assert(eq(composed.scale[0],4)&&
+           eq(composed.scale[1],6)&&
+           eq(composed.scale[2],8));
+    const MusaDwgAc1032InsertPlacement saved_composed=composed;
+    child.rotation=acos(-1.0)/4.0;
+    assert(!musa_dwg_ac1032_insert_compose_world_z(
+        &p,base,&child,&composed));
+    assert(!memcmp(&composed,&saved_composed,sizeof(composed)));
+    child.rotation=0;
+    child.scale[0]=INFINITY;
+    assert(!musa_dwg_ac1032_insert_compose_world_z(
+        &p,base,&child,&composed));
+    assert(!memcmp(&composed,&saved_composed,sizeof(composed)));
     p.numeric_fields_decoded=0;
     assert(!musa_dwg_ac1032_insert_xy_world_z(&p,base,local,out));
     assert(!memcmp(out,saved,sizeof(saved)));
