@@ -54,6 +54,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_mtext_v6_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_mtext_v6_color_smoke
                  COMMAND musacad_core_ac1032_mtext_v6_color_test)
+        # Real R2018 OT1 TEXT H8E independently joined source ENC and
+        # OT51 Unicode layer; NOT final layer/viewport display.
+        add_executable(musacad_core_ac1032_original_ot1_color_test
+                tests/core_dwg_ac1032_original_ot1_color_provenance_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_color_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_color_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_color_test)
         # Genuine OT1 TEXT R2018 numeric OCS placement (not MTEXT).
         add_executable(musacad_core_ac1032_original_ot1_placement_test
                 tests/core_dwg_ac1032_original_ot1_placement_test.c)
