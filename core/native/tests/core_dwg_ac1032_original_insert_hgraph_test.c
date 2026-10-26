@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Genuine unchanged R2018 example_2018.dwg vs independent companion DXF:
  * INSERT H1C8/H190/H756, LAYER/BLOCK_RECORD, ATTRIB and SEQEND handles.
- * Source H/CRC only. No nested block expansion or visible scene claim. */
+ * Source H/CRC and insertion-point math only. No nested block expansion or visible scene claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_insert_transform.h"
 #include <stdint.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +62,19 @@ static int genuine(const char *file){
                p.owned_attrib_count==g.owned_attrib_count&&
                p.has_attribs==(uint8_t)(e->count!=0u)&&
                !p.block_graph_and_display_accepted;
+            /* Genuine source INSERT + independent transform oracle:
+             * identity block base is synthetic; not yet a BLOCK_HEADER
+             * base-point or final scene-geometry verification. */
+            if(ok&&e->h==UINT64_C(0x1c8)){
+                const double base[3]={0.0,0.0,0.0};
+                const double origin[3]={0.0,0.0,0.0};
+                double mapped[3]={NAN,NAN,NAN};
+                ok=musa_dwg_ac1032_insert_xy_world_z(
+                    &p,base,origin,mapped)&&
+                    fabs(mapped[0]-p.insertion[0])<1e-9&&
+                    fabs(mapped[1]-p.insertion[1])<1e-9&&
+                    fabs(mapped[2]-p.insertion[2])<1e-9;
+            }
         }
     }
     if(ok){
@@ -84,7 +99,7 @@ static int genuine(const char *file){
              scene,UINT64_C(0x191),&unchanged)&&
            !memcmp(&unchanged,&saved,sizeof(unchanged));
     }
-    fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph; "
+    fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
         ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
