@@ -215,6 +215,22 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS genuine INSERT source H graph; no block expansion or rendering"
 
+      - name: P0 source-only all original R2018 INSERT LINE v6 packet with real WCS and CRC H graph
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbBlockReference' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_all_insert_line_v6_diagnostic_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-all-insert-line-v6
+          timeout 120s /tmp/musacad-r2018-all-insert-line-v6 "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS genuine R2018 multi-INSERT source v6: partial only, no paint"
+
       - name: P0 original R2018 INSERT H graph to real Unicode LAYER and raw status provenance
         run: |
           set -euo pipefail
