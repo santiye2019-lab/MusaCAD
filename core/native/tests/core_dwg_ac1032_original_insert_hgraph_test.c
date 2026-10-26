@@ -177,6 +177,14 @@ static int genuine(const char *file){
                  (MusaDwgAc1032BlockHeaderIdentity *)(void *)shared)&&
                  !memcmp(shared,saved_shared,sizeof(shared));
         }
+        {
+            MusaDwgAc1032BlockHeaderFieldSpan span;
+            memset(&span,0x5a,sizeof(span));
+            const MusaDwgAc1032BlockHeaderFieldSpan before=span;
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_field_span(
+                  fake,sizeof(fake),&layout,&span)&&
+                  !memcmp(&span,&before,sizeof(span));
+        }
         layout.handle_stream_start_bit=11u;
         if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
                     fake,sizeof(fake),&layout,&identity)&&
