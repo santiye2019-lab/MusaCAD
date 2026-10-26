@@ -22,6 +22,12 @@ public final class FirstPartyDwgPreview {
             String inputPath,long insertHandle,int maxFloatWords,long[] audit)
             throws IOException;
 
+    /* All real source-verified INSERT LINEs in one experimental scene, still
+     * deliberately PARTIAL; not the editable DWG document open route. */
+    private static native float[] readAllInsertLinesNative(
+            String inputPath,int maxFloatWords,long[] audit)
+            throws IOException;
+
     /** Genuine source evidence, NOT display-ready color or visibility.
      * Counts R2018 indexed OBJECT records, including non-entity records.
      * The diagnostic deliberately does not infer model-space owners or XREF. */
@@ -173,6 +179,66 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Bos INSERT icin sahte geometri paketi");
         }
         return new InsertLineDiagnostic(parsed,evidence);
+    }
+
+    /** An entire source file's authenticated INSERT LINE instances in ONE
+     * vector scene. This proves neither all original 2B objects were read
+     * nor that model/paper-space visibility and final colors are correct. */
+    public static final class AllInsertLinesDiagnostic {
+        public final NativeScene scene;
+        public final long indexedRecords,candidateInserts,verifiedInserts;
+        public final long unsupportedInserts,sourceLines,admittedLines,omittedLines;
+        public final boolean incomplete;
+        private AllInsertLinesDiagnostic(NativeScene verified,long[] audit){
+            scene=verified;
+            indexedRecords=audit[0];
+            candidateInserts=audit[1];
+            verifiedInserts=audit[2];
+            unsupportedInserts=audit[3];
+            sourceLines=audit[4];
+            admittedLines=audit[5];
+            omittedLines=audit[6];
+            incomplete=true;
+        }
+    }
+
+    /** Experiment: show all independently authenticated R2018 INSERT LINE
+     * instances together without requiring a user-supplied H. Unknown
+     * BYLAYER/BYBLOCK, layer off/freeze, XREF and viewport remain omitted
+     * or uncertain; never use the result as a normal editable DWG model. */
+    public static AllInsertLinesDiagnostic readAllInsertLinesDiagnostic(
+            File original,int maxFloatWords)throws IOException {
+        if(original==null||!original.isFile())
+            throw new IOException("Kaynak DWG bulunamadi");
+        if(maxFloatWords<7||maxFloatWords>9*1024*1024)
+            throw new IOException("Coklu INSERT bellek siniri gecersiz");
+        long[] audit=new long[11];
+        float[] v6=readAllInsertLinesNative(
+                original.getAbsolutePath(),maxFloatWords,audit);
+        if(v6==null||v6.length<7||
+           v6.length>1048576||v6.length>maxFloatWords||
+           audit[0]<1||audit[0]>1000000||
+           audit[1]<0||audit[1]>4096||
+           audit[2]<0||audit[3]<0||audit[2]+audit[3]!=audit[1]||
+           audit[4]<0||audit[4]>4096L*64L||
+           audit[5]<0||audit[6]<0||audit[5]+audit[6]!=audit[4]||
+           audit[5]>Integer.MAX_VALUE||
+           audit[7]!=v6.length||
+           audit[8]!=(audit[5]>0?1:0)||
+           audit[9]!=1||audit[10]!=0||
+           v6[0]!=6f||v6[1]!=(float)audit[5]||v6[6]!=1f||
+           audit[5]*5L>v6.length-7L||
+           audit[5]*6L<v6.length-7L)
+            throw new IOException("Coklu INSERT kaynak raporu tutarsiz");
+        NativeScene parsed=null;
+        if(audit[5]!=0L){
+            parsed=NativeScene.fromRaw(v6);
+            if(parsed.primitiveCount!=audit[5]||!parsed.truncated)
+                throw new IOException("Coklu blok sahnesi hatali veya tam isaretlenmis");
+        }else if(v6.length!=7){
+            throw new IOException("Bos blok listesinden sahte cizim uretildi");
+        }
+        return new AllInsertLinesDiagnostic(parsed,audit);
     }
 
 }
