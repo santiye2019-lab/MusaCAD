@@ -28,6 +28,12 @@ public final class FirstPartyDwgPreview {
             String inputPath,int maxFloatWords,long[] audit)
             throws IOException;
 
+    /* Numeric-only WCS CIRCLE silhouettes. ACI6 is a deliberately
+     * NON-SOURCE wireframe indicator, NEVER original DWG color. */
+    private static native float[] readCircleGeometryEvidenceNative(
+            String inputPath,int maxFloatWords,long[] audit)
+            throws IOException;
+
     /** Genuine source evidence, NOT display-ready color or visibility.
      * Counts R2018 indexed OBJECT records, including non-entity records.
      * The diagnostic deliberately does not infer model-space owners or XREF. */
@@ -289,6 +295,65 @@ public final class FirstPartyDwgPreview {
             throw new IOException("Kaynak 2B ve blok nesneleri uyusmuyor");
         return new CombinedSourcesDiagnostic(
                 unified,direct.readiness,inserts);
+    }
+
+    /** Separate diagnostic of original transformed CIRCLE numeric geometry.
+     * ACI6 outlines are a non-source warning color: owners, H4/H5, layer
+     * visibility, BYLAYER/BYBLOCK and actual paint remain UNKNOWN. */
+    public static final class CircleGeometryEvidence {
+        public final NativeScene scene;
+        public final long insertCandidates,verifiedInserts,unsupportedInserts;
+        public final long circleCandidates,verifiedNumericCircles;
+        public final long unresolvedOwnerOrLayer,omittedCircles;
+        public final boolean sourceColorKnown,complete;
+        private CircleGeometryEvidence(NativeScene value,long[] audit){
+            scene=value;
+            insertCandidates=audit[1];
+            verifiedInserts=audit[2];
+            unsupportedInserts=audit[3];
+            circleCandidates=audit[4];
+            verifiedNumericCircles=audit[5];
+            omittedCircles=audit[6];
+            unresolvedOwnerOrLayer=audit[7];
+            sourceColorKnown=false;complete=false;
+        }
+    }
+
+    public static CircleGeometryEvidence readCircleGeometryEvidence(
+            File original,int maxFloatWords)throws IOException{
+        if(original==null||!original.isFile())
+            throw new IOException("Orijinal DWG bulunamadi");
+        if(maxFloatWords<7||maxFloatWords>9*1024*1024)
+            throw new IOException("Tel-kafes DWG bellek siniri gecersiz");
+        long[] audit=new long[11];
+        float[] packet=readCircleGeometryEvidenceNative(
+                original.getAbsolutePath(),maxFloatWords,audit);
+        if(packet==null||packet.length<7||
+           packet.length>7+1024*(2+2*65)||
+           packet.length>maxFloatWords||
+           audit[0]<=0||audit[0]>1000000||
+           audit[1]<0||audit[1]>4096||
+           audit[2]<0||audit[3]<0||
+           audit[2]+audit[3]!=audit[1]||
+           audit[4]<0||audit[5]<0||audit[6]<0||
+           audit[5]+audit[6]!=audit[4]||
+           audit[7]<0||audit[7]>audit[5]||
+           audit[8]!=audit[5]||audit[5]>1024||
+           audit[9]!=packet.length||audit[10]!=1||
+           packet[0]!=6f||packet[1]!=(float)audit[8]||
+           packet[6]!=1f||packet.length!=7+audit[8]*132L)
+            throw new IOException("Sayisal DWG CIRCLE kaniti tutarsiz");
+        NativeScene parsed=null;
+        if(audit[8]>0){
+            for(int i=7;i<packet.length;i+=132){
+                if(packet[i]!=518f||packet[i+1]!=65f)
+                    throw new IOException("Tel-kafes CIRCLE renk/tur etiketi degistirildi");
+            }
+            parsed=NativeScene.fromRaw(packet);
+            if(!parsed.truncated||parsed.primitiveCount!=audit[8])
+                throw new IOException("Sayisal CIRCLE gorunumu tam DWG gibi isaretlendi");
+        }
+        return new CircleGeometryEvidence(parsed,audit);
     }
 
 }

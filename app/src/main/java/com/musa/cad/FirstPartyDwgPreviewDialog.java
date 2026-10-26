@@ -83,6 +83,10 @@ public final class FirstPartyDwgPreviewDialog {
         inspectCombined.setText("2B çizim + tüm blokları birlikte göster (deneysel)");
         inspectCombined.setEnabled(false);
         layout.addView(inspectCombined);
+        final Button inspectNumericCircle=new Button(owner);
+        inspectNumericCircle.setText("Blok CIRCLE geometrisini göster (renk orijinal DEĞİL)");
+        inspectNumericCircle.setEnabled(false);
+        layout.addView(inspectNumericCircle);
         final TextView status=new TextView(owner);
         status.setPadding(0,pad/2,0,pad/2);
         status.setMaxLines(5);
@@ -134,6 +138,7 @@ public final class FirstPartyDwgPreviewDialog {
             inspectBlock.setEnabled(false);
             inspectAllBlocks.setEnabled(false);
             inspectCombined.setEnabled(false);
+            inspectNumericCircle.setEnabled(false);
             activeReaders.incrementAndGet();
             new Thread(()->{
                 try{
@@ -171,6 +176,7 @@ public final class FirstPartyDwgPreviewDialog {
                             inspectBlock.setEnabled(true);
                             inspectAllBlocks.setEnabled(true);
                             inspectCombined.setEnabled(true);
+                            inspectNumericCircle.setEnabled(true);
                         }
                     });
                 }
@@ -185,6 +191,7 @@ public final class FirstPartyDwgPreviewDialog {
             inspectBlock.setEnabled(false);
             inspectAllBlocks.setEnabled(false);
             inspectCombined.setEnabled(false);
+            inspectNumericCircle.setEnabled(false);
             activeReaders.incrementAndGet();
             Thread allTask=new Thread(()->{
                 try{
@@ -224,6 +231,7 @@ public final class FirstPartyDwgPreviewDialog {
                         inspectBlock.setEnabled(true);
                         inspectAllBlocks.setEnabled(true);
                         inspectCombined.setEnabled(true);
+                        inspectNumericCircle.setEnabled(true);
                     });
                 }
             },"MusaCAD-OriginalAllINSERT-Partial2D");
@@ -235,6 +243,7 @@ public final class FirstPartyDwgPreviewDialog {
             inspectBlock.setEnabled(false);
             inspectAllBlocks.setEnabled(false);
             inspectCombined.setEnabled(false);
+            inspectNumericCircle.setEnabled(false);
             activeReaders.incrementAndGet();
             Thread combinedTask=new Thread(()->{
                 try{
@@ -275,11 +284,70 @@ public final class FirstPartyDwgPreviewDialog {
                         inspectBlock.setEnabled(true);
                         inspectAllBlocks.setEnabled(true);
                         inspectCombined.setEnabled(true);
+                        inspectNumericCircle.setEnabled(true);
                     });
                 }
             },"MusaCAD-OriginalCombinedSource2D");
             combinedTask.setDaemon(true);
             combinedTask.start();
+        });
+
+        /* Explicit NUMERIC geometry inspection only: magenta ACI6 strokes
+         * are a user-interface alert and NOT DWG source ACI, layer or paint.
+         * An unresolved H4/H5 CIRCLE is NOT promoted to an owned block. */
+        inspectNumericCircle.setOnClickListener(view->{
+            if(dismissed.get())return;
+            inspectBlock.setEnabled(false);
+            inspectAllBlocks.setEnabled(false);
+            inspectCombined.setEnabled(false);
+            inspectNumericCircle.setEnabled(false);
+            activeReaders.incrementAndGet();
+            Thread circleTask=new Thread(()->{
+                try{
+                    FirstPartyDwgPreview.CircleGeometryEvidence result=
+                        FirstPartyDwgPreview.readCircleGeometryEvidence(
+                            source,MAX_FLOAT_WORDS);
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        sceneCanvas.setScene(result.scene);
+                        status.setText("SAYISAL CIRCLE TEL-KAFES • ORİJİNAL RENK DEĞİL"+
+                            "\nGerçek DWG INSERT: "+result.insertCandidates+
+                            " • çözümlenen: "+result.verifiedInserts+
+                            " • desteklenmeyen: "+result.unsupportedInserts+
+                            "\nDönüştürülmüş CIRCLE: "+result.verifiedNumericCircles+
+                            " • doğrulanamayan: "+result.omittedCircles+
+                            " • H4/H5 sahiplik/katmanı belirsiz: "+
+                            result.unresolvedOwnerOrLayer+
+                            "\nMOR ÇİZGİLER KAYNAK DWG RENGİ DEĞİLDİR. "+
+                            "Yalnız sayısal merkez/eksen kanıtıdır. "+
+                            "Katman, renk, model/pafta ve görünürlük doğrulanmadı.");
+                    });
+                }catch(IOException | RuntimeException ex){
+                    final String message=ex.getMessage()==null?
+                        "Orijinal CIRCLE sayısal kaynak çözümlenemedi":
+                        ex.getMessage();
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        status.setText("CIRCLE kaynak geometrisi açılamadı: "+
+                            message+" • Kaynak DWG değiştirilmedi.");
+                    });
+                }finally{
+                    activeReaders.decrementAndGet();
+                    cleanup.run();
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        inspectBlock.setEnabled(true);
+                        inspectAllBlocks.setEnabled(true);
+                        inspectCombined.setEnabled(true);
+                        inspectNumericCircle.setEnabled(true);
+                    });
+                }
+            },"MusaCAD-NumericCIRCLE-NonSourceColor");
+            circleTask.setDaemon(true);
+            circleTask.start();
         });
         Thread task=new Thread(()->{
             try{
@@ -294,6 +362,7 @@ public final class FirstPartyDwgPreviewDialog {
                     inspectBlock.setEnabled(true);
                     inspectAllBlocks.setEnabled(true);
                     inspectCombined.setEnabled(true);
+                    inspectNumericCircle.setEnabled(true);
                     FirstPartyDwgPreview.Readiness a=preview.readiness;
                     status.setText("Gerçek DWG • "+preview.scene.primitiveCount+
                         " çizilen öğe • "+
@@ -347,6 +416,7 @@ public final class FirstPartyDwgPreviewDialog {
                     inspectBlock.setEnabled(true);
                     inspectAllBlocks.setEnabled(true);
                     inspectCombined.setEnabled(true);
+                    inspectNumericCircle.setEnabled(true);
                     status.setText("Bağımsız DWG önizleme açılamadı: "+message+
                                    " • Ana çizim ve kaynak dosya değiştirilmedi.");
                 });
