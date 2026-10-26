@@ -79,8 +79,34 @@ static int original(const char *dwg,const char *dxf){
        profile.handle_end_bit>profile.handle_start_bit&&
        profile.prefix_bit_count>0u&&profile.prefix_bit_count<=64u&&
        profile.profile_status>=MUSACAD_AC1032_CIRCLE_H_COMMON_UNSUPPORTED&&
-       profile.profile_status<=MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE&&
+       profile.profile_status==
+           MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE&&
+       profile.first_ref_code==12u&&
+       profile.first_raw_target==UINT64_C(0x1b8)&&
+       profile.second_ref_code==5u&&
+       profile.second_raw_target==UINT64_C(0x8a)&&
+       profile.verified_relative_h12_owner_h5_layer_source&&
+       !profile.exact_h4_h5_source_verified&&
        !profile.final_visibility_and_paint_accepted;
+    if(ok){
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        MusaDwgAc1032EntityLayerRef layer={0};
+        ok=musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               scene,UINT64_C(0x1bb),&edge)&&
+           edge.child_handle==UINT64_C(0x1bb)&&
+           edge.owner_block_header_handle==UINT64_C(0x1b8)&&
+           edge.layer_handle==UINT64_C(0x8a)&&
+           edge.original_owner_wire_code==12u&&
+           edge.original_relative_h12_owner_verified&&
+           edge.exact_h4_owner_and_h5_layer_source_verified&&
+           !edge.visible_scene_and_paint_accepted&&
+           musa_dwg_ac1032_scene_index_entity_layer_ref(
+               scene,UINT64_C(0x1bb),&layer)&&
+           layer.layer_handle==UINT64_C(0x8a)&&
+           layer.raw_layer_type==51u&&
+           layer.original_entity_crc_verified&&
+           layer.original_layer_crc_verified;
+    }
     if(ok){
         MusaDwgAc1032CircleHTailProfile repeat={0};
         ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
