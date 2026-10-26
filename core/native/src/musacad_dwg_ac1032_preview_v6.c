@@ -9,6 +9,44 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_PREVIEW_RECORDS 1000000u
+/* This is an admission guard, NOT an MTEXT formatting decoder. Reject
+ * unsupported formatting/paragraph syntax instead of painting literal
+ * \\P, \\C, {...} as if they were the original CAD glyph layout.
+ * Independently validate UTF-8 (including overlong/surrogate/out-of-range).
+ * Never claim a valid plain string proves font or viewport equivalence. */
+int musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+    const char *utf8,size_t bytes){
+    if(!utf8||bytes==0u||bytes>2047u||utf8[bytes]!='\\0')return 0;
+    size_t i=0u;
+    while(i<bytes){
+        const unsigned char c=(unsigned char)utf8[i];
+        if(c<0x80u){
+            if(c<0x20u||c==0x7fu||c=='\\\\'||c=='{'||c=='}')
+                return 0;
+            i++;continue;
+        }
+        size_t count=0u;
+        uint32_t scalar=0u,min_scalar=0u;
+        if(c>=0xc2u&&c<=0xdfu){
+            count=2u;scalar=(uint32_t)(c&0x1fu);min_scalar=0x80u;
+        }else if(c>=0xe0u&&c<=0xefu){
+            count=3u;scalar=(uint32_t)(c&0x0fu);min_scalar=0x800u;
+        }else if(c>=0xf0u&&c<=0xf4u){
+            count=4u;scalar=(uint32_t)(c&0x07u);min_scalar=0x10000u;
+        }else return 0;
+        if(count>bytes-i)return 0;
+        for(size_t j=1u;j<count;j++){
+            const unsigned char b=(unsigned char)utf8[i+j];
+            if((b&0xc0u)!=0x80u)return 0;
+            scalar=(scalar<<6u)|(uint32_t)(b&0x3fu);
+        }
+        if(scalar<min_scalar||scalar>0x10ffffu||
+           (scalar>=0xd800u&&scalar<=0xdfffu)||
+           scalar==0x2028u||scalar==0x2029u)return 0;
+        i+=count;
+    }
+    return 1;
+}
 static int overlaps(const void *a,size_t na,const void *b,size_t nb){
     if(!na||!nb)return 0;
     uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
