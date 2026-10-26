@@ -89,6 +89,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_circle_layer_cmc_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_circle_layer_cmc_abi_smoke
                  COMMAND musacad_core_ac1032_circle_layer_cmc_test)
+        # Authentic INSERT -> relative-owner CIRCLE -> LAYER CMC
+        # source-only WCS join; no final BYLAYER paint.
+        add_executable(musacad_core_ac1032_insert_circle_layer_cmc_chain_test
+                tests/core_dwg_ac1032_insert_circle_layer_cmc_chain_test.c)
+        target_link_libraries(musacad_core_ac1032_insert_circle_layer_cmc_chain_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_insert_circle_layer_cmc_chain_abi_smoke
+                 COMMAND musacad_core_ac1032_insert_circle_layer_cmc_chain_test)
         # Original R2018 OT18 H-tail forensic profile; no owner/layer guessing.
         add_executable(musacad_core_ac1032_circle_h_tail_profile_test
                 tests/core_dwg_ac1032_circle_h_tail_profile_test.c)
