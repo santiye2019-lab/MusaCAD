@@ -201,6 +201,12 @@ static int genuine(const char *file){
                   fake,sizeof(fake),&layout,&span)&&
                   !memcmp(&span,&before,sizeof(span));
         }
+        {
+            uint8_t output[2]={0xa5u,0x5au};
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_copy_field_bits(
+                   fake,sizeof(fake),&layout,10u,8u,output,sizeof(output))&&
+                   output[0]==0xa5u&&output[1]==0x5au;
+        }
         layout.handle_stream_start_bit=11u;
         if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
                     fake,sizeof(fake),&layout,&identity)&&
