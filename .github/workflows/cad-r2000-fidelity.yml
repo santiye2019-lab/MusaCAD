@@ -182,6 +182,24 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS original OT2 ATTRIB CRC/H/ENC only; content and owner graph unverified"
 
+      - name: P0 original R2018 OT7 INSERT H1C8 numeric OCS placement against DXF
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbBlockReference' "$oracle"
+          grep -F '8482.030567364651' "$oracle"
+          grep -F -- '-1381.341268226861' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \\
+            core/native/tests/core_dwg_ac1032_original_insert_placement_test.c \\
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \\
+            -o /tmp/musacad-r2018-original-insert-placement
+          timeout 120s /tmp/musacad-r2018-original-insert-placement "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT7 INSERT H1C8 numeric OCS; block graph unverified"
+
       - name: P0 original R2018 Text DWG exact 108-byte physical footer and genuine MTEXT H1C0
         run: |
           set -euo pipefail
