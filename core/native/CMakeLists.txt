@@ -27,6 +27,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_insert_common_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_insert_common_smoke
                  COMMAND musacad_core_ac1032_original_insert_common_test)
+        # Original R2018 OT5 ENDBLK source CRC/H common only.
+        add_executable(musacad_core_ac1032_original_endblk_common_test
+                tests/core_dwg_ac1032_original_endblk_common_test.c)
+        target_link_libraries(musacad_core_ac1032_original_endblk_common_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_endblk_common_smoke
+                 COMMAND musacad_core_ac1032_original_endblk_common_test)
         # Original R2018 OT4 BLOCK begin source CRC/H common only.
         add_executable(musacad_core_ac1032_original_block_common_test
                 tests/core_dwg_ac1032_original_block_common_test.c)
