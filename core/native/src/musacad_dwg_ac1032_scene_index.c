@@ -852,6 +852,44 @@ int musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
     if(!ok)return 0;
     *out=value;return 1;
 }
+int musa_dwg_ac1032_scene_index_copy_block_header_field_bits(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t h,
+    size_t start_bit,size_t bit_count,uint8_t *out,size_t out_bytes){
+    if(!h||!bit_count||bit_count>SIZE_MAX-7u||
+       out_bytes>MAX_OBJECT_SECTION||
+       out_bytes<(bit_count+7u)/8u||
+       !check_output(scene,out,out_bytes))return 0;
+    uint64_t off=0u;size_t needed=0u,copied=0u;
+    MusaDwgAc1032PayloadInfo meta={0},again={0};
+    MusaDwgAc1032ObjectStreams layout={0};
+    if(!find(scene,h,&off)||
+       !musa_dwg_ac1032_object_payload_bytes(
+           scene->objects,scene->object_bytes,h,off,
+           NULL,0u,&needed,&meta)||
+       !meta.original_record_crc_verified||
+       meta.raw_object_type!=49u||meta.indexed_handle!=h||
+       !needed||needed>MAX_OBJECT_SECTION||
+       meta.payload_bytes!=needed||
+       !musa_dwg_ac1032_stream_layout_bytes(
+           scene->objects,scene->object_bytes,h,off,&layout)||
+       !layout.original_record_crc_verified||
+       layout.indexed_handle!=h||layout.raw_object_type!=49u||
+       layout.object_section_offset!=off||
+       layout.total_payload_bits!=(uint64_t)needed*8u||
+       layout.handle_stream_bits!=meta.handle_stream_bits)return 0;
+    uint8_t *raw=(uint8_t*)malloc(needed);
+    if(!raw)return 0;
+    int ok=musa_dwg_ac1032_object_payload_bytes(
+           scene->objects,scene->object_bytes,h,off,
+           raw,needed,&copied,&again)&&
+       copied==needed&&again.original_record_crc_verified&&
+       again.raw_object_type==49u&&again.indexed_handle==h&&
+       again.object_section_offset==off&&
+       musa_dwg_ac1032_block_header_ot49_copy_field_bits(
+           raw,needed,&layout,start_bit,bit_count,out,out_bytes);
+    free(raw);
+    return ok;
+}
 int musa_dwg_ac1032_scene_index_read_block_header_field_span(
     const MusaDwgAc1032SceneIndex *scene,uint64_t h,
     MusaDwgAc1032BlockHeaderFieldSpan *out){
