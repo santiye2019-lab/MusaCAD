@@ -132,6 +132,9 @@ int musa_dwg_ac1032_preview_v6_entity_aci_code(
  * extra=1 means negative kind code and one extra exact 24-bit RGB float;
  * extra=0 means positive ACI (direct or provisional 7). 'exact' is exact
  * source-assigned color only, NOT final visibility/color inheritance.
+ * Supports v6 kinds 1 LINE, 2 POLY, 3 POINT, 4 CURVE and 6 TEXT.
+ * This is a source-style selector, not proof of entity visibility or a
+ * genuine direct-RGB MTEXT fixture; owner/layer/viewport remain unresolved.
  * All four outputs fail-atomic on invalid/overlapping arguments. */
 int musa_dwg_ac1032_preview_v6_entity_source_style_code(
     const MusaDwgAc1032EntityCommon *source,uint8_t v6_kind,
