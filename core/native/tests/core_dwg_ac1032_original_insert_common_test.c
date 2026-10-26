@@ -55,7 +55,7 @@ static int genuine(const char *file){
            !memcmp(&before,&untouched,sizeof(before));
     }
     fprintf(stderr,"%s original R2018 INSERT OT7 H190/H1C8/H756 "
-        "CRC/H/common ENC; numeric DATA, owner, rendering UNVERIFIED\\n",
+        "CRC/H/common ENC; numeric DATA, owner, rendering UNVERIFIED\n",
         ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
     return ok;
