@@ -719,9 +719,34 @@ int musa_dwg_ac1032_scene_index_entity_layer_ref(
     if(!h||!check_output(s,out,sizeof(*out)))return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&
+       (type!=1u&&type!=17u&&type!=18u&&type!=19u&&type!=27u&&
          type!=35u&&type!=44u&&type!=77u))
         return 0;
+    /* OT1 TEXT has two H5 targets (LAYER and STYLE) and a source-specific
+     * terminal 111, not the single-H LINE grammar. Require the existing
+     * independently authenticated H graph before exposing its layer. */
+    if(type==1u){
+        MusaDwgAc1032TextGraph graph={0};
+        if(!musa_dwg_ac1032_scene_index_text_graph(s,h,&graph)||
+           !graph.graph_edges_verified||
+           !graph.original_entity_crc_verified||
+           !graph.original_layer_crc_verified||
+           !graph.original_style_crc_verified||
+           graph.font_and_display_accepted||
+           graph.indexed_handle!=h||
+           !graph.layer_handle||graph.layer_object_type!=51u||
+           !graph.style_handle||graph.style_object_type!=53u)return 0;
+        MusaDwgAc1032EntityLayerRef linked={0};
+        linked.entity_handle=h;
+        linked.layer_handle=graph.layer_handle;
+        linked.raw_entity_type=type;
+        linked.raw_layer_type=51u;
+        linked.original_entity_crc_verified=1u;
+        linked.original_layer_crc_verified=1u;
+        linked.source_handle_ref_verified=1u;
+        *out=linked;
+        return 1;
+    }
     /* MTEXT uses its own already original-H/CRC verified owner/layer/
      * text-style graph, including the exact optional 0x50 null handle.
      * Reuse it instead of incorrectly applying the LINE single-H tail. */
