@@ -67,15 +67,16 @@ int musa_dwg_ac1032_insert_placement_at(
     uint32_t attribs=0u;
     if(!musa_dwg_ac1015_bits_read_bd(&b,&v.rotation))
         return reject_field("rotation",&b,v.indexed_handle);
-    if(!musa_dwg_ac1015_bits_read_be(&b,v.extrusion))
+    if(!musa_dwg_ac1015_bits_read_bd(&b,&v.extrusion[0])||
+       !musa_dwg_ac1015_bits_read_bd(&b,&v.extrusion[1])||
+       !musa_dwg_ac1015_bits_read_bd(&b,&v.extrusion[2]))
         return reject_field("extrusion",&b,v.indexed_handle);
     if(!musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
         return reject_field("has_attribs",&b,v.indexed_handle);
     v.has_attribs=(uint8_t)attribs;
-    /* R2004+ INSERT stores owned-object count only when attributes exist.
-     * Never consume a BL from the next field for an attribute-free INSERT. */
-    if(v.has_attribs &&
-       !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
+    /* R2004+ INSERT stores a BL owned-object count in DATA even when
+     * Has ATTRIBs is zero; handles remain in the separate handle stream. */
+    if(!musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
         return reject_field("owned_attrib_count",&b,v.indexed_handle);
     if(b.bit_pos!=b.bit_end){
         /* Preserve strict rejection while recording exact unparsed source bits.
