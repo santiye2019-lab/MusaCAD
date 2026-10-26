@@ -89,6 +89,20 @@ typedef struct MusaDwgAc1032InsertLayerProvenance {
 int musa_dwg_ac1032_scene_index_insert_layer_provenance(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertLayerProvenance *out);
+/* Narrow ORIGINAL R2018 INSERT -> CRC/H-authenticated LAYER OT51 CMC
+ * evidence. Only the independently proven default-profile C3 ACI is
+ * accepted. This is source ACI, NOT resolved BYLAYER/BYBLOCK, RGB, layer
+ * visibility, block child paint or viewport/XREF override acceptance.
+ * Failure is atomic; unsupported colors must never silently become white. */
+typedef struct MusaDwgAc1032InsertLayerCmcSource {
+    MusaDwgAc1032InsertLayerProvenance source;
+    MusaDwgAc1032LayerCmcEvidence cmc;
+    uint8_t source_aci_verified;
+    uint8_t resolved_color_and_paint_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032InsertLayerCmcSource;
+int musa_dwg_ac1032_scene_index_insert_layer_cmc_source(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertLayerCmcSource *out);
 int musa_dwg_ac1032_scene_index_read_insert_placement(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertPlacement *out);
