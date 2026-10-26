@@ -222,6 +222,11 @@ static int genuine(const char *file){
                 e->block==UINT64_C(0x1b8)?13u:5u;
             const int decoded=musa_dwg_ac1032_scene_index_read_block_header_base(
                    scene,e->block,&base);
+            fprintf(stderr,"OT49 H%llx decoded=%d owned=%u xyz=(%.8g,%.8g,%.8g) att=%u dep=%u xref=%u\n",
+                    (unsigned long long)e->block,decoded,base.owned_object_count,
+                    base.base_xyz[0],base.base_xyz[1],base.base_xyz[2],
+                    (unsigned)base.has_attdefs,(unsigned)base.xref_dependent,
+                    (unsigned)base.is_xref);
             ok=decoded&&
                base.indexed_handle==e->block&&
                base.original_record_crc_verified&&
