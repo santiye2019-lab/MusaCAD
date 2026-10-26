@@ -70,6 +70,15 @@ int musa_dwg_ac1032_preview_v6_planar_polylines(
 int musa_dwg_ac1032_preview_v6_planar_source_aci(
     const MusaDwgAc1032SceneIndex *scene,float *words,
     size_t capacity,MusaAc1032PreviewV6Stats *out);
+/* Conservative first-paint MTEXT formatting admission. Accepts only a
+ * valid single-line Unicode UTF-8 string without MTEXT formatting syntax,
+ * braces, backslash escapes, raw controls or paragraph separators. This
+ * does NOT decode MTEXT paragraph/font/rich-text syntax; formatted source
+ * is omitted rather than displayed as misleading literal escape codes.
+ * Pure C11, no external DWG decoder. The input must have bytes+1 readable
+ * bytes, with NUL exactly at utf8[bytes]. */
+int musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+    const char *utf8,size_t bytes);
 /* Experimental source-authenticated R2018 MTEXT (OT44) optional visual
  * bridge: original UTF-8 content and planar position/axes/text size are
  * transported as native v6 type 6 glyph proxy. Android uses generic font
