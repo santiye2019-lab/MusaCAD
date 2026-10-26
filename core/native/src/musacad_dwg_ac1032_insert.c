@@ -80,6 +80,14 @@ int musa_dwg_ac1032_insert_placement_at(
     if(b.bit_pos!=b.bit_end){
         /* Preserve strict rejection while recording exact unparsed source bits.
          * This is evidence for the remaining INSERT grammar, not padding. */
+        /* Bounded raw provenance to compare DATA/handle partition across
+         * authentic fixtures. Diagnostic only, never changes acceptance. */
+        fprintf(stderr,"MC1032 INSERT source H%llx payload=%zu handle_bits=%llu rawhex=",
+                (unsigned long long)v.indexed_handle,n,
+                (unsigned long long)l->handle_stream_bits);
+        for(size_t byte=0u;byte<n&&byte<64u;byte++)
+            fprintf(stderr,"%02x",(unsigned)raw[byte]);
+        fputc('\\n',stderr);
         fprintf(stderr,"MC1032 INSERT trailing DATA H%llx bits=",
                 (unsigned long long)v.indexed_handle);
         for(size_t bit=b.bit_pos;bit<b.bit_end;bit++){
