@@ -55,7 +55,15 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertIn("final AtomicInteger activeReaders=new AtomicInteger(1)",source)
         self.assertIn("if(temporaryCopy&&dismissed.get()&&activeReaders.get()==0)",source)
         self.assertIn("activeReaders.incrementAndGet()",source)
-        self.assertEqual(source.count("activeReaders.decrementAndGet()"),2)
+        # Initial read, manual INSERT, and one-tap all-INSERT readers share
+        # the same source and must all release their temporary-copy lease.
+        self.assertEqual(source.count("activeReaders.decrementAndGet()"),3)
+        self.assertIn("FirstPartyDwgPreview.readAllInsertLinesDiagnostic(",source)
+        self.assertIn("Tüm doğrulanmış blok çizgilerini göster",source)
+        self.assertIn("sceneCanvas.setScene(result.scene)",source)
+        self.assertIn("result.unsupportedInserts",source)
+        self.assertIn("result.omittedLines",source)
+        self.assertIn("ÇOKLU INSERT • GERÇEK DWG • KISMİ 2B SAHNE",source)
         self.assertIn("dialog.setOnDismissListener(ignored->{",source)
         self.assertIn("cleanup.run()",source)
         self.assertNotIn("if(temporaryCopy)source.delete()",source)
