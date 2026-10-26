@@ -57,7 +57,7 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertIn("activeReaders.incrementAndGet()",source)
         # Initial read, manual INSERT, and one-tap all-INSERT readers share
         # the same source and must all release their temporary-copy lease.
-        self.assertEqual(source.count("activeReaders.decrementAndGet()"),3)
+        self.assertEqual(source.count("activeReaders.decrementAndGet()"),4)
         self.assertIn("FirstPartyDwgPreview.readAllInsertLinesDiagnostic(",source)
         self.assertIn("Tüm doğrulanmış blok çizgilerini göster",source)
         self.assertIn("sceneCanvas.setScene(result.scene)",source)
@@ -72,6 +72,9 @@ class FirstPartyOriginalDwgDiagnosticIsolation(unittest.TestCase):
         self.assertNotIn("Long.parseUnsignedLong(",source)
         self.assertIn("inspectBlock.setEnabled(false)",source)
         self.assertIn("result.omittedSourceLines",source)
+        self.assertIn("readCombinedSourceDiagnostic(",source)
+        self.assertIn("Birlikte çizilen kaynak ilkel",source)
+        self.assertIn("Blok tanımı nesneleri iki kez görünebilir",source)
         self.assertIn("YALNIZCA BLOK LINE KAYNAK TESTİ",source)
         self.assertIn("show(owner,original,false)",source)
         self.assertIn("ScaleGestureDetector",source)

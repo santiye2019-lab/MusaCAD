@@ -61,10 +61,10 @@ public final class FirstPartyDwgPreviewDialog {
             LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT));
 
         final TextView blockHelp=new TextView(owner);
-        blockHelp.setText("DENEYSEL BLOK GEOMETRİSİ • Doğrulanmış özgün " +
-            "INSERT çizgilerini tek tek veya bütün kaynak INSERT örneklerinden " +
-            "birlikte gösterebilirsin. Diğer nesneler, katman görünürlüğü, " +
-            "nihai renk ve tam DWG açılışı henüz doğrulanmış değildir.");
+        blockHelp.setText("DENEYSEL 2B KAYNAK • Doğrudan DWG çizgileri, " +
+            "eğriler, yaklaşık metinler ve özgün INSERT örneklerinin doğrulanmış " +
+            "çizgileri aynı sahnede görülebilir. Blok tanımı çift çizimleri, " +
+            "katman görünürlüğü ve nihai renkler henüz doğrulanmadı.");
         layout.addView(blockHelp);
         final EditText insertHandleInput=new EditText(owner);
         insertHandleInput.setSingleLine(true);
@@ -79,6 +79,10 @@ public final class FirstPartyDwgPreviewDialog {
         inspectAllBlocks.setText("Tüm doğrulanmış blok çizgilerini göster");
         inspectAllBlocks.setEnabled(false);
         layout.addView(inspectAllBlocks);
+        final Button inspectCombined=new Button(owner);
+        inspectCombined.setText("2B çizim + tüm blokları birlikte göster (deneysel)");
+        inspectCombined.setEnabled(false);
+        layout.addView(inspectCombined);
         final TextView status=new TextView(owner);
         status.setPadding(0,pad/2,0,pad/2);
         status.setMaxLines(5);
@@ -129,6 +133,7 @@ public final class FirstPartyDwgPreviewDialog {
             }
             inspectBlock.setEnabled(false);
             inspectAllBlocks.setEnabled(false);
+            inspectCombined.setEnabled(false);
             activeReaders.incrementAndGet();
             new Thread(()->{
                 try{
@@ -165,6 +170,7 @@ public final class FirstPartyDwgPreviewDialog {
                            !owner.isDestroyed()){
                             inspectBlock.setEnabled(true);
                             inspectAllBlocks.setEnabled(true);
+                            inspectCombined.setEnabled(true);
                         }
                     });
                 }
@@ -178,6 +184,7 @@ public final class FirstPartyDwgPreviewDialog {
             if(dismissed.get())return;
             inspectBlock.setEnabled(false);
             inspectAllBlocks.setEnabled(false);
+            inspectCombined.setEnabled(false);
             activeReaders.incrementAndGet();
             Thread allTask=new Thread(()->{
                 try{
@@ -216,11 +223,63 @@ public final class FirstPartyDwgPreviewDialog {
                            owner.isDestroyed())return;
                         inspectBlock.setEnabled(true);
                         inspectAllBlocks.setEnabled(true);
+                        inspectCombined.setEnabled(true);
                     });
                 }
             },"MusaCAD-OriginalAllINSERT-Partial2D");
             allTask.setDaemon(true);
             allTask.start();
+        });
+        inspectCombined.setOnClickListener(view->{
+            if(dismissed.get())return;
+            inspectBlock.setEnabled(false);
+            inspectAllBlocks.setEnabled(false);
+            inspectCombined.setEnabled(false);
+            activeReaders.incrementAndGet();
+            Thread combinedTask=new Thread(()->{
+                try{
+                    FirstPartyDwgPreview.CombinedSourcesDiagnostic result=
+                        FirstPartyDwgPreview.readCombinedSourceDiagnostic(
+                            source,MAX_FLOAT_WORDS);
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        sceneCanvas.setScene(result.scene);
+                        status.setText("2B + TÜM INSERT ÇİZGİLERİ • TEK SAHNE • KISMİ"+
+                            "\nBirlikte çizilen kaynak ilkel: "+result.shownPrimitiveCount+
+                            " • doğrudan DWG ilkel: "+result.original.previewPrimitives+
+                            " • doğrulanmış INSERT LINE: "+result.admittedInsertLines+
+                            "\nINSERT doğrulanan: "+result.verifiedInsertInstances+
+                            " • kaynağı belirsiz: "+result.unsupportedInsertInstances+
+                            " • elenen LINE: "+result.omittedInsertLines+
+                            "\nUYARI: Blok tanımı nesneleri iki kez görünebilir. "+
+                            "MODEL/PAFTA ve katman kapalı/donmuş durumu doğrulanmadı. "+
+                            "BYLAYER/BYBLOCK ve TEXT/MTEXT font/yerleşimi birebir değildir.");
+                    });
+                }catch(IOException | RuntimeException ex){
+                    final String message=ex.getMessage()==null?
+                        "Birleşik DWG kaynak sahnesi doğrulanamadı":
+                        ex.getMessage();
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        status.setText("Birleşik özgün DWG görünümü açılamadı: "+
+                            message+" • Ana çizim ve kaynak dosya değiştirilmedi.");
+                    });
+                }finally{
+                    activeReaders.decrementAndGet();
+                    cleanup.run();
+                    owner.runOnUiThread(()->{
+                        if(dismissed.get()||owner.isFinishing()||
+                           owner.isDestroyed())return;
+                        inspectBlock.setEnabled(true);
+                        inspectAllBlocks.setEnabled(true);
+                        inspectCombined.setEnabled(true);
+                    });
+                }
+            },"MusaCAD-OriginalCombinedSource2D");
+            combinedTask.setDaemon(true);
+            combinedTask.start();
         });
         Thread task=new Thread(()->{
             try{
@@ -234,6 +293,7 @@ public final class FirstPartyDwgPreviewDialog {
                     sceneCanvas.setScene(preview.scene);
                     inspectBlock.setEnabled(true);
                     inspectAllBlocks.setEnabled(true);
+                    inspectCombined.setEnabled(true);
                     FirstPartyDwgPreview.Readiness a=preview.readiness;
                     status.setText("Gerçek DWG • "+preview.scene.primitiveCount+
                         " çizilen öğe • "+
@@ -286,6 +346,7 @@ public final class FirstPartyDwgPreviewDialog {
                     if(dismissed.get()||owner.isFinishing()||owner.isDestroyed())return;
                     inspectBlock.setEnabled(true);
                     inspectAllBlocks.setEnabled(true);
+                    inspectCombined.setEnabled(true);
                     status.setText("Bağımsız DWG önizleme açılamadı: "+message+
                                    " • Ana çizim ve kaynak dosya değiştirilmedi.");
                 });

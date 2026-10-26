@@ -116,6 +116,28 @@ public final class NativeScene {
                 version);
     }
 
+    /** Join two already source-decoded INCOMPLETE original AC1032 streams
+     * into one visible vector scene. This does NOT infer DRAW ORDER, model
+     * owner, layer off/freeze, inherited color, or absence of duplicate BLOCK
+     * definition entities: all such semantics remain unverified. */
+    static NativeScene joinPartialOriginalSourceScenes(
+            NativeScene direct,NativeScene inserted,int maxWords)
+            throws IOException {
+        if(direct==null||direct.streamVersion!=6||!direct.truncated)
+            throw new IOException("Ana orijinal DWG kaynak sahnesi eksik");
+        if(inserted==null)return direct;
+        if(inserted.streamVersion!=6||!inserted.truncated)
+            throw new IOException("INSERT DWG kaynak sahnesi kismi degil");
+        float[] merged=OriginalSourceV6Merge.join(
+                direct.raw,inserted.raw,maxWords);
+        NativeScene parsed=fromRaw(merged);
+        if(!parsed.truncated||
+           parsed.primitiveCount!=
+              (long)direct.primitiveCount+inserted.primitiveCount)
+            throw new IOException("Birlesik DWG 2B sahnesi hatali");
+        return parsed;
+    }
+
     private final int streamVersion;
     private NativeScene(float[] raw,int[] offsets,float[] bounds,String[] textValues,Matrix view,RectF worldBounds,boolean truncated,int streamVersion){
         this.raw=raw;this.offsets=offsets;this.bounds=bounds;this.textValues=textValues;this.worldToContent=new Matrix(view);this.worldBounds=new RectF(worldBounds);

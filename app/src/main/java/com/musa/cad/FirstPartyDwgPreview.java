@@ -241,4 +241,54 @@ public final class FirstPartyDwgPreview {
         return new AllInsertLinesDiagnostic(parsed,audit);
     }
 
+    /** One read-only experimental Android scene containing BOTH original
+     * direct primitive candidates (including approx source TEXT/MTEXT) and
+     * independently authenticated transformed INSERT LINE instances.
+     *
+     * Deliberately does not claim all source records, uniqueness of owner
+     * (BLOCK definition geometry may be duplicated), complete layer/space
+     * visibility, or accurate BYLAYER/BYBLOCK and original text fonts. */
+    public static final class CombinedSourcesDiagnostic {
+        public final NativeScene scene;
+        public final Readiness original;
+        public final long verifiedInsertInstances,unsupportedInsertInstances;
+        public final long admittedInsertLines,omittedInsertLines;
+        public final int shownPrimitiveCount;
+        public final boolean incomplete;
+        private CombinedSourcesDiagnostic(
+                NativeScene joined,Readiness originalReadiness,
+                AllInsertLinesDiagnostic inserts) {
+            scene=joined;
+            original=originalReadiness;
+            verifiedInsertInstances=inserts.verifiedInserts;
+            unsupportedInsertInstances=inserts.unsupportedInserts;
+            admittedInsertLines=inserts.admittedLines;
+            omittedInsertLines=inserts.omittedLines;
+            shownPrimitiveCount=joined.primitiveCount;
+            incomplete=true;
+        }
+    }
+
+    public static CombinedSourcesDiagnostic readCombinedSourceDiagnostic(
+            File original,int maxFloatWords)throws IOException {
+        if(original==null||!original.isFile())
+            throw new IOException("Kaynak DWG bulunamadi");
+        if(maxFloatWords<256||maxFloatWords>9*1024*1024)
+            throw new IOException("Birlesik DWG bellek siniri gecersiz");
+        // Real original DWG, read-only; no reconstructed DXF or editor handoff.
+        Result direct=read(original,maxFloatWords);
+        AllInsertLinesDiagnostic inserts=readAllInsertLinesDiagnostic(
+                original,maxFloatWords);
+        if(!direct.incomplete||!inserts.incomplete)
+            throw new IOException("Kaynak veriden tamamlanmis DWG iddiasi");
+        NativeScene unified=NativeScene.joinPartialOriginalSourceScenes(
+                direct.scene,inserts.scene,maxFloatWords);
+        if(unified.primitiveCount!=
+                (long)direct.scene.primitiveCount+inserts.admittedLines||
+           !unified.truncated)
+            throw new IOException("Kaynak 2B ve blok nesneleri uyusmuyor");
+        return new CombinedSourcesDiagnostic(
+                unified,direct.readiness,inserts);
+    }
+
 }
