@@ -59,6 +59,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_android_firstparty_runtime.py' -v
           python3 -m unittest discover -s tests -p 'test_original_dwg_2d_diagnostic_isolation.py' -v
+          python3 -m unittest discover -s tests -p 'test_ac1032_all_insert_android_bridge.py' -v
       - name: MC1032 own-engine v1-v2 lossless migration JNI and no-core proof
         run: |
           set -euo pipefail
@@ -1220,6 +1221,19 @@ jobs:
             /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
           nm -D /tmp/musacad-r2018-preview-jni-host.so \
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readOriginalNative'
+          # Compile the new genuine all-INSERT Android JNI against the same
+          # independent shared C11 engine, rather than merely checking text.
+          grep -F 'ac1032_all_insert_line_diagnostic_jni.c' app/src/main/cpp/CMakeLists.txt
+          cc -std=c11 -Wall -Wextra -Werror -fPIC \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+            -Icore/native/include -c \
+            app/src/main/cpp/ac1032_all_insert_line_diagnostic_jni.c \
+            -o /tmp/musacad-r2018-all-insert-jni.o
+          cc -shared -o /tmp/musacad-r2018-all-insert-jni-host.so \
+            /tmp/musacad-r2018-all-insert-jni.o \
+            /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
+          nm -D /tmp/musacad-r2018-all-insert-jni-host.so \
+            | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readAllInsertLinesNative'
           mkdir -p /tmp/musacad-r2018-preview-jni-java
           javac -encoding UTF-8 -d /tmp/musacad-r2018-preview-jni-java \
             app/src/main/java/com/musa/cad/NativeSceneViewportBounds.java \
