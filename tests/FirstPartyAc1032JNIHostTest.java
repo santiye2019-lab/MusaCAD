@@ -43,9 +43,10 @@ final class FirstPartyDwgPreview {
                 +" preview packet and MUST NOT certify full DWG display");
         require(report[20]+report[21]+report[22]+report[23]+
                    report[24]==report[0]&&
-                report[20]+report[21]+report[22]+report[23]<=report[16],
-                "Original R2018 unrendered TEXT BLOCK INSERT families must"
-                +" be authenticated, excluded from v6 admitted objects");
+                report[21]+report[22]+report[23]<=report[16]&&
+                report[20]<=report[13]+report[16],
+                "Original R2018 TEXT/MTEXT candidates and unrendered BLOCK INSERT must"
+                +" be authenticated without falsely counting source TEXT as other");
         require(raw[0]==6f&&raw[1]>0f&&raw[6]==1f,
                 "Incomplete scene must be explicitly marked");
         for(float x:raw)require(Float.isFinite(x),"Invalid float");
