@@ -30,6 +30,14 @@ static int sample(const char *filename){
     MusaDwgAc1032TextSource text={0};
     MusaDwgAc1032EntityCommon common={0};
     MusaDwgAc1032LayerName layer={0};
+    /* TEMP CI diagnostic, remove before merge. */
+    MusaDwgAc1032LayerIdentity probe_id={0};
+    MusaDwgAc1032LayerName probe_name={0};
+    const int id_ok=musa_dwg_ac1032_scene_index_read_layer_identity(scene,UINT64_C(0x81),&probe_id);
+    const int name_ok=musa_dwg_ac1032_scene_index_read_layer_name(scene,UINT64_C(0x81),&probe_name);
+    fprintf(stderr,"OT1_LAYER_DIAG h=81 id_ok=%d name_ok=%d name='%s' self=%u name_bytes=%u\\n",
+        id_ok,name_ok,probe_name.utf8,(unsigned)probe_id.embedded_self_handle_verified,
+        (unsigned)probe_name.utf8_bytes);
     ok=musa_dwg_ac1032_scene_index_read_text_common(
            scene,h,&common)&&
        musa_dwg_ac1032_scene_index_read_text_source(
