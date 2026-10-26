@@ -49,6 +49,18 @@ static int genuine(const char *file){
             g.owned_attrib_count==e->count&&
             g.original_entity_and_targets_crc_verified&&
             g.source_edges_verified&&!g.block_expansion_and_display_accepted;
+        /* A verified source H graph must agree with the independently
+         * decoded INSERT DATA attribute flag/count for the same handle.
+         * This is source consistency, not block ownership or rendering. */
+        if(ok){
+            MusaDwgAc1032InsertPlacement p={0};
+            ok=musa_dwg_ac1032_scene_index_read_insert_placement(
+                 scene,e->h,&p)&&p.indexed_handle==e->h&&
+               p.original_record_crc_verified&&p.numeric_fields_decoded&&
+               p.owned_attrib_count==g.owned_attrib_count&&
+               p.has_attribs==(uint8_t)(e->count!=0u)&&
+               !p.block_graph_and_display_accepted;
+        }
     }
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
@@ -59,6 +71,17 @@ static int genuine(const char *file){
            !memcmp(&unchanged,&saved,sizeof(unchanged))&&
            !musa_dwg_ac1032_scene_index_insert_source_graph(
              scene,UINT64_C(0x192),&unchanged)&&
+           !memcmp(&unchanged,&saved,sizeof(unchanged))&&
+           /* Reject valid, CRC-authenticated non-INSERT source types.
+            * Every failed read must leave the caller's output intact. */
+           !musa_dwg_ac1032_scene_index_insert_source_graph(
+             scene,UINT64_C(0x8a),&unchanged)&&
+           !memcmp(&unchanged,&saved,sizeof(unchanged))&&
+           !musa_dwg_ac1032_scene_index_insert_source_graph(
+             scene,UINT64_C(0x1b8),&unchanged)&&
+           !memcmp(&unchanged,&saved,sizeof(unchanged))&&
+           !musa_dwg_ac1032_scene_index_insert_source_graph(
+             scene,UINT64_C(0x191),&unchanged)&&
            !memcmp(&unchanged,&saved,sizeof(unchanged));
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph; "
