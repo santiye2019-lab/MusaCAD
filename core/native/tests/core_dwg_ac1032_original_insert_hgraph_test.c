@@ -20,6 +20,7 @@
 #include "musacad_dwg_ac1032_insert_reverse_owner_source_join.h"
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_insert_line_style_risk_evidence.h"
+#include "musacad_dwg_ac1032_insert_line_source_bounds.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1540,6 +1541,81 @@ static int genuine(const char *file){
         s.raw_rgb=UINT32_C(0xff010203);
         risk=musa_dwg_ac1032_line_source_risk_mask(&s,&l);
         ok=ok&&(risk&MUSACAD_AC1032_LINE_RISK_RGB_PROFILE);
+    }
+    if(ok){
+        /* Genuine R2018 original/DXF handles, no invented origin when
+         * there are zero accepted source LINEs. Float projection must
+         * never promote an indistinguishable segment to visible paint. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertLineSourceBounds bounds={0},again={0};
+            MusaDwgAc1032InsertLineSourceSegments lines={0};
+            MusaDwgAc1032InsertLineStyleRiskEvidence risk={0};
+            ok=musa_dwg_ac1032_insert_line_source_bounds(
+                   scene,inserts[b],&bounds)&&
+               musa_dwg_ac1032_insert_line_source_bounds(
+                   scene,inserts[b],&again)&&
+               !memcmp(&bounds,&again,sizeof(bounds))&&
+               musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&lines)&&
+               musa_dwg_ac1032_insert_line_style_risk_evidence(
+                   scene,inserts[b],&risk)&&
+               bounds.insert_handle==inserts[b]&&
+               bounds.block_header_handle==blocks[b]&&
+               bounds.source_line_count==lines.verified_planar_line_count&&
+               bounds.source_line_count==risk.source_line_count&&
+               bounds.source_bounds_present==(bounds.source_line_count>0u)&&
+               bounds.original_line_bounds_source_verified&&
+               !bounds.final_visibility_and_paint_accepted&&
+               bounds.float_distinguishable_count+
+                 bounds.float_degenerate_or_rounded_count==
+                 bounds.source_line_count;
+            double minxy[2]={0.0,0.0},maxxy[2]={0.0,0.0};
+            for(uint32_t i=0u;ok&&i<bounds.source_line_count;i++){
+                const MusaDwgAc1032InsertLineSourceRow *s=&lines.rows[i];
+                const MusaDwgAc1032InsertLineSourceBoundsRow *r=&bounds.rows[i];
+                ok=r->child_handle==s->child_handle&&
+                   r->source_layer_handle==s->source_layer_handle&&
+                   r->style_risk_mask==risk.rows[i].risk_mask&&
+                   r->original_source_bounds_verified&&
+                   !r->final_paint_accepted;
+                for(unsigned k=0u;ok&&k<2u;k++){
+                    const double low=fmin(s->world_start[k],s->world_end[k]);
+                    const double high=fmax(s->world_start[k],s->world_end[k]);
+                    ok=r->min_xy[k]==low&&r->max_xy[k]==high&&
+                       r->float_min_xy[k]==(float)low&&
+                       r->float_max_xy[k]==(float)high;
+                    if(i==0u){minxy[k]=low;maxxy[k]=high;}
+                    else{
+                        if(low<minxy[k])minxy[k]=low;
+                        if(high>maxxy[k])maxxy[k]=high;
+                    }
+                }
+                const int float_distinct=
+                    r->float_min_xy[0]!=r->float_max_xy[0]||
+                    r->float_min_xy[1]!=r->float_max_xy[1];
+                ok=ok&&(r->float_endpoints_distinguishable==
+                    (uint8_t)float_distinct);
+            }
+            for(unsigned k=0u;ok&&bounds.source_bounds_present&&k<2u;k++)
+                ok=bounds.source_min_xy[k]==minxy[k]&&
+                   bounds.source_max_xy[k]==maxxy[k];
+            if(ok){
+                MusaDwgAc1032InsertLineSourceBounds prior=bounds;
+                ok=!musa_dwg_ac1032_insert_line_source_bounds(
+                       scene,blocks[b],&bounds)&&
+                   !memcmp(&bounds,&prior,sizeof(bounds))&&
+                   !musa_dwg_ac1032_insert_line_source_bounds(
+                       scene,UINT64_MAX,&bounds)&&
+                   !memcmp(&bounds,&prior,sizeof(bounds))&&
+                   !musa_dwg_ac1032_insert_line_source_bounds(
+                       scene,inserts[b],NULL)&&
+                   !memcmp(&bounds,&prior,sizeof(bounds));
+            }
+        }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
