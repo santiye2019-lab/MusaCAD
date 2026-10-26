@@ -218,6 +218,23 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS separate original OT1 TEXT Unicode; geometry/font/display unresolved"
 
+      - name: P0 genuine R2018 OT1 TEXT H8E source ENC and Unicode layer provenance
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/sample_2018.dwg
+          oracle=third_party/libredwg/test/test-data/sample_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'Jen teksto simpla, cxu ne?' "$oracle"
+          grep -F 'Tavolo 1' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_ot1_color_provenance_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-ot1-color
+          timeout 120s /tmp/musacad-r2018-original-ot1-color "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT1 H8E ENC+H5 Unicode layer; no final color/visibility"
+
       - name: P0 genuine R2018 OT1 TEXT H8E OCS placement and height oracle
         run: |
           set -euo pipefail

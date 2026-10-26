@@ -13,11 +13,26 @@ int musa_dwg_ac1032_scene_planar_color_provenance(
     if(!s||!h||!out||(const void*)s==(const void*)out)return 0;
     uint16_t type=0u;
     if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
-       (type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&
+       (type!=1u&&type!=17u&&type!=18u&&type!=19u&&type!=27u&&type!=35u&&
         type!=44u&&type!=77u))
         return 0;
     MusaDwgAc1032EntityCommon common={0};
-    if(type==19u){
+    if(type==1u){
+        /* Real OT1 TEXT must authenticate its OWN TU Unicode, OCS numeric
+         * fields and strict source H layer/style graph. Never reuse MTEXT
+         * decoding or claim WCS/font/viewport visibility. */
+        MusaDwgAc1032TextSource content={0};
+        MusaDwgAc1032TextPlacement place={0};
+        if(!musa_dwg_ac1032_scene_index_read_text_source(s,h,&content)||
+           !musa_dwg_ac1032_scene_index_read_text_placement(s,h,&place)||
+           !content.original_record_crc_verified||
+           !place.original_record_crc_verified||
+           !place.numeric_fields_decoded||
+           place.wcs_font_and_display_accepted||
+           content.indexed_handle!=h||place.indexed_handle!=h||
+           !musa_dwg_ac1032_scene_index_read_text_common(s,h,&common))
+            return 0;
+    }else if(type==19u){
         MusaDwgAc1032NativeLine line={0};
         if(!musa_dwg_ac1032_scene_index_read_line(s,h,&line))return 0;
         common=line.common;
