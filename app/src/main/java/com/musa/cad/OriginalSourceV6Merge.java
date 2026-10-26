@@ -125,4 +125,33 @@ final class OriginalSourceV6Merge {
             throw new IOException("Birlesik kaynak DWG paketi bozuk");
         return merged;
     }
+    /** Append genuine WCS numeric CIRCLE evidence to the already partial
+     * direct+INSERT LINE streams. All 65-point ACI6 outlines are explicitly
+     * NON-SOURCE-color diagnostics; no owner, layer or viewport is inferred.
+     * No packet is changed on failure. */
+    static float[] joinWithDiagnosticCircles(float[] direct,float[] lines,
+            float[] numericCircles,int maxWords)throws IOException{
+        int n=count(numericCircles,maxWords);
+        if(n>1024||numericCircles.length!=7+132*n)
+            throw new IOException("Sayisal CIRCLE tani kaydi boyutu gecersiz");
+        int at=7;
+        for(int k=0;k<n;k++,at+=132){
+            if(numericCircles[at]!=518f||numericCircles[at+1]!=65f)
+                throw new IOException("CIRCLE orijinal renk gibi sunulamaz");
+            if(numericCircles[at+2]!=numericCircles[at+130]||
+               numericCircles[at+3]!=numericCircles[at+131])
+                throw new IOException("CIRCLE WCS tel-kafesi kapanmadi");
+            for(int j=0;j<65;j++){
+                float x=numericCircles[at+2+2*j];
+                float y=numericCircles[at+3+2*j];
+                if(!Float.isFinite(x)||!Float.isFinite(y)||
+                   x<numericCircles[2]||x>numericCircles[4]||
+                   y<numericCircles[3]||y>numericCircles[5])
+                    throw new IOException("CIRCLE WCS noktasi kaynak sinirini asti");
+            }
+        }
+        float[] partial=join(direct,lines,maxWords);
+        return join(partial,numericCircles,maxWords);
+    }
+
 }
