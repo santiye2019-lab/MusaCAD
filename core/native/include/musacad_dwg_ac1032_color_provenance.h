@@ -54,6 +54,17 @@ typedef struct MusaAc1032ColorProvenance {
 int musa_dwg_ac1032_scene_planar_color_provenance(
     const MusaDwgAc1032SceneIndex *scene,
     uint64_t entity_handle,MusaAc1032ColorProvenance *out);
+
+/* Genuine R2018 OT18 CIRCLE whose first H is a relative owner H(C),
+ * NOT the restricted no-owner planar H4 graph. The source CRC/H-certified
+ * CIRCLE->BLOCK_HEADER forward child membership and H5->OT51 Unicode
+ * LAYER are verified before reporting raw ENC color categories.
+ * Direct ACI/RGB is only source evidence. BYLAYER/BYBLOCK, layer CMC,
+ * owner/model-space, viewport, off/frozen and XREF never authorize paint.
+ * Unsupported input is fail-atomic; no invented default palette color. */
+int musa_dwg_ac1032_scene_circle_owned_color_provenance(
+    const MusaDwgAc1032SceneIndex *scene,
+    uint64_t circle_handle,MusaAc1032ColorProvenance *out);
 int musa_dwg_ac1032_scene_line_point_color_provenance(
     const MusaDwgAc1032SceneIndex *scene,
     uint64_t entity_handle,MusaAc1032ColorProvenance *out);
