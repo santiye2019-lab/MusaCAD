@@ -1304,6 +1304,45 @@ static int genuine(const char *file){
             }
         }
     }
+    if(ok){
+        /* The independent R2018 DXF oracle has two INSERTs H190/H756
+         * of the SAME H17D source block. Reverse H4 source ownership
+         * must be instance-invariant; H1C8 belongs to H1B8 instead. */
+        MusaDwgAc1032InsertReverseOwnerPair pair={0},reverse={0};
+        ok=musa_dwg_ac1032_insert_reverse_owner_source_pair(
+               scene,UINT64_C(0x190),UINT64_C(0x756),&pair)&&
+           musa_dwg_ac1032_insert_reverse_owner_source_pair(
+               scene,UINT64_C(0x756),UINT64_C(0x190),&reverse)&&
+           pair.first_insert==UINT64_C(0x190)&&
+           pair.second_insert==UINT64_C(0x756)&&
+           pair.shared_block_header==UINT64_C(0x17d)&&
+           pair.matched_child_sources==5u&&
+           pair.matched_reverse_edges+pair.foreign_reverse_edges+
+             pair.unresolved_reverse_edges==5u&&
+           pair.original_reverse_owner_provenance_instance_invariant&&
+           !pair.visibility_and_paint_accepted&&
+           reverse.first_insert==pair.second_insert&&
+           reverse.second_insert==pair.first_insert&&
+           reverse.shared_block_header==pair.shared_block_header&&
+           reverse.matched_reverse_edges==pair.matched_reverse_edges&&
+           reverse.foreign_reverse_edges==pair.foreign_reverse_edges&&
+           reverse.unresolved_reverse_edges==pair.unresolved_reverse_edges;
+        if(ok){
+            const MusaDwgAc1032InsertReverseOwnerPair before=pair;
+            ok=!musa_dwg_ac1032_insert_reverse_owner_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x1c8),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_reverse_owner_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x190),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_reverse_owner_source_pair(
+                    scene,UINT64_C(0x190),UINT64_MAX,&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_reverse_owner_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x756),NULL)&&
+               !memcmp(&pair,&before,sizeof(pair));
+        }
+    }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
         ok?"PASS":"FAIL");
