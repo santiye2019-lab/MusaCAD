@@ -29,6 +29,17 @@ static int genuine(const char *file){
         src,(size_t)n,&scene)&&!memcmp(src,saved,(size_t)n);
     free(src);free(saved);
     if(!ok)return 0;
+    /* Independent DXF-listed OT7 handles: collect strict parser diagnostics
+     * for other genuine source objects without treating failures as passes. */
+    const uint64_t diagnostic_handles[]={UINT64_C(0x190),UINT64_C(0x756)};
+    for(size_t i=0u;i<sizeof(diagnostic_handles)/sizeof(diagnostic_handles[0]);i++){
+        MusaDwgAc1032InsertPlacement probe={0};
+        const int parsed=musa_dwg_ac1032_scene_index_read_insert_placement(
+            scene,diagnostic_handles[i],&probe);
+        fprintf(stderr,"MC1032 INSERT original H%llx accepted=%d attrib=%u count=%u\\n",
+            (unsigned long long)diagnostic_handles[i],parsed,
+            (unsigned)probe.has_attribs,(unsigned)probe.owned_attrib_count);
+    }
     const uint64_t h=UINT64_C(0x1c8);
     MusaDwgAc1032InsertPlacement p={0};
     ok=musa_dwg_ac1032_scene_index_read_insert_placement(scene,h,&p)&&
