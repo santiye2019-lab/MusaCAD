@@ -93,6 +93,24 @@ static int genuine(const char *file){
                block.no_reactors_verified&&
                !block.base_point_decoded;
         }
+        if(ok){
+            MusaDwgAc1032InsertBlockHeaderSource joined={0};
+            ok=musa_dwg_ac1032_insert_bind_block_header_source(
+                   scene,e->h,&joined)&&
+               joined.source_join_verified&&
+               joined.insert.graph.indexed_handle==e->h&&
+               joined.block_header.indexed_handle==e->block&&
+               joined.block_header.original_record_crc_verified&&
+               !joined.block_base_decoded&&
+               !joined.block_header.base_point_decoded;
+            /* The wrong object type must not mutate the caller output. */
+            if(ok){
+                const MusaDwgAc1032InsertBlockHeaderSource before=joined;
+                ok=!musa_dwg_ac1032_insert_bind_block_header_source(
+                       scene,e->block,&joined)&&
+                   !memcmp(&before,&joined,sizeof(joined));
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
