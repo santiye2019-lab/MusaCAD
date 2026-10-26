@@ -328,12 +328,28 @@ static int genuine(const char *file){
                !markers.reverse_owner_links_verified&&
                !markers.final_display_accepted;
             if(ok){
+                MusaDwgAc1032BlockMarkerCommons repeated={0};
+                ok=musa_dwg_ac1032_block_marker_commons(
+                       scene,e->block,&repeated)&&
+                   repeated.block_begin_handle==markers.block_begin_handle&&
+                   repeated.endblk_handle==markers.endblk_handle&&
+                   repeated.child_count==markers.child_count&&
+                   repeated.marker_records_crc_verified&&
+                   repeated.unique_prefix_handles_verified;
+            }
+            if(ok){
                 const MusaDwgAc1032BlockMarkerCommons before=markers;
                 ok=!musa_dwg_ac1032_block_marker_commons(
                        scene,e->h,&markers)&&
                    !memcmp(&before,&markers,sizeof(markers))&&
                    !musa_dwg_ac1032_block_marker_commons(
                        scene,UINT64_MAX,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers))&&
+                   !musa_dwg_ac1032_block_marker_commons(
+                       scene,before.block_begin_handle,&markers)&&
+                   !memcmp(&before,&markers,sizeof(markers))&&
+                   !musa_dwg_ac1032_block_marker_commons(
+                       scene,before.endblk_handle,&markers)&&
                    !memcmp(&before,&markers,sizeof(markers));
             }
         }
