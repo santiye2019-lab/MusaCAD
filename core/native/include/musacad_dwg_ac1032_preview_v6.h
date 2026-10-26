@@ -140,6 +140,15 @@ int musa_dwg_ac1032_preview_v6_entity_source_style_code(
     const MusaDwgAc1032EntityCommon *source,uint8_t v6_kind,
     float *code,float *rgb,uint8_t *extra,uint8_t *exact);
 
+/* New opt-in source-authenticated OT1 TEXT + OT44 MTEXT v6 diagnostic.
+ * OT1 is a distinct TU decoder; unknown owner/viewport/font remain partial.
+ * Older no-TEXT and MTEXT-only APIs retain their original semantics. */
+int musa_dwg_ac1032_preview_v6_planar_source_with_text(
+    const MusaDwgAc1032SceneIndex *scene,float *words,
+    size_t capacity,MusaAc1032PreviewV6Stats *out);
+int musa_dwg_ac1032_preview_v6_source_census_with_text(
+    const MusaDwgAc1032SceneIndex *scene,
+    MusaAc1032PreviewV6SourceCensus *out);
 #ifdef __cplusplus
 }
 #endif
