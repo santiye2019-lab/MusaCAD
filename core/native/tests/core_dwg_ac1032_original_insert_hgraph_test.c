@@ -109,6 +109,23 @@ static int genuine(const char *file){
                    !memcmp(&before,&span,sizeof(span));
             }
         }
+        if(ok){
+            /* Genuine R2018: first authenticated field bits must be
+             * reproducible, without claiming that they encode XYZ. */
+            MusaDwgAc1032BlockHeaderFieldSpan span={0};
+            if(ok)ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                   scene,e->block,&span);
+            if(ok){
+                MusaDwgAc1032BlockHeaderFieldSpan repeat={0};
+                ok=musa_dwg_ac1032_scene_index_read_block_header_field_span(
+                       scene,e->block,&repeat)&&
+                   repeat.indexed_handle==span.indexed_handle&&
+                   repeat.first_bit==span.first_bit&&
+                   repeat.end_bit==span.end_bit&&
+                   repeat.original_record_crc_verified&&
+                   !repeat.base_point_decoded;
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
