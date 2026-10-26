@@ -21,6 +21,7 @@
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_insert_line_style_risk_evidence.h"
 #include "musacad_dwg_ac1032_insert_line_source_bounds.h"
+#include "musacad_dwg_ac1032_insert_line_v6_diagnostic.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1614,6 +1615,109 @@ static int genuine(const char *file){
                    !musa_dwg_ac1032_insert_line_source_bounds(
                        scene,inserts[b],NULL)&&
                    !memcmp(&bounds,&prior,sizeof(bounds));
+            }
+        }
+    }
+    if(ok){
+        /* New source-only v6 geometry BRIDGE, not a user-visible
+         * display guarantee. Genuine unchanged R2018 INSERT gold:
+         * no guessed Layer0/ACI7, foreign owner or float-collapsed LINE. */
+        const uint64_t inserts[]={UINT64_C(0x1c8),
+                                  UINT64_C(0x190),UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),
+                                 UINT64_C(0x17d),UINT64_C(0x17d)};
+        for(size_t b=0u;ok&&b<3u;b++){
+            float packet[7u+6u*MUSACAD_AC1032_OT49_CHILD_LIMIT]={0};
+            float again[7u+6u*MUSACAD_AC1032_OT49_CHILD_LIMIT]={0};
+            MusaDwgAc1032InsertLineV6Diagnostic info={0},repeat={0};
+            MusaDwgAc1032InsertLineSourceSegments source={0};
+            MusaDwgAc1032InsertLineStyleRiskEvidence risk={0};
+            MusaDwgAc1032InsertLineSourceBounds bounds={0};
+            ok=musa_dwg_ac1032_insert_line_v6_diagnostic(
+                   scene,inserts[b],NULL,0u,&info)&&
+               musa_dwg_ac1032_insert_line_v6_diagnostic(
+                   scene,inserts[b],packet,
+                   sizeof(packet)/sizeof(packet[0]),&repeat)&&
+               !memcmp(&info,&repeat,sizeof(info))&&
+               musa_dwg_ac1032_insert_line_v6_diagnostic(
+                   scene,inserts[b],again,
+                   sizeof(again)/sizeof(again[0]),&repeat)&&
+               !memcmp(packet,again,info.required_float_words*sizeof(float))&&
+               musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&source)&&
+               musa_dwg_ac1032_insert_line_style_risk_evidence(
+                   scene,inserts[b],&risk)&&
+               musa_dwg_ac1032_insert_line_source_bounds(
+                   scene,inserts[b],&bounds)&&
+               info.insert_handle==inserts[b]&&
+               info.block_header_handle==blocks[b]&&
+               info.original_source_line_count==source.verified_planar_line_count&&
+               info.admitted_line_count+info.omitted_source_line_count==
+                   info.original_source_line_count&&
+               info.required_float_words>=7u&&
+               info.original_h4_h5_wcs_source_verified&&
+               info.packet_partial_by_design&&
+               !info.final_visibility_and_paint_accepted&&
+               packet[0]==6.0f&&
+               packet[1]==(float)info.admitted_line_count&&
+               packet[6]==1.0f;
+            const uint32_t mandatory=
+                MUSACAD_AC1032_LINE_RISK_LAYER_VISIBILITY|
+                MUSACAD_AC1032_LINE_RISK_SPACE_VIEWPORT;
+            size_t pos=7u,emitted=0u;
+            for(size_t i=0u;ok&&i<info.original_source_line_count;i++){
+                const MusaDwgAc1032InsertLineSourceRow *sr=&source.rows[i];
+                const MusaDwgAc1032InsertLineStyleRiskRow *rr=&risk.rows[i];
+                const MusaDwgAc1032InsertLineSourceBoundsRow *br=&bounds.rows[i];
+                ok=sr->child_handle==rr->child_handle&&
+                   sr->child_handle==br->child_handle;
+                if(!ok)break;
+                if((rr->risk_mask&~mandatory)||
+                   !rr->direct_encoded_color_source_only||
+                   !br->float_endpoints_distinguishable)continue;
+                const int rgb=rr->source_style_class==
+                    MUSACAD_AC1032_SOURCE_STYLE_EXPLICIT_RGB;
+                const size_t needed=rgb?6u:5u;
+                ok=pos+needed<=info.required_float_words&&
+                   packet[pos]==(rgb?-258.0f:
+                                      256.0f+(float)rr->source_aci);
+                if(!ok)break;
+                if(rgb)ok=packet[pos+1u]==(float)rr->source_rgb24;
+                const size_t base=pos+(rgb?1u:0u);
+                ok=ok&&packet[base+1u]==(float)sr->world_start[0]&&
+                   packet[base+2u]==(float)sr->world_start[1]&&
+                   packet[base+3u]==(float)sr->world_end[0]&&
+                   packet[base+4u]==(float)sr->world_end[1];
+                pos+=needed;
+                emitted++;
+            }
+            if(ok)ok=pos==info.required_float_words&&
+                     emitted==info.admitted_line_count;
+            if(ok){
+                /* Failed request cannot modify the float output or
+                 * the caller's previous statistics. */
+                float small[6]={9.f,8.f,7.f,6.f,5.f,4.f};
+                const float original[6]={9.f,8.f,7.f,6.f,5.f,4.f};
+                const MusaDwgAc1032InsertLineV6Diagnostic prior=info;
+                ok=!musa_dwg_ac1032_insert_line_v6_diagnostic(
+                       scene,inserts[b],small,6u,&info)&&
+                   !memcmp(small,original,sizeof(small))&&
+                   !memcmp(&info,&prior,sizeof(info))&&
+                   !musa_dwg_ac1032_insert_line_v6_diagnostic(
+                       scene,blocks[b],packet,
+                       sizeof(packet)/sizeof(packet[0]),&info)&&
+                   !memcmp(&info,&prior,sizeof(info))&&
+                   !musa_dwg_ac1032_insert_line_v6_diagnostic(
+                       scene,UINT64_MAX,packet,
+                       sizeof(packet)/sizeof(packet[0]),&info)&&
+                   !memcmp(&info,&prior,sizeof(info))&&
+                   !musa_dwg_ac1032_insert_line_v6_diagnostic(
+                       scene,inserts[b],NULL,1u,&info)&&
+                   !memcmp(&info,&prior,sizeof(info))&&
+                   !musa_dwg_ac1032_insert_line_v6_diagnostic(
+                       scene,inserts[b],packet,
+                       sizeof(packet)/sizeof(packet[0]),NULL)&&
+                   !memcmp(&info,&prior,sizeof(info));
             }
         }
     }
