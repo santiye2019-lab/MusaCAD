@@ -123,6 +123,21 @@ static int genuine(const char *file){
         ok=!musa_dwg_ac1032_block_header_ot49_identity(
               fake,sizeof(fake),&layout,&identity)&&
            !memcmp(&identity,&saved_identity,sizeof(identity));
+        /* A CRC bit alone must not authorize an OT49 identity: a
+         * mismatched object type and malformed prefix both fail closed. */
+        layout.original_record_crc_verified=1u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
+        layout.raw_object_type=51u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
+        layout.raw_object_type=49u;
+        layout.handle_stream_start_bit=11u;
+        if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
+                    fake,sizeof(fake),&layout,&identity)&&
+                  !memcmp(&identity,&saved_identity,sizeof(identity));
     }
     if(ok){
         MusaDwgAc1032InsertSourceGraph unchanged;
