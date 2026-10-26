@@ -67,16 +67,28 @@ int musa_dwg_ac1032_insert_placement_at(
     uint32_t attribs=0u;
     if(!musa_dwg_ac1015_bits_read_bd(&b,&v.rotation))
         return reject_field("rotation",&b,v.indexed_handle);
-    if(!musa_dwg_ac1015_bits_read_be(&b,v.extrusion))
-        return reject_field("extrusion",&b,v.indexed_handle);
+    /* OT7 INSERT stores extrusion as 3BD (not BE). Genuine R2018
+     * H1C8/H190/H756 use the six-bit default 10 10 01 = (0,0,1).
+     * BE would under-consume five bits and corrupt the ATTRIB flag. */
+    for(unsigned k=0u;k<3u;k++)
+        if(!musa_dwg_ac1015_bits_read_bd(&b,&v.extrusion[k]))
+            return reject_field("extrusion_3bd",&b,v.indexed_handle);
     if(!musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
         return reject_field("has_attribs",&b,v.indexed_handle);
     v.has_attribs=(uint8_t)attribs;
-    /* R2004+ INSERT encodes Owned Object Count (BL) regardless of the
-     * Has ATTRIBs bit. The count must be zero if no attributes follow.
-     * ODA DWG specification, INSERT (7), R2004+ field order. */
-    if(!musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
+    /* Source-verified R2018 INSERT: attribute count BL follows only when
+     * Has ATTRIBs=1 (H190/H756 -> 1; H1C8 -> no count). Reject a missing
+     * or malformed BL; do not read into the handle stream. */
+    if(v.has_attribs &&
+       !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
         return reject_field("owned_attrib_count",&b,v.indexed_handle);
+    /* R2007+ final DATA bit announces a separate TU string stream.
+     * An ordinary INSERT has no TU string: require the authentic zero bit.
+     * No unverified payload is ever silently treated as padding. */
+    uint32_t has_string_stream=0u;
+    if(!musa_dwg_ac1015_bits_read_u(&b,1u,&has_string_stream)||
+       has_string_stream!=0u)
+        return reject_field("unexpected_string_stream",&b,v.indexed_handle);
     if(b.bit_pos!=b.bit_end){
         /* Preserve strict rejection while recording exact unparsed source bits.
          * This is evidence for the remaining INSERT grammar, not padding. */
