@@ -1236,6 +1236,9 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon lintPlayDebug lintDirectDebug testPlayDebugUnitTest testDirectDebugUnitTest compilePlayReleaseJavaWithJavac compileDirectReleaseJavaWithJavac :licensemanager:lintDebug :licensemanager:testDebugUnitTest :licensemanager:compileDebugJavaWithJavac :licensemanager:compileReleaseJavaWithJavac
+      - name: Guard Linux host and Android JNI CMake configuration
+        run: |
+          python3 -m unittest discover -s tools -p 'test_native_build_contract.py' -v
       - name: Build and smoke-test native converter
         run: |
           cmake -S app/src/main/cpp -B /tmp/musa-native -DCMAKE_BUILD_TYPE=Release
