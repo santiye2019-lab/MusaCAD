@@ -110,9 +110,9 @@ jobs:
           before="$(sha256sum "$original" | cut -d ' ' -f1)"
           test "$(head -c 6 "$original")" = AC1032
           grep -F 'AcDbBlockReference' "$oracle"
-          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \\
-            core/native/tests/core_dwg_ac1032_original_insert_common_test.c \\
-            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \\
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_insert_common_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
             -o /tmp/musacad-r2018-original-insert-common
           timeout 120s /tmp/musacad-r2018-original-insert-common "$original"
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
