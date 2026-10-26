@@ -93,6 +93,22 @@ static int genuine(const char *file){
                block.no_reactors_verified&&
                !block.base_point_decoded;
         }
+        if(ok){
+            MusaDwgAc1032BlockHeaderPrefixEvidence prefix={0};
+            ok=musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+                   scene,e->block,&prefix)&&
+               prefix.indexed_handle==e->block&&
+               prefix.original_record_crc_verified&&
+               prefix.fields_start_bit>10u&&
+               prefix.prefix_fnv1a64!=0u&&
+               !prefix.base_point_decoded;
+            if(ok){
+                const MusaDwgAc1032BlockHeaderPrefixEvidence before=prefix;
+                ok=!musa_dwg_ac1032_scene_index_read_block_header_prefix_evidence(
+                        scene,e->h,&prefix)&&
+                   !memcmp(&prefix,&before,sizeof(prefix));
+            }
+        }
         /* A verified source H graph must agree with the independently
          * decoded INSERT DATA attribute flag/count for the same handle.
          * This is source consistency, not block ownership or rendering. */
