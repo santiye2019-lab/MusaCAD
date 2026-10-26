@@ -606,6 +606,28 @@ int musa_dwg_ac1032_scene_index_insert_layer_provenance(
     v.source_layer_and_entity_verified=1u;
     *out=v;return 1;
 }
+/* One source-backed original INSERT -> LAYER CMC join. Reuse the
+ * independently verified H graph and Unicode/status source evidence.
+ * Do not assign a drawable block color or silently default BYLAYER. */
+int musa_dwg_ac1032_scene_index_insert_layer_cmc_source(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertLayerCmcSource *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032InsertLayerCmcSource v={0};
+    if(!musa_dwg_ac1032_scene_index_insert_layer_provenance(
+           s,h,&v.source)||
+       !v.source.source_layer_and_entity_verified||
+       v.source.final_visibility_color_and_paint_accepted||
+       !musa_dwg_ac1032_scene_index_layer_anchored_cmc_evidence(
+           s,v.source.graph.layer_handle,&v.cmc)||
+       v.cmc.indexed_handle!=v.source.graph.layer_handle||
+       !v.cmc.original_record_crc_verified||
+       v.cmc.packed_color_method!=0xc3u||
+       !v.cmc.aci_index||
+       v.cmc.cmc_end_bit<=v.cmc.cmc_start_bit)return 0;
+    v.source_aci_verified=1u;
+    *out=v;return 1;
+}
 /* Original MTEXT H tail: optional hard owner, entity layer H5 and
  * MTEXT style H5. Reject unexpected extras, never infer a default layer. */
 /* Source OT1 TEXT H tail is NOT MTEXT's H graph. For this narrow
