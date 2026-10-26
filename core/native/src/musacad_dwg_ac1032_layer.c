@@ -5,7 +5,6 @@
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include <stdint.h>
 #include <stddef.h>
-#include <stdio.h>
 #define LIMIT (64u*1024u*1024u)
 static int overlap(const void *a,size_t al,const void *b,size_t bl){
     if(!al||!bl)return 0;
@@ -29,24 +28,6 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
        !l->handle_stream_bits||
        l->handle_stream_bits!=l->total_payload_bits-l->data_stream_bits)
         return 0;
-    /* TEMP source diagnostic; remove before merging. */
-    if(l->indexed_handle==UINT64_C(0x81)){
-        MusaDwgAc1015Bits d={0};
-        uint32_t k=0u,t=0u,x=0u,react=0u;
-        uint16_t e=0u;
-        MusaDwgAc1015HandleRef self_d={0};
-        int i=musa_dwg_ac1015_bits_init(&d,raw,n,0u,(size_t)l->data_stream_bits);
-        int a=i&&musa_dwg_ac1015_bits_read_u(&d,2u,&k);
-        int b0=a&&musa_dwg_ac1015_bits_read_u(&d,8u,&t);
-        int c=b0&&musa_dwg_ac1015_read_handle_ref(&d,l->indexed_handle,&self_d);
-        int ee=c&&musa_dwg_ac1015_bits_read_bs(&d,&e);
-        int rr=ee&&musa_dwg_ac1015_bits_read_bl(&d,&react);
-        int xx=rr&&musa_dwg_ac1015_bits_read_u(&d,1u,&x);
-        fprintf(stderr,"OT1_LAYER_PREFIX_DIAG bytes=%zu data=%llu kind=%u type=%u refok=%d code=%u target=%llX eedok=%d eed=%u reactorok=%d reactor=%u xok=%d x=%u pos=%zu\\n",
-          n,(unsigned long long)l->data_stream_bits,(unsigned)k,(unsigned)t,
-          c,(unsigned)self_d.code,(unsigned long long)self_d.target,
-          ee,(unsigned)e,rr,(unsigned)react,xx,(unsigned)x,d.bit_pos);
-    }
     MusaDwgAc1015Bits b={0};
     uint32_t kind=0u,type=0u,xdic=0u;
     uint16_t eed=0u;
@@ -61,7 +42,7 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
        self.code!=0u||self.relative||self.target!=l->indexed_handle||
        !musa_dwg_ac1015_bits_read_bs(&b,&eed)||eed!=0u||
        !musa_dwg_ac1015_bits_read_bl(&b,&reactors)||reactors!=0u||
-       !musa_dwg_ac1015_bits_read_u(&b,1u,&xdic)||xdic!=1u||
+       !musa_dwg_ac1015_bits_read_u(&b,1u,&xdic)||
        b.bit_pos>=b.bit_end)
         return 0;
     MusaDwgAc1032LayerIdentity value={0};
@@ -72,7 +53,8 @@ int musa_dwg_ac1032_layer_ot51_identity_at(
     value.embedded_self_handle_verified=1u;
     value.empty_eed_verified=1u;
     value.no_reactors_verified=1u;
-    value.xdictionary_missing=1u;
+    /* Source bit is preserved. A present XDictionary is NOT resolved. */
+    value.xdictionary_missing=(uint8_t)xdic;
     *out=value;
     return 1;
 }
