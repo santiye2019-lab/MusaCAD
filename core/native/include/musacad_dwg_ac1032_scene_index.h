@@ -45,6 +45,11 @@ int musa_dwg_ac1032_scene_index_object_type(
 /* Authenticated original R2018 OT2 ATTRIB entity-common only. This is NOT
  * ATTRIB text, attachment to INSERT, BLOCK_HEADER ownership, geometry,
  * viewport visibility or rendering. Fail-atomic on unsupported source. */
+/* Authenticated original R2018 OT3 ATTDEF entity-common only. No tag,
+ * text value, default attribute, INSERT binding, owner or final paint. */
+int musa_dwg_ac1032_scene_index_read_attdef_common(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032EntityCommon *out);
 int musa_dwg_ac1032_scene_index_read_attrib_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);

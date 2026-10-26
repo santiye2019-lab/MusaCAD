@@ -188,6 +188,21 @@ static int check_output(const MusaDwgAc1032SceneIndex *s,
        !overlap(s->objects,s->object_bytes,out,n)&&
        !overlap(s->handles,s->count*sizeof(*s->handles),out,n);
 }
+/* Real OT3 ATTDEF authenticated common ENC/status; no tag/default text,
+ * BLOCK ownership, attributes on INSERT or rendered geometry. */
+int musa_dwg_ac1032_scene_index_read_attdef_common(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032EntityCommon *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,3u,&p))return 0;
+    const MusaDwgAc1032EntityCommon v=p.common;
+    free(p.raw);
+    if(!v.common_decoded||!v.prefix.prefix_decoded||
+       v.prefix.indexed_handle!=h||v.prefix.raw_object_type!=3u||
+       v.geometry_start_bit<=v.prefix.next_color_bit)return 0;
+    *out=v;return 1;
+}
 /* Real OT2 ATTRIB authenticated common ENC/status. The attribute DATA,
  * INSERT ownership and block transforms are intentionally NOT admitted. */
 int musa_dwg_ac1032_scene_index_read_attrib_common(
