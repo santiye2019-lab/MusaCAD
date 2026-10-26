@@ -15,6 +15,7 @@
 #include "musacad_dwg_ac1032_block_child_layer_style_provenance.h"
 #include "musacad_dwg_ac1032_block_pair_source_isolation.h"
 #include "musacad_dwg_ac1032_insert_child_source_join.h"
+#include "musacad_dwg_ac1032_insert_instance_source_pair.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -1097,6 +1098,46 @@ static int genuine(const char *file){
                         scene,inserts[b],NULL)&&
                    !memcmp(&joined,&before,sizeof(joined));
             }
+        }
+    }
+    if(ok){
+        /* Independent original example_2018.dwg/DXF: two distinct INSERTs
+         * H190 and H756 target the SAME OT49 H17D with five children.
+         * Original layer/color provenance must not change with instance
+         * transform. H1C8 targets a DIFFERENT block and must be rejected. */
+        MusaDwgAc1032InsertInstanceSourcePair pair={0},reverse={0};
+        ok=musa_dwg_ac1032_insert_instance_source_pair(
+               scene,UINT64_C(0x190),UINT64_C(0x756),&pair)&&
+           musa_dwg_ac1032_insert_instance_source_pair(
+               scene,UINT64_C(0x756),UINT64_C(0x190),&reverse)&&
+           pair.first_insert==UINT64_C(0x190)&&
+           pair.second_insert==UINT64_C(0x756)&&
+           pair.shared_block_header==UINT64_C(0x17d)&&
+           pair.matched_child_sources==5u&&
+           pair.original_child_provenance_instance_invariant&&
+           !pair.distinct_transform_verified&&
+           !pair.owner_and_visibility_verified&&
+           !pair.final_paint_accepted&&
+           reverse.first_insert==pair.second_insert&&
+           reverse.second_insert==pair.first_insert&&
+           reverse.shared_block_header==pair.shared_block_header&&
+           reverse.matched_child_sources==pair.matched_child_sources&&
+           reverse.first_mapped==pair.second_mapped&&
+           reverse.second_mapped==pair.first_mapped;
+        if(ok){
+            const MusaDwgAc1032InsertInstanceSourcePair before=pair;
+            ok=!musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x1c8),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x190),&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_MAX,&pair)&&
+               !memcmp(&pair,&before,sizeof(pair))&&
+               !musa_dwg_ac1032_insert_instance_source_pair(
+                    scene,UINT64_C(0x190),UINT64_C(0x756),NULL)&&
+               !memcmp(&pair,&before,sizeof(pair));
         }
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
