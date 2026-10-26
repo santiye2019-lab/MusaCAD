@@ -255,6 +255,22 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS real INSERT CIRCLE positive WCS geometry; magenta is NOT original source color"
 
+      - name: P0 independent original R2018 H1C8 H1BB CIRCLE WCS v6 source fidelity
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'AcDbBlockReference' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_circle_wireframe_source_fidelity_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-circle-source-fidelity
+          timeout 120s /tmp/musacad-r2018-circle-source-fidelity "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original R2018 CIRCLE WCS v6 source fidelity; owner/color UNKNOWN"
+
       - name: P0 original R2018 INSERT H graph to real Unicode LAYER and raw status provenance
         run: |
           set -euo pipefail

@@ -3,7 +3,7 @@
  * emitted below do NOT represent source DWG color, visibility or owner.
  * Never use this endpoint for normal editable DWG opening. */
 #include <jni.h>
-#include "musacad_dwg_ac1032_insert_circle_numeric_wireframe_v6.h"
+#include "musacad_dwg_ac1032_circle_wireframe_source_fidelity.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -62,6 +62,16 @@ Java_com_musa_cad_FirstPartyDwgPreview_readCircleGeometryEvidenceNative(
            !memcmp(&first,&last,sizeof(first))&&
            packet[0]==6.0f&&packet[6]==1.0f&&
            packet[1]==(float)first.emitted_numeric_wireframes;
+    /* Independent source-vs-packet check BEFORE releasing original scene.
+     * Reject corrupted or drifted WCS vertices, bounds, diagnostic ACI.
+     * This is never a proof of source paint or layer visibility. */
+    MusaDwgAc1032CircleWireframeFidelity fidelity={0};
+    if(ok)ok=musa_dwg_ac1032_circle_wireframe_source_fidelity(
+              scene,packet,first.required_float_words,&fidelity)&&
+           fidelity.geometry_only_verified&&
+           !fidelity.source_color_or_visibility_accepted&&
+           fidelity.verified_wireframes==first.emitted_numeric_wireframes&&
+           fidelity.unresolved_h4_h5_circles==first.unresolved_h4_h5_circles;
     musa_dwg_ac1032_scene_index_close(scene);
     if(!ok){
         free(packet);
