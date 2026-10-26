@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1032_curve.h"
 #include "musacad_dwg_ac1032_point.h"
 #include "musacad_dwg_ac1032_text.h"
+#include "musacad_dwg_ac1032_insert.h"
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_lwpolyline.h"
 #include "musacad_dwg_ac1032_polyline3d.h"
