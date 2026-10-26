@@ -348,6 +348,14 @@ static int genuine(const char *file){
                    fake,sizeof(fake),&layout,10u,8u,output,sizeof(output))&&
                    output[0]==0xa5u&&output[1]==0x5au;
         }
+        {
+            MusaDwgAc1032BlockHeaderBase base;
+            memset(&base,0x5au,sizeof(base));
+            const MusaDwgAc1032BlockHeaderBase before=base;
+            if(ok)ok=!musa_dwg_ac1032_block_header_ot49_base_at(
+                  fake,sizeof(fake),&layout,&base)&&
+                  !memcmp(&base,&before,sizeof(base));
+        }
         layout.handle_stream_start_bit=11u;
         if(ok)ok=!musa_dwg_ac1032_block_header_ot49_identity(
                     fake,sizeof(fake),&layout,&identity)&&
