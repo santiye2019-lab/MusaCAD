@@ -279,6 +279,35 @@ static int genuine(const char *file){
             }
         }
         if(ok){
+            /* Independent companion DXF block sizes 13/5; each binary
+             * source H is independently checked for CRC and actual OT.
+             * No reverse-owner or final paint acceptance is inferred. */
+            MusaDwgAc1032BlockHeaderTypedChildren typed={0};
+            const uint32_t expected_count=
+                e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_scene_index_block_header_typed_children(
+                   scene,e->block,&typed)&&
+               typed.prefix.indexed_handle==e->block&&
+               typed.prefix.child_count==expected_count&&
+               typed.prefix.canonical_h_roles_verified&&
+               typed.all_child_record_types_crc_verified&&
+               !typed.reverse_owner_links_verified&&
+               !typed.final_display_accepted;
+            for(uint32_t j=0u;ok&&j<typed.prefix.child_count;j++){
+                uint16_t type=0u;
+                ok=musa_dwg_ac1032_scene_index_object_type(
+                      scene,typed.prefix.child_handles[j],&type)&&
+                   type==typed.child_object_types[j]&&
+                   type!=4u&&type!=5u;
+            }
+            if(ok){
+                const MusaDwgAc1032BlockHeaderTypedChildren before=typed;
+                ok=!musa_dwg_ac1032_scene_index_block_header_typed_children(
+                        scene,e->h,&typed)&&
+                   !memcmp(&before,&typed,sizeof(typed));
+            }
+        }
+        if(ok){
             /* The independent companion DXF says both referenced BLOCK
              * origins are (0,0,0). Use the actual OT49 base reader and
              * original INSERT placement; do not inject a synthetic base. */
