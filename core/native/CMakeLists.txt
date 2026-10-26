@@ -54,6 +54,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_mtext_v6_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_mtext_v6_color_smoke
                  COMMAND musacad_core_ac1032_mtext_v6_color_test)
+        # Strict real OT1 TEXT common entity evidence, separate from MTEXT.
+        add_executable(musacad_core_ac1032_original_ot1_common_test
+                tests/core_dwg_ac1032_original_ot1_common_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_common_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_common_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_common_test)
         # Genuine separate R2018 sample_2018.dwg OT1 TEXT H8E physical
         # and CRC/H type identity preflight; not a Unicode decoder yet.
         add_executable(musacad_core_ac1032_original_ot1_fixture_test

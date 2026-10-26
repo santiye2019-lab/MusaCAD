@@ -52,6 +52,12 @@ int musa_dwg_ac1032_scene_index_read_ellipse(
  * Does NOT parse OT1 TEXT, paragraph formatting or owner visibility. */
 /* One original CRC/H verified common source COLOR/visibility field.
  * Fonts/layout, block ownership, viewport and final BYLAYER remain open. */
+/* Genuine R2018 OT1 TEXT entity-common source only. Strict OT/H/CRC and
+ * ENC/visibility fields, no claim of TEXT TU, WCS, font, owner or glyphs.
+ * Deliberately distinct from OT44 MTEXT and its string grammar. */
+int musa_dwg_ac1032_scene_index_read_text_common(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032EntityCommon *out);
 int musa_dwg_ac1032_scene_index_read_mtext_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
