@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #define LIMIT (64u*1024u*1024u)
-/* Diagnostics are emitted only on rejection; no source bytes are modified. */
+/* Fail-closed field diagnostics emit offsets, never user DWG contents. */
 static int reject_field(const char *field,const MusaDwgAc1015Bits *b,
                         uint64_t handle){
     fprintf(stderr,"MC1032 INSERT reject H%llx field=%s bit=%zu end=%zu remaining=%zu\n",
@@ -89,31 +89,8 @@ int musa_dwg_ac1032_insert_placement_at(
     if(!musa_dwg_ac1015_bits_read_u(&b,1u,&has_string_stream)||
        has_string_stream!=0u)
         return reject_field("unexpected_string_stream",&b,v.indexed_handle);
-    if(b.bit_pos!=b.bit_end){
-        /* Preserve strict rejection while recording exact unparsed source bits.
-         * This is evidence for the remaining INSERT grammar, not padding. */
-        /* Bounded raw provenance to compare DATA/handle partition across
-         * authentic fixtures. Diagnostic only, never changes acceptance. */
-        fprintf(stderr,"MC1032 INSERT source H%llx payload=%zu handle_bits=%llu rawhex=",
-                (unsigned long long)v.indexed_handle,n,
-                (unsigned long long)l->handle_stream_bits);
-        for(size_t byte=0u;byte<n&&byte<64u;byte++)
-            fprintf(stderr,"%02x",(unsigned)raw[byte]);
-        fputc('\n',stderr);
-        fprintf(stderr,"MC1032 INSERT trailing DATA H%llx bits=",
-                (unsigned long long)v.indexed_handle);
-        for(size_t bit=b.bit_pos;bit<b.bit_end;bit++){
-            const uint8_t octet=raw[bit/8u];
-            fputc((octet & (uint8_t)(1u << (7u-(bit%8u))))?'1':'0',stderr);
-        }
-        fputc('\n',stderr);
-        fprintf(stderr,"MC1032 INSERT diagnostic handle=%llx geom=%zu data_end=%zu pos=%zu remaining=%zu flags=%u attrib=%u count=%u xyz=(%.12g,%.12g,%.12g)\n",
-            (unsigned long long)v.indexed_handle,geom,(size_t)l->data_stream_bits,
-            b.bit_pos,b.bit_end-b.bit_pos,(unsigned)v.scale_data_flags,
-            (unsigned)v.has_attribs,(unsigned)v.owned_attrib_count,
-            v.insertion[0],v.insertion[1],v.insertion[2]);
+    if(b.bit_pos!=b.bit_end)
         return reject_field("trailing_data",&b,v.indexed_handle);
-    }
     if((!v.has_attribs&&v.owned_attrib_count!=0u)||
        v.owned_attrib_count>100000u||
        !isfinite(v.rotation))return 0;
