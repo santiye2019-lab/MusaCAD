@@ -12,6 +12,7 @@
 #include "musacad_dwg_ac1032_block_child_geometry_audit.h"
 #include "musacad_dwg_ac1032_insert_child_coordinate_probe.h"
 #include "musacad_dwg_ac1032_block_child_color_evidence.h"
+#include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
@@ -532,6 +533,75 @@ static int genuine(const char *file){
                    geo.child_types[j]==probe.child_types[j]&&
                    (!probe.anchor_mapped[j]||geo.numeric_geometry_ok[j])&&
                    (!probe.line_end_mapped[j]||probe.anchor_mapped[j]);
+            }
+        }
+        if(ok){
+            /* Original R2018 block child TEXT/MTEXT is not silently
+             * accepted on raw OT alone. Every source TU, numeric position,
+             * graph edge is decoded independently or remains unresolved.
+             * Independent DXF: H1B8 13 children, H17D 5 children. */
+            MusaDwgAc1032BlockChildTextSourceInventory textinv={0};
+            const uint32_t count=e->block==UINT64_C(0x1b8)?13u:5u;
+            ok=musa_dwg_ac1032_block_child_text_source_inventory(
+                   scene,e->block,&textinv)&&
+               textinv.block_header_handle==e->block&&
+               textinv.child_count==count&&
+               textinv.original_child_source_graph_verified&&
+               !textinv.complete_reverse_ownership_verified&&
+               !textinv.font_layout_and_paint_accepted&&
+               textinv.utf8_source_count<=textinv.text_family_count&&
+               textinv.numeric_placement_count<=textinv.text_family_count&&
+               textinv.h_graph_count<=textinv.text_family_count&&
+               textinv.matching_owner_edge_count<=textinv.h_graph_count&&
+               textinv.matching_layer_edge_count<=textinv.h_graph_count;
+            if(ok){
+                MusaDwgAc1032BlockChildLayerInventory layers={0};
+                ok=musa_dwg_ac1032_block_child_layer_evidence(
+                       scene,e->block,&layers);
+                uint32_t text_types=0u;
+                for(uint32_t j=0u;ok&&j<textinv.child_count;j++){
+                    const MusaDwgAc1032BlockTextChildRow *row=&
+                        textinv.children[j];
+                    ok=row->child_handle==layers.children[j].child_handle&&
+                       row->raw_object_type==layers.children[j].raw_object_type&&
+                       !row->text_and_display_accepted;
+                    if(!ok)break;
+                    if(row->raw_object_type!=1u&&row->raw_object_type!=44u){
+                        ok=!row->utf8_source_verified&&
+                           !row->numeric_placement_verified&&
+                           !row->source_h_graph_verified&&
+                           !row->reverse_owner_edge_matches_block&&
+                           !row->source_layer_edge_matches;
+                        continue;
+                    }
+                    text_types++;
+                    if(row->reverse_owner_edge_matches_block)
+                        ok=row->source_h_graph_verified&&
+                           row->source_owner_handle==e->block;
+                    if(ok&&row->source_layer_edge_matches)
+                        ok=row->source_h_graph_verified&&
+                           layers.children[j].layer_evidence_status==
+                             MUSACAD_AC1032_BLOCK_LAYER_VERIFIED&&
+                           row->source_layer_handle==
+                             layers.children[j].layer_handle;
+                }
+                if(ok)ok=text_types==textinv.text_family_count;
+            }
+            if(ok){
+                MusaDwgAc1032BlockChildTextSourceInventory again={0};
+                ok=musa_dwg_ac1032_block_child_text_source_inventory(
+                        scene,e->block,&again)&&
+                   !memcmp(&again,&textinv,sizeof(again));
+            }
+            if(ok){
+                const MusaDwgAc1032BlockChildTextSourceInventory
+                    before=textinv;
+                ok=!musa_dwg_ac1032_block_child_text_source_inventory(
+                       scene,e->h,&textinv)&&
+                   !memcmp(&before,&textinv,sizeof(before))&&
+                   !musa_dwg_ac1032_block_child_text_source_inventory(
+                       scene,UINT64_MAX,&textinv)&&
+                   !memcmp(&before,&textinv,sizeof(before));
             }
         }
         if(ok){
