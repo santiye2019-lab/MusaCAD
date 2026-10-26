@@ -277,6 +277,7 @@ typedef struct MusaDwgAc1032BlockHeaderChildPrefix {
     size_t next_handle_bit;
     uint8_t original_record_crc_verified;
     uint8_t h_prefix_decoded;
+    uint8_t canonical_h_roles_verified;
     uint8_t full_handle_tail_verified; /* ALWAYS zero */
     uint8_t final_child_ownership_and_paint_accepted; /* ALWAYS zero */
 } MusaDwgAc1032BlockHeaderChildPrefix;
@@ -307,6 +308,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
            (size_t)layout->total_payload_bits)||
        !musa_dwg_ac1015_read_handle_ref(
            &bits,base.indexed_handle,&ref)||
+       ref.code!=4u||ref.relative||
        !ref.target||ref.target==base.indexed_handle)return 0;
     value.block_control_handle=ref.target;
     /* Original R2018 H stream has an explicit null H pointer 0x50:
@@ -316,11 +318,13 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
        null_pointer!=0x50u||
        !musa_dwg_ac1015_read_handle_ref(
            &bits,base.indexed_handle,&ref)||
+       ref.code!=3u||ref.relative||
        !ref.target||ref.target==base.indexed_handle)return 0;
     value.block_begin_handle=ref.target;
     for(uint32_t i=0u;i<value.child_count;i++){
         if(!musa_dwg_ac1015_read_handle_ref(
                &bits,base.indexed_handle,&ref)||
+           ref.code!=3u||ref.relative||
            !ref.target||ref.target==base.indexed_handle||
            ref.target==value.block_begin_handle||
            ref.target==value.block_control_handle)return 0;
@@ -330,6 +334,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
     }
     if(!musa_dwg_ac1015_read_handle_ref(
            &bits,base.indexed_handle,&ref)||
+       ref.code!=3u||ref.relative||
        !ref.target||ref.target==base.indexed_handle||
        ref.target==value.block_begin_handle||
        ref.target==value.block_control_handle)return 0;
@@ -339,6 +344,7 @@ static inline int musa_dwg_ac1032_block_header_ot49_child_prefix_at(
     value.next_handle_bit=bits.bit_pos;
     value.original_record_crc_verified=1u;
     value.h_prefix_decoded=1u;
+    value.canonical_h_roles_verified=1u;
     *out=value;return 1;
 }
 #endif
