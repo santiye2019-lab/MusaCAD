@@ -12,6 +12,7 @@
 #include "musacad_dwg_ac1032_block_child_geometry_audit.h"
 #include "musacad_dwg_ac1032_insert_child_coordinate_probe.h"
 #include "musacad_dwg_ac1032_block_child_color_evidence.h"
+#include "musacad_dwg_ac1032_block_child_layer_style_provenance.h"
 #include "musacad_dwg_ac1032_block_child_text_source_inventory.h"
 #include <stdint.h>
 #include <math.h>
@@ -863,6 +864,113 @@ static int genuine(const char *file){
         c.has_transparency=0u;c.has_color_reference=1u;
         if(ok)ok=musa_dwg_ac1032_block_child_direct_color_class(&c)==
                  MUSACAD_AC1032_CHILD_COLOR_UNRESOLVED;
+    }
+    if(ok){
+        /* Authentic R2018 source OT49 child H -> original OT51 LAYER
+         * numeric flags + anchored default-profile CMC. This is NOT a
+         * viewport visibility/plot decision or a BYLAYER paint result.
+         * Independent DXF oracle: H1B8=13, H17D=5 children. */
+        const uint64_t handles[]={UINT64_C(0x1b8),UINT64_C(0x17d)};
+        const uint32_t child_counts[]={13u,5u};
+        for(size_t b=0u;ok&&b<2u;b++){
+            MusaDwgAc1032BlockChildLayerStyleProvenance styled={0};
+            MusaDwgAc1032BlockChildLayerStyleProvenance repeat={0};
+            MusaDwgAc1032BlockChildLayerInventory layer={0};
+            MusaDwgAc1032BlockChildColorEvidence colors={0};
+            ok=musa_dwg_ac1032_block_child_layer_style_provenance(
+                   scene,handles[b],&styled)&&
+               musa_dwg_ac1032_block_child_layer_style_provenance(
+                   scene,handles[b],&repeat)&&
+               !memcmp(&styled,&repeat,sizeof(styled))&&
+               musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,handles[b],&layer)&&
+               musa_dwg_ac1032_block_child_color_evidence(
+                   scene,handles[b],&colors)&&
+               styled.block_header_handle==handles[b]&&
+               styled.child_count==child_counts[b]&&
+               styled.original_children_joined&&
+               !styled.reverse_ownership_accepted&&
+               !styled.layer_visibility_and_paint_accepted&&
+               styled.layer_flags_source_count<=styled.source_layer_count&&
+               styled.layer_cmc_source_count<=styled.source_layer_count&&
+               styled.explicit_aci_count+styled.explicit_rgb_count+
+               styled.bylayer_count+styled.byblock_count+
+               styled.hidden_count+styled.unresolved_count==
+                   child_counts[b];
+            for(uint32_t i=0u;ok&&i<styled.child_count;i++){
+                const MusaDwgAc1032BlockChildLayerStyleRow *row=&
+                    styled.rows[i];
+                ok=row->child_handle==layer.children[i].child_handle&&
+                   row->raw_object_type==layer.children[i].raw_object_type&&
+                   row->child_handle==colors.rows[i].child_handle&&
+                   row->layer_handle==layer.children[i].layer_handle&&
+                   !row->effective_color_and_visibility_accepted;
+                if(!ok)break;
+                if(row->original_layer_flags_verified){
+                    MusaDwgAc1032LayerFlagsEvidence flags={0};
+                    ok=row->layer_handle&&
+                       musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+                         scene,row->layer_handle,&flags)&&
+                       flags.source_crc_verified&&
+                       flags.indexed_handle==row->layer_handle&&
+                       flags.raw_values_70_290_370==
+                           row->source_layer_raw_flags;
+                }
+                if(ok&&row->original_layer_cmc_aci_verified){
+                    MusaDwgAc1032LayerCmcEvidence cmc={0};
+                    ok=row->layer_handle&&
+                       musa_dwg_ac1032_scene_index_layer_anchored_cmc_evidence(
+                         scene,row->layer_handle,&cmc)&&
+                       cmc.original_record_crc_verified&&
+                       cmc.indexed_handle==row->layer_handle&&
+                       cmc.aci_index==row->original_layer_cmc_aci;
+                }
+            }
+            if(ok){
+                const MusaDwgAc1032BlockChildLayerStyleProvenance
+                    original=styled;
+                ok=!musa_dwg_ac1032_block_child_layer_style_provenance(
+                        scene,UINT64_C(0x1c8),&styled)&&
+                   !memcmp(&original,&styled,sizeof(original))&&
+                   !musa_dwg_ac1032_block_child_layer_style_provenance(
+                        scene,UINT64_MAX,&styled)&&
+                   !memcmp(&original,&styled,sizeof(original));
+            }
+        }
+    }
+    if(ok){
+        /* One original inherited status is NOT enough to choose color.
+         * Index 0 is BYBLOCK; 256 is BYLAYER, never direct ACI7.
+         * The source classification never authorizes final paint. */
+        MusaDwgAc1032BlockChildColorRow c={0};
+        c.source_common_verified=1u;
+        c.source_layer_handle=UINT64_C(0x8a);
+        c.source_color_status=MUSACAD_AC1032_CHILD_COLOR_INHERITED;
+        c.raw_color_index=0u;
+        ok=musa_dwg_ac1032_child_source_style_class(&c)==
+             MUSACAD_AC1032_SOURCE_STYLE_BYBLOCK;
+        c.raw_color_index=256u;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_BYLAYER;
+        c.source_color_status=MUSACAD_AC1032_CHILD_COLOR_DIRECT_ACI;
+        c.raw_color_index=5u;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_EXPLICIT_ACI;
+        c.source_color_status=MUSACAD_AC1032_CHILD_COLOR_DIRECT_RGB;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_EXPLICIT_RGB;
+        c.source_color_status=MUSACAD_AC1032_CHILD_COLOR_HIDDEN;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_HIDDEN;
+        c.source_color_status=MUSACAD_AC1032_CHILD_COLOR_UNRESOLVED;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_UNRESOLVED;
+        c.source_common_verified=0u;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_UNRESOLVED;
+        c.source_common_verified=1u;c.source_layer_handle=0u;
+        if(ok)ok=musa_dwg_ac1032_child_source_style_class(&c)==
+                     MUSACAD_AC1032_SOURCE_STYLE_UNRESOLVED;
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
