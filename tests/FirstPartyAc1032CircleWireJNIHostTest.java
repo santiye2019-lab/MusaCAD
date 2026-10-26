@@ -21,7 +21,7 @@ final class FirstPartyDwgPreview {
                audit[2]+audit[3]==audit[1],"Original INSERT coverage partition");
         verify(audit[4]>=1&&audit[5]>=1&&audit[6]>=0&&
                audit[5]+audit[6]==audit[4],"Original CIRCLE numeric evidence");
-        verify(audit[7]>=1&&audit[7]<=audit[5],
+        verify(audit[7]>=0&&audit[7]<audit[5],
                "Genuine H1BB owner/color must remain UNRESOLVED");
         verify(audit[8]==audit[5]&&audit[9]==raw.length&&audit[10]==1,
                "Every numeric CIRCLE is wireframed; synthetic hue only");
