@@ -43,6 +43,7 @@ static int sample(const char *filename){
        !graph.font_and_display_accepted&&
        graph.indexed_handle==h&&
        graph.layer_object_type==51u&&
+       graph.style_object_type==53u&&
        musa_dwg_ac1032_scene_index_read_layer_name(
            scene,graph.layer_handle,&layer)&&
        layer.original_record_crc_verified&&
