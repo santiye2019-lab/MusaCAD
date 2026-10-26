@@ -361,6 +361,24 @@ int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
     const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
     MusaDwgAc1032CircleRelativeOwnerLayerSource *out);
 
+/* Original OT18 CIRCLE -> authenticated relative owner H(C) + OT51 H5
+ * LAYER -> Unicode layer name, raw layer numeric flags and source ENC.
+ * Geometry is verified from the SAME immutable CRC/H-indexed R2018 source.
+ * Raw flags, BYLAYER/BYBLOCK, off/frozen, viewport, XREF, model-space
+ * ownership and final color/visibility are NOT resolved by this evidence.
+ * Fail atomic: no caller output is modified for an unsupported source. */
+typedef struct MusaDwgAc1032CircleLayerProvenance {
+    MusaDwgAc1032CircleRelativeOwnerLayerSource edge;
+    MusaDwgAc1032LayerName layer_name;
+    MusaDwgAc1032LayerFlagsEvidence raw_layer_flags;
+    MusaDwgAc1032NativeCurve circle;
+    uint8_t source_geometry_and_layer_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleLayerProvenance;
+int musa_dwg_ac1032_scene_index_circle_layer_provenance(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleLayerProvenance *out);
+
 /* Single ORIGINAL indexed DWG graph walk from one geometry entity
  * to its source-CRC-verified LAYER table record and bounded Unicode TU
  * name. Built from separate first-party readers, never by guessing a
