@@ -33,6 +33,10 @@ typedef struct MusaAc1032DisplayReadiness {
      * own invisibility bits were source-authenticated, not that a whole
      * drawing or layer state can be certified. */
     size_t source_entity_invisible;
+    /* Source-authenticated genuine OT1 TEXT; explicitly NOT glyph paint. */
+    size_t original_ot1_text_records;
+    size_t original_ot1_text_joined;
+    size_t original_ot1_text_rejected;
     uint8_t display_accepted;
 } MusaAc1032DisplayReadiness;
 /* Bounded 1M record diagnostic. Caller output is fail-atomic.

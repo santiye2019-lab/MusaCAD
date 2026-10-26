@@ -61,6 +61,12 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_ot1_color_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_ot1_color_smoke
                  COMMAND musacad_core_ac1032_original_ot1_color_test)
+        # Genuine OT1 TEXT joins source-readiness census; not glyph paint.
+        add_executable(musacad_core_ac1032_original_ot1_census_test
+                tests/core_dwg_ac1032_original_ot1_census_test.c)
+        target_link_libraries(musacad_core_ac1032_original_ot1_census_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_original_ot1_census_smoke
+                 COMMAND musacad_core_ac1032_original_ot1_census_test)
         # Genuine OT1 TEXT -> OT51 raw layer status bit evidence;
         # fail closed on owner, viewport and actual on/off state.
         add_executable(musacad_core_ac1032_original_ot1_layer_status_test

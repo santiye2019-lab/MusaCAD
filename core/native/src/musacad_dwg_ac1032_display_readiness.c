@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_display_readiness.h"
+#include "musacad_dwg_ac1032_text_bundle.h"
 #include <stdint.h>
 #define MUSA_DISPLAY_MAX_RECORDS 1000000u
 
@@ -19,36 +20,68 @@ int musa_dwg_ac1032_scene_display_readiness(
            !musa_dwg_ac1032_scene_index_object_type(
                 scene,entry.handle,&type))return 0;
         previous=entry.handle;
-        if(type!=17u&&type!=18u&&type!=19u&&type!=27u&&
+        if(type!=1u&&type!=17u&&type!=18u&&type!=19u&&type!=27u&&
            type!=35u&&type!=44u&&type!=77u){
             result.other_indexed_records++;
             continue;
         }
         result.known_planar_records++;
         MusaAc1032PlanarStyleEvidence evidence={0};
-        if(!musa_dwg_ac1032_scene_planar_style_evidence(
-               scene,entry.handle,&evidence)||
-           !evidence.source_layer_join_verified||
-           !evidence.color.entity_and_layer_crc_verified||
-           evidence.color.entity_handle!=entry.handle||
-           evidence.color.raw_entity_type!=type||
-           evidence.raw_layer_status.indexed_handle!=
-               evidence.color.layer_handle||
-           evidence.original_layer_name.indexed_handle!=
-               evidence.color.layer_handle||
-           !evidence.base_bit_preflight.source_crc_verified||
-           evidence.base_bit_preflight.layer_handle!=
-               evidence.color.layer_handle||
-           evidence.base_bit_preflight.raw_values!=
-               evidence.raw_layer_status.raw_values_70_290_370||
-           evidence.base_bit_preflight.display_accepted||
-           evidence.visibility_resolved||
-           evidence.display_style_resolved||
-           evidence.color.rendering_accepted){
+        MusaDwgAc1032TextBundle text={0};
+        const MusaAc1032ColorProvenance *p=NULL;
+        if(type==1u){
+            /* OT1 TEXT has its own strict TU/OCS/graph grammar. Never
+             * misread it through OT44 MTEXT or infer visible glyphs. */
+            result.original_ot1_text_records++;
+            if(!musa_dwg_ac1032_scene_text_bundle(
+                    scene,entry.handle,&text)||
+               !text.source_join_verified||
+               !text.unicode.original_record_crc_verified||
+               !text.world.wcs_math_decoded||
+               !text.layer_flags.source_crc_verified||
+               !text.layer_bits.source_crc_verified||
+               text.layer_bits.display_accepted||
+               text.model_viewport_visibility_accepted||
+               text.font_glyph_layout_accepted||
+               text.final_display_color_accepted){
+                result.known_style_rejected++;
+                result.original_ot1_text_rejected++;
+                continue;
+            }
+            p=&text.color;
+        }else{
+            if(!musa_dwg_ac1032_scene_planar_style_evidence(
+                   scene,entry.handle,&evidence)||
+               !evidence.source_layer_join_verified||
+               !evidence.color.entity_and_layer_crc_verified||
+               evidence.color.entity_handle!=entry.handle||
+               evidence.color.raw_entity_type!=type||
+               evidence.raw_layer_status.indexed_handle!=
+                   evidence.color.layer_handle||
+               evidence.original_layer_name.indexed_handle!=
+                   evidence.color.layer_handle||
+               !evidence.base_bit_preflight.source_crc_verified||
+               evidence.base_bit_preflight.layer_handle!=
+                   evidence.color.layer_handle||
+               evidence.base_bit_preflight.raw_values!=
+                   evidence.raw_layer_status.raw_values_70_290_370||
+               evidence.base_bit_preflight.display_accepted||
+               evidence.visibility_resolved||
+               evidence.display_style_resolved||
+               evidence.color.rendering_accepted){
+                result.known_style_rejected++;
+                continue;
+            }
+            p=&evidence.color;
+        }
+        if(!p->entity_and_layer_crc_verified||
+           p->entity_handle!=entry.handle||
+           p->raw_entity_type!=type||
+           p->rendering_accepted){
             result.known_style_rejected++;
+            if(type==1u)result.original_ot1_text_rejected++;
             continue;
         }
-        const MusaAc1032ColorProvenance *p=&evidence.color;
         const unsigned classes=(unsigned)p->entity_has_direct_aci+
              (unsigned)p->entity_by_layer+
              (unsigned)p->entity_by_block+
@@ -57,9 +90,11 @@ int musa_dwg_ac1032_scene_display_readiness(
             /* Unmapped source color form is one unresolved entity, never
              * an excuse to discard the entire authenticated scene. */
             result.known_style_rejected++;
+            if(type==1u)result.original_ot1_text_rejected++;
             continue;
         }
         result.source_style_joined++;
+        if(type==1u)result.original_ot1_text_joined++;
         if(p->entity_has_direct_aci)result.source_direct_aci++;
         if(p->entity_by_layer)result.source_bylayer++;
         if(p->entity_by_block)result.source_byblock++;
@@ -87,7 +122,11 @@ int musa_dwg_ac1032_scene_display_readiness(
         if(p->source_layer_aci_supported)
             result.narrow_layer_aci_available++;
     }
-    if(result.known_planar_records+
+    if(result.original_ot1_text_joined+
+           result.original_ot1_text_rejected!=
+           result.original_ot1_text_records||
+       result.original_ot1_text_records>result.known_planar_records||
+       result.known_planar_records+
            result.other_indexed_records!=result.indexed_records||
        result.source_style_joined+
            result.known_style_rejected!=result.known_planar_records||

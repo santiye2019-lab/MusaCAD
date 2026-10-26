@@ -235,6 +235,22 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS original OT1 H8E ENC+H5 Unicode layer; no final color/visibility"
 
+      - name: P0 genuine R2018 OT1 TEXT H8E counted in 2D source readiness
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/sample_2018.dwg
+          oracle=third_party/libredwg/test/test-data/sample_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          grep -F 'Jen teksto simpla, cxu ne?' "$oracle"
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_original_ot1_census_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-original-ot1-census
+          timeout 120s /tmp/musacad-r2018-original-ot1-census "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original OT1 H8E source census; no glyph/owner/viewport"
+
       - name: P0 original R2018 OT1 TEXT H8E OT51 layer status source-only oracle
         run: |
           set -euo pipefail
