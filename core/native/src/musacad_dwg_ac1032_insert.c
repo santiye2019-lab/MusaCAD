@@ -74,9 +74,10 @@ int musa_dwg_ac1032_insert_placement_at(
     if(!musa_dwg_ac1015_bits_read_u(&b,1u,&attribs))
         return reject_field("has_attribs",&b,v.indexed_handle);
     v.has_attribs=(uint8_t)attribs;
-    /* R2004+ INSERT stores a BL owned-object count in DATA even when
-     * Has ATTRIBs is zero; handles remain in the separate handle stream. */
-    if(!musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
+    /* Attribute-free INSERT has no owned ATTRIB objects; its BL count
+     * is present only for the attribute-bearing variant. */
+    if(v.has_attribs &&
+       !musa_dwg_ac1015_bits_read_bl(&b,&v.owned_attrib_count))
         return reject_field("owned_attrib_count",&b,v.indexed_handle);
     if(b.bit_pos!=b.bit_end){
         /* Preserve strict rejection while recording exact unparsed source bits.
