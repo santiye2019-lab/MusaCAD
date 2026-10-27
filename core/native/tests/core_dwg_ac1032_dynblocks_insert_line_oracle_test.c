@@ -532,6 +532,22 @@ static int original(const char *filename){
     if(ok){
         const double parent[6]={2.0,0.0,10.0,0.0,3.0,20.0};
         const double child[6]={0.0,-1.0,4.0,1.0,0.0,5.0};
+        const double line[4]={1.0,2.0,3.0,4.0};
+        double composed[6]={0},out[4]={0};
+        ok=musa_dwg_ac1032_compose_planar_affine(parent,child,composed)&&
+           musa_dwg_ac1032_transform_planar_segment(composed,line,out)&&
+           out[0]==14.0&&out[1]==38.0&&
+           out[2]==10.0&&out[3]==44.0;
+        const double invalid[4]={1.0,2.0,INFINITY,4.0};
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_planar_segment(
+               composed,invalid,sentinel)&&
+           sentinel[0]==9.0&&sentinel[1]==8.0&&
+           sentinel[2]==7.0&&sentinel[3]==6.0;
+    }
+    if(ok){
+        const double parent[6]={2.0,0.0,10.0,0.0,3.0,20.0};
+        const double child[6]={0.0,-1.0,4.0,1.0,0.0,5.0};
         double composed[6]={0};
         ok=musa_dwg_ac1032_compose_planar_affine(parent,child,composed)&&
            composed[0]==0.0&&composed[1]==-2.0&&
