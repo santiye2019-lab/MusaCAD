@@ -452,6 +452,92 @@ static inline int musa_dwg_ac1032_block_child_owner_edge_matches(
            edge->original_owner_wire_code==12u&&
            edge->original_relative_h12_owner_verified;
 }
+/* Per-slot original OT49 owner evidence.  A failed or unsupported edge is
+ * preserved as a rejection, never treated as valid block geometry.
+ * Statuses follow the authenticated OT49 child order.  Even COMPLETE
+ * source ownership does NOT authorize visibility, nested transforms or
+ * painting. */
+#define MUSACAD_AC1032_BLOCK_OWNER_VERIFIED 1u
+#define MUSACAD_AC1032_BLOCK_OWNER_UNSUPPORTED 2u
+#define MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE 3u
+#define MUSACAD_AC1032_BLOCK_OWNER_MISMATCH 4u
+typedef struct MusaDwgAc1032InsertBlockOwnerCoverage {
+    uint64_t insert_handle,block_header_handle;
+    uint64_t child_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint16_t child_types[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint8_t child_status[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint32_t child_count,verified_count,unsupported_count;
+    uint32_t unreadable_count,mismatched_count;
+    uint8_t source_inventory_verified;
+    uint8_t complete_reverse_owner_links_verified;
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockOwnerCoverage;
+static inline int musa_dwg_ac1032_block_child_owner_type_supported(
+    uint16_t type){
+    return type==17u||type==18u||type==19u||
+           type==27u||type==35u||type==77u;
+}
+static inline uint8_t musa_dwg_ac1032_block_child_owner_status(
+    const MusaDwgAc1032EntityBlockOwnerLayerSource *edge,
+    int readable,uint64_t child,uint64_t block,uint16_t type){
+    if(!musa_dwg_ac1032_block_child_owner_type_supported(type))
+        return MUSACAD_AC1032_BLOCK_OWNER_UNSUPPORTED;
+    if(!readable||!edge)return MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE;
+    return musa_dwg_ac1032_block_child_owner_edge_matches(
+        edge,child,block,type)?
+        MUSACAD_AC1032_BLOCK_OWNER_VERIFIED:
+        MUSACAD_AC1032_BLOCK_OWNER_MISMATCH;
+}
+static inline int musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockOwnerCoverage *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockChildInventory inventory={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+           index,insert_handle,&inventory)||
+       !inventory.insert_to_block_source_edge_verified||
+       inventory.reverse_owner_and_nested_transforms_verified||
+       inventory.final_display_accepted||
+       inventory.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)
+        return 0;
+    MusaDwgAc1032InsertBlockOwnerCoverage local={0};
+    local.insert_handle=insert_handle;
+    local.block_header_handle=inventory.insert.block_header_handle;
+    local.child_count=inventory.block.prefix.child_count;
+    for(uint32_t i=0u;i<local.child_count;i++){
+        const uint64_t child=inventory.block.prefix.child_handles[i];
+        const uint16_t type=inventory.block.child_object_types[i];
+        local.child_handles[i]=child;
+        local.child_types[i]=type;
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        const int readable=musa_dwg_ac1032_block_child_owner_type_supported(type)?
+            musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                index,child,&edge):0;
+        const uint8_t status=musa_dwg_ac1032_block_child_owner_status(
+            &edge,readable,child,local.block_header_handle,type);
+        local.child_status[i]=status;
+        switch(status){
+            case MUSACAD_AC1032_BLOCK_OWNER_VERIFIED:
+                local.verified_count++;break;
+            case MUSACAD_AC1032_BLOCK_OWNER_UNSUPPORTED:
+                local.unsupported_count++;break;
+            case MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE:
+                local.unreadable_count++;break;
+            case MUSACAD_AC1032_BLOCK_OWNER_MISMATCH:
+                local.mismatched_count++;break;
+            default:return 0;
+        }
+    }
+    if(local.verified_count+local.unsupported_count+
+       local.unreadable_count+local.mismatched_count!=local.child_count)
+        return 0;
+    local.source_inventory_verified=1u;
+    local.complete_reverse_owner_links_verified=
+        (uint8_t)(local.child_count>0u&&
+                  local.verified_count==local.child_count);
+    *out=local;
+    return 1;
+}
 static inline int musa_dwg_ac1032_scene_index_insert_block_owner_audit(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     MusaDwgAc1032InsertBlockOwnerAudit *out){
