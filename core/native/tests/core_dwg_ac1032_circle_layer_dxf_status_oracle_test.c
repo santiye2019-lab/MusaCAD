@@ -2,7 +2,7 @@
 /* Genuine R2018 original H1C8 INSERT/H1BB CIRCLE/H8A LAYER source status.
  * DXF group 70 is separately read, NOT equated to DWG packed 70/290/370.
  * Unknown viewport, frozen/off and overrides continue to veto paint. */
-#include "musacad_dwg_ac1032_circle_layer_visibility_veto.h"
+#include "musacad_dwg_ac1032_circle_bylayer_inventory.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -281,6 +281,57 @@ static int run(const char *dwg,const char *dxf){
                    scene,UINT64_C(0x1c8),UINT64_C(0x8a),
                    &external,&untouched)&&
                !memcmp(&before,&untouched,sizeof(before));
+        }
+    }
+    /* Enumerate the ORIGINAL R2018 indexed scene, not just a hand-picked
+     * H1C8 call. Companion DXF is the independent oracle for H1BB/H8A
+     * and ACI4, never an input to the runtime inventory. */
+    if(ok){
+        MusaDwgAc1032CircleByLayerInventory inventory={0};
+        ok=musa_dwg_ac1032_circle_bylayer_inventory(scene,&inventory)&&
+           inventory.original_source_inventory_only&&
+           !inventory.final_visible_paint_accepted&&
+           inventory.indexed_record_count==
+               musa_dwg_ac1032_scene_index_count(scene)&&
+           inventory.insert_count>=1u&&
+           inventory.source_indexed_insert_count>=1u&&
+           inventory.circle_candidate_count>=1u&&
+           inventory.verified_source_color_count>=1u&&
+           inventory.verified_source_color_count+
+             inventory.unresolved_circle_count==
+               inventory.circle_candidate_count&&
+           inventory.source_indexed_insert_count+
+             inventory.unresolved_insert_count==inventory.insert_count;
+        unsigned matches=0u;
+        for(size_t i=0u;ok&&i<inventory.verified_source_color_count;i++){
+            const MusaDwgAc1032CircleByLayerInventoryRow *row=
+                &inventory.rows[i];
+            ok=row->original_source_crc_and_wcs_verified&&
+               !row->final_visible_paint_accepted&&
+               row->insert_handle&&row->circle_handle&&
+               row->block_header_handle&&row->layer_handle&&
+               row->original_layer_aci;
+            if(row->insert_handle==UINT64_C(0x1c8)&&
+               row->circle_handle==UINT64_C(0x1bb)){
+                matches++;
+                ok=ok&&row->block_header_handle==UINT64_C(0x1b8)&&
+                   row->layer_handle==UINT64_C(0x8a)&&
+                   row->original_layer_aci==(uint8_t)oracle.aci;
+            }
+        }
+        if(ok)ok=matches==1u;
+        if(ok){
+            MusaDwgAc1032CircleByLayerInventory repeat={0};
+            ok=musa_dwg_ac1032_circle_bylayer_inventory(scene,&repeat)&&
+               !memcmp(&repeat,&inventory,sizeof(inventory));
+        }
+        if(ok){
+            MusaDwgAc1032CircleByLayerInventory untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032CircleByLayerInventory before=untouched;
+            ok=!musa_dwg_ac1032_circle_bylayer_inventory(NULL,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before))&&
+               !musa_dwg_ac1032_circle_bylayer_inventory(scene,NULL);
         }
     }
     fprintf(stderr,"%s original DWG vs independent DXF signed LAYER oracle, group70=%ld "
