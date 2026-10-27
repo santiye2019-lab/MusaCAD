@@ -1978,6 +1978,34 @@ static int genuine(const char *file){
             MusaDwgAc1032InsertLineSourceSegments ref={0};
             const int ref_ok=musa_dwg_ac1032_insert_line_source_segments(
                    scene,inserts[b],&ref);
+            if(b==1u){
+                MusaDwgAc1032InsertChildSourceJoin source={0};
+                MusaDwgAc1032InsertReverseOwnerJoin owner={0};
+                const int source_ok=musa_dwg_ac1032_insert_child_source_join(
+                    scene,inserts[b],&source);
+                const int owner_ok=musa_dwg_ac1032_insert_reverse_owner_source_join(
+                    scene,inserts[b],&owner);
+                fprintf(stderr,"DIAG H190 independent source_ok=%d owner_ok=%d "
+                               "children=%u mapped=%u owner_matches=%u\n",
+                    source_ok,owner_ok,source.child_count,
+                    source.mapped_count,owner.matched_owner_count);
+                if(source_ok&&owner_ok){
+                    for(uint32_t z=0u;z<source.child_count;z++){
+                        if(source.rows[z].raw_object_type!=19u)continue;
+                        fprintf(stderr,"DIAG H190 LINE H%llx "
+                                       "coord=%u end=%u common=%u "
+                                       "layer=H%llx owner_status=%u "
+                                       "owner=H%llx\n",
+                            (unsigned long long)source.rows[z].child_handle,
+                            (unsigned)source.rows[z].coordinate_mapped,
+                            (unsigned)source.rows[z].line_end_mapped,
+                            (unsigned)source.rows[z].original_common_verified,
+                            (unsigned long long)source.rows[z].source_layer_handle,
+                            (unsigned)owner.rows[z].reverse_owner_status,
+                            (unsigned long long)owner.rows[z].verified_owner_handle);
+                    }
+                }
+            }
             fprintf(stderr,"DIAG example INSERT H%llx got_lines=%u "
                            "ref_ok=%d ref_lines=%u block=H%llx "
                            "expected_block=H%llx\n",
