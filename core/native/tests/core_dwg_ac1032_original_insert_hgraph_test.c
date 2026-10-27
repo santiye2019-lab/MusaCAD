@@ -1955,6 +1955,73 @@ static int genuine(const char *file){
                !memcmp(&all,&previous,sizeof(all));
         }
     }
+    /* Genuine R2018 regression for the strict OT7 -> OT49 -> OT19
+     * reverse-owner and source-only LINE affine helper. The independent
+     * companion DXF fixes the INSERT/BLOCK_HEADER handle pairs. The
+     * separately authenticated original line-segment join is an oracle
+     * for world endpoints; neither result grants final paint. */
+    if(ok){
+        const uint64_t inserts[]={UINT64_C(0x1c8),UINT64_C(0x190),
+                                  UINT64_C(0x756)};
+        const uint64_t blocks[]={UINT64_C(0x1b8),UINT64_C(0x17d),
+                                 UINT64_C(0x17d)};
+        uint32_t matched=0u;
+        for(size_t b=0u;ok&&b<3u;b++){
+            MusaDwgAc1032InsertBlockLineSources got;
+            memset(&got,0x5a,sizeof(got));
+            const MusaDwgAc1032InsertBlockLineSources before=got;
+            if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
+                    scene,inserts[b],&got)){
+                ok=!memcmp(&got,&before,sizeof(got));
+                continue; /* Unsupported source must remain fail-atomic. */
+            }
+            MusaDwgAc1032InsertLineSourceSegments ref={0};
+            ok=musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&ref)&&
+               ref.original_source_line_packet_verified&&
+               !ref.model_viewport_layer_visibility_and_paint_accepted&&
+               got.insert_handle==inserts[b]&&
+               got.block_header_handle==blocks[b]&&
+               got.original_source_geometry_verified&&
+               !got.reverse_owner_links_verified&&
+               !got.final_display_accepted&&
+               got.line_count<=ref.verified_planar_line_count&&
+               got.line_count<=MUSACAD_AC1032_OT49_CHILD_LIMIT;
+            for(uint32_t i=0u;ok&&i<got.line_count;i++){
+                int found=0;
+                for(uint32_t j=0u;j<ref.verified_planar_line_count;j++){
+                    const MusaDwgAc1032InsertLineSourceRow *r=&ref.rows[j];
+                    if(r->child_handle!=got.child_handles[i])continue;
+                    if(found++||!r->original_line_h4_h5_and_world_xy_verified||
+                       r->verified_block_owner_handle!=blocks[b]||
+                       r->final_visibility_and_paint_accepted||
+                       fabs(got.endpoints[i][0]-r->world_start[0])>1e-5||
+                       fabs(got.endpoints[i][1]-r->world_start[1])>1e-5||
+                       fabs(got.endpoints[i][2]-r->world_end[0])>1e-5||
+                       fabs(got.endpoints[i][3]-r->world_end[1])>1e-5)
+                        ok=0;
+                }
+                if(found!=1)ok=0;
+                matched++;
+            }
+        }
+        if(ok){
+            MusaDwgAc1032InsertBlockLineSources out;
+            memset(&out,0xa5,sizeof(out));
+            const MusaDwgAc1032InsertBlockLineSources before=out;
+            ok=!musa_dwg_ac1032_scene_index_insert_block_line_sources(
+                   scene,UINT64_MAX,&out)&&
+               !memcmp(&out,&before,sizeof(out))&&
+               !musa_dwg_ac1032_scene_index_insert_block_line_sources(
+                   scene,UINT64_C(0x1b8),&out)&&
+               !memcmp(&out,&before,sizeof(out))&&
+               !musa_dwg_ac1032_scene_index_insert_block_line_sources(
+                   scene,UINT64_C(0x1c8),NULL);
+        }
+        fprintf(stderr,"%s genuine R2018 strict reverse-owner LINE source "
+                       "cross-check: %u admitted, no paint\\n",
+                ok?"PASS":"FAIL",(unsigned)matched);
+    }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
         "block expansion, owner, viewport, final paint UNVERIFIED\n",
         ok?"PASS":"FAIL");
