@@ -104,6 +104,9 @@ static int sample(const char *filename){
             ok=ok&&!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
             invalid=numeric;invalid.height=0.0;
             ok=ok&&!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
+            invalid=numeric;
+            for(unsigned k=0u;k<3u;k++)invalid.extrusion[k]=0.0;
+            ok=ok&&!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
         }
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
