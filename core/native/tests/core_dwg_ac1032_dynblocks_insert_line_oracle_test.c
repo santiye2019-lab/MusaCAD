@@ -634,6 +634,14 @@ static int original(const char *filename){
            !musa_dwg_ac1032_block_ancestry_handles_acyclic(valid_owners,0u);
     }
     if(ok){
+        double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
+        ok=!musa_dwg_ac1032_scene_index_verified_child_affine(
+               NULL,101u,202u,sentinel)&&
+           !musa_dwg_ac1032_scene_index_verified_child_affine(
+               NULL,0u,202u,sentinel);
+        for(unsigned i=0;i<6u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
         double chain[65][6];
         for(unsigned i=0;i<65u;i++){
             chain[i][0]=1.0;chain[i][1]=0.0;chain[i][2]=1.0;
