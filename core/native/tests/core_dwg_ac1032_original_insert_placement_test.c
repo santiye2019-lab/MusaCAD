@@ -3,6 +3,7 @@
  * against independent companion DXF AcDbBlockReference H1C8 group 10/20.
  * No BLOCK_HEADER H graph, owner, recursion or final display claim. */
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_insert_original_planar_affine.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -61,6 +62,32 @@ static int genuine(const char *file){
        near(p.extrusion[0],0.0)&&near(p.extrusion[1],0.0)&&
        near(p.extrusion[2],1.0)&&!p.has_attribs&&
        p.owned_attrib_count==0u;
+    if(ok){
+        /* Independent companion example_2018.dxf: INSERT H1C8 at
+         * (8482.030567364651,-1381.341268226861), scale 1, angle 0;
+         * referenced BLOCK origin is (0,0). Read all source fields from
+         * unchanged AC1032 bytes, never derive expected values from them. */
+        double affine[6]={NAN,NAN,NAN,NAN,NAN,NAN};
+        ok=musa_dwg_ac1032_insert_original_planar_affine(
+               scene,h,affine)&&
+           near(affine[0],1.0)&&near(affine[1],0.0)&&
+           near(affine[2],8482.030567364651)&&
+           near(affine[3],0.0)&&near(affine[4],1.0)&&
+           near(affine[5],-1381.341268226861);
+        if(ok){
+            const double unchanged[6]={affine[0],affine[1],affine[2],
+                                       affine[3],affine[4],affine[5]};
+            ok=!musa_dwg_ac1032_insert_original_planar_affine(
+                    scene,UINT64_MAX,affine)&&
+               !memcmp(affine,unchanged,sizeof(affine))&&
+               !musa_dwg_ac1032_insert_original_planar_affine(
+                    scene,UINT64_C(0x192),affine)&&
+               !memcmp(affine,unchanged,sizeof(affine));
+        }
+        fprintf(stderr,"%s genuine R2018 INSERT H1C8 original source "
+                "affine vs independent DXF; block paint NOT accepted\\n",
+                ok?"PASS":"FAIL");
+    }
     if(ok){
         MusaDwgAc1032InsertPlacement unchanged;
         memset(&unchanged,0x5a,sizeof(unchanged));
