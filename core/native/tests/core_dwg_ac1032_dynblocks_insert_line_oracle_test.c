@@ -530,6 +530,15 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const uint64_t valid_owners[4]={11u,22u,33u,44u};
+        const uint64_t cyclic_owners[4]={11u,22u,33u,11u};
+        const uint64_t zero_owner[3]={11u,0u,33u};
+        ok=musa_dwg_ac1032_block_ancestry_handles_acyclic(valid_owners,4u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(cyclic_owners,4u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(zero_owner,3u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(valid_owners,0u);
+    }
+    if(ok){
         double chain[65][6];
         for(unsigned i=0;i<65u;i++){
             chain[i][0]=1.0;chain[i][1]=0.0;chain[i][2]=1.0;
