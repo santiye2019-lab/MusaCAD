@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1032_entity_prefix.h"
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_source_utf8.h"
 #include "musacad_dwg_ac1015_values.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -76,6 +77,8 @@ int main(int argc,char **argv){
        source.indexed_handle==h&&
        source.utf16_code_units==98u&&
        source.utf8_bytes==strlen(expected)&&
+       musa_dwg_ac1032_source_utf8_valid(
+           source.utf8,source.utf8_bytes,sizeof(source.utf8),1)&&
        !strcmp(source.utf8,expected)&&
        source.original_record_crc_verified&&
        !source.geometry_style_and_glyphs_accepted&&
