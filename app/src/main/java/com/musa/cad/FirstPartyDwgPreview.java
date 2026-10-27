@@ -34,6 +34,12 @@ public final class FirstPartyDwgPreview {
             String inputPath,int maxFloatWords,long[] audit)
             throws IOException;
 
+    /* Genuine R2018 source LAYER ACI, not effective visible paint.
+     * Six longs per verified row: INSERT/BLOCK/CIRCLE/LAYER H, ACI, flags.
+     * Unknown owner/space, viewport, frozen/off and XREF stay unresolved. */
+    private static native long[] readCircleLayerAciEvidenceNative(
+            String inputPath,int maxRows,long[] audit) throws IOException;
+
     /** Genuine source evidence, NOT display-ready color or visibility.
      * Counts R2018 indexed OBJECT records, including non-entity records.
      * The diagnostic deliberately does not infer model-space owners or XREF. */
@@ -403,6 +409,63 @@ public final class FirstPartyDwgPreview {
                 throw new IOException("Sayisal CIRCLE gorunumu tam DWG gibi isaretlendi");
         }
         return new CircleGeometryEvidence(parsed,audit);
+    }
+
+    /** Bounded source-only audit; no pixel/scene is produced here.
+     * The numeric CIRCLE diagnostic still uses non-source magenta ACI6. */
+    public static final class CircleSourceAciEvidence {
+        public final long indexedRecords,insertCandidates,verifiedInserts;
+        public final long unsupportedInserts,undecodableRecords;
+        public final long circleCandidates,unresolvedCircles,sourceColorRows;
+        public final boolean sourceOnly,finalVisiblePaintAccepted;
+        private final long[] originalRows;
+        private CircleSourceAciEvidence(long[] rows,long[] audit)
+                throws IOException {
+            if(rows==null||audit==null||audit.length!=10)
+                throw new IOException("CIRCLE kaynak ACI kaniti eksik");
+            for(int i=0;i<8;i++)
+                if(audit[i]<0||audit[i]>1000000L)
+                    throw new IOException("CIRCLE kaynak ACI sayaci gecersiz");
+            if(audit[0]<1||audit[1]>4096||
+               audit[2]+audit[3]!=audit[1]||
+               audit[7]>256||audit[7]+audit[6]!=audit[5]||
+               rows.length!=audit[7]*6L||
+               audit[8]!=1L||audit[9]!=0L)
+                throw new IOException("CIRCLE kaynak ACI envanteri tutarsiz");
+            for(int i=0;i<rows.length;i+=6)
+                if(rows[i]<=0||rows[i+1]<=0||rows[i+2]<=0||
+                   rows[i+3]<=0||rows[i+4]<1||rows[i+4]>255||
+                   rows[i+5]<0||rows[i+5]>65535)
+                    throw new IOException("CIRCLE kaynak renk satiri gecersiz");
+            indexedRecords=audit[0];
+            insertCandidates=audit[1];verifiedInserts=audit[2];
+            unsupportedInserts=audit[3];undecodableRecords=audit[4];
+            circleCandidates=audit[5];unresolvedCircles=audit[6];
+            sourceColorRows=audit[7];sourceOnly=true;
+            finalVisiblePaintAccepted=false;
+            originalRows=rows.clone();
+        }
+        public int firstLayerAci(){
+            return originalRows.length==0?-1:(int)originalRows[4];
+        }
+        public long firstLayerHandle(){
+            return originalRows.length==0?0L:originalRows[3];
+        }
+        public long firstCircleHandle(){
+            return originalRows.length==0?0L:originalRows[2];
+        }
+    }
+
+    /** Read-only original DWG color provenance. Never changes the renderer
+     * or authorizes source ACI as effective BYLAYER/BYBLOCK paint. */
+    public static CircleSourceAciEvidence readCircleSourceAciEvidence(
+            File original)throws IOException {
+        if(original==null||!original.isFile())
+            throw new IOException("Orijinal DWG bulunamadi");
+        long[] audit=new long[10];
+        long[] rows=readCircleLayerAciEvidenceNative(
+                original.getAbsolutePath(),256,audit);
+        return new CircleSourceAciEvidence(rows,audit);
     }
 
 }
