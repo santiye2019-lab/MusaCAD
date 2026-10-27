@@ -15,9 +15,10 @@
 typedef struct MusaDwgAc1032TextSourceBundle {
     uint64_t indexed_handle,owner_handle,layer_handle,style_handle;
     uint16_t raw_object_type;
-    uint32_t utf8_bytes;
+    uint32_t utf8_bytes,layer_utf8_bytes;
     double insertion[3],text_height;
     char utf8[2048];
+    char layer_utf8[512]; /* Authenticated OT51 name, not visibility/color. */
     uint8_t original_unicode_numeric_h_graph_verified;
     uint8_t original_layer_name_verified;
     uint8_t font_layout_visibility_color_and_paint_accepted; /* ALWAYS 0 */
@@ -118,6 +119,8 @@ static inline int musa_dwg_ac1032_text_source_bundle(
        layer.indexed_handle!=result.layer_handle||
        !musa_dwg_ac1032_source_utf8_valid(
            layer.utf8,layer.utf8_bytes,sizeof(layer.utf8),0))return 0;
+    result.layer_utf8_bytes=layer.utf8_bytes;
+    memcpy(result.layer_utf8,layer.utf8,layer.utf8_bytes+1u);
     result.original_unicode_numeric_h_graph_verified=1u;
     result.original_layer_name_verified=1u;
     *out=result;
