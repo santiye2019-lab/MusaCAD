@@ -168,6 +168,16 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_child_inventory(
        !local.block.all_child_record_types_crc_verified||
        local.block.reverse_owner_links_verified||
        local.block.final_display_accepted)return 0;
+    /* Reject duplicate or missing child handles before exposing an
+     * inventory. Distinct source slots must not alias one DWG entity. */
+    if(local.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)
+        return 0;
+    for(uint32_t i=0u;i<local.block.prefix.child_count;i++){
+        const uint64_t handle=local.block.prefix.child_handles[i];
+        if(!handle)return 0;
+        for(uint32_t j=0u;j<i;j++)
+            if(local.block.prefix.child_handles[j]==handle)return 0;
+    }
     local.insert_to_block_source_edge_verified=1u;
     *out=local;
     return 1;
