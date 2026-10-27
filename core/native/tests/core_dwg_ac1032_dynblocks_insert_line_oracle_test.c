@@ -530,6 +530,22 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const double parent[6]={2.0,0.0,10.0,0.0,3.0,20.0};
+        const double child[6]={0.0,-1.0,4.0,1.0,0.0,5.0};
+        double composed[6]={0};
+        ok=musa_dwg_ac1032_compose_planar_affine(parent,child,composed)&&
+           composed[0]==0.0&&composed[1]==-2.0&&
+           composed[2]==18.0&&composed[3]==3.0&&
+           composed[4]==0.0&&composed[5]==35.0;
+        double bad[6]={2.0,0.0,10.0,0.0,3.0,20.0};
+        double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
+        bad[0]=INFINITY;
+        ok=ok&&!musa_dwg_ac1032_compose_planar_affine(
+               bad,child,sentinel)&&sentinel[0]==9.0&&
+           sentinel[1]==8.0&&sentinel[2]==7.0&&
+           sentinel[3]==6.0&&sentinel[4]==5.0&&sentinel[5]==4.0;
+    }
+    if(ok){
         MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
         coverage.insert_handle=UINT64_C(0x123);
         coverage.block_header_handle=UINT64_C(0x456);

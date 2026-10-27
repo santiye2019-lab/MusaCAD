@@ -259,6 +259,25 @@ static inline int musa_dwg_ac1032_scene_index_original_insert_block_affine(
     for(unsigned i=0;i<6u;i++)out_six[i]=local[i];
     return 1;
 }
+/* Compose parent and child planar INSERT affines in source order.
+ * Six coefficients are [a,b,tx,c,d,ty], mapping (x,y) to
+ * (a*x+b*y+tx,c*x+d*y+ty). This does NOT authorize nested traversal. */
+static inline int musa_dwg_ac1032_compose_planar_affine(
+    const double parent[6],const double child[6],double out[6]){
+    if(!parent||!child||!out)return 0;
+    for(unsigned i=0;i<6u;i++)
+        if(!isfinite(parent[i])||!isfinite(child[i]))return 0;
+    double m[6]={
+        parent[0]*child[0]+parent[1]*child[3],
+        parent[0]*child[1]+parent[1]*child[4],
+        parent[0]*child[2]+parent[1]*child[5]+parent[2],
+        parent[3]*child[0]+parent[4]*child[3],
+        parent[3]*child[1]+parent[4]*child[4],
+        parent[3]*child[2]+parent[4]*child[5]+parent[5]};
+    for(unsigned i=0;i<6u;i++)if(!isfinite(m[i]))return 0;
+    for(unsigned i=0;i<6u;i++)out[i]=m[i];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
