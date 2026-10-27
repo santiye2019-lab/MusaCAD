@@ -35,6 +35,9 @@ static int original(const char *filename){
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
     size_t inventory_line_candidates=0u,inventory_with_line=0u;
+    size_t inventory_line_owner_readable=0u,inventory_line_owner_matches=0u;
+    size_t inventory_line_geometry_readable=0u,inventory_line_planar=0u;
+    size_t first_line_diagnostics=0u;
     size_t admitted_line_sources=0u,source_segments_positive=0u;
     size_t source_segments_total=0u,source_segments_lines=0u;
     size_t graph_inventory_affine_ok=0u;
@@ -135,6 +138,44 @@ static int original(const char *filename){
             size_t candidates=0u;
             for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++)
                 if(inventory.block.child_object_types[z]==19u)candidates++;
+            for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++){
+                if(inventory.block.child_object_types[z]!=19u)continue;
+                const uint64_t child=inventory.block.prefix.child_handles[z];
+                MusaDwgAc1032EntityBlockOwnerLayerSource owner={0};
+                MusaDwgAc1032NativeLine line={0};
+                const int owner_ok=
+                    musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                        scene,child,&owner);
+                const int line_ok=musa_dwg_ac1032_scene_index_read_line(
+                    scene,child,&line);
+                if(owner_ok){
+                    inventory_line_owner_readable++;
+                    if(owner.owner_block_header_handle==
+                       inventory.insert.block_header_handle)
+                        inventory_line_owner_matches++;
+                }
+                if(line_ok){
+                    inventory_line_geometry_readable++;
+                    if(line.geometry.start[2]==0.0&&
+                       line.geometry.end[2]==0.0&&
+                       line.geometry.extrusion[0]==0.0&&
+                       line.geometry.extrusion[1]==0.0&&
+                       line.geometry.extrusion[2]==1.0&&
+                       line.geometry.thickness==0.0)
+                        inventory_line_planar++;
+                }
+                if(first_line_diagnostics<8u){
+                    fprintf(stderr,"DIAG LINE H%llx block H%llx "
+                                   "owner_ok=%d owner_H%llx "
+                                   "line_ok=%d invis=%u\n",
+                        (unsigned long long)child,
+                        (unsigned long long)inventory.insert.block_header_handle,
+                        owner_ok,
+                        (unsigned long long)owner.owner_block_header_handle,
+                        line_ok,line_ok?(unsigned)line.common.invisibility:0u);
+                    first_line_diagnostics++;
+                }
+            }
             inventory_line_candidates+=candidates;
             if(candidates)inventory_with_line++;
             if(inventory_ok<=10u)
@@ -240,6 +281,10 @@ static int original(const char *filename){
             source_graph_first_failure);
     fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\n",
             (unsigned long long)first_rejected_insert);
+    fprintf(stderr,"DIAG LINE evidence owner_readable=%zu "
+                   "owner_matches=%zu geometry_readable=%zu planar=%zu\n",
+            inventory_line_owner_readable,inventory_line_owner_matches,
+            inventory_line_geometry_readable,inventory_line_planar);
     fprintf(stderr,"DIAG OT49 inventory=%zu with_LINE=%zu "
                    "LINE_candidates=%zu source_line_helpers=%zu "
                    "helper_lines=%zu independent_packets=%zu "
