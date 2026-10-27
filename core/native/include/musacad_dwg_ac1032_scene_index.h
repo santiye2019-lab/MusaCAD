@@ -334,6 +334,17 @@ static inline int musa_dwg_ac1032_block_ancestry_handles_acyclic(
     }
     return 1;
 }
+/* Source-only chain gate: supplied BLOCK ancestry must be acyclic,
+ * nonzero and have exactly one owner handle per affine. The caller must
+ * authenticate every handle-to-INSERT/BLOCK edge from the DWG index. */
+static inline int musa_dwg_ac1032_transform_segment_with_ancestry(
+    const uint64_t *block_handles,const double (*chain)[6],
+    unsigned count,const double source_xy[4],double out_xy[4]){
+    if(!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           block_handles,count))return 0;
+    return musa_dwg_ac1032_transform_segment_through_chain(
+        chain,count,source_xy,out_xy);
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
