@@ -640,6 +640,7 @@ static int run(const char *dwg,const char *dxf){
                proof.float_word_count==7u+2u+2u*(proof.segment_count+1u)&&
                words[0]==6.0f&&words[1]==1.0f&&words[6]==1.0f&&
                words[7]==518.0f&&words[8]==(float)(proof.segment_count+1u)&&
+               proof.segment_count>=3u&&
                words[9]==words[9u+2u*proof.segment_count]&&
                words[10]==words[10u+2u*proof.segment_count];
             for(size_t j=0u;ok&&j<=proof.segment_count;j++)
