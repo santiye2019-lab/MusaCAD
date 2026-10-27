@@ -168,6 +168,12 @@ int main(int argc,char **argv){
             ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
             invalid=numeric;invalid.text_height=0.0;
             ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
+            invalid=numeric;
+            for(unsigned k=0u;k<3u;k++)invalid.extrusion[k]=0.0;
+            ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
+            invalid=numeric;
+            for(unsigned k=0u;k<3u;k++)invalid.x_axis[k]=0.0;
+            ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
         }
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
