@@ -2,7 +2,7 @@
 /* Genuine R2018 original H1C8 INSERT/H1BB CIRCLE/H8A LAYER source status.
  * DXF group 70 is separately read, NOT equated to DWG packed 70/290/370.
  * Unknown viewport, frozen/off and overrides continue to veto paint. */
-#include "musacad_dwg_ac1032_circle_layer_dxf_status_oracle.h"
+#include "musacad_dwg_ac1032_circle_layer_visibility_veto.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -198,6 +198,89 @@ static int run(const char *dwg,const char *dxf){
                      &synthetic,&off)&&off.external_dxf_off&&
                    !off.viewport_and_final_paint_accepted;
             }
+        }
+    }
+    /* Authentic immutable R2018 DWG/DXF oracle: classification is NOT
+     * a runtime visibility permission, even if the companion layer is ON. */
+    if(ok){
+        MusaDwgAc1032CircleLayerDxfOracle external={
+            UINT64_C(0x8a),(int32_t)oracle.group70,(int32_t)oracle.aci,
+            1u,1u,1u
+        };
+        MusaDwgAc1032CircleLayerVisibilityVeto evidence={0};
+        ok=musa_dwg_ac1032_circle_layer_visibility_veto(
+             scene,UINT64_C(0x1c8),UINT64_C(0x1bb),
+             &external,&evidence)&&
+           evidence.original_layer_handle==UINT64_C(0x8a)&&
+           evidence.original_dwg_chain_crc_verified&&
+           !evidence.final_visible_paint_accepted&&
+           evidence.unresolved_original_dwg_requirements==
+             (MUSA_CIRCLE_DWG_UNRESOLVED_LAYER_BITS|
+              MUSA_CIRCLE_DWG_UNRESOLVED_OWNER_SPACE|
+              MUSA_CIRCLE_DWG_UNRESOLVED_NESTED_INSERT|
+              MUSA_CIRCLE_DWG_UNRESOLVED_VIEWPORT|
+              MUSA_CIRCLE_DWG_UNRESOLVED_XREF)&&
+           evidence.external_unconditional_veto==
+             (uint32_t)(((oracle.aci<0L)?
+               MUSA_CIRCLE_DXF_VETO_LAYER_OFF:0u)|
+              ((oracle.group70&1L)?
+               MUSA_CIRCLE_DXF_VETO_LAYER_FROZEN:0u))&&
+           evidence.external_dxf_locked_for_editing==
+             (uint8_t)((oracle.group70&4L)!=0L);
+        if(ok){
+            MusaDwgAc1032CircleLayerVisibilityVeto again={0};
+            ok=musa_dwg_ac1032_circle_layer_visibility_veto(
+                scene,UINT64_C(0x1c8),UINT64_C(0x1bb),
+                &external,&again)&&
+               !memcmp(&evidence,&again,sizeof(evidence));
+        }
+        /* These are synthetic DXF statuses, NOT claims about the fixture.
+         * Exercise OFF, frozen, new-viewport, locked and xref flags. */
+        if(ok){
+            const int32_t flags[]={0,1,2,4,16,32,64,127};
+            for(size_t i=0u;ok&&i<sizeof(flags)/sizeof(flags[0]);i++){
+                MusaDwgAc1032CircleLayerDxfOracle synthetic=external;
+                synthetic.dxf_group70=flags[i];
+                synthetic.dxf_signed_group62=(i==0u)?-4:4;
+                MusaDwgAc1032CircleLayerVisibilityVeto v={0};
+                const uint32_t expected_veto=
+                    (uint32_t)(((i==0u)?
+                      MUSA_CIRCLE_DXF_VETO_LAYER_OFF:0u)|
+                     ((flags[i]&1)?
+                      MUSA_CIRCLE_DXF_VETO_LAYER_FROZEN:0u));
+                const uint32_t expected_risks=
+                    (uint32_t)(((flags[i]&2)?
+                      MUSA_CIRCLE_DXF_RISK_NEW_VIEWPORT_FROZEN:0u)|
+                     ((flags[i]&16)?
+                      MUSA_CIRCLE_DXF_RISK_XREF_DEPENDENT:0u)|
+                     ((flags[i]&32)?
+                      MUSA_CIRCLE_DXF_RISK_XREF_RESOLVED:0u)|
+                     ((flags[i]&64)?
+                      MUSA_CIRCLE_DXF_RISK_REFERENCED:0u));
+                ok=musa_dwg_ac1032_circle_layer_visibility_veto(
+                    scene,UINT64_C(0x1c8),UINT64_C(0x1bb),
+                    &synthetic,&v)&&
+                   v.external_unconditional_veto==expected_veto&&
+                   v.external_conditional_risks==expected_risks&&
+                   v.external_dxf_locked_for_editing==
+                       (uint8_t)((flags[i]&4)!=0)&&
+                   !v.final_visible_paint_accepted;
+            }
+        }
+        if(ok){
+            MusaDwgAc1032CircleLayerVisibilityVeto untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032CircleLayerVisibilityVeto before=untouched;
+            MusaDwgAc1032CircleLayerDxfOracle invalid=external;
+            invalid.dxf_group70=8; /* reserved DXF LAYER status */
+            ok=!musa_dwg_ac1032_circle_layer_visibility_veto(
+                   scene,UINT64_C(0x1c8),UINT64_C(0x1bb),
+                   &invalid,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before));
+            if(ok)ok=!musa_dwg_ac1032_circle_layer_visibility_veto(
+                   scene,UINT64_C(0x1c8),UINT64_C(0x8a),
+                   &external,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before));
         }
     }
     fprintf(stderr,"%s original DWG vs independent DXF signed LAYER oracle, group70=%ld "
