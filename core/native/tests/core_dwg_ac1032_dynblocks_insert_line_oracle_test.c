@@ -318,6 +318,28 @@ static int original(const char *filename){
                    "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\n",
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
             line_sources_ok,segments_ok);
+    /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
+     * never be misread as a LINE, and failed output is unchanged. */
+    if(ok){
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        ok=musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+              scene,UINT64_C(0xbcad),&edge)&&
+           edge.child_handle==UINT64_C(0xbcad)&&
+           edge.owner_block_header_handle==UINT64_C(0xbcaa)&&
+           edge.layer_handle==UINT64_C(0xbf6f)&&
+           edge.original_owner_wire_code==12u&&
+           edge.original_relative_h12_owner_verified&&
+           edge.exact_h4_owner_and_h5_layer_source_verified&&
+           !edge.visible_scene_and_paint_accepted;
+        if(ok){
+            MusaDwgAc1032EntityBlockOwnerLayerSource bad;
+            memset(&bad,0xa5,sizeof(bad));
+            const MusaDwgAc1032EntityBlockOwnerLayerSource before=bad;
+            ok=!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                  scene,UINT64_C(0xbcaa),&bad)&&
+               !memcmp(&bad,&before,sizeof(bad));
+        }
+    }
     if(ok){
         uint8_t stage=255u;
         ok=musa_dwg_ac1032_scene_index_insert_decode_stage(

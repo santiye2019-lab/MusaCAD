@@ -1470,15 +1470,15 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits);
-        if(ok&&type==18u){
+        if(ok&&(type==18u||type==19u)){
             MusaDwgAc1015HandleRef owner_ref={0};
             ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&owner_ref)&&
                owner_ref.target!=0u&&
                (owner_ref.code==4u||
-                /* Original R2018 CIRCLE H1BB stores its block owner as
-                 * the genuine canonical relative H12=H1BB-3 -> H1B8.
-                 * Other types retain the exact H4-only profile.
-                 * Check real OT49/OT51 CRC/index below as well. */
+                /* Genuine original OT18 H1BB and R2018 Dynblocks OT19
+                 * LINE HBCAD..HBCB2 store canonical relative H12 owners.
+                 * Verify the exact target, original OT49 and OT51 CRC.
+                 * Other entity types retain their strict H4 profile. */
                 (owner_ref.code==12u&&owner_ref.relative&&
                  owner_ref.encoded_value>0u&&
                  owner_ref.target<h&&
@@ -1494,10 +1494,9 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         if(ok)
             ok=cached_graph_ref(&bits,h,5u,&layer)&&
                owner!=h&&layer!=h&&owner!=layer&&
-               /* Same independently observed original OT18 relative
-                * owner H12 + layer H5 canonical 111 tail. Other object
-                * types and absolute H4 retain exact ZERO padding. */
-               ((type==18u&&owner_wire_code==12u)?
+               /* Independently observed OT18/OT19 relative H12 + H5
+                * require canonical ONE padding; H4 retains ZERO. */
+               (((type==18u||type==19u)&&owner_wire_code==12u)?
                     cached_graph_one_padding(&bits):
                     cached_graph_zero_padding(&bits));
     }
@@ -1518,7 +1517,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     result.exact_h4_owner_and_h5_layer_source_verified=1u;
     result.original_owner_wire_code=owner_wire_code;
     result.original_relative_h12_owner_verified=
-        (uint8_t)(type==18u&&owner_wire_code==12u);
+        (uint8_t)((type==18u||type==19u)&&owner_wire_code==12u);
     *out=result;
     return 1;
 }
