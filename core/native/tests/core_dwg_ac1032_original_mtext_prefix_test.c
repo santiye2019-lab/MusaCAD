@@ -102,6 +102,17 @@ int main(int argc,char **argv){
            memcmp(&source,&saved,sizeof(source))!=0)ok=0;
     }
     if(ok){
+        MusaDwgAc1032MTextGraph graph={0};
+        ok=musa_dwg_ac1032_scene_index_mtext_graph(scene,h,&graph)&&
+           graph.indexed_handle==h&&graph.graph_edges_verified&&
+           graph.original_entity_crc_verified&&
+           graph.original_layer_crc_verified&&
+           graph.original_style_crc_verified&&
+           graph.layer_object_type==51u&&graph.style_object_type==53u&&
+           graph.layer_handle!=0u&&graph.style_handle!=0u&&
+           !graph.font_and_display_accepted;
+    }
+    if(ok){
         MusaDwgAc1032TextSourceBundle bundle={0};
         ok=musa_dwg_ac1032_text_source_bundle(scene,h,44u,&bundle)&&
            bundle.indexed_handle==h&&bundle.raw_object_type==44u&&
