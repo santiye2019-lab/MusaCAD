@@ -118,7 +118,7 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                    layer.original_record_crc_verified&&
                    layer.utf8_bytes>0u&&
                    layer.utf8_bytes<sizeof(layer.utf8)&&
-                   layer.utf8[layer.utf8_bytes]=='\\0'){
+                   layer.utf8[layer.utf8_bytes]=='\0'){
                     row->layer_handle=edge.layer_handle;
                     row->layer_evidence_status=
                         MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
