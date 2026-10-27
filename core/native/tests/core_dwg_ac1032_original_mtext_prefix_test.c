@@ -122,6 +122,24 @@ int main(int argc,char **argv){
            bundle.layer_handle!=0u&&bundle.style_handle!=0u&&
            bundle.utf8_bytes==strlen(expected)&&
            !strcmp(bundle.utf8,expected);
+        MusaDwgAc1032LayerName original_layer={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_read_layer_name(
+                       scene,bundle.layer_handle,&original_layer)&&
+                  original_layer.original_record_crc_verified&&
+                  original_layer.indexed_handle==bundle.layer_handle&&
+                  bundle.layer_utf8_bytes==original_layer.utf8_bytes&&
+                  bundle.layer_utf8_bytes>0u&&
+                  bundle.layer_utf8_bytes<sizeof(bundle.layer_utf8)&&
+                  !strcmp(bundle.layer_utf8,original_layer.utf8);
+        /* Independent OT44 H graph must agree with the exported source
+         * packet; a style handle is not a verified font or glyph layout. */
+        MusaDwgAc1032MTextGraph verified_graph={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_mtext_graph(
+                      scene,h,&verified_graph)&&
+                  verified_graph.style_object_type==53u&&
+                  verified_graph.layer_object_type==51u&&
+                  bundle.style_handle==verified_graph.style_handle&&
+                  bundle.layer_handle==verified_graph.layer_handle;
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
             memset(&rejected,0x5a,sizeof(rejected));
@@ -130,6 +148,12 @@ int main(int argc,char **argv){
                    scene,h,1u,&rejected)&&
                !musa_dwg_ac1032_text_source_bundle(
                    scene,UINT64_MAX,44u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,0u,44u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,0u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   NULL,h,44u,&rejected)&&
                !memcmp(&rejected,&before,sizeof(rejected));
         }
     }
