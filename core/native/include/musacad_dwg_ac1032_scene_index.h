@@ -110,6 +110,21 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
     MusaDwgAc1032EntityCommon *out);
 /* Original R2018 OT7 INSERT OCS numeric placement; no block expansion,
  * owner/model-space or final rendering acceptance. */
+/* Prefix forensic gate: 0=unavailable, 1=H header, 2=self H,
+ * 3=EED, 4=preview, 5=entity mode, 6=reactors, 7=XDictionary,
+ * 8=binary data store, 9=canonical strict prefix. Untrusted field
+ * values are diagnostic only, never permission to render. */
+typedef struct MusaDwgAc1032InsertPrefixProbe {
+    uint64_t indexed_handle;
+    uint32_t reactor_count;
+    uint16_t eed_bytes;
+    uint8_t fetch_stage,prefix_reason;
+    uint8_t preview,entity_mode,xdictionary_missing;
+    uint8_t has_binary_data_store;
+} MusaDwgAc1032InsertPrefixProbe;
+int musa_dwg_ac1032_scene_index_insert_prefix_probe(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertPrefixProbe *out);
 /* Diagnostic only: 0=not indexed, 1=index, 2=CRC/type payload,
  * 3=CRC stream layout, 4=payload copy, 5=decoded entity common.
  * This never authorizes INSERT ownership, visibility or paint. */

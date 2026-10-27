@@ -40,6 +40,8 @@ static int original(const char *filename){
     size_t insert_type_lookup_failures=0u;
     size_t insert_common_ok=0u,insert_placement_ok=0u;
     size_t fetch_stages[6]={0};
+    size_t prefix_reasons[10]={0};
+    MusaDwgAc1032InsertPrefixProbe first_prefix={0};
     unsigned first_fetch_stage=255u;
     size_t entity_mode_0=0u,entity_mode_1=0u,entity_mode_2=0u;
     size_t entity_mode_other=0u,placement_has_attribs=0u;
@@ -65,6 +67,14 @@ static int original(const char *filename){
         }
         fetch_stages[fetch_stage]++;
         if(inserts==1u)first_fetch_stage=(unsigned)fetch_stage;
+        MusaDwgAc1032InsertPrefixProbe probe={0};
+        if(!musa_dwg_ac1032_scene_index_insert_prefix_probe(
+               scene,entry.handle,&probe)||
+           probe.indexed_handle!=entry.handle||
+           probe.fetch_stage!=fetch_stage||
+           probe.prefix_reason>9u){ok=0;break;}
+        prefix_reasons[probe.prefix_reason]++;
+        if(inserts==1u)first_prefix=probe;
         MusaDwgAc1032EntityCommon common={0};
         if(musa_dwg_ac1032_scene_index_read_insert_common(
                scene,entry.handle,&common)){
@@ -148,6 +158,23 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG original OT7 prefix gates: "
+                   "unavailable=%zu Hheader=%zu self=%zu EED=%zu "
+                   "preview=%zu mode=%zu reactors=%zu xdict=%zu "
+                   "datastore=%zu canonical=%zu\n",
+            prefix_reasons[0],prefix_reasons[1],prefix_reasons[2],
+            prefix_reasons[3],prefix_reasons[4],prefix_reasons[5],
+            prefix_reasons[6],prefix_reasons[7],prefix_reasons[8],
+            prefix_reasons[9]);
+    fprintf(stderr,"DIAG first OT7 prefix: reason=%u eed=%u "
+                   "preview=%u mode=%u reactors=%u xdict=%u datastore=%u\n",
+            (unsigned)first_prefix.prefix_reason,
+            (unsigned)first_prefix.eed_bytes,
+            (unsigned)first_prefix.preview,
+            (unsigned)first_prefix.entity_mode,
+            (unsigned)first_prefix.reactor_count,
+            (unsigned)first_prefix.xdictionary_missing,
+            (unsigned)first_prefix.has_binary_data_store);
     fprintf(stderr,"DIAG original OT7 fetch stage first=%u "
                    "not_indexed=%zu indexed=%zu payload=%zu layout=%zu "
                    "copied=%zu common=%zu\n",

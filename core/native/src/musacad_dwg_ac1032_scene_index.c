@@ -140,10 +140,70 @@ typedef struct Payload {
     MusaDwgAc1032ObjectStreams layout;
     MusaDwgAc1032EntityCommon common;
 } Payload;
+/* Forensic inspection of CRC-authenticated OT7 prefix bytes only.
+ * Noncanonical fields are REPORTED, never accepted as valid geometry. */
+static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032InsertPrefixProbe *out){
+    if(!raw||!layout||!out||layout->data_stream_bits>SIZE_MAX)return;
+    MusaDwgAc1015Bits bits={0};
+    if(!musa_dwg_ac1015_bits_init(&bits,raw,bytes,
+          layout->object_type_field_bits,(size_t)layout->data_stream_bits))
+        return;
+    uint32_t h_header=0u,preview=0u,mode=0u,xdic=0u,ds=0u;
+    uint32_t reactors=0u;
+    uint16_t eed=0u;
+    uint64_t self=0u;
+    if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&h_header)||
+       h_header>>4u||!(h_header&15u)||(h_header&15u)>8u){
+        out->prefix_reason=1u;return;
+    }
+    for(unsigned i=0u;i<(h_header&15u);i++){
+        uint32_t b=0u;
+        if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&b)){
+            out->prefix_reason=2u;return;
+        }
+        self=(self<<8u)|b;
+    }
+    if(self!=layout->indexed_handle){
+        out->prefix_reason=2u;return;
+    }
+    if(!musa_dwg_ac1015_bits_read_bs(&bits,&eed)){
+        out->prefix_reason=3u;return;
+    }
+    out->eed_bytes=eed;
+    if(eed){out->prefix_reason=3u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&preview)){
+        out->prefix_reason=4u;return;
+    }
+    out->preview=(uint8_t)preview;
+    if(preview){out->prefix_reason=4u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,2u,&mode)){
+        out->prefix_reason=5u;return;
+    }
+    out->entity_mode=(uint8_t)mode;
+    if(mode==3u){out->prefix_reason=5u;return;}
+    if(!musa_dwg_ac1015_bits_read_bl(&bits,&reactors)){
+        out->prefix_reason=6u;return;
+    }
+    out->reactor_count=reactors;
+    if(reactors){out->prefix_reason=6u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&xdic)){
+        out->prefix_reason=7u;return;
+    }
+    out->xdictionary_missing=(uint8_t)xdic;
+    if(!xdic){out->prefix_reason=7u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&ds)){
+        out->prefix_reason=8u;return;
+    }
+    out->has_binary_data_store=(uint8_t)ds;
+    out->prefix_reason=ds?8u:9u;
+}
 /* Diagnostic stages describe authenticated read progress, never display
  * permission. Keep the ordinary fetch() semantics and fail-atomic output. */
 static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
-                        uint16_t type,Payload *out,uint8_t *stage){
+                        uint16_t type,Payload *out,uint8_t *stage,
+                        MusaDwgAc1032InsertPrefixProbe *prefix_probe){
     uint64_t off=0u;size_t needed=0u,copied=0u;
     MusaDwgAc1032PayloadInfo meta={0},again={0};
     MusaDwgAc1032ObjectStreams layout={0};
@@ -181,6 +241,8 @@ static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        again.handle_stream_bits==meta.handle_stream_bits;
     if(!ok){free(raw);return 0;}
     if(stage)*stage=4u; /* immutable original record copied */
+    if(prefix_probe&&type==7u)
+        inspect_insert_prefix(raw,needed,&layout,prefix_probe);
     ok=musa_dwg_ac1032_entity_common_bytes(
           raw,needed,&layout,type,&common)&&
        common.common_decoded&&
@@ -193,7 +255,7 @@ static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
 }
 static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
                  uint16_t type,Payload *out){
-    return fetch_staged(s,h,type,out,NULL);
+    return fetch_staged(s,h,type,out,NULL,NULL);
 }
 static int check_output(const MusaDwgAc1032SceneIndex *s,
                         const void *out,size_t n){
@@ -209,8 +271,24 @@ int musa_dwg_ac1032_scene_index_insert_decode_stage(
     if(!h||!check_output(s,out_stage,sizeof(*out_stage)))return 0;
     Payload p={0};
     uint8_t stage=0u;
-    if(fetch_staged(s,h,7u,&p,&stage))free(p.raw);
+    if(fetch_staged(s,h,7u,&p,&stage,NULL))free(p.raw);
     *out_stage=stage;
+    return 1;
+}
+/* Exposes the first strict rejection gate for original OT7 records.
+ * No EED/preview/reactor shortcuts and no acceptance of unsupported
+ * ownership, layer, color, visibility or drawing. */
+int musa_dwg_ac1032_scene_index_insert_prefix_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertPrefixProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032InsertPrefixProbe local={0};
+    local.indexed_handle=h;
+    Payload p={0};
+    uint8_t stage=0u;
+    if(fetch_staged(s,h,7u,&p,&stage,&local))free(p.raw);
+    local.fetch_stage=stage;
+    *out=local;
     return 1;
 }
 /* Real OT4 BLOCK begin source only. BLOCK marker is not drawable,
