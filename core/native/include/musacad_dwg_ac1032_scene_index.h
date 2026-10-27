@@ -259,8 +259,20 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
         if(inventory.block.child_object_types[i]!=19u)continue;
         MusaDwgAc1032NativeLine line={0};
         const uint64_t handle=inventory.block.prefix.child_handles[i];
-        if(!handle||!musa_dwg_ac1032_scene_index_read_line(
-                index,handle,&line))return 0;
+        MusaDwgAc1032EntityBlockOwnerLayerSource owner={0};
+        if(!handle||
+           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                index,handle,&owner)||
+           owner.child_handle!=handle||
+           owner.owner_block_header_handle!=local.block_header_handle||
+           owner.raw_entity_type!=19u||
+           !owner.original_child_record_crc_verified||
+           !owner.original_owner_and_layer_records_crc_verified||
+           !owner.exact_h4_owner_and_h5_layer_source_verified||
+           owner.visible_scene_and_paint_accepted||
+           !musa_dwg_ac1032_scene_index_read_line(
+                index,handle,&line)||
+           line.common.invisibility!=0u)return 0;
         for(unsigned j=0;j<3u;j++){
             if(!isfinite(line.geometry.start[j])||
                !isfinite(line.geometry.end[j]))return 0;
