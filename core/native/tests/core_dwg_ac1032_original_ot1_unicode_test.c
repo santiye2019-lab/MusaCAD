@@ -119,6 +119,10 @@ static int sample(const char *filename){
                    scene,h,0u,&rejected)&&
                !musa_dwg_ac1032_text_source_bundle(
                    NULL,h,1u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,1u,NULL)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,UINT16_MAX,&rejected)&&
                !memcmp(&rejected,&before,sizeof(rejected));
         }
     }
