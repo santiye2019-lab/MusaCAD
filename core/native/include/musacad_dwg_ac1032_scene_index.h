@@ -223,6 +223,66 @@ int musa_dwg_ac1032_scene_index_read_insert_common(
 int musa_dwg_ac1032_scene_index_read_line(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeLine *out);
+/* Extract transformed LINE endpoints from an authenticated INSERT's
+ * OT49 child H list. SOURCE-ONLY: reverse owner and display are NOT
+ * verified. Callers MUST NOT treat these as paint-authorized geometry.
+ * Fail-atomic and bounded to the original OT49 64-child inventory. */
+typedef struct MusaDwgAc1032InsertBlockLineSources {
+    uint64_t insert_handle,block_header_handle;
+    uint64_t child_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    double endpoints[MUSACAD_AC1032_OT49_CHILD_LIMIT][4];
+    uint32_t line_count;
+    uint8_t original_source_geometry_verified;
+    uint8_t reverse_owner_links_verified; /* ALWAYS ZERO */
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockLineSources;
+static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockLineSources *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockChildInventory inventory={0};
+    double m[6]={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+            index,insert_handle,&inventory)||
+       !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+            index,insert_handle,m)||
+       inventory.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)
+        return 0;
+    MusaDwgAc1032InsertBlockLineSources local={0};
+    local.insert_handle=insert_handle;
+    local.block_header_handle=inventory.insert.block_header_handle;
+    for(uint32_t i=0;i<inventory.block.prefix.child_count;i++){
+        if(inventory.block.child_object_types[i]!=19u)continue;
+        MusaDwgAc1032NativeLine line={0};
+        const uint64_t handle=inventory.block.prefix.child_handles[i];
+        if(!handle||!musa_dwg_ac1032_scene_index_read_line(
+                index,handle,&line))return 0;
+        for(unsigned j=0;j<3u;j++){
+            if(!isfinite(line.geometry.start[j])||
+               !isfinite(line.geometry.end[j]))return 0;
+        }
+        if(line.geometry.start[2]!=0.0||
+           line.geometry.end[2]!=0.0||
+           line.geometry.extrusion[0]!=0.0||
+           line.geometry.extrusion[1]!=0.0||
+           line.geometry.extrusion[2]!=1.0||
+           !isfinite(line.geometry.thickness)||
+           line.geometry.thickness!=0.0)return 0;
+        const double x=line.geometry.start[0],y=line.geometry.start[1];
+        const double u=line.geometry.end[0],v=line.geometry.end[1];
+        double xy[4]={m[0]*x+m[1]*y+m[2],
+                      m[3]*x+m[4]*y+m[5],
+                      m[0]*u+m[1]*v+m[2],
+                      m[3]*u+m[4]*v+m[5]};
+        for(unsigned k=0;k<4u;k++)if(!isfinite(xy[k]))return 0;
+        const uint32_t at=local.line_count++;
+        local.child_handles[at]=handle;
+        for(unsigned k=0;k<4u;k++)local.endpoints[at][k]=xy[k];
+    }
+    local.original_source_geometry_verified=1u;
+    *out=local;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_curve(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032NativeCurve *out);
