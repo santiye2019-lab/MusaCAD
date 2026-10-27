@@ -1955,6 +1955,51 @@ static int genuine(const char *file){
                !memcmp(&all,&previous,sizeof(all));
         }
     }
+    /* Positive: genuine unchanged example_2018.dwg block-owned CIRCLE
+     * H1BB and four LINEs H18B..H18E resolve the same CRC/H-verified
+     * OT51 Unicode layer H8A, with exact reverse OT49 parent. Negative:
+     * a CIRCLE object is not a BLOCK_HEADER; invalid parent must leave
+     * output untouched. No layer status implies paint permission. */
+    if(ok){
+        MusaDwgAc1032BlockChildLayerInventory circles={0},lines={0};
+        ok=musa_dwg_ac1032_block_child_layer_evidence(
+               scene,UINT64_C(0x1b8),&circles)&&
+           musa_dwg_ac1032_block_child_layer_evidence(
+               scene,UINT64_C(0x17d),&lines)&&
+           circles.block_header_handle==UINT64_C(0x1b8)&&
+           lines.block_header_handle==UINT64_C(0x17d)&&
+           circles.marker_and_child_source_crc_verified&&
+           lines.marker_and_child_source_crc_verified&&
+           !circles.layer_visibility_color_and_paint_accepted&&
+           !lines.layer_visibility_color_and_paint_accepted;
+        uint32_t circle_count=0u,line_count=0u;
+        for(uint32_t i=0u;ok&&i<circles.child_count;i++){
+            const MusaDwgAc1032BlockChildLayerRow *row=&circles.children[i];
+            if(row->child_handle!=UINT64_C(0x1bb))continue;
+            circle_count++;
+            ok=row->raw_object_type==18u&&
+               row->layer_evidence_status==MUSACAD_AC1032_BLOCK_LAYER_VERIFIED&&
+               row->layer_handle==UINT64_C(0x8a);
+        }
+        for(uint32_t i=0u;ok&&i<lines.child_count;i++){
+            const MusaDwgAc1032BlockChildLayerRow *row=&lines.children[i];
+            if(row->child_handle<UINT64_C(0x18b)||
+               row->child_handle>UINT64_C(0x18e))continue;
+            line_count++;
+            ok=row->raw_object_type==19u&&
+               row->layer_evidence_status==MUSACAD_AC1032_BLOCK_LAYER_VERIFIED&&
+               row->layer_handle==UINT64_C(0x8a);
+        }
+        if(ok)ok=circle_count==1u&&line_count==4u;
+        if(ok){
+            MusaDwgAc1032BlockChildLayerInventory rejected;
+            memset(&rejected,0xa5,sizeof(rejected));
+            const MusaDwgAc1032BlockChildLayerInventory before=rejected;
+            ok=!musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,UINT64_C(0x1bb),&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected));
+        }
+    }
     /* Genuine R2018 regression for the strict OT7 -> OT49 -> OT19
      * reverse-owner and source-only LINE affine helper. The independent
      * companion DXF fixes the INSERT/BLOCK_HEADER handle pairs. The
