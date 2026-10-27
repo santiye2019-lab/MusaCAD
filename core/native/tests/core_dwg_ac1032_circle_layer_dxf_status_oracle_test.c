@@ -715,6 +715,20 @@ static int run(const char *dwg,const char *dxf){
                            &metadata)&&
                           !memcmp(untouched,before,sizeof(before))&&
                           !memcmp(&metadata,&meta_before,sizeof(metadata));
+                /* Synthetic negative, NOT authentic fixture evidence:
+                 * at 1e9, float32 loses radius-1 geometry. Fail atomically. */
+                MusaDwgAc1032CircleByLayerInventory shifted=inventory;
+                for(unsigned k=0u;k<3u;k++){
+                    shifted.rows[i].world_center[k]=k<2u?1000000000.25:0.0;
+                    shifted.rows[i].world_axis_u[k]=k==0u?1.0:0.0;
+                    shifted.rows[i].world_axis_v[k]=k==1u?1.0:0.0;
+                }
+                if(ok)ok=!musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                           &shifted,i,0.5,untouched,
+                           MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,
+                           &metadata)&&
+                          !memcmp(untouched,before,sizeof(before))&&
+                          !memcmp(&metadata,&meta_before,sizeof(metadata));
             }
         }
         if(ok)ok=matches==1u;
