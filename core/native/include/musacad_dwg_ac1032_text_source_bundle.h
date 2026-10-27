@@ -41,7 +41,10 @@ static inline int musa_dwg_ac1032_text_ocs_numeric_valid(
     for(unsigned k=0u;k<3u;k++)
         if(!isfinite(p->insertion[k])||!isfinite(p->alignment[k])||
            !isfinite(p->extrusion[k]))return 0;
-    return 1;
+    /* Zero extrusion cannot define an OCS normal, even if every
+     * component is finite. Do not publish it to a future 2D layout. */
+    return p->extrusion[0]!=0.0||p->extrusion[1]!=0.0||
+           p->extrusion[2]!=0.0;
 }
 static inline int musa_dwg_ac1032_mtext_numeric_valid(
     const MusaDwgAc1032MTextPlacement *p){
@@ -52,7 +55,12 @@ static inline int musa_dwg_ac1032_mtext_numeric_valid(
     for(unsigned k=0u;k<3u;k++)
         if(!isfinite(p->insertion[k])||!isfinite(p->extrusion[k])||
            !isfinite(p->x_axis[k]))return 0;
-    return 1;
+    /* Both directions are required to build an MTEXT source frame.
+     * This does not validate orthogonality or approve glyph painting. */
+    return (p->extrusion[0]!=0.0||p->extrusion[1]!=0.0||
+            p->extrusion[2]!=0.0)&&
+           (p->x_axis[0]!=0.0||p->x_axis[1]!=0.0||
+            p->x_axis[2]!=0.0);
 }
 
 /* Fail-atomic for invalid handle/type, unsupported source profiles,
