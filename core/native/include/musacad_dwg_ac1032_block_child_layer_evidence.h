@@ -93,6 +93,41 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                 row->layer_handle=link.edge.layer_handle;
                 row->layer_evidence_status=MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
                 result.verified_layer_count++;
+            }else if(type==19u){
+                /* A block-owned LINE has an explicit owner H4 (or a
+                 * canonical relative H12) before its H5 layer. The
+                 * no-owner layer reader must reject that valid grammar.
+                 * Recover only from the independently CRC/type-checked
+                 * owner+layer source, and require this exact OT49 parent
+                 * plus the original OT51 Unicode name. Never infer
+                 * layer 0, BYLAYER color or drawing visibility. */
+                MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+                MusaDwgAc1032LayerName layer={0};
+                if(musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                       scene,h,&edge)&&
+                   edge.child_handle==h&&edge.raw_entity_type==19u&&
+                   edge.owner_block_header_handle==block_header_handle&&
+                   edge.layer_handle&&edge.layer_handle!=h&&
+                   edge.original_child_record_crc_verified&&
+                   edge.original_owner_and_layer_records_crc_verified&&
+                   edge.exact_h4_owner_and_h5_layer_source_verified&&
+                   !edge.visible_scene_and_paint_accepted&&
+                   musa_dwg_ac1032_scene_index_read_layer_name(
+                       scene,edge.layer_handle,&layer)&&
+                   layer.indexed_handle==edge.layer_handle&&
+                   layer.original_record_crc_verified&&
+                   layer.utf8_bytes>0u&&
+                   layer.utf8_bytes<sizeof(layer.utf8)&&
+                   layer.utf8[layer.utf8_bytes]=='\\0'){
+                    row->layer_handle=edge.layer_handle;
+                    row->layer_evidence_status=
+                        MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
+                    result.verified_layer_count++;
+                }else{
+                    row->layer_evidence_status=
+                        MUSACAD_AC1032_BLOCK_LAYER_PROFILE_UNRESOLVED;
+                    result.unresolved_profile_count++;
+                }
             }else{
                 row->layer_evidence_status=
                     MUSACAD_AC1032_BLOCK_LAYER_PROFILE_UNRESOLVED;
