@@ -57,6 +57,16 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_original_insert_hgraph_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_original_insert_hgraph_smoke
                  COMMAND musacad_core_ac1032_original_insert_hgraph_test)
+        # Portable synthetic 2D INSERT affine guard; no claim of genuine
+        # DWG block rendering or reverse owner validation.
+        add_executable(musacad_core_ac1032_insert_planar_affine_test
+                tests/core_dwg_ac1032_insert_planar_affine_test.c)
+        target_include_directories(musacad_core_ac1032_insert_planar_affine_test PRIVATE include)
+        if(NOT MSVC)
+            target_link_libraries(musacad_core_ac1032_insert_planar_affine_test PRIVATE m)
+        endif()
+        add_test(NAME musacad_core_ac1032_insert_planar_affine_smoke
+                 COMMAND musacad_core_ac1032_insert_planar_affine_test)
         # Original R2018 OT7 INSERT numeric OCS against independent DXF.
         add_executable(musacad_core_ac1032_original_insert_placement_test
                 tests/core_dwg_ac1032_original_insert_placement_test.c)
