@@ -1560,7 +1560,10 @@ int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
            s,h,&profile)||
        !profile.original_record_crc_verified||
        profile.raw_object_type!=18u||
-       profile.profile_status!=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4||
+       profile.profile_status!=
+           MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE||
+       !profile.verified_relative_h12_owner_h5_layer_source||
+       profile.exact_h4_h5_source_verified||
        profile.entity_mode!=0u||profile.reactor_count!=0u||
        profile.xdictionary_missing!=1u||
        profile.has_color_reference||profile.linetype_flags||
