@@ -48,6 +48,52 @@ static int bit_order_oracle(void){
                 source,sizeof(source),20u,10u,out,sizeof(out))&&
            !memcmp(out,before,sizeof(out));
 }
+/* Synthetic positive/negative UTF-8 vectors are independent of the
+ * authentic R2018 OT51 layer-name oracle exercised in genuine(). */
+static int utf8_layer_name_oracle(void){
+    const char ascii[]="Layer 0";
+    const char accented[]={'C','a','f',(char)0xc3,(char)0xa9,0};
+    const char emoji[]={(char)0xf0,(char)0x9f,(char)0x98,(char)0x80,0};
+    const char overlong[]={(char)0xc0,(char)0xaf,0};
+    const char surrogate[]={(char)0xed,(char)0xa0,(char)0x80,0};
+    const char out_of_range[]={(char)0xf4,(char)0x90,(char)0x80,(char)0x80,0};
+    const char bad_continuation[]={(char)0xe2,'A',(char)0x82,0};
+    const char truncated[]={(char)0xe2,(char)0x82,0};
+    const char embedded_nul[]={'A',0,'B',0};
+    const char missing_terminator[]={'A','B'};
+    const int ok=
+        musa_dwg_ac1032_block_layer_utf8_valid(
+            ascii,sizeof(ascii)-1u,sizeof(ascii))&&
+        musa_dwg_ac1032_block_layer_utf8_valid(
+            accented,sizeof(accented)-1u,sizeof(accented))&&
+        musa_dwg_ac1032_block_layer_utf8_valid(
+            emoji,sizeof(emoji)-1u,sizeof(emoji))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            overlong,sizeof(overlong)-1u,sizeof(overlong))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            surrogate,sizeof(surrogate)-1u,sizeof(surrogate))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            out_of_range,sizeof(out_of_range)-1u,sizeof(out_of_range))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            bad_continuation,sizeof(bad_continuation)-1u,
+            sizeof(bad_continuation))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            truncated,sizeof(truncated)-1u,sizeof(truncated))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            embedded_nul,sizeof(embedded_nul)-1u,sizeof(embedded_nul))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            missing_terminator,sizeof(missing_terminator),
+            sizeof(missing_terminator))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            ascii,0u,sizeof(ascii))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            ascii,sizeof(ascii),sizeof(ascii))&&
+        !musa_dwg_ac1032_block_layer_utf8_valid(
+            NULL,1u,sizeof(ascii));
+    fprintf(stderr,"%s strict OT51 layer UTF-8 name vectors\\n",
+            ok?"PASS":"FAIL");
+    return ok;
+}
 static int genuine(const char *file){
     FILE *f=fopen(file,"rb");
     if(!f)return 0;
@@ -2182,7 +2228,7 @@ static int genuine(const char *file){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc==1)return bit_order_oracle()?0:1;
+    if(argc==1)return bit_order_oracle()&&utf8_layer_name_oracle()?0:1;
     if(argc!=2)return 2;
-    return bit_order_oracle()&&genuine(argv[1])?0:1;
+    return bit_order_oracle()&&utf8_layer_name_oracle()&&genuine(argv[1])?0:1;
 }
