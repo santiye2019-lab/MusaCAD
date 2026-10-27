@@ -530,6 +530,17 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        double chain[65][6];
+        for(unsigned i=0;i<65u;i++){
+            chain[i][0]=1.0;chain[i][1]=0.0;chain[i][2]=1.0;
+            chain[i][3]=0.0;chain[i][4]=1.0;chain[i][5]=0.0;
+        }
+        double result[6]={0};
+        ok=musa_dwg_ac1032_fold_planar_affine_chain(chain,65u,result)&&
+           result[0]==1.0&&result[1]==0.0&&result[2]==65.0&&
+           result[3]==0.0&&result[4]==1.0&&result[5]==0.0;
+    }
+    if(ok){
         const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
                                   {0.0,-1.0,4.0,1.0,0.0,5.0}};
         const double source[4]={1.0,2.0,3.0,4.0};
@@ -551,8 +562,7 @@ static int original(const char *filename){
            musa_dwg_ac1032_fold_planar_affine_chain(chain,2u,m);
         for(unsigned i=0;i<6u;i++)ok=ok&&m[i]==expected[i];
         double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
-        ok=ok&&!musa_dwg_ac1032_fold_planar_affine_chain(chain,0u,sentinel)&&
-           !musa_dwg_ac1032_fold_planar_affine_chain(chain,65u,sentinel);
+        ok=ok&&!musa_dwg_ac1032_fold_planar_affine_chain(chain,0u,sentinel);
         for(unsigned i=0;i<6u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
     }
     if(ok){
