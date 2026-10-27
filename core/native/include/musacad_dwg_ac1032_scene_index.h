@@ -345,6 +345,18 @@ static inline int musa_dwg_ac1032_transform_segment_with_ancestry(
     return musa_dwg_ac1032_transform_segment_through_chain(
         chain,count,source_xy,out_xy);
 }
+/* Require independently supplied INSERT and BLOCK handle chains to be
+ * unique and nonzero before source-only coordinate transformation.
+ * This is NOT proof that any INSERT actually references its BLOCK. */
+static inline int musa_dwg_ac1032_transform_segment_with_insert_chain(
+    const uint64_t *insert_handles,const uint64_t *block_handles,
+    const double (*chain)[6],unsigned count,
+    const double source_xy[4],double out_xy[4]){
+    if(!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           insert_handles,count))return 0;
+    return musa_dwg_ac1032_transform_segment_with_ancestry(
+        block_handles,chain,count,source_xy,out_xy);
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
