@@ -309,6 +309,29 @@ public final class FirstPartyDwgPreviewDialog {
                     FirstPartyDwgPreview.CircleGeometryEvidence result=
                         FirstPartyDwgPreview.readCircleGeometryEvidence(
                             source,MAX_FLOAT_WORDS);
+                    /* Separate original DWG source ACI provenance; failure
+                     * never upgrades the diagnostic magenta to source paint. */
+                    String sourceReport;
+                    try{
+                        FirstPartyDwgPreview.CircleSourceAciEvidence colors=
+                            FirstPartyDwgPreview.readCircleSourceAciEvidence(source);
+                        sourceReport="\nCRC/H kaynak katman ACI zinciri: "+
+                            colors.sourceColorRows+" • belirsiz CIRCLE: "+
+                            colors.unresolvedCircles;
+                        if(colors.sourceColorRows>0)
+                            sourceReport+=" • ilk H"+
+                                Long.toHexString(colors.firstCircleHandle())
+                                    .toUpperCase(java.util.Locale.ROOT)+
+                                " katman H"+
+                                Long.toHexString(colors.firstLayerHandle())
+                                    .toUpperCase(java.util.Locale.ROOT)+
+                                " kaynak ACI "+colors.firstLayerAci();
+                        sourceReport+=" • NİHAİ GÖRÜNÜRLÜK/RENK ONAYI YOK";
+                    }catch(IOException | RuntimeException sourceError){
+                        sourceReport="\nKaynak ACI kanıtı okunamadı; "+
+                            "orijinal renk/visibility kabul edilmedi.";
+                    }
+                    final String layerReport=sourceReport;
                     owner.runOnUiThread(()->{
                         if(dismissed.get()||owner.isFinishing()||
                            owner.isDestroyed())return;
@@ -323,7 +346,9 @@ public final class FirstPartyDwgPreviewDialog {
                             result.unresolvedOwnerOrLayer+
                             "\nMOR ÇİZGİLER KAYNAK DWG RENGİ DEĞİLDİR. "+
                             "Yalnız sayısal merkez/eksen kanıtıdır. "+
-                            "Katman, renk, model/pafta ve görünürlük doğrulanmadı.");
+                            "MODEL/PAFTA, katman kapalı/donmuş ve viewport "+ 
+                            "görünürlüğü doğrulanmadı; mor çizim kaynak renk değildir."+
+                            layerReport);
                     });
                 }catch(IOException | RuntimeException ex){
                     final String message=ex.getMessage()==null?

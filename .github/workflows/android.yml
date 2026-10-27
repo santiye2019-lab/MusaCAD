@@ -61,6 +61,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_original_dwg_2d_diagnostic_isolation.py' -v
           python3 -m unittest discover -s tests -p 'test_ac1032_all_insert_android_bridge.py' -v
           python3 -m unittest discover -s tests -p 'test_ac1032_circle_numeric_wireframe_android.py' -v
+          python3 -m unittest discover -s tests -p 'test_ac1032_circle_source_aci_android.py' -v
           # Actual pure-Java packet merger used by NativeScene, not just
           # source-text assertions. Includes mixed LINE/RGB/TEXT/curve and
           # corruption/overflow/fail-atomic negative acceptance.
@@ -1266,6 +1267,29 @@ jobs:
             com.musa.cad.FirstPartyDwgPreview \
             /tmp/musacad-r2018-circle-numeric-jni-host.so "$original"
           test "$before_circle" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          # Real R2018 source LAYER ACI evidence is separate from ACI6 paint.
+          # Host-compile the actual Android JNI with -Werror and validate
+          # H1C8/H1BB/H8A ACI4 against the independent DXF gold oracle.
+          grep -F 'ac1032_circle_layer_aci_evidence_jni.c' app/src/main/cpp/CMakeLists.txt
+          cc -std=c11 -Wall -Wextra -Werror -fPIC \
+            -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" \
+            -Icore/native/include -c \
+            app/src/main/cpp/ac1032_circle_layer_aci_evidence_jni.c \
+            -o /tmp/musacad-r2018-circle-source-aci-jni.o
+          cc -shared -o /tmp/musacad-r2018-circle-source-aci-jni-host.so \
+            /tmp/musacad-r2018-circle-source-aci-jni.o \
+            /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
+          nm -D /tmp/musacad-r2018-circle-source-aci-jni-host.so \
+            | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readCircleLayerAciEvidenceNative'
+          mkdir -p /tmp/musacad-r2018-circle-source-aci-java
+          javac -encoding UTF-8 -d /tmp/musacad-r2018-circle-source-aci-java \
+            tests/FirstPartyAc1032CircleSourceAciJNIHostTest.java
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          before_aci="$(sha256sum "$original" | cut -d ' ' -f1)"
+          timeout 120s java -Xmx256m -cp /tmp/musacad-r2018-circle-source-aci-java \
+            com.musa.cad.FirstPartyDwgPreview \
+            /tmp/musacad-r2018-circle-source-aci-jni-host.so "$original"
+          test "$before_aci" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           # Actual independent original DWG -> two JNI readers -> exact
           # Android Java source v6 merge on the SAME original bytes.
           cc -shared -o /tmp/musacad-r2018-combined-jni-host.so \
