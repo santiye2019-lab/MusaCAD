@@ -3,12 +3,47 @@
 #define MUSACAD_DWG_AC1032_BLOCK_CHILD_LAYER_EVIDENCE_H
 #include "musacad_dwg_ac1032_block_marker_commons.h"
 #include <stdint.h>
+#include <stddef.h>
 
 /* These classifications describe ORIGINAL source evidence, not paint.
  * 1: the child's source H graph, original layer OT51 and Unicode name agree.
  * 2: its raw type has a known layer reader but its exact H profile rejects.
  * 3: no supported source layer reader exists for this raw object type.
  * Never synthesize layer 0 or ACI 7 for either unresolved classification. */
+/* Reject malformed UTF-8 before exposing an OT51 Unicode layer label.
+ * The caller supplies the actual array capacity: never probe beyond it.
+ * Reject overlong encodings, surrogates, non-scalars, truncation and
+ * embedded NUL; a valid name is nonempty and terminated at exactly n. */
+static inline int musa_dwg_ac1032_block_layer_utf8_valid(
+    const char *text,size_t n,size_t capacity){
+    if(!text||!n||n>=capacity)return 0;
+    size_t i=0u;
+    while(i<n){
+        const unsigned char lead=(unsigned char)text[i];
+        if(!lead)return 0;
+        if(lead<0x80u){i++;continue;}
+        uint32_t scalar=0u,min_scalar=0u;
+        size_t tails=0u;
+        if(lead>=0xc2u&&lead<=0xdfu){
+            scalar=(uint32_t)(lead&0x1fu);min_scalar=0x80u;tails=1u;
+        }else if(lead>=0xe0u&&lead<=0xefu){
+            scalar=(uint32_t)(lead&0x0fu);min_scalar=0x800u;tails=2u;
+        }else if(lead>=0xf0u&&lead<=0xf4u){
+            scalar=(uint32_t)(lead&0x07u);min_scalar=0x10000u;tails=3u;
+        }else return 0;
+        if(tails>n-i-1u)return 0;
+        for(size_t k=1u;k<=tails;k++){
+            const unsigned char tail=(unsigned char)text[i+k];
+            if((tail&0xc0u)!=0x80u)return 0;
+            scalar=(scalar<<6u)|(uint32_t)(tail&0x3fu);
+        }
+        if(scalar<min_scalar||scalar>0x10ffffu||
+           (scalar>=0xd800u&&scalar<=0xdfffu))return 0;
+        i+=tails+1u;
+    }
+    return text[n]=='\\0';
+}
+
 #define MUSACAD_AC1032_BLOCK_LAYER_VERIFIED 1u
 #define MUSACAD_AC1032_BLOCK_LAYER_PROFILE_UNRESOLVED 2u
 #define MUSACAD_AC1032_BLOCK_LAYER_TYPE_UNSUPPORTED 3u
@@ -94,7 +129,10 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                 * Unicode layer name is not enough source evidence. */
                link.layer.utf8_bytes>0u&&
                link.layer.utf8_bytes<sizeof(link.layer.utf8)&&
-               link.layer.utf8[link.layer.utf8_bytes]=='\0'){
+               link.layer.utf8[link.layer.utf8_bytes]=='\0'&&
+               musa_dwg_ac1032_block_layer_utf8_valid(
+                   link.layer.utf8,link.layer.utf8_bytes,
+                   sizeof(link.layer.utf8))){
                 row->layer_handle=link.edge.layer_handle;
                 row->layer_evidence_status=MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
                 result.verified_layer_count++;
@@ -125,7 +163,9 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                    layer.original_record_crc_verified&&
                    layer.utf8_bytes>0u&&
                    layer.utf8_bytes<sizeof(layer.utf8)&&
-                   layer.utf8[layer.utf8_bytes]=='\0'){
+                   layer.utf8[layer.utf8_bytes]=='\0'&&
+                   musa_dwg_ac1032_block_layer_utf8_valid(
+                       layer.utf8,layer.utf8_bytes,sizeof(layer.utf8))){
                     row->layer_handle=edge.layer_handle;
                     row->layer_evidence_status=
                         MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
@@ -187,7 +227,9 @@ static inline int musa_dwg_ac1032_block_child_verified_layer_name(
            !name.original_record_crc_verified||
            name.indexed_handle!=row->layer_handle||
            !name.utf8_bytes||name.utf8_bytes>=sizeof(name.utf8)||
-           name.utf8[name.utf8_bytes]!='\0')return 0;
+           name.utf8[name.utf8_bytes]!='\0'||
+           !musa_dwg_ac1032_block_layer_utf8_valid(
+               name.utf8,name.utf8_bytes,sizeof(name.utf8)))return 0;
         MusaDwgAc1032BlockChildVerifiedLayerName result={0};
         result.block_header_handle=block_header_handle;
         result.child_handle=child_handle;
