@@ -1991,13 +1991,45 @@ static int genuine(const char *file){
                row->layer_handle==UINT64_C(0x8a);
         }
         if(ok)ok=circle_count==1u&&line_count==4u;
+        /* All original OT49 children must be classified; an unresolved
+         * owner/layer is never silently substituted with layer zero. */
+        const MusaDwgAc1032BlockChildLayerInventory *inventories[]={
+            &circles,&lines
+        };
+        for(size_t n=0u;ok&&n<2u;n++){
+            const MusaDwgAc1032BlockChildLayerInventory *inv=inventories[n];
+            ok=inv->verified_layer_count+inv->unresolved_profile_count+
+               inv->unsupported_type_count==inv->child_count&&
+               !inv->reverse_child_owner_links_verified&&
+               !inv->layer_visibility_color_and_paint_accepted;
+            for(uint32_t j=0u;ok&&j<inv->child_count;j++){
+                const MusaDwgAc1032BlockChildLayerRow *row=&inv->children[j];
+                ok=row->child_handle!=0u&&
+                   (row->layer_evidence_status==
+                        MUSACAD_AC1032_BLOCK_LAYER_VERIFIED?
+                        row->layer_handle!=0u:
+                        (row->layer_evidence_status==
+                         MUSACAD_AC1032_BLOCK_LAYER_PROFILE_UNRESOLVED||
+                         row->layer_evidence_status==
+                         MUSACAD_AC1032_BLOCK_LAYER_TYPE_UNSUPPORTED)&&
+                        row->layer_handle==0u);
+            }
+        }
         if(ok){
             MusaDwgAc1032BlockChildLayerInventory rejected;
             memset(&rejected,0xa5,sizeof(rejected));
             const MusaDwgAc1032BlockChildLayerInventory before=rejected;
             ok=!musa_dwg_ac1032_block_child_layer_evidence(
                    scene,UINT64_C(0x1bb),&rejected)&&
-               !memcmp(&rejected,&before,sizeof(rejected));
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,0u,&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_layer_evidence(
+                   NULL,UINT64_C(0x1b8),&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_layer_evidence(
+                   scene,UINT64_C(0x1b8),NULL);
         }
     }
     /* Genuine R2018 regression for the strict OT7 -> OT49 -> OT19
