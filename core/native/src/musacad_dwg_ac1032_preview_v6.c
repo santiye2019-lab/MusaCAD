@@ -48,7 +48,15 @@ int musa_dwg_ac1032_mtext_v6_plain_source_preflight(
            (scalar>=0x202au&&scalar<=0x202eu)||
            (scalar>=0x2066u&&scalar<=0x2069u)||
            (scalar>=0x200bu&&scalar<=0x200fu)||
-           scalar==0x061cu||scalar==0xfeffu)return 0;
+           scalar==0x061cu||scalar==0xfeffu||
+           /* Nonprinting Unicode format controls are not faithful glyphs.
+            * Reject rather than silently substitute or reorder them. */
+           scalar==0x00adu||scalar==0x034fu||
+           scalar==0x180eu||
+           (scalar>=0x2060u&&scalar<=0x2064u)||
+           (scalar>=0x206au&&scalar<=0x206fu)||
+           (scalar>=0xfff9u&&scalar<=0xfffbu)||
+           (scalar>=0xe0000u&&scalar<=0xe007fu))return 0;
         i+=count;
     }
     return 1;
