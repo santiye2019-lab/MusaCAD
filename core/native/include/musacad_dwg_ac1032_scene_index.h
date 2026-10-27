@@ -70,6 +70,42 @@ typedef struct MusaDwgAc1032BlockHeaderTypedChildren {
 int musa_dwg_ac1032_scene_index_block_header_typed_children(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderTypedChildren *out);
+/* Read-only OT7 INSERT -> OT49 BLOCK_HEADER child type inventory.
+ * The INSERT H graph and OT49 child H prefix are independently CRC/H
+ * authenticated; matching target handles does NOT prove reverse owner
+ * links, nested transforms, XREF visibility or permission to render.
+ * A failed source edge leaves the caller's output unchanged. */
+typedef struct MusaDwgAc1032InsertBlockChildInventory {
+    MusaDwgAc1032InsertSourceGraph insert;
+    MusaDwgAc1032BlockHeaderTypedChildren block;
+    uint8_t insert_to_block_source_edge_verified;
+    uint8_t reverse_owner_and_nested_transforms_verified; /* ALWAYS 0 */
+    uint8_t final_display_accepted; /* ALWAYS 0 */
+} MusaDwgAc1032InsertBlockChildInventory;
+static inline int musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockChildInventory *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockChildInventory local={0};
+    if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+            index,insert_handle,&local.insert)||
+       !local.insert.original_entity_and_targets_crc_verified||
+       !local.insert.source_edges_verified||
+       local.insert.indexed_handle!=insert_handle||
+       !local.insert.block_header_handle||
+       local.insert.block_expansion_and_display_accepted||
+       !musa_dwg_ac1032_scene_index_block_header_typed_children(
+            index,local.insert.block_header_handle,&local.block)||
+       local.block.prefix.indexed_handle!=local.insert.block_header_handle||
+       !local.block.prefix.original_record_crc_verified||
+       !local.block.prefix.h_prefix_decoded||
+       !local.block.all_child_record_types_crc_verified||
+       local.block.reverse_owner_links_verified||
+       local.block.final_display_accepted)return 0;
+    local.insert_to_block_source_edge_verified=1u;
+    *out=local;
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_block_header_base(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032BlockHeaderBase *out);
