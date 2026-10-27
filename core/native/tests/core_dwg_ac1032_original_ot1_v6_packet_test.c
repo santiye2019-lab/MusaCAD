@@ -37,6 +37,11 @@ static int original(const char *filename){
        musa_dwg_ac1032_scene_index_read_text_common(scene,h,&c)&&
        !strcmp(b.unicode.utf8,"Jen teksto simpla, cxu ne?")&&
        !strcmp(b.layer.utf8,"Tavolo 1")&&
+       b.color.entity_handle==h&&
+       b.color.entity_and_layer_crc_verified&&
+       b.color.layer_handle==b.graph.layer_handle&&
+       !b.color.rendering_accepted&&
+       !b.color.source_entity_invisible&&
        b.world.horizontal_alignment==4u&&
        musa_dwg_ac1032_text_v6_packet(scene,h,NULL,0u,&planned)&&
        planned.source_handle==h&&
@@ -67,6 +72,18 @@ static int original(const char *filename){
                packet[0]==code&&
                (!extra||packet[1]==rgb)&&
                done.source_direct_style_exact==exact;
+            /* Independent source-CRC/H OT1 -> OT51 oracle, not merely
+             * another invocation of the native style selector. */
+            const float oracle=b.color.entity_has_direct_rgb24?
+                -1538.f:b.color.entity_has_direct_aci?
+                (float)(1536u+b.color.entity_aci):1543.f;
+            ok=ok&&packet[0]==oracle&&
+               (!b.color.entity_has_direct_rgb24||
+                (extra==1u&&packet[1]==
+                    (float)b.color.entity_source_rgb24))&&
+               (done.source_direct_style_exact==
+                (uint8_t)(b.color.entity_has_direct_rgb24||
+                          b.color.entity_has_direct_aci));
             size_t at=(size_t)extra;
             ok=ok&&near(packet[at+1u],9.264596078552017)&&
                near(packet[at+2u],136.3624257905797)&&
