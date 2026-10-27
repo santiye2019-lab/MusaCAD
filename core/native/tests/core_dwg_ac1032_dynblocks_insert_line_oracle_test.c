@@ -530,6 +530,34 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        /* Reverse-owner edges must reject a different BLOCK, child,
+         * layer-less reference, or contradictory relative wire flag. */
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        edge.child_handle=UINT64_C(0x123);
+        edge.owner_block_header_handle=UINT64_C(0x456);
+        edge.layer_handle=UINT64_C(0x789);
+        edge.raw_entity_type=19u;
+        edge.original_child_record_crc_verified=1u;
+        edge.original_owner_and_layer_records_crc_verified=1u;
+        edge.exact_h4_owner_and_h5_layer_source_verified=1u;
+        edge.original_owner_wire_code=4u;
+        ok=musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x123),UINT64_C(0x456),19u)&&
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x123),UINT64_C(0x457),19u)&&
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x124),UINT64_C(0x456),19u);
+        edge.original_relative_h12_owner_verified=1u;
+        ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x123),UINT64_C(0x456),19u);
+        edge.original_owner_wire_code=12u;
+        ok=ok&&musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x123),UINT64_C(0x456),19u);
+        edge.layer_handle=0u;
+        ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,UINT64_C(0x123),UINT64_C(0x456),19u);
+    }
+    if(ok){
         const uint64_t valid[3]={UINT64_C(0x123),UINT64_C(0x456),UINT64_C(0x789)};
         const uint64_t repeated[3]={UINT64_C(0x123),UINT64_C(0x456),UINT64_C(0x123)};
         const uint64_t missing[3]={UINT64_C(0x123),0u,UINT64_C(0x789)};
