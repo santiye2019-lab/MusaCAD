@@ -181,10 +181,17 @@ static int original(const char *filename){
             if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)){
                 double source_affine[6]={0};
                 MusaDwgAc1032InsertBlockLineSources source_lines={0};
+                MusaDwgAc1032InsertLineSourceSegments independent_lines={0};
                 if(!musa_dwg_ac1032_scene_index_original_insert_block_affine(
                        scene,entry.handle,source_affine)||
                    !musa_dwg_ac1032_scene_index_insert_block_line_sources(
-                       scene,entry.handle,&source_lines)){ok=0;break;}
+                       scene,entry.handle,&source_lines)||
+                   !musa_dwg_ac1032_insert_line_source_segments(
+                       scene,entry.handle,&independent_lines)||
+                   !independent_lines.original_source_line_packet_verified||
+                   independent_lines.model_viewport_layer_visibility_and_paint_accepted||
+                   independent_lines.block_header_handle!=
+                       coverage.block_header_handle){ok=0;break;}
                 for(uint32_t z=0u;ok&&z<coverage.child_count;z++){
                     const uint64_t child=coverage.child_handles[z];
                     double verified_affine[6]={0};
@@ -211,6 +218,25 @@ static int original(const char *filename){
                                 ok=0;
                     }
                     if(matches!=1u){ok=0;break;}
+                    /* Independently joined source H4/H12 owner and OT51
+                     * layer must agree on the unchanged DWG endpoints. */
+                    unsigned independently_matched=0u;
+                    for(uint32_t k=0u;k<
+                            independent_lines.verified_planar_line_count;k++){
+                        const MusaDwgAc1032InsertLineSourceRow *row=
+                            &independent_lines.rows[k];
+                        if(row->child_handle!=child)continue;
+                        independently_matched++;
+                        if(!row->original_line_h4_h5_and_world_xy_verified||
+                           row->final_visibility_and_paint_accepted||
+                           row->verified_block_owner_handle!=
+                               coverage.block_header_handle)ok=0;
+                        if(!near(verified_xy[0],row->world_start[0])||
+                           !near(verified_xy[1],row->world_start[1])||
+                           !near(verified_xy[2],row->world_end[0])||
+                           !near(verified_xy[3],row->world_end[1]))ok=0;
+                    }
+                    if(independently_matched!=1u||!ok){ok=0;break;}
                     owner_line_positive++;
                 }
                 if(!ok)break;
