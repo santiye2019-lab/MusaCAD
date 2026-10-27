@@ -406,7 +406,7 @@ static int original(const char *filename){
             owner_audit_mismatched,owner_audit_unsupported_on_reject);
     fprintf(stderr,"DIAG OT49 owner per-child coverage: inventories=%zu "
                    "verified=%zu unreadable=%zu mismatch=%zu "
-                   "unsupported=%zu complete=%zu\\n",
+                   "unsupported=%zu complete=%zu\n",
             coverage_ok,coverage_verified,coverage_unreadable,
             coverage_mismatched,coverage_unsupported,coverage_complete);
     if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
