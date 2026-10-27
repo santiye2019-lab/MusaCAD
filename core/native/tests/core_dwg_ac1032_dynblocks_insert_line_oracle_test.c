@@ -36,6 +36,7 @@ static int original(const char *filename){
     size_t line_sources_ok=0u,segments_ok=0u;
     size_t graph_inventory_affine_ok=0u;
     uint64_t first_rejected_insert=0u;
+    size_t source_graph_first_failure=0u;
     uint64_t first_insert=0u,first_line=0u;
     double first_xy[4]={0};
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
@@ -53,6 +54,7 @@ static int original(const char *filename){
         double affine[6]={0};
         if(musa_dwg_ac1032_scene_index_insert_source_graph(
                scene,entry.handle,&graph))graph_ok++;
+        else if(!source_graph_first_failure)source_graph_first_failure=i+1u;
         if(musa_dwg_ac1032_scene_index_insert_block_child_inventory(
                scene,entry.handle,&inventory))inventory_ok++;
         if(musa_dwg_ac1032_scene_index_original_insert_block_affine(
@@ -102,6 +104,8 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG first source graph rejection index=%zu\\n",
+            source_graph_first_failure);
     fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\\n",
             (unsigned long long)first_rejected_insert);
     fprintf(stderr,"DIAG genuine R2018 INSERT gates: total=%zu graph=%zu "
