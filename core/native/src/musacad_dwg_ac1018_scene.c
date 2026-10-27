@@ -252,7 +252,7 @@ int musa_dwg_ac1018_scene_read_layer_control_refs(
     uint64_t *entry_handles,size_t capacity,
     MusaDwgAc1018LayerControlRefs *out){
     if(!s||!out||!control_handle||!entry_handles||
-       !capacity||capacity>4096u||capacity>SIZE_MAX/sizeof(uint64_t)||
+       !capacity||capacity>4096u||
        scene_output_overlaps(s,out,sizeof(*out))||
        scene_output_overlaps(s,entry_handles,capacity*sizeof(uint64_t))||
        overlaps(out,sizeof(*out),entry_handles,
@@ -263,8 +263,7 @@ int musa_dwg_ac1018_scene_read_layer_control_refs(
     if(!musa_dwg_ac1018_layer_control_refs_record(
            s->objects,s->object_bytes,offset,control_handle,
            NULL,0u,&checked)||
-       !checked.entry_count||checked.entry_count>capacity||
-       checked.entry_count>SIZE_MAX/sizeof(uint64_t))return 0;
+       !checked.entry_count||checked.entry_count>capacity)return 0;
     const size_t n=(size_t)checked.entry_count;
     uint64_t *resolved=(uint64_t*)malloc(n*sizeof(*resolved));
     uint64_t *sorted=(uint64_t*)malloc(n*sizeof(*sorted));
@@ -3225,6 +3224,10 @@ int musa_dwg_ac1018_scene_enclose_lw_radial_bridges_wcs(
  * ||p''|| <= 2*|dr|*theta + max(radius)*theta^2.
  * For N equal parameter intervals, linear chord deviation <= M/(8*N²).
  */
+/* All bounded page/output capacities below are <= 65536; their
+ * allocations fit size_t on the supported 32- and 64-bit C11 targets.
+ * Do not compare uint32_t counts against 64-bit SIZE_MAX quotients:
+ * such comparisons are tautological and mask actionable warnings. */
 int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
     const MusaDwgAc1018Scene *s,uint64_t handle,
     uint32_t vertex_index,uint32_t side,
@@ -3236,8 +3239,7 @@ int musa_dwg_ac1018_scene_tessellate_lw_radial_fan(
        !boundary_thickness_wcs||
        !isfinite(max_chord_error)||!(max_chord_error>0.0)||
        max_triangles<1u||max_triangles>4096u||
-       point_capacity<2u||point_capacity>65536u||
-       point_capacity>SIZE_MAX/sizeof(*boundary_wcs))
+       point_capacity<2u||point_capacity>65536u)
         return 0;
     const size_t bytes=(size_t)point_capacity*sizeof(*boundary_wcs);
     if(scene_output_overlaps(s,out,sizeof(*out))||
@@ -3386,8 +3388,7 @@ int musa_dwg_ac1018_scene_tessellate_bulge_ribbon_strip(
     if(!s||!handle||!sections||!out||
        !isfinite(max_chord_error)||!(max_chord_error>0.0)||
        max_cells<1u||max_cells>4096u||
-       section_capacity<2u||section_capacity>65536u||
-       section_capacity>SIZE_MAX/sizeof(*sections))return 0;
+       section_capacity<2u||section_capacity>65536u)return 0;
     const size_t capacity_bytes=(size_t)section_capacity*
                                 sizeof(*sections);
     if(scene_output_overlaps(s,sections,capacity_bytes)||
@@ -3746,8 +3747,7 @@ int musa_dwg_ac1018_lw_source_snapshot_read_page(
     if(!snap||!snap->vertices||!rows||!out||
        !capacity||capacity>4096u||
        !snap->source.vertex_count||
-       first_index>=snap->source.vertex_count||
-       capacity>SIZE_MAX/sizeof(*rows))
+       first_index>=snap->source.vertex_count)
         return 0;
     const size_t rows_bytes=(size_t)capacity*sizeof(*rows);
     const size_t src_bytes=(size_t)snap->source.vertex_count*
