@@ -35,6 +35,7 @@ static int original(const char *filename){
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
     size_t graph_inventory_affine_ok=0u;
+    uint64_t first_rejected_insert=0u;
     uint64_t first_insert=0u,first_line=0u;
     double first_xy[4]={0};
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
@@ -46,6 +47,7 @@ static int original(const char *filename){
         if(!ok)break; /* Index/type failures must not be skipped. */
         if(type!=7u)continue;
         inserts++;
+        if(!first_rejected_insert)first_rejected_insert=entry.handle;
         MusaDwgAc1032InsertSourceGraph graph={0};
         MusaDwgAc1032InsertBlockChildInventory inventory={0};
         double affine[6]={0};
@@ -100,6 +102,8 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\\n",
+            (unsigned long long)first_rejected_insert);
     fprintf(stderr,"DIAG genuine R2018 INSERT gates: total=%zu graph=%zu "
                    "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\\n",
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
