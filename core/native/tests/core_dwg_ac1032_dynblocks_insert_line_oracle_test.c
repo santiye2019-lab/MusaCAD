@@ -38,6 +38,7 @@ static int original(const char *filename){
     size_t inventory_line_owner_readable=0u,inventory_line_owner_matches=0u;
     size_t inventory_line_geometry_readable=0u,inventory_line_planar=0u;
     size_t first_line_diagnostics=0u;
+    size_t tail_ok_count=0u,tail_h4=0u,tail_h12=0u,tail_other=0u;
     size_t admitted_line_sources=0u,source_segments_positive=0u;
     size_t source_segments_total=0u,source_segments_lines=0u;
     size_t graph_inventory_affine_ok=0u;
@@ -164,7 +165,26 @@ static int original(const char *filename){
                        line.geometry.thickness==0.0)
                         inventory_line_planar++;
                 }
+                MusaDwgAc1032LineHTailProbe tail={0};
+                const int tail_ok=musa_dwg_ac1032_scene_index_line_h_tail_probe(
+                    scene,child,&tail);
+                if(tail_ok){
+                    tail_ok_count++;
+                    if(tail.first_code==4u)tail_h4++;
+                    else if(tail.first_code==12u)tail_h12++;
+                    else tail_other++;
+                }
                 if(first_line_diagnostics<8u){
+                    fprintf(stderr,"DIAG LINE H-tail H%llx mode=%u "
+                                   "first=%u/H%llx second=%u/H%llx "
+                                   "remaining=%u\n",
+                        (unsigned long long)child,
+                        tail_ok?(unsigned)tail.entity_mode:255u,
+                        tail_ok?(unsigned)tail.first_code:255u,
+                        (unsigned long long)tail.first_target,
+                        tail_ok?(unsigned)tail.second_code:255u,
+                        (unsigned long long)tail.second_target,
+                        tail.residual_bits);
                     fprintf(stderr,"DIAG LINE H%llx block H%llx "
                                    "owner_ok=%d owner_H%llx "
                                    "line_ok=%d invis=%u\n",
@@ -281,6 +301,8 @@ static int original(const char *filename){
             source_graph_first_failure);
     fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\n",
             (unsigned long long)first_rejected_insert);
+    fprintf(stderr,"DIAG LINE H-tail verified=%zu H4=%zu H12=%zu "
+                   "other=%zu\n",tail_ok_count,tail_h4,tail_h12,tail_other);
     fprintf(stderr,"DIAG LINE evidence owner_readable=%zu "
                    "owner_matches=%zu geometry_readable=%zu planar=%zu\n",
             inventory_line_owner_readable,inventory_line_owner_matches,

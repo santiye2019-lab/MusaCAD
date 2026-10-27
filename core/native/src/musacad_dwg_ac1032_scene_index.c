@@ -1523,6 +1523,44 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     return 1;
 }
 
+/* Genuine LINE raw H refs, without assuming owner or layer roles. */
+int musa_dwg_ac1032_scene_index_line_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032LineHTailProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,19u,&p))return 0;
+    MusaDwgAc1032LineHTailProbe v={0};
+    v.indexed_handle=h;
+    v.entity_mode=p.common.prefix.entity_mode;
+    v.original_record_crc_verified=1u;
+    MusaDwgAc1015Bits bits={0};
+    if(p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX&&
+       musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+          (size_t)p.layout.data_stream_bits,
+          (size_t)p.layout.total_payload_bits)){
+        MusaDwgAc1015HandleRef first={0},second={0};
+        if(musa_dwg_ac1015_read_handle_ref(&bits,h,&first)){
+            v.first_readable=1u;
+            v.first_code=first.code;
+            v.first_relative=first.relative;
+            v.first_target=first.target;
+            if(musa_dwg_ac1015_read_handle_ref(&bits,h,&second)){
+                v.second_readable=1u;
+                v.second_code=second.code;
+                v.second_relative=second.relative;
+                v.second_target=second.target;
+            }
+        }
+        if(bits.bit_end>=bits.bit_pos&&
+           bits.bit_end-bits.bit_pos<=UINT32_MAX)
+            v.residual_bits=(uint32_t)(bits.bit_end-bits.bit_pos);
+    }
+    free(p.raw);
+    *out=v;
+    return 1;
+}
 /* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
  * decoded H references are RAW observations, NOT owner/layer assignments.
  * This records precisely which strict H4/H5 assumption failed, without

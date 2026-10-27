@@ -485,6 +485,19 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
 
 
 
+/* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
+typedef struct MusaDwgAc1032LineHTailProbe {
+    uint64_t indexed_handle,first_target,second_target;
+    uint32_t residual_bits;
+    uint8_t entity_mode,first_code,second_code;
+    uint8_t first_relative,second_relative,first_readable,second_readable;
+    uint8_t original_record_crc_verified;
+    uint8_t owner_layer_and_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032LineHTailProbe;
+int musa_dwg_ac1032_scene_index_line_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t line_handle,
+    MusaDwgAc1032LineHTailProbe *out);
+
 /* R2018 OT18 original CRC/H forensic probe. first_raw_target and
  * second_raw_target are untrusted H references, NOT certified owner/layer.
  * MSB prefix is copied from the authenticated original HANDLE bitstream.
