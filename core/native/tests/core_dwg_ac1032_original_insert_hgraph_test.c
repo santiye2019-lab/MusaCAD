@@ -90,7 +90,7 @@ static int utf8_layer_name_oracle(void){
             ascii,sizeof(ascii),sizeof(ascii))&&
         !musa_dwg_ac1032_block_layer_utf8_valid(
             NULL,1u,sizeof(ascii));
-    fprintf(stderr,"%s strict OT51 layer UTF-8 name vectors\\n",
+    fprintf(stderr,"%s strict OT51 layer UTF-8 name vectors\n",
             ok?"PASS":"FAIL");
     return ok;
 }
