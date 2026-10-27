@@ -185,6 +185,38 @@ int musa_dwg_ac1032_scene_index_insert_layer_cmc_source(
 int musa_dwg_ac1032_scene_index_read_insert_placement(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertPlacement *out);
+/* Join independently authenticated original OT7 placement, OT7 H
+ * target, and OT49 base before producing a numeric 2D affine. This is
+ * source geometry only: reverse owner, model-space, nested blocks,
+ * layer visibility and final painting remain unverified. Fail-atomic. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_block_affine(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    double out_six[6]){
+    if(!index||!insert_handle||!out_six)return 0;
+    MusaDwgAc1032InsertSourceGraph graph={0};
+    MusaDwgAc1032InsertPlacement placement={0};
+    MusaDwgAc1032BlockHeaderBase base={0};
+    double local[6];
+    if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+           index,insert_handle,&graph)||
+       !graph.original_entity_and_targets_crc_verified||
+       !graph.source_edges_verified||
+       graph.indexed_handle!=insert_handle||
+       !graph.block_header_handle||
+       graph.block_expansion_and_display_accepted||
+       !musa_dwg_ac1032_scene_index_read_insert_placement(
+           index,insert_handle,&placement)||
+       placement.indexed_handle!=insert_handle||
+       !musa_dwg_ac1032_scene_index_read_block_header_base(
+           index,graph.block_header_handle,&base)||
+       base.indexed_handle!=graph.block_header_handle||
+       !base.original_record_crc_verified||!base.base_point_decoded||
+       base.block_children_and_display_accepted||
+       !musa_dwg_ac1032_insert_planar_affine(
+           &placement,base.base_xyz,local))return 0;
+    for(unsigned i=0;i<6u;i++)out_six[i]=local[i];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
