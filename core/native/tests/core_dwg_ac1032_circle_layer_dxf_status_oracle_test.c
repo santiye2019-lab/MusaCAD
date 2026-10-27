@@ -649,6 +649,29 @@ static int run(const char *dwg,const char *dxf){
                    words[9u+2u*j]<=words[4]&&
                    words[10u+2u*j]>=words[3]&&
                    words[10u+2u*j]<=words[5];
+            /* Verify the float32 transport budget independently from the
+             * source R2018 WCS tessellation and its DXF-backed oracle. */
+            if(ok){
+                MusaDwgAc1032CircleAdaptiveSourcePolyline source={0};
+                ok=musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,i,0.5,&source)&&
+                   source.segment_count==proof.segment_count;
+                double max_displacement=0.0;
+                for(size_t j=0u;ok&&j<=source.segment_count;j++){
+                    const double dx=(double)words[9u+2u*j]-source.xy[j][0];
+                    const double dy=(double)words[10u+2u*j]-source.xy[j][1];
+                    const double distance=hypot(dx,dy);
+                    if(!isfinite(distance))ok=0;
+                    else if(distance>max_displacement)
+                        max_displacement=distance;
+                }
+                if(ok)ok=proof.max_float32_vertex_displacement>=
+                           max_displacement&&
+                          proof.combined_world_xy_error_bound>=
+                           proof.conservative_world_xy_error_bound+
+                           proof.max_float32_vertex_displacement&&
+                          proof.combined_world_xy_error_bound<=0.5;
+            }
             /* Independent authentic R2018 gold: transported geometry must
              * retain at least two distinct float32 vertices. */
             if(ok){
@@ -688,6 +711,20 @@ static int run(const char *dwg,const char *dxf){
                 invalid.rows[i].original_layer_aci=0u;
                 if(ok)ok=!musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
                            &invalid,i,0.5,untouched,
+                           MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,
+                           &metadata)&&
+                          !memcmp(untouched,before,sizeof(before))&&
+                          !memcmp(&metadata,&meta_before,sizeof(metadata));
+                /* Synthetic negative, NOT authentic fixture evidence:
+                 * at 1e9, float32 loses radius-1 geometry. Fail atomically. */
+                MusaDwgAc1032CircleByLayerInventory shifted=inventory;
+                for(unsigned k=0u;k<3u;k++){
+                    shifted.rows[i].world_center[k]=k<2u?1000000000.25:0.0;
+                    shifted.rows[i].world_axis_u[k]=k==0u?1.0:0.0;
+                    shifted.rows[i].world_axis_v[k]=k==1u?1.0:0.0;
+                }
+                if(ok)ok=!musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                           &shifted,i,0.5,untouched,
                            MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,
                            &metadata)&&
                           !memcmp(untouched,before,sizeof(before))&&
