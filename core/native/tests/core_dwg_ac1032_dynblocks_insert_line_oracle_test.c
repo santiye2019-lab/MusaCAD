@@ -362,6 +362,18 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const uint64_t valid[3]={UINT64_C(0x123),UINT64_C(0x456),UINT64_C(0x789)};
+        const uint64_t repeated[3]={UINT64_C(0x123),UINT64_C(0x456),UINT64_C(0x123)};
+        const uint64_t missing[3]={UINT64_C(0x123),0u,UINT64_C(0x789)};
+        ok=musa_dwg_ac1032_block_child_handles_unique(valid,3u)&&
+           musa_dwg_ac1032_block_child_handles_unique(NULL,0u)&&
+           !musa_dwg_ac1032_block_child_handles_unique(NULL,1u)&&
+           !musa_dwg_ac1032_block_child_handles_unique(repeated,3u)&&
+           !musa_dwg_ac1032_block_child_handles_unique(missing,3u)&&
+           !musa_dwg_ac1032_block_child_handles_unique(
+               valid,MUSACAD_AC1032_OT49_CHILD_LIMIT+1u);
+    }
+    if(ok){
         const uint64_t previous[2]={UINT64_C(0x123),UINT64_C(0x456)};
         const uint64_t invalid_previous[2]={UINT64_C(0x123),0u};
         ok=musa_dwg_ac1032_source_line_handle_admissible(
