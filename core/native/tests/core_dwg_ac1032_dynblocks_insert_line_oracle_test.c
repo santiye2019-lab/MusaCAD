@@ -34,6 +34,7 @@ static int original(const char *filename){
     size_t inserts=0u,admitted=0u,verified=0u;
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
+    size_t graph_inventory_affine_ok=0u;
     uint64_t first_insert=0u,first_line=0u;
     double first_xy[4]={0};
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
@@ -54,6 +55,12 @@ static int original(const char *filename){
                scene,entry.handle,&inventory))inventory_ok++;
         if(musa_dwg_ac1032_scene_index_original_insert_block_affine(
                scene,entry.handle,affine))affine_ok++;
+        if(musa_dwg_ac1032_scene_index_insert_source_graph(
+               scene,entry.handle,&graph)&&
+           musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+               scene,entry.handle,&inventory)&&
+           musa_dwg_ac1032_scene_index_original_insert_block_affine(
+               scene,entry.handle,affine))graph_inventory_affine_ok++;
         MusaDwgAc1032InsertBlockLineSources got={0};
         if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
                scene,entry.handle,&got))continue;
@@ -94,9 +101,9 @@ static int original(const char *filename){
         }
     }
     fprintf(stderr,"DIAG genuine R2018 INSERT gates: total=%zu graph=%zu "
-                   "inventory=%zu affine=%zu line_sources=%zu segments=%zu\\n",
-            inserts,graph_ok,inventory_ok,affine_ok,line_sources_ok,
-            segments_ok);
+                   "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\\n",
+            inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
+            line_sources_ok,segments_ok);
     if(ok){
         MusaDwgAc1032InsertBlockLineSources out;
         memset(&out,0xa5,sizeof(out));
