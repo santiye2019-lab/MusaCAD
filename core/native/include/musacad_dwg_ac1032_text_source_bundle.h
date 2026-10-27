@@ -83,6 +83,7 @@ static inline int musa_dwg_ac1032_text_source_bundle(
            !musa_dwg_ac1032_scene_index_mtext_graph(
                scene,handle,&graph)||
            source.indexed_handle!=handle||
+           placement.indexed_handle!=handle||
            graph.indexed_handle!=handle||
            !source.original_record_crc_verified||
            !placement.original_record_crc_verified||
