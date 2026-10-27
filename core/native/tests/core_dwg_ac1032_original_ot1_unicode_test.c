@@ -59,6 +59,15 @@ static int sample(const char *filename){
            bundle.layer_handle!=0u&&bundle.style_handle!=0u&&
            bundle.utf8_bytes==text.utf8_bytes&&
            !strcmp(bundle.utf8,text.utf8);
+        MusaDwgAc1032LayerName original_layer={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_read_layer_name(
+                       scene,bundle.layer_handle,&original_layer)&&
+                  original_layer.original_record_crc_verified&&
+                  original_layer.indexed_handle==bundle.layer_handle&&
+                  bundle.layer_utf8_bytes==original_layer.utf8_bytes&&
+                  bundle.layer_utf8_bytes>0u&&
+                  bundle.layer_utf8_bytes<sizeof(bundle.layer_utf8)&&
+                  !strcmp(bundle.layer_utf8,original_layer.utf8);
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
             memset(&rejected,0x5a,sizeof(rejected));
