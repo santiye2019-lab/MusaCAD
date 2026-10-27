@@ -89,7 +89,12 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                link.edge.original_layer_crc_verified&&
                link.layer.original_record_crc_verified&&
                link.layer.indexed_handle==link.edge.layer_handle&&
-               link.edge.layer_handle!=h){
+               link.edge.layer_handle&&link.edge.layer_handle!=h&&
+               /* A verified OT51 record without a bounded, terminated
+                * Unicode layer name is not enough source evidence. */
+               link.layer.utf8_bytes>0u&&
+               link.layer.utf8_bytes<sizeof(link.layer.utf8)&&
+               link.layer.utf8[link.layer.utf8_bytes]=='\0'){
                 row->layer_handle=link.edge.layer_handle;
                 row->layer_evidence_status=MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
                 result.verified_layer_count++;
