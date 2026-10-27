@@ -93,6 +93,13 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
         }
     }
     if(!distinct_float_vertex)return 0;
+    /* The packet's bounds must enclose its ACTUAL transported float32
+     * vertices, not merely the double-precision source envelope. A
+     * rounded vertex outside the envelope must not be silently culled. */
+    for(size_t i=0u;i<=poly.segment_count;i++){
+        const float x=v[9u+2u*i],y=v[10u+2u*i];
+        if(x<v[2]||x>v[4]||y<v[3]||y>v[5])return 0;
+    }
     /* Exact float32 seam for Android Canvas and all other v6 adapters. */
     v[9u+2u*poly.segment_count]=v[9u];
     v[10u+2u*poly.segment_count]=v[10u];
