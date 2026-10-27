@@ -148,6 +148,19 @@ typedef struct MusaDwgAc1032InsertBlockChildInventory {
     uint8_t reverse_owner_and_nested_transforms_verified; /* ALWAYS 0 */
     uint8_t final_display_accepted; /* ALWAYS 0 */
 } MusaDwgAc1032InsertBlockChildInventory;
+/* Validate an OT49 source child list independently of the decoder.
+ * No reference resolution or display approval is implied. */
+static inline int musa_dwg_ac1032_block_child_handles_unique(
+    const uint64_t *handles,uint32_t count){
+    if(count>MUSACAD_AC1032_OT49_CHILD_LIMIT||
+       (count&&!handles))return 0;
+    for(uint32_t i=0u;i<count;i++){
+        if(!handles[i])return 0;
+        for(uint32_t j=0u;j<i;j++)
+            if(handles[j]==handles[i])return 0;
+    }
+    return 1;
+}
 static inline int musa_dwg_ac1032_scene_index_insert_block_child_inventory(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     MusaDwgAc1032InsertBlockChildInventory *out){
@@ -170,14 +183,9 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_child_inventory(
        local.block.final_display_accepted)return 0;
     /* Reject duplicate or missing child handles before exposing an
      * inventory. Distinct source slots must not alias one DWG entity. */
-    if(local.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)
+    if(!musa_dwg_ac1032_block_child_handles_unique(
+           local.block.prefix.child_handles,local.block.prefix.child_count))
         return 0;
-    for(uint32_t i=0u;i<local.block.prefix.child_count;i++){
-        const uint64_t handle=local.block.prefix.child_handles[i];
-        if(!handle)return 0;
-        for(uint32_t j=0u;j<i;j++)
-            if(local.block.prefix.child_handles[j]==handle)return 0;
-    }
     local.insert_to_block_source_edge_verified=1u;
     *out=local;
     return 1;
