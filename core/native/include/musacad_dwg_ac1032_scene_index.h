@@ -842,40 +842,6 @@ typedef struct MusaDwgAc1032InsertBlockLineSources {
     uint8_t reverse_owner_links_verified; /* ALWAYS ZERO */
     uint8_t final_display_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032InsertBlockLineSources;
-/* Bulk LINE source extraction with complete reverse-owner coverage.
- * Every child must be owned by this BLOCK; unsupported siblings reject
- * the whole packet. This is still NOT layer/viewport paint approval. */
-static inline int musa_dwg_ac1032_scene_index_complete_block_line_sources(
-    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
-    MusaDwgAc1032InsertBlockLineSources *out){
-    if(!index||!insert_handle||!out)return 0;
-    MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
-    if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
-           index,insert_handle,&coverage)||
-       !musa_dwg_ac1032_block_owner_coverage_complete(&coverage))return 0;
-    MusaDwgAc1032InsertBlockLineSources local={0};
-    if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
-           index,insert_handle,&local)||
-       local.insert_handle!=insert_handle||
-       local.block_header_handle!=coverage.block_header_handle||
-       !local.original_source_geometry_verified||
-       local.reverse_owner_links_verified||local.final_display_accepted)return 0;
-    uint32_t expected=0;
-    for(uint32_t i=0;i<coverage.child_count;i++)
-        if(coverage.child_types[i]==19u)expected++;
-    if(local.line_count!=expected)return 0;
-    for(uint32_t i=0;i<local.line_count;i++){
-        int found=0;
-        for(uint32_t j=0;j<coverage.child_count;j++)
-            if(coverage.child_types[j]==19u&&
-               coverage.child_handles[j]==local.child_handles[i]){
-                found=1;break;
-            }
-        if(!found)return 0;
-    }
-    *out=local;
-    return 1;
-}
 /* Source-only OT49 child LINE handle guard. Reject duplicate/zero
  * handles before joining H4/H5 owner and emitting any transformed
  * geometry. This is not a block traversal or paint authorization. */
@@ -946,6 +912,41 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
     *out=local;
     return 1;
 }
+/* Bulk LINE source extraction with complete reverse-owner coverage.
+ * Every child must be owned by this BLOCK; unsupported siblings reject
+ * the whole packet. This is still NOT layer/viewport paint approval. */
+static inline int musa_dwg_ac1032_scene_index_complete_block_line_sources(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockLineSources *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+           index,insert_handle,&coverage)||
+       !musa_dwg_ac1032_block_owner_coverage_complete(&coverage))return 0;
+    MusaDwgAc1032InsertBlockLineSources local={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
+           index,insert_handle,&local)||
+       local.insert_handle!=insert_handle||
+       local.block_header_handle!=coverage.block_header_handle||
+       !local.original_source_geometry_verified||
+       local.reverse_owner_links_verified||local.final_display_accepted)return 0;
+    uint32_t expected=0;
+    for(uint32_t i=0;i<coverage.child_count;i++)
+        if(coverage.child_types[i]==19u)expected++;
+    if(local.line_count!=expected)return 0;
+    for(uint32_t i=0;i<local.line_count;i++){
+        int found=0;
+        for(uint32_t j=0;j<coverage.child_count;j++)
+            if(coverage.child_types[j]==19u&&
+               coverage.child_handles[j]==local.child_handles[i]){
+                found=1;break;
+            }
+        if(!found)return 0;
+    }
+    *out=local;
+    return 1;
+}
+
 
 
 
