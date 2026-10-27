@@ -294,6 +294,21 @@ static inline int musa_dwg_ac1032_transform_planar_segment(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
+/* Fold authenticated ancestor-to-descendant INSERT transforms; caller
+ * must independently authenticate each owner edge. No graph traversal. */
+static inline int musa_dwg_ac1032_fold_planar_affine_chain(
+    const double (*chain)[6],unsigned count,double out[6]){
+    if(!chain||!out||count==0u||count>64u)return 0;
+    double acc[6]={1.0,0.0,0.0,0.0,1.0,0.0};
+    for(unsigned i=0;i<count;i++){
+        double next[6];
+        if(!musa_dwg_ac1032_compose_planar_affine(acc,chain[i],next))
+            return 0;
+        for(unsigned j=0;j<6u;j++)acc[j]=next[j];
+    }
+    for(unsigned j=0;j<6u;j++)out[j]=acc[j];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
