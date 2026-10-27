@@ -672,7 +672,7 @@ static int original(const char *filename){
                    "partial_rejected=%zu\n",
             owner_bulk_positive,owner_bulk_partial_rejected);
     fprintf(stderr,"DIAG complete-owner source LINE batch: positive=%zu "
-                   "partial_rejected=%zu\\n",
+                   "partial_rejected=%zu\n",
             complete_batch_positive,complete_batch_partial_rejected);
     fprintf(stderr,"DIAG complete-owner LINE Unicode layer/raw color: "
                    "positive=%zu absent=%zu partial_rejected=%zu\n",
