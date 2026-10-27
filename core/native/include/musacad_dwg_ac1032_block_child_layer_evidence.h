@@ -187,7 +187,7 @@ static inline int musa_dwg_ac1032_block_child_verified_layer_name(
            !name.original_record_crc_verified||
            name.indexed_handle!=row->layer_handle||
            !name.utf8_bytes||name.utf8_bytes>=sizeof(name.utf8)||
-           name.utf8[name.utf8_bytes]!='\\0')return 0;
+           name.utf8[name.utf8_bytes]!='\0')return 0;
         MusaDwgAc1032BlockChildVerifiedLayerName result={0};
         result.block_header_handle=block_header_handle;
         result.child_handle=child_handle;
