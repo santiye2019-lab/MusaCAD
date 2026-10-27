@@ -130,6 +130,12 @@ int main(int argc,char **argv){
                  zero_width,sizeof(zero_width)-1u)&&
            !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
                  direction_mark,sizeof(direction_mark)-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 "A\\xC2\\xAD""B",sizeof("A\\xC2\\xAD""B")-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 "A\\xE2\\x81\\xA0""B",sizeof("A\\xE2\\x81\\xA0""B")-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 "A\\xEF\\xBF\\xB9""B",sizeof("A\\xEF\\xBF\\xB9""B")-1u)&&
            musa_dwg_ac1032_mtext_v6_plain_source_preflight(
                  "Plain MTEXT",sizeof("Plain MTEXT")-1u);
     }
