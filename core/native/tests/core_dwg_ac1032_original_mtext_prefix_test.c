@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1032_mtext.h"
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_source_utf8.h"
+#include "musacad_dwg_ac1032_text_source_bundle.h"
 #include "musacad_dwg_ac1015_values.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -99,6 +100,27 @@ int main(int argc,char **argv){
         if(musa_dwg_ac1032_mtext_single_tu_at(
                raw,need,&layout,common.geometry_start_bit,&source)||
            memcmp(&source,&saved,sizeof(source))!=0)ok=0;
+    }
+    if(ok){
+        MusaDwgAc1032TextSourceBundle bundle={0};
+        ok=musa_dwg_ac1032_text_source_bundle(scene,h,44u,&bundle)&&
+           bundle.indexed_handle==h&&bundle.raw_object_type==44u&&
+           bundle.original_unicode_numeric_h_graph_verified&&
+           bundle.original_layer_name_verified&&
+           !bundle.font_layout_visibility_color_and_paint_accepted&&
+           bundle.layer_handle!=0u&&bundle.style_handle!=0u&&
+           bundle.utf8_bytes==strlen(expected)&&
+           !strcmp(bundle.utf8,expected);
+        if(ok){
+            MusaDwgAc1032TextSourceBundle rejected;
+            memset(&rejected,0x5a,sizeof(rejected));
+            const MusaDwgAc1032TextSourceBundle before=rejected;
+            ok=!musa_dwg_ac1032_text_source_bundle(
+                   scene,h,1u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,UINT64_MAX,44u,&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected));
+        }
     }
     fprintf(stderr,"%s original MTEXT TU source Unicode H1C0 exact oracle; NOT full MTEXT glyph/format/placement\\n",ok?"PASS":"FAIL");
     musa_dwg_ac1032_scene_index_close(scene);
