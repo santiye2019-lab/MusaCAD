@@ -66,6 +66,18 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
             v[9u+2u*i+k]=f;
         }
     }
+    /* Reject float32 quantization that erases the entire source curve.
+     * A double-precision source circle can be nondegenerate yet collapse
+     * into one float32 point at very large WCS offsets. Such a packet
+     * must not masquerade as a successfully transported geometry. */
+    int distinct_float_vertex=0;
+    for(size_t i=1u;i<poly.segment_count;i++){
+        if(v[9u+2u*i]!=v[9u]||v[10u+2u*i]!=v[10u]){
+            distinct_float_vertex=1;
+            break;
+        }
+    }
+    if(!distinct_float_vertex)return 0;
     /* Exact float32 seam for Android Canvas and all other v6 adapters. */
     v[9u+2u*poly.segment_count]=v[9u];
     v[10u+2u*poly.segment_count]=v[10u];
