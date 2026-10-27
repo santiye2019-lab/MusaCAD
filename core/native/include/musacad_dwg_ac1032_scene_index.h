@@ -382,6 +382,21 @@ static inline int musa_dwg_ac1032_scene_index_original_insert_affine_chain(
     for(unsigned j=0;j<6u;j++)out[j]=acc[j];
     return 1;
 }
+/* Convert source LINE endpoints through indexed original INSERT affines.
+ * Caller must separately verify nested owner edges and paint visibility. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_line_chain(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,
+    const double source_xy[4],double out_xy[4]){
+    if(!source_xy||!out_xy)return 0;
+    double composed[6],transformed[4];
+    if(!musa_dwg_ac1032_scene_index_original_insert_affine_chain(
+           index,insert_handles,block_handles,count,composed)||
+       !musa_dwg_ac1032_transform_planar_segment(
+           composed,source_xy,transformed))return 0;
+    for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
