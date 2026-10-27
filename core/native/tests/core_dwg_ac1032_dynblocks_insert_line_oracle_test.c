@@ -34,6 +34,9 @@ static int original(const char *filename){
     size_t inserts=0u,admitted=0u,verified=0u;
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
+    size_t inventory_line_candidates=0u,inventory_with_line=0u;
+    size_t admitted_line_sources=0u,source_segments_positive=0u;
+    size_t source_segments_total=0u,source_segments_lines=0u;
     size_t graph_inventory_affine_ok=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -127,7 +130,20 @@ static int original(const char *filename){
                scene,entry.handle,&graph))graph_ok++;
         else if(!source_graph_first_failure)source_graph_first_failure=i+1u;
         if(musa_dwg_ac1032_scene_index_insert_block_child_inventory(
-               scene,entry.handle,&inventory))inventory_ok++;
+               scene,entry.handle,&inventory)){
+            inventory_ok++;
+            size_t candidates=0u;
+            for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++)
+                if(inventory.block.child_object_types[z]==19u)candidates++;
+            inventory_line_candidates+=candidates;
+            if(candidates)inventory_with_line++;
+            if(inventory_ok<=10u)
+                fprintf(stderr,"DIAG inventory H%llx block H%llx "
+                               "children=%u LINE=%zu\n",
+                        (unsigned long long)entry.handle,
+                        (unsigned long long)inventory.insert.block_header_handle,
+                        inventory.block.prefix.child_count,candidates);
+        }
         if(musa_dwg_ac1032_scene_index_original_insert_block_affine(
                scene,entry.handle,affine))affine_ok++;
         if(musa_dwg_ac1032_scene_index_insert_source_graph(
@@ -136,10 +152,18 @@ static int original(const char *filename){
                scene,entry.handle,&inventory)&&
            musa_dwg_ac1032_scene_index_original_insert_block_affine(
                scene,entry.handle,affine))graph_inventory_affine_ok++;
+        MusaDwgAc1032InsertLineSourceSegments independent={0};
+        if(musa_dwg_ac1032_insert_line_source_segments(
+               scene,entry.handle,&independent)){
+            source_segments_total++;
+            source_segments_lines+=independent.verified_planar_line_count;
+            if(independent.verified_planar_line_count)source_segments_positive++;
+        }
         MusaDwgAc1032InsertBlockLineSources got={0};
         if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
                scene,entry.handle,&got))continue;
         line_sources_ok++;
+        admitted_line_sources+=got.line_count;
         if(!got.original_source_geometry_verified||
            got.reverse_owner_links_verified||got.final_display_accepted||
            got.insert_handle!=entry.handle||
@@ -216,6 +240,13 @@ static int original(const char *filename){
             source_graph_first_failure);
     fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\n",
             (unsigned long long)first_rejected_insert);
+    fprintf(stderr,"DIAG OT49 inventory=%zu with_LINE=%zu "
+                   "LINE_candidates=%zu source_line_helpers=%zu "
+                   "helper_lines=%zu independent_packets=%zu "
+                   "independent_positive=%zu independent_lines=%zu\n",
+            inventory_ok,inventory_with_line,inventory_line_candidates,
+            line_sources_ok,admitted_line_sources,source_segments_total,
+            source_segments_positive,source_segments_lines);
     fprintf(stderr,"DIAG genuine R2018 INSERT gates: total=%zu graph=%zu "
                    "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\n",
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
