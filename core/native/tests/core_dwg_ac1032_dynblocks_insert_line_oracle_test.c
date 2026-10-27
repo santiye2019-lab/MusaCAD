@@ -530,6 +530,27 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+        coverage.insert_handle=UINT64_C(0x123);
+        coverage.block_header_handle=UINT64_C(0x456);
+        coverage.child_count=1u;
+        coverage.child_handles[0]=UINT64_C(0x789);
+        coverage.child_types[0]=19u;
+        coverage.child_status[0]=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED;
+        coverage.verified_count=1u;
+        coverage.source_inventory_verified=1u;
+        coverage.complete_reverse_owner_links_verified=1u;
+        ok=musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
+        coverage.child_status[0]=MUSACAD_AC1032_BLOCK_OWNER_MISMATCH;
+        ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
+        coverage.child_status[0]=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED;
+        coverage.unreadable_count=1u;
+        ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
+        coverage.unreadable_count=0u;
+        coverage.final_display_accepted=1u;
+        ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
+    }
+    if(ok){
         /* Reverse-owner edges must reject a different BLOCK, child,
          * layer-less reference, or contradictory relative wire flag. */
         MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
