@@ -44,6 +44,8 @@ static int original(const char *filename){
     size_t graph_inventory_affine_ok=0u;
     size_t owner_audit_ok=0u,owner_audit_verified=0u;
     size_t owner_audit_complete=0u,owner_audit_unsupported=0u;
+    size_t owner_audit_rejected=0u,owner_audit_unreadable=0u;
+    size_t owner_audit_mismatched=0u,owner_audit_unsupported_on_reject=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
@@ -154,6 +156,23 @@ static int original(const char *filename){
                    audit.final_display_accepted||
                    audit.supported_child_count+audit.unsupported_child_count!=
                        audit.child_count){ok=0;break;}
+            }else{
+                owner_audit_rejected++;
+                for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++){
+                    const uint16_t t=inventory.block.child_object_types[z];
+                    if(t!=17u&&t!=18u&&t!=19u&&
+                       t!=27u&&t!=35u&&t!=77u){
+                        owner_audit_unsupported_on_reject++;
+                        continue;
+                    }
+                    MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+                    const uint64_t child=inventory.block.prefix.child_handles[z];
+                    if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                           scene,child,&edge))owner_audit_unreadable++;
+                    else if(!musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &edge,child,inventory.insert.block_header_handle,t))
+                        owner_audit_mismatched++;
+                }
             }
             size_t candidates=0u;
             for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++)
@@ -346,11 +365,15 @@ static int original(const char *filename){
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
             line_sources_ok,segments_ok);
     fprintf(stderr,"DIAG OT49 reverse owner audit: successful=%zu "
-                   "verified=%zu unsupported=%zu complete=%zu\n",
+                   "verified=%zu unsupported=%zu complete=%zu "
+                   "rejected=%zu unreadable_edges=%zu mismatched_edges=%zu "
+                   "unsupported_on_reject=%zu\n",
             owner_audit_ok,owner_audit_verified,owner_audit_unsupported,
-            owner_audit_complete);
+            owner_audit_complete,owner_audit_rejected,owner_audit_unreadable,
+            owner_audit_mismatched,owner_audit_unsupported_on_reject);
     if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
-             owner_audit_complete>0u;
+             owner_audit_complete>0u&&
+             owner_audit_ok+owner_audit_rejected==inventory_ok;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
