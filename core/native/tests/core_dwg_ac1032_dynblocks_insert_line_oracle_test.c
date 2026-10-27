@@ -49,6 +49,9 @@ static int original(const char *filename){
     size_t coverage_ok=0u,coverage_verified=0u,coverage_unreadable=0u;
     size_t coverage_mismatched=0u,coverage_unsupported=0u;
     size_t coverage_complete=0u;
+    size_t owner_affine_positive=0u,owner_line_positive=0u;
+    size_t owner_affine_negative=0u,owner_affine_partial_rejected=0u;
+    size_t owner_bulk_positive=0u,owner_bulk_partial_rejected=0u;
     size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -174,6 +177,125 @@ static int original(const char *filename){
                 }
             }
             if(!ok)break;
+            /* Real unchanged R2018: only fully owner-verified OT49 blocks
+             * may release source affine or LINE WCS. Partial blocks reject. */
+            if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)){
+                double source_affine[6]={0};
+                MusaDwgAc1032InsertBlockLineSources source_lines={0};
+                MusaDwgAc1032InsertLineSourceSegments independent_lines={0};
+                MusaDwgAc1032InsertBlockLineSources complete_lines={0};
+                if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
+                       scene,entry.handle,&complete_lines)||
+                   complete_lines.insert_handle!=entry.handle||
+                   complete_lines.block_header_handle!=coverage.block_header_handle||
+                   !complete_lines.original_source_geometry_verified||
+                   complete_lines.final_display_accepted||
+                   complete_lines.line_count==0u){ok=0;break;}
+                owner_bulk_positive++;
+                if(!musa_dwg_ac1032_scene_index_original_insert_block_affine(
+                       scene,entry.handle,source_affine)||
+                   !musa_dwg_ac1032_scene_index_insert_block_line_sources(
+                       scene,entry.handle,&source_lines)||
+                   !musa_dwg_ac1032_insert_line_source_segments(
+                       scene,entry.handle,&independent_lines)||
+                   !independent_lines.original_source_line_packet_verified||
+                   independent_lines.model_viewport_layer_visibility_and_paint_accepted||
+                   independent_lines.block_header_handle!=
+                       coverage.block_header_handle){ok=0;break;}
+                if(complete_lines.line_count!=source_lines.line_count){
+                    ok=0;break;
+                }
+                for(uint32_t k=0u;k<source_lines.line_count;k++){
+                    if(complete_lines.child_handles[k]!=source_lines.child_handles[k])
+                        ok=0;
+                    for(unsigned j=0u;j<4u;j++)
+                        if(!near(complete_lines.endpoints[k][j],
+                                 source_lines.endpoints[k][j]))ok=0;
+                }
+                if(!ok)break;
+                for(uint32_t z=0u;ok&&z<coverage.child_count;z++){
+                    const uint64_t child=coverage.child_handles[z];
+                    double verified_affine[6]={0};
+                    if(!musa_dwg_ac1032_scene_index_verified_child_affine(
+                           scene,entry.handle,child,verified_affine)){
+                        ok=0;break;
+                    }
+                    for(unsigned j=0u;j<6u;j++)
+                        if(!near(verified_affine[j],source_affine[j]))ok=0;
+                    if(!ok)break;
+                    owner_affine_positive++;
+                    if(coverage.child_types[z]!=19u)continue;
+                    double verified_xy[4]={0};
+                    if(!musa_dwg_ac1032_scene_index_verified_child_line_xy(
+                           scene,entry.handle,child,verified_xy)){
+                        ok=0;break;
+                    }
+                    unsigned matches=0u;
+                    for(uint32_t k=0u;k<source_lines.line_count;k++){
+                        if(source_lines.child_handles[k]!=child)continue;
+                        matches++;
+                        for(unsigned j=0u;j<4u;j++)
+                            if(!near(verified_xy[j],source_lines.endpoints[k][j]))
+                                ok=0;
+                    }
+                    if(matches!=1u){ok=0;break;}
+                    /* Independently joined source H4/H12 owner and OT51
+                     * layer must agree on the unchanged DWG endpoints. */
+                    unsigned independently_matched=0u;
+                    for(uint32_t k=0u;k<
+                            independent_lines.verified_planar_line_count;k++){
+                        const MusaDwgAc1032InsertLineSourceRow *row=
+                            &independent_lines.rows[k];
+                        if(row->child_handle!=child)continue;
+                        independently_matched++;
+                        if(!row->original_line_h4_h5_and_world_xy_verified||
+                           row->final_visibility_and_paint_accepted||
+                           row->verified_block_owner_handle!=
+                               coverage.block_header_handle)ok=0;
+                        if(!near(verified_xy[0],row->world_start[0])||
+                           !near(verified_xy[1],row->world_start[1])||
+                           !near(verified_xy[2],row->world_end[0])||
+                           !near(verified_xy[3],row->world_end[1]))ok=0;
+                    }
+                    if(independently_matched!=1u||!ok){ok=0;break;}
+                    owner_line_positive++;
+                }
+                if(!ok)break;
+                double unchanged[6]={9.0,8.0,7.0,6.0,5.0,4.0};
+                double unchanged_xy[4]={9.0,8.0,7.0,6.0};
+                if(musa_dwg_ac1032_scene_index_verified_child_affine(
+                       scene,entry.handle,UINT64_MAX,unchanged)||
+                   musa_dwg_ac1032_scene_index_verified_child_line_xy(
+                       scene,entry.handle,UINT64_MAX,unchanged_xy)){
+                    ok=0;break;
+                }
+                for(unsigned j=0u;j<6u;j++)
+                    if(unchanged[j]!=9.0-(double)j)ok=0;
+                for(unsigned j=0u;j<4u;j++)
+                    if(unchanged_xy[j]!=9.0-(double)j)ok=0;
+                if(!ok)break;
+                owner_affine_negative++;
+            }else if(coverage.child_count){
+                MusaDwgAc1032InsertBlockLineSources unchanged_bulk;
+                memset(&unchanged_bulk,0xa5,sizeof(unchanged_bulk));
+                const MusaDwgAc1032InsertBlockLineSources before_bulk=
+                    unchanged_bulk;
+                if(musa_dwg_ac1032_scene_index_complete_block_line_sources(
+                       scene,entry.handle,&unchanged_bulk)||
+                   memcmp(&unchanged_bulk,&before_bulk,sizeof(unchanged_bulk))){
+                    ok=0;break;
+                }
+                owner_bulk_partial_rejected++;
+                double unchanged[6]={9.0,8.0,7.0,6.0,5.0,4.0};
+                if(musa_dwg_ac1032_scene_index_verified_child_affine(
+                       scene,entry.handle,coverage.child_handles[0],unchanged)){
+                    ok=0;break;
+                }
+                for(unsigned j=0u;j<6u;j++)
+                    if(unchanged[j]!=9.0-(double)j)ok=0;
+                if(!ok)break;
+                owner_affine_partial_rejected++;
+            }
             for(uint32_t z=0u;ok&&z<coverage.child_count;z++){
                 if(coverage.child_status[z]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
                     continue;
@@ -460,6 +582,13 @@ static int original(const char *filename){
                    "unsupported=%zu complete=%zu\n",
             coverage_ok,coverage_verified,coverage_unreadable,
             coverage_mismatched,coverage_unsupported,coverage_complete);
+    fprintf(stderr,"DIAG complete-owner bulk LINE: positive=%zu "
+                   "partial_rejected=%zu\n",
+            owner_bulk_positive,owner_bulk_partial_rejected);
+    fprintf(stderr,"DIAG verified child affine: positive=%zu "
+                   "LINE=%zu absent=%zu partial_rejected=%zu\n",
+            owner_affine_positive,owner_line_positive,
+            owner_affine_negative,owner_affine_partial_rejected);
     fprintf(stderr,"DIAG OT49 verified child Unicode layer joins: "
                    "joined=%zu unsupported=%zu\n",
             child_layer_joined,child_layer_unavailable);
@@ -471,7 +600,10 @@ static int original(const char *filename){
              coverage_ok==inventory_ok&&
              coverage_verified>=owner_audit_verified&&
              coverage_unreadable>0u&&
-             coverage_complete==owner_audit_complete;
+             coverage_complete==owner_audit_complete&&
+             owner_affine_positive>0u&&owner_line_positive>0u&&
+             owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
+             owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
