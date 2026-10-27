@@ -538,6 +538,27 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
     *out=local;
     return 1;
 }
+/* A strict source-ownership gate: coverage diagnostics may be partial,
+ * but downstream traversal must never mistake partial for complete. */
+static inline int musa_dwg_ac1032_block_owner_coverage_complete(
+    const MusaDwgAc1032InsertBlockOwnerCoverage *coverage){
+    if(!coverage||!coverage->source_inventory_verified||
+       !coverage->insert_handle||!coverage->block_header_handle||
+       !coverage->child_count||
+       coverage->child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT||
+       !coverage->complete_reverse_owner_links_verified||
+       coverage->final_display_accepted||
+       coverage->verified_count!=coverage->child_count||
+       coverage->unsupported_count||coverage->unreadable_count||
+       coverage->mismatched_count)return 0;
+    for(uint32_t i=0u;i<coverage->child_count;i++)
+        if(!coverage->child_handles[i]||
+           !musa_dwg_ac1032_block_child_owner_type_supported(
+               coverage->child_types[i])||
+           coverage->child_status[i]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
+            return 0;
+    return 1;
+}
 static inline int musa_dwg_ac1032_scene_index_insert_block_owner_audit(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     MusaDwgAc1032InsertBlockOwnerAudit *out){
