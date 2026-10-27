@@ -188,4 +188,49 @@ static inline int musa_dwg_ac1032_insert_line_layer_source(
     }
     return 0;
 }
+/* Source-only complete BLOCK child LINE provenance: cross-check strict
+ * OT49 reverse-owner completeness, independently joined OT51 Unicode
+ * layer/status, raw source color and WCS endpoints. Raw ACI/RGB is NOT
+ * resolved BYLAYER/BYBLOCK or viewport/layer visibility. */
+typedef struct MusaDwgAc1032CompleteBlockLineLayerSource {
+    MusaDwgAc1032InsertLineLayerSource source;
+    uint8_t complete_block_reverse_owners_verified;
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CompleteBlockLineLayerSource;
+static inline int musa_dwg_ac1032_complete_block_line_layer_source(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t insert_handle,
+    uint64_t line_handle,MusaDwgAc1032CompleteBlockLineLayerSource *out){
+    if(!scene||!insert_handle||!line_handle||!out)return 0;
+    double xy[4];
+    MusaDwgAc1032InsertLineLayerSource line={0};
+    MusaDwgAc1032InsertBlockChildLayerSource layer={0};
+    if(!musa_dwg_ac1032_scene_index_verified_child_line_xy(
+           scene,insert_handle,line_handle,xy)||
+       !musa_dwg_ac1032_insert_line_layer_source(
+           scene,insert_handle,line_handle,&line)||
+       !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+           scene,insert_handle,line_handle,&layer)||
+       !line.source_line_layer_and_owner_verified||
+       line.final_visibility_color_and_paint_accepted||
+       !layer.original_owner_layer_and_name_verified||
+       layer.final_visibility_color_and_paint_accepted||
+       line.insert_handle!=insert_handle||
+       line.child_handle!=line_handle||
+       line.block_header_handle!=layer.block_header_handle||
+       line.layer_handle!=layer.layer_handle||
+       line.layer_name.indexed_handle!=layer.layer_name.indexed_handle||
+       line.raw_layer_flags.indexed_handle!=
+           layer.raw_layer_flags.indexed_handle)return 0;
+    const double observed[4]={
+        line.world_start[0],line.world_start[1],
+        line.world_end[0],line.world_end[1]};
+    for(unsigned i=0u;i<4u;i++)
+        if(!isfinite(xy[i])||!isfinite(observed[i])||
+           fabs(xy[i]-observed[i])>1e-5)return 0;
+    MusaDwgAc1032CompleteBlockLineLayerSource local={0};
+    local.source=line;
+    local.complete_block_reverse_owners_verified=1u;
+    *out=local;
+    return 1;
+}
 #endif
