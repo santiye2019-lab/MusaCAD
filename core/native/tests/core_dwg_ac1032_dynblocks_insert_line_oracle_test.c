@@ -346,7 +346,7 @@ static int original(const char *filename){
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
             line_sources_ok,segments_ok);
     fprintf(stderr,"DIAG OT49 reverse owner audit: successful=%zu "
-                   "verified=%zu unsupported=%zu complete=%zu\\n",
+                   "verified=%zu unsupported=%zu complete=%zu\n",
             owner_audit_ok,owner_audit_verified,owner_audit_unsupported,
             owner_audit_complete);
     if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
