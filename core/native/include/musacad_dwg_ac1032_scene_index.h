@@ -713,6 +713,27 @@ static inline int musa_dwg_ac1032_block_owner_coverage_complete(
             return 0;
     return 1;
 }
+/* Authenticate the entire original OT49 child-owner inventory before
+ * exposing one child's source INSERT transform. No paint authorization. */
+static inline int musa_dwg_ac1032_scene_index_verified_child_affine(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    uint64_t child_handle,double out_six[6]){
+    if(!index||!insert_handle||!child_handle||!out_six)return 0;
+    MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+    double local[6];
+    if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+           index,insert_handle,&coverage)||
+       !musa_dwg_ac1032_block_owner_coverage_complete(&coverage)||
+       coverage.insert_handle!=insert_handle||
+       !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+           index,insert_handle,local))return 0;
+    int found=0;
+    for(uint32_t i=0u;i<coverage.child_count;i++)
+        if(coverage.child_handles[i]==child_handle){found=1;break;}
+    if(!found)return 0;
+    for(unsigned i=0u;i<6u;i++)out_six[i]=local[i];
+    return 1;
+}
 /* Per-child original OT49 owner -> OT51 Unicode layer name/status,
  * only when that exact slot has a verified reverse-owner H edge.
  * Does not resolve effective color, visibility, XREF or final paint. */
