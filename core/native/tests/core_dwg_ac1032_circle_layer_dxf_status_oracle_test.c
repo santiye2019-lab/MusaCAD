@@ -237,7 +237,7 @@ static int run(const char *dwg,const char *dxf){
         /* These are synthetic DXF statuses, NOT claims about the fixture.
          * Exercise OFF, frozen, new-viewport, locked and xref flags. */
         if(ok){
-            const int32_t flags[]={0,1,2,4,16,32,64,127};
+            const int32_t flags[]={0,1,2,4,16,32,64,119};
             for(size_t i=0u;ok&&i<sizeof(flags)/sizeof(flags[0]);i++){
                 MusaDwgAc1032CircleLayerDxfOracle synthetic=external;
                 synthetic.dxf_group70=flags[i];
