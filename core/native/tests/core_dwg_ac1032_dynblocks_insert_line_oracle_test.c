@@ -547,6 +547,14 @@ static int original(const char *filename){
         coverage.unreadable_count=1u;
         ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
         coverage.unreadable_count=0u;
+        coverage.child_count=2u;
+        coverage.child_handles[1]=coverage.child_handles[0];
+        coverage.child_types[1]=19u;
+        coverage.child_status[1]=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED;
+        coverage.verified_count=2u;
+        ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
+        coverage.child_count=1u;
+        coverage.verified_count=1u;
         coverage.final_display_accepted=1u;
         ok=ok&&!musa_dwg_ac1032_block_owner_coverage_complete(&coverage);
     }
