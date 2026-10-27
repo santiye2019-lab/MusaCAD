@@ -150,6 +150,14 @@ static inline int musa_dwg_ac1032_insert_line_layer_source(
            row->final_visibility_and_paint_accepted||
            row->verified_block_owner_handle!=segments.block_header_handle||
            !row->source_layer_handle)return 0;
+        /* Recheck the independently authenticated child H4/H12 owner
+         * and H5 OT51 layer, not only the derived packet row. */
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               scene,child_handle,&edge)||
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,child_handle,segments.block_header_handle,19u)||
+           edge.layer_handle!=row->source_layer_handle)return 0;
         MusaDwgAc1032InsertLineLayerSource local={0};
         if(!musa_dwg_ac1032_scene_index_read_layer_name(
                scene,row->source_layer_handle,&local.layer_name)||
