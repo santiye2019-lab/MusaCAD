@@ -1281,6 +1281,12 @@ jobs:
             /tmp/musacad-r2018-android-jni-core/libmusacad_core.a -lm
           nm -D /tmp/musacad-r2018-circle-source-aci-jni-host.so \
             | grep 'Java_com_musa_cad_FirstPartyDwgPreview_readCircleLayerAciEvidenceNative'
+          # Compile the actual Android preview adapter; a host-only
+          # NativeScene stub supplies the UI ABI without building an APK.
+          mkdir -p /tmp/musacad-r2018-circle-source-aci-adapter
+          javac -encoding UTF-8 -d /tmp/musacad-r2018-circle-source-aci-adapter \
+            tests/FirstPartyDwgPreviewJavaCompileStub.java \
+            app/src/main/java/com/musa/cad/FirstPartyDwgPreview.java
           mkdir -p /tmp/musacad-r2018-circle-source-aci-java
           javac -encoding UTF-8 -d /tmp/musacad-r2018-circle-source-aci-java \
             tests/FirstPartyAc1032CircleSourceAciJNIHostTest.java
