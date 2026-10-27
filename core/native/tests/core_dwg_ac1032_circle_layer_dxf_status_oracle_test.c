@@ -2,7 +2,7 @@
 /* Genuine R2018 original H1C8 INSERT/H1BB CIRCLE/H8A LAYER source status.
  * DXF group 70 is separately read, NOT equated to DWG packed 70/290/370.
  * Unknown viewport, frozen/off and overrides continue to veto paint. */
-#include "musacad_dwg_ac1032_circle_source_layer_spatial_index.h"
+#include "musacad_dwg_ac1032_circle_source_adaptive_polyline.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -523,6 +523,96 @@ static int run(const char *dwg,const char *dxf){
                      &invalid,&untouched)&&
                    !memcmp(&before,&untouched,sizeof(before));
             }
+        }
+    }
+
+    /* Adaptive first-party C11 geometry from ORIGINAL R2018 H1C8/H1BB.
+     * Independent DXF supplies the ACI4 oracle, not visibility authority.
+     * Check true affine-curve midpoints against every emitted chord. */
+    if(ok){
+        MusaDwgAc1032CircleByLayerInventory inventory={0};
+        ok=musa_dwg_ac1032_circle_bylayer_inventory(scene,&inventory);
+        unsigned matches=0u;
+        for(size_t i=0u;ok&&i<inventory.verified_source_color_count;i++){
+            const MusaDwgAc1032CircleByLayerInventoryRow *row=
+                &inventory.rows[i];
+            MusaDwgAc1032CircleAdaptiveSourcePolyline poly={0};
+            MusaDwgAc1032CircleAdaptiveSourcePolyline finer={0};
+            ok=musa_dwg_ac1032_circle_adaptive_source_polyline(
+                &inventory,i,0.5,&poly)&&
+               musa_dwg_ac1032_circle_adaptive_source_polyline(
+                &inventory,i,0.125,&finer)&&
+               poly.source_only&&!poly.final_visible_paint_accepted&&
+               poly.segment_count>=8u&&
+               poly.segment_count<=MUSA_AC1032_CIRCLE_ADAPTIVE_MAX_SEGMENTS&&
+               finer.segment_count>=poly.segment_count&&
+               poly.conservative_xy_chord_error_bound<=0.5&&
+               finer.conservative_xy_chord_error_bound<=0.125&&
+               poly.unresolved_original_dwg_requirements==
+                 (MUSA_CIRCLE_DWG_UNRESOLVED_LAYER_BITS|
+                  MUSA_CIRCLE_DWG_UNRESOLVED_OWNER_SPACE|
+                  MUSA_CIRCLE_DWG_UNRESOLVED_NESTED_INSERT|
+                  MUSA_CIRCLE_DWG_UNRESOLVED_VIEWPORT|
+                  MUSA_CIRCLE_DWG_UNRESOLVED_XREF)&&
+               poly.xy[0][0]==poly.xy[poly.segment_count][0]&&
+               poly.xy[0][1]==poly.xy[poly.segment_count][1];
+            for(size_t j=0u;ok&&j<poly.segment_count;j++){
+                const double a=6.2831853071795864769*
+                    ((double)j+0.5)/(double)poly.segment_count;
+                const double x=row->world_center[0]+
+                    row->world_axis_u[0]*cos(a)+
+                    row->world_axis_v[0]*sin(a);
+                const double y=row->world_center[1]+
+                    row->world_axis_u[1]*cos(a)+
+                    row->world_axis_v[1]*sin(a);
+                const double midx=(poly.xy[j][0]+poly.xy[j+1u][0])*0.5;
+                const double midy=(poly.xy[j][1]+poly.xy[j+1u][1])*0.5;
+                ok=hypot(x-midx,y-midy)<=
+                    poly.conservative_xy_chord_error_bound+1e-7;
+                for(unsigned k=0u;ok&&k<2u;k++)
+                    ok=poly.xy[j][k]>=poly.min_xy[k]&&
+                       poly.xy[j][k]<=poly.max_xy[k];
+            }
+            if(row->insert_handle==UINT64_C(0x1c8)&&
+               row->circle_handle==UINT64_C(0x1bb)){
+                matches++;
+                ok=ok&&poly.layer_handle==UINT64_C(0x8a)&&
+                   poly.original_layer_aci==(uint8_t)oracle.aci;
+            }
+            if(ok){
+                MusaDwgAc1032CircleAdaptiveSourcePolyline repeat={0};
+                ok=musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,i,0.5,&repeat)&&
+                   !memcmp(&repeat,&poly,sizeof(poly));
+            }
+        }
+        if(ok)ok=matches==1u;
+        if(ok){
+            MusaDwgAc1032CircleAdaptiveSourcePolyline untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032CircleAdaptiveSourcePolyline before=
+                untouched;
+            MusaDwgAc1032CircleByLayerInventory invalid=inventory;
+            ok=!musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,0u,0.0,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before))&&
+               !musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,0u,NAN,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before))&&
+               !musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,0u,1e-12,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before))&&
+               !musa_dwg_ac1032_circle_adaptive_source_polyline(
+                    &inventory,0u,0.5,NULL);
+            invalid.rows[0].original_layer_aci=0u;
+            if(ok)ok=!musa_dwg_ac1032_circle_adaptive_source_polyline(
+                        &invalid,0u,0.5,&untouched)&&
+                      !memcmp(&before,&untouched,sizeof(before));
+            invalid=inventory;
+            invalid.rows[0].world_axis_u[0]=INFINITY;
+            if(ok)ok=!musa_dwg_ac1032_circle_adaptive_source_polyline(
+                        &invalid,0u,0.5,&untouched)&&
+                      !memcmp(&before,&untouched,sizeof(before));
         }
     }
     fprintf(stderr,"%s original DWG vs independent DXF signed LAYER oracle, group70=%ld "
