@@ -94,6 +94,40 @@ static int utf8_layer_name_oracle(void){
             ok?"PASS":"FAIL");
     return ok;
 }
+/* TEXT/MTEXT may legitimately be empty; OT51 layer names may not.
+ * Invalid original source UTF-8 must never be passed to text inventory/UI. */
+static int text_source_utf8_oracle(void){
+    const char empty[]="";
+    const char plain[]="Original text";
+    const char supplementary[]={(char)0xf0,(char)0x9f,(char)0x98,(char)0x80,0};
+    const char bad_overlong[]={(char)0xc0,(char)0xaf,0};
+    const char bad_surrogate[]={(char)0xed,(char)0xa0,(char)0x80,0};
+    const char bad_truncated[]={(char)0xe2,(char)0x82,0};
+    const char embedded_nul[]={'A',0,'B',0};
+    const char unterminated[]={'A','B'};
+    const int ok=
+        musa_dwg_ac1032_source_utf8_valid(empty,0u,sizeof(empty),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(empty,0u,sizeof(empty),0)&&
+        musa_dwg_ac1032_source_utf8_valid(
+            plain,sizeof(plain)-1u,sizeof(plain),1)&&
+        musa_dwg_ac1032_source_utf8_valid(
+            supplementary,sizeof(supplementary)-1u,
+            sizeof(supplementary),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_overlong,sizeof(bad_overlong)-1u,sizeof(bad_overlong),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_surrogate,sizeof(bad_surrogate)-1u,sizeof(bad_surrogate),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_truncated,sizeof(bad_truncated)-1u,sizeof(bad_truncated),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            embedded_nul,sizeof(embedded_nul)-1u,sizeof(embedded_nul),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            unterminated,sizeof(unterminated),sizeof(unterminated),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(NULL,0u,1u,1);
+    fprintf(stderr,"%s strict OT1/OT44 UTF-8 source vectors\n",
+            ok?"PASS":"FAIL");
+    return ok;
+}
 static int genuine(const char *file){
     FILE *f=fopen(file,"rb");
     if(!f)return 0;
@@ -2228,7 +2262,7 @@ static int genuine(const char *file){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc==1)return bit_order_oracle()&&utf8_layer_name_oracle()?0:1;
+    if(argc==1)return bit_order_oracle()&&utf8_layer_name_oracle()&&text_source_utf8_oracle()?0:1;
     if(argc!=2)return 2;
-    return bit_order_oracle()&&utf8_layer_name_oracle()&&genuine(argv[1])?0:1;
+    return bit_order_oracle()&&utf8_layer_name_oracle()&&text_source_utf8_oracle()&&genuine(argv[1])?0:1;
 }

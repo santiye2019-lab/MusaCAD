@@ -2,6 +2,7 @@
 /* Independent original R2018 sample_2018.dwg OT1 AcDbText H8E:
  * exact source Unicode TU vs companion DXF oracle, NOT glyph layout. */
 #include "musacad_dwg_ac1032_scene_index.h"
+#include "musacad_dwg_ac1032_source_utf8.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,8 @@ static int sample(const char *filename){
        text.indexed_handle==h&&
        text.utf16_code_units==26u&&
        text.utf8_bytes==26u&&
+       musa_dwg_ac1032_source_utf8_valid(
+           text.utf8,text.utf8_bytes,sizeof(text.utf8),1)&&
        !strcmp(text.utf8,"Jen teksto simpla, cxu ne?");
     if(ok){
         MusaDwgAc1032TextSource sentinel;
