@@ -115,6 +115,24 @@ int main(int argc,char **argv){
        census.emitted_v6_primitives==planned.rendered_primitives&&
        census.packet_admitted_source_records>=1u&&
        !census.complete_dwg_display_accepted;
+    /* Original R2018 MTEXT is retained as positive gold. These synthetic
+     * Unicode controls are negative cases, never claimed as DWG fixtures. */
+    if(ok){
+        static const char bidi_override[]="A\\xE2\\x80\\xAE""B";
+        static const char bidi_isolate[]="A\\xE2\\x81\\xA7""B";
+        static const char zero_width[]="A\\xE2\\x80\\x8B""B";
+        static const char direction_mark[]="A\\xD8\\x9C""B";
+        ok=!musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 bidi_override,sizeof(bidi_override)-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 bidi_isolate,sizeof(bidi_isolate)-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 zero_width,sizeof(zero_width)-1u)&&
+           !musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 direction_mark,sizeof(direction_mark)-1u)&&
+           musa_dwg_ac1032_mtext_v6_plain_source_preflight(
+                 "Plain MTEXT",sizeof("Plain MTEXT")-1u);
+    }
     if(ok){
         float *packet=(float*)malloc(planned.required_float_words*
                                      sizeof(*packet));
