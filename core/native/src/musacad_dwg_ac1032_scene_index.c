@@ -1393,7 +1393,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                 * owner H12 + layer H5 canonical 111 tail. Other object
                 * types and absolute H4 retain exact ZERO padding. */
                ((type==18u&&owner_wire_code==12u)?
-                    insert_one_padding(&bits):
+                    cached_graph_one_padding(&bits):
                     cached_graph_zero_padding(&bits));
     }
     free(p.raw);
@@ -1495,7 +1495,7 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
                  * followed by three ONE pad bits (0xE0 MSB prefix).
                  * Never generalize one-padding to H4/other entity types. */
                 padding_ok=first.code==12u&&first.relative?
-                    insert_one_padding(&tail):
+                    cached_graph_one_padding(&tail):
                     cached_graph_zero_padding(&tail);
             }
         }
@@ -1560,7 +1560,10 @@ int musa_dwg_ac1032_scene_index_circle_relative_owner_layer_source(
            s,h,&profile)||
        !profile.original_record_crc_verified||
        profile.raw_object_type!=18u||
-       profile.profile_status!=MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4||
+       profile.profile_status!=
+           MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE||
+       !profile.verified_relative_h12_owner_h5_layer_source||
+       profile.exact_h4_h5_source_verified||
        profile.entity_mode!=0u||profile.reactor_count!=0u||
        profile.xdictionary_missing!=1u||
        profile.has_color_reference||profile.linetype_flags||

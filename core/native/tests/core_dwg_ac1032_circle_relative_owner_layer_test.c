@@ -65,7 +65,10 @@ static int genuine(const char *dwg,const char *dxf){
     MusaDwgAc1032CircleRelativeOwnerLayerSource edge={0};
     ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
            scene,UINT64_C(0x1bb),&raw)&&
-       raw.profile_status==MUSACAD_AC1032_CIRCLE_H_FIRST_NOT_H4&&
+       raw.profile_status==
+           MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE&&
+       raw.verified_relative_h12_owner_h5_layer_source&&
+       !raw.exact_h4_h5_source_verified&&
        raw.first_ref_code==12u&&raw.second_ref_code==5u&&
        raw.first_raw_target==UINT64_C(0x1b8)&&
        raw.second_raw_target==UINT64_C(0x8a)&&
