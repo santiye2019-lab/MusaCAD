@@ -672,6 +672,21 @@ static int run(const char *dwg,const char *dxf){
                     else if(distance>max_displacement)
                         max_displacement=distance;
                 }
+                /* Compare the *emitted* closing seam against the source
+                 * final double vertex, not only the source start point. */
+                if(ok){
+                    const size_t last=source.segment_count;
+                    const double sx=(double)words[9u+2u*last]-
+                                    source.xy[last][0];
+                    const double sy=(double)words[10u+2u*last]-
+                                    source.xy[last][1];
+                    const double seam_displacement=hypot(sx,sy);
+                    ok=words[9u+2u*last]==words[9u]&&
+                       words[10u+2u*last]==words[10u]&&
+                       isfinite(seam_displacement)&&
+                       proof.max_float32_vertex_displacement>=
+                       seam_displacement;
+                }
                 if(ok)ok=proof.max_float32_vertex_displacement>=
                            max_displacement&&
                           proof.combined_world_xy_error_bound>=

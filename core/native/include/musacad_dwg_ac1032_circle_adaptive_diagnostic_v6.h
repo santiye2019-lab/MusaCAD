@@ -67,6 +67,13 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
             if(!isfinite(f))return 0;
             v[9u+2u*i+k]=f;
         }
+        /* The final vertex is transported as an exact float32 seam.
+         * Apply that rounding BEFORE computing the error budget, so the
+         * reported bound describes the actual emitted packet. */
+        if(i==poly.segment_count){
+            v[9u+2u*i]=v[9u];
+            v[10u+2u*i]=v[10u];
+        }
         const double dx=(double)v[9u+2u*i]-poly.xy[i][0];
         const double dy=(double)v[10u+2u*i]-poly.xy[i][1];
         const double displacement=hypot(dx,dy);
@@ -100,9 +107,7 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
         const float x=v[9u+2u*i],y=v[10u+2u*i];
         if(x<v[2]||x>v[4]||y<v[3]||y>v[5])return 0;
     }
-    /* Exact float32 seam for Android Canvas and all other v6 adapters. */
-    v[9u+2u*poly.segment_count]=v[9u];
-    v[10u+2u*poly.segment_count]=v[10u];
+    /* Exact seam was established before the error-budget computation. */
     MusaDwgAc1032CircleAdaptiveV6Evidence proof={0};
     proof.insert_handle=poly.insert_handle;
     proof.circle_handle=poly.circle_handle;
