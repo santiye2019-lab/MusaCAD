@@ -551,6 +551,8 @@ static inline int musa_dwg_ac1032_block_owner_coverage_complete(
        coverage->verified_count!=coverage->child_count||
        coverage->unsupported_count||coverage->unreadable_count||
        coverage->mismatched_count)return 0;
+    if(!musa_dwg_ac1032_block_child_handles_unique(
+           coverage->child_handles,coverage->child_count))return 0;
     for(uint32_t i=0u;i<coverage->child_count;i++)
         if(!coverage->child_handles[i]||
            !musa_dwg_ac1032_block_child_owner_type_supported(
