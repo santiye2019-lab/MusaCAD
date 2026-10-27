@@ -5,6 +5,7 @@
 #include "musacad_dwg_ac1032_source_utf8.h"
 #include "musacad_dwg_ac1032_text_source_bundle.h"
 #include <stdint.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +76,35 @@ static int sample(const char *filename){
                   verified_graph.layer_object_type==51u&&
                   bundle.style_handle==verified_graph.style_handle&&
                   bundle.layer_handle==verified_graph.layer_handle;
+        /* Positive original OT1 OCS orientation and alignment provenance.
+         * Negative nonfinite source geometry must be rejected atomically. */
+        MusaDwgAc1032TextPlacement numeric={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_read_text_placement(
+                      scene,h,&numeric)&&
+                  musa_dwg_ac1032_text_ocs_numeric_valid(&numeric)&&
+                  bundle.source_numeric_placement_preserved&&
+                  bundle.text_ocs_placement.indexed_handle==h&&
+                  bundle.text_ocs_placement.original_record_crc_verified&&
+                  !bundle.text_ocs_placement.wcs_font_and_display_accepted&&
+                  bundle.text_ocs_placement.rotation==numeric.rotation&&
+                  bundle.text_ocs_placement.width_factor==numeric.width_factor&&
+                  bundle.text_ocs_placement.horizontal_alignment==
+                      numeric.horizontal_alignment&&
+                  bundle.text_ocs_placement.vertical_alignment==
+                      numeric.vertical_alignment;
+        for(unsigned k=0u;ok&&k<3u;k++)
+            ok=bundle.text_ocs_placement.insertion[k]==numeric.insertion[k]&&
+               bundle.text_ocs_placement.alignment[k]==numeric.alignment[k]&&
+               bundle.text_ocs_placement.extrusion[k]==numeric.extrusion[k];
+        if(ok){
+            MusaDwgAc1032TextPlacement invalid=numeric;
+            invalid.rotation=NAN;
+            ok=!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
+            invalid=numeric;invalid.extrusion[1]=INFINITY;
+            ok=ok&&!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
+            invalid=numeric;invalid.height=0.0;
+            ok=ok&&!musa_dwg_ac1032_text_ocs_numeric_valid(&invalid);
+        }
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
             memset(&rejected,0x5a,sizeof(rejected));
