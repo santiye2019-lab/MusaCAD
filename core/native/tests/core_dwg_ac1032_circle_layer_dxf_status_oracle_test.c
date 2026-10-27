@@ -2,7 +2,7 @@
 /* Genuine R2018 original H1C8 INSERT/H1BB CIRCLE/H8A LAYER source status.
  * DXF group 70 is separately read, NOT equated to DWG packed 70/290/370.
  * Unknown viewport, frozen/off and overrides continue to veto paint. */
-#include "musacad_dwg_ac1032_circle_source_adaptive_polyline.h"
+#include "musacad_dwg_ac1032_circle_adaptive_diagnostic_v6.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -614,6 +614,78 @@ static int run(const char *dwg,const char *dxf){
                         &invalid,0u,0.5,&untouched)&&
                       !memcmp(&before,&untouched,sizeof(before));
         }
+    }
+
+    /* Authentic R2018 adaptive v6 packet: geometry is original affine WCS,
+     * but v6 ACI6 is explicitly DIAGNOSTIC, not original source ACI4. */
+    if(ok){
+        MusaDwgAc1032CircleByLayerInventory inventory={0};
+        ok=musa_dwg_ac1032_circle_bylayer_inventory(scene,&inventory);
+        unsigned matches=0u;
+        for(size_t i=0u;ok&&i<inventory.verified_source_color_count;i++){
+            float words[MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS]={0};
+            float again[MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS]={0};
+            MusaDwgAc1032CircleAdaptiveV6Evidence proof={0},repeat={0};
+            ok=musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                 &inventory,i,0.5,words,
+                 MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,&proof)&&
+               musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                 &inventory,i,0.5,again,
+                 MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,&repeat)&&
+               !memcmp(&proof,&repeat,sizeof(proof))&&
+               !memcmp(words,again,proof.float_word_count*sizeof(float))&&
+               proof.source_only&&!proof.original_color_or_final_paint_accepted&&
+               proof.diagnostic_packet_aci==6u&&
+               proof.original_layer_aci==inventory.rows[i].original_layer_aci&&
+               proof.float_word_count==7u+2u+2u*(proof.segment_count+1u)&&
+               words[0]==6.0f&&words[1]==1.0f&&words[6]==1.0f&&
+               words[7]==518.0f&&words[8]==(float)(proof.segment_count+1u)&&
+               words[9]==words[9u+2u*proof.segment_count]&&
+               words[10]==words[10u+2u*proof.segment_count];
+            for(size_t j=0u;ok&&j<=proof.segment_count;j++)
+                ok=isfinite(words[9u+2u*j])&&
+                   isfinite(words[10u+2u*j])&&
+                   words[9u+2u*j]>=words[2]&&
+                   words[9u+2u*j]<=words[4]&&
+                   words[10u+2u*j]>=words[3]&&
+                   words[10u+2u*j]<=words[5];
+            if(inventory.rows[i].insert_handle==UINT64_C(0x1c8)&&
+               inventory.rows[i].circle_handle==UINT64_C(0x1bb)){
+                matches++;
+                ok=ok&&proof.layer_handle==UINT64_C(0x8a)&&
+                   proof.original_layer_aci==(uint8_t)oracle.aci&&
+                   proof.diagnostic_packet_aci!=proof.original_layer_aci;
+            }
+            if(ok){
+                float untouched[MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS];
+                memset(untouched,0xa5,sizeof(untouched));
+                float before[MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS];
+                memcpy(before,untouched,sizeof(before));
+                MusaDwgAc1032CircleAdaptiveV6Evidence metadata;
+                memset(&metadata,0xa5,sizeof(metadata));
+                const MusaDwgAc1032CircleAdaptiveV6Evidence meta_before=
+                    metadata;
+                ok=!musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                      &inventory,i,0.5,untouched,proof.float_word_count-1u,
+                      &metadata)&&
+                   !memcmp(untouched,before,sizeof(before))&&
+                   !memcmp(&metadata,&meta_before,sizeof(metadata))&&
+                   !musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                      &inventory,i,0.0,untouched,
+                      MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,&metadata)&&
+                   !memcmp(untouched,before,sizeof(before))&&
+                   !memcmp(&metadata,&meta_before,sizeof(metadata));
+                MusaDwgAc1032CircleByLayerInventory invalid=inventory;
+                invalid.rows[i].original_layer_aci=0u;
+                if(ok)ok=!musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
+                           &invalid,i,0.5,untouched,
+                           MUSA_AC1032_CIRCLE_ADAPTIVE_V6_MAX_WORDS,
+                           &metadata)&&
+                          !memcmp(untouched,before,sizeof(before))&&
+                          !memcmp(&metadata,&meta_before,sizeof(metadata));
+            }
+        }
+        if(ok)ok=matches==1u;
     }
     fprintf(stderr,"%s original DWG vs independent DXF signed LAYER oracle, group70=%ld "
             "is separate; viewport/paint UNKNOWN\n",
