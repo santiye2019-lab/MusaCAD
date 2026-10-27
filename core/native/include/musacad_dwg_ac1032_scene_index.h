@@ -580,6 +580,61 @@ static inline int musa_dwg_ac1032_block_owner_coverage_complete(
             return 0;
     return 1;
 }
+/* Per-child original OT49 owner -> OT51 Unicode layer name/status,
+ * only when that exact slot has a verified reverse-owner H edge.
+ * Does not resolve effective color, visibility, XREF or final paint. */
+typedef struct MusaDwgAc1032InsertBlockChildLayerSource {
+    uint64_t insert_handle,block_header_handle,child_handle,layer_handle;
+    uint16_t raw_child_type;
+    MusaDwgAc1032LayerName layer_name;
+    MusaDwgAc1032LayerFlagsEvidence raw_layer_flags;
+    uint8_t original_owner_layer_and_name_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockChildLayerSource;
+static inline int musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    uint64_t child_handle,MusaDwgAc1032InsertBlockChildLayerSource *out){
+    if(!index||!insert_handle||!child_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+           index,insert_handle,&coverage)||
+       !coverage.source_inventory_verified||coverage.final_display_accepted)
+        return 0;
+    for(uint32_t i=0u;i<coverage.child_count;i++){
+        if(coverage.child_handles[i]!=child_handle)continue;
+        if(coverage.child_status[i]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
+            return 0;
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        const uint16_t type=coverage.child_types[i];
+        if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               index,child_handle,&edge)||
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,child_handle,coverage.block_header_handle,type))
+            return 0;
+        MusaDwgAc1032InsertBlockChildLayerSource local={0};
+        if(!musa_dwg_ac1032_scene_index_read_layer_name(
+               index,edge.layer_handle,&local.layer_name)||
+           !musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+               index,edge.layer_handle,&local.raw_layer_flags)||
+           !local.layer_name.original_record_crc_verified||
+           !local.raw_layer_flags.source_crc_verified||
+           local.layer_name.indexed_handle!=edge.layer_handle||
+           local.raw_layer_flags.indexed_handle!=edge.layer_handle||
+           !local.layer_name.utf8_bytes||
+           local.layer_name.utf8_bytes>=sizeof(local.layer_name.utf8)||
+           local.layer_name.utf8[local.layer_name.utf8_bytes]!='\0')
+            return 0;
+        local.insert_handle=insert_handle;
+        local.block_header_handle=coverage.block_header_handle;
+        local.child_handle=child_handle;
+        local.layer_handle=edge.layer_handle;
+        local.raw_child_type=type;
+        local.original_owner_layer_and_name_verified=1u;
+        *out=local;
+        return 1;
+    }
+    return 0;
+}
 static inline int musa_dwg_ac1032_scene_index_insert_block_owner_audit(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     MusaDwgAc1032InsertBlockOwnerAudit *out){
