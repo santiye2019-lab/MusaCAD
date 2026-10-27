@@ -212,6 +212,8 @@ static inline int musa_dwg_ac1032_scene_index_original_insert_block_affine(
        base.indexed_handle!=graph.block_header_handle||
        !base.original_record_crc_verified||!base.base_point_decoded||
        base.block_children_and_display_accepted||
+       base.is_xref||base.xref_overlaid||base.xref_dependent||
+       base.xref_index_plus_one||
        !musa_dwg_ac1032_insert_planar_affine(
            &placement,base.base_xyz,local))return 0;
     for(unsigned i=0;i<6u;i++)out_six[i]=local[i];
