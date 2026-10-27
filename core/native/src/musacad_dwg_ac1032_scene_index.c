@@ -1393,7 +1393,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                 * owner H12 + layer H5 canonical 111 tail. Other object
                 * types and absolute H4 retain exact ZERO padding. */
                ((type==18u&&owner_wire_code==12u)?
-                    insert_one_padding(&bits):
+                    cached_graph_one_padding(&bits):
                     cached_graph_zero_padding(&bits));
     }
     free(p.raw);
@@ -1495,7 +1495,7 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
                  * followed by three ONE pad bits (0xE0 MSB prefix).
                  * Never generalize one-padding to H4/other entity types. */
                 padding_ok=first.code==12u&&first.relative?
-                    insert_one_padding(&tail):
+                    cached_graph_one_padding(&tail):
                     cached_graph_zero_padding(&tail);
             }
         }
