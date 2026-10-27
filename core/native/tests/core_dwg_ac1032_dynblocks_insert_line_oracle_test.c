@@ -351,6 +351,23 @@ static int original(const char *filename){
                    got.block_header_handle,19u)){
                 ok=0;break;
             }
+            /* Negative evidence on the same authenticated source record:
+             * a corrupted owner, CRC or owner wire code must fail closed. */
+            MusaDwgAc1032EntityBlockOwnerLayerSource tampered=source_edge;
+            tampered.owner_block_header_handle^=1u;
+            if(musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &tampered,got.child_handles[k],
+                   got.block_header_handle,19u)){ok=0;break;}
+            tampered=source_edge;
+            tampered.original_owner_and_layer_records_crc_verified=0u;
+            if(musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &tampered,got.child_handles[k],
+                   got.block_header_handle,19u)){ok=0;break;}
+            tampered=source_edge;
+            tampered.original_owner_wire_code=99u;
+            if(musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &tampered,got.child_handles[k],
+                   got.block_header_handle,19u)){ok=0;break;}
             int matches=0;
             for(uint32_t j=0u;j<ref.verified_planar_line_count;j++){
                 const MusaDwgAc1032InsertLineSourceRow *row=&ref.rows[j];
