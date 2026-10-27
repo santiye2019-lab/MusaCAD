@@ -42,7 +42,13 @@ int musa_dwg_ac1032_mtext_v6_plain_source_preflight(
         }
         if(scalar<min_scalar||scalar>0x10ffffu||
            (scalar>=0xd800u&&scalar<=0xdfffu)||
-           scalar==0x2028u||scalar==0x2029u)return 0;
+           scalar==0x2028u||scalar==0x2029u||
+           /* Without Unicode bidi/shaping support, invisible direction
+            * controls can silently reorder source-authenticated MTEXT. */
+           (scalar>=0x202au&&scalar<=0x202eu)||
+           (scalar>=0x2066u&&scalar<=0x2069u)||
+           (scalar>=0x200bu&&scalar<=0x200fu)||
+           scalar==0x061cu||scalar==0xfeffu)return 0;
         i+=count;
     }
     return 1;
