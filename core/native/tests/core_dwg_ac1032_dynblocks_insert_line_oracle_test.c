@@ -416,6 +416,21 @@ static int original(const char *filename){
             changed=edge;changed.visible_scene_and_paint_accepted=1u;
             ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
                   &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.layer_handle=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.raw_entity_type=17u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_owner_wire_code=3u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_relative_h12_owner_verified=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_owner_and_layer_records_crc_verified=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
         }
     }
     if(ok){
