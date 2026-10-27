@@ -154,6 +154,10 @@ int main(int argc,char **argv){
                    scene,h,0u,&rejected)&&
                !musa_dwg_ac1032_text_source_bundle(
                    NULL,h,44u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,44u,NULL)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,UINT16_MAX,&rejected)&&
                !memcmp(&rejected,&before,sizeof(rejected));
         }
     }
