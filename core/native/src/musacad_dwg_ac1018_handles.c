@@ -68,10 +68,10 @@ static int modular_signed(const uint8_t *p,size_t end,size_t *pos,
 }
 static int scan(const uint8_t *section,size_t section_bytes,
                 size_t object_bytes,MusaDwgAc1018HandleEntry *dst,
-                size_t *count_out) {
+                size_t *count_out,int continuous_offsets) {
     if(!section||!count_out||section_bytes<8u||!object_bytes)return 0;
     size_t cursor=0u,count=0u;
-    uint64_t handle=0u;
+    uint64_t handle=0u,object_offset=0u;
     int terminal=0;
     while(cursor<section_bytes){
         if(section_bytes-cursor<4u)return 0;
@@ -87,8 +87,9 @@ static int scan(const uint8_t *section,size_t section_bytes,
         if(!musa_core_crc16_arc(0xc0c1u,section+start,size,&computed)||
            computed!=stored)return 0;
         cursor=start+2u;
-        /* IMPORTANT: reset OFFSET at every 2004 handle-map page. */
-        uint64_t object_offset=0u;
+        /* R2004 page-local offsets; R2018 original logical Objects
+         * offsets continue across CRC-authenticated handle-map pages. */
+        if(!continuous_offsets)object_offset=0u;
         if(size==2u){
             if(page_end+2u!=section_bytes||count==0u)return 0;
             terminal=1;cursor=section_bytes;break;
@@ -128,10 +129,10 @@ static int scan(const uint8_t *section,size_t section_bytes,
     if(!terminal || !count)return 0;
     *count_out=count;return 1;
 }
-int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
+static int handles_index_mode(const uint8_t *handle_section,
     size_t handle_bytes,size_t object_section_bytes,
     MusaDwgAc1018HandleEntry *entries,size_t capacity,
-    size_t *out_count) {
+    size_t *out_count,int continuous_offsets) {
     if(!handle_section||!out_count||(!entries&&capacity)||
        overlaps(handle_section,handle_bytes,out_count,sizeof(*out_count)))
         return 0;
@@ -145,7 +146,8 @@ int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
             return 0;
     }
     size_t needed=0u;
-    if(!scan(handle_section,handle_bytes,object_section_bytes,NULL,&needed))
+    if(!scan(handle_section,handle_bytes,object_section_bytes,NULL,&needed,
+             continuous_offsets))
         return 0;
     if(entries){
         if(needed>capacity)return 0;
@@ -153,8 +155,21 @@ int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
          * transactional; never expose half an index for corrupt sources. */
         size_t verified=0u;
         if(!scan(handle_section,handle_bytes,object_section_bytes,
-                 entries,&verified)||verified!=needed)return 0;
+                 entries,&verified,continuous_offsets)||verified!=needed)return 0;
     }
     *out_count=needed;
     return 1;
+}
+
+int musa_dwg_ac1018_handles_index(const uint8_t *section,
+    size_t bytes,size_t objects,MusaDwgAc1018HandleEntry *entries,
+    size_t capacity,size_t *out_count){
+    return handles_index_mode(section,bytes,objects,entries,capacity,
+                              out_count,0);
+}
+int musa_dwg_ac1018_handles_index_continuous_offsets(
+    const uint8_t *section,size_t bytes,size_t objects,
+    MusaDwgAc1018HandleEntry *entries,size_t capacity,size_t *out_count){
+    return handles_index_mode(section,bytes,objects,entries,capacity,
+                              out_count,1);
 }

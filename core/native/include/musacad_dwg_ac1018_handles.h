@@ -31,6 +31,12 @@ int musa_dwg_ac1018_handles_index(const uint8_t *handle_section,
     size_t handle_bytes, size_t object_section_bytes,
     MusaDwgAc1018HandleEntry *entries, size_t capacity,
     size_t *out_count);
+/* R2018 handle-map pages: both handle and logical object-location
+ * deltas persist across CRC-checked pages. Preserve legacy R2004 API. */
+int musa_dwg_ac1018_handles_index_continuous_offsets(
+    const uint8_t *handle_section,size_t handle_bytes,
+    size_t object_section_bytes,MusaDwgAc1018HandleEntry *entries,
+    size_t capacity,size_t *out_count);
 #ifdef __cplusplus
 }
 #endif

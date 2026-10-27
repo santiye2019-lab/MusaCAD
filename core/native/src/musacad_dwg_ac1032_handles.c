@@ -79,7 +79,7 @@ int musa_dwg_ac1032_handles_index(
        !musa_dwg_ac1032_extract_named_section(file,file_bytes,
           "AcDb:Handles",handles,handle_bytes,&handle_got)||
        handle_got!=handle_bytes||
-       !musa_dwg_ac1018_handles_index(handles,handle_bytes,object_bytes,
+       !musa_dwg_ac1018_handles_index_continuous_offsets(handles,handle_bytes,object_bytes,
                                      NULL,0u,&needed)||
        !needed||needed>MUSA_AC1032_HANDLES_MAX||
        needed>SIZE_MAX/sizeof(*entries))
@@ -89,7 +89,7 @@ int musa_dwg_ac1032_handles_index(
         temporary=malloc(needed*sizeof(*temporary));
         if(!temporary)goto done;
         size_t filled=0u;
-        if(!musa_dwg_ac1018_handles_index(
+        if(!musa_dwg_ac1018_handles_index_continuous_offsets(
               handles,handle_bytes,object_bytes,
               temporary,needed,&filled)||filled!=needed)
             goto done;

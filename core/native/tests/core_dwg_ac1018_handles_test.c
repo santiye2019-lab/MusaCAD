@@ -75,6 +75,33 @@ int main(void){
     assert(!musa_dwg_ac1018_handles_index(buf,size,0u,out,6u,&count));
     assert(!musa_dwg_ac1018_handles_index(buf,size,40u,NULL,1u,&count));
     assert(!memcmp(prev,out,sizeof(prev))&&count==saved);
+    /* Synthetic multi-page R2018 continuous object-offset profile. */
+    uint8_t modern[80]={0};
+    memcpy(modern,buf,size);
+    modern[11]=4u;modern[13]=16u;crc_page(modern+8u,6u);
+    modern[19]=4u;crc_page(modern+16u,6u);
+    MusaDwgAc1018HandleEntry continuous[6]={{0}};
+    const uint64_t offsets_continuous[]={4u,16u,20u,36u,40u,34u};
+    assert(musa_dwg_ac1018_handles_index_continuous_offsets(
+           modern,size,64u,NULL,0u,&count)&&count==6u);
+    assert(musa_dwg_ac1018_handles_index_continuous_offsets(
+           modern,size,64u,continuous,6u,&count)&&count==6u);
+    for(unsigned i=0u;i<6u;i++){
+        assert(continuous[i].handle==handles[i]);
+        assert(continuous[i].object_offset==offsets_continuous[i]);
+    }
+    MusaDwgAc1018HandleEntry saved_continuous[6];
+    memcpy(saved_continuous,continuous,sizeof(continuous));
+    const size_t saved_continuous_count=count;
+    assert(!musa_dwg_ac1018_handles_index_continuous_offsets(
+           modern,size,40u,continuous,6u,&count));
+    assert(!memcmp(continuous,saved_continuous,sizeof(continuous))&&
+           count==saved_continuous_count);
+    modern[13]^=1u;
+    assert(!musa_dwg_ac1018_handles_index_continuous_offsets(
+           modern,size,64u,continuous,6u,&count));
+    assert(!memcmp(continuous,saved_continuous,sizeof(continuous))&&
+           count==saved_continuous_count);
     uint8_t damaged[80]={0};
     memcpy(damaged,buf,size);
     damaged[18]^=0x1u; /* page 3 CRC must reject */
