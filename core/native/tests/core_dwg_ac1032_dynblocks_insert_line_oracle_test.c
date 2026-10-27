@@ -52,6 +52,8 @@ static int original(const char *filename){
     size_t owner_affine_positive=0u,owner_line_positive=0u;
     size_t owner_affine_negative=0u,owner_affine_partial_rejected=0u;
     size_t owner_bulk_positive=0u,owner_bulk_partial_rejected=0u;
+    size_t complete_layer_positive=0u,complete_layer_negative=0u;
+    size_t complete_layer_partial_rejected=0u;
     size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -258,6 +260,25 @@ static int original(const char *filename){
                            !near(verified_xy[3],row->world_end[1]))ok=0;
                     }
                     if(independently_matched!=1u||!ok){ok=0;break;}
+                    MusaDwgAc1032CompleteBlockLineLayerSource joined={0};
+                    if(!musa_dwg_ac1032_complete_block_line_layer_source(
+                           scene,entry.handle,child,&joined)||
+                       !joined.complete_block_reverse_owners_verified||
+                       joined.final_display_accepted||
+                       !joined.source.source_line_layer_and_owner_verified||
+                       joined.source.final_visibility_color_and_paint_accepted||
+                       joined.source.layer_name.utf8_bytes==0u||
+                       joined.source.layer_handle!=
+                           joined.source.layer_name.indexed_handle||
+                       joined.source.layer_handle!=
+                           joined.source.raw_layer_flags.indexed_handle||
+                       !near(joined.source.world_start[0],verified_xy[0])||
+                       !near(joined.source.world_start[1],verified_xy[1])||
+                       !near(joined.source.world_end[0],verified_xy[2])||
+                       !near(joined.source.world_end[1],verified_xy[3])){
+                        ok=0;break;
+                    }
+                    complete_layer_positive++;
                     owner_line_positive++;
                 }
                 if(!ok)break;
@@ -274,6 +295,16 @@ static int original(const char *filename){
                 for(unsigned j=0u;j<4u;j++)
                     if(unchanged_xy[j]!=9.0-(double)j)ok=0;
                 if(!ok)break;
+                MusaDwgAc1032CompleteBlockLineLayerSource unchanged_layer;
+                memset(&unchanged_layer,0xa5,sizeof(unchanged_layer));
+                const MusaDwgAc1032CompleteBlockLineLayerSource before_layer=
+                    unchanged_layer;
+                if(musa_dwg_ac1032_complete_block_line_layer_source(
+                       scene,entry.handle,UINT64_MAX,&unchanged_layer)||
+                   memcmp(&unchanged_layer,&before_layer,sizeof(unchanged_layer))){
+                    ok=0;break;
+                }
+                complete_layer_negative++;
                 owner_affine_negative++;
             }else if(coverage.child_count){
                 MusaDwgAc1032InsertBlockLineSources unchanged_bulk;
@@ -286,6 +317,21 @@ static int original(const char *filename){
                     ok=0;break;
                 }
                 owner_bulk_partial_rejected++;
+                for(uint32_t z=0u;z<coverage.child_count;z++){
+                    if(coverage.child_types[z]!=19u)continue;
+                    MusaDwgAc1032CompleteBlockLineLayerSource unchanged_layer;
+                    memset(&unchanged_layer,0xa5,sizeof(unchanged_layer));
+                    const MusaDwgAc1032CompleteBlockLineLayerSource before_layer=
+                        unchanged_layer;
+                    if(musa_dwg_ac1032_complete_block_line_layer_source(
+                           scene,entry.handle,coverage.child_handles[z],
+                           &unchanged_layer)||
+                       memcmp(&unchanged_layer,&before_layer,
+                              sizeof(unchanged_layer))){ok=0;break;}
+                    complete_layer_partial_rejected++;
+                    break;
+                }
+                if(!ok)break;
                 double unchanged[6]={9.0,8.0,7.0,6.0,5.0,4.0};
                 if(musa_dwg_ac1032_scene_index_verified_child_affine(
                        scene,entry.handle,coverage.child_handles[0],unchanged)){
@@ -585,6 +631,10 @@ static int original(const char *filename){
     fprintf(stderr,"DIAG complete-owner bulk LINE: positive=%zu "
                    "partial_rejected=%zu\n",
             owner_bulk_positive,owner_bulk_partial_rejected);
+    fprintf(stderr,"DIAG complete-owner LINE Unicode layer/raw color: "
+                   "positive=%zu absent=%zu partial_rejected=%zu\n",
+            complete_layer_positive,complete_layer_negative,
+            complete_layer_partial_rejected);
     fprintf(stderr,"DIAG verified child affine: positive=%zu "
                    "LINE=%zu absent=%zu partial_rejected=%zu\n",
             owner_affine_positive,owner_line_positive,
@@ -603,7 +653,9 @@ static int original(const char *filename){
              coverage_complete==owner_audit_complete&&
              owner_affine_positive>0u&&owner_line_positive>0u&&
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
-             owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u;
+             owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u&&
+             complete_layer_positive>0u&&complete_layer_negative>0u&&
+             complete_layer_partial_rejected>0u;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
