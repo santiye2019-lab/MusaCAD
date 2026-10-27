@@ -649,6 +649,13 @@ static int run(const char *dwg,const char *dxf){
                    words[9u+2u*j]<=words[4]&&
                    words[10u+2u*j]>=words[3]&&
                    words[10u+2u*j]<=words[5];
+            /* Independently verify all float32 vertices lie inside the
+             * outward source bounds of the genuine R2018 v6 packet. */
+            for(size_t j=0u;ok&&j<=proof.segment_count;j++){
+                const float x=words[9u+2u*j],y=words[10u+2u*j];
+                ok=x>=words[2]&&x<=words[4]&&
+                   y>=words[3]&&y<=words[5];
+            }
             /* Verify the float32 transport budget independently from the
              * source R2018 WCS tessellation and its DXF-backed oracle. */
             if(ok){
