@@ -671,6 +671,9 @@ static int original(const char *filename){
     fprintf(stderr,"DIAG complete-owner bulk LINE: positive=%zu "
                    "partial_rejected=%zu\n",
             owner_bulk_positive,owner_bulk_partial_rejected);
+    fprintf(stderr,"DIAG complete-owner source LINE batch: positive=%zu "
+                   "partial_rejected=%zu\\n",
+            complete_batch_positive,complete_batch_partial_rejected);
     fprintf(stderr,"DIAG complete-owner LINE Unicode layer/raw color: "
                    "positive=%zu absent=%zu partial_rejected=%zu\n",
             complete_layer_positive,complete_layer_negative,
@@ -694,6 +697,8 @@ static int original(const char *filename){
              owner_affine_positive>0u&&owner_line_positive>0u&&
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
              owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u&&
+             complete_batch_positive==owner_bulk_positive&&
+             complete_batch_partial_rejected==owner_bulk_partial_rejected&&
              complete_layer_positive>0u&&complete_layer_negative>0u&&
              complete_layer_partial_rejected>0u;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
