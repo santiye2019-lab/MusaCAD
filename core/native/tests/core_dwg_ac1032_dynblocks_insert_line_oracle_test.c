@@ -530,6 +530,15 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const uint64_t inserts[2]={101u,202u};
+        const uint64_t blocks[2]={11u,22u};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=!musa_dwg_ac1032_scene_index_original_insert_line_chain(
+               NULL,inserts,blocks,2u,source,sentinel);
+        for(unsigned i=0;i<4u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
         double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
         const uint64_t inserts[2]={101u,202u};
         const uint64_t duplicate_blocks[2]={11u,11u};
