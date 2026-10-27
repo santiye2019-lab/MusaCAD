@@ -419,6 +419,17 @@ typedef struct MusaDwgAc1032InsertBlockLineSources {
     uint8_t reverse_owner_links_verified; /* ALWAYS ZERO */
     uint8_t final_display_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032InsertBlockLineSources;
+/* Source-only OT49 child LINE handle guard. Reject duplicate/zero
+ * handles before joining H4/H5 owner and emitting any transformed
+ * geometry. This is not a block traversal or paint authorization. */
+static inline int musa_dwg_ac1032_source_line_handle_admissible(
+    const uint64_t *previous,uint32_t count,uint64_t candidate){
+    if(!previous||!candidate||
+       count>=MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    for(uint32_t i=0u;i<count;i++)
+        if(!previous[i]||previous[i]==candidate)return 0;
+    return 1;
+}
 static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     MusaDwgAc1032InsertBlockLineSources *out){
@@ -443,7 +454,8 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
         MusaDwgAc1032NativeLine line={0};
         const uint64_t handle=inventory.block.prefix.child_handles[i];
         MusaDwgAc1032EntityBlockOwnerLayerSource owner={0};
-        if(!handle||
+        if(!musa_dwg_ac1032_source_line_handle_admissible(
+                local.child_handles,local.line_count,handle)||
            !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                 index,handle,&owner)||
            owner.child_handle!=handle||
