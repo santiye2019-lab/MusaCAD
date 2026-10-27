@@ -649,6 +649,15 @@ static int run(const char *dwg,const char *dxf){
                    words[9u+2u*j]<=words[4]&&
                    words[10u+2u*j]>=words[3]&&
                    words[10u+2u*j]<=words[5];
+            /* Independent authentic R2018 gold: transported geometry must
+             * retain at least two distinct float32 vertices. */
+            if(ok){
+                int distinct=0;
+                for(size_t j=1u;j<proof.segment_count;j++)
+                    if(words[9u+2u*j]!=words[9u]||
+                       words[10u+2u*j]!=words[10u])distinct=1;
+                ok=distinct;
+            }
             if(inventory.rows[i].insert_handle==UINT64_C(0x1c8)&&
                inventory.rows[i].circle_handle==UINT64_C(0x1bb)){
                 matches++;
