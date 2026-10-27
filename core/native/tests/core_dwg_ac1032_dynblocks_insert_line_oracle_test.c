@@ -46,6 +46,9 @@ static int original(const char *filename){
     size_t owner_audit_complete=0u,owner_audit_unsupported=0u;
     size_t owner_audit_rejected=0u,owner_audit_unreadable=0u;
     size_t owner_audit_mismatched=0u,owner_audit_unsupported_on_reject=0u;
+    size_t coverage_ok=0u,coverage_verified=0u,coverage_unreadable=0u;
+    size_t coverage_mismatched=0u,coverage_unsupported=0u;
+    size_t coverage_complete=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
@@ -140,6 +143,36 @@ static int original(const char *filename){
         if(musa_dwg_ac1032_scene_index_insert_block_child_inventory(
                scene,entry.handle,&inventory)){
             inventory_ok++;
+            MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+            if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+                   scene,entry.handle,&coverage)||
+               !coverage.source_inventory_verified||
+               coverage.final_display_accepted||
+               coverage.insert_handle!=entry.handle||
+               coverage.block_header_handle!=
+                   inventory.insert.block_header_handle||
+               coverage.child_count!=inventory.block.prefix.child_count||
+               coverage.verified_count+coverage.unsupported_count+
+               coverage.unreadable_count+coverage.mismatched_count!=
+                   coverage.child_count){ok=0;break;}
+            coverage_ok++;
+            coverage_verified+=coverage.verified_count;
+            coverage_unreadable+=coverage.unreadable_count;
+            coverage_mismatched+=coverage.mismatched_count;
+            coverage_unsupported+=coverage.unsupported_count;
+            if(coverage.complete_reverse_owner_links_verified)
+                coverage_complete++;
+            for(uint32_t z=0u;z<coverage.child_count;z++){
+                if(coverage.child_handles[z]!=
+                       inventory.block.prefix.child_handles[z]||
+                   coverage.child_types[z]!=
+                       inventory.block.child_object_types[z]||
+                   coverage.child_status[z]<MUSACAD_AC1032_BLOCK_OWNER_VERIFIED||
+                   coverage.child_status[z]>MUSACAD_AC1032_BLOCK_OWNER_MISMATCH){
+                    ok=0;break;
+                }
+            }
+            if(!ok)break;
             MusaDwgAc1032InsertBlockOwnerAudit audit={0};
             if(musa_dwg_ac1032_scene_index_insert_block_owner_audit(
                    scene,entry.handle,&audit)){
@@ -371,9 +404,18 @@ static int original(const char *filename){
             owner_audit_ok,owner_audit_verified,owner_audit_unsupported,
             owner_audit_complete,owner_audit_rejected,owner_audit_unreadable,
             owner_audit_mismatched,owner_audit_unsupported_on_reject);
+    fprintf(stderr,"DIAG OT49 owner per-child coverage: inventories=%zu "
+                   "verified=%zu unreadable=%zu mismatch=%zu "
+                   "unsupported=%zu complete=%zu\\n",
+            coverage_ok,coverage_verified,coverage_unreadable,
+            coverage_mismatched,coverage_unsupported,coverage_complete);
     if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
              owner_audit_complete>0u&&
-             owner_audit_ok+owner_audit_rejected==inventory_ok;
+             owner_audit_ok+owner_audit_rejected==inventory_ok&&
+             coverage_ok==inventory_ok&&
+             coverage_verified>=owner_audit_verified&&
+             coverage_unreadable>0u&&
+             coverage_complete==owner_audit_complete;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
@@ -432,6 +474,40 @@ static int original(const char *filename){
             ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
                   &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
         }
+    }
+    if(ok){
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        ok=musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+              scene,UINT64_C(0xbcad),&edge)&&
+           musa_dwg_ac1032_block_child_owner_status(
+              &edge,1,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u)==
+              MUSACAD_AC1032_BLOCK_OWNER_VERIFIED;
+        if(ok){
+            MusaDwgAc1032EntityBlockOwnerLayerSource changed=edge;
+            changed.owner_block_header_handle^=1u;
+            ok=musa_dwg_ac1032_block_child_owner_status(
+                   &changed,1,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u)==
+                   MUSACAD_AC1032_BLOCK_OWNER_MISMATCH&&
+               musa_dwg_ac1032_block_child_owner_status(
+                   &edge,0,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u)==
+                   MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE&&
+               musa_dwg_ac1032_block_child_owner_status(
+                   NULL,1,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u)==
+                   MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE&&
+               musa_dwg_ac1032_block_child_owner_status(
+                   &edge,1,UINT64_C(0xbcad),UINT64_C(0xbcaa),999u)==
+                   MUSACAD_AC1032_BLOCK_OWNER_UNSUPPORTED;
+        }
+    }
+    if(ok){
+        MusaDwgAc1032InsertBlockOwnerCoverage bad;
+        memset(&bad,0xa5,sizeof(bad));
+        const MusaDwgAc1032InsertBlockOwnerCoverage before=bad;
+        ok=!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+              scene,UINT64_MAX,&bad)&&!memcmp(&bad,&before,sizeof(bad))&&
+           !musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+              NULL,UINT64_C(0xbcad),&bad)&&
+           !memcmp(&bad,&before,sizeof(bad));
     }
     if(ok){
         MusaDwgAc1032InsertBlockOwnerAudit bad;
