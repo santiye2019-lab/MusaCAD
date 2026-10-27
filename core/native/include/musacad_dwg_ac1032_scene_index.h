@@ -246,7 +246,11 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
             index,insert_handle,&inventory)||
        !musa_dwg_ac1032_scene_index_original_insert_block_affine(
             index,insert_handle,m)||
-       inventory.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)
+       inventory.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT||
+       !inventory.insert_to_block_source_edge_verified||
+       !inventory.block.all_child_record_types_crc_verified||
+       inventory.reverse_owner_and_nested_transforms_verified||
+       inventory.final_display_accepted)
         return 0;
     MusaDwgAc1032InsertBlockLineSources local={0};
     local.insert_handle=insert_handle;
