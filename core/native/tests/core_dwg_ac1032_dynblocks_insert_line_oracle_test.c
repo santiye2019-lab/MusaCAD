@@ -532,6 +532,20 @@ static int original(const char *filename){
     if(ok){
         const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
                                   {0.0,-1.0,4.0,1.0,0.0,5.0}};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double result[4]={0};
+        ok=musa_dwg_ac1032_transform_segment_through_chain(
+               chain,2u,source,result)&&
+           result[0]==14.0&&result[1]==38.0&&
+           result[2]==10.0&&result[3]==44.0;
+        double unchanged[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_segment_through_chain(
+               chain,0u,source,unchanged);
+        for(unsigned i=0;i<4u;i++)ok=ok&&unchanged[i]==9.0-(double)i;
+    }
+    if(ok){
+        const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
+                                  {0.0,-1.0,4.0,1.0,0.0,5.0}};
         double m[6]={0},expected[6]={0};
         ok=musa_dwg_ac1032_compose_planar_affine(chain[0],chain[1],expected)&&
            musa_dwg_ac1032_fold_planar_affine_chain(chain,2u,m);
