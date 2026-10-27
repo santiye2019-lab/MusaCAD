@@ -2,7 +2,7 @@
 /* Genuine R2018 original H1C8 INSERT/H1BB CIRCLE/H8A LAYER source status.
  * DXF group 70 is separately read, NOT equated to DWG packed 70/290/370.
  * Unknown viewport, frozen/off and overrides continue to veto paint. */
-#include "musacad_dwg_ac1032_circle_source_envelope.h"
+#include "musacad_dwg_ac1032_circle_source_layer_spatial_index.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -433,6 +433,96 @@ static int run(const char *dwg,const char *dxf){
             if(ok)ok=!musa_dwg_ac1032_circle_source_envelope(
                          &invalid,0u,&untouched)&&
                       !memcmp(&untouched,&before,sizeof(before));
+        }
+    }
+    /* Per-source-layer WCS unions from the SAME genuine immutable R2018
+     * scene; independent companion DXF verifies H8A ACI4, never visibility. */
+    if(ok){
+        MusaDwgAc1032CircleByLayerInventory inventory={0};
+        MusaDwgAc1032CircleSourceLayerSpatialIndex spatial={0};
+        ok=musa_dwg_ac1032_circle_bylayer_inventory(scene,&inventory)&&
+           musa_dwg_ac1032_circle_source_layer_spatial_index(
+             &inventory,&spatial)&&spatial.source_only&&
+           !spatial.final_visible_paint_accepted&&
+           spatial.source_layer_count>=1u&&
+           spatial.verified_instance_count==
+             inventory.verified_source_color_count&&
+           spatial.unresolved_circle_count==
+             inventory.unresolved_circle_count&&
+           spatial.unresolved_insert_count==
+             inventory.unresolved_insert_count&&
+           spatial.unresolved_original_dwg_requirements==
+             (MUSA_CIRCLE_DWG_UNRESOLVED_LAYER_BITS|
+              MUSA_CIRCLE_DWG_UNRESOLVED_OWNER_SPACE|
+              MUSA_CIRCLE_DWG_UNRESOLVED_NESTED_INSERT|
+              MUSA_CIRCLE_DWG_UNRESOLVED_VIEWPORT|
+              MUSA_CIRCLE_DWG_UNRESOLVED_XREF);
+        unsigned match=0u;
+        size_t total=0u;
+        for(size_t j=0u;ok&&j<spatial.source_layer_count;j++){
+            const MusaDwgAc1032CircleSourceLayerSpatialRow *r=
+                &spatial.rows[j];
+            ok=r->layer_handle&&r->original_layer_aci&&
+               r->verified_instance_count>0u;
+            total+=r->verified_instance_count;
+            if(r->layer_handle==UINT64_C(0x8a)){
+                match++;
+                ok=ok&&r->original_layer_aci==(uint8_t)oracle.aci;
+            }
+            for(size_t i=0u;ok&&i<inventory.verified_source_color_count;i++){
+                MusaDwgAc1032CircleSourceEnvelope e={0};
+                ok=musa_dwg_ac1032_circle_source_envelope(
+                       &inventory,i,&e);
+                if(ok&&e.layer_handle==r->layer_handle){
+                    ok=e.original_layer_aci==r->original_layer_aci&&
+                       e.original_layer_packed_values==
+                         r->original_layer_packed_values;
+                    for(unsigned k=0u;ok&&k<2u;k++)
+                        ok=r->min_xy[k]<=e.min_xy[k]&&
+                           r->max_xy[k]>=e.max_xy[k];
+                }
+            }
+        }
+        if(ok)ok=match==1u&&total==spatial.verified_instance_count;
+        if(ok){
+            MusaDwgAc1032CircleSourceLayerSpatialIndex again={0};
+            ok=musa_dwg_ac1032_circle_source_layer_spatial_index(
+                 &inventory,&again)&&
+               !memcmp(&again,&spatial,sizeof(again));
+        }
+        if(ok){
+            MusaDwgAc1032CircleSourceLayerSpatialIndex untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032CircleSourceLayerSpatialIndex before=
+                untouched;
+            MusaDwgAc1032CircleByLayerInventory invalid=inventory;
+            ok=!musa_dwg_ac1032_circle_source_layer_spatial_index(
+                    NULL,&untouched)&&
+               !memcmp(&before,&untouched,sizeof(before))&&
+               !musa_dwg_ac1032_circle_source_layer_spatial_index(
+                    &inventory,NULL);
+            invalid.rows[0].original_layer_aci=0u;
+            if(ok)ok=!musa_dwg_ac1032_circle_source_layer_spatial_index(
+                        &invalid,&untouched)&&
+                      !memcmp(&before,&untouched,sizeof(before));
+            invalid=inventory;
+            invalid.rows[0].world_center[0]=NAN;
+            if(ok)ok=!musa_dwg_ac1032_circle_source_layer_spatial_index(
+                        &invalid,&untouched)&&
+                      !memcmp(&before,&untouched,sizeof(before));
+            if(ok&&inventory.verified_source_color_count<
+                    MUSACAD_AC1032_CIRCLE_BYLAYER_INVENTORY_MAX){
+                invalid=inventory;
+                const size_t n=invalid.verified_source_color_count;
+                invalid.rows[n]=invalid.rows[0];
+                invalid.rows[n].original_layer_aci=
+                    invalid.rows[0].original_layer_aci==4u?5u:4u;
+                invalid.verified_source_color_count++;
+                invalid.circle_candidate_count++;
+                ok=!musa_dwg_ac1032_circle_source_layer_spatial_index(
+                     &invalid,&untouched)&&
+                   !memcmp(&before,&untouched,sizeof(before));
+            }
         }
     }
     fprintf(stderr,"%s original DWG vs independent DXF signed LAYER oracle, group70=%ld "
