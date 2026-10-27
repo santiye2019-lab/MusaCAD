@@ -140,20 +140,87 @@ typedef struct Payload {
     MusaDwgAc1032ObjectStreams layout;
     MusaDwgAc1032EntityCommon common;
 } Payload;
-static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
-                 uint16_t type,Payload *out){
+/* Forensic inspection of CRC-authenticated OT7 prefix bytes only.
+ * Noncanonical fields are REPORTED, never accepted as valid geometry. */
+static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
+    const MusaDwgAc1032ObjectStreams *layout,
+    MusaDwgAc1032InsertPrefixProbe *out){
+    if(!raw||!layout||!out||layout->data_stream_bits>SIZE_MAX)return;
+    MusaDwgAc1015Bits bits={0};
+    if(!musa_dwg_ac1015_bits_init(&bits,raw,bytes,
+          layout->object_type_field_bits,(size_t)layout->data_stream_bits))
+        return;
+    uint32_t h_header=0u,preview=0u,mode=0u,xdic=0u,ds=0u;
+    uint32_t reactors=0u;
+    uint16_t eed=0u;
+    uint64_t self=0u;
+    if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&h_header)||
+       h_header>>4u||!(h_header&15u)||(h_header&15u)>8u){
+        out->prefix_reason=1u;return;
+    }
+    out->embedded_handle_length=(uint8_t)(h_header&15u);
+    for(unsigned i=0u;i<(h_header&15u);i++){
+        uint32_t b=0u;
+        if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&b)){
+            out->prefix_reason=2u;return;
+        }
+        self=(self<<8u)|b;
+    }
+    out->embedded_self_handle=self;
+    if(self!=layout->indexed_handle){
+        out->prefix_reason=2u;return;
+    }
+    if(!musa_dwg_ac1015_bits_read_bs(&bits,&eed)){
+        out->prefix_reason=3u;return;
+    }
+    out->eed_bytes=eed;
+    if(eed){out->prefix_reason=3u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&preview)){
+        out->prefix_reason=4u;return;
+    }
+    out->preview=(uint8_t)preview;
+    if(preview){out->prefix_reason=4u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,2u,&mode)){
+        out->prefix_reason=5u;return;
+    }
+    out->entity_mode=(uint8_t)mode;
+    if(mode==3u){out->prefix_reason=5u;return;}
+    if(!musa_dwg_ac1015_bits_read_bl(&bits,&reactors)){
+        out->prefix_reason=6u;return;
+    }
+    out->reactor_count=reactors;
+    if(reactors){out->prefix_reason=6u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&xdic)){
+        out->prefix_reason=7u;return;
+    }
+    out->xdictionary_missing=(uint8_t)xdic;
+    if(!xdic){out->prefix_reason=7u;return;}
+    if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&ds)){
+        out->prefix_reason=8u;return;
+    }
+    out->has_binary_data_store=(uint8_t)ds;
+    out->prefix_reason=ds?8u:9u;
+}
+/* Diagnostic stages describe authenticated read progress, never display
+ * permission. Keep the ordinary fetch() semantics and fail-atomic output. */
+static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
+                        uint16_t type,Payload *out,uint8_t *stage,
+                        MusaDwgAc1032InsertPrefixProbe *prefix_probe){
     uint64_t off=0u;size_t needed=0u,copied=0u;
     MusaDwgAc1032PayloadInfo meta={0},again={0};
     MusaDwgAc1032ObjectStreams layout={0};
-    if(!s||!out||!find(s,h,&off)||
-       !musa_dwg_ac1032_object_payload_bytes(
+    if(stage)*stage=0u;
+    if(!s||!out||!find(s,h,&off))return 0;
+    if(stage)*stage=1u; /* indexed handle */
+    if(!musa_dwg_ac1032_object_payload_bytes(
            s->objects,s->object_bytes,h,off,
            NULL,0u,&needed,&meta)||
        !meta.original_record_crc_verified||
        meta.raw_object_type!=type||meta.object_type_field_bits!=10u||
        !needed||needed>MAX_OBJECT_SECTION||
-       meta.payload_bytes!=needed||
-       !musa_dwg_ac1032_stream_layout_bytes(
+       meta.payload_bytes!=needed)return 0;
+    if(stage)*stage=2u; /* original CRC/type/payload length */
+    if(!musa_dwg_ac1032_stream_layout_bytes(
            s->objects,s->object_bytes,h,off,&layout)||
        !layout.original_record_crc_verified||
        layout.indexed_handle!=h||
@@ -162,6 +229,7 @@ static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        layout.object_type_field_bits!=meta.object_type_field_bits||
        layout.handle_stream_bits!=meta.handle_stream_bits||
        layout.total_payload_bits!=(uint64_t)needed*8u)return 0;
+    if(stage)*stage=3u; /* stream layout */
     uint8_t *raw=(uint8_t*)malloc(needed);
     if(!raw)return 0;
     MusaDwgAc1032EntityCommon common={0};
@@ -172,21 +240,58 @@ static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        again.indexed_handle==h&&
        again.object_section_offset==off&&
        again.raw_object_type==type&&
-       again.handle_stream_bits==meta.handle_stream_bits&&
-       musa_dwg_ac1032_entity_common_bytes(
+       again.handle_stream_bits==meta.handle_stream_bits;
+    if(!ok){free(raw);return 0;}
+    if(stage)*stage=4u; /* immutable original record copied */
+    if(prefix_probe&&type==7u)
+        inspect_insert_prefix(raw,needed,&layout,prefix_probe);
+    ok=musa_dwg_ac1032_entity_common_bytes(
           raw,needed,&layout,type,&common)&&
        common.common_decoded&&
        common.prefix.indexed_handle==h&&
        common.prefix.raw_object_type==type;
     if(!ok){free(raw);return 0;}
+    if(stage)*stage=5u; /* entity common decoded */
     const Payload valid={raw,needed,layout,common};
     *out=valid;return 1;
+}
+static int fetch(const MusaDwgAc1032SceneIndex *s,uint64_t h,
+                 uint16_t type,Payload *out){
+    return fetch_staged(s,h,type,out,NULL,NULL);
 }
 static int check_output(const MusaDwgAc1032SceneIndex *s,
                         const void *out,size_t n){
     return s&&out&&!overlap(s,sizeof(*s),out,n)&&
        !overlap(s->objects,s->object_bytes,out,n)&&
        !overlap(s->handles,s->count*sizeof(*s->handles),out,n);
+}
+/* Source-only OT7 failure stage. A stage below 5 is a rejected
+ * read, not permission to decode geometry or infer missing handles.
+ * The caller receives only a stage, never unchecked object bytes. */
+int musa_dwg_ac1032_scene_index_insert_decode_stage(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,uint8_t *out_stage){
+    if(!h||!check_output(s,out_stage,sizeof(*out_stage)))return 0;
+    Payload p={0};
+    uint8_t stage=0u;
+    if(fetch_staged(s,h,7u,&p,&stage,NULL))free(p.raw);
+    *out_stage=stage;
+    return 1;
+}
+/* Exposes the first strict rejection gate for original OT7 records.
+ * No EED/preview/reactor shortcuts and no acceptance of unsupported
+ * ownership, layer, color, visibility or drawing. */
+int musa_dwg_ac1032_scene_index_insert_prefix_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032InsertPrefixProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032InsertPrefixProbe local={0};
+    local.indexed_handle=h;
+    Payload p={0};
+    uint8_t stage=0u;
+    if(fetch_staged(s,h,7u,&p,&stage,&local))free(p.raw);
+    local.fetch_stage=stage;
+    *out=local;
+    return 1;
 }
 /* Real OT4 BLOCK begin source only. BLOCK marker is not drawable,
  * and no BLOCK_HEADER, nested INSERT or owned children are inferred. */
@@ -1365,15 +1470,15 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits);
-        if(ok&&type==18u){
+        if(ok&&(type==18u||type==19u)){
             MusaDwgAc1015HandleRef owner_ref={0};
             ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&owner_ref)&&
                owner_ref.target!=0u&&
                (owner_ref.code==4u||
-                /* Original R2018 CIRCLE H1BB stores its block owner as
-                 * the genuine canonical relative H12=H1BB-3 -> H1B8.
-                 * Other types retain the exact H4-only profile.
-                 * Check real OT49/OT51 CRC/index below as well. */
+                /* Genuine original OT18 H1BB and R2018 Dynblocks OT19
+                 * LINE HBCAD..HBCB2 store canonical relative H12 owners.
+                 * Verify the exact target, original OT49 and OT51 CRC.
+                 * Other entity types retain their strict H4 profile. */
                 (owner_ref.code==12u&&owner_ref.relative&&
                  owner_ref.encoded_value>0u&&
                  owner_ref.target<h&&
@@ -1389,10 +1494,9 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         if(ok)
             ok=cached_graph_ref(&bits,h,5u,&layer)&&
                owner!=h&&layer!=h&&owner!=layer&&
-               /* Same independently observed original OT18 relative
-                * owner H12 + layer H5 canonical 111 tail. Other object
-                * types and absolute H4 retain exact ZERO padding. */
-               ((type==18u&&owner_wire_code==12u)?
+               /* Independently observed OT18/OT19 relative H12 + H5
+                * require canonical ONE padding; H4 retains ZERO. */
+               (((type==18u||type==19u)&&owner_wire_code==12u)?
                     cached_graph_one_padding(&bits):
                     cached_graph_zero_padding(&bits));
     }
@@ -1413,11 +1517,49 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     result.exact_h4_owner_and_h5_layer_source_verified=1u;
     result.original_owner_wire_code=owner_wire_code;
     result.original_relative_h12_owner_verified=
-        (uint8_t)(type==18u&&owner_wire_code==12u);
+        (uint8_t)((type==18u||type==19u)&&owner_wire_code==12u);
     *out=result;
     return 1;
 }
 
+/* Genuine LINE raw H refs, without assuming owner or layer roles. */
+int musa_dwg_ac1032_scene_index_line_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032LineHTailProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,19u,&p))return 0;
+    MusaDwgAc1032LineHTailProbe v={0};
+    v.indexed_handle=h;
+    v.entity_mode=p.common.prefix.entity_mode;
+    v.original_record_crc_verified=1u;
+    MusaDwgAc1015Bits bits={0};
+    if(p.layout.data_stream_bits<=SIZE_MAX&&
+       p.layout.total_payload_bits<=SIZE_MAX&&
+       musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+          (size_t)p.layout.data_stream_bits,
+          (size_t)p.layout.total_payload_bits)){
+        MusaDwgAc1015HandleRef first={0},second={0};
+        if(musa_dwg_ac1015_read_handle_ref(&bits,h,&first)){
+            v.first_readable=1u;
+            v.first_code=first.code;
+            v.first_relative=first.relative;
+            v.first_target=first.target;
+            if(musa_dwg_ac1015_read_handle_ref(&bits,h,&second)){
+                v.second_readable=1u;
+                v.second_code=second.code;
+                v.second_relative=second.relative;
+                v.second_target=second.target;
+            }
+        }
+        if(bits.bit_end>=bits.bit_pos&&
+           bits.bit_end-bits.bit_pos<=UINT32_MAX)
+            v.residual_bits=(uint32_t)(bits.bit_end-bits.bit_pos);
+    }
+    free(p.raw);
+    *out=v;
+    return 1;
+}
 /* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
  * decoded H references are RAW observations, NOT owner/layer assignments.
  * This records precisely which strict H4/H5 assumption failed, without

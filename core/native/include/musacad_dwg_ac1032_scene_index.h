@@ -110,6 +110,28 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
     MusaDwgAc1032EntityCommon *out);
 /* Original R2018 OT7 INSERT OCS numeric placement; no block expansion,
  * owner/model-space or final rendering acceptance. */
+/* Prefix forensic gate: 0=unavailable, 1=H header, 2=self H,
+ * 3=EED, 4=preview, 5=entity mode, 6=reactors, 7=XDictionary,
+ * 8=binary data store, 9=canonical strict prefix. Untrusted field
+ * values are diagnostic only, never permission to render. */
+typedef struct MusaDwgAc1032InsertPrefixProbe {
+    uint64_t indexed_handle,embedded_self_handle;
+    uint32_t reactor_count;
+    uint8_t embedded_handle_length;
+    uint16_t eed_bytes;
+    uint8_t fetch_stage,prefix_reason;
+    uint8_t preview,entity_mode,xdictionary_missing;
+    uint8_t has_binary_data_store;
+} MusaDwgAc1032InsertPrefixProbe;
+int musa_dwg_ac1032_scene_index_insert_prefix_probe(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    MusaDwgAc1032InsertPrefixProbe *out);
+/* Diagnostic only: 0=not indexed, 1=index, 2=CRC/type payload,
+ * 3=CRC stream layout, 4=payload copy, 5=decoded entity common.
+ * This never authorizes INSERT ownership, visibility or paint. */
+int musa_dwg_ac1032_scene_index_insert_decode_stage(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    uint8_t *out_stage);
 /* Authenticated original INSERT H edges only. No block expansion or paint. */
 int musa_dwg_ac1032_scene_index_insert_source_graph(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
@@ -185,6 +207,40 @@ int musa_dwg_ac1032_scene_index_insert_layer_cmc_source(
 int musa_dwg_ac1032_scene_index_read_insert_placement(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032InsertPlacement *out);
+/* Join independently authenticated original OT7 placement, OT7 H
+ * target, and OT49 base before producing a numeric 2D affine. This is
+ * source geometry only: reverse owner, model-space, nested blocks,
+ * layer visibility and final painting remain unverified. Fail-atomic. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_block_affine(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    double out_six[6]){
+    if(!index||!insert_handle||!out_six)return 0;
+    MusaDwgAc1032InsertSourceGraph graph={0};
+    MusaDwgAc1032InsertPlacement placement={0};
+    MusaDwgAc1032BlockHeaderBase base={0};
+    double local[6];
+    if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+           index,insert_handle,&graph)||
+       !graph.original_entity_and_targets_crc_verified||
+       !graph.source_edges_verified||
+       graph.indexed_handle!=insert_handle||
+       !graph.block_header_handle||
+       graph.block_expansion_and_display_accepted||
+       !musa_dwg_ac1032_scene_index_read_insert_placement(
+           index,insert_handle,&placement)||
+       placement.indexed_handle!=insert_handle||
+       !musa_dwg_ac1032_scene_index_read_block_header_base(
+           index,graph.block_header_handle,&base)||
+       base.indexed_handle!=graph.block_header_handle||
+       !base.original_record_crc_verified||!base.base_point_decoded||
+       base.block_children_and_display_accepted||
+       base.is_xref||base.xref_overlaid||base.xref_dependent||
+       base.xref_index_plus_one||
+       !musa_dwg_ac1032_insert_planar_affine(
+           &placement,base.base_xyz,local))return 0;
+    for(unsigned i=0;i<6u;i++)out_six[i]=local[i];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
@@ -350,7 +406,97 @@ typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
 int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     const MusaDwgAc1032SceneIndex *scene,uint64_t child_handle,
     MusaDwgAc1032EntityBlockOwnerLayerSource *out);
+/* Extract transformed LINE endpoints from an authenticated INSERT's
+ * OT49 child H list. SOURCE-ONLY: reverse owner and display are NOT
+ * verified. Callers MUST NOT treat these as paint-authorized geometry.
+ * Fail-atomic and bounded to the original OT49 64-child inventory. */
+typedef struct MusaDwgAc1032InsertBlockLineSources {
+    uint64_t insert_handle,block_header_handle;
+    uint64_t child_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    double endpoints[MUSACAD_AC1032_OT49_CHILD_LIMIT][4];
+    uint32_t line_count;
+    uint8_t original_source_geometry_verified;
+    uint8_t reverse_owner_links_verified; /* ALWAYS ZERO */
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockLineSources;
+static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockLineSources *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockChildInventory inventory={0};
+    double m[6]={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+            index,insert_handle,&inventory)||
+       !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+            index,insert_handle,m)||
+       inventory.block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT||
+       !inventory.insert_to_block_source_edge_verified||
+       !inventory.block.all_child_record_types_crc_verified||
+       inventory.reverse_owner_and_nested_transforms_verified||
+       inventory.final_display_accepted)
+        return 0;
+    MusaDwgAc1032InsertBlockLineSources local={0};
+    local.insert_handle=insert_handle;
+    local.block_header_handle=inventory.insert.block_header_handle;
+    for(uint32_t i=0;i<inventory.block.prefix.child_count;i++){
+        if(inventory.block.child_object_types[i]!=19u)continue;
+        MusaDwgAc1032NativeLine line={0};
+        const uint64_t handle=inventory.block.prefix.child_handles[i];
+        MusaDwgAc1032EntityBlockOwnerLayerSource owner={0};
+        if(!handle||
+           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                index,handle,&owner)||
+           owner.child_handle!=handle||
+           owner.owner_block_header_handle!=local.block_header_handle||
+           owner.raw_entity_type!=19u||
+           !owner.original_child_record_crc_verified||
+           !owner.original_owner_and_layer_records_crc_verified||
+           !owner.exact_h4_owner_and_h5_layer_source_verified||
+           owner.visible_scene_and_paint_accepted||
+           !musa_dwg_ac1032_scene_index_read_line(
+                index,handle,&line)||
+           line.common.invisibility!=0u)return 0;
+        for(unsigned j=0;j<3u;j++){
+            if(!isfinite(line.geometry.start[j])||
+               !isfinite(line.geometry.end[j]))return 0;
+        }
+        if(line.geometry.start[2]!=0.0||
+           line.geometry.end[2]!=0.0||
+           line.geometry.extrusion[0]!=0.0||
+           line.geometry.extrusion[1]!=0.0||
+           line.geometry.extrusion[2]!=1.0||
+           !isfinite(line.geometry.thickness)||
+           line.geometry.thickness!=0.0)return 0;
+        const double x=line.geometry.start[0],y=line.geometry.start[1];
+        const double u=line.geometry.end[0],v=line.geometry.end[1];
+        double xy[4]={m[0]*x+m[1]*y+m[2],
+                      m[3]*x+m[4]*y+m[5],
+                      m[0]*u+m[1]*v+m[2],
+                      m[3]*u+m[4]*v+m[5]};
+        for(unsigned k=0;k<4u;k++)if(!isfinite(xy[k]))return 0;
+        const uint32_t at=local.line_count++;
+        local.child_handles[at]=handle;
+        for(unsigned k=0;k<4u;k++)local.endpoints[at][k]=xy[k];
+    }
+    local.original_source_geometry_verified=1u;
+    *out=local;
+    return 1;
+}
 
+
+
+/* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
+typedef struct MusaDwgAc1032LineHTailProbe {
+    uint64_t indexed_handle,first_target,second_target;
+    uint32_t residual_bits;
+    uint8_t entity_mode,first_code,second_code;
+    uint8_t first_relative,second_relative,first_readable,second_readable;
+    uint8_t original_record_crc_verified;
+    uint8_t owner_layer_and_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032LineHTailProbe;
+int musa_dwg_ac1032_scene_index_line_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t line_handle,
+    MusaDwgAc1032LineHTailProbe *out);
 
 /* R2018 OT18 original CRC/H forensic probe. first_raw_target and
  * second_raw_target are untrusted H references, NOT certified owner/layer.

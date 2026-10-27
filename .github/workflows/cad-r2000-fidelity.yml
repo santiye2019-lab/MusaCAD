@@ -315,6 +315,20 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS genuine INSERT source H graph; no block expansion or rendering"
 
+      - name: P0 genuine R2018 Dynblocks positive INSERT LINE strict reverse-owner and affine oracle
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/2018/Dynblocks.dwg
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_dynblocks_insert_line_oracle_test.c \
+            /tmp/musacad-real-ac1032-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-dynblocks-insert-lines
+          timeout 120s /tmp/musacad-r2018-dynblocks-insert-lines "$original"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS genuine R2018 positive INSERT LINE source join; final paint blocked"
+
       - name: P0 source-only all original R2018 INSERT LINE v6 packet with real WCS and CRC H graph
         run: |
           set -euo pipefail
