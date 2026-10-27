@@ -294,11 +294,11 @@ static inline int musa_dwg_ac1032_transform_planar_segment(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
-/* Fold authenticated ancestor-to-descendant INSERT transforms; caller
+/* Fold any representable number of ancestor-to-descendant INSERT transforms; caller
  * must independently authenticate each owner edge. No graph traversal. */
 static inline int musa_dwg_ac1032_fold_planar_affine_chain(
     const double (*chain)[6],unsigned count,double out[6]){
-    if(!chain||!out||count==0u||count>64u)return 0;
+    if(!chain||!out||count==0u)return 0;
     double acc[6]={1.0,0.0,0.0,0.0,1.0,0.0};
     for(unsigned i=0;i<count;i++){
         double next[6];
