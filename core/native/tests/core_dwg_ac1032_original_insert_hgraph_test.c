@@ -2032,6 +2032,46 @@ static int genuine(const char *file){
                    scene,UINT64_C(0x1b8),NULL);
         }
     }
+    /* Metadata-only original OT51 layer name: independently validate
+     * the same genuine layer for a CIRCLE and a LINE, without granting
+     * reverse-owner visibility, color or final paint. Wrong-parent and
+     * missing-source calls must not mutate caller output. */
+    if(ok){
+        MusaDwgAc1032BlockChildVerifiedLayerName circle={0},line={0};
+        ok=musa_dwg_ac1032_block_child_verified_layer_name(
+               scene,UINT64_C(0x1b8),UINT64_C(0x1bb),&circle)&&
+           musa_dwg_ac1032_block_child_verified_layer_name(
+               scene,UINT64_C(0x17d),UINT64_C(0x18b),&line)&&
+           circle.block_header_handle==UINT64_C(0x1b8)&&
+           circle.child_handle==UINT64_C(0x1bb)&&
+           line.block_header_handle==UINT64_C(0x17d)&&
+           line.child_handle==UINT64_C(0x18b)&&
+           circle.layer.indexed_handle==UINT64_C(0x8a)&&
+           line.layer.indexed_handle==UINT64_C(0x8a)&&
+           circle.source_graph_and_unicode_verified&&
+           line.source_graph_and_unicode_verified&&
+           !circle.layer_visibility_color_and_paint_accepted&&
+           !line.layer_visibility_color_and_paint_accepted&&
+           circle.layer.utf8_bytes>0u&&
+           circle.layer.utf8_bytes==line.layer.utf8_bytes&&
+           !strcmp(circle.layer.utf8,line.layer.utf8);
+        if(ok){
+            MusaDwgAc1032BlockChildVerifiedLayerName rejected;
+            memset(&rejected,0xa5,sizeof(rejected));
+            const MusaDwgAc1032BlockChildVerifiedLayerName before=rejected;
+            ok=!musa_dwg_ac1032_block_child_verified_layer_name(
+                   scene,UINT64_C(0x17d),UINT64_C(0x1bb),&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_verified_layer_name(
+                   scene,UINT64_C(0x1b8),0u,&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_verified_layer_name(
+                   NULL,UINT64_C(0x1b8),UINT64_C(0x1bb),&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected))&&
+               !musa_dwg_ac1032_block_child_verified_layer_name(
+                   scene,UINT64_C(0x1b8),UINT64_C(0x1bb),NULL);
+        }
+    }
     /* Genuine R2018 regression for the strict OT7 -> OT49 -> OT19
      * reverse-owner and source-only LINE affine helper. The independent
      * companion DXF fixes the INSERT/BLOCK_HEADER handle pairs. The

@@ -152,4 +152,51 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
     *out=result;
     return 1;
 }
+/* Metadata-only, source-authenticated layer label for one original block
+ * child. Revalidate OT49 membership and the child's OT51 edge on demand;
+ * do not trust a caller-supplied row or infer Layer0 for missing evidence.
+ * This is NOT a per-frame rendering API: cache the result in the caller
+ * after its source scene is validated. No visibility, color, or paint grant.
+ * Failure leaves the caller's output byte-for-byte unchanged. */
+typedef struct MusaDwgAc1032BlockChildVerifiedLayerName {
+    uint64_t block_header_handle;
+    uint64_t child_handle;
+    MusaDwgAc1032LayerName layer;
+    uint8_t source_graph_and_unicode_verified;
+    uint8_t layer_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032BlockChildVerifiedLayerName;
+
+static inline int musa_dwg_ac1032_block_child_verified_layer_name(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t block_header_handle,
+    uint64_t child_handle,MusaDwgAc1032BlockChildVerifiedLayerName *out){
+    if(!scene||!out||!block_header_handle||!child_handle)return 0;
+    MusaDwgAc1032BlockChildLayerInventory inventory={0};
+    if(!musa_dwg_ac1032_block_child_layer_evidence(
+           scene,block_header_handle,&inventory)||
+       !inventory.marker_and_child_source_crc_verified||
+       inventory.reverse_child_owner_links_verified||
+       inventory.layer_visibility_color_and_paint_accepted)return 0;
+    for(uint32_t i=0u;i<inventory.child_count;i++){
+        const MusaDwgAc1032BlockChildLayerRow *row=&inventory.children[i];
+        if(row->child_handle!=child_handle)continue;
+        if(row->layer_evidence_status!=MUSACAD_AC1032_BLOCK_LAYER_VERIFIED||
+           !row->layer_handle||row->layer_handle==child_handle)return 0;
+        MusaDwgAc1032LayerName name={0};
+        if(!musa_dwg_ac1032_scene_index_read_layer_name(
+               scene,row->layer_handle,&name)||
+           !name.original_record_crc_verified||
+           name.indexed_handle!=row->layer_handle||
+           !name.utf8_bytes||name.utf8_bytes>=sizeof(name.utf8)||
+           name.utf8[name.utf8_bytes]!='\0')return 0;
+        MusaDwgAc1032BlockChildVerifiedLayerName result={0};
+        result.block_header_handle=block_header_handle;
+        result.child_handle=child_handle;
+        result.layer=name;
+        result.source_graph_and_unicode_verified=1u;
+        *out=result;
+        return 1;
+    }
+    return 0;
+}
+
 #endif
