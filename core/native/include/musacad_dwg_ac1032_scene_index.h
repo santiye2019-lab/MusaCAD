@@ -323,6 +323,17 @@ static inline int musa_dwg_ac1032_transform_segment_through_chain(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
+/* Reject cyclic BLOCK_HEADER ancestry before folding a supplied chain.
+ * Handles must be independently authenticated by the caller. */
+static inline int musa_dwg_ac1032_block_ancestry_handles_acyclic(
+    const uint64_t *handles,unsigned count){
+    if(!handles||count==0u)return 0;
+    for(unsigned i=0;i<count;i++){
+        if(handles[i]==0u)return 0;
+        for(unsigned j=0;j<i;j++)if(handles[j]==handles[i])return 0;
+    }
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
