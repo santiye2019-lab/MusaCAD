@@ -41,7 +41,7 @@ static inline int musa_dwg_ac1032_block_layer_utf8_valid(
            (scalar>=0xd800u&&scalar<=0xdfffu))return 0;
         i+=tails+1u;
     }
-    return text[n]=='\\0';
+    return text[n]=='\0';
 }
 
 #define MUSACAD_AC1032_BLOCK_LAYER_VERIFIED 1u
