@@ -37,6 +37,13 @@ int musa_dwg_ac1018_handles_index_continuous_offsets(
     const uint8_t *handle_section,size_t handle_bytes,
     size_t object_section_bytes,MusaDwgAc1018HandleEntry *entries,
     size_t capacity,size_t *out_count);
+/* Alternative R2018 candidate: absolute first handle on each page,
+ * monotonic handles, page-local object offsets. CRC and bounds checked;
+ * callers must independently verify embedded original self handles. */
+int musa_dwg_ac1018_handles_index_page_absolute_handles(
+    const uint8_t *handle_section,size_t handle_bytes,
+    size_t object_section_bytes,MusaDwgAc1018HandleEntry *entries,
+    size_t capacity,size_t *out_count);
 #ifdef __cplusplus
 }
 #endif

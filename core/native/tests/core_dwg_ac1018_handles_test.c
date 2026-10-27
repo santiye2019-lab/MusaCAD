@@ -102,6 +102,24 @@ int main(void){
            modern,size,64u,continuous,6u,&count));
     assert(!memcmp(continuous,saved_continuous,sizeof(continuous))&&
            count==saved_continuous_count);
+    uint8_t absolute[80]={0};
+    memcpy(absolute,buf,size);
+    absolute[10]=1u; /* first handle of page 2: absolute H3 */
+    absolute[18]=1u; /* first handle of page 3: absolute H6 */
+    /* Correct absolute first handles, retaining original page-local offsets. */
+    absolute[10]=3u;
+    absolute[18]=6u;
+    crc_page(absolute+8u,6u);crc_page(absolute+16u,6u);
+    MusaDwgAc1018HandleEntry absolute_entries[6]={{0}};
+    assert(musa_dwg_ac1018_handles_index_page_absolute_handles(
+           absolute,size,40u,absolute_entries,6u,&count)&&count==6u);
+    for(unsigned i=0u;i<6u;i++){
+        assert(absolute_entries[i].handle==handles[i]);
+        assert(absolute_entries[i].object_offset==offsets[i]);
+    }
+    absolute[18]=2u;crc_page(absolute+16u,6u);
+    assert(!musa_dwg_ac1018_handles_index_page_absolute_handles(
+           absolute,size,40u,absolute_entries,6u,&count));
     uint8_t damaged[80]={0};
     memcpy(damaged,buf,size);
     damaged[18]^=0x1u; /* page 3 CRC must reject */

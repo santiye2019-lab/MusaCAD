@@ -68,10 +68,10 @@ static int modular_signed(const uint8_t *p,size_t end,size_t *pos,
 }
 static int scan(const uint8_t *section,size_t section_bytes,
                 size_t object_bytes,MusaDwgAc1018HandleEntry *dst,
-                size_t *count_out,int continuous_offsets) {
+                size_t *count_out,int continuous_offsets,int page_absolute_handles) {
     if(!section||!count_out||section_bytes<8u||!object_bytes)return 0;
     size_t cursor=0u,count=0u;
-    uint64_t handle=0u,object_offset=0u;
+    uint64_t handle=0u,object_offset=0u,last_global_handle=0u;
     int terminal=0;
     while(cursor<section_bytes){
         if(section_bytes-cursor<4u)return 0;
@@ -90,6 +90,7 @@ static int scan(const uint8_t *section,size_t section_bytes,
         /* R2004 page-local offsets; R2018 original logical Objects
          * offsets continue across CRC-authenticated handle-map pages. */
         if(!continuous_offsets)object_offset=0u;
+        if(page_absolute_handles)handle=0u;
         if(size==2u){
             if(page_end+2u!=section_bytes||count==0u)return 0;
             terminal=1;cursor=section_bytes;break;
@@ -102,6 +103,8 @@ static int scan(const uint8_t *section,size_t section_bytes,
                !modular_signed(section,page_end,&cursor,&offset_delta)||
                handle_delta>UINT64_MAX-handle)return 0;
             const uint64_t next_handle=handle+handle_delta;
+            if(page_absolute_handles&&count&&next_handle<=last_global_handle)
+                return 0;
             uint64_t next_offset=object_offset;
             if(offset_delta>=0){
                 if((uint64_t)offset_delta>UINT64_MAX-next_offset)
@@ -122,6 +125,7 @@ static int scan(const uint8_t *section,size_t section_bytes,
             }
             ++count;
             handle=next_handle;
+            last_global_handle=next_handle;
             object_offset=next_offset;
         }
         cursor=page_end+2u;
@@ -132,7 +136,7 @@ static int scan(const uint8_t *section,size_t section_bytes,
 static int handles_index_mode(const uint8_t *handle_section,
     size_t handle_bytes,size_t object_section_bytes,
     MusaDwgAc1018HandleEntry *entries,size_t capacity,
-    size_t *out_count,int continuous_offsets) {
+    size_t *out_count,int continuous_offsets,int page_absolute_handles) {
     if(!handle_section||!out_count||(!entries&&capacity)||
        overlaps(handle_section,handle_bytes,out_count,sizeof(*out_count)))
         return 0;
@@ -147,7 +151,7 @@ static int handles_index_mode(const uint8_t *handle_section,
     }
     size_t needed=0u;
     if(!scan(handle_section,handle_bytes,object_section_bytes,NULL,&needed,
-             continuous_offsets))
+             continuous_offsets,page_absolute_handles))
         return 0;
     if(entries){
         if(needed>capacity)return 0;
@@ -155,7 +159,7 @@ static int handles_index_mode(const uint8_t *handle_section,
          * transactional; never expose half an index for corrupt sources. */
         size_t verified=0u;
         if(!scan(handle_section,handle_bytes,object_section_bytes,
-                 entries,&verified,continuous_offsets)||verified!=needed)return 0;
+                 entries,&verified,continuous_offsets,page_absolute_handles)||verified!=needed)return 0;
     }
     *out_count=needed;
     return 1;
@@ -165,11 +169,20 @@ int musa_dwg_ac1018_handles_index(const uint8_t *section,
     size_t bytes,size_t objects,MusaDwgAc1018HandleEntry *entries,
     size_t capacity,size_t *out_count){
     return handles_index_mode(section,bytes,objects,entries,capacity,
-                              out_count,0);
+                              out_count,0,0);
 }
 int musa_dwg_ac1018_handles_index_continuous_offsets(
     const uint8_t *section,size_t bytes,size_t objects,
     MusaDwgAc1018HandleEntry *entries,size_t capacity,size_t *out_count){
     return handles_index_mode(section,bytes,objects,entries,capacity,
-                              out_count,1);
+                              out_count,1,0);
+}
+
+/* Candidate R2018 profile: page-local absolute first H, relative H
+ * within each CRC-authenticated page. Do not use without source proof. */
+int musa_dwg_ac1018_handles_index_page_absolute_handles(
+    const uint8_t *section,size_t bytes,size_t objects,
+    MusaDwgAc1018HandleEntry *entries,size_t capacity,size_t *out_count){
+    return handles_index_mode(section,bytes,objects,entries,capacity,
+                              out_count,0,1);
 }

@@ -138,17 +138,22 @@ int musa_dwg_ac1032_handles_index(
        !musa_dwg_ac1032_extract_named_section(file,file_bytes,
           "AcDb:Handles",handles,handle_bytes,&handle_got)||
        handle_got!=handle_bytes)goto done;
-    size_t legacy_count=0u,continuous_count=0u;
+    size_t legacy_count=0u,continuous_count=0u,absolute_count=0u;
     const int legacy_ok=musa_dwg_ac1018_handles_index(
         handles,handle_bytes,object_bytes,NULL,0u,&legacy_count);
     const int continuous_ok=
         musa_dwg_ac1018_handles_index_continuous_offsets(
         handles,handle_bytes,object_bytes,NULL,0u,&continuous_count);
-    if(!legacy_ok&&!continuous_ok)goto done;
-    needed=legacy_ok?legacy_count:continuous_count;
+    const int absolute_ok=
+        musa_dwg_ac1018_handles_index_page_absolute_handles(
+        handles,handle_bytes,object_bytes,NULL,0u,&absolute_count);
+    if(!legacy_ok&&!continuous_ok&&!absolute_ok)goto done;
+    needed=legacy_ok?legacy_count:(continuous_ok?continuous_count:absolute_count);
     if(!needed||needed>MUSA_AC1032_HANDLES_MAX||
        needed>SIZE_MAX/sizeof(*entries)||
-       (legacy_ok&&continuous_ok&&legacy_count!=continuous_count))
+       (legacy_ok&&continuous_ok&&legacy_count!=continuous_count)||
+       (legacy_ok&&absolute_ok&&legacy_count!=absolute_count)||
+       (!legacy_ok&&continuous_ok&&absolute_ok&&continuous_count!=absolute_count))
         goto done;
     if(entries){
         if(capacity<needed)goto done;
@@ -158,9 +163,13 @@ int musa_dwg_ac1032_handles_index(
         if(!(legacy_ok?musa_dwg_ac1018_handles_index(
               handles,handle_bytes,object_bytes,
               temporary,needed,&filled):
-              musa_dwg_ac1018_handles_index_continuous_offsets(
-              handles,handle_bytes,object_bytes,
-              temporary,needed,&filled))||filled!=needed)goto done;
+              (continuous_ok?
+               musa_dwg_ac1018_handles_index_continuous_offsets(
+                   handles,handle_bytes,object_bytes,
+                   temporary,needed,&filled):
+               musa_dwg_ac1018_handles_index_page_absolute_handles(
+                   handles,handle_bytes,object_bytes,
+                   temporary,needed,&filled)))||filled!=needed)goto done;
         /* Only switch to the continuous profile when independent original
          * CRC-backed entity self handles positively prove it and the
          * legacy profile is demonstrably mismatched. Otherwise preserve
@@ -170,6 +179,30 @@ int musa_dwg_ac1032_handles_index(
             if(!alternate)goto done;
             size_t alt_count=0u;
             if(musa_dwg_ac1018_handles_index_continuous_offsets(
+                   handles,handle_bytes,object_bytes,
+                   alternate,needed,&alt_count)&&alt_count==needed){
+                const HandleMapEvidence a=handle_map_evidence(
+                    objects,object_bytes,temporary,needed);
+                const HandleMapEvidence b=handle_map_evidence(
+                    objects,object_bytes,alternate,needed);
+                if(b.exact>=4u&&b.foreign==0u&&
+                   b.exact>a.exact&&a.foreign>0u){
+                    MusaDwgAc1032HandleEntry *swap=temporary;
+                    temporary=alternate;
+                    alternate=swap;
+                }
+            }
+        }
+        /* Another CRC-checked candidate: each page starts with an
+         * absolute handle. Only select with positive embedded-self
+         * evidence and demonstrable mismatch in the previous profile. */
+        if(absolute_ok){
+            if(!alternate){
+                alternate=malloc(needed*sizeof(*alternate));
+                if(!alternate)goto done;
+            }
+            size_t alt_count=0u;
+            if(musa_dwg_ac1018_handles_index_page_absolute_handles(
                    handles,handle_bytes,object_bytes,
                    alternate,needed,&alt_count)&&alt_count==needed){
                 const HandleMapEvidence a=handle_map_evidence(
