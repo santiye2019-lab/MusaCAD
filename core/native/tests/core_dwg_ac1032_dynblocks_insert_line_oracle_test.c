@@ -377,6 +377,9 @@ static int original(const char *filename){
            !musa_dwg_ac1032_source_line_handle_admissible(
                NULL,0u,UINT64_C(0x789))&&
            !musa_dwg_ac1032_source_line_handle_admissible(
+               previous,MUSACAD_AC1032_OT49_CHILD_LIMIT,
+               UINT64_C(0x789))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
                previous,MUSACAD_AC1032_OT49_CHILD_LIMIT+1u,
                UINT64_C(0x789));
     }
