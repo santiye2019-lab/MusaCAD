@@ -278,6 +278,22 @@ static inline int musa_dwg_ac1032_compose_planar_affine(
     for(unsigned i=0;i<6u;i++)out[i]=m[i];
     return 1;
 }
+/* Apply a validated composed INSERT transform to one source LINE.
+ * This is coordinate evidence only, never a visibility/paint decision. */
+static inline int musa_dwg_ac1032_transform_planar_segment(
+    const double m[6],const double source_xy[4],double out_xy[4]){
+    if(!m||!source_xy||!out_xy)return 0;
+    for(unsigned i=0;i<6u;i++)if(!isfinite(m[i]))return 0;
+    for(unsigned i=0;i<4u;i++)if(!isfinite(source_xy[i]))return 0;
+    const double transformed[4]={
+        m[0]*source_xy[0]+m[1]*source_xy[1]+m[2],
+        m[3]*source_xy[0]+m[4]*source_xy[1]+m[5],
+        m[0]*source_xy[2]+m[1]*source_xy[3]+m[2],
+        m[3]*source_xy[2]+m[4]*source_xy[3]+m[5]};
+    for(unsigned i=0;i<4u;i++)if(!isfinite(transformed[i]))return 0;
+    for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
