@@ -401,6 +401,16 @@ static inline int musa_dwg_ac1032_scene_index_original_insert_line_chain(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
+/* Compose original indexed INSERT affines and apply them to one source
+ * LINE atomically. BLOCK owner edges still need graph-level verification. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_line_chain_xy(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,
+    double x1,double y1,double x2,double y2,double out_xy[4]){
+    const double source[4]={x1,y1,x2,y2};
+    return musa_dwg_ac1032_scene_index_original_insert_line_chain(
+        index,insert_handles,block_handles,count,source,out_xy);
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
