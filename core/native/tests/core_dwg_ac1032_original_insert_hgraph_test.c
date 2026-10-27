@@ -94,6 +94,40 @@ static int utf8_layer_name_oracle(void){
             ok?"PASS":"FAIL");
     return ok;
 }
+/* TEXT/MTEXT may legitimately be empty; OT51 layer names may not.
+ * Invalid original source UTF-8 must never be passed to text inventory/UI. */
+static int text_source_utf8_oracle(void){
+    const char empty[]="";
+    const char plain[]="Original text";
+    const char supplementary[]={(char)0xf0,(char)0x9f,(char)0x98,(char)0x80,0};
+    const char bad_overlong[]={(char)0xc0,(char)0xaf,0};
+    const char bad_surrogate[]={(char)0xed,(char)0xa0,(char)0x80,0};
+    const char bad_truncated[]={(char)0xe2,(char)0x82,0};
+    const char embedded_nul[]={'A',0,'B',0};
+    const char unterminated[]={'A','B'};
+    const int ok=
+        musa_dwg_ac1032_source_utf8_valid(empty,0u,sizeof(empty),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(empty,0u,sizeof(empty),0)&&
+        musa_dwg_ac1032_source_utf8_valid(
+            plain,sizeof(plain)-1u,sizeof(plain),1)&&
+        musa_dwg_ac1032_source_utf8_valid(
+            supplementary,sizeof(supplementary)-1u,
+            sizeof(supplementary),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_overlong,sizeof(bad_overlong)-1u,sizeof(bad_overlong),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_surrogate,sizeof(bad_surrogate)-1u,sizeof(bad_surrogate),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            bad_truncated,sizeof(bad_truncated)-1u,sizeof(bad_truncated),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            embedded_nul,sizeof(embedded_nul)-1u,sizeof(embedded_nul),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(
+            unterminated,sizeof(unterminated),sizeof(unterminated),1)&&
+        !musa_dwg_ac1032_source_utf8_valid(NULL,0u,1u,1);
+    fprintf(stderr,"%s strict OT1/OT44 UTF-8 source vectors\\n",
+            ok?"PASS":"FAIL");
+    return ok;
+}
 static int genuine(const char *file){
     FILE *f=fopen(file,"rb");
     if(!f)return 0;
@@ -114,6 +148,30 @@ static int genuine(const char *file){
         src,(size_t)n,&scene)&&!memcmp(src,saved,(size_t)n);
     free(src);free(saved);
     if(!ok)return 0;
+    /* Independently identified original R2018 OT1 H8E and OT44 H1C0:
+     * Unicode is source-only, not permission for glyphs or paint. */
+    if(ok){
+        MusaDwgAc1032TextSource t={0};
+        MusaDwgAc1032MTextSource mt={0};
+        ok=musa_dwg_ac1032_scene_index_read_text_source(
+                scene,UINT64_C(0x8e),&t)&&
+           t.indexed_handle==UINT64_C(0x8e)&&
+           t.original_record_crc_verified&&
+           !t.geometry_font_and_display_accepted&&
+           t.utf8_bytes>0u&&
+           musa_dwg_ac1032_source_utf8_valid(
+               t.utf8,t.utf8_bytes,sizeof(t.utf8),1)&&
+           musa_dwg_ac1032_scene_index_read_mtext_source(
+               scene,UINT64_C(0x1c0),&mt)&&
+           mt.indexed_handle==UINT64_C(0x1c0)&&
+           mt.original_record_crc_verified&&
+           !mt.geometry_style_and_glyphs_accepted&&
+           mt.utf8_bytes>0u&&
+           musa_dwg_ac1032_source_utf8_valid(
+               mt.utf8,mt.utf8_bytes,sizeof(mt.utf8),1);
+        fprintf(stderr,"%s authentic R2018 OT1 H8E / OT44 H1C0 bounded Unicode source\\n",
+                ok?"PASS":"FAIL");
+    }
     /* Handles from independent DXF AcDbBlockReference / BLOCK_RECORD,
      * ATTRIB and SEQEND group 5, never guessed from adjacent offsets. */
     const Expected expected[]={
@@ -2228,7 +2286,7 @@ static int genuine(const char *file){
     return ok;
 }
 int main(int argc,char **argv){
-    if(argc==1)return bit_order_oracle()&&utf8_layer_name_oracle()?0:1;
+    if(argc==1)return bit_order_oracle()&&utf8_layer_name_oracle()&&text_source_utf8_oracle()?0:1;
     if(argc!=2)return 2;
-    return bit_order_oracle()&&utf8_layer_name_oracle()&&genuine(argv[1])?0:1;
+    return bit_order_oracle()&&utf8_layer_name_oracle()&&text_source_utf8_oracle()&&genuine(argv[1])?0:1;
 }
