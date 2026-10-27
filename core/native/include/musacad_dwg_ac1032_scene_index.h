@@ -859,13 +859,8 @@ static inline int musa_dwg_ac1032_scene_index_insert_block_line_sources(
                 local.child_handles,local.line_count,handle)||
            !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                 index,handle,&owner)||
-           owner.child_handle!=handle||
-           owner.owner_block_header_handle!=local.block_header_handle||
-           owner.raw_entity_type!=19u||
-           !owner.original_child_record_crc_verified||
-           !owner.original_owner_and_layer_records_crc_verified||
-           !owner.exact_h4_owner_and_h5_layer_source_verified||
-           owner.visible_scene_and_paint_accepted||
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+                &owner,handle,local.block_header_handle,19u)||
            !musa_dwg_ac1032_scene_index_read_line(
                 index,handle,&line)||
            line.common.invisibility!=0u)return 0;
