@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1032_handles.h"
 #include "musacad_dwg_ac1032_sections.h"
+#include "musacad_dwg_ac1032_object_payload.h"
+#include "musacad_dwg_ac1015_values.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +15,63 @@ static int overlap(const void *p, size_t n, const void *q, size_t m){
     if(!n||!m)return 0;
     const uintptr_t a=(uintptr_t)p,b=(uintptr_t)q;
     return a<=b?b-a<n:a-b<m;
+}
+/* Both original map profiles are CRC-validated before selection.
+ * A candidate's index H is NOT proof of the record's embedded self H.
+ * Inspect a bounded, distributed sample of independently CRC-checked
+ * original entity records. Unsupported types contribute no evidence. */
+typedef struct HandleMapEvidence {
+    size_t exact,foreign;
+} HandleMapEvidence;
+static HandleMapEvidence handle_map_evidence(
+    const uint8_t *objects,size_t object_bytes,
+    const MusaDwgAc1032HandleEntry *entries,size_t count){
+    HandleMapEvidence evidence={0};
+    if(!objects||!entries||!count)return evidence;
+    const size_t samples=count<512u?count:512u;
+    for(size_t k=0u;k<samples;k++){
+        const size_t at=samples==1u?0u:
+            (k*(count-1u))/(samples-1u);
+        const MusaDwgAc1032HandleEntry *entry=&entries[at];
+        MusaDwgAc1032PayloadInfo info={0};
+        size_t needed=0u,copied=0u;
+        if(!musa_dwg_ac1032_object_payload_bytes(
+             objects,object_bytes,entry->handle,entry->object_offset,
+             NULL,0u,&needed,&info)||!info.original_record_crc_verified||
+           !needed||needed>object_bytes||info.object_type_field_bits!=10u)
+            continue;
+        const uint16_t type=info.raw_object_type;
+        if(type!=1u&&type!=2u&&type!=3u&&type!=4u&&type!=5u&&
+           type!=7u&&type!=17u&&type!=18u&&type!=19u&&
+           type!=27u&&type!=35u&&type!=44u&&type!=77u)continue;
+        uint8_t *raw=(uint8_t*)malloc(needed);
+        if(!raw)continue;
+        MusaDwgAc1032PayloadInfo copied_info={0};
+        int ok=musa_dwg_ac1032_object_payload_bytes(
+              objects,object_bytes,entry->handle,entry->object_offset,
+              raw,needed,&copied,&copied_info)&&copied==needed&&
+              copied_info.original_record_crc_verified;
+        if(ok){
+            MusaDwgAc1015Bits bits={0};
+            uint32_t header=0u;
+            ok=musa_dwg_ac1015_bits_init(
+                 &bits,raw,needed,10u,needed*8u)&&
+               musa_dwg_ac1015_bits_read_u(&bits,8u,&header)&&
+               !(header>>4u)&&(header&15u)>0u&&(header&15u)<=8u;
+            uint64_t self=0u;
+            for(unsigned j=0u;ok&&j<(header&15u);j++){
+                uint32_t byte=0u;
+                ok=musa_dwg_ac1015_bits_read_u(&bits,8u,&byte);
+                if(ok)self=(self<<8u)|byte;
+            }
+            if(ok){
+                if(self==entry->handle)evidence.exact++;
+                else evidence.foreign++;
+            }
+        }
+        free(raw);
+    }
+    return evidence;
 }
 int musa_dwg_ac1032_handles_index(
     const uint8_t *file,size_t file_bytes,
@@ -69,7 +128,7 @@ int musa_dwg_ac1032_handles_index(
      * without actual valid LZ logical content is not sufficient. */
     uint8_t *objects=malloc(object_bytes);
     uint8_t *handles=malloc(handle_bytes);
-    MusaDwgAc1032HandleEntry *temporary=NULL;
+    MusaDwgAc1032HandleEntry *temporary=NULL,*alternate=NULL;
     size_t object_got=0u,handle_got=0u,needed=0u;
     ok=0;
     if(!objects||!handles)goto done;
@@ -78,26 +137,59 @@ int musa_dwg_ac1032_handles_index(
        object_got!=object_bytes||
        !musa_dwg_ac1032_extract_named_section(file,file_bytes,
           "AcDb:Handles",handles,handle_bytes,&handle_got)||
-       handle_got!=handle_bytes||
-       !musa_dwg_ac1018_handles_index_continuous_offsets(handles,handle_bytes,object_bytes,
-                                     NULL,0u,&needed)||
-       !needed||needed>MUSA_AC1032_HANDLES_MAX||
-       needed>SIZE_MAX/sizeof(*entries))
+       handle_got!=handle_bytes)goto done;
+    size_t legacy_count=0u,continuous_count=0u;
+    const int legacy_ok=musa_dwg_ac1018_handles_index(
+        handles,handle_bytes,object_bytes,NULL,0u,&legacy_count);
+    const int continuous_ok=
+        musa_dwg_ac1018_handles_index_continuous_offsets(
+        handles,handle_bytes,object_bytes,NULL,0u,&continuous_count);
+    if(!legacy_ok&&!continuous_ok)goto done;
+    needed=legacy_ok?legacy_count:continuous_count;
+    if(!needed||needed>MUSA_AC1032_HANDLES_MAX||
+       needed>SIZE_MAX/sizeof(*entries)||
+       (legacy_ok&&continuous_ok&&legacy_count!=continuous_count))
         goto done;
     if(entries){
         if(capacity<needed)goto done;
         temporary=malloc(needed*sizeof(*temporary));
         if(!temporary)goto done;
         size_t filled=0u;
-        if(!musa_dwg_ac1018_handles_index_continuous_offsets(
+        if(!(legacy_ok?musa_dwg_ac1018_handles_index(
               handles,handle_bytes,object_bytes,
-              temporary,needed,&filled)||filled!=needed)
-            goto done;
+              temporary,needed,&filled):
+              musa_dwg_ac1018_handles_index_continuous_offsets(
+              handles,handle_bytes,object_bytes,
+              temporary,needed,&filled))||filled!=needed)goto done;
+        /* Only switch to the continuous profile when independent original
+         * CRC-backed entity self handles positively prove it and the
+         * legacy profile is demonstrably mismatched. Otherwise preserve
+         * the established profile. Never synthesize a missing handle. */
+        if(legacy_ok&&continuous_ok){
+            alternate=malloc(needed*sizeof(*alternate));
+            if(!alternate)goto done;
+            size_t alt_count=0u;
+            if(musa_dwg_ac1018_handles_index_continuous_offsets(
+                   handles,handle_bytes,object_bytes,
+                   alternate,needed,&alt_count)&&alt_count==needed){
+                const HandleMapEvidence a=handle_map_evidence(
+                    objects,object_bytes,temporary,needed);
+                const HandleMapEvidence b=handle_map_evidence(
+                    objects,object_bytes,alternate,needed);
+                if(b.exact>=4u&&b.foreign==0u&&
+                   b.exact>a.exact&&a.foreign>0u){
+                    MusaDwgAc1032HandleEntry *swap=temporary;
+                    temporary=alternate;
+                    alternate=swap;
+                }
+            }
+        }
         memcpy(entries,temporary,needed*sizeof(*entries));
     }
     *out_count=needed;
     ok=1;
 done:
+    free(alternate);
     free(temporary);
     free(handles);
     free(objects);
