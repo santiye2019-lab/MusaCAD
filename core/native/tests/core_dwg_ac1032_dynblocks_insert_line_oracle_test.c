@@ -91,7 +91,7 @@ static int original(const char *filename){
     fprintf(stderr,"%s genuine R2018 Dynblocks INSERT source LINE: "
                    "%zu INSERT, %zu strict source joins, %zu lines; "
                    "first H%llx child H%llx (%.8f %.8f)-(%.8f %.8f); "
-                   "paint never accepted\\n",
+                   "paint never accepted\n",
             ok?"PASS":"FAIL",inserts,verified,admitted,
             (unsigned long long)first_insert,(unsigned long long)first_line,
             first_xy[0],first_xy[1],first_xy[2],first_xy[3]);
