@@ -166,6 +166,24 @@ jobs:
           test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
           echo "PASS original layer source numeric bits; DXF 70 distinct, paint blocked"
 
+      - name: P0 R2018 original CIRCLE LAYER signed DXF oracle without final paint
+        run: |
+          set -euo pipefail
+          original=third_party/libredwg/test/test-data/example_2018.dwg
+          oracle=third_party/libredwg/test/test-data/example_2018.dxf
+          before="$(sha256sum "$original" | cut -d ' ' -f1)"
+          test "$(head -c 6 "$original")" = AC1032
+          test -s "$oracle"
+          cmake -S core/native -B /tmp/musacad-circle-layer-dxf-oracle -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build /tmp/musacad-circle-layer-dxf-oracle --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            core/native/tests/core_dwg_ac1032_circle_layer_dxf_status_oracle_test.c \
+            /tmp/musacad-circle-layer-dxf-oracle/libmusacad_core.a -lm \
+            -o /tmp/musacad-r2018-circle-layer-dxf-oracle
+          timeout 120s /tmp/musacad-r2018-circle-layer-dxf-oracle "$original" "$oracle"
+          test "$before" = "$(sha256sum "$original" | cut -d ' ' -f1)"
+          echo "PASS original R2018 source ACI vs external DXF signed 62/70; viewport paint blocked"
+
       - name: P0 genuine R2018 BLOCK INSERT ATTRIB indexed original H CRC oracle
         run: |
           set -euo pipefail
