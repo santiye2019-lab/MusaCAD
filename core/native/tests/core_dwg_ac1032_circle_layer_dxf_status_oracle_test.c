@@ -100,6 +100,52 @@ static int run(const char *dwg,const char *dxf){
        !memcmp(bytes,copy,(size_t)n);
     free(bytes);free(copy);
     if(!ok){musa_dwg_ac1032_scene_index_close(scene);return 0;}
+    /* Independent original R2018 H1C8 INSERT golden fixture. Verify that
+     * the new source-only join agrees exactly with the two independently
+     * authenticated H/CRC readers; never infer reverse owner or paint.
+     * If the OT49 child prefix is unsupported for this genuine fixture,
+     * fail closed and retain the explicit negative oracle instead. */
+    if(ok){
+        MusaDwgAc1032InsertSourceGraph graph={0};
+        ok=musa_dwg_ac1032_scene_index_insert_source_graph(
+             scene,UINT64_C(0x1c8),&graph)&&
+           graph.indexed_handle==UINT64_C(0x1c8)&&
+           graph.block_header_handle!=0u&&
+           graph.original_entity_and_targets_crc_verified&&
+           graph.source_edges_verified&&
+           !graph.block_expansion_and_display_accepted;
+        if(ok){
+            MusaDwgAc1032BlockHeaderTypedChildren children={0};
+            const int direct=
+                musa_dwg_ac1032_scene_index_block_header_typed_children(
+                    scene,graph.block_header_handle,&children);
+            MusaDwgAc1032InsertBlockChildInventory joined={0};
+            const int admitted=
+                musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+                    scene,UINT64_C(0x1c8),&joined);
+            ok=direct==admitted;
+            if(ok&&admitted)ok=
+                !memcmp(&graph,&joined.insert,sizeof(graph))&&
+                !memcmp(&children,&joined.block,sizeof(children))&&
+                joined.insert_to_block_source_edge_verified&&
+                !joined.reverse_owner_and_nested_transforms_verified&&
+                !joined.final_display_accepted;
+            if(ok&&!admitted){
+                fprintf(stderr,"Original R2018 H1C8 OT49 typed children "
+                    "unsupported: join correctly rejects; no block paint\\n");
+            }
+            MusaDwgAc1032InsertBlockChildInventory untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032InsertBlockChildInventory before=untouched;
+            const uint64_t invalid[]={0u,UINT64_C(0x1bb),UINT64_MAX};
+            for(size_t i=0u;ok&&i<sizeof(invalid)/sizeof(invalid[0]);i++)
+                ok=!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+                        scene,invalid[i],&untouched)&&
+                   !memcmp(&untouched,&before,sizeof(before));
+            if(ok)ok=!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+                       scene,UINT64_C(0x1c8),NULL);
+        }
+    }
     MusaDwgAc1032CircleLayerStatusPreflight v={0};
     ok=musa_dwg_ac1032_circle_layer_status_preflight(
            scene,UINT64_C(0x1c8),UINT64_C(0x1bb),&v)&&
