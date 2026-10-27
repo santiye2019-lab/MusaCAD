@@ -18,6 +18,7 @@ typedef struct MusaDwgAc1032CircleAdaptiveV6Evidence {
     uint64_t insert_handle,circle_handle,layer_handle;
     size_t segment_count,float_word_count;
     double requested_world_xy_error,conservative_world_xy_error_bound;
+    double max_float32_vertex_displacement,combined_world_xy_error_bound;
     uint32_t unresolved_original_dwg_requirements;
     uint16_t original_layer_packed_values;
     uint8_t original_layer_aci;
@@ -59,13 +60,27 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
     }
     v[7]=(float)(512u+MUSA_AC1032_CIRCLE_ADAPTIVE_DIAGNOSTIC_ACI);
     v[8]=(float)(poly.segment_count+1u);
+    double max_float_displacement=0.0;
     for(size_t i=0u;i<=poly.segment_count;i++){
         for(unsigned k=0u;k<2u;k++){
             const float f=(float)poly.xy[i][k];
             if(!isfinite(f))return 0;
             v[9u+2u*i+k]=f;
         }
+        const double dx=(double)v[9u+2u*i]-poly.xy[i][0];
+        const double dy=(double)v[10u+2u*i]-poly.xy[i][1];
+        const double displacement=hypot(dx,dy);
+        if(!isfinite(displacement))return 0;
+        if(displacement>max_float_displacement)
+            max_float_displacement=displacement;
     }
+    /* The float32 transport adds vertex displacement to the original
+     * source curve-to-chord error. Reject if the sum exceeds the caller's
+     * WORLD-XY budget; successful source tessellation alone is insufficient. */
+    const double float_bound=nextafter(max_float_displacement,INFINITY);
+    const double combined=nextafter(
+        poly.conservative_xy_chord_error_bound+float_bound,INFINITY);
+    if(!isfinite(combined)||combined>max_world_xy_error)return 0;
     /* Reject float32 quantization that erases the entire source curve.
      * A double-precision source circle can be nondegenerate yet collapse
      * into one float32 point at very large WCS offsets. Such a packet
@@ -90,6 +105,8 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
     proof.requested_world_xy_error=poly.max_requested_xy_chord_error;
     proof.conservative_world_xy_error_bound=
         poly.conservative_xy_chord_error_bound;
+    proof.max_float32_vertex_displacement=float_bound;
+    proof.combined_world_xy_error_bound=combined;
     proof.unresolved_original_dwg_requirements=
         poly.unresolved_original_dwg_requirements;
     proof.original_layer_packed_values=poly.original_layer_packed_values;
