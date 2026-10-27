@@ -37,6 +37,7 @@ static int original(const char *filename){
     size_t graph_inventory_affine_ok=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
+    size_t insert_type_lookup_failures=0u;
     uint64_t first_insert=0u,first_line=0u;
     double first_xy[4]={0};
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
@@ -45,7 +46,7 @@ static int original(const char *filename){
         ok=musa_dwg_ac1032_scene_index_entry(scene,i,&entry)&&
            musa_dwg_ac1032_scene_index_object_type(
                scene,entry.handle,&type);
-        if(!ok)break; /* Index/type failures must not be skipped. */
+        if(!ok){insert_type_lookup_failures++;break;} /* Fail closed. */
         if(type!=7u)continue;
         inserts++;
         if(!first_rejected_insert)first_rejected_insert=entry.handle;
@@ -104,6 +105,8 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG index/type lookup failures=%zu\\n",
+            insert_type_lookup_failures);
     fprintf(stderr,"DIAG first source graph rejection index=%zu\\n",
             source_graph_first_failure);
     fprintf(stderr,"DIAG genuine R2018 first INSERT handle=H%llx\\n",
