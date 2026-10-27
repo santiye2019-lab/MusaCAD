@@ -69,6 +69,27 @@ int musa_dwg_ac1032_text_v6_packet(
     uint8_t extra=0u,exact=0u;
     if(!musa_dwg_ac1032_preview_v6_entity_source_style_code(
         &c,6u,&code,&rgb,&extra,&exact))return 0;
+    /* Independent original OT1 H/CRC entity->LAYER source evidence must
+     * agree with the first-frame v6 color. A source direct RGB/ACI is
+     * NOT proof of owner/model-space, frozen/off, viewport or glyph paint.
+     * BYLAYER/BYBLOCK and complex ENC stay provisional, never guessed. */
+    const int plain=!c.has_rgb&&!c.has_color_reference&&
+        !c.has_transparency;
+    const int direct_rgb=c.has_rgb&&!c.has_color_reference&&
+        !c.has_transparency&&c.rgb<=UINT32_C(0x00ffffff);
+    if(direct_rgb){
+        if(!b.color.entity_has_direct_rgb24||
+           b.color.entity_source_rgb24!=c.rgb||!exact||
+           extra!=1u||code!=-1538.f||rgb!=(float)c.rgb)return 0;
+    }else if(plain&&c.color_index>=1u&&c.color_index<=255u){
+        if(!b.color.entity_has_direct_aci||!exact||extra!=0u||
+           code!=(float)(1536u+c.color_index))return 0;
+    }else if(plain&&c.color_index==256u){
+        if(!b.color.entity_by_layer||exact||code!=1543.f)return 0;
+    }else if(plain&&c.color_index==0u){
+        if(!b.color.entity_by_block||exact||code!=1543.f)return 0;
+    }else if(!b.color.entity_complex_color_or_transparency||
+             exact||code!=1543.f)return 0;
     /* Type6: [code,(RGB),x,y,ux,uy,vx,vy,hAlign,vAlign,byteCount,
      * packed UTF8 in 24-bit exact float words]. v-axis is negative
      * source WCS up, matching the established native Canvas grammar. */
