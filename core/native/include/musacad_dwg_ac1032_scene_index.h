@@ -110,6 +110,12 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
     MusaDwgAc1032EntityCommon *out);
 /* Original R2018 OT7 INSERT OCS numeric placement; no block expansion,
  * owner/model-space or final rendering acceptance. */
+/* Diagnostic only: 0=not indexed, 1=index, 2=CRC/type payload,
+ * 3=CRC stream layout, 4=payload copy, 5=decoded entity common.
+ * This never authorizes INSERT ownership, visibility or paint. */
+int musa_dwg_ac1032_scene_index_insert_decode_stage(
+    const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
+    uint8_t *out_stage);
 /* Authenticated original INSERT H edges only. No block expansion or paint. */
 int musa_dwg_ac1032_scene_index_insert_source_graph(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,

@@ -39,6 +39,8 @@ static int original(const char *filename){
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
     size_t insert_common_ok=0u,insert_placement_ok=0u;
+    size_t fetch_stages[6]={0};
+    unsigned first_fetch_stage=255u;
     size_t entity_mode_0=0u,entity_mode_1=0u,entity_mode_2=0u;
     size_t entity_mode_other=0u,placement_has_attribs=0u;
     unsigned first_entity_mode=255u,first_reactors=0u;
@@ -56,6 +58,13 @@ static int original(const char *filename){
         if(!ok){insert_type_lookup_failures++;break;} /* Fail closed. */
         if(type!=7u)continue;
         inserts++;
+        uint8_t fetch_stage=255u;
+        if(!musa_dwg_ac1032_scene_index_insert_decode_stage(
+               scene,entry.handle,&fetch_stage)||fetch_stage>5u){
+            ok=0;break;
+        }
+        fetch_stages[fetch_stage]++;
+        if(inserts==1u)first_fetch_stage=(unsigned)fetch_stage;
         MusaDwgAc1032EntityCommon common={0};
         if(musa_dwg_ac1032_scene_index_read_insert_common(
                scene,entry.handle,&common)){
@@ -139,6 +148,12 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG original OT7 fetch stage first=%u "
+                   "not_indexed=%zu indexed=%zu payload=%zu layout=%zu "
+                   "copied=%zu common=%zu\n",
+            first_fetch_stage,fetch_stages[0],fetch_stages[1],
+            fetch_stages[2],fetch_stages[3],fetch_stages[4],
+            fetch_stages[5]);
     fprintf(stderr,"DIAG original OT7 common=%zu placement=%zu "
                    "mode0=%zu mode1=%zu mode2=%zu other=%zu attrib=%zu\n",
             insert_common_ok,insert_placement_ok,entity_mode_0,
@@ -159,6 +174,11 @@ static int original(const char *filename){
                    "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\n",
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
             line_sources_ok,segments_ok);
+    if(ok){
+        uint8_t stage=255u;
+        ok=musa_dwg_ac1032_scene_index_insert_decode_stage(
+              scene,UINT64_MAX,&stage)&&stage==0u;
+    }
     if(ok){
         MusaDwgAc1032InsertBlockLineSources out;
         memset(&out,0xa5,sizeof(out));
