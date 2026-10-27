@@ -530,6 +530,22 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const uint64_t valid[2]={11u,22u};
+        const uint64_t cyclic[2]={11u,11u};
+        const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
+                                  {0.0,-1.0,4.0,1.0,0.0,5.0}};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double out[4]={0};
+        ok=musa_dwg_ac1032_transform_segment_with_ancestry(
+               valid,chain,2u,source,out)&&
+           out[0]==14.0&&out[1]==38.0&&
+           out[2]==10.0&&out[3]==44.0;
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_segment_with_ancestry(
+               cyclic,chain,2u,source,sentinel);
+        for(unsigned i=0;i<4u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
         const uint64_t valid_owners[4]={11u,22u,33u,44u};
         const uint64_t cyclic_owners[4]={11u,22u,33u,11u};
         const uint64_t zero_owner[3]={11u,0u,33u};
