@@ -146,7 +146,7 @@ static int genuine(const char *filename){
                scene,first_insert,first_child,NULL);
     }
     fprintf(stderr,"DIAG genuine R2018 complete-owner LINE risk: "
-                   "positive=%zu partial_rejected=%zu\\n",
+                   "positive=%zu partial_rejected=%zu\n",
             complete_style_positive,partial_style_rejected);
     fprintf(stderr,"%s genuine R2018 INSERT LINE source OT51 layer: "
                    "%zu INSERT, %zu source LINE, %zu joined, "
