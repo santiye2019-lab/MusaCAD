@@ -94,6 +94,7 @@ static inline int musa_dwg_ac1032_text_source_bundle(
            !graph.original_layer_crc_verified||
            !graph.original_style_crc_verified||
            graph.layer_object_type!=51u||
+           graph.style_object_type!=53u||
            source.geometry_style_and_glyphs_accepted||
            placement.glyph_layout_and_display_accepted||
            graph.font_and_display_accepted||
@@ -118,7 +119,8 @@ static inline int musa_dwg_ac1032_text_source_bundle(
        !layer.original_record_crc_verified||
        layer.indexed_handle!=result.layer_handle||
        !musa_dwg_ac1032_source_utf8_valid(
-           layer.utf8,layer.utf8_bytes,sizeof(layer.utf8),0))return 0;
+           layer.utf8,layer.utf8_bytes,sizeof(layer.utf8),0)||
+       layer.utf8_bytes>=sizeof(result.layer_utf8))return 0;
     result.layer_utf8_bytes=layer.utf8_bytes;
     memcpy(result.layer_utf8,layer.utf8,layer.utf8_bytes+1u);
     result.original_unicode_numeric_h_graph_verified=1u;
