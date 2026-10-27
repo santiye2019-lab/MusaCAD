@@ -575,6 +575,90 @@ static int original(const char *filename){
            !memcmp(&out,&before,sizeof(out));
     }
     if(ok){
+        const uint64_t inserts[2]={101u,202u};
+        const uint64_t blocks[2]={11u,22u};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=!musa_dwg_ac1032_scene_index_original_insert_line_chain(
+               NULL,inserts,blocks,2u,source,sentinel);
+        for(unsigned i=0;i<4u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
+        double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
+        const uint64_t inserts[2]={101u,202u};
+        const uint64_t duplicate_blocks[2]={11u,11u};
+        ok=!musa_dwg_ac1032_scene_index_original_insert_affine_chain(
+               NULL,inserts,duplicate_blocks,2u,sentinel);
+        for(unsigned i=0;i<6u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
+        const uint64_t inserts[2]={101u,202u};
+        const uint64_t duplicate_inserts[2]={101u,101u};
+        const uint64_t blocks[2]={11u,22u};
+        const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
+                                  {0.0,-1.0,4.0,1.0,0.0,5.0}};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double out[4]={0};
+        ok=musa_dwg_ac1032_transform_segment_with_insert_chain(
+               inserts,blocks,chain,2u,source,out)&&
+           out[0]==14.0&&out[1]==38.0&&
+           out[2]==10.0&&out[3]==44.0;
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_segment_with_insert_chain(
+               duplicate_inserts,blocks,chain,2u,source,sentinel);
+        for(unsigned i=0;i<4u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
+        const uint64_t valid[2]={11u,22u};
+        const uint64_t cyclic[2]={11u,11u};
+        const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
+                                  {0.0,-1.0,4.0,1.0,0.0,5.0}};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double out[4]={0};
+        ok=musa_dwg_ac1032_transform_segment_with_ancestry(
+               valid,chain,2u,source,out)&&
+           out[0]==14.0&&out[1]==38.0&&
+           out[2]==10.0&&out[3]==44.0;
+        double sentinel[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_segment_with_ancestry(
+               cyclic,chain,2u,source,sentinel);
+        for(unsigned i=0;i<4u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
+    }
+    if(ok){
+        const uint64_t valid_owners[4]={11u,22u,33u,44u};
+        const uint64_t cyclic_owners[4]={11u,22u,33u,11u};
+        const uint64_t zero_owner[3]={11u,0u,33u};
+        ok=musa_dwg_ac1032_block_ancestry_handles_acyclic(valid_owners,4u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(cyclic_owners,4u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(zero_owner,3u)&&
+           !musa_dwg_ac1032_block_ancestry_handles_acyclic(valid_owners,0u);
+    }
+    if(ok){
+        double chain[65][6];
+        for(unsigned i=0;i<65u;i++){
+            chain[i][0]=1.0;chain[i][1]=0.0;chain[i][2]=1.0;
+            chain[i][3]=0.0;chain[i][4]=1.0;chain[i][5]=0.0;
+        }
+        double result[6]={0};
+        ok=musa_dwg_ac1032_fold_planar_affine_chain(chain,65u,result)&&
+           result[0]==1.0&&result[1]==0.0&&result[2]==65.0&&
+           result[3]==0.0&&result[4]==1.0&&result[5]==0.0;
+    }
+    if(ok){
+        const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
+                                  {0.0,-1.0,4.0,1.0,0.0,5.0}};
+        const double source[4]={1.0,2.0,3.0,4.0};
+        double result[4]={0};
+        ok=musa_dwg_ac1032_transform_segment_through_chain(
+               chain,2u,source,result)&&
+           result[0]==14.0&&result[1]==38.0&&
+           result[2]==10.0&&result[3]==44.0;
+        double unchanged[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_transform_segment_through_chain(
+               chain,0u,source,unchanged);
+        for(unsigned i=0;i<4u;i++)ok=ok&&unchanged[i]==9.0-(double)i;
+    }
+    if(ok){
         const double chain[2][6]={{2.0,0.0,10.0,0.0,3.0,20.0},
                                   {0.0,-1.0,4.0,1.0,0.0,5.0}};
         double m[6]={0},expected[6]={0};
@@ -582,8 +666,7 @@ static int original(const char *filename){
            musa_dwg_ac1032_fold_planar_affine_chain(chain,2u,m);
         for(unsigned i=0;i<6u;i++)ok=ok&&m[i]==expected[i];
         double sentinel[6]={9.0,8.0,7.0,6.0,5.0,4.0};
-        ok=ok&&!musa_dwg_ac1032_fold_planar_affine_chain(chain,0u,sentinel)&&
-           !musa_dwg_ac1032_fold_planar_affine_chain(chain,65u,sentinel);
+        ok=ok&&!musa_dwg_ac1032_fold_planar_affine_chain(chain,0u,sentinel);
         for(unsigned i=0;i<6u;i++)ok=ok&&sentinel[i]==9.0-(double)i;
     }
     if(ok){

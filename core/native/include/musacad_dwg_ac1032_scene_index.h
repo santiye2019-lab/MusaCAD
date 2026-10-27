@@ -294,11 +294,11 @@ static inline int musa_dwg_ac1032_transform_planar_segment(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
-/* Fold authenticated ancestor-to-descendant INSERT transforms; caller
+/* Fold any representable number of ancestor-to-descendant INSERT transforms; caller
  * must independently authenticate each owner edge. No graph traversal. */
 static inline int musa_dwg_ac1032_fold_planar_affine_chain(
     const double (*chain)[6],unsigned count,double out[6]){
-    if(!chain||!out||count==0u||count>64u)return 0;
+    if(!chain||!out||count==0u)return 0;
     double acc[6]={1.0,0.0,0.0,0.0,1.0,0.0};
     for(unsigned i=0;i<count;i++){
         double next[6];
@@ -308,6 +308,108 @@ static inline int musa_dwg_ac1032_fold_planar_affine_chain(
     }
     for(unsigned j=0;j<6u;j++)out[j]=acc[j];
     return 1;
+}
+/* Compute one source LINE's final XY coordinates through an externally
+ * authenticated INSERT ancestor chain. Does not authenticate graph edges
+ * or authorize rendering. Atomic on all failures. */
+static inline int musa_dwg_ac1032_transform_segment_through_chain(
+    const double (*chain)[6],unsigned count,
+    const double source_xy[4],double out_xy[4]){
+    if(!source_xy||!out_xy)return 0;
+    double composed[6],transformed[4];
+    if(!musa_dwg_ac1032_fold_planar_affine_chain(chain,count,composed)||
+       !musa_dwg_ac1032_transform_planar_segment(
+           composed,source_xy,transformed))return 0;
+    for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
+    return 1;
+}
+/* Reject cyclic BLOCK_HEADER ancestry before folding a supplied chain.
+ * Handles must be independently authenticated by the caller. */
+static inline int musa_dwg_ac1032_block_ancestry_handles_acyclic(
+    const uint64_t *handles,unsigned count){
+    if(!handles||count==0u)return 0;
+    for(unsigned i=0;i<count;i++){
+        if(handles[i]==0u)return 0;
+        for(unsigned j=0;j<i;j++)if(handles[j]==handles[i])return 0;
+    }
+    return 1;
+}
+/* Source-only chain gate: supplied BLOCK ancestry must be acyclic,
+ * nonzero and have exactly one owner handle per affine. The caller must
+ * authenticate every handle-to-INSERT/BLOCK edge from the DWG index. */
+static inline int musa_dwg_ac1032_transform_segment_with_ancestry(
+    const uint64_t *block_handles,const double (*chain)[6],
+    unsigned count,const double source_xy[4],double out_xy[4]){
+    if(!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           block_handles,count))return 0;
+    return musa_dwg_ac1032_transform_segment_through_chain(
+        chain,count,source_xy,out_xy);
+}
+/* Require independently supplied INSERT and BLOCK handle chains to be
+ * unique and nonzero before source-only coordinate transformation.
+ * This is NOT proof that any INSERT actually references its BLOCK. */
+static inline int musa_dwg_ac1032_transform_segment_with_insert_chain(
+    const uint64_t *insert_handles,const uint64_t *block_handles,
+    const double (*chain)[6],unsigned count,
+    const double source_xy[4],double out_xy[4]){
+    if(!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           insert_handles,count))return 0;
+    return musa_dwg_ac1032_transform_segment_with_ancestry(
+        block_handles,chain,count,source_xy,out_xy);
+}
+/* Resolve each original INSERT->BLOCK source affine from the indexed DWG,
+ * then fold the supplied ancestor order. Handle order and parent-child
+ * owner edges still require independent authentication by the caller. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_affine_chain(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,double out[6]){
+    if(!index||!out||!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           insert_handles,count)||
+       !musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           block_handles,count))return 0;
+    double acc[6]={1.0,0.0,0.0,0.0,1.0,0.0};
+    for(unsigned i=0;i<count;i++){
+        MusaDwgAc1032InsertSourceGraph graph={0};
+        double local[6],next[6];
+        if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+               index,insert_handles[i],&graph)||
+           graph.indexed_handle!=insert_handles[i]||
+           !graph.original_entity_and_targets_crc_verified||
+           !graph.source_edges_verified||
+           graph.block_expansion_and_display_accepted||
+           graph.block_header_handle!=block_handles[i]||
+           !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+               index,insert_handles[i],local)||
+           !musa_dwg_ac1032_compose_planar_affine(acc,local,next))return 0;
+        for(unsigned j=0;j<6u;j++)acc[j]=next[j];
+    }
+    for(unsigned j=0;j<6u;j++)out[j]=acc[j];
+    return 1;
+}
+/* Convert source LINE endpoints through indexed original INSERT affines.
+ * Caller must separately verify nested owner edges and paint visibility. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_line_chain(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,
+    const double source_xy[4],double out_xy[4]){
+    if(!source_xy||!out_xy)return 0;
+    double composed[6],transformed[4];
+    if(!musa_dwg_ac1032_scene_index_original_insert_affine_chain(
+           index,insert_handles,block_handles,count,composed)||
+       !musa_dwg_ac1032_transform_planar_segment(
+           composed,source_xy,transformed))return 0;
+    for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
+    return 1;
+}
+/* Compose original indexed INSERT affines and apply them to one source
+ * LINE atomically. BLOCK owner edges still need graph-level verification. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_line_chain_xy(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,
+    double x1,double y1,double x2,double y2,double out_xy[4]){
+    const double source[4]={x1,y1,x2,y2};
+    return musa_dwg_ac1032_scene_index_original_insert_line_chain(
+        index,insert_handles,block_handles,count,source,out_xy);
 }
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
