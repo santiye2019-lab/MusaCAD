@@ -3,6 +3,7 @@
  * exact source Unicode TU vs companion DXF oracle, NOT glyph layout. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_source_utf8.h"
+#include "musacad_dwg_ac1032_text_source_bundle.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,27 @@ static int sample(const char *filename){
         ok=!musa_dwg_ac1032_scene_index_read_text_source(
               scene,UINT64_MAX,&sentinel)&&
            !memcmp(&sentinel,&before,sizeof(sentinel));
+    }
+    if(ok){
+        MusaDwgAc1032TextSourceBundle bundle={0};
+        ok=musa_dwg_ac1032_text_source_bundle(scene,h,1u,&bundle)&&
+           bundle.indexed_handle==h&&bundle.raw_object_type==1u&&
+           bundle.original_unicode_numeric_h_graph_verified&&
+           bundle.original_layer_name_verified&&
+           !bundle.font_layout_visibility_color_and_paint_accepted&&
+           bundle.layer_handle!=0u&&bundle.style_handle!=0u&&
+           bundle.utf8_bytes==text.utf8_bytes&&
+           !strcmp(bundle.utf8,text.utf8);
+        if(ok){
+            MusaDwgAc1032TextSourceBundle rejected;
+            memset(&rejected,0x5a,sizeof(rejected));
+            const MusaDwgAc1032TextSourceBundle before=rejected;
+            ok=!musa_dwg_ac1032_text_source_bundle(
+                   scene,h,44u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,UINT64_MAX,1u,&rejected)&&
+               !memcmp(&rejected,&before,sizeof(rejected));
+        }
     }
     fprintf(stderr,"%s genuine R2018 OT1 H8E Unicode='%s'; "
        "WCS/font/owner/display UNVERIFIED\n",ok?"PASS":"FAIL",

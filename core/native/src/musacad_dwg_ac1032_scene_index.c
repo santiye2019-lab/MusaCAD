@@ -851,7 +851,7 @@ int musa_dwg_ac1032_scene_index_mtext_graph(
     if(!musa_dwg_ac1032_scene_index_object_type(
           s,value.layer_handle,&layer_type)||layer_type!=51u||
        !musa_dwg_ac1032_scene_index_object_type(
-          s,value.style_handle,&style_type))return 0;
+          s,value.style_handle,&style_type)||style_type!=53u)return 0;
     value.layer_object_type=layer_type;
     value.style_object_type=style_type;
     value.original_entity_crc_verified=1u;
