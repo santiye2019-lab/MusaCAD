@@ -10,6 +10,7 @@
 #include "musacad_dwg_ac1032_text_source_bundle.h"
 #include "musacad_dwg_ac1015_values.h"
 #include <stdint.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -140,6 +141,34 @@ int main(int argc,char **argv){
                   verified_graph.layer_object_type==51u&&
                   bundle.style_handle==verified_graph.style_handle&&
                   bundle.layer_handle==verified_graph.layer_handle;
+        /* Genuine OT44 numeric layout: original x-axis, extrusion,
+         * rectangle and attachment, NOT final WCS glyph placement. */
+        MusaDwgAc1032MTextPlacement numeric={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_read_mtext_placement(
+                      scene,h,&numeric)&&
+                  musa_dwg_ac1032_mtext_numeric_valid(&numeric)&&
+                  bundle.source_numeric_placement_preserved&&
+                  bundle.mtext_source_placement.indexed_handle==h&&
+                  bundle.mtext_source_placement.original_record_crc_verified&&
+                  !bundle.mtext_source_placement.glyph_layout_and_display_accepted&&
+                  bundle.mtext_source_placement.rect_width==numeric.rect_width&&
+                  bundle.mtext_source_placement.rect_height==numeric.rect_height&&
+                  bundle.mtext_source_placement.attachment==numeric.attachment&&
+                  bundle.mtext_source_placement.drawing_direction==
+                      numeric.drawing_direction;
+        for(unsigned k=0u;ok&&k<3u;k++)
+            ok=bundle.mtext_source_placement.insertion[k]==numeric.insertion[k]&&
+               bundle.mtext_source_placement.x_axis[k]==numeric.x_axis[k]&&
+               bundle.mtext_source_placement.extrusion[k]==numeric.extrusion[k];
+        if(ok){
+            MusaDwgAc1032MTextPlacement invalid=numeric;
+            invalid.x_axis[0]=NAN;
+            ok=!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
+            invalid=numeric;invalid.rect_width=INFINITY;
+            ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
+            invalid=numeric;invalid.text_height=0.0;
+            ok=ok&&!musa_dwg_ac1032_mtext_numeric_valid(&invalid);
+        }
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
             memset(&rejected,0x5a,sizeof(rejected));

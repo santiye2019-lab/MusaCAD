@@ -17,12 +17,43 @@ typedef struct MusaDwgAc1032TextSourceBundle {
     uint16_t raw_object_type;
     uint32_t utf8_bytes,layer_utf8_bytes;
     double insertion[3],text_height;
+    /* Preserve the complete independently CRC-backed numeric source records.
+     * OT1 is OCS; OT44 is original layout axes, neither is glyph paint. */
+    MusaDwgAc1032TextPlacement text_ocs_placement;
+    MusaDwgAc1032MTextPlacement mtext_source_placement;
+    uint8_t source_numeric_placement_preserved;
     char utf8[2048];
     char layer_utf8[512]; /* Authenticated OT51 name, not visibility/color. */
     uint8_t original_unicode_numeric_h_graph_verified;
     uint8_t original_layer_name_verified;
     uint8_t font_layout_visibility_color_and_paint_accepted; /* ALWAYS 0 */
 } MusaDwgAc1032TextSourceBundle;
+
+/* Numeric source must not expose NaN/Inf to any future 2B geometry stage.
+ * This is a pure validator, deliberately separate from font/paint approval. */
+static inline int musa_dwg_ac1032_text_ocs_numeric_valid(
+    const MusaDwgAc1032TextPlacement *p){
+    if(!p||!p->original_record_crc_verified||!p->numeric_fields_decoded||
+       p->wcs_font_and_display_accepted||!isfinite(p->height)||
+       p->height<=0.0||!isfinite(p->width_factor)||
+       !isfinite(p->rotation)||!isfinite(p->oblique)||
+       !isfinite(p->thickness))return 0;
+    for(unsigned k=0u;k<3u;k++)
+        if(!isfinite(p->insertion[k])||!isfinite(p->alignment[k])||
+           !isfinite(p->extrusion[k]))return 0;
+    return 1;
+}
+static inline int musa_dwg_ac1032_mtext_numeric_valid(
+    const MusaDwgAc1032MTextPlacement *p){
+    if(!p||!p->original_record_crc_verified||!p->geometry_fields_decoded||
+       p->glyph_layout_and_display_accepted||!isfinite(p->text_height)||
+       p->text_height<=0.0||!isfinite(p->rect_width)||
+       !isfinite(p->rect_height))return 0;
+    for(unsigned k=0u;k<3u;k++)
+        if(!isfinite(p->insertion[k])||!isfinite(p->extrusion[k])||
+           !isfinite(p->x_axis[k]))return 0;
+    return 1;
+}
 
 /* Fail-atomic for invalid handle/type, unsupported source profiles,
  * malformed Unicode, nonfinite insertion, or mismatched H/CRC layer.
@@ -54,6 +85,7 @@ static inline int musa_dwg_ac1032_text_source_bundle(
            !source.original_record_crc_verified||
            !placement.original_record_crc_verified||
            !placement.numeric_fields_decoded||
+           !musa_dwg_ac1032_text_ocs_numeric_valid(&placement)||
            !graph.graph_edges_verified||
            !graph.original_entity_crc_verified||
            !graph.original_layer_crc_verified||
@@ -72,6 +104,8 @@ static inline int musa_dwg_ac1032_text_source_bundle(
         result.utf8_bytes=source.utf8_bytes;
         memcpy(result.utf8,source.utf8,source.utf8_bytes+1u);
         result.text_height=placement.height;
+        result.text_ocs_placement=placement;
+        result.source_numeric_placement_preserved=1u;
         for(unsigned k=0u;k<3u;k++)result.insertion[k]=placement.insertion[k];
     }else{
         MusaDwgAc1032MTextSource source={0};
@@ -89,6 +123,7 @@ static inline int musa_dwg_ac1032_text_source_bundle(
            !source.original_record_crc_verified||
            !placement.original_record_crc_verified||
            !placement.geometry_fields_decoded||
+           !musa_dwg_ac1032_mtext_numeric_valid(&placement)||
            !graph.graph_edges_verified||
            !graph.original_entity_crc_verified||
            !graph.original_layer_crc_verified||
@@ -107,6 +142,8 @@ static inline int musa_dwg_ac1032_text_source_bundle(
         result.utf8_bytes=source.utf8_bytes;
         memcpy(result.utf8,source.utf8,source.utf8_bytes+1u);
         result.text_height=placement.text_height;
+        result.mtext_source_placement=placement;
+        result.source_numeric_placement_preserved=1u;
         for(unsigned k=0u;k<3u;k++)result.insertion[k]=placement.insertion[k];
     }
     if(!result.layer_handle||!result.style_handle||
