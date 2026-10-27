@@ -158,6 +158,7 @@ static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
        h_header>>4u||!(h_header&15u)||(h_header&15u)>8u){
         out->prefix_reason=1u;return;
     }
+    out->embedded_handle_length=(uint8_t)(h_header&15u);
     for(unsigned i=0u;i<(h_header&15u);i++){
         uint32_t b=0u;
         if(!musa_dwg_ac1015_bits_read_u(&bits,8u,&b)){
@@ -165,6 +166,7 @@ static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
         }
         self=(self<<8u)|b;
     }
+    out->embedded_self_handle=self;
     if(self!=layout->indexed_handle){
         out->prefix_reason=2u;return;
     }

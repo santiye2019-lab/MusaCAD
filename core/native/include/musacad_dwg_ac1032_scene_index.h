@@ -115,8 +115,9 @@ int musa_dwg_ac1032_scene_index_read_attrib_common(
  * 8=binary data store, 9=canonical strict prefix. Untrusted field
  * values are diagnostic only, never permission to render. */
 typedef struct MusaDwgAc1032InsertPrefixProbe {
-    uint64_t indexed_handle;
+    uint64_t indexed_handle,embedded_self_handle;
     uint32_t reactor_count;
+    uint8_t embedded_handle_length;
     uint16_t eed_bytes;
     uint8_t fetch_stage,prefix_reason;
     uint8_t preview,entity_mode,xdictionary_missing;

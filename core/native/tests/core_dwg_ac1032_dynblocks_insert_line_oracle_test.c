@@ -38,6 +38,8 @@ static int original(const char *filename){
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
+    size_t line_samples=0u,line_sample_ok=0u;
+    size_t first_mismatches=0u;
     size_t insert_common_ok=0u,insert_placement_ok=0u;
     size_t fetch_stages[6]={0};
     size_t prefix_reasons[10]={0};
@@ -58,6 +60,12 @@ static int original(const char *filename){
            musa_dwg_ac1032_scene_index_object_type(
                scene,entry.handle,&type);
         if(!ok){insert_type_lookup_failures++;break;} /* Fail closed. */
+        if(type==19u&&line_samples<10u){
+            MusaDwgAc1032NativeLine line={0};
+            line_samples++;
+            if(musa_dwg_ac1032_scene_index_read_line(
+                   scene,entry.handle,&line))line_sample_ok++;
+        }
         if(type!=7u)continue;
         inserts++;
         uint8_t fetch_stage=255u;
@@ -74,6 +82,15 @@ static int original(const char *filename){
            probe.fetch_stage!=fetch_stage||
            probe.prefix_reason>9u){ok=0;break;}
         prefix_reasons[probe.prefix_reason]++;
+        if(probe.prefix_reason==2u&&first_mismatches<5u){
+            fprintf(stderr,"DIAG self mismatch %zu: index=H%llx "
+                           "embedded=H%llx length=%u\n",
+                    first_mismatches+1u,
+                    (unsigned long long)entry.handle,
+                    (unsigned long long)probe.embedded_self_handle,
+                    (unsigned)probe.embedded_handle_length);
+            first_mismatches++;
+        }
         if(inserts==1u)first_prefix=probe;
         MusaDwgAc1032EntityCommon common={0};
         if(musa_dwg_ac1032_scene_index_read_insert_common(
@@ -158,6 +175,8 @@ static int original(const char *filename){
             admitted++;
         }
     }
+    fprintf(stderr,"DIAG genuine OT19 LINE sample decoded=%zu/%zu\n",
+            line_sample_ok,line_samples);
     fprintf(stderr,"DIAG original OT7 prefix gates: "
                    "unavailable=%zu Hheader=%zu self=%zu EED=%zu "
                    "preview=%zu mode=%zu reactors=%zu xdict=%zu "
