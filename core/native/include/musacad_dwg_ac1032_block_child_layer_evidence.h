@@ -93,10 +93,12 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                 row->layer_handle=link.edge.layer_handle;
                 row->layer_evidence_status=MUSACAD_AC1032_BLOCK_LAYER_VERIFIED;
                 result.verified_layer_count++;
-            }else if(type==19u){
-                /* A block-owned LINE has an explicit owner H4 (or a
-                 * canonical relative H12) before its H5 layer. The
-                 * no-owner layer reader must reject that valid grammar.
+            }else if(type==17u||type==18u||type==19u||
+                     type==27u||type==35u||type==77u){
+                /* A block-owned geometric entity may have an explicit H4
+                 * owner (or an authenticated OT18/OT19 relative H12)
+                 * before its H5 layer. The no-owner layer reader must
+                 * reject that valid grammar.
                  * Recover only from the independently CRC/type-checked
                  * owner+layer source, and require this exact OT49 parent
                  * plus the original OT51 Unicode name. Never infer
@@ -105,7 +107,7 @@ static inline int musa_dwg_ac1032_block_child_layer_evidence(
                 MusaDwgAc1032LayerName layer={0};
                 if(musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                        scene,h,&edge)&&
-                   edge.child_handle==h&&edge.raw_entity_type==19u&&
+                   edge.child_handle==h&&edge.raw_entity_type==type&&
                    edge.owner_block_header_handle==block_header_handle&&
                    edge.layer_handle&&edge.layer_handle!=h&&
                    edge.original_child_record_crc_verified&&
