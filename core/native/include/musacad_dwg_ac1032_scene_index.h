@@ -338,7 +338,13 @@ typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
     uint16_t raw_entity_type;
     uint8_t original_child_record_crc_verified;
     uint8_t original_owner_and_layer_records_crc_verified;
+    /* Historical name: verified exact owner + layer graph role. The
+     * canonical original handle stream may encode OT18's owner as absolute
+     * H4 or the independently verified H12 base-relative reference.
+     * Explicitly retain its raw wire code instead of claiming both H4. */
     uint8_t exact_h4_owner_and_h5_layer_source_verified;
+    uint8_t original_owner_wire_code; /* original 4 or OT18-only 12 */
+    uint8_t original_relative_h12_owner_verified;
     uint8_t visible_scene_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032EntityBlockOwnerLayerSource;
 int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
@@ -360,6 +366,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
 #define MUSACAD_AC1032_CIRCLE_H_TARGET_TYPES_REJECTED 7u
 #define MUSACAD_AC1032_CIRCLE_H_GRAPH_REJECTED 8u
 #define MUSACAD_AC1032_CIRCLE_H_EXACT_EDGE 9u
+#define MUSACAD_AC1032_CIRCLE_H_EXACT_RELATIVE_H12_EDGE 10u
 typedef struct MusaDwgAc1032CircleHTailProfile {
     uint64_t indexed_handle,handle_start_bit,handle_end_bit;
     uint64_t first_raw_target,second_raw_target;
@@ -373,6 +380,7 @@ typedef struct MusaDwgAc1032CircleHTailProfile {
     uint8_t second_ref_decoded,second_ref_code,second_ref_count;
     uint8_t profile_status,original_record_crc_verified;
     uint8_t exact_h4_h5_source_verified;
+    uint8_t verified_relative_h12_owner_h5_layer_source;
     uint8_t final_visibility_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032CircleHTailProfile;
 int musa_dwg_ac1032_scene_index_circle_h_tail_profile(

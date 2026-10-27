@@ -28,7 +28,7 @@ static int genuine(const char *path){
           !a.final_color_visibility_and_ownership_accepted&&
           a.insert_candidates>=3u&&
           a.source_numeric_circles>=1u&&
-          a.unresolved_h4_h5_circles>=1u&&
+          a.unresolved_h4_h5_circles<a.source_numeric_circles&&
           a.emitted_numeric_wireframes==a.source_numeric_circles&&
           a.required_float_words==7u+
               a.emitted_numeric_wireframes*(2u+2u*65u)&&

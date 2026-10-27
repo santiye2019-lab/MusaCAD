@@ -27,7 +27,7 @@ static int original(const char *path){
     ok=musa_dwg_ac1032_circle_wireframe_v6_diagnostic(
            scene,NULL,0u,&evidence)&&
        evidence.emitted_numeric_wireframes>0u&&
-       evidence.unresolved_h4_h5_circles>0u;
+       evidence.unresolved_h4_h5_circles<evidence.emitted_numeric_wireframes;
     float *packet=ok?(float*)malloc(evidence.required_float_words*sizeof(float)):NULL;
     if(!packet)ok=0;
     if(ok)ok=musa_dwg_ac1032_circle_wireframe_v6_diagnostic(
@@ -48,7 +48,10 @@ static int original(const char *path){
            h1c8.block_header_handle==UINT64_C(0x1b8)&&
            h1c8.circle_candidate_count==1u&&
            h1c8.verified_circle_count==1u&&
-           h1c8.h4_h5_unresolved_count==1u&&
+           h1c8.h4_h5_unresolved_count==0u&&
+           h1c8.h4_h5_source_verified_count==1u&&
+           h1c8.rows[0].verified_block_owner_handle==UINT64_C(0x1b8)&&
+           h1c8.rows[0].source_layer_handle==UINT64_C(0x8a)&&
            h1c8.rows[0].child_handle==UINT64_C(0x1bb)&&
            fabs(h1c8.rows[0].world_center[0]-8482.030567364651)<1e-6&&
            fabs(h1c8.rows[0].world_center[1]+1381.341268226861)<1e-6&&
