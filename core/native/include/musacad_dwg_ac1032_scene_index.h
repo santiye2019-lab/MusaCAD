@@ -425,7 +425,7 @@ typedef struct MusaDwgAc1032InsertBlockLineSources {
 static inline int musa_dwg_ac1032_source_line_handle_admissible(
     const uint64_t *previous,uint32_t count,uint64_t candidate){
     if(!previous||!candidate||
-       count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+       count>=MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
     for(uint32_t i=0u;i<count;i++)
         if(!previous[i]||previous[i]==candidate)return 0;
     return 1;
