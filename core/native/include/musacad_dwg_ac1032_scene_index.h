@@ -357,6 +357,31 @@ static inline int musa_dwg_ac1032_transform_segment_with_insert_chain(
     return musa_dwg_ac1032_transform_segment_with_ancestry(
         block_handles,chain,count,source_xy,out_xy);
 }
+/* Resolve each original INSERT->BLOCK source affine from the indexed DWG,
+ * then fold the supplied ancestor order. Handle order and parent-child
+ * owner edges still require independent authentication by the caller. */
+static inline int musa_dwg_ac1032_scene_index_original_insert_affine_chain(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    const uint64_t *block_handles,unsigned count,double out[6]){
+    if(!index||!out||!musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           insert_handles,count)||
+       !musa_dwg_ac1032_block_ancestry_handles_acyclic(
+           block_handles,count))return 0;
+    double acc[6]={1.0,0.0,0.0,0.0,1.0,0.0};
+    for(unsigned i=0;i<count;i++){
+        MusaDwgAc1032InsertSourceGraph graph={0};
+        double local[6],next[6];
+        if(!musa_dwg_ac1032_scene_index_insert_source_graph(
+               index,insert_handles[i],&graph)||
+           graph.block_header_handle!=block_handles[i]||
+           !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+               index,insert_handles[i],local)||
+           !musa_dwg_ac1032_compose_planar_affine(acc,local,next))return 0;
+        for(unsigned j=0;j<6u;j++)acc[j]=next[j];
+    }
+    for(unsigned j=0;j<6u;j++)out[j]=acc[j];
+    return 1;
+}
 int musa_dwg_ac1032_scene_index_read_insert_common(
     const MusaDwgAc1032SceneIndex *index,uint64_t indexed_handle,
     MusaDwgAc1032EntityCommon *out);
