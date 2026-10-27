@@ -600,6 +600,31 @@ static int process(const MusaDwgAc1032SceneIndex *s,
                     !provenance.rendering_accepted&&
                     common.invisibility==0u&&
                     !provenance.source_entity_invisible;
+                /* The first-frame direct ACI/RGB must match the separate
+                 * CRC/H-joined OT44 -> OT51 color provenance. This does
+                 * NOT establish model-space, owner or viewport visibility.
+                 * BYLAYER/BYBLOCK and complex styles remain provisional. */
+                if(supported){
+                    const int plain=!common.has_rgb&&
+                        !common.has_color_reference&&
+                        !common.has_transparency;
+                    const int direct_rgb=common.has_rgb&&
+                        !common.has_color_reference&&
+                        !common.has_transparency&&
+                        common.rgb<=UINT32_C(0x00ffffff);
+                    if(direct_rgb)
+                        supported=provenance.entity_has_direct_rgb24&&
+                            provenance.entity_source_rgb24==common.rgb;
+                    else if(plain&&common.color_index>=1u&&
+                            common.color_index<=255u)
+                        supported=provenance.entity_has_direct_aci&&
+                            provenance.entity_aci==common.color_index;
+                    else if(plain&&common.color_index==256u)
+                        supported=provenance.entity_by_layer!=0u;
+                    else if(plain&&common.color_index==0u)
+                        supported=provenance.entity_by_block!=0u;
+                    else supported=provenance.entity_complex_color_or_transparency!=0u;
+                }
             }
             const double ux=place.x_axis[0]*place.text_height;
             const double uy=place.x_axis[1]*place.text_height;
