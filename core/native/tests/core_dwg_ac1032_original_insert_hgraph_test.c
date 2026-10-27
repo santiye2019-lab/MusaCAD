@@ -1976,8 +1976,16 @@ static int genuine(const char *file){
                 continue; /* Unsupported source must remain fail-atomic. */
             }
             MusaDwgAc1032InsertLineSourceSegments ref={0};
-            ok=musa_dwg_ac1032_insert_line_source_segments(
-                   scene,inserts[b],&ref)&&
+            const int ref_ok=musa_dwg_ac1032_insert_line_source_segments(
+                   scene,inserts[b],&ref);
+            fprintf(stderr,"DIAG example INSERT H%llx got_lines=%u "
+                           "ref_ok=%d ref_lines=%u block=H%llx "
+                           "expected_block=H%llx\n",
+                    (unsigned long long)inserts[b],got.line_count,
+                    ref_ok,ref.verified_planar_line_count,
+                    (unsigned long long)got.block_header_handle,
+                    (unsigned long long)blocks[b]);
+            ok=ref_ok&&
                ref.original_source_line_packet_verified&&
                !ref.model_viewport_layer_visibility_and_paint_accepted&&
                got.insert_handle==inserts[b]&&
@@ -2019,7 +2027,7 @@ static int genuine(const char *file){
                    scene,UINT64_C(0x1c8),NULL);
         }
         fprintf(stderr,"%s genuine R2018 strict reverse-owner LINE source "
-                       "cross-check: %u admitted, no paint\\n",
+                       "cross-check: %u admitted, no paint\n",
                 ok?"PASS":"FAIL",(unsigned)matched);
     }
     fprintf(stderr,"%s genuine R2018 INSERT H1C8/H190/H756 source H graph and H1C8 origin transform; "
