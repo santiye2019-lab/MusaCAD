@@ -68,6 +68,13 @@ static int sample(const char *filename){
                   bundle.layer_utf8_bytes>0u&&
                   bundle.layer_utf8_bytes<sizeof(bundle.layer_utf8)&&
                   !strcmp(bundle.layer_utf8,original_layer.utf8);
+        MusaDwgAc1032TextGraph verified_graph={0};
+        if(ok)ok=musa_dwg_ac1032_scene_index_text_graph(
+                      scene,h,&verified_graph)&&
+                  verified_graph.style_object_type==53u&&
+                  verified_graph.layer_object_type==51u&&
+                  bundle.style_handle==verified_graph.style_handle&&
+                  bundle.layer_handle==verified_graph.layer_handle;
         if(ok){
             MusaDwgAc1032TextSourceBundle rejected;
             memset(&rejected,0x5a,sizeof(rejected));
@@ -76,6 +83,12 @@ static int sample(const char *filename){
                    scene,h,44u,&rejected)&&
                !musa_dwg_ac1032_text_source_bundle(
                    scene,UINT64_MAX,1u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,0u,1u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   scene,h,0u,&rejected)&&
+               !musa_dwg_ac1032_text_source_bundle(
+                   NULL,h,1u,&rejected)&&
                !memcmp(&rejected,&before,sizeof(rejected));
         }
     }
