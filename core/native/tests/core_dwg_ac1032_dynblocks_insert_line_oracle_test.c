@@ -341,6 +341,16 @@ static int original(const char *filename){
                     got.child_handles,k+1u,got.child_handles[k])){
                 ok=0;break;
             }
+            /* Genuine R2018 LINE must retain its authenticated original
+             * H4 or permitted relative H12 owner before acceptance. */
+            MusaDwgAc1032EntityBlockOwnerLayerSource source_edge={0};
+            if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                   scene,got.child_handles[k],&source_edge)||
+               !musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &source_edge,got.child_handles[k],
+                   got.block_header_handle,19u)){
+                ok=0;break;
+            }
             int matches=0;
             for(uint32_t j=0u;j<ref.verified_planar_line_count;j++){
                 const MusaDwgAc1032InsertLineSourceRow *row=&ref.rows[j];
