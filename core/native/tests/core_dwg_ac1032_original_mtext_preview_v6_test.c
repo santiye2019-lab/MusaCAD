@@ -4,6 +4,7 @@
  * font rendering, BYLAYER resolving or model-space visibility acceptance.
  * No LibreDWG runtime. */
 #include "musacad_dwg_ac1032_preview_v6.h"
+#include "musacad_dwg_ac1032_color_provenance.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,7 +14,8 @@ static int near(double a,double b,double eps){
     return isfinite(a)&&fabs(a-b)<eps;
 }
 static int check(const float *words,size_t length,
-                 const MusaDwgAc1032MTextSource *source){
+                 const MusaDwgAc1032MTextSource *source,
+                 const MusaAc1032ColorProvenance *color){
     if(!words||length<18u||words[0]!=6.0f||
        words[1]<1.0f||words[6]!=1.0f)return 0;
     size_t at=7u,parsed=0u,found=0u;
@@ -21,6 +23,7 @@ static int check(const float *words,size_t length,
         const float raw=words[at++];
         if(!isfinite(raw)||raw==0.0f||fabsf(raw)>16383.0f)
             return 0;
+        const float direct_rgb_word=raw<0.0f&&at<length?words[at]:0.0f;
         const uint32_t packed=(uint32_t)fabsf(raw);
         const uint32_t type=packed>>8u;
         if(type<1u||type>6u)return 0;
@@ -60,6 +63,15 @@ static int check(const float *words,size_t length,
             at+=n;buffer[bytes]='\0';
             if(bytes==(int)source->utf8_bytes&&
                strcmp(buffer,source->utf8)==0){
+                /* Independent original CRC/H OT44 -> OT51 ENC oracle:
+                 * verify the actual native v6 first-frame style word. */
+                const float expected=color->entity_has_direct_rgb24?
+                    -1538.0f:color->entity_has_direct_aci?
+                    (float)(1536u+color->entity_aci):1543.0f;
+                if(raw!=expected||
+                   (color->entity_has_direct_rgb24&&
+                    direct_rgb_word!=(float)color->entity_source_rgb24))
+                    return 0;
                 if(!near(g[0],7.33298,.0003)||
                    !near(g[1],14.1158,.0003)||
                    !near(g[2],.2,.00001)||
@@ -99,12 +111,20 @@ int main(int argc,char **argv){
     free(src);free(snapshot);
     if(!ok){fprintf(stderr,"FAIL authentic MTEXT source open\n");return 1;}
     MusaDwgAc1032MTextSource text={0};
+    MusaAc1032ColorProvenance color={0};
     MusaAc1032PreviewV6Stats planned={0},done={0};
     MusaAc1032PreviewV6SourceCensus census={0};
     ok=musa_dwg_ac1032_scene_index_read_mtext_source(
            scene,UINT64_C(0x1c0),&text)&&
        text.utf8_bytes>0u&&
        text.original_record_crc_verified&&
+       musa_dwg_ac1032_scene_planar_color_provenance(
+           scene,UINT64_C(0x1c0),&color)&&
+       color.entity_handle==UINT64_C(0x1c0)&&
+       color.raw_entity_type==44u&&
+       color.entity_and_layer_crc_verified&&
+       !color.source_entity_invisible&&
+       !color.rendering_accepted&&
        !text.geometry_style_and_glyphs_accepted&&
        musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
            scene,NULL,0u,&planned)&&
@@ -128,7 +148,7 @@ int main(int argc,char **argv){
             if(ok)ok=musa_dwg_ac1032_preview_v6_planar_source_with_mtext(
                 scene,packet,planned.required_float_words,&done)&&
                 memcmp(&planned,&done,sizeof(done))==0&&
-                check(packet,planned.required_float_words,&text);
+                check(packet,planned.required_float_words,&text,&color);
             free(packet);
         }
     }
