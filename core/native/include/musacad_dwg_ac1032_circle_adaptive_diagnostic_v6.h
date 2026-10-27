@@ -100,6 +100,11 @@ static inline int musa_dwg_ac1032_circle_adaptive_diagnostic_v6(
         }
     }
     if(!distinct_float_vertex)return 0;
+    /* The diagnostic packet stores a closed polyline. Reject an invalid
+     * vertex count before writing anything to caller-owned memory. */
+    if(v[8]!=(float)(poly.segment_count+1u)||
+       v[9u+2u*poly.segment_count]!=v[9u]||
+       v[10u+2u*poly.segment_count]!=v[10u])return 0;
     /* The packet's bounds must enclose its ACTUAL transported float32
      * vertices, not merely the double-precision source envelope. A
      * rounded vertex outside the envelope must not be silently culled. */
