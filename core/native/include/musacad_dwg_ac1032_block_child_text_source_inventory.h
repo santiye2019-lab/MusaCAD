@@ -2,6 +2,7 @@
 #ifndef MUSACAD_DWG_AC1032_BLOCK_CHILD_TEXT_SOURCE_INVENTORY_H
 #define MUSACAD_DWG_AC1032_BLOCK_CHILD_TEXT_SOURCE_INVENTORY_H
 #include "musacad_dwg_ac1032_block_child_layer_evidence.h"
+#include "musacad_dwg_ac1032_source_utf8.h"
 #include <stdint.h>
 
 /* CRC/H-authenticated OT49 child candidates are classified individually.
@@ -76,7 +77,9 @@ static inline int musa_dwg_ac1032_block_child_text_source_inventory(
             string_ok=(uint8_t)(
                 musa_dwg_ac1032_scene_index_read_text_source(
                   scene,h,&text)&&text.original_record_crc_verified&&
-                text.indexed_handle==h&&!text.geometry_font_and_display_accepted);
+                text.indexed_handle==h&&!text.geometry_font_and_display_accepted&&
+                musa_dwg_ac1032_source_utf8_valid(
+                    text.utf8,text.utf8_bytes,sizeof(text.utf8),1));
             if(string_ok)row->source_utf8_bytes=text.utf8_bytes;
             placement_ok=(uint8_t)(
                 musa_dwg_ac1032_scene_index_read_text_placement(
@@ -102,7 +105,9 @@ static inline int musa_dwg_ac1032_block_child_text_source_inventory(
             string_ok=(uint8_t)(
                 musa_dwg_ac1032_scene_index_read_mtext_source(
                   scene,h,&text)&&text.original_record_crc_verified&&
-                text.indexed_handle==h&&!text.geometry_style_and_glyphs_accepted);
+                text.indexed_handle==h&&!text.geometry_style_and_glyphs_accepted&&
+                musa_dwg_ac1032_source_utf8_valid(
+                    text.utf8,text.utf8_bytes,sizeof(text.utf8),1));
             if(string_ok)row->source_utf8_bytes=text.utf8_bytes;
             placement_ok=(uint8_t)(
                 musa_dwg_ac1032_scene_index_read_mtext_placement(
