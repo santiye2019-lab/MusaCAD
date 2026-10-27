@@ -42,6 +42,10 @@ static int original(const char *filename){
     size_t admitted_line_sources=0u,source_segments_positive=0u;
     size_t source_segments_total=0u,source_segments_lines=0u;
     size_t graph_inventory_affine_ok=0u;
+    size_t owner_audit_ok=0u,owner_audit_verified=0u;
+    size_t owner_audit_complete=0u,owner_audit_unsupported=0u;
+    size_t owner_audit_rejected=0u,owner_audit_unreadable=0u;
+    size_t owner_audit_mismatched=0u,owner_audit_unsupported_on_reject=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
@@ -136,6 +140,40 @@ static int original(const char *filename){
         if(musa_dwg_ac1032_scene_index_insert_block_child_inventory(
                scene,entry.handle,&inventory)){
             inventory_ok++;
+            MusaDwgAc1032InsertBlockOwnerAudit audit={0};
+            if(musa_dwg_ac1032_scene_index_insert_block_owner_audit(
+                   scene,entry.handle,&audit)){
+                owner_audit_ok++;
+                owner_audit_verified+=audit.supported_child_count;
+                owner_audit_unsupported+=audit.unsupported_child_count;
+                if(audit.complete_reverse_owner_links_verified)
+                    owner_audit_complete++;
+                if(audit.insert_handle!=entry.handle||
+                   audit.block_header_handle!=
+                       inventory.insert.block_header_handle||
+                   audit.child_count!=inventory.block.prefix.child_count||
+                   !audit.supported_reverse_owner_links_verified||
+                   audit.final_display_accepted||
+                   audit.supported_child_count+audit.unsupported_child_count!=
+                       audit.child_count){ok=0;break;}
+            }else{
+                owner_audit_rejected++;
+                for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++){
+                    const uint16_t t=inventory.block.child_object_types[z];
+                    if(t!=17u&&t!=18u&&t!=19u&&
+                       t!=27u&&t!=35u&&t!=77u){
+                        owner_audit_unsupported_on_reject++;
+                        continue;
+                    }
+                    MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+                    const uint64_t child=inventory.block.prefix.child_handles[z];
+                    if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                           scene,child,&edge))owner_audit_unreadable++;
+                    else if(!musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &edge,child,inventory.insert.block_header_handle,t))
+                        owner_audit_mismatched++;
+                }
+            }
             size_t candidates=0u;
             for(uint32_t z=0u;z<inventory.block.prefix.child_count;z++)
                 if(inventory.block.child_object_types[z]==19u)candidates++;
@@ -326,6 +364,16 @@ static int original(const char *filename){
                    "inventory=%zu affine=%zu all_three=%zu line_sources=%zu segments=%zu\n",
             inserts,graph_ok,inventory_ok,affine_ok,graph_inventory_affine_ok,
             line_sources_ok,segments_ok);
+    fprintf(stderr,"DIAG OT49 reverse owner audit: successful=%zu "
+                   "verified=%zu unsupported=%zu complete=%zu "
+                   "rejected=%zu unreadable_edges=%zu mismatched_edges=%zu "
+                   "unsupported_on_reject=%zu\n",
+            owner_audit_ok,owner_audit_verified,owner_audit_unsupported,
+            owner_audit_complete,owner_audit_rejected,owner_audit_unreadable,
+            owner_audit_mismatched,owner_audit_unsupported_on_reject);
+    if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
+             owner_audit_complete>0u&&
+             owner_audit_ok+owner_audit_rejected==inventory_ok;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
@@ -347,6 +395,50 @@ static int original(const char *filename){
                   scene,UINT64_C(0xbcaa),&bad)&&
                !memcmp(&bad,&before,sizeof(bad));
         }
+    }
+    if(ok){
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        ok=musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+              scene,UINT64_C(0xbcad),&edge)&&
+           musa_dwg_ac1032_block_child_owner_edge_matches(
+              &edge,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+        if(ok){
+            MusaDwgAc1032EntityBlockOwnerLayerSource changed=edge;
+            changed.owner_block_header_handle^=1u;
+            ok=!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.child_handle^=1u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_child_record_crc_verified=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.visible_scene_and_paint_accepted=1u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.layer_handle=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.raw_entity_type=17u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_owner_wire_code=3u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_relative_h12_owner_verified=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+            changed=edge;changed.original_owner_and_layer_records_crc_verified=0u;
+            ok=ok&&!musa_dwg_ac1032_block_child_owner_edge_matches(
+                  &changed,UINT64_C(0xbcad),UINT64_C(0xbcaa),19u);
+        }
+    }
+    if(ok){
+        MusaDwgAc1032InsertBlockOwnerAudit bad;
+        memset(&bad,0xa5,sizeof(bad));
+        const MusaDwgAc1032InsertBlockOwnerAudit before=bad;
+        ok=!musa_dwg_ac1032_scene_index_insert_block_owner_audit(
+              scene,UINT64_MAX,&bad)&&!memcmp(&bad,&before,sizeof(bad));
     }
     if(ok){
         uint8_t stage=255u;

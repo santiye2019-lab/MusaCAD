@@ -424,6 +424,73 @@ typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
 int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     const MusaDwgAc1032SceneIndex *scene,uint64_t child_handle,
     MusaDwgAc1032EntityBlockOwnerLayerSource *out);
+/* Source-only reverse-owner audit for the explicitly supported OT49
+ * child geometry profiles. Unsupported types are counted, never assumed
+ * owned or silently treated as paintable. No nested INSERT traversal,
+ * model-space/viewport/layer/color resolution or final paint approval. */
+typedef struct MusaDwgAc1032InsertBlockOwnerAudit {
+    uint64_t insert_handle,block_header_handle;
+    uint32_t child_count,supported_child_count,unsupported_child_count;
+    uint8_t supported_reverse_owner_links_verified;
+    uint8_t complete_reverse_owner_links_verified;
+    uint8_t final_display_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockOwnerAudit;
+static inline int musa_dwg_ac1032_block_child_owner_edge_matches(
+    const MusaDwgAc1032EntityBlockOwnerLayerSource *edge,
+    uint64_t child,uint64_t block,uint16_t type){
+    if(!edge||!child||!block||!edge->layer_handle||
+       edge->child_handle!=child||
+       edge->owner_block_header_handle!=block||
+       edge->raw_entity_type!=type||
+       !edge->original_child_record_crc_verified||
+       !edge->original_owner_and_layer_records_crc_verified||
+       !edge->exact_h4_owner_and_h5_layer_source_verified||
+       edge->visible_scene_and_paint_accepted)return 0;
+    if(edge->original_owner_wire_code==4u)
+        return !edge->original_relative_h12_owner_verified;
+    return (type==18u||type==19u)&&
+           edge->original_owner_wire_code==12u&&
+           edge->original_relative_h12_owner_verified;
+}
+static inline int musa_dwg_ac1032_scene_index_insert_block_owner_audit(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockOwnerAudit *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockChildInventory inventory={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_inventory(
+           index,insert_handle,&inventory)||
+       !inventory.insert_to_block_source_edge_verified||
+       inventory.reverse_owner_and_nested_transforms_verified||
+       inventory.final_display_accepted)return 0;
+    MusaDwgAc1032InsertBlockOwnerAudit local={0};
+    local.insert_handle=insert_handle;
+    local.block_header_handle=inventory.insert.block_header_handle;
+    local.child_count=inventory.block.prefix.child_count;
+    for(uint32_t i=0u;i<local.child_count;i++){
+        const uint16_t type=inventory.block.child_object_types[i];
+        if(type!=17u&&type!=18u&&type!=19u&&
+           type!=27u&&type!=35u&&type!=77u){
+            local.unsupported_child_count++;
+            continue;
+        }
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        const uint64_t child=inventory.block.prefix.child_handles[i];
+        if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               index,child,&edge)||
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,child,local.block_header_handle,type))
+            return 0;
+        local.supported_child_count++;
+    }
+    if(!local.supported_child_count||
+       local.supported_child_count+local.unsupported_child_count!=
+           local.child_count)return 0;
+    local.supported_reverse_owner_links_verified=1u;
+    local.complete_reverse_owner_links_verified=
+        (uint8_t)(local.unsupported_child_count==0u);
+    *out=local;
+    return 1;
+}
 /* Extract transformed LINE endpoints from an authenticated INSERT's
  * OT49 child H list. SOURCE-ONLY: reverse owner and display are NOT
  * verified. Callers MUST NOT treat these as paint-authorized geometry.
