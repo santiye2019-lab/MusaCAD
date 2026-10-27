@@ -40,7 +40,8 @@ static int original(const char *filename){
         ok=musa_dwg_ac1032_scene_index_entry(scene,i,&entry)&&
            musa_dwg_ac1032_scene_index_object_type(
                scene,entry.handle,&type);
-        if(!ok||type!=7u)continue;
+        if(!ok)break; /* Index/type failures must not be skipped. */
+        if(type!=7u)continue;
         inserts++;
         MusaDwgAc1032InsertBlockLineSources got={0};
         if(!musa_dwg_ac1032_scene_index_insert_block_line_sources(
