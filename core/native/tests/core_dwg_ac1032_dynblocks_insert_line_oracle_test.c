@@ -49,6 +49,7 @@ static int original(const char *filename){
     size_t coverage_ok=0u,coverage_verified=0u,coverage_unreadable=0u;
     size_t coverage_mismatched=0u,coverage_unsupported=0u;
     size_t coverage_complete=0u;
+    size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
     size_t insert_type_lookup_failures=0u;
@@ -171,6 +172,29 @@ static int original(const char *filename){
                    coverage.child_status[z]>MUSACAD_AC1032_BLOCK_OWNER_MISMATCH){
                     ok=0;break;
                 }
+            }
+            if(!ok)break;
+            for(uint32_t z=0u;ok&&z<coverage.child_count;z++){
+                if(coverage.child_status[z]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
+                    continue;
+                MusaDwgAc1032InsertBlockChildLayerSource layer={0};
+                if(!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+                       scene,entry.handle,coverage.child_handles[z],&layer)){
+                    child_layer_unavailable++;
+                    continue;
+                }
+                child_layer_joined++;
+                ok=layer.original_owner_layer_and_name_verified&&
+                   !layer.final_visibility_color_and_paint_accepted&&
+                   layer.insert_handle==entry.handle&&
+                   layer.block_header_handle==coverage.block_header_handle&&
+                   layer.child_handle==coverage.child_handles[z]&&
+                   layer.raw_child_type==coverage.child_types[z]&&
+                   layer.layer_handle==layer.layer_name.indexed_handle&&
+                   layer.layer_handle==layer.raw_layer_flags.indexed_handle&&
+                   layer.layer_name.original_record_crc_verified&&
+                   layer.raw_layer_flags.source_crc_verified&&
+                   layer.layer_name.utf8_bytes>0u;
             }
             if(!ok)break;
             MusaDwgAc1032InsertBlockOwnerAudit audit={0};
@@ -409,7 +433,12 @@ static int original(const char *filename){
                    "unsupported=%zu complete=%zu\n",
             coverage_ok,coverage_verified,coverage_unreadable,
             coverage_mismatched,coverage_unsupported,coverage_complete);
-    if(ok)ok=owner_audit_ok>0u&&owner_audit_verified>0u&&
+    fprintf(stderr,"DIAG OT49 verified child Unicode layer joins: "
+                   "joined=%zu unsupported=%zu\n",
+            child_layer_joined,child_layer_unavailable);
+    if(ok)ok=child_layer_joined>0u&&
+             child_layer_joined+child_layer_unavailable==coverage_verified&&
+             owner_audit_ok>0u&&owner_audit_verified>0u&&
              owner_audit_complete>0u&&
              owner_audit_ok+owner_audit_rejected==inventory_ok&&
              coverage_ok==inventory_ok&&
@@ -498,6 +527,22 @@ static int original(const char *filename){
                    &edge,1,UINT64_C(0xbcad),UINT64_C(0xbcaa),999u)==
                    MUSACAD_AC1032_BLOCK_OWNER_UNSUPPORTED;
         }
+    }
+    if(ok){
+        MusaDwgAc1032InsertBlockChildLayerSource bad;
+        memset(&bad,0xa5,sizeof(bad));
+        const MusaDwgAc1032InsertBlockChildLayerSource before=bad;
+        ok=!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+               scene,UINT64_MAX,UINT64_C(0xbcad),&bad)&&
+           !memcmp(&bad,&before,sizeof(bad))&&
+           !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+               scene,UINT64_C(0xc195),UINT64_MAX,&bad)&&
+           !memcmp(&bad,&before,sizeof(bad))&&
+           !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+               NULL,UINT64_C(0xc195),UINT64_C(0xbcad),&bad)&&
+           !memcmp(&bad,&before,sizeof(bad))&&
+           !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+               scene,UINT64_C(0xc195),UINT64_C(0xbcad),NULL);
     }
     if(ok){
         MusaDwgAc1032InsertBlockOwnerCoverage bad;
