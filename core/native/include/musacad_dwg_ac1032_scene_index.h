@@ -373,6 +373,10 @@ static inline int musa_dwg_ac1032_scene_index_original_insert_affine_chain(
         double local[6],next[6];
         if(!musa_dwg_ac1032_scene_index_insert_source_graph(
                index,insert_handles[i],&graph)||
+           graph.indexed_handle!=insert_handles[i]||
+           !graph.original_entity_and_targets_crc_verified||
+           !graph.source_edges_verified||
+           graph.block_expansion_and_display_accepted||
            graph.block_header_handle!=block_handles[i]||
            !musa_dwg_ac1032_scene_index_original_insert_block_affine(
                index,insert_handles[i],local)||
