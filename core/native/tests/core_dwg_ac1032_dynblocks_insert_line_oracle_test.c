@@ -238,6 +238,14 @@ static int original(const char *filename){
         segments_ok++;
         verified++;
         for(uint32_t k=0u;ok&&k<got.line_count;k++){
+            /* Real source LINE handles must be nonzero and unique.
+             * The same handle appended twice must be rejected. */
+            if(!musa_dwg_ac1032_source_line_handle_admissible(
+                    got.child_handles,k,got.child_handles[k])||
+               musa_dwg_ac1032_source_line_handle_admissible(
+                    got.child_handles,k+1u,got.child_handles[k])){
+                ok=0;break;
+            }
             int matches=0;
             for(uint32_t j=0u;j<ref.verified_planar_line_count;j++){
                 const MusaDwgAc1032InsertLineSourceRow *row=&ref.rows[j];
@@ -352,6 +360,25 @@ static int original(const char *filename){
         ok=!musa_dwg_ac1032_scene_index_insert_block_line_sources(
               scene,UINT64_MAX,&out)&&
            !memcmp(&out,&before,sizeof(out));
+    }
+    if(ok){
+        const uint64_t previous[2]={UINT64_C(0x123),UINT64_C(0x456)};
+        const uint64_t invalid_previous[2]={UINT64_C(0x123),0u};
+        ok=musa_dwg_ac1032_source_line_handle_admissible(
+               previous,2u,UINT64_C(0x789))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               previous,2u,UINT64_C(0x123))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               previous,2u,UINT64_C(0x456))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               previous,2u,0u)&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               invalid_previous,2u,UINT64_C(0x789))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               NULL,0u,UINT64_C(0x789))&&
+           !musa_dwg_ac1032_source_line_handle_admissible(
+               previous,MUSACAD_AC1032_OT49_CHILD_LIMIT+1u,
+               UINT64_C(0x789));
     }
     fprintf(stderr,"%s genuine R2018 Dynblocks INSERT source LINE: "
                    "%zu INSERT, %zu strict source joins, %zu lines; "
