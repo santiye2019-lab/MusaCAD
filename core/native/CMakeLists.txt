@@ -109,6 +109,13 @@ if(PROJECT_IS_TOP_LEVEL)
         target_link_libraries(musacad_core_ac1032_circle_layer_status_preflight_test PRIVATE musacad_core)
         add_test(NAME musacad_core_r2018_circle_layer_status_preflight_smoke
                  COMMAND musacad_core_ac1032_circle_layer_status_preflight_test)
+        # Original R2018 CIRCLE layer source ACI vs independent signed DXF
+        # group 62/group 70 oracle; no DWG viewport or final paint claim.
+        add_executable(musacad_core_ac1032_circle_layer_dxf_status_oracle_test
+                tests/core_dwg_ac1032_circle_layer_dxf_status_oracle_test.c)
+        target_link_libraries(musacad_core_ac1032_circle_layer_dxf_status_oracle_test PRIVATE musacad_core)
+        add_test(NAME musacad_core_r2018_circle_layer_dxf_status_oracle_smoke
+                 COMMAND musacad_core_ac1032_circle_layer_dxf_status_oracle_test)
         # Original R2018 OT18 H-tail forensic profile; no owner/layer guessing.
         add_executable(musacad_core_ac1032_circle_h_tail_profile_test
                 tests/core_dwg_ac1032_circle_h_tail_profile_test.c)
