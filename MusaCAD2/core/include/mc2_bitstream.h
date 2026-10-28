@@ -25,6 +25,11 @@ int mc2_read_dwg_bitshort(Mc2BitReader *r, int16_t *out);
 int mc2_read_dwg_bitlong(Mc2BitReader *r, int32_t *out);
 /* DWG BD: raw IEEE-754 double, implicit 1.0, or implicit 0.0. */
 int mc2_read_dwg_bitdouble(Mc2BitReader *r, double *out);
+/* DWG H references: preserve the ownership/pointer code and resolve relative
+ * handle offsets against the supplied object handle. */
+typedef struct { uint8_t code; uint64_t handle; } Mc2DwgHandleRef;
+int mc2_read_dwg_handle(Mc2BitReader *r, uint64_t base_handle,
+                        Mc2DwgHandleRef *out);
 #ifdef __cplusplus
 }
 #endif
