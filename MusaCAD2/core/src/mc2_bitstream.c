@@ -52,3 +52,15 @@ int mc2_seek_bits(Mc2BitReader *r, size_t position) {
     r->bit_position = position;
     return 1;
 }
+
+int mc2_read_bits_lsb64(Mc2BitReader *r, unsigned count, uint64_t *out) {
+    if (!r || !out || count > 64u || (size_t)count > mc2_bits_remaining(r)) return 0;
+    uint64_t value = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        size_t bit = r->bit_position + i;
+        value |= (uint64_t)((r->data[bit / 8u] >> (unsigned)(bit % 8u)) & 1u) << i;
+    }
+    r->bit_position += count;
+    *out = value;
+    return 1;
+}
