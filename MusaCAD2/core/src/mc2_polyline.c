@@ -93,3 +93,74 @@ int mc2_polyline_bulge_length(const Mc2Point2 *vertices,
     *out_length=total;
     return 1;
 }
+
+static void mc2_bounds_include(Mc2Bounds2 *b, Mc2Point2 p) {
+    if (p.x<b->min_x) b->min_x=p.x;
+    if (p.x>b->max_x) b->max_x=p.x;
+    if (p.y<b->min_y) b->min_y=p.y;
+    if (p.y>b->max_y) b->max_y=p.y;
+}
+static int mc2_angle_on_sweep(double angle,double start,double sweep) {
+    const double tau=6.28318530717958647693;
+    double delta=fmod(sweep>=0 ? angle-start : start-angle,tau);
+    if (delta<0) delta+=tau;
+    return delta<=fabs(sweep)+1e-12;
+}
+int mc2_polyline_bulge_bounds(const Mc2Point2 *vertices,
+                              const double *bulges, size_t count, int closed,
+                              const Mc2Affine2 *transform, Mc2Bounds2 *out) {
+    if (!vertices || !count || !transform || !out) return 0;
+    Mc2Bounds2 bounds;
+    if (!mc2_polyline_bounds(vertices,count,closed,transform,&bounds)) return 0;
+    const size_t edges=(closed && count>1) ? count : count-1;
+    for (size_t i=0;i<edges;++i) {
+        const double bulge=bulges ? bulges[i] : 0.0;
+        if (!isfinite(bulge)) return 0;
+        if (bulge==0.0) continue;
+        const Mc2Point2 p=vertices[i],q=vertices[(i+1)%count];
+        const double dx=q.x-p.x,dy=q.y-p.y;
+        const double chord=hypot(dx,dy);
+        if (!isfinite(chord) || chord==0.0) return 0;
+        if (fabs(bulge)<1e-8) {
+            /* The minor arc lies within a sagitta-wide strip around its
+               chord; avoid an ill-conditioned remote circle center. */
+            Mc2Point2 a,z;
+            if (!mc2_transform_point(transform,p,&a) ||
+                !mc2_transform_point(transform,q,&z)) return 0;
+            const double sagitta=0.5*fabs(bulge)*chord;
+            const double nx=-dy/chord,ny=dx/chord;
+            const double ex=sagitta*fabs(transform->a*nx+transform->c*ny);
+            const double ey=sagitta*fabs(transform->b*nx+transform->d*ny);
+            Mc2Point2 low={fmin(a.x,z.x)-ex,fmin(a.y,z.y)-ey};
+            Mc2Point2 high={fmax(a.x,z.x)+ex,fmax(a.y,z.y)+ey};
+            if (!isfinite(low.x) || !isfinite(low.y) ||
+                !isfinite(high.x) || !isfinite(high.y)) return 0;
+            mc2_bounds_include(&bounds,low);
+            mc2_bounds_include(&bounds,high);
+            continue;
+        }
+        const double center_factor=0.25*(1.0/bulge-bulge);
+        const double cx=0.5*p.x+0.5*q.x-center_factor*dy;
+        const double cy=0.5*p.y+0.5*q.y+center_factor*dx;
+        const double ab=fabs(bulge);
+        const double radius=0.25*chord*(ab+1.0/ab);
+        const double start=atan2(p.y-cy,p.x-cx);
+        const double sweep=4.0*atan(bulge);
+        if (!isfinite(cx) || !isfinite(cy) || !isfinite(radius) ||
+            radius<=0 || !isfinite(start) || !isfinite(sweep)) return 0;
+        const double xangle=atan2(transform->c,transform->a);
+        const double yangle=atan2(transform->d,transform->b);
+        const double candidates[]={xangle,xangle+3.14159265358979323846,
+                                   yangle,yangle+3.14159265358979323846};
+        for (size_t k=0;k<4;++k) {
+            if (!mc2_angle_on_sweep(candidates[k],start,sweep)) continue;
+            Mc2Point2 point={cx+radius*cos(candidates[k]),
+                             cy+radius*sin(candidates[k])};
+            Mc2Point2 transformed;
+            if (!mc2_transform_point(transform,point,&transformed)) return 0;
+            mc2_bounds_include(&bounds,transformed);
+        }
+    }
+    *out=bounds;
+    return 1;
+}
