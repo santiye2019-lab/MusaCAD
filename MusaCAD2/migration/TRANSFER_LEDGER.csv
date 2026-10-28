@@ -1,3 +1,13 @@
 legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classification,decision,tests,status
-(new implementation),core/include/mc2_bytes.h,,assistant-authored-in-new-branch,original implementation,standard C11 only,NEW_ORIGINAL,admit,not yet run,added
-(new implementation),core/src/mc2_bytes.c,,assistant-authored-in-new-branch,original implementation,standard C11 only,NEW_ORIGINAL,admit,not yet run,added
+,core/include/mc2_bytes.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_bytes.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_dwg_header.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_header.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_dwg_sections.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_sections.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_bitstream.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_bitstream.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_section_map.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_section_map.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_dwg_document.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_document.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
