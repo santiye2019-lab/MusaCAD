@@ -85,7 +85,10 @@ static inline int musa_dwg_ac1032_complete_block_line_rebase_checked(
             const float transported=(float)relative;
             if(!isfinite(transported)||
                (relative!=0.0&&transported==0.0f))return 0;
-            const double error=fabs((double)transported-relative);
+            const double reconstructed=
+                local.origin_xy[axis]+(double)transported;
+            if(!isfinite(reconstructed))return 0;
+            const double error=fabs(reconstructed-world);
             if(!isfinite(error)||error>maximum_error)return 0;
             if(error>local.max_absolute_roundtrip_error)
                 local.max_absolute_roundtrip_error=error;
