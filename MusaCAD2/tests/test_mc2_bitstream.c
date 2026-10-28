@@ -74,7 +74,54 @@ static void test_dwg_bitcodes(void) {
     assert(!mc2_read_dwg_bitdouble(&r,&d) && r.bit_position==0 && d==2.5);
 }
 
+
+static void test_dwg_handles(void) {
+    const uint8_t references[] = {
+        0x52,0x05,0xe7, /* hard pointer: absolute 0x5e7 */
+        0x60,          /* base + 1 */
+        0x80,          /* base - 1 */
+        0xa1,0x05,     /* base + 5 */
+        0xc1,0x05,     /* base - 5 */
+        0x00           /* self handle code, zero length */
+    };
+    Mc2BitReader r;
+    Mc2DwgHandleRef h = {99,999};
+    assert(mc2_bitreader_init(&r,references,sizeof references));
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==5 && h.handle==0x5e7);
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==6 && h.handle==101);
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==8 && h.handle==99);
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==10 && h.handle==105);
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==12 && h.handle==95);
+    assert(mc2_read_dwg_handle(&r,100,&h) && h.code==0 && h.handle==0);
+    assert(r.bit_position==sizeof references*8u);
+    const uint8_t invalid_code[] = {0xf0};
+    assert(mc2_bitreader_init(&r,invalid_code,sizeof invalid_code));
+    assert(!mc2_read_dwg_handle(&r,100,&h) && r.bit_position==0 && h.code==0);
+    const uint8_t invalid_count[] = {0x59};
+    assert(mc2_bitreader_init(&r,invalid_count,sizeof invalid_count));
+    assert(!mc2_read_dwg_handle(&r,100,&h) && r.bit_position==0);
+    const uint8_t truncated[] = {0x52,0x05};
+    assert(mc2_bitreader_init(&r,truncated,sizeof truncated));
+    assert(!mc2_read_dwg_handle(&r,100,&h) && r.bit_position==0);
+    const uint8_t relative_bad[] = {0x61};
+    assert(mc2_bitreader_init(&r,relative_bad,sizeof relative_bad));
+    assert(!mc2_read_dwg_handle(&r,100,&h) && r.bit_position==0);
+    const uint8_t plus_one[] = {0x60};
+    assert(mc2_bitreader_init(&r,plus_one,sizeof plus_one));
+    assert(!mc2_read_dwg_handle(&r,UINT64_MAX,&h) && r.bit_position==0);
+    const uint8_t minus_one[] = {0x80};
+    assert(mc2_bitreader_init(&r,minus_one,sizeof minus_one));
+    assert(!mc2_read_dwg_handle(&r,0,&h) && r.bit_position==0);
+    const uint8_t plus_five[] = {0xa1,0x05};
+    assert(mc2_bitreader_init(&r,plus_five,sizeof plus_five));
+    assert(!mc2_read_dwg_handle(&r,UINT64_MAX-4,&h) && r.bit_position==0);
+    const uint8_t minus_five[] = {0xc1,0x05};
+    assert(mc2_bitreader_init(&r,minus_five,sizeof minus_five));
+    assert(!mc2_read_dwg_handle(&r,4,&h) && r.bit_position==0);
+}
+
 int main(void) {
+    test_dwg_handles();
     test_dwg_bitcodes();
     const uint8_t data[] = {0xb2,0x5c,0xff};
     Mc2BitReader r;
