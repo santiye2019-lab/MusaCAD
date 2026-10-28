@@ -1470,7 +1470,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits);
-        if(ok&&(type==18u||type==19u)){
+        if(ok&&(type==18u||type==19u||type==77u)){
             MusaDwgAc1015HandleRef owner_ref={0};
             ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&owner_ref)&&
                owner_ref.target!=0u&&
@@ -1496,8 +1496,11 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                owner!=h&&layer!=h&&owner!=layer&&
                /* Independently observed OT18/OT19 relative H12 + H5
                 * require canonical ONE padding; H4 retains ZERO. */
-               (((type==18u||type==19u)&&owner_wire_code==12u)?
-                    cached_graph_one_padding(&bits):
+               (((type==18u||type==19u||type==77u)&&owner_wire_code==12u)?
+                    ((type!=77u||
+                      (bits.bit_end>=bits.bit_pos&&
+                       bits.bit_end-bits.bit_pos==5u))&&
+                     cached_graph_one_padding(&bits)):
                     cached_graph_zero_padding(&bits));
     }
     free(p.raw);
@@ -1517,7 +1520,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
     result.exact_h4_owner_and_h5_layer_source_verified=1u;
     result.original_owner_wire_code=owner_wire_code;
     result.original_relative_h12_owner_verified=
-        (uint8_t)((type==18u||type==19u)&&owner_wire_code==12u);
+        (uint8_t)((type==18u||type==19u||type==77u)&&owner_wire_code==12u);
     *out=result;
     return 1;
 }
