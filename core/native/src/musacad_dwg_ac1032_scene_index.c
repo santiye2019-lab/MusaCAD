@@ -1560,6 +1560,68 @@ int musa_dwg_ac1032_scene_index_line_h_tail_probe(
     *out=v;
     return 1;
 }
+/* Raw OT77 H-tail observations from a CRC-authenticated R2018 record.
+ * Deliberately does not reinterpret unknown H references as ownership.
+ * The caller can compare the observed wire grammar to the original
+ * OT49 forward inventory before any decoder policy is broadened. */
+int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032LWPolylineHTailProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,77u,&p))return 0;
+    if(p.layout.data_stream_bits>SIZE_MAX||
+       p.layout.total_payload_bits>SIZE_MAX||
+       p.layout.data_stream_bits>=p.layout.total_payload_bits){
+        free(p.raw);return 0;
+    }
+    MusaDwgAc1032LWPolylineHTailProbe v={0};
+    v.indexed_handle=h;
+    v.raw_object_type=77u;
+    v.original_record_crc_verified=1u;
+    v.handle_start_bit=p.layout.data_stream_bits;
+    v.handle_end_bit=p.layout.total_payload_bits;
+    v.entity_mode=p.common.prefix.entity_mode;
+    v.reactor_count=p.common.prefix.reactor_count;
+    v.xdictionary_missing=p.common.prefix.xdictionary_missing;
+    v.has_color_reference=p.common.has_color_reference;
+    v.linetype_flags=p.common.linetype_flags;
+    v.plotstyle_flags=p.common.plotstyle_flags;
+    v.material_flags=p.common.material_flags;
+    v.visualstyle_flags=p.common.visualstyle_flags;
+    MusaDwgAc1015Bits bits={0};
+    if(musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+           (size_t)p.layout.data_stream_bits,
+           (size_t)p.layout.total_payload_bits)){
+        MusaDwgAc1015HandleRef first={0},second={0};
+        if(musa_dwg_ac1015_read_handle_ref(&bits,h,&first)){
+            v.first_ref_decoded=1u;
+            v.first_ref_code=first.code;
+            v.first_ref_count=first.count;
+            v.first_ref_relative=first.relative;
+            v.first_raw_target=first.target;
+            if(musa_dwg_ac1015_read_handle_ref(&bits,h,&second)){
+                v.second_ref_decoded=1u;
+                v.second_ref_code=second.code;
+                v.second_ref_count=second.count;
+                v.second_ref_relative=second.relative;
+                v.second_raw_target=second.target;
+                if(bits.bit_end>=bits.bit_pos){
+                    v.residual_bits_after_two_refs=
+                        (uint64_t)(bits.bit_end-bits.bit_pos);
+                    MusaDwgAc1015Bits zeros=bits,ones=bits;
+                    v.zero_tail_padding=
+                        (uint8_t)cached_graph_zero_padding(&zeros);
+                    v.one_tail_padding=
+                        (uint8_t)cached_graph_one_padding(&ones);
+                }
+            }
+        }
+    }
+    free(p.raw);
+    *out=v;
+    return 1;
+}
 /* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
  * decoded H references are RAW observations, NOT owner/layer assignments.
  * This records precisely which strict H4/H5 assumption failed, without
