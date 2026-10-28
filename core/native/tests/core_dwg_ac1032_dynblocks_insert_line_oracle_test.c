@@ -330,6 +330,34 @@ static int original(const char *filename){
                        &batch,&forged_bounds,tolerance,&unchanged_rebased)||
                    memcmp(&unchanged_rebased,&before_rebased,
                           sizeof(unchanged_rebased))){ok=0;break;}
+                /* Independent synthetic precision oracle: a strict zero
+                 * WCS error budget must reject a non-exact float delta,
+                 * whereas a bounded error budget must reconstruct it. */
+                MusaDwgAc1032CompleteBlockLineBatch precision=batch;
+                MusaDwgAc1032CompleteBlockLineBounds precision_bounds=bounds;
+                precision.line_count=1u;
+                precision_bounds.line_count=1u;
+                precision.lines[0].source.world_start[0]=0.1;
+                precision.lines[0].source.world_start[1]=0.1;
+                precision.lines[0].source.world_end[0]=0.3;
+                precision.lines[0].source.world_end[1]=0.4;
+                precision_bounds.min_xy[0]=0.1;
+                precision_bounds.min_xy[1]=0.1;
+                precision_bounds.max_xy[0]=0.3;
+                precision_bounds.max_xy[1]=0.4;
+                if(musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &precision,&precision_bounds,0.0,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineRebased bounded={0};
+                if(!musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &precision,&precision_bounds,1e-5,&bounded)||
+                   !bounded.original_complete_source_rebased_verified||
+                   bounded.final_visibility_color_and_paint_accepted||
+                   bounded.line_count!=1u||
+                   bounded.max_absolute_roundtrip_error>1e-5){
+                    ok=0;break;
+                }
                 rebased_positive++;
                 complete_bounds_positive++;
                 complete_batch_positive++;
