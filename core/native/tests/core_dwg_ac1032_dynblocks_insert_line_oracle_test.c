@@ -744,6 +744,24 @@ static int original(const char *filename){
              complete_batch_partial_rejected==owner_bulk_partial_rejected&&
              complete_layer_positive>0u&&complete_layer_negative>0u&&
              complete_layer_partial_rejected>0u;
+    /* Missing scene, missing/forged INSERT and NULL destination must
+     * fail without modifying even one byte of the caller's result. */
+    if(ok){
+        MusaDwgAc1032CompleteBlockLineBounds untouched;
+        memset(&untouched,0xa5,sizeof(untouched));
+        const MusaDwgAc1032CompleteBlockLineBounds before=untouched;
+        ok=!musa_dwg_ac1032_complete_block_line_bounds(
+               NULL,first_insert,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,0u,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,UINT64_MAX,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,first_insert,NULL);
+    }
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
