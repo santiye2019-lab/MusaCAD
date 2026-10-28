@@ -22,8 +22,10 @@ int main(void) {
     assert(count==1 && out[0].index==0 && out[0].color_rgb==0x112233);
     assert(!mc2_viewport_collect(items,3,transforms,layers,1,
            (Mc2Bounds2){-1,-1,2,2},out,0,&count));
+    out[0].index=12345;
     items[2].parent_handle=99;
     assert(!mc2_viewport_collect(items,3,transforms,layers,1,
            (Mc2Bounds2){-1,-1,2,2},out,3,&count));
+    assert(out[0].index==12345);
     return 0;
 }
