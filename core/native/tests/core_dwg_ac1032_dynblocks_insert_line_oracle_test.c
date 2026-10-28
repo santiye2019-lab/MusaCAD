@@ -6,6 +6,7 @@
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_complete_block_line_batch.h"
+#include "musacad_dwg_ac1032_complete_block_line_bounds.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -56,6 +57,7 @@ static int original(const char *filename){
     size_t complete_layer_positive=0u,complete_layer_negative=0u;
     size_t complete_layer_partial_rejected=0u;
     size_t complete_batch_positive=0u,complete_batch_partial_rejected=0u;
+    size_t complete_bounds_positive=0u,complete_bounds_partial_rejected=0u;
     size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -223,6 +225,45 @@ static int original(const char *filename){
                             ok=0;
                 }
                 if(!ok)break;
+                MusaDwgAc1032CompleteBlockLineBounds bounds={0};
+                if(!musa_dwg_ac1032_complete_block_line_bounds(
+                       scene,entry.handle,&bounds)||
+                   !bounds.original_complete_source_bounds_verified||
+                   bounds.final_visibility_color_and_paint_accepted||
+                   bounds.insert_handle!=entry.handle||
+                   bounds.block_header_handle!=coverage.block_header_handle||
+                   bounds.line_count!=batch.line_count){ok=0;break;}
+                double expected_min[2]={0},expected_max[2]={0};
+                for(uint32_t q=0u;q<complete_lines.line_count;q++){
+                    for(unsigned axis=0u;axis<2u;axis++){
+                        const double a=complete_lines.endpoints[q][axis];
+                        const double b=complete_lines.endpoints[q][axis+2u];
+                        const double lo=a<b?a:b,hi=a>b?a:b;
+                        if(q==0u){
+                            expected_min[axis]=lo;
+                            expected_max[axis]=hi;
+                        }else{
+                            if(lo<expected_min[axis])expected_min[axis]=lo;
+                            if(hi>expected_max[axis])expected_max[axis]=hi;
+                        }
+                    }
+                }
+                for(unsigned axis=0u;axis<2u;axis++)
+                    if(!near(bounds.min_xy[axis],expected_min[axis])||
+                       !near(bounds.max_xy[axis],expected_max[axis])||
+                       bounds.min_xy[axis]>bounds.max_xy[axis])
+                        ok=0;
+                if(!ok)break;
+                float framed[4]={0};
+                if(!musa_dwg_ac1032_complete_block_line_bounds_float(
+                       &bounds,framed)||
+                   !isfinite(framed[0])||!isfinite(framed[1])||
+                   !isfinite(framed[2])||!isfinite(framed[3])||
+                   (double)framed[0]>expected_min[0]||
+                   (double)framed[1]>expected_min[1]||
+                   (double)framed[2]<expected_max[0]||
+                   (double)framed[3]<expected_max[1]){ok=0;break;}
+                complete_bounds_positive++;
                 complete_batch_positive++;
                 owner_bulk_positive++;
                 if(!musa_dwg_ac1032_scene_index_original_insert_block_affine(
@@ -355,6 +396,15 @@ static int original(const char *filename){
                        scene,entry.handle,&unchanged_batch)||
                    memcmp(&unchanged_batch,&before_batch,
                           sizeof(unchanged_batch))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineBounds unchanged_bounds;
+                memset(&unchanged_bounds,0xa5,sizeof(unchanged_bounds));
+                const MusaDwgAc1032CompleteBlockLineBounds before_bounds=
+                    unchanged_bounds;
+                if(musa_dwg_ac1032_complete_block_line_bounds(
+                       scene,entry.handle,&unchanged_bounds)||
+                   memcmp(&unchanged_bounds,&before_bounds,
+                          sizeof(unchanged_bounds))){ok=0;break;}
+                complete_bounds_partial_rejected++;
                 complete_batch_partial_rejected++;
                 owner_bulk_partial_rejected++;
                 for(uint32_t z=0u;z<coverage.child_count;z++){
@@ -698,9 +748,43 @@ static int original(const char *filename){
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
              owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u&&
              complete_batch_positive==owner_bulk_positive&&
+             complete_bounds_positive==complete_batch_positive&&
+             complete_bounds_partial_rejected==complete_batch_partial_rejected&&
              complete_batch_partial_rejected==owner_bulk_partial_rejected&&
              complete_layer_positive>0u&&complete_layer_negative>0u&&
              complete_layer_partial_rejected>0u;
+    /* Missing scene, missing/forged INSERT and NULL destination must
+     * fail without modifying even one byte of the caller's result. */
+    if(ok){
+        MusaDwgAc1032CompleteBlockLineBounds untouched;
+        memset(&untouched,0xa5,sizeof(untouched));
+        const MusaDwgAc1032CompleteBlockLineBounds before=untouched;
+        float frame[4]={11.0f,22.0f,33.0f,44.0f};
+        MusaDwgAc1032CompleteBlockLineBounds forged={0};
+        forged.insert_handle=first_insert;
+        forged.block_header_handle=UINT64_C(1);
+        forged.line_count=1u;
+        forged.original_complete_source_bounds_verified=1u;
+        forged.min_xy[0]=NAN;
+        forged.max_xy[0]=2.0;
+        forged.min_xy[1]=0.0;
+        forged.max_xy[1]=2.0;
+        ok=!musa_dwg_ac1032_complete_block_line_bounds_float(
+               &forged,frame)&&
+           frame[0]==11.0f&&frame[1]==22.0f&&
+           frame[2]==33.0f&&frame[3]==44.0f&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               NULL,first_insert,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,0u,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,UINT64_MAX,&untouched)&&
+           !memcmp(&untouched,&before,sizeof(untouched))&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
+               scene,first_insert,NULL);
+    }
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
      * never be misread as a LINE, and failed output is unchanged. */
     if(ok){
