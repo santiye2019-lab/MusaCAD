@@ -80,7 +80,8 @@ static int genuine(const char *filename){
                        prefix.fetch_stage!=stage.fetch_stage||
                        prefix.owner_layer_visibility_and_paint_accepted||
                        (prefix.fetch_stage<4u&&prefix.prefix_reason!=0u)||
-                       (prefix.fetch_stage==5u&&prefix.prefix_reason!=9u)){
+                       prefix.fetch_stage!=5u||prefix.prefix_reason!=9u||
+                       prefix.reactor_count!=1u){
                         ok=0;break;
                     }
                     fprintf(stderr,"DIAG genuine OT18 H=%llx stage=%u "
