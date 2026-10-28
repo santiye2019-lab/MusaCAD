@@ -55,11 +55,14 @@ int mc2_read_u64le(Mc2Reader *r, uint64_t *out) {
 }
 int mc2_read_f64le(Mc2Reader *r, double *out) {
     if (!out || sizeof(double)!=8 || DBL_MANT_DIG!=53 || FLT_RADIX!=2) return 0;
+    if (!r) return 0;
+    Mc2Reader candidate = *r;
     uint64_t bits;
-    if (!mc2_read_u64le(r,&bits)) return 0;
+    if (!mc2_read_u64le(&candidate,&bits)) return 0;
     double value;
     memcpy(&value,&bits,sizeof(value));
     if (!isfinite(value)) return 0;
     *out=value;
+    *r=candidate;
     return 1;
 }
