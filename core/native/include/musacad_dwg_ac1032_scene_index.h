@@ -1014,6 +1014,38 @@ static inline int musa_dwg_ac1032_scene_index_verified_child_line_xy(
     }
     return 0;
 }
+/* Source-only CIRCLE envelope for an individually authenticated original
+ * INSERT child. Its OT49 slot, H4/H12 reverse owner and H5 OT51 layer
+ * must match. Other siblings MAY be unsupported: that does not invalidate
+ * this individual geometry source, but forbids claiming complete BLOCK
+ * expansion. The original OT7->OT49 affine must be CRC/H authenticated.
+ * No viewport, layer-state, inherited color or final paint acceptance.
+ * All failures preserve the caller's output unchanged. */
+static inline int musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    uint64_t circle_handle,double out_minmax[4]){
+    if(!index||!insert_handle||!circle_handle||!out_minmax)return 0;
+    double affine[6],bounds[4];
+    MusaDwgAc1032InsertBlockChildLayerSource layer={0};
+    MusaDwgAc1032NativeCurve circle={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+           index,insert_handle,circle_handle,&layer)||
+       !layer.original_owner_layer_and_name_verified||
+       layer.final_visibility_color_and_paint_accepted||
+       layer.insert_handle!=insert_handle||
+       layer.child_handle!=circle_handle||
+       layer.raw_child_type!=18u||
+       !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+           index,insert_handle,affine)||
+       !musa_dwg_ac1032_scene_index_read_curve(
+           index,circle_handle,&circle)||
+       circle.indexed_handle!=circle_handle||
+       circle.object_type!=18u||circle.common.invisibility!=0u||
+       !musa_dwg_ac1032_planar_circle_affine_bounds(
+           &circle,affine,bounds))return 0;
+    for(unsigned i=0u;i<4u;i++)out_minmax[i]=bounds[i];
+    return 1;
+}
 /* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
 typedef struct MusaDwgAc1032LineHTailProbe {
     uint64_t indexed_handle,first_target,second_target;

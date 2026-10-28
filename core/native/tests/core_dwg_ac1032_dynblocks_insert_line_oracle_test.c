@@ -84,6 +84,49 @@ static int original(const char *filename){
         if(!ok)fprintf(stderr,
             "FAIL genuine CIRCLE or conservative affine bounds oracle\\n");
     }
+    /* Real, unchanged R2018 CIRCLE children BE49..BE4C belong to
+     * INSERT C1A1 / BLOCK_HEADER BE41. This must join original OT49
+     * reverse owners, H5 layer, OT18 geometry and the INSERT affine;
+     * a decoded standalone CIRCLE is insufficient. The block has an\n     * unsupported sibling: individual proof is NOT full BLOCK admission. */
+    if(ok){
+        const uint64_t insert_handle=UINT64_C(0xC1A1);
+        double affine[6]={0};
+        MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+        ok=musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+               scene,insert_handle,&coverage)&&
+           coverage.source_inventory_verified&&
+           !musa_dwg_ac1032_block_owner_coverage_complete(&coverage)&&
+           coverage.unsupported_count==1u&&
+           coverage.unreadable_count==0u&&coverage.mismatched_count==0u&&
+           musa_dwg_ac1032_scene_index_original_insert_block_affine(
+               scene,insert_handle,affine);
+        for(uint64_t child=UINT64_C(0xBE49);
+            ok&&child<=UINT64_C(0xBE4C);child++){
+            MusaDwgAc1032NativeCurve circle={0};
+            double expected[4]={0},actual[4]={0};
+            ok=musa_dwg_ac1032_scene_index_read_curve(
+                   scene,child,&circle)&&
+               musa_dwg_ac1032_planar_circle_affine_bounds(
+                   &circle,affine,expected)&&
+               musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+                   scene,insert_handle,child,actual);
+            for(unsigned i=0u;ok&&i<4u;i++)
+                if(actual[i]!=expected[i])ok=0;
+        }
+        double unchanged[4]={9.0,8.0,7.0,6.0};
+        const double before[4]={9.0,8.0,7.0,6.0};
+        ok=ok&&!musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+                    scene,insert_handle,UINT64_MAX,unchanged)&&
+           !memcmp(unchanged,before,sizeof(before))&&
+           !musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+                    scene,UINT64_C(0xC195),UINT64_C(0xBE49),unchanged)&&
+           !memcmp(unchanged,before,sizeof(before))&&
+           !musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+                    NULL,insert_handle,UINT64_C(0xBE49),unchanged)&&
+           !memcmp(unchanged,before,sizeof(before));
+        if(!ok)fprintf(stderr,
+            "FAIL original CIRCLE per-child BLOCK owner/OT51/affine bounds\\n");
+    }
     size_t inserts=0u,admitted=0u,verified=0u;
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
