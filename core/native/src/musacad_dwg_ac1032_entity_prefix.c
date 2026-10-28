@@ -62,7 +62,12 @@ int musa_dwg_ac1032_entity_prefix_bytes(
     if(edata!=0u||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&preview)||preview!=0u||
        !musa_dwg_ac1015_bits_read_u(&c,2u,&mode)||mode==3u||
-       !musa_dwg_ac1015_bits_read_bl(&c,&reactors)||reactors!=0u||
+       !musa_dwg_ac1015_bits_read_bl(&c,&reactors)||
+       /* Genuine R2018 CIRCLE OT18 can carry one reactor (Dynblocks).
+        * This authenticates the DATA prefix/geometry only. Reactor H,
+        * reverse BLOCK owner, layer, visibility and paint remain separate
+        * mandatory checks. Other types and >1 reactors still fail closed. */
+       (reactors!=0u&&!(expected_type==18u&&reactors==1u))||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&xdic)||
        !musa_dwg_ac1015_bits_read_u(&c,1u,&ds)||
        !xdic||ds)return 0;
