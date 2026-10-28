@@ -120,7 +120,35 @@ static void test_dwg_handles(void) {
     assert(!mc2_read_dwg_handle(&r,4,&h) && r.bit_position==0);
 }
 
+
+static void test_dwg_object_types(void) {
+    uint8_t fixture[8] = {0};
+    size_t bits=0;
+    put_test_bits(fixture,&bits,0,2);
+    put_test_bits(fixture,&bits,0x42,8);
+    put_test_bits(fixture,&bits,1,2);
+    put_test_bits(fixture,&bits,0x10,8);
+    put_test_bits(fixture,&bits,2,2);
+    put_test_bits(fixture,&bits,0x34,8);
+    put_test_bits(fixture,&bits,0x12,8);
+    put_test_bits(fixture,&bits,3,2);
+    put_test_bits(fixture,&bits,0x78,8);
+    put_test_bits(fixture,&bits,0x56,8);
+    Mc2BitReader r;
+    uint16_t type=0;
+    assert(mc2_bitreader_init(&r,fixture,(bits+7u)/8u));
+    assert(mc2_read_dwg_object_type(&r,&type) && type==0x42);
+    assert(mc2_read_dwg_object_type(&r,&type) && type==0x200);
+    assert(mc2_read_dwg_object_type(&r,&type) && type==0x1234);
+    assert(mc2_read_dwg_object_type(&r,&type) && type==0x5678);
+    assert(r.bit_position==bits);
+    const uint8_t truncated[] = {0x80}; /* selector 2, missing 16-bit raw type */
+    assert(mc2_bitreader_init(&r,truncated,sizeof truncated));
+    assert(!mc2_read_dwg_object_type(&r,&type) && r.bit_position==0 && type==0x5678);
+}
+
 int main(void) {
+    test_dwg_object_types();
     test_dwg_handles();
     test_dwg_bitcodes();
     const uint8_t data[] = {0xb2,0x5c,0xff};
