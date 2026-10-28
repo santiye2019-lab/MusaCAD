@@ -18,7 +18,12 @@ typedef struct {
     uint32_t effective_rgb;
     int visible;
 } Mc2EntityAppearance;
-/* Returns 0 on missing layer, duplicate layer id, or invalid color. */
+/* Resolve against a preselected layer; caller guarantees layer identity. */
+int mc2_resolve_appearance_on_layer(const Mc2Entity2 *entity,
+                                    Mc2Color color, const Mc2Layer *layer,
+                                    uint32_t parent_block_rgb, int parent_visible,
+                                    Mc2EntityAppearance *out);
+/* Returns 0 on missing layer, duplicate matching layer id, or invalid color. */
 int mc2_resolve_appearance(const Mc2Entity2 *entity,
                            Mc2Color color,
                            const Mc2Layer *layers, size_t layer_count,
