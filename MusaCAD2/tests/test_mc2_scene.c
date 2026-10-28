@@ -89,6 +89,31 @@ int main(void) {
     nested[0].own_visible=0;
     assert(mc2_scene_resolve_all(nested,3,layers,1,0xaabbcc,nested_out));
     assert(!nested_out[2].visible && nested_out[2].effective_rgb==0xaabbcc);
+    /* Large, unsorted layer tables exercise indexed lookups and duplicate rejection. */
+    const size_t layer_n=1024;
+    Mc2Layer *many_layers=(Mc2Layer *)calloc(layer_n,sizeof(*many_layers));
+    assert(many_layers);
+    for (size_t i=0;i<layer_n;++i) {
+        many_layers[i].id=(uint32_t)(layer_n-1-i);
+        many_layers[i].color_rgb=(uint32_t)i;
+        many_layers[i].is_on=1;
+    }
+    large[1023].parent_handle=1023;
+    large[1023].own_visible=1;
+    for (size_t i=0;i<n;++i) large[i].entity.layer_id=(uint32_t)(i%layer_n);
+    assert(mc2_scene_resolve_all(large,n,many_layers,layer_n,0,appearances));
+    assert(appearances[n-1].visible);
+    assert(appearances[0].effective_rgb==1023);
+    assert(appearances[1].effective_rgb==1022);
+    many_layers[100].id=many_layers[101].id;
+    appearances[0].effective_rgb=0xdeadbeef;
+    assert(!mc2_scene_resolve_all(large,n,many_layers,layer_n,0,appearances));
+    assert(appearances[0].effective_rgb==0xdeadbeef);
+    many_layers[100].id=(uint32_t)(layer_n-101);
+    many_layers[0].color_rgb=0x1000000;
+    assert(!mc2_scene_resolve_all(large,n,many_layers,layer_n,0,appearances));
+    assert(appearances[0].effective_rgb==0xdeadbeef);
+    free(many_layers);
     free(appearances);
     free(large);
     return 0;
