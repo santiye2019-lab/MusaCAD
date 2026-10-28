@@ -15,3 +15,11 @@
 - **Runtime:** Standard C11 plus the system math library; O(n) candidate collection without heap allocation. Output and count remain unchanged on malformed geometry, overflow, aliasing, or insufficient capacity.
 - **Coverage:** Rotation, reflection/shear-compatible corner transforms, inherited layer visibility, hidden geometry, viewport edge contact, malformed bounds, nonfinite arithmetic, and rollback.
 - **Limits:** Conservative screen-space candidate selection over *already resolved* scene geometry; not AC1032 decoding, spatial indexing, exact clipping, or evidence of complete DWG rendering. New CI must pass before describing the addition as verified.
+
+## Viewport-specific layer freeze adapter (2026-10-28)
+
+- **New files:** `include/musa_scene2d_viewport.h`, `src/musa_scene2d_viewport.c`, and `tests/scene2d_viewport_test.c`.
+- **Origin:** Independently written C11 adapter based on combining boolean layer visibility and invoking the existing independent scene graph evaluator. No source imported from legacy MusaCAD, LibreDWG, or other third-party CAD code.
+- **Behavior:** Per-viewport layer eligibility is combined with global layer visibility without mutating the source layer table. Frozen INSERT ancestors hide descendants, even if descendants have their own nonfrozen layers; effective layer-0 inheritance, BYLAYER/BYBLOCK colors and world transforms remain intact.
+- **Failure policy:** Invalid masks or global visibility flags, buffer overlap, malformed ownership, and insufficient capacity leave output untouched. The implementation allocates one temporary layer array and retains the existing iterative O((nodes+layers) log(nodes+layers)) resolver.
+- **Limits:** This API receives predecoded layer flags and scene nodes. It does not decode AC1032 viewport records, derive VP-FROZEN lists from DWG, handle layout-specific display states, or enable production DWG loading. Validate CI and real drawing fixtures before treating it as production-ready.
