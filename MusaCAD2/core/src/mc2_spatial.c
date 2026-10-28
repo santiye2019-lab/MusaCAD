@@ -42,6 +42,20 @@ int mc2_entity_world_bounds(const Mc2Entity2 *entity,const Mc2Affine2 *world,Mc2
         };
         return 1;
     }
-    /* Conservative bound for curved entities; refine for precise viewport culling later. */
+    if (entity->kind == MC2_ENTITY_CIRCLE) {
+        /* Exact AABB for an affine-transformed circle: each axis is a sinusoid. */
+        Mc2Point2 center=entity->geometry.circle.center;
+        double radius=entity->geometry.circle.radius;
+        Mc2Point2 transformed;
+        if (!mc2_transform_point(world,center,&transformed)) return 0;
+        double extent_x=radius*hypot(world->a,world->c);
+        double extent_y=radius*hypot(world->b,world->d);
+        Mc2Bounds2 bounds={transformed.x-extent_x,transformed.y-extent_y,
+                          transformed.x+extent_x,transformed.y+extent_y};
+        if (!valid_bounds(&bounds)) return 0;
+        *out=bounds;
+        return 1;
+    }
+    /* Partial arcs: conservative bounds from the transformed local AABB. */
     return mc2_transform_bounds(&local,world,out);
 }
