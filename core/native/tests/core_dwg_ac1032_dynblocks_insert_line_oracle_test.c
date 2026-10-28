@@ -139,7 +139,7 @@ static int original(const char *filename){
         const MusaDwgAc1032InsertBlockCircleBoundsBatch before_batch=
             rejected;
         ok=ok&&!musa_dwg_ac1032_scene_index_source_block_circle_batch(
-                   scene,UINT64_C(0xC195),&rejected)&&
+                   scene,UINT64_MAX,&rejected)&&
            !memcmp(&rejected,&before_batch,sizeof(rejected))&&
            !musa_dwg_ac1032_scene_index_source_block_circle_batch(
                    NULL,insert_handle,&rejected)&&
