@@ -229,6 +229,38 @@ static int genuine(const char *filename){
                      scene,first_unreadable_ot77,NULL);
         }
     }
+    /* Existing CIRCLE H-tail decoder is independently inspected on the
+     * original OT18 unreadable case; a profile is not owner proof. */
+    if(ok&&first_unreadable_ot18){
+        MusaDwgAc1032CircleHTailProfile p={0};
+        ok=musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+               scene,first_unreadable_ot18,&p)&&
+           p.original_record_crc_verified&&
+           p.indexed_handle==first_unreadable_ot18&&
+           p.raw_object_type==18u&&
+           !p.final_visibility_and_paint_accepted;
+        if(ok){
+            fprintf(stderr,"DIAG genuine OT18 unreadable H=%llx "
+                "status=%u first=%u/%u/%llx second=%u/%u/%llx "
+                "residual=%llu entity_mode=%u reactor=%u\\n",
+                (unsigned long long)p.indexed_handle,p.profile_status,
+                p.first_ref_decoded,p.first_ref_code,
+                (unsigned long long)p.first_raw_target,
+                p.second_ref_decoded,p.second_ref_code,
+                (unsigned long long)p.second_raw_target,
+                (unsigned long long)p.residual_bits_after_two_refs,
+                p.entity_mode,p.reactor_count);
+            MusaDwgAc1032CircleHTailProfile untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032CircleHTailProfile before=untouched;
+            ok=!musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+                     scene,0u,&untouched)&&
+               !memcmp(&untouched,&before,sizeof(untouched))&&
+               !musa_dwg_ac1032_scene_index_circle_h_tail_profile(
+                     scene,UINT64_MAX,&untouched)&&
+               !memcmp(&untouched,&before,sizeof(untouched));
+        }
+    }
     fprintf(stderr,"DIAG genuine R2018 owner gap by OT: "
                    "OT17=%u OT18=%u OT19=%u OT27=%u OT35=%u OT77=%u "
                    "total=%zu inventories=%zu\n",
