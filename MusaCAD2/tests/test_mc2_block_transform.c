@@ -14,6 +14,9 @@ int main(void) {
     nodes[0].ownership.parent_handle=3;
     assert(!mc2_block_world_transform(nodes,3,3,&world));
     nodes[0].ownership.parent_handle=0;
+    nodes[2].ownership.handle=1;
+    assert(!mc2_block_world_transform(nodes,3,2,&world));
+    nodes[2].ownership.handle=3;
     nodes[1].ownership.parent_handle=99;
     assert(!mc2_block_world_transform(nodes,3,3,&world));
     return 0;
