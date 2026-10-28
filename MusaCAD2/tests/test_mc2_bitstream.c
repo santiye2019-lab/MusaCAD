@@ -140,11 +140,17 @@ static void test_dwg_object_types(void) {
     assert(mc2_read_dwg_object_type(&r,&type) && type==0x42);
     assert(mc2_read_dwg_object_type(&r,&type) && type==0x200);
     assert(mc2_read_dwg_object_type(&r,&type) && type==0x1234);
-    assert(mc2_read_dwg_object_type(&r,&type) && type==0x5678);
-    assert(r.bit_position==bits);
+    const size_t before_reserved=r.bit_position;
+    assert(!mc2_read_dwg_object_type(&r,&type) &&
+           r.bit_position==before_reserved && type==0x1234);
+    /* A zero type is not an object; failure must not consume bits. */
+    const uint8_t zero_type[] = {0x00,0x00};
+    assert(mc2_bitreader_init(&r,zero_type,sizeof zero_type));
+    assert(!mc2_read_dwg_object_type(&r,&type) &&
+           r.bit_position==0 && type==0x1234);
     const uint8_t truncated[] = {0x80}; /* selector 2, missing 16-bit raw type */
     assert(mc2_bitreader_init(&r,truncated,sizeof truncated));
-    assert(!mc2_read_dwg_object_type(&r,&type) && r.bit_position==0 && type==0x5678);
+    assert(!mc2_read_dwg_object_type(&r,&type) && r.bit_position==0 && type==0x1234);
 }
 
 int main(void) {
