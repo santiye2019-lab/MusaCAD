@@ -79,3 +79,24 @@ int musa_scene2d_arc_bounds(double cx, double cy, double radius,
     b.min_y -= my; b.max_y += my;
     return widen(b,out);
 }
+
+/* A planar ellipse with major vector (ax,ay) and minor vector
+ * ratio*(-ay,ax) has x/y extrema at the Euclidean norms of the
+ * respective cosine/sine coefficients. No trigonometric sampling or
+ * third-party CAD implementation is required. */
+int musa_scene2d_ellipse_bounds(double cx, double cy,
+                                double ax, double ay, double minor_ratio,
+                                MusaScene2dBox *out) {
+    if (!out || !isfinite(cx) || !isfinite(cy) ||
+        !isfinite(ax) || !isfinite(ay) ||
+        !isfinite(minor_ratio) || minor_ratio <= 0.0 ||
+        minor_ratio > 1.0 || (ax == 0.0 && ay == 0.0))
+        return 0;
+    const double minor_x = -ay * minor_ratio;
+    const double minor_y = ax * minor_ratio;
+    const double rx = hypot(ax, minor_x);
+    const double ry = hypot(ay, minor_y);
+    if (!isfinite(minor_x) || !isfinite(minor_y) ||
+        !isfinite(rx) || !isfinite(ry)) return 0;
+    return widen((MusaScene2dBox){cx-rx,cy-ry,cx+rx,cy+ry},out);
+}
