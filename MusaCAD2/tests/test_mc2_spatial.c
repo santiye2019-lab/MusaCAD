@@ -33,6 +33,25 @@ int main(void) {
     assert(fabs(out.max_x-2.8284271247461903)<1e-12);
     assert(out.min_x>=-1e-12 && out.min_y>=-1e-12);
     assert(fabs(out.max_y-2)<1e-12);
+    /* Wrapped 270-to-90 degree arc crosses zero: +X cardinal is inside. */
+    const double pi=3.14159265358979323846;
+    arc.geometry.arc.start_radians=1.5*pi;
+    arc.geometry.arc.end_radians=0.5*pi;
+    Mc2Affine2 identity=mc2_transform_identity();
+    assert(mc2_entity_world_bounds(&arc,&identity,&out));
+    assert(fabs(out.max_x-2.0)<1e-12);
+    assert(fabs(out.min_x)<1e-12);
+    assert(fabs(out.min_y+2.0)<1e-12 && fabs(out.max_y-2.0)<1e-12);
+    /* Under shear, the 45-degree stationary point must be included. */
+    assert(mc2_entity_world_bounds(&arc,&shear,&out));
+    assert(fabs(out.max_x-2.8284271247461903)<1e-12);
+    assert(fabs(out.min_x+2.0)<1e-12);
+    assert(fabs(out.min_y+2.0)<1e-12 && fabs(out.max_y-2.0)<1e-12);
+    /* A nonwrapped left-hand arc must exclude the right cardinal point. */
+    arc.geometry.arc.start_radians=0.5*pi;
+    arc.geometry.arc.end_radians=1.5*pi;
+    assert(mc2_entity_world_bounds(&arc,&identity,&out));
+    assert(out.max_x<1e-12 && fabs(out.min_x+2.0)<1e-12);
     a.min_x=3;
     assert(!mc2_transform_bounds(&a,&t,&out));
     return 0;
