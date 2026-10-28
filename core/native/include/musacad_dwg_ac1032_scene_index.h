@@ -790,6 +790,7 @@ static inline int musa_dwg_ac1032_scene_index_build_line_scene_packet(
     if(!index||!insert_handles||!insert_count||!out_count||
        (!items&&capacity))return 0;
     size_t written=0;
+    /* Preflight all source packets before touching caller output. */
     for(size_t i=0;i<insert_count;i++){
         if(!insert_handles[i])return 0;
         for(size_t j=0;j<i;j++)
@@ -798,6 +799,13 @@ static inline int musa_dwg_ac1032_scene_index_build_line_scene_packet(
         if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
                index,insert_handles[i],&packet)||
            packet.line_count>capacity-written)return 0;
+        written+=packet.line_count;
+    }
+    written=0;
+    for(size_t i=0;i<insert_count;i++){
+        MusaDwgAc1032InsertBlockLineSources packet={0};
+        if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
+               index,insert_handles[i],&packet))return 0;
         for(uint32_t k=0;k<packet.line_count;k++){
             MusaDwgAc1032LineSceneItem *dst=&items[written++];
             dst->insert_handle=insert_handles[i];
