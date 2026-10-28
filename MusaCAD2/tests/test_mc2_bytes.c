@@ -43,7 +43,6 @@ int main(void) {
         0,0,0,0,0,0,0xf8,0x7f  /* NaN */
     };
     double value=0;
-    uint64_t integer=0;
     assert(mc2_reader_init(&r,doubles,sizeof doubles));
     assert(mc2_read_f64le(&r,&value) && value==3.5 && r.offset==8);
     assert(!mc2_read_f64le(&r,&value) && r.offset==8 && value==3.5);
