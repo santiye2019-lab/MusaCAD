@@ -10,6 +10,8 @@ int mc2_reader_init(Mc2Reader *r, const uint8_t *data, size_t length);
 size_t mc2_reader_remaining(const Mc2Reader *r);
 int mc2_read_u8(Mc2Reader *r, uint8_t *out);
 int mc2_read_u16le(Mc2Reader *r, uint16_t *out);
+int mc2_read_u64le(Mc2Reader *r, uint64_t *out);
+int mc2_read_f64le(Mc2Reader *r, double *out);
 int mc2_read_u32le(Mc2Reader *r, uint32_t *out);
 int mc2_read_bytes(Mc2Reader *r, uint8_t *out, size_t count);
 int mc2_read_dwg_version(const uint8_t *data, size_t length, char out[7]);
