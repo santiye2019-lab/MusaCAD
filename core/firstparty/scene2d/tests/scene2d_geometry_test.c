@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_scene2d_geometry.h"
+#include "musa_scene2d_cache.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -40,5 +41,31 @@ int main(void) {
     assert(!musa_scene2d_circle_bounds(DBL_MAX,0,DBL_MAX,&b));
     assert(b.min_x==keep.min_x && b.max_y==keep.max_y);
     assert(!musa_scene2d_line_bounds(0,0,1,1,0));
+    /* Analytic primitive bounds feed the independent block/viewport pipeline. */
+    const MusaScene2dLayer layers[] = {
+        {0,0xffffffffu,1}, {10,0xff00ff00u,1}
+    };
+    const MusaScene2dNode nodes[] = {
+        {100,0,10,0,MUSA_SCENE2D_INSERT,1,MUSA_SCENE2D_BYLAYER,
+         {1,0,0,1,10,20}},
+        {200,100,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYBLOCK,
+         {1,0,0,1,2,3}}
+    };
+    MusaScene2dBox local[2] = {{NAN,NAN,NAN,NAN},{0,0,0,0}};
+    assert(musa_scene2d_circle_bounds(0,0,2,&local[1]));
+    MusaScene2dResolved resolved[2];
+    MusaScene2dPreparedBounds cache[2];
+    size_t written = 0, indices[2] = {99,99};
+    assert(musa_scene2d_resolve(nodes,2,layers,2,resolved,2,&written));
+    assert(musa_scene2d_prepare_bounds(nodes,resolved,local,2,
+                                       cache,2,&written));
+    assert(written == 2 && cache[0].visible == 0 &&
+           cache[1].visible == 1);
+    assert(musa_scene2d_collect_prepared(cache,2,
+             (MusaScene2dBox){14,23,14,23},indices,2,&written));
+    assert(written == 1 && indices[0] == 1);
+    assert(musa_scene2d_collect_prepared(cache,2,
+             (MusaScene2dBox){50,50,60,60},indices,2,&written));
+    assert(written == 0);
     return 0;
 }
