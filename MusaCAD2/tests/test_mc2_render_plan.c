@@ -15,25 +15,25 @@ int main(void) {
     }
     items[1].parent_handle=1;
     assert(mc2_render_plan_build(items,2,local,layers,1,
-           (Mc2Bounds2){11,-1,14,1},output,2,&count));
+           (Mc2Bounds2){11.5,-1,14,1},output,2,&count));
     assert(count==1 && output[0].index==1);
     assert(output[0].world_bounds.min_x==12);
     items[0].own_visible=0;
     assert(mc2_render_plan_build(items,2,local,layers,1,
-           (Mc2Bounds2){11,-1,14,1},output,2,&count));
+           (Mc2Bounds2){11.5,-1,14,1},output,2,&count));
     assert(count==0);
     items[0].own_visible=1;
     items[1].entity.handle=1;
     output[0].index=999;
     assert(!mc2_render_plan_build(items,2,local,layers,1,
-           (Mc2Bounds2){11,-1,14,1},output,2,&count));
+           (Mc2Bounds2){11.5,-1,14,1},output,2,&count));
     assert(output[0].index==999);
     items[1].entity.handle=2;
     items[0].parent_handle=2;
     output[0].index=888;
     count=777;
     assert(!mc2_render_plan_build(items,2,local,layers,1,
-           (Mc2Bounds2){11,-1,14,1},output,2,&count));
+           (Mc2Bounds2){11.5,-1,14,1},output,2,&count));
     assert(count==777 && output[0].index==888);
     return 0;
 }
