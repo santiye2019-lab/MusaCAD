@@ -31,3 +31,11 @@
 - **Safety:** Reject malformed handles, visibility values, nonfinite transforms, invalid local boxes, overflowing affine results, output/input aliasing and insufficient capacity. Both APIs validate before writing; failed calls leave caller outputs unchanged.
 - **Tests:** Compare cached queries against the existing independent uncached collector (including viewport-edge contact and frozen parent INSERT), check rollback on malformed data and aliasing, and query a synthetic 20,000-object scene. No performance benchmark or production DWG file evidence is claimed.
 - **Boundary:** Remains a standalone MIT C11 target, not linked to the GPL-marked historical native core or production Android JNI. Does not parse AC1032 bytes, render text, decode ACI colors, or prove full DWG interoperability.
+
+## Analytic primitive bounds (2026-10-29)
+
+- **New files:** `include/musa_scene2d_geometry.h`, `src/musa_scene2d_geometry.c`, `tests/scene2d_geometry_test.c`.
+- **Source origin:** Independently authored using elementary line extrema, circle radii and trigonometric arc extrema at quadrant angles. No code from existing CAD readers, LibreDWG, or GPL/AGPL/LGPL libraries was copied, adapted or linked.
+- **License and boundary:** MIT SPDX headers, standard C11 `math.h` and `float.h` only. Part of the isolated `musacad_independent_scene2d` target, not the existing GPL-marked native CAD core or Android DWG JNI.
+- **Coverage:** LINE, CIRCLE and counterclockwise ARC local AABBs; wraparound, full-circle sweeps, zero-sweep arcs, invalid/nonfinite inputs, overflow, output rollback and 5000 sampled arc sweeps.
+- **Limitations:** Requires already decoded primitive coordinates; it does not parse DWG, resolve OCS extrusion or elevation, interpret text/fonts or bulged polylines, render geometry, or demonstrate successful real-file opening. The input coordinates must be in the same local coordinate system as the scene resolver.
