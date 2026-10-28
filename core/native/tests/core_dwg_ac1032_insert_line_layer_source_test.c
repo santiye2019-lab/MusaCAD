@@ -3,6 +3,7 @@
  * Unicode/status and raw color join; never grants final paint. */
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_complete_block_line_style_risk.h"
+#include "musacad_dwg_ac1032_block_owner_gap_census.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,6 +29,8 @@ static int genuine(const char *filename){
     if(!ok){musa_dwg_ac1032_scene_index_close(scene);return 0;}
     size_t inserts=0u,source_rows=0u,joined=0u,unsupported=0u;
     size_t complete_style_positive=0u,partial_style_rejected=0u;
+    size_t census_inventories=0u,census_unreadable=0u;
+    uint32_t unreadable_by_type[MUSACAD_AC1032_OWNER_GAP_FAMILIES]={0};
     uint64_t first_insert=0u,first_child=0u;
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
         MusaDwgAc1032HandleEntry entry={0};
@@ -40,6 +43,43 @@ static int genuine(const char *filename){
         MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
         if(musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
                scene,entry.handle,&coverage)){
+            if(coverage.child_count){
+                MusaDwgAc1032BlockOwnerGapCensus census={0};
+                if(!musa_dwg_ac1032_block_owner_gap_census(
+                       &coverage,&census)||
+                   !census.source_inventory_and_statuses_verified||
+                   census.final_visibility_color_and_paint_accepted||
+                   census.insert_handle!=entry.handle||
+                   census.block_header_handle!=coverage.block_header_handle||
+                   census.child_count!=coverage.child_count){ok=0;break;}
+                census_inventories++;
+                for(unsigned t=0u;t<MUSACAD_AC1032_OWNER_GAP_FAMILIES;t++){
+                    unreadable_by_type[t]+=census.unreadable[t];
+                    census_unreadable+=census.unreadable[t];
+                    if(census.unreadable[t]&&!census.first_unreadable_handle[t]){
+                        ok=0;break;
+                    }
+                }
+                if(!ok)break;
+                MusaDwgAc1032BlockOwnerGapCensus untouched;
+                memset(&untouched,0xa5,sizeof(untouched));
+                const MusaDwgAc1032BlockOwnerGapCensus before=untouched;
+                MusaDwgAc1032InsertBlockOwnerCoverage forged=coverage;
+                forged.verified_count++;
+                if(musa_dwg_ac1032_block_owner_gap_census(
+                       &forged,&untouched)||
+                   memcmp(&untouched,&before,sizeof(untouched))){ok=0;break;}
+                forged=coverage;
+                forged.child_handles[0]=0u;
+                if(musa_dwg_ac1032_block_owner_gap_census(
+                       &forged,&untouched)||
+                   memcmp(&untouched,&before,sizeof(untouched))){ok=0;break;}
+                forged=coverage;
+                forged.final_display_accepted=1u;
+                if(musa_dwg_ac1032_block_owner_gap_census(
+                       &forged,&untouched)||
+                   memcmp(&untouched,&before,sizeof(untouched))){ok=0;break;}
+            }
             if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)){
                 MusaDwgAc1032CompleteBlockLineStyleRisk batch={0};
                 if(!musa_dwg_ac1032_complete_block_line_style_risk(
@@ -123,7 +163,8 @@ static int genuine(const char *filename){
             }
         }
     }
-    if(ok)ok=complete_style_positive>0u&&partial_style_rejected>0u&&
+    if(ok)ok=census_inventories>0u&&census_unreadable>0u&&
+             complete_style_positive>0u&&partial_style_rejected>0u&&
              inserts>0u&&source_rows>0u&&joined>0u&&
              joined+unsupported==source_rows;
     if(ok){
@@ -145,6 +186,13 @@ static int genuine(const char *filename){
            !musa_dwg_ac1032_insert_line_layer_source(
                scene,first_insert,first_child,NULL);
     }
+    fprintf(stderr,"DIAG genuine R2018 owner gap by OT: "
+                   "OT17=%u OT18=%u OT19=%u OT27=%u OT35=%u OT77=%u "
+                   "total=%zu inventories=%zu\n",
+            unreadable_by_type[0],unreadable_by_type[1],
+            unreadable_by_type[2],unreadable_by_type[3],
+            unreadable_by_type[4],unreadable_by_type[5],
+            census_unreadable,census_inventories);
     fprintf(stderr,"DIAG genuine R2018 complete-owner LINE risk: "
                    "positive=%zu partial_rejected=%zu\n",
             complete_style_positive,partial_style_rejected);
