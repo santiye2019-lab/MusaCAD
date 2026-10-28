@@ -243,7 +243,7 @@ static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
        again.handle_stream_bits==meta.handle_stream_bits;
     if(!ok){free(raw);return 0;}
     if(stage)*stage=4u; /* immutable original record copied */
-    if(prefix_probe&&type==7u)
+    if(prefix_probe&&(type==7u||type==18u))
         inspect_insert_prefix(raw,needed,&layout,prefix_probe);
     ok=musa_dwg_ac1032_entity_common_bytes(
           raw,needed,&layout,type,&common)&&
@@ -1626,6 +1626,54 @@ int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
     free(p.raw);
     *out=v;
     return 1;
+}
+/* Source-only OT18 fetch rejection stage, preserving fail-atomic output.
+ * The original CRC-indexed record must be OT18, not merely a guessed
+ * payload address. Stage 4 means the source bytes are authenticated but
+ * the strict common ENTITY prefix is not accepted. */
+int musa_dwg_ac1032_scene_index_circle_decode_stage(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleDecodeStage *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    uint16_t type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
+       type!=18u)return 0;
+    uint8_t stage=0u;
+    Payload p={0};
+    if(fetch_staged(s,h,18u,&p,&stage,NULL))free(p.raw);
+    MusaDwgAc1032CircleDecodeStage v={0};
+    v.indexed_handle=h;
+    v.raw_object_type=18u;
+    v.fetch_stage=stage;
+    v.original_record_crc_verified=(uint8_t)(stage>=2u);
+    *out=v;
+    return 1;
+}
+/* Diagnose the actual CRC-authenticated CIRCLE prefix rejection stage;
+ * never convert a forensic prefix into a valid entity or paint decision. */
+int musa_dwg_ac1032_scene_index_circle_prefix_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CirclePrefixProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    uint16_t type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
+       type!=18u)return 0;
+    MusaDwgAc1032InsertPrefixProbe prefix={0};
+    Payload p={0};uint8_t stage=0u;
+    if(fetch_staged(s,h,18u,&p,&stage,&prefix))free(p.raw);
+    MusaDwgAc1032CirclePrefixProbe v={0};
+    v.indexed_handle=h;
+    v.embedded_self_handle=prefix.embedded_self_handle;
+    v.reactor_count=prefix.reactor_count;
+    v.embedded_handle_length=prefix.embedded_handle_length;
+    v.eed_bytes=prefix.eed_bytes;
+    v.fetch_stage=stage;
+    v.prefix_reason=prefix.prefix_reason;
+    v.preview=prefix.preview;
+    v.entity_mode=prefix.entity_mode;
+    v.xdictionary_missing=prefix.xdictionary_missing;
+    v.has_binary_data_store=prefix.has_binary_data_store;
+    *out=v;return 1;
 }
 /* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
  * decoded H references are RAW observations, NOT owner/layer assignments.

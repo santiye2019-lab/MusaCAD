@@ -1007,6 +1007,35 @@ int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
     const MusaDwgAc1032SceneIndex *scene,uint64_t lwpolyline_handle,
     MusaDwgAc1032LWPolylineHTailProbe *out);
 
+/* Genuine OT18 source fetch stage: 0 absent, 1 indexed, 2 CRC/type,
+ * 3 layout, 4 immutable payload copied, 5 strict common decoded.
+ * A stage below 5 is a rejected read, never owner/paint evidence. */
+typedef struct MusaDwgAc1032CircleDecodeStage {
+    uint64_t indexed_handle;
+    uint16_t raw_object_type;
+    uint8_t fetch_stage,original_record_crc_verified;
+    uint8_t owner_layer_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleDecodeStage;
+int musa_dwg_ac1032_scene_index_circle_decode_stage(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleDecodeStage *out);
+
+/* CRC-indexed CIRCLE common-prefix forensic evidence. Only the original
+ * H/EED/preview/mode/reactor/xdictionary flags are inspected, never used
+ * to bypass strict common decoding or authorize geometry/paint. */
+typedef struct MusaDwgAc1032CirclePrefixProbe {
+    uint64_t indexed_handle,embedded_self_handle;
+    uint32_t reactor_count;
+    uint8_t embedded_handle_length;
+    uint16_t eed_bytes;
+    uint8_t fetch_stage,prefix_reason,preview,entity_mode;
+    uint8_t xdictionary_missing,has_binary_data_store;
+    uint8_t owner_layer_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CirclePrefixProbe;
+int musa_dwg_ac1032_scene_index_circle_prefix_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CirclePrefixProbe *out);
+
 /* R2018 OT18 original CRC/H forensic probe. first_raw_target and
  * second_raw_target are untrusted H references, NOT certified owner/layer.
  * MSB prefix is copied from the authenticated original HANDLE bitstream.
