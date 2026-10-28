@@ -877,7 +877,7 @@ static int original(const char *filename){
              owner_audit_ok+owner_audit_rejected==inventory_ok&&
              coverage_ok==inventory_ok&&
              coverage_verified>=owner_audit_verified&&
-             coverage_unreadable>0u&&
+             coverage_unreadable==0u&&
              coverage_complete==owner_audit_complete&&
              owner_affine_positive>0u&&owner_line_positive>0u&&
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&

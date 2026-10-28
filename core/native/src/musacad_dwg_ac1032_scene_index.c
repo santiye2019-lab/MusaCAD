@@ -1455,7 +1455,8 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         p.common.prefix.indexed_handle==h&&
         p.common.prefix.raw_object_type==type&&
         p.common.prefix.entity_mode==0u&&
-        p.common.prefix.reactor_count==0u&&
+        (p.common.prefix.reactor_count==0u||
+         (type==18u&&p.common.prefix.reactor_count==1u))&&
         p.common.prefix.xdictionary_missing==1u&&
         !p.common.has_color_reference&&
         p.common.linetype_flags==0u&&
@@ -1472,6 +1473,32 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
         ok=musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
               (size_t)p.layout.data_stream_bits,
               (size_t)p.layout.total_payload_bits);
+        /* Genuine Dynblocks OT18 Hbe49..Hbe4c: H12 relative OT49
+         * BLOCK owner BE41, H4 reactor BE48, H5 OT51 layer BF71.
+         * The reactor is NOT the owner. Exactly three ONE pad bits
+         * are observed in the authenticated original source.
+         * All other entity types retain their existing grammar. */
+        if(ok&&type==18u&&p.common.prefix.reactor_count==1u){
+            MusaDwgAc1015HandleRef own={0},reactor={0},lay={0};
+            uint16_t reactor_type=0u;
+            ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&own)&&
+               musa_dwg_ac1015_read_handle_ref(&bits,h,&reactor)&&
+               musa_dwg_ac1015_read_handle_ref(&bits,h,&lay)&&
+               own.code==12u&&own.relative&&
+               own.encoded_value>0u&&own.target<h&&
+               h-own.target==own.encoded_value&&
+               reactor.code==4u&&lay.code==5u&&
+               reactor.target&&own.target&&lay.target&&
+               reactor.target!=h&&own.target!=h&&lay.target!=h&&
+               reactor.target!=own.target&&
+               reactor.target!=lay.target&&own.target!=lay.target&&
+               bits.bit_end>=bits.bit_pos&&
+               bits.bit_end-bits.bit_pos==3u&&
+               cached_graph_one_padding(&bits)&&
+               musa_dwg_ac1032_scene_index_object_type(
+                   s,reactor.target,&reactor_type);
+            if(ok){owner=own.target;layer=lay.target;owner_wire_code=12u;}
+        }else{
         if(ok&&(type==18u||type==19u||type==77u)){
             MusaDwgAc1015HandleRef owner_ref={0};
             ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&owner_ref)&&
@@ -1506,6 +1533,7 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                         ((bits.bit_end-bits.bit_pos)&1u)==1u)))&&
                      cached_graph_one_padding(&bits)):
                     cached_graph_zero_padding(&bits));
+        }
     }
     free(p.raw);
     uint16_t owner_type=0u,layer_type=0u;
