@@ -3,6 +3,19 @@
 #include <stdint.h>
 #include <string.h>
 int main(void) {
+    const uint8_t numeric[]={
+        0x08,0x07,0x06,0x05,0x04,0x03,0x02,0x01,
+        0x00,0x00,0x00,0x00,0x00,0x00,0xf0,0x3f,
+        0x00,0x00,0x00,0x00,0x00,0x00,0xf8,0x7f
+    };
+    Mc2Reader numeric_reader;
+    uint64_t integer=0;
+    double number=0;
+    assert(mc2_reader_init(&numeric_reader,numeric,sizeof numeric));
+    assert(mc2_read_u64le(&numeric_reader,&integer) && integer==UINT64_C(0x0102030405060708));
+    assert(mc2_read_f64le(&numeric_reader,&number) && number==1.0);
+    assert(!mc2_read_f64le(&numeric_reader,&number) && number==1.0);
+    assert(!mc2_read_u64le(&numeric_reader,&integer));
     const uint8_t bytes[] = {0x12,0x34,0x56,0x78,0x9a,0xbc,0xde};
     Mc2Reader r;
     uint8_t b = 0;
