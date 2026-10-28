@@ -167,3 +167,16 @@ int mc2_read_dwg_handle(Mc2BitReader *r, uint64_t base_handle,
     *r = candidate;
     return 1;
 }
+
+int mc2_read_dwg_object_type(Mc2BitReader *r, uint16_t *out) {
+    if (!r || !out) return 0;
+    Mc2BitReader candidate = *r;
+    uint32_t selector;
+    uint64_t raw;
+    if (!mc2_read_bits_msb(&candidate, 2, &selector)) return 0;
+    if (!mc2_dwg_raw_le(&candidate, selector < 2 ? 1 : 2, &raw)) return 0;
+    if (selector == 1) raw += 0x1f0u;
+    *out = (uint16_t)raw;
+    *r = candidate;
+    return 1;
+}
