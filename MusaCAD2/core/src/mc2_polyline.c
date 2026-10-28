@@ -34,3 +34,30 @@ double mc2_polyline_length(const Mc2Point2 *vertices,size_t count,int closed) {
     }
     return length;
 }
+
+int mc2_polyline_signed_area(const Mc2Point2 *vertices,size_t count,
+                             int closed,double *out_area) {
+    if (!vertices || !out_area || !closed || count<3) return 0;
+    /* Translate to the first vertex to reduce cancellation for large offsets. */
+    const double ox=vertices[0].x,oy=vertices[0].y;
+    if (!isfinite(ox) || !isfinite(oy)) return 0;
+    double sum=0.0,compensation=0.0;
+    for (size_t i=1;i<count;++i) {
+        if (!isfinite(vertices[i].x) || !isfinite(vertices[i].y)) return 0;
+    }
+    for (size_t i=1;i+1<count;++i) {
+        double ax=vertices[i].x-ox,ay=vertices[i].y-oy;
+        double bx=vertices[i+1].x-ox,by=vertices[i+1].y-oy;
+        double term=ax*by-ay*bx;
+        if (!isfinite(term)) return 0;
+        double corrected=term-compensation;
+        double next=sum+corrected;
+        compensation=(next-sum)-corrected;
+        sum=next;
+        if (!isfinite(sum)) return 0;
+    }
+    double area=sum*0.5;
+    if (!isfinite(area)) return 0;
+    *out_area=area;
+    return 1;
+}
