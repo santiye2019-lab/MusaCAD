@@ -93,6 +93,49 @@ static int genuine(const char *filename){
                         prefix.entity_mode,prefix.eed_bytes,prefix.preview,
                         prefix.reactor_count,prefix.xdictionary_missing,
                         prefix.has_binary_data_store);
+                    /* Real original one-reactor CIRCLEs must expose three
+                     * CRC-authenticated raw H refs, not a guessed owner.
+                     * Invalid indices fail without modifying the output. */
+                    MusaDwgAc1032CircleReactorHTailProbe triple={0};
+                    if(!musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+                           scene,child,&triple)||
+                       !triple.original_record_crc_verified||
+                       !triple.strict_common_verified||
+                       triple.indexed_handle!=child||
+                       triple.reactor_count!=1u||
+                       triple.ref_codes[0]!=12u||
+                       triple.ref_codes[1]!=4u||
+                       triple.owner_layer_roles_verified||
+                       triple.final_visibility_and_paint_accepted){
+                        ok=0;break;
+                    }
+                    fprintf(stderr,"DIAG genuine OT18 reactor H triple "
+                        "H=%llx first=%u/%llx second=%u/%llx "
+                        "third=%u/%llx residual=%llu zero=%u one=%u\\n",
+                        (unsigned long long)child,triple.ref_codes[0],
+                        (unsigned long long)triple.raw_targets[0],
+                        triple.ref_codes[1],
+                        (unsigned long long)triple.raw_targets[1],
+                        triple.ref_codes[2],
+                        (unsigned long long)triple.raw_targets[2],
+                        (unsigned long long)triple.residual_bits_after_three_refs,
+                        triple.zero_tail_padding,triple.one_tail_padding);
+                    MusaDwgAc1032CircleReactorHTailProbe untouched_triple;
+                    memset(&untouched_triple,0xa5,sizeof(untouched_triple));
+                    unsigned char triple_before[sizeof(untouched_triple)];
+                    memcpy(triple_before,&untouched_triple,sizeof(triple_before));
+                    if(musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+                           scene,0u,&untouched_triple)||
+                       memcmp(&untouched_triple,triple_before,
+                              sizeof(triple_before))||
+                       musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+                           scene,UINT64_MAX,&untouched_triple)||
+                       memcmp(&untouched_triple,triple_before,
+                              sizeof(triple_before))||
+                       musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+                           NULL,child,&untouched_triple)||
+                       memcmp(&untouched_triple,triple_before,
+                              sizeof(triple_before))){ok=0;break;}
                     MusaDwgAc1032CirclePrefixProbe untouched_prefix;
                     memset(&untouched_prefix,0xa5,sizeof(untouched_prefix));
                     unsigned char prefix_before[sizeof(untouched_prefix)];
