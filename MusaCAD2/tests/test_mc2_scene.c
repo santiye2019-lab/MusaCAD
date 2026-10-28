@@ -61,6 +61,34 @@ int main(void) {
     assert(appearances[1000].visible && !appearances[n-1].visible);
     large[1023].parent_handle=(uint64_t)n;
     assert(!mc2_scene_resolve_all(large,n,layers,1,0,appearances));
+    /* BYBLOCK must use the immediate parent insertion's resolved RGB,
+     * not the scene's external fallback color. */
+    Mc2SceneItem nested[3]={0};
+    Mc2EntityAppearance nested_out[3]={{0}};
+    for (size_t i=0;i<3;++i) {
+        nested[i].entity.handle=(uint64_t)(i+100);
+        nested[i].entity.kind=MC2_ENTITY_LINE;
+        nested[i].entity.geometry.line.end.x=1;
+        nested[i].own_visible=1;
+        nested[i].parent_handle=i ? (uint64_t)(i+99) : 0;
+        nested[i].color.mode=MC2_COLOR_BY_BLOCK;
+    }
+    nested[0].color=(Mc2Color){0x123456,MC2_COLOR_EXPLICIT};
+    assert(mc2_scene_resolve_all(nested,3,layers,1,0xaabbcc,nested_out));
+    assert(nested_out[0].effective_rgb==0x123456);
+    assert(nested_out[1].effective_rgb==0x123456);
+    assert(nested_out[2].effective_rgb==0x123456);
+    nested[1].color=(Mc2Color){0,MC2_COLOR_BY_LAYER};
+    assert(mc2_scene_resolve_all(nested,3,layers,1,0xaabbcc,nested_out));
+    assert(nested_out[1].effective_rgb==0xffffff);
+    assert(nested_out[2].effective_rgb==0xffffff);
+    nested[0].color=(Mc2Color){0,MC2_COLOR_BY_BLOCK};
+    nested[1].color=(Mc2Color){0,MC2_COLOR_BY_BLOCK};
+    assert(mc2_scene_resolve_all(nested,3,layers,1,0xaabbcc,nested_out));
+    assert(nested_out[2].effective_rgb==0xaabbcc);
+    nested[0].own_visible=0;
+    assert(mc2_scene_resolve_all(nested,3,layers,1,0xaabbcc,nested_out));
+    assert(!nested_out[2].visible && nested_out[2].effective_rgb==0xaabbcc);
     free(appearances);
     free(large);
     return 0;
