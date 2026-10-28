@@ -1072,6 +1072,25 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
     MusaDwgAc1032CircleHTailProfile *out);
 
 
+/* Source-authenticated R2018 OT18 one-reactor H-tail forensic census.
+ * Exactly three raw references are decoded in stream order. Their roles
+ * are NOT inferred from position: reactor, owner and layer identities
+ * remain unverified until independent source graph checks. No paint. */
+typedef struct MusaDwgAc1032CircleReactorHTailProbe {
+    uint64_t indexed_handle,handle_start_bit,handle_end_bit;
+    uint64_t raw_targets[3];
+    uint64_t residual_bits_after_three_refs;
+    uint32_t reactor_count;
+    uint8_t ref_codes[3],ref_counts[3],ref_relative[3];
+    uint8_t zero_tail_padding,one_tail_padding;
+    uint8_t original_record_crc_verified,strict_common_verified;
+    uint8_t owner_layer_roles_verified; /* ALWAYS ZERO */
+    uint8_t final_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleReactorHTailProbe;
+int musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleReactorHTailProbe *out);
+
 /* Narrow source-authenticated R2018 OT18 H(C relative owner) + H5 layer.
  * Both referenced original OT49/OT51 records are independently CRC/OT
  * checked and the OT49 forward child list must contain the same OT18 H.
