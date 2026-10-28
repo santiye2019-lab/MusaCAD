@@ -1,5 +1,6 @@
 #include "mc2_scene.h"
 #include <assert.h>
+#include <stdlib.h>
 int main(void) {
     Mc2SceneItem items[2] = {0};
     Mc2Layer layers[] = {{0,0xffffff,1,0}};
@@ -25,5 +26,42 @@ int main(void) {
     items[1].parent_handle = 1;
     items[1].entity.handle = 1;
     assert(!mc2_scene_resolve(items,2,1,layers,1,0,&a));
+    /* Ancestor layer visibility must propagate into nested inserts. */
+    items[1].entity.handle=2;
+    items[0].entity.layer_id=1;
+    Mc2Layer extended[]={{0,0xffffff,1,0},{1,0x123456,0,0}};
+    Mc2EntityAppearance output[2]={{0xdeadbeef,9},{0xdeadbeef,9}};
+    assert(mc2_scene_resolve_all(items,2,extended,2,0,output));
+    assert(!output[0].visible && !output[1].visible);
+    extended[1].is_on=1;
+    assert(mc2_scene_resolve_all(items,2,extended,2,0,output));
+    assert(output[0].visible && output[1].visible);
+    items[0].parent_handle=2;
+    output[0].effective_rgb=0xdeadbeef;
+    assert(!mc2_scene_resolve_all(items,2,extended,2,0,output));
+    assert(output[0].effective_rgb==0xdeadbeef);
+    items[0].parent_handle=0;
+    /* Long ownership chains must be iterative and indexed, not recursive. */
+    const size_t n=2048;
+    Mc2SceneItem *large=(Mc2SceneItem *)calloc(n,sizeof(*large));
+    Mc2EntityAppearance *appearances=(Mc2EntityAppearance *)calloc(n,sizeof(*appearances));
+    assert(large && appearances);
+    for (size_t i=0;i<n;++i) {
+        large[i].entity.handle=(uint64_t)(i+1);
+        large[i].entity.kind=MC2_ENTITY_LINE;
+        large[i].entity.geometry.line.end.x=1;
+        large[i].color.mode=MC2_COLOR_BY_LAYER;
+        large[i].parent_handle=i?(uint64_t)i:0;
+        large[i].own_visible=1;
+    }
+    assert(mc2_scene_resolve_all(large,n,layers,1,0,appearances));
+    assert(appearances[n-1].visible);
+    large[1023].own_visible=0;
+    assert(mc2_scene_resolve_all(large,n,layers,1,0,appearances));
+    assert(appearances[1000].visible && !appearances[n-1].visible);
+    large[1023].parent_handle=(uint64_t)n;
+    assert(!mc2_scene_resolve_all(large,n,layers,1,0,appearances));
+    free(appearances);
+    free(large);
     return 0;
 }
