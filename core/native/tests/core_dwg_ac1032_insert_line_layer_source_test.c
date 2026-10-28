@@ -68,6 +68,10 @@ static int genuine(const char *filename){
                     if(coverage.child_types[k]==18u&&
                        circle_h>=UINT64_C(0xBE49)&&
                        circle_h<=UINT64_C(0xBE4C)){
+                        fprintf(stderr,"DIAG reactor CIRCLE slot H=%llx block=%llx status=%u\\n",
+                            (unsigned long long)circle_h,
+                            (unsigned long long)coverage.block_header_handle,
+                            coverage.child_status[k]);
                         MusaDwgAc1032CircleReactorHTailProbe triple={0};
                         MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
                         if(coverage.child_status[k]!=
