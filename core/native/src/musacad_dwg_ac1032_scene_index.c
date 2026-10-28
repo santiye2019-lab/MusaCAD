@@ -1627,6 +1627,28 @@ int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
     *out=v;
     return 1;
 }
+/* Source-only OT18 fetch rejection stage, preserving fail-atomic output.
+ * The original CRC-indexed record must be OT18, not merely a guessed
+ * payload address. Stage 4 means the source bytes are authenticated but
+ * the strict common ENTITY prefix is not accepted. */
+int musa_dwg_ac1032_scene_index_circle_decode_stage(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleDecodeStage *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    uint16_t type=0u;
+    if(!musa_dwg_ac1032_scene_index_object_type(s,h,&type)||
+       type!=18u)return 0;
+    uint8_t stage=0u;
+    Payload p={0};
+    if(fetch_staged(s,h,18u,&p,&stage,NULL))free(p.raw);
+    MusaDwgAc1032CircleDecodeStage v={0};
+    v.indexed_handle=h;
+    v.raw_object_type=18u;
+    v.fetch_stage=stage;
+    v.original_record_crc_verified=(uint8_t)(stage>=2u);
+    *out=v;
+    return 1;
+}
 /* Source-authenticated R2018 OT18 H-tail forensic profile.  The first two
  * decoded H references are RAW observations, NOT owner/layer assignments.
  * This records precisely which strict H4/H5 assumption failed, without
