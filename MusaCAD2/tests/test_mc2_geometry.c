@@ -30,6 +30,25 @@ int main(void) {
     assert(mc2_entity_bounds(&e,&b));
     assert(b.min_x >= -1e-12 && fabs(b.max_x-2)<1e-12);
     assert(b.min_y >= -1e-12 && fabs(b.max_y-2)<1e-12);
+    /* Counterclockwise sweep from 270 to 90 degrees crosses zero. */
+    e.geometry.arc.start_radians = 4.71238898038469;
+    e.geometry.arc.end_radians = 1.5707963267948966;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x)<1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(fabs(b.min_y+2)<1e-12 && fabs(b.max_y-2)<1e-12);
+    /* Wider arc includes the west, north and south cardinal extrema. */
+    e.geometry.arc.start_radians = 0.7853981633974483;
+    e.geometry.arc.end_radians = 5.497787143782138;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x+2)<1e-12 && fabs(b.min_y+2)<1e-12);
+    assert(fabs(b.max_y-2)<1e-12);
+    e.geometry.arc.end_radians = e.geometry.arc.start_radians;
+    assert(!mc2_entity_validate(&e));
+    e.geometry.arc.start_radians = 0;
+    e.geometry.arc.end_radians = 6.28318530717958647693;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x+2)<1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(fabs(b.min_y+2)<1e-12 && fabs(b.max_y-2)<1e-12);
     e.geometry.arc.end_radians = NAN;
     assert(!mc2_entity_validate(&e));
     return 0;
