@@ -215,7 +215,8 @@ static int genuine(const char *filename){
                 p.entity_mode,p.reactor_count,p.xdictionary_missing);
             MusaDwgAc1032LWPolylineHTailProbe untouched;
             memset(&untouched,0xa5,sizeof(untouched));
-            const MusaDwgAc1032LWPolylineHTailProbe before=untouched;
+            unsigned char before[sizeof(untouched)];
+            memcpy(before,&untouched,sizeof(before));
             ok=!musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
                      scene,0u,&untouched)&&
                !memcmp(&untouched,&before,sizeof(untouched))&&
@@ -252,7 +253,8 @@ static int genuine(const char *filename){
                 p.entity_mode,p.reactor_count);
             MusaDwgAc1032CircleHTailProfile untouched;
             memset(&untouched,0xa5,sizeof(untouched));
-            const MusaDwgAc1032CircleHTailProfile before=untouched;
+            unsigned char before[sizeof(untouched)];
+            memcpy(before,&untouched,sizeof(before));
             ok=!musa_dwg_ac1032_scene_index_circle_h_tail_profile(
                      scene,0u,&untouched)&&
                !memcmp(&untouched,&before,sizeof(untouched))&&
