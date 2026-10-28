@@ -87,7 +87,8 @@ static int original(const char *filename){
     /* Real, unchanged R2018 CIRCLE children BE49..BE4C belong to
      * INSERT C1A1 / BLOCK_HEADER BE41. This must join original OT49
      * reverse owners, H5 layer, OT18 geometry and the INSERT affine;
-     * a decoded standalone CIRCLE is insufficient. The block has an\n     * unsupported sibling: individual proof is NOT full BLOCK admission. */
+     * a decoded standalone CIRCLE is insufficient. The block has an
+     * unsupported sibling: individual proof is NOT full BLOCK admission. */
     if(ok){
         const uint64_t insert_handle=UINT64_C(0xC1A1);
         double affine[6]={0};
@@ -113,6 +114,36 @@ static int original(const char *filename){
             for(unsigned i=0u;ok&&i<4u;i++)
                 if(actual[i]!=expected[i])ok=0;
         }
+        /* A genuine partial BLOCK must still yield all individually
+         * verified CIRCLE sources, while reporting the unsupported
+         * sibling and never authorizing a complete rendered scene. */
+        MusaDwgAc1032InsertBlockCircleBoundsBatch batch={0};
+        ok=ok&&musa_dwg_ac1032_scene_index_source_block_circle_batch(
+                   scene,insert_handle,&batch)&&
+           batch.original_circle_sources_verified&&
+           !batch.final_visibility_color_and_paint_accepted&&
+           batch.insert_handle==insert_handle&&
+           batch.block_header_handle==UINT64_C(0xBE41)&&
+           batch.unsupported_sibling_count==1u&&batch.circle_count==4u;
+        for(uint32_t i=0u;ok&&i<batch.circle_count;i++){
+            double one[4]={0};
+            ok=batch.circle_handles[i]==UINT64_C(0xBE49)+i&&
+               batch.layer_handles[i]!=0u&&
+               musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+                   scene,insert_handle,batch.circle_handles[i],one);
+            for(unsigned j=0u;ok&&j<4u;j++)
+                if(one[j]!=batch.bounds[i][j])ok=0;
+        }
+        MusaDwgAc1032InsertBlockCircleBoundsBatch rejected;
+        memset(&rejected,0xa5,sizeof(rejected));
+        const MusaDwgAc1032InsertBlockCircleBoundsBatch before_batch=
+            rejected;
+        ok=ok&&!musa_dwg_ac1032_scene_index_source_block_circle_batch(
+                   scene,UINT64_MAX,&rejected)&&
+           !memcmp(&rejected,&before_batch,sizeof(rejected))&&
+           !musa_dwg_ac1032_scene_index_source_block_circle_batch(
+                   NULL,insert_handle,&rejected)&&
+           !memcmp(&rejected,&before_batch,sizeof(rejected));
         double unchanged[4]={9.0,8.0,7.0,6.0};
         const double before[4]={9.0,8.0,7.0,6.0};
         ok=ok&&!musa_dwg_ac1032_scene_index_source_child_circle_bounds(
