@@ -986,6 +986,49 @@ static inline int musa_dwg_ac1032_scene_index_complete_block_line_sources(
     *out=local;
     return 1;
 }
+/* Build a bounded source scene packet from an arbitrary set of original
+ * INSERTs, using only complete reverse-owner BLOCK LINE inventories.
+ * Caller provides INSERT handles from the indexed model; this does not
+ * discover model space or nested INSERTs, nor authorize display. */
+typedef struct MusaDwgAc1032LineSceneItem {
+    uint64_t insert_handle,block_header_handle,line_handle;
+    double xy[4];
+} MusaDwgAc1032LineSceneItem;
+static inline int musa_dwg_ac1032_scene_index_build_line_scene_packet(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    size_t insert_count,MusaDwgAc1032LineSceneItem *items,
+    size_t capacity,size_t *out_count){
+    if(!index||!insert_handles||!insert_count||!out_count||
+       (!items&&capacity))return 0;
+    size_t written=0;
+    /* Preflight all source packets before touching caller output. */
+    for(size_t i=0;i<insert_count;i++){
+        if(!insert_handles[i])return 0;
+        for(size_t j=0;j<i;j++)
+            if(insert_handles[j]==insert_handles[i])return 0;
+        MusaDwgAc1032InsertBlockLineSources packet={0};
+        if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
+               index,insert_handles[i],&packet)||
+           packet.line_count>capacity-written)return 0;
+        written+=packet.line_count;
+    }
+    written=0;
+    for(size_t i=0;i<insert_count;i++){
+        MusaDwgAc1032InsertBlockLineSources packet={0};
+        if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
+               index,insert_handles[i],&packet))return 0;
+        for(uint32_t k=0;k<packet.line_count;k++){
+            MusaDwgAc1032LineSceneItem *dst=&items[written++];
+            dst->insert_handle=insert_handles[i];
+            dst->block_header_handle=packet.block_header_handle;
+            dst->line_handle=packet.child_handles[k];
+            for(unsigned q=0;q<4u;q++)dst->xy[q]=packet.endpoints[k][q];
+        }
+    }
+    *out_count=written;
+    return 1;
+}
+
 
 
 
