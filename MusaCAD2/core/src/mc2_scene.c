@@ -58,14 +58,18 @@ int mc2_scene_resolve_all(const Mc2SceneItem *items, size_t count,
             const size_t k=path[--depth];
             const uint64_t parent=items[k].parent_handle;
             int inherited_visible=1;
+            uint32_t inherited_rgb=parent_block_rgb;
             if (parent) {
                 size_t parent_index=0;
                 if (!find_handle(sorted,count,parent,&parent_index) ||
                     state[parent_index]!=2) goto done;
                 inherited_visible=resolved[parent_index].visible;
+                /* BYBLOCK inherits the actual resolved insertion color,
+                 * including colors inherited by that insertion itself. */
+                inherited_rgb=resolved[parent_index].effective_rgb;
             }
             if (!mc2_resolve_appearance(&items[k].entity,items[k].color,
-                                        layers,layer_count,parent_block_rgb,
+                                        layers,layer_count,inherited_rgb,
                                         inherited_visible && items[k].own_visible,
                                         &resolved[k])) goto done;
             state[k]=2;
