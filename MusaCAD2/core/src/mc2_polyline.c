@@ -61,3 +61,35 @@ int mc2_polyline_signed_area(const Mc2Point2 *vertices,size_t count,
     *out_area=area;
     return 1;
 }
+
+int mc2_polyline_bulge_length(const Mc2Point2 *vertices,
+                              const double *bulges, size_t count,
+                              int closed, double *out_length) {
+    if (!vertices || !count || !out_length) return 0;
+    for (size_t i=0;i<count;++i) {
+        if (!isfinite(vertices[i].x) || !isfinite(vertices[i].y)) return 0;
+    }
+    const size_t edges=(closed && count>1) ? count : count-1;
+    double total=0.0;
+    for (size_t i=0;i<edges;++i) {
+        size_t next=(i+1==count) ? 0 : i+1;
+        double dx=vertices[next].x-vertices[i].x;
+        double dy=vertices[next].y-vertices[i].y;
+        double chord=hypot(dx,dy);
+        double bulge=bulges ? bulges[i] : 0.0;
+        if (!isfinite(chord) || !isfinite(bulge)) return 0;
+        double segment=chord;
+        if (bulge!=0.0) {
+            if (chord==0.0) return 0; /* no defined curved segment */
+            double ab=fabs(bulge);
+            double factor=ab<=1.0 ?
+                (1.0+ab*ab)*(atan(ab)/ab) :
+                (ab+1.0/ab)*atan(ab);
+            segment=chord*factor;
+        }
+        if (!isfinite(segment) || !isfinite(total+segment)) return 0;
+        total+=segment;
+    }
+    *out_length=total;
+    return 1;
+}
