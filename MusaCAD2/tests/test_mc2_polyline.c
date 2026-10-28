@@ -47,5 +47,28 @@ int main(void) {
     const double impossible[]={1.0,0.0};
     assert(!mc2_polyline_bulge_length(coincident,impossible,2,0,&length));
     assert(length==4.0);
+    Mc2Point2 arc_vertices[]={{0,0},{2,0}};
+    double arc_bulges[]={1.0,0.0};
+    Mc2Affine2 identity=mc2_transform_identity();
+    assert(mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&identity,&b));
+    assert(fabs(b.min_x)<1e-12 && fabs(b.max_x-2.0)<1e-12);
+    assert(fabs(b.min_y+1.0)<1e-12 && fabs(b.max_y)<1e-12);
+    assert(mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&t,&b));
+    assert(fabs(b.min_x-10.0)<1e-12 && fabs(b.max_x-11.0)<1e-12);
+    assert(fabs(b.min_y-20.0)<1e-12 && fabs(b.max_y-22.0)<1e-12);
+    arc_bulges[0]=-1.0;
+    assert(mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&identity,&b));
+    assert(fabs(b.min_y)<1e-12 && fabs(b.max_y-1.0)<1e-12);
+    arc_bulges[0]=1e-12;
+    assert(mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&identity,&b));
+    assert(b.min_y<0 && b.max_y>=0);
+    arc_bulges[0]=NAN;
+    b.min_x=-777;
+    assert(!mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&identity,&b));
+    assert(b.min_x==-777);
+    arc_bulges[0]=1.0;
+    assert(mc2_polyline_bulge_bounds(arc_vertices,arc_bulges,2,0,&identity,&b));
+    Mc2Point2 duplicate[]={{1,1},{1,1}};
+    assert(!mc2_polyline_bulge_bounds(duplicate,arc_bulges,2,0,&identity,&b));
     return 0;
 }
