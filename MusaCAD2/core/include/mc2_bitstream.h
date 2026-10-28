@@ -19,6 +19,10 @@ int mc2_read_bits_lsb64(Mc2BitReader *r, unsigned count, uint64_t *out);
 int mc2_seek_bits(Mc2BitReader *r, size_t position);
 int mc2_skip_bits(Mc2BitReader *r, size_t count);
 int mc2_align_byte(Mc2BitReader *r);
+/* DWG bit-coded signed integers (BS and BL). Failed reads are transactional:
+ * neither cursor nor output changes.  Raw payload bytes are little-endian. */
+int mc2_read_dwg_bitshort(Mc2BitReader *r, int16_t *out);
+int mc2_read_dwg_bitlong(Mc2BitReader *r, int32_t *out);
 #ifdef __cplusplus
 }
 #endif
