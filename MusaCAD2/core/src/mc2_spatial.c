@@ -77,7 +77,14 @@ int mc2_entity_world_bounds(const Mc2Entity2 *entity,const Mc2Affine2 *world,Mc2
             if (i>=2) {
                 angle=fmod(angle,tau);
                 if (angle<0) angle+=tau;
-                if (angle<start-1e-14 || angle>end+1e-14) continue;
+                /* Counterclockwise arcs may cross the zero-angle seam.
+                 * A wrapped interval is the union [start,2*pi) U [0,end].
+                 * Keep the existing tolerance for stationary points. */
+                if (start<=end) {
+                    if (angle<start-1e-14 || angle>end+1e-14) continue;
+                } else {
+                    if (angle<start-1e-14 && angle>end+1e-14) continue;
+                }
             }
             double x=transformed_center.x+radius*(world->a*cos(angle)+world->c*sin(angle));
             double y=transformed_center.y+radius*(world->b*cos(angle)+world->d*sin(angle));
