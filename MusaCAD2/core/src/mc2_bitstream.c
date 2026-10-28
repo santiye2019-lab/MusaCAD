@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
+#include <float.h>
+#include <math.h>
+#include <string.h>
 int mc2_bitreader_init(Mc2BitReader *r, const uint8_t *data, size_t length) {
     if (!r || (!data && length) || length > SIZE_MAX / 8u) return 0;
     r->data = data;
@@ -103,6 +106,26 @@ int mc2_read_dwg_bitlong(Mc2BitReader *r, int32_t *out) {
     if (selector == 0 && !mc2_dwg_raw_le(&candidate, 4, &raw)) return 0;
     if (selector == 1 && !mc2_dwg_raw_le(&candidate, 1, &raw)) return 0;
     int32_t value = (int32_t)(raw <= INT32_MAX ? (int64_t)raw : (int64_t)raw - INT64_C(4294967296));
+    *out = value;
+    *r = candidate;
+    return 1;
+}
+
+int mc2_read_dwg_bitdouble(Mc2BitReader *r, double *out) {
+    if (!r || !out || sizeof(double) != 8 || DBL_MANT_DIG != 53 ||
+        FLT_RADIX != 2) return 0;
+    Mc2BitReader candidate = *r;
+    uint32_t selector;
+    if (!mc2_read_bits_msb(&candidate, 2, &selector) || selector == 3) return 0;
+    double value;
+    if (selector == 1) value = 1.0;
+    else if (selector == 2) value = 0.0;
+    else {
+        uint64_t bits;
+        if (!mc2_dwg_raw_le(&candidate, 8, &bits)) return 0;
+        memcpy(&value, &bits, sizeof value);
+        if (!isfinite(value)) return 0;
+    }
     *out = value;
     *r = candidate;
     return 1;
