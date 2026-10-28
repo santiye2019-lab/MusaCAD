@@ -18,3 +18,7 @@ Run standalone MusaCAD2 builds/tests on Linux, Windows and macOS, plus format fi
 A reviewer verifies ledger evidence and CI results. No claim of GPL-free status or commercial relicensing clearance is made until all code, assets and dependencies have passed a complete audit.
 
 **Decision values:** QUARANTINE / REJECT / REIMPLEMENT / APPROVE. **Status values:** PENDING / IN_REVIEW / VERIFIED / TESTED.
+
+## GPL functionality: independent replacement, not derivative code
+
+When a useful working implementation is GPL-licensed or its rights cannot be verified, **do not copy, adapt, translate, or superficially rewrite that implementation**. Preserve the desired functionality as a behavioral requirement, not its source expression. Document inputs, outputs, supported cases, and independent acceptance tests; consult lawfully available format specifications and clean test fixtures. Prefer a separate implementer who has not studied the restricted implementation where practical. Develop original algorithms, data structures, interfaces, and error handling; validate functional equivalence and improvements without transplanting restricted code. Record the replacement as REIMPLEMENT, with evidence of independent authorship and tests. This procedure does not itself certify legal independence; rights review remains mandatory.
