@@ -101,5 +101,56 @@ int main(void){
     assert(!musa_dwg_ac1032_line_common_bytes(full,sizeof(full),
            &full_layout,(MusaDwgAc1032LineCommon*)(void*)full));
 
+    /* R2018 OT18 single-reactor DATA prefix and common numeric source.
+     * A reactor HANDLE is not authenticated here; no BLOCK/paint claim. */
+    uint8_t circle[16]={0};size_t cb=0u;
+    bits(circle,&cb,2u,0u);bits(circle,&cb,8u,18u);
+    bits(circle,&cb,8u,2u);bits(circle,&cb,8u,1u);
+    bits(circle,&cb,8u,0xCAu);bits(circle,&cb,2u,2u);
+    bits(circle,&cb,1u,0u);bits(circle,&cb,2u,0u);
+    bits(circle,&cb,2u,1u);bits(circle,&cb,8u,1u); /* BL reactor=1 */
+    bits(circle,&cb,1u,1u);bits(circle,&cb,1u,0u);
+    assert(cb==51u);
+    bits(circle,&cb,2u,3u); /* ENC ACI BYLAYER */
+    bits(circle,&cb,2u,1u); /* BD linetype scale 1 */
+    bits(circle,&cb,2u,0u);bits(circle,&cb,2u,0u);
+    bits(circle,&cb,2u,0u);bits(circle,&cb,8u,0u);
+    bits(circle,&cb,1u,0u);bits(circle,&cb,1u,0u);
+    bits(circle,&cb,1u,0u);bits(circle,&cb,2u,2u);
+    bits(circle,&cb,8u,29u);
+    assert(cb==82u);
+    MusaDwgAc1032ObjectStreams circle_layout=full_layout;
+    circle_layout.raw_object_type=18u;
+    MusaDwgAc1032EntityPrefix cp={0};
+    assert(musa_dwg_ac1032_entity_prefix_bytes(circle,sizeof(circle),
+        &circle_layout,18u,&cp));
+    assert(cp.prefix_decoded&&cp.reactor_count==1u&&
+           cp.next_color_bit==51u&&cp.entity_mode==0u);
+    MusaDwgAc1032EntityCommon cc={0};
+    assert(musa_dwg_ac1032_entity_common_bytes(circle,sizeof(circle),
+        &circle_layout,18u,&cc));
+    assert(cc.common_decoded&&cc.prefix.reactor_count==1u&&
+           cc.geometry_start_bit==82u&&cc.color_index==256u);
+    const MusaDwgAc1032EntityPrefix saved_cp=cp;
+    const MusaDwgAc1032EntityCommon saved_cc=cc;
+    /* Forged reactor=3 is unsupported and must not change either output. */
+    circle[47u/8u]^=(uint8_t)(1u<<(7u-47u%8u));
+    assert(!musa_dwg_ac1032_entity_prefix_bytes(circle,sizeof(circle),
+        &circle_layout,18u,&cp));
+    assert(!memcmp(&cp,&saved_cp,sizeof(cp)));
+    assert(!musa_dwg_ac1032_entity_common_bytes(circle,sizeof(circle),
+        &circle_layout,18u,&cc));
+    assert(!memcmp(&cc,&saved_cc,sizeof(cc)));
+    circle[47u/8u]^=(uint8_t)(1u<<(7u-47u%8u));
+    /* One-reactor is NOT an exemption for LINE or any other entity. */
+    circle[9u/8u]^=(uint8_t)(1u<<(7u-9u%8u));
+    circle_layout.raw_object_type=19u;
+    assert(!musa_dwg_ac1032_entity_prefix_bytes(circle,sizeof(circle),
+        &circle_layout,19u,&cp));
+    assert(!memcmp(&cp,&saved_cp,sizeof(cp)));
+    assert(!musa_dwg_ac1032_entity_common_bytes(circle,sizeof(circle),
+        &circle_layout,19u,&cc));
+    assert(!memcmp(&cc,&saved_cc,sizeof(cc)));
+
     return 0;
 }
