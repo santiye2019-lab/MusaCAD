@@ -65,6 +65,14 @@ static void test_rejection_is_atomic(void) {
                                           mask,out,7,&written));
     assert(written == 77 && memcmp(out,saved,sizeof out) == 0);
     mask[2] = 1;
+    MusaScene2dLayer invalid_layers[4];
+    memcpy(invalid_layers,layers,sizeof invalid_layers);
+    invalid_layers[2].visible = 2;
+    mask[2] = 0; /* A frozen viewport must not mask malformed input. */
+    assert(!musa_scene2d_resolve_viewport(nodes,7,invalid_layers,4,
+                                          mask,out,7,&written));
+    assert(written == 77 && memcmp(out,saved,sizeof out) == 0);
+    mask[2] = 1;
     assert(!musa_scene2d_resolve_viewport(nodes,7,layers,4,
                                           mask,out,6,&written));
     assert(written == 77 && memcmp(out,saved,sizeof out) == 0);
