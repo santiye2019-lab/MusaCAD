@@ -5,6 +5,7 @@
  * a visibility, BYLAYER/BYBLOCK or final paint acceptance test. */
 #include "musacad_dwg_ac1032_scene_index.h"
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
+#include "musacad_dwg_ac1032_complete_block_line_batch.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,6 +55,7 @@ static int original(const char *filename){
     size_t owner_bulk_positive=0u,owner_bulk_partial_rejected=0u;
     size_t complete_layer_positive=0u,complete_layer_negative=0u;
     size_t complete_layer_partial_rejected=0u;
+    size_t complete_batch_positive=0u,complete_batch_partial_rejected=0u;
     size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -193,6 +195,35 @@ static int original(const char *filename){
                    !complete_lines.original_source_geometry_verified||
                    complete_lines.final_display_accepted||
                    complete_lines.line_count==0u){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineBatch batch={0};
+                if(!musa_dwg_ac1032_complete_block_line_batch(
+                       scene,entry.handle,&batch)||
+                   !batch.original_complete_source_batch_verified||
+                   batch.final_visibility_color_and_paint_accepted||
+                   batch.insert_handle!=entry.handle||
+                   batch.block_header_handle!=coverage.block_header_handle||
+                   batch.line_count!=complete_lines.line_count){
+                    ok=0;break;
+                }
+                for(uint32_t q=0u;q<batch.line_count;q++){
+                    const MusaDwgAc1032CompleteBlockLineLayerSource *row=
+                        &batch.lines[q];
+                    if(row->source.child_handle!=complete_lines.child_handles[q]||
+                       !row->complete_block_reverse_owners_verified||
+                       row->final_display_accepted||
+                       !row->source.source_line_layer_and_owner_verified||
+                       row->source.final_visibility_color_and_paint_accepted){
+                        ok=0;break;
+                    }
+                    const double actual[4]={
+                        row->source.world_start[0],row->source.world_start[1],
+                        row->source.world_end[0],row->source.world_end[1]};
+                    for(unsigned j=0u;j<4u;j++)
+                        if(!near(actual[j],complete_lines.endpoints[q][j]))
+                            ok=0;
+                }
+                if(!ok)break;
+                complete_batch_positive++;
                 owner_bulk_positive++;
                 if(!musa_dwg_ac1032_scene_index_original_insert_block_affine(
                        scene,entry.handle,source_affine)||
@@ -316,6 +347,15 @@ static int original(const char *filename){
                    memcmp(&unchanged_bulk,&before_bulk,sizeof(unchanged_bulk))){
                     ok=0;break;
                 }
+                MusaDwgAc1032CompleteBlockLineBatch unchanged_batch;
+                memset(&unchanged_batch,0xa5,sizeof(unchanged_batch));
+                const MusaDwgAc1032CompleteBlockLineBatch before_batch=
+                    unchanged_batch;
+                if(musa_dwg_ac1032_complete_block_line_batch(
+                       scene,entry.handle,&unchanged_batch)||
+                   memcmp(&unchanged_batch,&before_batch,
+                          sizeof(unchanged_batch))){ok=0;break;}
+                complete_batch_partial_rejected++;
                 owner_bulk_partial_rejected++;
                 for(uint32_t z=0u;z<coverage.child_count;z++){
                     if(coverage.child_types[z]!=19u)continue;
@@ -631,6 +671,9 @@ static int original(const char *filename){
     fprintf(stderr,"DIAG complete-owner bulk LINE: positive=%zu "
                    "partial_rejected=%zu\n",
             owner_bulk_positive,owner_bulk_partial_rejected);
+    fprintf(stderr,"DIAG complete-owner source LINE batch: positive=%zu "
+                   "partial_rejected=%zu\n",
+            complete_batch_positive,complete_batch_partial_rejected);
     fprintf(stderr,"DIAG complete-owner LINE Unicode layer/raw color: "
                    "positive=%zu absent=%zu partial_rejected=%zu\n",
             complete_layer_positive,complete_layer_negative,
@@ -654,6 +697,8 @@ static int original(const char *filename){
              owner_affine_positive>0u&&owner_line_positive>0u&&
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
              owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u&&
+             complete_batch_positive==owner_bulk_positive&&
+             complete_batch_partial_rejected==owner_bulk_partial_rejected&&
              complete_layer_positive>0u&&complete_layer_negative>0u&&
              complete_layer_partial_rejected>0u;
     /* Genuine positive R2018 H12 owner/H5 layer; a BLOCK_HEADER must
