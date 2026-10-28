@@ -111,7 +111,7 @@ static int genuine(const char *filename){
                     }
                     fprintf(stderr,"DIAG genuine OT18 reactor H triple "
                         "H=%llx first=%u/%llx second=%u/%llx "
-                        "third=%u/%llx residual=%llu zero=%u one=%u\\n",
+                        "third=%u/%llx residual=%llu zero=%u one=%u\n",
                         (unsigned long long)child,triple.ref_codes[0],
                         (unsigned long long)triple.raw_targets[0],
                         triple.ref_codes[1],
